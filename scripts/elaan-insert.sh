@@ -1,0 +1,149 @@
+#!/bin/bash
+# Elaan (What's New) insert helper — Task 999
+# Creates a published AppUpdate row so POS/FBR users see the bell badge + popup
+# after a deploy. Run this BEFORE (or after) each deploy.
+#
+# Usage (live — default):
+#   bash scripts/elaan-insert.sh \
+#     --title "Naya update — August 2026" \
+#     --point "Pehla kaam theek hua" \
+#     --point "Doosra feature add kiya" \
+#     [--audience pos|fbr_pos|all]   (default: pos)
+#
+# Usage (dev local DB):
+#   bash scripts/elaan-insert.sh --dev \
+#     --title "Test elaan" \
+#     --point "Test point 1"
+#
+# Rules (from .agents/memory/pos-whats-new-updates.md):
+#   - points MUST be a PHP array on the way in (never a pre-encoded JSON string).
+#   - AppUpdate model's setPointsAttribute handles encoding — just pass the array.
+#   - audience 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
+#   - Editing an existing row does NOT reset seen rows — always create a NEW row.
+#
+# After running, verify the row appeared: check /admin/app-updates on live.
+
+set -uo pipefail
+cd "$(dirname "$0")/.."
+
+KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
+HOST="taxnestc@cpanel.taxnest.com.pk"
+PORT=22
+LIVE_DIR="/home/taxnestc/public_html"
+SSH_OPTS=(-i "$KEY" -p "$PORT" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+
+fail() { echo ""; echo "ELAAN INSERT FAILED: $*" >&2; exit 1; }
+
+# ---------------------------------------------------------- Parse args
+TITLE=""
+AUDIENCE="pos"
+DEV=0
+declare -a POINTS=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --title)    shift; TITLE="$1" ;;
+    --point)    shift; POINTS+=("$1") ;;
+    --audience) shift; AUDIENCE="$1" ;;
+    --dev)      DEV=1 ;;
+    *) echo "Unknown arg: $1" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+[ -n "$TITLE" ] || fail "--title is required"
+[ ${#POINTS[@]} -gt 0 ] || fail "at least one --point is required"
+case "$AUDIENCE" in pos|fbr_pos|all) ;; *) fail "--audience must be pos, fbr_pos, or all" ;; esac
+
+echo ""
+echo "==> Elaan insert: \"$TITLE\" (audience=$AUDIENCE, ${#POINTS[@]} point(s))"
+for P in "${POINTS[@]}"; do echo "    • $P"; done
+echo ""
+
+# ---------------------------------------------------------- Build PHP points array literal
+# Each point is single-quoted for PHP. Single quotes inside the text are escaped.
+PHP_POINTS_ARRAY="array("
+FIRST=1
+for P in "${POINTS[@]}"; do
+  ESCAPED=$(printf '%s' "$P" | sed "s/'/\\\\'/g")
+  if [ $FIRST -eq 1 ]; then
+    PHP_POINTS_ARRAY="${PHP_POINTS_ARRAY}'${ESCAPED}'"
+    FIRST=0
+  else
+    PHP_POINTS_ARRAY="${PHP_POINTS_ARRAY},'${ESCAPED}'"
+  fi
+done
+PHP_POINTS_ARRAY="${PHP_POINTS_ARRAY})"
+
+TITLE_ESCAPED=$(printf '%s' "$TITLE" | sed "s/'/\\\\'/g")
+AUDIENCE_ESCAPED=$(printf '%s' "$AUDIENCE" | sed "s/'/\\\\'/g")
+
+# ---------------------------------------------------------- PHP bootstrap script
+# Runs identically on live (hardcoded LIVE_DIR paths) or dev (relative paths from CWD).
+# GOTCHA: on live the script runs from /tmp so __DIR__ is wrong — we hardcode the path.
+read -r -d '' PHP_SCRIPT <<PHPEOF || true
+<?php
+// Elaan insert helper — Task 999
+// Hardcoded live path (script may run from /tmp via SSH pipe).
+\$base = is_dir('/home/taxnestc/public_html/vendor')
+    ? '/home/taxnestc/public_html'
+    : realpath(__DIR__);
+
+require \$base . '/vendor/autoload.php';
+\$app = require \$base . '/bootstrap/app.php';
+\$kernel = \$app->make(Illuminate\Contracts\Http\Kernel::class);
+\$kernel->bootstrap();
+
+\$points = $PHP_POINTS_ARRAY;
+// Validate: must be a non-empty array of non-blank strings (model rule).
+\$points = array_values(array_filter(array_map('trim', \$points), fn(\$p) => \$p !== ''));
+if (empty(\$points)) {
+    fwrite(STDERR, "ERROR: all points are blank after trim.\n");
+    exit(1);
+}
+
+\$row = App\Models\AppUpdate::create([
+    'title'        => '$TITLE_ESCAPED',
+    'points'       => \$points,   // PHP array — model setter handles JSON encode
+    'audience'     => '$AUDIENCE_ESCAPED',
+    'is_published' => true,
+    'created_by'   => null,
+]);
+
+echo "ELAAN_INSERTED id=" . \$row->id . " title=" . json_encode(\$row->title) . "\n";
+exit(0);
+PHPEOF
+
+# ---------------------------------------------------------- Run
+if [ "$DEV" = "1" ]; then
+  # Dev: run directly with the dev PHP (strips PG env vars to hit MySQL Staging).
+  echo "Running on dev DB (local artisan bootstrap)..."
+  TMP_SCRIPT=$(mktemp /tmp/elaan_insert_XXXXXX.php)
+  printf '%s' "$PHP_SCRIPT" > "$TMP_SCRIPT"
+  env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE \
+    php "$TMP_SCRIPT"
+  DEV_RC=$?
+  rm -f "$TMP_SCRIPT"
+  [ $DEV_RC -eq 0 ] || fail "PHP bootstrap failed on dev (exit $DEV_RC)"
+  echo ""
+  echo "Done. Check /admin/app-updates on dev to verify."
+else
+  # Live: stream the PHP script to live via SSH and run with ea-php84.
+  [ -f "$KEY" ] || fail "SSH key not found at $KEY — can only run on live from the workspace"
+  echo "Streaming bootstrap script to live server..."
+  LIVE_OUT=$(printf '%s' "$PHP_SCRIPT" \
+    | timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" \
+        "cat > /tmp/elaan_insert_$$.php && ea-php84 /tmp/elaan_insert_$$.php; RC=\$?; rm -f /tmp/elaan_insert_$$.php; exit \$RC" \
+    2>&1) || { echo "$LIVE_OUT" >&2; fail "PHP bootstrap failed on live"; }
+  echo "$LIVE_OUT"
+  echo "$LIVE_OUT" | grep -q "ELAAN_INSERTED" \
+    || fail "PHP ran but ELAAN_INSERTED marker missing — check output above"
+  CREATED_ID=$(echo "$LIVE_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
+  echo ""
+  echo "---------------------------------------------------------------"
+  echo "ELAAN OK: AppUpdate row #${CREATED_ID} created on live."
+  echo "          Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
+  echo "          POS bell badge + popup will appear on next page load."
+  echo "          Verify: https://taxnest.com.pk/admin/app-updates"
+  echo "---------------------------------------------------------------"
+fi

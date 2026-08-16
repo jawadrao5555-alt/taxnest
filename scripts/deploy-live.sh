@@ -1,6 +1,6 @@
 #!/bin/bash
 # One-command live (cPanel) deploy for TaxNest.
-# Usage: bash scripts/deploy-live.sh
+# Usage: bash scripts/deploy-live.sh [--no-elaan]
 #
 # Does the FULL runbook from .agents/memory/cpanel-deployment.md:
 #   1. Push workspace HEAD to GitHub main (git push origin HEAD:main)
@@ -12,8 +12,28 @@
 #   3. Verify: live HEAD == workspace HEAD, and homepage curls 200.
 #
 # Fails LOUDLY on any step — no silent half-deploys. Safe to re-run.
+#
+# ELAAN ENFORCEMENT (Task 999):
+#   Every deploy MUST have a What's New announcement (AppUpdate row, audience
+#   pos/all, is_published=1) created since the last deploy marker. If none is
+#   found, the script fails with a loud message BEFORE deploying.
+#
+#   To create an announcement:  bash scripts/elaan-insert.sh --title "..." --point "..."
+#   Emergency bypass (hotfixes): bash scripts/deploy-live.sh --no-elaan
+#
+#   After each successful deploy, a marker is written to:
+#   /home/taxnestc/.taxnest-last-deploy-marker  (format: EPOCH|COMMIT_SHA)
+#   This lets the next deploy know exactly what window to check.
 
 set -uo pipefail
+
+# ---------------------------------------------------------------- Parse flags
+NO_ELAAN=0
+for _arg in "$@"; do
+  case "$_arg" in
+    --no-elaan) NO_ELAAN=1 ;;
+  esac
+done
 cd "$(dirname "$0")/.."
 
 KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
@@ -223,6 +243,178 @@ check_live_logging() {
   return 0
 }
 
+# Task 999: Check that a What's New announcement (AppUpdate, audience pos/all,
+# is_published=1) exists on live that was created AFTER the last deploy marker.
+# Runs after SSH connectivity is confirmed. ALL error paths FAIL LOUDLY unless
+# NO_ELAAN=1 — this is a hard gate, not a best-effort warning.
+#
+# First-use bootstrap: no marker on live → FAIL with instructions. Use
+# --no-elaan on the very first deploy to seed the initial marker; after that
+# every deploy requires an elaan.
+check_elaan_freshness() {
+  step "Preflight: Elaan freshness check (What's New announcement required per deploy)"
+  if [ "$NO_ELAAN" = "1" ]; then
+    echo "" >&2
+    echo "!!! ELAAN SKIPPED (--no-elaan flag) !!!" >&2
+    echo "!!! Acceptable only for: emergency hotfixes OR the very first deploy  !!!" >&2
+    echo "!!! (first-use seeds the marker; future deploys enforce it).          !!!" >&2
+    echo "!!! After this deploy run: bash scripts/elaan-insert.sh               !!!" >&2
+    echo "!!!   --title '...' --point '...'                                     !!!" >&2
+    echo "" >&2
+    return 0
+  fi
+
+  local ELAAN_OUT ELAAN_RC
+  ELAAN_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" bash -s 2>&1 <<'EOFELAAN'
+MARKER_FILE=/home/taxnestc/.taxnest-last-deploy-marker
+if [ ! -f "$MARKER_FILE" ]; then
+  echo "ELAAN_NO_MARKER"
+  exit 0
+fi
+MARKER=$(head -1 "$MARKER_FILE" 2>/dev/null || echo "")
+MARKER_TS=$(echo "$MARKER" | cut -d'|' -f1)
+MARKER_COMMIT=$(echo "$MARKER" | cut -d'|' -f2)
+# Validate that MARKER_TS is a plain integer epoch
+if ! echo "$MARKER_TS" | grep -qE '^[0-9]+$'; then
+  echo "ELAAN_MARKER_PARSE_ERROR content=$(cat /home/taxnestc/.taxnest-last-deploy-marker 2>/dev/null | head -1)"
+  exit 0
+fi
+SINCE=$(date -d "@$MARKER_TS" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
+  || date -r "$MARKER_TS" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
+  || echo "")
+if [ -z "$SINCE" ]; then
+  echo "ELAAN_MARKER_PARSE_ERROR ts=$MARKER_TS"
+  exit 0
+fi
+cd /home/taxnestc/public_html
+DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
+DB_USER=$(grep '^DB_USERNAME=' .env | head -1 | sed 's/^DB_USERNAME=//' | tr -d "\"'")
+DB_PASS=$(grep '^DB_PASSWORD=' .env | head -1 | sed 's/^DB_PASSWORD=//' | tr -d "\"'")
+DB_NAME=$(grep '^DB_DATABASE=' .env | head -1 | sed 's/^DB_DATABASE=//' | tr -d "\"'")
+if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
+  echo "ELAAN_DB_CREDS_MISSING"
+  exit 0
+fi
+COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
+  -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND created_at > '$SINCE'" 2>&1)
+MYSQL_RC=$?
+if [ $MYSQL_RC -ne 0 ] || ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+  echo "ELAAN_DB_ERROR mysql_rc=$MYSQL_RC output=$(echo "$COUNT" | head -1)"
+  exit 0
+fi
+echo "ELAAN_COUNT=$COUNT MARKER_TS=$MARKER_TS MARKER_COMMIT=$MARKER_COMMIT SINCE=$SINCE"
+EOFELAAN
+  )
+  ELAAN_RC=$?
+
+  # SSH itself failed (non-zero exit or empty output from the SSH command).
+  if [ $ELAAN_RC -ne 0 ] || [ -z "$ELAAN_OUT" ]; then
+    echo "" >&2
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+    echo "!!! ELAAN CHECK FAILED — SSH error or empty response (rc=$ELAAN_RC) !!!" >&2
+    echo "!!! Cannot verify announcement without reaching live DB.             !!!" >&2
+    echo "!!! Fix SSH connectivity, then re-run.                               !!!" >&2
+    echo "!!! Emergency only: bash scripts/deploy-live.sh --no-elaan           !!!" >&2
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+    fail "elaan check: SSH failed (rc=$ELAAN_RC) — cannot verify announcement; fix connectivity or use --no-elaan"
+  fi
+
+  case "$ELAAN_OUT" in
+    ELAAN_NO_MARKER*)
+      echo "" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      echo "!!! ELAAN CHECK: NO MARKER FOUND (first deploy with this system)    !!!" >&2
+      echo "!!! The deploy marker file does not exist on live yet.              !!!" >&2
+      echo "!!!                                                                  !!!" >&2
+      echo "!!! Bootstrap procedure (one-time):                                 !!!" >&2
+      echo "!!!   1. bash scripts/deploy-live.sh --no-elaan  (seeds the marker) !!!" >&2
+      echo "!!!   2. bash scripts/elaan-insert.sh --title '...' --point '...'   !!!" >&2
+      echo "!!!   3. From now on: every deploy requires an elaan first.          !!!" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      fail "elaan check: no deploy marker on live — bootstrap with --no-elaan (see message above)"
+      ;;
+    ELAAN_MARKER_PARSE_ERROR*)
+      echo "" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      echo "!!! ELAAN CHECK: MARKER FILE MALFORMED — $ELAAN_OUT" >&2
+      echo "!!! Fix: SSH to live and run:                                        !!!" >&2
+      echo "!!!   printf 'EPOCH|COMMIT\n' > /home/taxnestc/.taxnest-last-deploy-marker  !!!" >&2
+      echo "!!! Or use --no-elaan to re-seed the marker with this deploy.       !!!" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      fail "elaan check: marker file malformed ($ELAAN_OUT) — fix or re-seed with --no-elaan"
+      ;;
+    ELAAN_DB_CREDS_MISSING*)
+      echo "" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      echo "!!! ELAAN CHECK: DB CREDENTIALS MISSING from live .env              !!!" >&2
+      echo "!!! Cannot query app_updates without DB access.                     !!!" >&2
+      echo "!!! Fix live .env (DB_HOST/DB_USERNAME/DB_DATABASE), then re-run.  !!!" >&2
+      echo "!!! Emergency only: bash scripts/deploy-live.sh --no-elaan          !!!" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      fail "elaan check: live DB credentials missing — cannot query app_updates; fix .env or use --no-elaan"
+      ;;
+    ELAAN_DB_ERROR*)
+      echo "" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      echo "!!! ELAAN CHECK: DB QUERY FAILED — $ELAAN_OUT" >&2
+      echo "!!! Cannot verify announcement without DB access.                   !!!" >&2
+      echo "!!! Fix MySQL connectivity on live, then re-run.                   !!!" >&2
+      echo "!!! Emergency only: bash scripts/deploy-live.sh --no-elaan          !!!" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      fail "elaan check: live DB query failed ($ELAAN_OUT) — fix MySQL or use --no-elaan"
+      ;;
+    *ELAAN_COUNT=*)
+      local COUNT MARKER_C SINCE_DT
+      COUNT=$(echo "$ELAAN_OUT" | grep -oE 'ELAAN_COUNT=[0-9]+' | cut -d= -f2)
+      MARKER_C=$(echo "$ELAAN_OUT" | grep -oE 'MARKER_COMMIT=[^ ]+' | cut -d= -f2)
+      SINCE_DT=$(echo "$ELAAN_OUT" | grep -oE 'SINCE=[^ ]+.*' | sed 's/SINCE=//' | sed 's/ MARKER.*//')
+      echo "Last deploy marker: commit ${MARKER_C:-?} at ${SINCE_DT:-?}"
+      if [ "${COUNT:-0}" -ge 1 ] 2>/dev/null; then
+        echo "Elaan check: PASSED ($COUNT published update(s) since last deploy)."
+        return 0
+      else
+        echo "" >&2
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+        echo "!!! ELAAN MISSING — deploy blocked                                 !!!" >&2
+        echo "!!! No published What's New found since: ${SINCE_DT:-?}" >&2
+        echo "!!!                                                                   !!!" >&2
+        echo "!!! POS users will not know what changed. Create elaan first:      !!!" >&2
+        echo "!!!   bash scripts/elaan-insert.sh --title '...' --point '...'     !!!" >&2
+        echo "!!! Then re-run: bash scripts/deploy-live.sh                       !!!" >&2
+        echo "!!!                                                                   !!!" >&2
+        echo "!!! Emergency hotfix only: bash scripts/deploy-live.sh --no-elaan  !!!" >&2
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+        fail "elaan missing — create announcement (scripts/elaan-insert.sh) then redeploy, or use --no-elaan for emergency hotfixes"
+      fi
+      ;;
+    *)
+      echo "" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      echo "!!! ELAAN CHECK: UNEXPECTED REMOTE OUTPUT — cannot verify           !!!" >&2
+      echo "!!! Output: $ELAAN_OUT" >&2
+      echo "!!! Emergency only: bash scripts/deploy-live.sh --no-elaan          !!!" >&2
+      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+      fail "elaan check: unexpected remote output — cannot verify; use --no-elaan for emergencies: $ELAAN_OUT"
+      ;;
+  esac
+}
+
+# Task 999: Record a deploy marker on live after a successful deploy.
+# Format: EPOCH|COMMIT_SHA  →  /home/taxnestc/.taxnest-last-deploy-marker
+# The next deploy's check_elaan_freshness reads this to know the window to check.
+# HARD FAIL if the write does not succeed — without a marker the next deploy's
+# elaan check has no baseline and would fail on "no marker" immediately.
+record_deploy_marker() {
+  local COMMIT="$1"
+  local NOW_TS
+  NOW_TS=$(date +%s)
+  step "Recording deploy marker (${NOW_TS}|${COMMIT})"
+  run_ssh "printf '%s\n' '${NOW_TS}|${COMMIT}' > /home/taxnestc/.taxnest-last-deploy-marker && echo MARKER_WRITTEN" 2>/dev/null \
+    | grep -q "MARKER_WRITTEN" \
+    || fail "deploy marker write FAILED on live — the deploy code is live but the marker was not recorded. Fix manually: SSH to live and run: printf '${NOW_TS}|${COMMIT}\n' > /home/taxnestc/.taxnest-last-deploy-marker — then re-verify the next elaan check will pass."
+  echo "Deploy marker recorded: ${NOW_TS}|${COMMIT} → /home/taxnestc/.taxnest-last-deploy-marker"
+}
+
 [ -f "$KEY" ] || fail "SSH key not found at $KEY"
 
 # ---------------------------------------------------------------- 0. Preflight
@@ -279,6 +471,8 @@ LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
   || fail "cannot reach live server over SSH (or live git repo broken)"
 echo "live HEAD (before): $LIVE_HEAD_BEFORE"
 
+check_elaan_freshness
+
 if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   # cPanel auto-deploy (.cpanel.yml, triggered by pushes to origin main — e.g. task
   # merges) may have already pulled this HEAD. Racing auto-deploys can leave POISONED
@@ -304,6 +498,8 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
 
   check_live_logging
   post_deploy_screen_smoke
+
+  record_deploy_marker "$LOCAL_HEAD"
 
   echo "DEPLOY OK (refresh-only): live already at workspace HEAD; migrate + caches + OPcache refreshed."
   exit 0
@@ -473,9 +669,13 @@ rm -f "$TRIAGE_TMP"
 check_live_logging
 post_deploy_screen_smoke
 
+record_deploy_marker "$LOCAL_HEAD"
+
 echo ""
 echo "---------------------------------------------------------------"
 echo "DEPLOY OK: live HEAD == workspace HEAD ($LOCAL_HEAD)"
 echo "           pull + caches + web OPcache reset done; homepage 200."
+echo "           Next deploy requires a What's New elaan — create one:"
+echo "             bash scripts/elaan-insert.sh --title '...' --point '...'"
 echo "---------------------------------------------------------------"
 exit 0

@@ -261,6 +261,25 @@
         <div class="tb-serial">{{ $transaction->invoice_number }}</div>
     </div>
     @endif
+
+    {{-- Order type badge (mirrors receipt_80mm.blade.php lines 453-468):
+         Dine-In / Take Away / Delivery printed bold + centered so counter staff
+         spot it instantly. Only when the bill carries an order_type (restaurant
+         flow) — retail bills skip. --}}
+    @php
+        $rcptOrderType = match ($transaction->order_type ?? null) {
+            'dine_in'  => 'DINE-IN',
+            'takeaway' => 'TAKE AWAY',
+            'delivery' => 'DELIVERY',
+            default    => null,
+        };
+    @endphp
+    @if($rcptOrderType)
+    <div style="text-align:center; padding:2px 0 3px;">
+        <span style="display:inline-block; border:1.5px solid #000; padding:1px 10px; font-size:11px; font-weight:bold; letter-spacing:1px;">{{ $rcptOrderType }}</span>
+    </div>
+    @endif
+
     {{-- Owner (6 Aug 2026): POS/FBR invoice-numbers ka boxed table hata diya —
          FBR number neeche QR box mein hai, POS invoice number ab details mein. --}}
 

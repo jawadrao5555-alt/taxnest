@@ -3351,7 +3351,9 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company   = Company::find($companyId);
 
-        if (!auth('pos')->user()?->isPosAdmin()) {
+        // Task 818 review: owner/pos_admin ONLY — managers are admin-equivalent
+        // elsewhere (isPosAdmin) but must NOT push bills into the fiscal pipeline.
+        if (!auth('pos')->user()?->canRequeueExemptPra()) {
             return back()->with('error', __('pos.only_owner_requeue_exempt'));
         }
 

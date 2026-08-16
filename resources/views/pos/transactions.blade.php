@@ -263,7 +263,7 @@
                                 {{-- Task 808: Re-queue historical exempt_internal bill for PRA.
                                      Owner/admin only — mirrors artisan pra:requeue-exempt-internal.
                                      Shown on the exempt tab when the bill has no fiscal number yet. --}}
-                                @if($txn->isExemptStream() && !$txn->pra_invoice_number && !$rowIsReturn && auth('pos')->user()?->isPosAdmin())
+                                @if($txn->isExemptStream() && !$txn->pra_invoice_number && !$rowIsReturn && auth('pos')->user()?->canRequeueExemptPra())
                                 <form method="POST" action="{{ route('pos.transaction.requeue-exempt', $txn->id) }}" class="inline"
                                       onsubmit="return confirm(@js(__('pos.confirm_requeue_exempt', ['invoice' => $txn->invoice_number])))">
                                     @csrf

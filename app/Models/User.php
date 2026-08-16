@@ -187,6 +187,19 @@ class User extends Authenticatable
         return $this->pos_role === 'pos_manager';
     }
 
+    /**
+     * PRA re-queue of exempt_internal bills (Tasks 808/818): owner (base role
+     * company_admin) or pos_admin ONLY. pos_manager is deliberately EXCLUDED —
+     * this flips a never-reported bill into the live PRA fiscal pipeline, a
+     * stricter action than the general isPosAdmin() gate (which treats
+     * managers as admin-equivalent). Single truth for the controller guard
+     * AND both Blade surfaces (transactions list + transaction-show).
+     */
+    public function canRequeueExemptPra(): bool
+    {
+        return $this->role === 'company_admin' || $this->pos_role === 'pos_admin';
+    }
+
     public function isPosCashier()
     {
         return $this->pos_role === 'pos_cashier';

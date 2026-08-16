@@ -343,6 +343,9 @@
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">{{ __('pos.offline') }}</span>
                         @elseif($transaction->pra_status === 'local')
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.local_word') }}</span>
+                        @elseif($transaction->pra_status === \App\Models\PosTransaction::EXEMPT_INTERNAL)
+                            {{-- Task 818: all-exempt bill — same EXEMPT badge as the list view --}}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 uppercase">{{ __('pos.exempt_badge') }}</span>
                         @else
                             <span class="text-gray-400">{{ __('pos.local_only') }}</span>
                         @endif
@@ -394,6 +397,25 @@
                     <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         {{ __('pos.retry_pra_submission') }}
+                    </button>
+                </form>
+            </div>
+            @elseif($transaction->pra_status === \App\Models\PosTransaction::EXEMPT_INTERNAL
+                && !$transaction->pra_invoice_number
+                && !$isReturnBill
+                && auth('pos')->user()?->canRequeueExemptPra())
+            {{-- Task 818: owner self-serve re-queue of an exempt_internal bill from the
+                 detail page too — same route/confirm/flash as the transactions-list
+                 (exempt tab) button added in Task 808. Owner/admin only. --}}
+            <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 p-5">
+                <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">{{ __('pos.exempt_word') }} — {{ __('pos.not_submitted_to_pra') }}</h3>
+                <p class="text-xs text-amber-700 dark:text-amber-400 mb-3">{{ __('pos.receipt_exempt_clarifier') }}</p>
+                <form method="POST" action="{{ route('pos.transaction.requeue-exempt', $transaction->id) }}"
+                      onsubmit="return confirm(@js(__('pos.confirm_requeue_exempt', ['invoice' => $transaction->invoice_number])))">
+                    @csrf
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        {{ __('pos.requeue_exempt_btn') }}
                     </button>
                 </form>
             </div>

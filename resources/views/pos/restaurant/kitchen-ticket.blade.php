@@ -295,11 +295,58 @@
             // by renderTransactionKot; order-based KOTs stay unchanged.
             $shimBillToken = $shimBillToken ?? null;
         @endphp
+        @php
+            // Task 993 (owner voice note, 16 Aug 2026): a takeaway/delivery
+            // punched-and-paid on the sale screen already HAS its finalized
+            // bill at KOT render time (billing pass-through links
+            // pos_transaction_id before the post-payment auto-print chain
+            // fires). When NO order-match identifier applies (style 'off', or
+            // 'token' style without a token), the KOT header prints the SAME
+            // number the receipt shows — bill token big (serial as small Ref)
+            // on token-style streams, else the invoice number — REPLACING the
+            // raw ORD- line so counter staff can pair slips at a glance.
+            // 'code' style keeps the full ORD- line (the receipt's code IS its
+            // last segment — that pairing already works; never two competing
+            // numbers). Pre-payment KOTs (dine-in hold / waiter send) have no
+            // linked bill and stay exactly as today; delta/reprint renders of
+            // a paid order resolve the same bill → same number on every slip.
+            // Stream/style resolution mirrors receipt_80mm/58mm (isLocalBill/
+            // isExemptStream + local/pra_number_style). Guarded per PROD
+            // drift convention — any lookup failure = old ORD- behavior.
+            $kotBillToken = null;
+            $kotBillNum = null;
+            try {
+                if ($omToken === null && $shimBillToken === null && $omStyle !== 'code'
+                    && $order->exists && !empty($order->pos_transaction_id)) {
+                    $kotBillTxn = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                        ->where('company_id', $order->company_id)
+                        ->find($order->pos_transaction_id);
+                    if ($kotBillTxn && $kotBillTxn->invoice_number) {
+                        $kotBillNum = $kotBillTxn->invoice_number;
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $kotBillTxn->bill_token) {
+                            $kotBillIsLocal = $kotBillTxn->isLocalBill() || $kotBillTxn->isExemptStream();
+                            $kotBillStyle = $kotBillIsLocal ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
+                            if ($kotBillStyle === 'token') { $kotBillToken = (int) $kotBillTxn->bill_token; }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) { $kotBillToken = null; $kotBillNum = null; }
+        @endphp
         @if($omToken)
             <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
         @elseif($shimBillToken !== null)
             <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $shimBillToken }}</span></p>
             <p class="text-sm bold">{{ __('pos.bill_ref_label') }}: {{ $order->order_number }}</p>
+        @elseif($kotBillToken !== null)
+            {{-- Task 993: paid order, token-style stream — bill token big with the
+                 serial as small Ref, mirroring the receipt + shim-KOT design.
+                 KOT #N rides the token line (delta/reprint sequencing intact). --}}
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $kotBillToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
+            <p class="text-sm bold">{{ __('pos.bill_ref_label') }}: {{ $kotBillNum }}</p>
+        @elseif($kotBillNum)
+            {{-- Task 993: paid order, serial-style stream — the bill's invoice
+                 number replaces the ORD- line (single identifier, owner rule). --}}
+            <p class="text-lg bold mt-1">{{ $kotBillNum }}@if($kotBatchShown) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
         @else
             <p class="text-lg bold mt-1">{{ $order->order_number }}@if($kotBatchShown) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
         @endif

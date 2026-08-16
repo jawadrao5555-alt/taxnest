@@ -732,7 +732,7 @@
     @if($praQr)
     <div class="qr-code">
         <img src="{{ $praQr }}" alt="PRA QR">
-        @if($prefs['show_verify_line'] ?? true)
+        @if($rp['show_verify_line'] ?? true)
         <p>{{ __('pos.receipt_scan_verify_short') }}</p>
         @endif
     </div>

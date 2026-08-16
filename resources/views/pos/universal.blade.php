@@ -6918,14 +6918,14 @@ function restaurantPos() {
             const inc = this.incomingForTable(table);
             if (inc) {
                 if (table.order) {
-                    // Task 781: flag ON = popup skip, order seedha edit mode mein.
-                    // Task 867 (Aug 2026): directOpenTable(table) ko BYPASS karo —
-                    // woh table.order.source check karta hai, lekin table-status poll
-                    // stale ho sakta hai (source='pos' show kare jabke waiter order
-                    // bell-panel mein already hai). Hamesha inc (bell-panel ka fresh
-                    // id) se directly claimAndLoadIncoming karo taake source-mismatch
-                    // race mein waiter order silently skip na ho.
-                    if (this.cart.length === 0) { this.showTablePicker = false; if (this.tableClickDirectOpen) { await this.claimAndLoadIncoming(inc); } else { this.openBoardMenu(table); } return; }
+                    // Task 867 (Aug 2026): table-status poll stale ho sakta hai — table.order
+                    // purana dine-in show kare jabke waiter ka NAYA order bell-panel mein already
+                    // aa chuka ho. inc (incomingOrders se, har 20s refresh) HAMESHA fresher hai.
+                    // Task 940 (Aug 2026): stale occupied + fresh inc → HAMESHA claimAndLoadIncoming
+                    // (tableClickDirectOpen ka check hatao — warna default cashiers ke liye tile
+                    // purple dikhta hai lekin click par openBoardMenu khulta tha, claim hota hi
+                    // nahi tha). Non-empty cart: warning barqarar (cart kabhi silently discard na ho).
+                    if (this.cart.length === 0) { this.showTablePicker = false; await this.claimAndLoadIncoming(inc); return; }
                     this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
                 }
                 await this.claimAndLoadIncoming(inc); return;

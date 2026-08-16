@@ -195,7 +195,70 @@ class FbrPosReceiptSerialWithFiscalTest extends TestCase
         }
     }
 
-    // ── 3. LOCAL / PROVISIONAL — unchanged (big serial badge, no FBR line) ──
+    // ── 3. OFFLINE — .local-badge prints with serial, no FBR fiscal line ───
+
+    /**
+     * Offline FBR bill (fbr_status='offline') — internet was unavailable at
+     * sale time so no FBR fiscal number has been assigned yet.  The template
+     * must render a .local-badge block and the shop's own serial must appear
+     * INSIDE that block so the printed slip is never number-less.
+     *
+     * Invariants locked (both paper widths — single FBR template, $is58 switch):
+     *   • .local-badge block is present
+     *   • serial appears inside the .local-badge content
+     *   • NO "FBR:" fiscal line (no fiscal number to show)
+     */
+    public function test_offline_bill_prints_local_badge_with_serial_no_fiscal_line(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            // fbr_status='offline', fbr_invoice_number=null — fiscal not yet assigned.
+            $txn = $this->makeTransaction($company, 'offline', null);
+
+            $body = $this->renderBody($company, $txn);
+
+            // .local-badge block must be present (the offline indicator).
+            $this->assertStringContainsString(
+                'local-badge',
+                $body,
+                ".local-badge block renders for offline FBR bill ({$paper})"
+            );
+
+            // Serial must appear INSIDE the .local-badge block — not just
+            // somewhere in the body (e.g. the details table above).
+            $badgeStart = strpos($body, 'local-badge');
+            $this->assertNotFalse($badgeStart, ".local-badge found ({$paper})");
+            $badgeOpen  = strpos($body, '>', $badgeStart);
+            $badgeClose = strpos($body, '</div>', $badgeOpen);
+            $badgeContent = substr($body, $badgeOpen + 1, $badgeClose - $badgeOpen - 1);
+            $this->assertStringContainsString(
+                self::SERIAL,
+                $badgeContent,
+                "serial appears inside .local-badge for offline FBR bill ({$paper})"
+            );
+
+            // The FBR-specific offline sync copy must appear (not the PRA wording).
+            $this->assertStringContainsString(
+                __('pos.receipt_offline_sync_fbr'),
+                $body,
+                "FBR offline sync copy prints ({$paper})"
+            );
+            $this->assertStringNotContainsString(
+                __('pos.receipt_offline_sync_auto'),
+                $body,
+                "PRA offline sync copy must NOT appear on FBR receipt ({$paper})"
+            );
+
+            // No FBR fiscal line — there is no fiscal number to show yet.
+            $this->assertStringNotContainsString(
+                'FBR: ',
+                $body,
+                "no FBR fiscal line on offline bill ({$paper})"
+            );
+        }
+    }
+
+    // ── 4. LOCAL / PROVISIONAL — unchanged (big serial badge, no FBR line) ──
 
     public function test_local_provisional_bill_keeps_top_badge_serial_only(): void
     {

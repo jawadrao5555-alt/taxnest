@@ -91,6 +91,9 @@
         .fbr-badge { border: 1.5px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 10px; overflow: hidden; color: #000; font-weight: 600; }
         .fbr-badge .fbr-title { font-size: 12px; font-weight: bold; margin-bottom: 3px; color: #000; }
         .fbr-badge .fbr-number { font-size: 9px; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
+        {{-- .local-badge (Task 824): offline FBR badge — dashed border mirrors the
+             PRA receipt .local-badge; same visual language, FBR-specific copy. --}}
+        .local-badge { border: 1.5px dashed #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 10px; color: #000; font-weight: 600; }
         .footer { margin-top: 4px; font-size: 10px; line-height: 1.5; color: #000; font-weight: 600; }
 
         @media print {
@@ -394,6 +397,17 @@
         @if($rd['show_verify_line'] ?? true)
         <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
         @endif
+    </div>
+    @elseif($transaction->fbr_status === 'offline')
+    {{-- OFFLINE badge (Task 824): bill was created while internet was unavailable;
+         FBR fiscal number not yet assigned.  Mirrors the PRA .local-badge pattern:
+         heading + sync note + serial.  .local-badge class uses the same dashed
+         border style so cashiers recognise it immediately.  The serial MUST appear
+         inside this block so the printed slip is never number-less. --}}
+    <div class="local-badge">
+        {{ __('pos.receipt_offline_invoice') }}<br>
+        {{ __('pos.receipt_offline_sync_fbr') }}<br>
+        {{ $transaction->invoice_number }}
     </div>
     @elseif(!$fbrRcptTopBadge)
     <div class="fbr-badge" style="border-style: dashed;">

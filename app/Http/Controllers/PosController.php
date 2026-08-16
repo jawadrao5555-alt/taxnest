@@ -4605,6 +4605,14 @@ class PosController extends Controller
             }
         }
 
+        // Order type filter (Task 977): dine_in / takeaway / delivery —
+        // only meaningful for restaurant-mode companies; plain retail bills
+        // have NULL order_type and won't appear when a specific type is selected.
+        $validOrderTypes = ['dine_in', 'takeaway', 'delivery'];
+        if ($request->filled('order_type') && in_array($request->order_type, $validOrderTypes, true)) {
+            $query->where('order_type', $request->order_type);
+        }
+
         // Wastage filter (Task 593): only wastage-flagged return bills —
         // spoiled goods whose stock was NOT restored. Schema-drift guarded.
         if ($request->boolean('wastage') && \Schema::hasColumn('pos_transactions', 'is_wastage')) {
@@ -4623,7 +4631,7 @@ class PosController extends Controller
         $hasPinSet = !empty($company->confidential_pin);
         $localCount = 0;
 
-        return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user'));
+        return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user', 'company'));
     }
 
     /**

@@ -113,6 +113,14 @@
                 <option value="credit_card" {{ request('payment_method') === 'credit_card' ? 'selected' : '' }}>{{ __("pos.credit_card") }}</option>
                 <option value="qr_payment" {{ request('payment_method') === 'qr_payment' ? 'selected' : '' }}>{{ __("pos.qr_raast") }}</option>
             </select>
+            @if(!empty($company->restaurant_mode))
+            <select name="order_type" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                <option value="">{{ __("pos.all_order_types") }}</option>
+                <option value="dine_in"   {{ request('order_type') === 'dine_in'   ? 'selected' : '' }}>{{ __("pos.ot_dine_in") }}</option>
+                <option value="takeaway"  {{ request('order_type') === 'takeaway'  ? 'selected' : '' }}>{{ __("pos.ot_takeaway") }}</option>
+                <option value="delivery"  {{ request('order_type') === 'delivery'  ? 'selected' : '' }}>{{ __("pos.ot_delivery") }}</option>
+            </select>
+            @endif
             <input type="date" name="date_from" value="{{ request('date_from') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <input type="date" name="date_to" value="{{ request('date_to') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <div class="flex items-center gap-3">

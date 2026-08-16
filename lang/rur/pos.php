@@ -2277,6 +2277,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'original_cart_snapshot_hint' => 'Asli cart audit snapshot ke liye save hai. Totals auto-recalculate ho jayenge.',
     'original_invoice_colon' => 'Original invoice:',
     'original_total_colon' => 'Original total:',
+    'all_order_types' => 'Sab Order Types',
     'ot_delivery' => 'DELIVERY',
     'ot_dine_in' => 'DINE IN',
     'ot_takeaway' => 'TAKEAWAY',

@@ -2277,6 +2277,7 @@ return [
     'original_cart_snapshot_hint' => 'اصل کارٹ آڈٹ اسنیپ شاٹ کے طور پر محفوظ ہے۔ ٹوٹل خود بخود ری-کیلکولیٹ ہو جائیں گے۔',
     'original_invoice_colon' => 'اصل رسید:',
     'original_total_colon' => 'اصل ٹوٹل:',
+    'all_order_types' => 'تمام آرڈر اقسام',
     'ot_delivery' => 'ڈیلیوری',
     'ot_dine_in' => 'ڈائن اِن',
     'ot_takeaway' => 'ٹیک اوے',

@@ -792,6 +792,9 @@ class PosRiderController extends Controller
         if ($newStatus === 'returned') {
             $bills = $openQuery()->orderBy('id')->get();
             if ($bills->isEmpty()) {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'No open deliveries for ' . $rider->name . '.'], 422);
+                }
                 return back()->with('error', 'No open deliveries for ' . $rider->name . '.');
             }
             $wastage = $request->boolean('wastage');
@@ -816,6 +819,9 @@ class PosRiderController extends Controller
             ));
 
         if ($count === 0) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'No open deliveries for ' . $rider->name . '.'], 422);
+            }
             return back()->with('error', 'No open deliveries for ' . $rider->name . '.');
         }
 

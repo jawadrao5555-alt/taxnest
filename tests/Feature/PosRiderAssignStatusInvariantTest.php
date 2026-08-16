@@ -164,6 +164,19 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         return $this->controller()->bulkStatus($this->makeRequest('/pos/deliveries/rider/' . $riderId . '/bulk-status', ['delivery_status' => $status]), $riderId);
     }
 
+    private function bulkStatusJson(int $riderId, string $status)
+    {
+        $this->actAs();
+        $request = Request::create(
+            '/pos/deliveries/rider/' . $riderId . '/bulk-status',
+            'POST',
+            ['delivery_status' => $status],
+            [], [], ['HTTP_ACCEPT' => 'application/json']
+        );
+        $request->setLaravelSession(app('session.store'));
+        return $this->controller()->bulkStatus($request, $riderId);
+    }
+
     private function tx(int $id): object
     {
         return DB::table('pos_transactions')->where('id', $id)->first();
@@ -581,6 +594,87 @@ class PosRiderAssignStatusInvariantTest extends TestCase
 
         // Fiscal identity byte-for-byte unchanged.
         $this->assertFiscalIdentityUnchanged($before, $bill);
+    }
+
+    // ── 8. bulkStatus JSON path: no open bills → JSON error, riderless untouched ─
+
+    /**
+     * Task 825: bulkStatus() already scopes to rider_id = $rider->id, so a
+     * rider with no open bills matches zero rows.  When the caller sends
+     * Accept: application/json (the sale-screen panel fetch path) the response
+     * must be a JsonResponse with success:false — not a redirect and not a 500.
+     *
+     * Two sub-cases are tested (delivered + returned) because the two code
+     * paths inside bulkStatus() differ: delivered uses a bulk UPDATE, returned
+     * iterates a collection; both now share the same wantsJson() guard.
+     */
+    public function test_bulk_status_json_path_no_open_bills_returns_json_error_for_delivered(): void
+    {
+        $rider = $this->makeRider();
+
+        // Riderless bill that happens to be in the right delivery state —
+        // it must NOT be matched, and its fiscal identity must be unchanged.
+        $riderless = $this->makeBill(null, [
+            'invoice_number'     => 'POS-2026-82501',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'pra_invoice_number' => 'PRA-82501',
+            'delivery_status'    => 'dispatched',
+            'rider_settlement_id' => null,
+        ]);
+        $before = $this->tx($riderless);
+
+        // Act — JSON-flavoured bulkStatus for 'delivered' with no open rider bills.
+        $response = $this->bulkStatusJson($rider, 'delivered');
+
+        // Must be a JsonResponse (not a redirect object).
+        $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
+
+        // Must signal failure.
+        $body = $response->getData(true);
+        $this->assertFalse(
+            (bool) ($body['success'] ?? false),
+            'bulkStatus JSON must return success:false when rider has no open bills'
+        );
+        $this->assertArrayHasKey('message', $body, 'JSON error body must include a message key');
+
+        // Riderless bill: delivery_status and fiscal identity untouched.
+        $this->assertSame('dispatched', $this->tx($riderless)->delivery_status, 'riderless bill delivery_status must be unchanged');
+        $this->assertFiscalIdentityUnchanged($before, $riderless);
+    }
+
+    public function test_bulk_status_json_path_no_open_bills_returns_json_error_for_returned(): void
+    {
+        $rider = $this->makeRider();
+
+        // Riderless bill in 'assigned' state — must never be touched.
+        $riderless = $this->makeBill(null, [
+            'invoice_number'     => 'POS-2026-82502',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'pra_invoice_number' => 'PRA-82502',
+            'delivery_status'    => 'assigned',
+            'rider_settlement_id' => null,
+        ]);
+        $before = $this->tx($riderless);
+
+        // Act — JSON-flavoured bulkStatus for 'returned' with no open rider bills.
+        $response = $this->bulkStatusJson($rider, 'returned');
+
+        // Must be a JsonResponse (not a redirect).
+        $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
+
+        // Must signal failure.
+        $body = $response->getData(true);
+        $this->assertFalse(
+            (bool) ($body['success'] ?? false),
+            'bulkStatus JSON must return success:false when rider has no open bills (returned path)'
+        );
+        $this->assertArrayHasKey('message', $body, 'JSON error body must include a message key');
+
+        // Riderless bill: delivery_status and fiscal identity untouched.
+        $this->assertSame('assigned', $this->tx($riderless)->delivery_status, 'riderless bill delivery_status must be unchanged');
+        $this->assertFiscalIdentityUnchanged($before, $riderless);
     }
 
     /**

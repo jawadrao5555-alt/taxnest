@@ -1477,6 +1477,9 @@ class RestaurantPosController extends Controller
                 Log::warning('Audit log failed: ' . $e->getMessage());
             }
 
+            // Task 1036: WhatsApp Bill extras ride the pay response (no extra
+            // client fetch) — nulls when feature off / no routable number.
+            $waShare = $transaction->waBillPayload($company);
             return response()->json([
                 'success' => true,
                 'message' => "Payment received. Invoice: {$invoiceNumber}",
@@ -1485,6 +1488,8 @@ class RestaurantPosController extends Controller
                 'total_amount' => $totalAmount,
                 'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
                 'pra_status' => $transaction->pra_status ?? null,
+                'wa_phone' => $waShare['wa_phone'],
+                'share_url' => $waShare['share_url'],
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -1576,6 +1581,9 @@ class RestaurantPosController extends Controller
             Log::warning('[PAY] Replay ghost tidy failed: ' . $e->getMessage());
         }
         Log::info('[PAY] Replayed by pay_uuid', ['transaction_id' => $existingTxn->id, 'pay_uuid' => $payUuid]);
+        // Task 1036: replay = the SAME canonical success payload — WhatsApp
+        // extras included so a lost-response retry still offers the button.
+        $waShare = $existingTxn->waBillPayload(Company::find($companyId));
         return response()->json([
             'success' => true,
             'replayed' => true,
@@ -1586,6 +1594,8 @@ class RestaurantPosController extends Controller
             'total_amount' => (float) $existingTxn->total_amount,
             'pra_invoice_number' => $existingTxn->pra_invoice_number,
             'pra_status' => $existingTxn->pra_status,
+            'wa_phone' => $waShare['wa_phone'],
+            'share_url' => $waShare['share_url'],
         ]);
     }
 

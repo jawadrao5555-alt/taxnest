@@ -71,6 +71,8 @@ class Company extends Model
         'pos_cashier_dayclose',
         'pos_cashier_order_cancel',
         'pos_cash_received_enabled',
+        'pos_whatsapp_bill_enabled',
+        'pos_whatsapp_bill_auto_open',
         'pra_reporting_enabled',
         'pos_integration_mode',
         'kds_enabled',
@@ -419,6 +421,7 @@ class Company extends Model
             'pos_guided_flow_enabled', 'pos_quick_type_enabled', 'default_language',
             'pos_receipt_autoclose_seconds', 'invoice_display_prefs', 'feature_flags',
             'pos_cash_received_enabled',
+            'pos_whatsapp_bill_enabled', 'pos_whatsapp_bill_auto_open',
             // Tax / pricing
             'standard_tax_rate', 'pos_tax_rate_cash', 'pos_tax_rate_card',
             'pos_tax_inclusive', 'pos_tax_pricing_mode', 'pos_product_search_mode',

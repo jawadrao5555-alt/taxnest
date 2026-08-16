@@ -4673,4 +4673,17 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'caller_id_last_event' => 'Last call event',
     'caller_id_download' => 'Download Caller ID App (Beta)',
     'caller_id_download_hint' => 'Install on the shop\'s Android phone, sign in with your admin login and allow notification access.',
+
+    // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
+    'wa_bill_toggle' => 'WhatsApp Bill',
+    'wa_bill_toggle_sub' => 'Show a WhatsApp button on the receipt popup — send the customer their bill and receipt link in one tap.',
+    'wa_bill_auto_open' => 'Auto-open WhatsApp after bill',
+    'wa_bill_auto_open_sub' => 'Open the WhatsApp chat automatically as soon as a final bill is made (if the browser blocks it, the button lights up instead).',
+    'wa_bill_btn' => 'WhatsApp Bill',
+    'ti_wa_bill' => 'Send bill on WhatsApp',
+    'wa_msg_receipt' => 'Receipt',
+    'wa_msg_thanks' => 'Thank you! Please visit again.',
+    'wa_popup_blocked' => 'Browser blocked the WhatsApp window — tap the green WhatsApp button.',
+    'wa_link_failed' => 'Could not create the receipt link — please try again.',
+    'wa_share_not_allowed' => 'Share link is only available for final bills.',
 ];

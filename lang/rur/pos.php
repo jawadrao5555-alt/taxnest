@@ -4673,4 +4673,17 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_id_last_event' => 'Aakhri call event',
     'caller_id_download' => 'Caller ID App Download Karein (Beta)',
     'caller_id_download_hint' => 'Shop ke Android phone par install karein, apne admin login se sign in kar ke notification access dein.',
+
+    // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
+    'wa_bill_toggle' => 'WhatsApp Bill',
+    'wa_bill_toggle_sub' => 'Receipt popup par WhatsApp button — customer ko bill aur receipt link aik tap mein bhejein.',
+    'wa_bill_auto_open' => 'Bill ke baad WhatsApp khud khule',
+    'wa_bill_auto_open_sub' => 'Final bill bante hi WhatsApp chat khud khul jaye (browser rokay to button roshan ho jata hai).',
+    'wa_bill_btn' => 'WhatsApp Bill',
+    'ti_wa_bill' => 'WhatsApp par bill bhejein',
+    'wa_msg_receipt' => 'Receipt',
+    'wa_msg_thanks' => 'Shukriya! Phir tashreef layen.',
+    'wa_popup_blocked' => 'Browser ne WhatsApp window rok di — green WhatsApp button dabayen.',
+    'wa_link_failed' => 'Receipt link nahi ban saka — dobara koshish karein.',
+    'wa_share_not_allowed' => 'Share link sirf final bills ke liye milta hai.',
 ];

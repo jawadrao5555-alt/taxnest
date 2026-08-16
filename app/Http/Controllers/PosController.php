@@ -139,6 +139,39 @@ class PosController extends Controller
     }
 
     /**
+     * Task 1036 — WhatsApp Bill settings (owner voice note 17 Aug 2026).
+     * Two flags on one endpoint (send only the key you're flipping):
+     *  - enabled:   receipt popup par WhatsApp Bill button (default ON)
+     *  - auto_open: final bill ban'te hi WhatsApp window khud khule (default OFF;
+     *               popup-block hone par button highlighted fallback rehta hai).
+     */
+    public function toggleWhatsappBill(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+        // Prod schema drift guard — never pretend to save into a missing column.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+            || !\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_auto_open')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
+        }
+        $update = [];
+        if ($request->has('enabled')) {
+            $update['pos_whatsapp_bill_enabled'] = $request->boolean('enabled');
+        }
+        if ($request->has('auto_open')) {
+            $update['pos_whatsapp_bill_auto_open'] = $request->boolean('auto_open');
+        }
+        if (!$update) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 422);
+        }
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update($update);
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Tax-Inclusive Pricing (Menu-Rate-Final) mode toggle — admin-only.
      * Applies to NEW bills only: existing bills keep their own tax_inclusive
      * snapshot, so history/reports/PRA payloads never shift retroactively.
@@ -2687,6 +2720,9 @@ class PosController extends Controller
         // callers (pos/create-invoice.blade.php) continue to receive the
         // traditional redirect-with-flash response.
         if ($request->wantsJson()) {
+            // Task 1036: WhatsApp Bill extras ride the pay response (no extra
+            // client fetch) — nulls when feature off / no routable number.
+            $waShare = $transaction->waBillPayload($company);
             return response()->json([
                 'success' => true,
                 'transaction_id' => $transaction->id,
@@ -2697,6 +2733,8 @@ class PosController extends Controller
                 // Task 646: true = waiter order already settled server-side;
                 // the client skips its completeIncomingOrder fallback call.
                 'waiter_order_settled' => $waiterOrderSettled,
+                'wa_phone' => $waShare['wa_phone'],
+                'share_url' => $waShare['share_url'],
                 'message' => $successMessage,
             ]);
         }
@@ -3840,7 +3878,14 @@ class PosController extends Controller
             })
             ->orderBy('id', 'desc')
             ->limit(300)
-            ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
+            ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'customer_phone', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
+
+        // Task 1036: WhatsApp Bill from the Reprint list — per-bill routable
+        // number (null when feature off / unroutable → client hides the action).
+        $company = Company::find($companyId);
+        $waBillOn = $company
+            && \Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+            && $company->pos_whatsapp_bill_enabled;
 
         // Table name per bill (dine-in): batch lookup via restaurant_orders →
         // restaurant_tables so the Reprint list can show "Dine-in • Table 5".
@@ -3858,7 +3903,7 @@ class PosController extends Controller
                 ->all();
         }
 
-        $data = $bills->map(function ($b) use ($tableByTx) {
+        $data = $bills->map(function ($b) use ($tableByTx, $waBillOn) {
             // Badge resolution mirrors the Transactions-page tab split: the
             // ACTUAL PRA outcome decides, not invoice_mode alone.
             if (!empty($b->pra_invoice_number)) {
@@ -3886,6 +3931,11 @@ class PosController extends Controller
                 'badge'              => $badge,
                 'created_time'       => $b->created_at?->format('h:i A'),
                 'created_human'      => $b->created_at?->diffForHumans(),
+                // Task 1036: normalized WhatsApp number (share link mints on
+                // demand). FINAL bills only — a deliberate provisional is still
+                // editable, so it must never be WhatsApp-shareable ($badge
+                // mirrors exactly what the row shows the cashier).
+                'wa_phone'           => ($waBillOn && $badge !== 'provisional') ? \App\Services\PkPhone::normalize($b->customer_phone) : null,
             ];
         });
 
@@ -4217,6 +4267,11 @@ class PosController extends Controller
         }
 
         // ── Post-commit: PRA submission happens STRICTLY outside the transaction ──
+        // Task 1036: promoted bill is now FINAL — WhatsApp Bill extras ride every
+        // success variant below (delivery-clear/promote is a final-bill path too).
+        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
+        $waShare = $tx ? $tx->waBillPayload($company) : ['wa_phone' => null, 'share_url' => null];
+
         if (!$reportingOn) {
             return response()->json([
                 'success'        => true,
@@ -4225,10 +4280,10 @@ class PosController extends Controller
                 'total_amount'   => $newTotal,
                 'message'        => __('pos.bill_now_final_pra_off_amount', ['number' => $newNumber, 'amount' => number_format($newTotal)]),
                 'id'             => $id,
+                'wa_phone'       => $waShare['wa_phone'],
+                'share_url'      => $waShare['share_url'],
             ]);
         }
-
-        $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
 
         // Agent Sync mode: just leave it queued — desktop agent picks it up within 10s.
         if ($company->agentHandlesPra()) {
@@ -4239,6 +4294,8 @@ class PosController extends Controller
                 'total_amount'   => $newTotal,
                 'message'        => __('pos.bill_requeued_agent', ['number' => $newNumber]),
                 'id'             => $id,
+                'wa_phone'       => $waShare['wa_phone'],
+                'share_url'      => $waShare['share_url'],
             ]);
         }
 
@@ -4256,6 +4313,8 @@ class PosController extends Controller
                     'message'        => __('pos.pra_submission_successful_num', ['number' => $tx->pra_invoice_number ?? 'N/A']),
                     'pra_number'     => $tx->pra_invoice_number,
                     'id'             => $id,
+                    'wa_phone'       => $waShare['wa_phone'],
+                    'share_url'      => $waShare['share_url'],
                 ]);
             }
 
@@ -4869,6 +4928,22 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
 
+        // Task 1036 (review-locked): public receipt links are FINAL-bill only.
+        // A deliberate provisional (pra_status='local') is still editable /
+        // deletable — never mint a public token for it, even for an
+        // authenticated same-company POST. The company WhatsApp-Bill toggle
+        // also gates minting; missing column fails OPEN (feature default is
+        // ON — prod schema drift must not kill the pre-existing Share button).
+        $company = Company::find($companyId);
+        $shareOn = !\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+            || (bool) ($company?->pos_whatsapp_bill_enabled ?? true);
+        if (!$shareOn || $transaction->isDeliberateProvisional()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.wa_share_not_allowed'),
+            ], 422);
+        }
+
         if (!$transaction->share_token) {
             $transaction->update([
                 'share_token' => bin2hex(random_bytes(32)),
@@ -4893,6 +4968,16 @@ class PosController extends Controller
 
         if ($transaction->share_token_created_at && $transaction->share_token_created_at < now()->subDays(30)) {
             abort(410, 'This share link has expired.');
+        }
+
+        // Task 1036 (review-locked): a deliberate provisional is still editable —
+        // even a legacy/pre-hardening token for one must never render publicly.
+        // (Promotion clears pra_status='local', so the same token starts working
+        // the moment the bill becomes final.) Direct response, NOT abort(404):
+        // the global NotFound renderable would 302 a pos/* path to /pos/login,
+        // which is wrong for a public customer-facing link.
+        if ($transaction->isDeliberateProvisional()) {
+            return response('This share link is no longer available.', 404);
         }
 
         $company = Company::find($transaction->company_id);

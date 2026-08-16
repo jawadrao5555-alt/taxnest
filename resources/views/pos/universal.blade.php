@@ -2820,6 +2820,17 @@ window.addEventListener('popstate', function() {
                                 <template x-if="bill.customer_name"><span x-text="' • ' + bill.customer_name"></span></template>
                                 <template x-if="bill.payment_method"><span class="uppercase" x-text="' • ' + bill.payment_method.replace('_', ' ')"></span></template>
                             </p>
+                            {{-- Task 1036: WhatsApp Bill — purana bill dobara bhejna (share link
+                                 on-demand mint hota hai). Sirf routable number wale bills par. --}}
+                            <template x-if="bill.wa_phone">
+                                <span @click.stop="waShareReprint(bill)"
+                                      class="text-[10px] font-bold text-green-600 hover:text-green-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 mr-1"
+                                      title="{{ __('pos.ti_wa_bill') }}">
+                                    <svg x-show="waReprintBusyId !== bill.id" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                    <svg x-show="waReprintBusyId === bill.id" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                    WA
+                                </span>
+                            </template>
                             {{-- Preview eye (ZFC, 30 Jul 2026): dekh kar print — row click = foran
                                  print barqarar. span (not button) — row itself is a <button>. --}}
                             {{-- pointer-only (review 30 Jul 2026): NOT focusable — row <button>
@@ -2871,6 +2882,13 @@ window.addEventListener('popstate', function() {
                 </template>
             </div>
             <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-end gap-2 flex-shrink-0">
+                {{-- Task 1036: WhatsApp Bill from the preview footer too --}}
+                <template x-if="reprintPreviewBill && reprintPreviewBill.wa_phone">
+                    <button @click="waShareReprint(reprintPreviewBill)" :disabled="waReprintBusyId === reprintPreviewBill.id" class="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 rounded-xl transition flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        {{ __('pos.wa_bill_btn') }}
+                    </button>
+                </template>
                 <button @click="reprintPreviewBill = null" class="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">{{ __('pos.close_btn_ur') }}</button>
                 <button @click="reprintBill(reprintPreviewBill); reprintPreviewBill = null" class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -3603,6 +3621,17 @@ window.addEventListener('popstate', function() {
             {{-- Persistent action bar: Print | KOT | New Sale | Close. Print/KOT fire prints      --}}
             {{-- but popup STAYS OPEN so cashier can verify, reprint, or take other actions.       --}}
             <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+                {{-- Task 1036: WhatsApp Bill (owner voice note 17 Aug 2026) — sirf jab bill par
+                     routable customer number + share link ho (warna chhupa; khali wa.me kabhi nahi).
+                     Auto-open popup-block ho to yehi button pulse-highlight fallback ban jata hai. --}}
+                <button x-show="waBillEnabled && lastWaPhone && lastShareUrl && !lastIsOffline" x-cloak
+                    @click="openWaBill()"
+                    class="w-full mb-2 py-3 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-2"
+                    :class="waHighlight ? 'ring-4 ring-green-300 animate-pulse' : ''"
+                    title="{{ __('pos.ti_wa_bill') }}">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    {{ __('pos.wa_bill_btn') }}
+                </button>
                 <div class="grid grid-cols-4 gap-2">
                     {{-- 1. Print Receipt (P) --}}
                     <button @click="lastIsOffline ? printOfflineReceipt() : printReceipt()" :disabled="!lastTransactionId && !lastIsOffline" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_print_receipt') }}">
@@ -4432,6 +4461,17 @@ function restaurantPos() {
         receiptAutoCloseSecs: {{ (int) ($company->pos_receipt_autoclose_seconds ?? 10) }},
         receiptCloseLeft: 0,
         receiptClosePaused: false,
+        // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026): final bill par
+        // customer ke number ki wa.me chat, bill message + public receipt link
+        // prefilled — cashier sirf Send dabata hai. Dono flags posConfigRev boot
+        // fingerprint mein shamil hain (SW-cached copy toggle par refresh hoti hai).
+        waBillEnabled: {{ !empty($company->pos_whatsapp_bill_enabled) ? 'true' : 'false' }},
+        waBillAutoOpen: {{ !empty($company->pos_whatsapp_bill_auto_open) ? 'true' : 'false' }},
+        waShopName: @json($company->name ?? ''),
+        lastWaPhone: null,
+        lastShareUrl: null,
+        waHighlight: false,
+        waReprintBusyId: null,
         // Print-chain session tracker — bumping the epoch invalidates in-flight iframe.onload /
         // afterprint callbacks so late-firing browser events (modal closed mid-sequence) cannot
         // enqueue stray prints. Mirrors restaurant POS engine.
@@ -5068,6 +5108,7 @@ function restaurantPos() {
             this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : '';
             this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
             this.lastSaleAt = Date.now();
+            this.setWaBill(null); // Task 1036: offline bill = no server link yet — button hidden
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.showToast(window.TXT.offline_bill_saved_will_sync, 'success');
@@ -8452,6 +8493,10 @@ function restaurantPos() {
                 method = 'qr_payment';
             }
 
+            // Task 1036: reserve the WhatsApp auto-open tab INSIDE this gesture
+            // (synchronously, before any await) — provisionals are never shared.
+            if (!provisional) this.reserveWaWindow(this.selectedCustomer?.phone);
+
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
                 const paidHeld = await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional, null, skipReceipt);
@@ -8732,6 +8777,7 @@ function restaurantPos() {
                 this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : '';
                 this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                 this.lastSaleAt = Date.now();
+                this.setWaBill(data); // Task 1036: WhatsApp Bill button/auto-open
                 this.showReceipt = true;
                 this.scheduleReceiptAutoClose();
                 this.startPraPoll(); // Task 655: agent-mode 'pending' → badge + receipt auto-flip
@@ -9842,6 +9888,9 @@ function restaurantPos() {
             if (!bill) return;
             if (this.promoteSubmitting) return;
             this.promoteSubmitting = true;
+            // Task 1036: promote = bill becomes FINAL — reserve the auto-open tab
+            // inside this click/keydown gesture (list rows carry customer_phone).
+            this.reserveWaWindow(bill.customer_phone);
             try {
                 const res = await fetch('{{ url('/pos/api/provisional-bills') }}/' + bill.id + '/promote', {
                     method: 'POST',
@@ -9876,6 +9925,7 @@ function restaurantPos() {
                     this.lastPraStatus = data.submitted ? 'submitted' : (data.queued ? 'pending' : '');
                     this.lastItemsCount = parseFloat(bill.items_count) || 0;
                     this.lastSaleAt = Date.now();
+                    this.setWaBill(data); // Task 1036: promoted bill is final — WhatsApp Bill available
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();
                     this.startPraPoll(); // Task 655: agent-queued promote → badge + receipt auto-flip
@@ -10067,6 +10117,7 @@ function restaurantPos() {
             }
             this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
             this.lastSaleAt = Date.now();
+            this.setWaBill(data); // Task 1036: WhatsApp Bill button/auto-open
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.startPraPoll(); // Task 655: agent-mode 'pending' → badge + receipt auto-flip
@@ -10084,6 +10135,104 @@ function restaurantPos() {
             this.loadReprintBills(); // Akhri Bills strip stays current
             if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: paid table frees up
             return true;
+        },
+
+        // ── Task 1036: WhatsApp Bill (owner voice note 17 Aug 2026) ─────────
+        // Success-response hook: stores the wa extras for the receipt popup
+        // button and (auto-open mode) tries to open the chat right away.
+        // Popup-blocked auto-open = pulse-highlight fallback on the button —
+        // an empty wa.me can NEVER open (server sends nulls when unroutable).
+        setWaBill(data) {
+            this.lastWaPhone = (data && data.wa_phone) || null;
+            this.lastShareUrl = (data && data.share_url) || null;
+            this.waHighlight = false;
+            // Consume the gesture-reserved tab (see reserveWaWindow). Kept on
+            // window (NOT Alpine state) — proxying a Window object is unsafe.
+            clearTimeout(window.__waReserveTimer);
+            const w = (window.__waReservedWin && !window.__waReservedWin.closed) ? window.__waReservedWin : null;
+            window.__waReservedWin = null;
+            if (this.waBillEnabled && this.waBillAutoOpen && this.lastWaPhone && this.lastShareUrl) {
+                if (w) {
+                    // Reserved inside the pay click/Enter gesture — navigating it
+                    // is never popup-blocked, so auto-open reliably works here.
+                    try { w.location = this.waBillLinkFromLast(); return; } catch (e) { try { w.close(); } catch (e2) {} }
+                }
+                // No reserved tab (promote/settle paths without a known phone at
+                // click time): best-effort open — popup-block par button pulse
+                // fallback (customize sub-label says exactly this).
+                setTimeout(() => this.openWaBill(true), 150);
+            } else if (w) {
+                // Bill turned out not WhatsApp-able (no phone / provisional /
+                // feature off server-side) — never leave a stray blank tab.
+                try { w.close(); } catch (e) {}
+            }
+        },
+        // Auto-open must be BORN inside the cashier's pay click/Enter gesture or
+        // the browser popup-blocks it (a fetch callback is not a gesture): reserve
+        // a blank tab now; setWaBill() navigates it to wa.me when the server
+        // confirms the extras, or closes it otherwise. A watchdog closes it on
+        // pay failure paths that never reach setWaBill.
+        reserveWaWindow(phone) {
+            if (!this.waBillEnabled || !this.waBillAutoOpen) return;
+            if (window.__waReservedWin && !window.__waReservedWin.closed) { try { window.__waReservedWin.close(); } catch (e) {} }
+            window.__waReservedWin = null;
+            const digits = String(phone || '').replace(/\D/g, '');
+            if (digits.length < 10) return; // no routable-looking number → no blank-tab flash
+            try { window.__waReservedWin = window.open('about:blank', '_blank'); } catch (e) { window.__waReservedWin = null; }
+            if (window.__waReservedWin) {
+                clearTimeout(window.__waReserveTimer);
+                window.__waReserveTimer = setTimeout(() => {
+                    if (window.__waReservedWin && !window.__waReservedWin.closed) { try { window.__waReservedWin.close(); } catch (e) {} }
+                    window.__waReservedWin = null;
+                }, 12000);
+            }
+        },
+        waBillMessage(number, total, url) {
+            return '*' + (this.waShopName || '') + '*\n'
+                + window.TXT.invoice_word + ': ' + (number || '') + '\n'
+                + window.TXT.total_word + ': Rs ' + Number(total || 0).toLocaleString() + '\n'
+                + window.TXT.wa_msg_receipt + ': ' + url + '\n'
+                + window.TXT.wa_msg_thanks;
+        },
+        waBillLinkFromLast() {
+            if (!this.lastWaPhone || !this.lastShareUrl) return null;
+            const msg = this.waBillMessage(this.lastPraNumber || this.lastInvoiceNumber, this.lastTotal, this.lastShareUrl);
+            return 'https://wa.me/' + this.lastWaPhone + '?text=' + encodeURIComponent(msg);
+        },
+        openWaBill(auto = false) {
+            const link = this.waBillLinkFromLast();
+            if (!link) return;
+            const w = window.open(link, '_blank');
+            if (!w) {
+                // Popup blocked (auto-open from a fetch callback usually is) —
+                // highlight the button; the cashier's own click always works.
+                this.waHighlight = true;
+                if (!auto) this.showToast(window.TXT.wa_popup_blocked, 'error');
+                return;
+            }
+            this.waHighlight = false;
+        },
+        // Reprint list / preview: purane bill ka share token on-demand mint hota
+        // hai. The blank tab opens SYNCHRONOUSLY (inside the click gesture) and
+        // navigates after the fetch — window.open after an await would be
+        // popup-blocked on Chrome.
+        async waShareReprint(bill) {
+            if (!bill || !bill.wa_phone || this.waReprintBusyId) return;
+            this.waReprintBusyId = bill.id;
+            const w = window.open('', '_blank');
+            try {
+                const res = await fetch('/pos/transaction/' + bill.id + '/share-link', { method: 'POST', headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' } });
+                const data = await res.json();
+                if (!data || !data.url) throw new Error('no share url');
+                const msg = this.waBillMessage(bill.pra_invoice_number || bill.invoice_number, bill.total_amount, data.url);
+                const link = 'https://wa.me/' + bill.wa_phone + '?text=' + encodeURIComponent(msg);
+                if (w) { w.location = link; } else { window.open(link, '_blank'); }
+            } catch (e) {
+                console.error('waShareReprint', e);
+                if (w) { try { w.close(); } catch (e2) {} }
+                this.showToast(window.TXT.wa_link_failed, 'error');
+            }
+            this.waReprintBusyId = null;
         },
 
         async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null, skipReceipt = false, payUuid = null) {

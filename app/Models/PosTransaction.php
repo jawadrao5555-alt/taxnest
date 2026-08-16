@@ -334,6 +334,55 @@ class PosTransaction extends Model
         }
     }
 
+    /**
+     * Deliberate provisional (Task 1036 finality predicate): the cashier saved
+     * the bill as provisional — pra_status='local' is stamped on that flow
+     * regardless of reporting mode (see storeInvoice) and is what the reprint
+     * badge / Transactions tab treat as "provisional". These bills stay
+     * editable/deletable until promoted, so they must NEVER be shared with a
+     * customer. Reporting-OFF finals (pra_status NULL) are NOT provisional.
+     */
+    public function isDeliberateProvisional(): bool
+    {
+        return ($this->pra_status ?? null) === 'local';
+    }
+
+    /**
+     * Task 1036 — WhatsApp Bill extras for FINAL-bill JSON responses.
+     * Returns ['wa_phone' => ..., 'share_url' => ...]; both null when the
+     * company feature is off, the bill is a deliberate provisional (still
+     * editable — never hand the customer a link to it), the bill has no
+     * routable customer number (PkPhone::normalize null), or the share token
+     * can't be minted — the client hides the button on null, so an empty
+     * wa.me can never open. Never throws: share extras must not break a pay
+     * response.
+     */
+    public function waBillPayload(?Company $company): array
+    {
+        $out = ['wa_phone' => null, 'share_url' => null];
+        try {
+            if (!$company
+                || !\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+                || !$company->pos_whatsapp_bill_enabled
+                || $this->isDeliberateProvisional()) {
+                return $out;
+            }
+            $wa = \App\Services\PkPhone::normalize($this->customer_phone);
+            if (!$wa) {
+                return $out;
+            }
+            $token = $this->publicBillToken();
+            if (!$token) {
+                return $out;
+            }
+            $out['wa_phone'] = $wa;
+            $out['share_url'] = url('/pos/invoice/share/' . $token);
+        } catch (\Throwable $e) {
+            // fall through with nulls
+        }
+        return $out;
+    }
+
     public function payments()
     {
         return $this->hasMany(PosPayment::class, 'transaction_id');

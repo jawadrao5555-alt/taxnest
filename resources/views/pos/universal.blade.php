@@ -6434,7 +6434,7 @@ function restaurantPos() {
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); this.recallOrder(this.heldOrders[this.activeHeldIndex]); }
                 else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
-                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const _hkO = this.heldOrders[this.activeHeldIndex]; if (_hkO) { this.boardCancelAsk = this.buildOrderCancelAsk(_hkO); this.boardCancelMade = {}; } }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
                 return;
             }

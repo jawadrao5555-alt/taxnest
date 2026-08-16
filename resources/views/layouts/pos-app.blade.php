@@ -1260,6 +1260,7 @@
                 wnDismiss() {
                     this.wnOpen = false;
                     fetch('/pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                    @if($surveyPopup && !$surveyDismissedSession) window.dispatchEvent(new CustomEvent('open-pos-survey')); @endif
                 },
                 wnTry(url) { this.wnDismiss(); window.location.href = url; } }"
              x-show="wnOpen" x-cloak data-wn-featured="1"
@@ -1336,6 +1337,7 @@
                 wnDismiss() {
                     this.wnOpen = false;
                     fetch('/pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                    @if($surveyPopup && !$surveyDismissedSession) window.dispatchEvent(new CustomEvent('open-pos-survey')); @endif
                 } }"
              x-show="wnOpen" x-cloak
              class="fixed inset-0 flex items-center justify-center p-4"
@@ -1399,7 +1401,11 @@
             // UTF-8-safe encode (bad-UTF8 @json incident): fallback [] keeps Alpine alive.
             $svQuestionsJson = json_encode($surveyPopup->questions, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]';
         @endphp
-        <div x-data="{ svOpen: {{ $surveyDismissedSession ? 'false' : 'true' }},
+        {{-- svOpen boots FALSE when What's New is also open (double-backdrop clash,
+             Task 1024): the What's New wnDismiss() fires open-pos-survey to reveal
+             the survey cleanly once the first modal is gone. When What's New is
+             absent, svOpen boots per the dismissed-session flag as before. --}}
+        <div x-data="{ svOpen: {{ ($surveyDismissedSession || $whatsNewPopup) ? 'false' : 'true' }},
                 svQuestions: {{ $svQuestionsJson }},
                 svAnswers: {},
                 svComment: '',

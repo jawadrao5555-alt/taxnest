@@ -258,6 +258,59 @@ class FbrPosReceiptSerialWithFiscalTest extends TestCase
         }
     }
 
+    // ── 3b. OFFLINE → SUBMITTED (after Desktop Agent sync) ─────────────────
+
+    /**
+     * After the Desktop Agent syncs a previously-offline bill, fbr_status
+     * transitions from 'offline' to 'submitted' and fbr_invoice_number is set.
+     * On re-print the cashier must see the full FBR fiscal QR badge — NOT the
+     * dashed .local-badge that appears when the internet was unavailable.
+     *
+     * Invariants locked (both paper widths):
+     *   • .local-badge is ABSENT — no duplicate / stale offline indicator.
+     *   • .fbr-badge is PRESENT — the fiscal QR block renders.
+     *   • "FBR: <fiscal_number>" line is present inside the badge.
+     *   • The shop's own serial still prints in the details table (not hidden).
+     */
+    public function test_after_sync_offline_to_submitted_shows_fiscal_badge_not_local_badge(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            // Simulate the post-sync state: was 'offline', now 'submitted' with fiscal #.
+            $txn = $this->makeTransaction($company, 'submitted', self::FISCAL);
+
+            $body = $this->renderBody($company, $txn);
+
+            // The offline indicator must be gone after sync.
+            $this->assertStringNotContainsString(
+                'local-badge',
+                $body,
+                ".local-badge must NOT render after offline→submitted sync ({$paper})"
+            );
+
+            // The fiscal QR badge must be present.
+            $this->assertStringContainsString(
+                'fbr-badge',
+                $body,
+                ".fbr-badge must render after offline→submitted sync ({$paper})"
+            );
+
+            // The FBR fiscal number must appear in the badge.
+            $this->assertStringContainsString(
+                'FBR: ' . self::FISCAL,
+                $body,
+                "FBR fiscal line must render after sync ({$paper})"
+            );
+
+            // The shop's own serial must also print (details table row).
+            $this->assertStringContainsString(
+                $this->serialRow(),
+                $body,
+                "POS serial row must still print after offline→submitted sync ({$paper})"
+            );
+        }
+    }
+
     // ── 4. LOCAL / PROVISIONAL — unchanged (big serial badge, no FBR line) ──
 
     public function test_local_provisional_bill_keeps_top_badge_serial_only(): void

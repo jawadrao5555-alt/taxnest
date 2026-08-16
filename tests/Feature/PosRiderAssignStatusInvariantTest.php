@@ -861,6 +861,59 @@ class PosRiderAssignStatusInvariantTest extends TestCase
     }
 
     /**
+     * Task 857: sale-screen Pending Deliveries panel path — updateStatus() via
+     * JSON fetch for 'returned' must return success:true + delivery_status:'returned'
+     * in the response body, AND stamp returned_at on the DB row.
+     *
+     * The existing Task 847 test confirms the DB stamp; this test locks the JSON
+     * response contract so a future refactor can't silently break the panel.
+     */
+    public function test_update_status_json_response_has_success_and_delivery_status_returned_and_stamps_returned_at(): void
+    {
+        $rider = $this->makeRider();
+
+        $bill = $this->makeBill($rider, [
+            'invoice_number'      => 'POS-2026-85701',
+            'invoice_mode'        => 'pra',
+            'pra_status'          => 'submitted',
+            'pra_invoice_number'  => 'PRA-85701',
+            'delivery_status'     => 'dispatched',
+            'rider_settlement_id' => null,
+        ]);
+
+        // Act — sale-screen Pending Deliveries panel sends Accept: application/json.
+        $response = $this->updateStatusJson($bill, 'returned');
+
+        // a) Must be a JSON response.
+        $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
+
+        $body = $response->getData(true);
+
+        // b) JSON body must carry success:true.
+        $this->assertTrue(
+            (bool) ($body['success'] ?? false),
+            'JSON response must have success:true for returned status'
+        );
+
+        // c) JSON body must carry delivery_status:'returned'.
+        $this->assertSame(
+            'returned',
+            $body['delivery_status'] ?? null,
+            'JSON response body must carry delivery_status:returned'
+        );
+
+        // d) DB row must have returned_at stamped (non-null).
+        $updated = $this->tx($bill);
+        $this->assertNotNull(
+            $updated->returned_at,
+            'returned_at must be stamped on the DB row via the JSON/sale-screen path'
+        );
+
+        // e) delivery_status on the DB row must also be 'returned'.
+        $this->assertSame('returned', $updated->delivery_status, 'DB delivery_status must be returned');
+    }
+
+    /**
      * Task 813: same guard — 'returned' on a riderless bill must also be
      * rejected via the JSON path with a JSON error body and no DB mutation.
      */

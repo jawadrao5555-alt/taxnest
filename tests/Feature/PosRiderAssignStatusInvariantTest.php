@@ -751,6 +751,76 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertSame($beforeRider->pra_invoice_number, $updatedRiderBill->pra_invoice_number, 'rider bill fiscal number must be unchanged');
     }
 
+    // ── 9b. bulkStatus form-submit path: delivered stamps delivered_at; riderless untouched ─
+
+    /**
+     * Task 897: bulkStatus() 'delivered' via the plain form-submit path (no
+     * Accept: application/json header — controller returns a redirect).
+     * The same delivered_at bulk-UPDATE runs on both paths; this test locks the
+     * non-JSON path so a regression there surfaces immediately.  Confirms:
+     *   a) rider's dispatched bills get delivered_at stamped (non-null)
+     *   b) a riderless bill's delivered_at stays NULL
+     *   c) fiscal identity of both bills is untouched
+     */
+    public function test_bulk_status_form_path_delivered_stamps_delivered_at(): void
+    {
+        $rider = $this->makeRider();
+
+        // Rider's own open bill (dispatched).
+        $riderBill = $this->makeBill($rider, [
+            'invoice_number'      => 'POS-2026-89701',
+            'invoice_mode'        => 'pra',
+            'pra_status'          => 'submitted',
+            'pra_invoice_number'  => 'PRA-89701',
+            'delivery_status'     => 'dispatched',
+            'rider_settlement_id' => null,
+        ]);
+
+        // Riderless bill that must NOT be touched.
+        $riderlessBill = $this->makeBill(null, [
+            'invoice_number'      => 'POS-2026-89702',
+            'invoice_mode'        => 'pra',
+            'pra_status'          => 'submitted',
+            'pra_invoice_number'  => 'PRA-89702',
+            'delivery_status'     => 'dispatched',
+            'rider_settlement_id' => null,
+        ]);
+        $beforeRiderless = $this->tx($riderlessBill);
+
+        // Act — plain form-submit bulkStatus (no Accept: application/json header).
+        $this->bulkStatus($rider, 'delivered');
+
+        $updatedRiderBill = $this->tx($riderBill);
+
+        // a) Rider bill: delivery_status flipped to 'delivered'.
+        $this->assertSame('delivered', $updatedRiderBill->delivery_status, 'rider bill delivery_status must be delivered (form path)');
+
+        // b) Rider bill: delivered_at must be stamped (non-null).
+        $this->assertNotNull($updatedRiderBill->delivered_at, 'rider bill delivered_at must be stamped after bulk delivered (form path)');
+
+        // c) Riderless bill: delivered_at stays NULL.
+        $updatedRiderless = $this->tx($riderlessBill);
+        $this->assertNull($updatedRiderless->delivered_at, 'riderless bill delivered_at must remain NULL (form path)');
+
+        // d) Riderless bill: fiscal identity untouched.
+        $this->assertFiscalIdentityUnchanged($beforeRiderless, $riderlessBill);
+
+        // e) Rider bill: fiscal identity untouched.
+        $beforeRider = (object) [
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'invoice_number'     => 'POS-2026-89701',
+            'pra_invoice_number' => 'PRA-89701',
+            'status'             => 'completed',
+            'total_amount'       => 500.00,
+            'is_archived'        => 0,
+        ];
+        $this->assertSame($beforeRider->invoice_mode,       $updatedRiderBill->invoice_mode,       'rider bill invoice_mode must be unchanged (form path)');
+        $this->assertSame($beforeRider->pra_status,         $updatedRiderBill->pra_status,         'rider bill pra_status must be unchanged (form path)');
+        $this->assertSame($beforeRider->invoice_number,     $updatedRiderBill->invoice_number,     'rider bill serial must be unchanged (form path)');
+        $this->assertSame($beforeRider->pra_invoice_number, $updatedRiderBill->pra_invoice_number, 'rider bill fiscal number must be unchanged (form path)');
+    }
+
     // ── 10. bulkStatus JSON path: returned stamps returned_at; riderless untouched ─
 
     /**

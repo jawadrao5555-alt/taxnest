@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\PosFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * P7 (F6) — Waiter Tablets.
@@ -698,11 +699,10 @@ class RestaurantWaiterController extends Controller
         } catch (\Exception $auditEx) {
         }
 
-        // Task 850 — post-cancel void enqueue: tell the kitchen to stop cooking
+        // Task 850/851 — post-cancel void enqueue: tell the kitchen to stop cooking
         // the cancelled dishes. Mirrors deleteOrder's best-effort pattern: a
-        // failed enqueue never rolls back the cancel. The waiter JS client only
-        // checks data.success and shows a toast — kot_void_queued/url are
-        // returned for parity with deleteOrder (future client enhancement).
+        // failed enqueue never rolls back the cancel. Desktop Agent silent path
+        // first; client falls back to the iframe void-ticket route when queued=false.
         $kotVoidQueued = false;
         $kotVoidUrl    = null;
         if (!empty($voidItems) && $company && $order) {
@@ -712,7 +712,11 @@ class RestaurantWaiterController extends Controller
             } catch (\Throwable $voidEx) {
                 \Illuminate\Support\Facades\Log::warning('cancelOrder (waiter) void KOT enqueue failed: ' . $voidEx->getMessage(), ['order_id' => $id]);
             }
-            $kotVoidUrl = route('pos.restaurant.void-ticket', $id, false)
+            // Iframe fallback — waiter-accessible route under pos/waiter/ so
+            // PosAuth's waiter allowlist covers it (pos/restaurant/orders/.../void-ticket
+            // is blocked for pos_waiter). Relative URL to avoid route-absolute-https
+            // trap (see route-absolute-https-fetch.md).
+            $kotVoidUrl = route('pos.waiter.orders.void-ticket', $id, false)
                 . '?void_items=' . urlencode(base64_encode(json_encode($voidItems)));
         }
 
@@ -721,6 +725,84 @@ class RestaurantWaiterController extends Controller
             'message'         => 'Order cancelled',
             'kot_void_queued' => $kotVoidQueued,
             'kot_void_url'    => $kotVoidUrl,
+        ]);
+    }
+
+    /**
+     * Task 851 — GET /pos/waiter/orders/{id}/void-ticket
+     *
+     * Waiter-accessible iframe fallback for the void slip. Lives under pos/waiter/
+     * so PosAuth's waiter allowlist already covers it — no middleware changes needed.
+     * Mirrors RestaurantPosController::voidTicket but is reachable by pos_waiter
+     * sessions (the cashier route pos/restaurant/orders/{id}/void-ticket is blocked
+     * by PosAuth for pos_waiter).
+     *
+     * Security:
+     * - Company-scoped: a waiter on company A cannot reach company B's orders.
+     * - Ownership-scoped for pos_waiter: the order must be source='waiter',
+     *   status='cancelled', and created_by the requesting waiter. Admins and
+     *   managers see any cancelled order in the company (they can supervise).
+     * - void_items are RECONSTRUCTED from the server-side kot_printed_at items —
+     *   the query-string payload is ignored to prevent a forged void slip.
+     */
+    public function waiterVoidTicket(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if (!is_numeric($id) || $id < 1) {
+            abort(404);
+        }
+
+        // Role gate: only the owning pos_waiter OR an admin/manager may view this
+        // endpoint. pos_cashier and other confined roles are excluded — they have no
+        // business triggering a void slip for a cancelled waiter order.
+        $isAdmin = $user && $user->isPosAdmin(); // isPosAdmin() covers pos_admin + company_admin + pos_manager
+        $isWaiter = $user && $user->isPosWaiter();
+        if (!$isAdmin && !$isWaiter) {
+            abort(403, 'Access denied');
+        }
+
+        // Base: company-scoped, cancelled waiter order.
+        $q = \App\Models\RestaurantOrder::where('company_id', $companyId)
+            ->where('source', 'waiter')
+            ->where('status', 'cancelled')
+            ->with(['table', 'creator', 'items']);
+
+        // pos_waiter confined to their OWN cancelled orders (same-company IDOR guard).
+        // Admin / manager roles supervise any company order.
+        if ($isWaiter) {
+            $q->where('created_by', $user->id);
+        }
+
+        $order = $q->findOrFail($id);
+
+        $company = Company::find($companyId);
+
+        // Reconstruct void items from KOT-printed items on the server — never
+        // trust the client-supplied query-string payload (forged-void-slip guard).
+        $voidItems = $order->items
+            ->filter(fn($oi) => !is_null($oi->kot_printed_at))
+            ->map(fn($oi) => [
+                'item_type' => $oi->item_type ?? 'product',
+                'item_id'   => $oi->item_id,
+                'item_name' => $oi->item_name ?? '',
+                'notes'     => $oi->special_notes ?? '',
+                'qty'       => (float) $oi->quantity,
+            ])
+            ->values();
+
+        return view('pos.restaurant.kitchen-ticket', [
+            'order'        => $order,
+            'company'      => $company,
+            'void'         => true,
+            'voidItems'    => $voidItems,
+            'ticketItems'  => collect(),
+            'grouped'      => collect(),
+            'stationLabel' => null,
+            'delta'        => false,
+            'kotBatchNo'   => null,
+            'newItemIds'   => collect(),
         ]);
     }
 

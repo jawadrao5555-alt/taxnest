@@ -940,6 +940,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/waiter/orders/{id}/shift-table', [\App\Http\Controllers\RestaurantWaiterController::class, 'shiftTable'])->name('pos.waiter.orders.shift-table');
     // Waiter self-cancel (Task 412): apna un-settled order tablet se cancel.
     Route::post('/waiter/orders/{id}/cancel', [\App\Http\Controllers\RestaurantWaiterController::class, 'cancelOrder'])->name('pos.waiter.orders.cancel');
+    // Task 851: waiter-accessible void-ticket fallback (under pos/waiter so PosAuth
+    // waiter allowlist covers it without touching PosAuth logic). Mirrors the cashier
+    // pos.restaurant.void-ticket but company-scoped to the waiter's own session.
+    Route::get('/waiter/orders/{id}/void-ticket', [\App\Http\Controllers\RestaurantWaiterController::class, 'waiterVoidTicket'])->name('pos.waiter.orders.void-ticket');
     // Cashier side — incoming waiter orders on the sale screen.
     Route::get('/api/incoming-orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'incomingOrders'])->name('pos.api.incoming-orders');
     Route::post('/api/incoming-orders/{id}/complete', [\App\Http\Controllers\RestaurantWaiterController::class, 'completeIncoming'])->name('pos.api.incoming-orders.complete');

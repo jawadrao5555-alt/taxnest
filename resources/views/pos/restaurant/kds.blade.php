@@ -275,6 +275,11 @@ function kdsScreen() {
             this.filteredOrders.forEach(o => {
                 const k = this.kstate(o);
                 if (k !== 'new' && k !== 'preparing') return;
+                // Task 854: cancelled dishes are already excluded from order.items.
+                // A recall/re-hold deletes the old order_items rows and recreates
+                // only the kept quantities on the replacement order; void_items is a
+                // KDS badge notification only (not a delta on top of items).
+                // Do NOT subtract void_items here — that would undercount active dishes.
                 this.myItems(o).forEach(it => {
                     const key = (it.name || '').trim();
                     if (!key) return;

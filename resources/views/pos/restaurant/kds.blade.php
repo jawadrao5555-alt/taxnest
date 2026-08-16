@@ -62,6 +62,36 @@
     </style>
     {{-- AGGREGATE VIEW: product-wise totals (vendor request — less confusion than full orders) --}}
     <div x-show="viewMode === 'aggregate'" class="mb-4">
+        {{-- Task 883: cancellation alert — shown above tiles when any order has unacknowledged void_items.
+             Uses the same acknowledgeVoids() path as the list-view badge so the ack clears on ALL
+             KDS screens on the next poll (server sets void_items = NULL). --}}
+        <div x-show="aggregateVoidOrders.length > 0"
+             class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700 rounded-xl">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="flex items-start gap-2 min-w-0">
+                    <svg class="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <div>
+                        <div class="text-sm font-black text-red-700 dark:text-red-400 uppercase tracking-wide mb-1.5">
+                            {{ __('pos.kds_cancelled_header') }}
+                            <span class="normal-case font-semibold text-red-600 dark:text-red-400 ml-1">— {{ __('pos.kds_agg_stop_making') }}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="vi in aggregateVoidItems" :key="vi.name">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-900/40 rounded text-xs font-semibold text-red-700 dark:text-red-300">
+                                    <span class="font-black" x-text="vi.qty"></span>
+                                    <span>&times;</span>
+                                    <span x-text="vi.name"></span>
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <button @click="acknowledgeAllVoids()"
+                        class="flex-shrink-0 text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold whitespace-nowrap">
+                    {{ __('pos.kds_void_ack_btn') }}
+                </button>
+            </div>
+        </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             <template x-for="row in aggregateItems" :key="row.name">
                 <div :class="{ 'ring-4 ring-emerald-500 scale-105': lastScanFlash && lastScanFlashItem === row.name }"
@@ -290,6 +320,35 @@ function kdsScreen() {
                 });
             });
             return Array.from(map.values()).sort((a, b) => b.qty - a.qty);
+        },
+
+        // Task 883: orders in the current filtered set that have unacknowledged voids —
+        // drives the aggregate-view cancellation banner.
+        get aggregateVoidOrders() {
+            return this.filteredOrders.filter(o => this.hasUnacknowledgedVoids(o));
+        },
+
+        // Task 883: aggregated cancelled-item totals across all void orders, for the
+        // banner item chips (same item name collapsed into one chip with summed qty).
+        get aggregateVoidItems() {
+            const map = new Map();
+            this.aggregateVoidOrders.forEach(o => {
+                (o.void_items || []).forEach(vi => {
+                    const key = (vi.item_name || '').trim();
+                    if (!key) return;
+                    if (!map.has(key)) map.set(key, { name: key, qty: 0 });
+                    map.get(key).qty += Number(vi.qty) || 0;
+                });
+            });
+            return Array.from(map.values()).sort((a, b) => b.qty - a.qty);
+        },
+
+        // Task 883: acknowledge all pending void orders visible on this aggregate view.
+        // Calls the same acknowledgeVoids() path as the list-view badge so the ack
+        // propagates server-side and clears on ALL KDS screens on next poll.
+        async acknowledgeAllVoids() {
+            const orders = this.aggregateVoidOrders.slice(); // snapshot before mutations
+            await Promise.all(orders.map(o => this.acknowledgeVoids(o.id, o.void_items)));
         },
 
         // Task 841: true when the order has void_items that have not yet been

@@ -1617,6 +1617,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kds_cancelled_header' => 'CANCEL',
     'kds_void_ack_btn' => 'Theek hai',
     'kds_void_conflict' => 'Nayi cancellation aayi — dobara dekh kar confirm karein',
+    'kds_agg_stop_making' => 'Banana band karein',
     'kds_new_colon' => 'Naye:',
     'kds_page_subtitle' => 'Kitchen staff ke liye active orders',
     'kds_page_title' => 'Kitchen Display System',

@@ -1617,6 +1617,7 @@ return [
     'kds_cancelled_header' => 'منسوخ',
     'kds_void_ack_btn' => 'ٹھیک ہے',
     'kds_void_conflict' => 'نئی منسوخی شامل ہوئی — دوبارہ چیک کریں',
+    'kds_agg_stop_making' => 'یہ بنانا بند کریں',
     'kds_new_colon' => 'نیا:',
     'kds_page_subtitle' => 'کچن اسٹاف کے لیے فعال آرڈرز',
     'kds_page_title' => 'کچن ڈسپلے سسٹم',

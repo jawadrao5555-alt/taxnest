@@ -256,6 +256,69 @@
                     </button>
                 </div>
 
+                {{-- Caller ID (Task 1039): Android companion app + sale-screen popup.
+                     Card-local Alpine state; toggle POST follows the guided-flow
+                     pattern. Status lines read the company columns directly
+                     (hasColumn-guarded for prod schema drift). Download button
+                     appears only once caller_app_latest_version is set — the
+                     public release gate flips AFTER the owner phone-test. --}}
+                @php
+                    $tnCallerReady = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'caller_id_enabled');
+                    $tnCallerOn = $tnCallerReady && ($company->caller_id_enabled ?? false);
+                    $tnCallerUser = ($tnCallerReady && ($company->caller_app_user_id ?? null)) ? \App\Models\User::find($company->caller_app_user_id) : null;
+                    $tnCallerSeen = ($tnCallerReady && ($company->caller_app_last_seen_at ?? null)) ? \Carbon\Carbon::parse($company->caller_app_last_seen_at) : null;
+                    $tnCallerLastEvent = ($tnCallerReady && \Illuminate\Support\Facades\Schema::hasTable('pos_caller_events'))
+                        ? \Illuminate\Support\Facades\DB::table('pos_caller_events')->where('company_id', $company->id)->orderByDesc('id')->value('created_at')
+                        : null;
+                    {{-- Release gate: SystemSetting AND the hosted file must both exist
+                         (APKs are scp'd to live public/downloads, never committed —
+                         repo is public; same pattern as rider/waiter apps) so the
+                         download button can never 404. --}}
+                    $tnCallerApkLive = trim((string) \App\Models\SystemSetting::get('caller_app_latest_version', '')) !== ''
+                        && is_file(public_path('downloads/taxnest-caller.apk'));
+                @endphp
+                @if($tnCallerReady)
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm" x-data="{ callerOn: {{ $tnCallerOn ? 'true' : 'false' }} }">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.caller_id_title') }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.caller_id_sub') }}</p>
+                        </div>
+                        <button type="button"
+                            @click="callerOn=!callerOn; fetch('/pos/settings/caller-id', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:callerOn})}).catch(()=>{})"
+                            class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="callerOn ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600'">
+                            <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="callerOn && 'translate-x-6'"></span>
+                        </button>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                        @if($tnCallerUser)
+                            <p class="text-[11px] text-gray-600 dark:text-gray-300">
+                                <span class="font-bold">{{ __('pos.caller_id_device') }}:</span>
+                                {{ $tnCallerUser->name }}{{ ($company->caller_app_device ?? '') !== '' ? ' · ' . $company->caller_app_device : '' }}
+                                @if($tnCallerSeen) · {{ __('pos.caller_id_last_seen') }}: {{ $tnCallerSeen->diffForHumans() }} @endif
+                            </p>
+                        @else
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.caller_id_no_device') }}</p>
+                        @endif
+                        @if($tnCallerLastEvent)
+                            <p class="text-[11px] text-gray-600 dark:text-gray-300"><span class="font-bold">{{ __('pos.caller_id_last_event') }}:</span> {{ \Carbon\Carbon::parse($tnCallerLastEvent)->diffForHumans() }}</p>
+                        @endif
+                        @if($tnCallerApkLive)
+                            <div class="pt-2">
+                                <a href="{{ url('downloads/taxnest-caller.apk') }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    {{ __('pos.caller_id_download') }}
+                                </a>
+                                <p class="text-[10px] text-gray-400 mt-1">{{ __('pos.caller_id_download_hint') }}</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
                 {{-- Company default language (owner, 30 Jul 2026) --}}
                 {{-- Mobile fix (Task 540): card wraps on phones so the 3 language buttons
                      drop below the text instead of pushing off-screen; desktop unchanged. --}}

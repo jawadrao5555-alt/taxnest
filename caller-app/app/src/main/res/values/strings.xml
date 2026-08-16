@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TaxNest Caller ID</string>
+
+    <!-- Login -->
+    <string name="login_title">TaxNest Caller ID</string>
+    <string name="login_hint">شاپ کے ایڈمن یا منیجر لاگ اِن سے سائن اِن کریں — وہی ای میل اور پاس ورڈ جو پورٹل پر چلتا ہے</string>
+    <string name="email">ای میل</string>
+    <string name="password">پاس ورڈ</string>
+    <string name="show_password">پاس ورڈ دکھائیں</string>
+    <string name="login_btn">سائن اِن کریں</string>
+    <string name="fill_both">ای میل اور پاس ورڈ دونوں لکھیں</string>
+    <string name="network_error">انٹرنیٹ مسئلہ — دوبارہ کوشش کریں</string>
+    <string name="login_failed">لاگ اِن ناکام — ای میل یا پاس ورڈ چیک کریں</string>
+
+    <!-- Main -->
+    <string name="welcome_fmt">%1$s · %2$s</string>
+    <string name="status_ok">✔ سب تیار — کال آتے ہی POS اسکرین پر پاپ اپ آئے گا</string>
+    <string name="status_need_permission">پہلے نوٹیفکیشن کی اجازت دیں — نیچے بٹن دبائیں</string>
+    <string name="status_feature_off">POS سیٹنگز میں کالر آئی ڈی ابھی بند ہے — پورٹل سے آن کریں</string>
+
+    <string name="notif_on">✔ نوٹیفکیشن کی اجازت مل گئی</string>
+    <string name="notif_off">✖ نوٹیفکیشن کی اجازت نہیں — اس کے بغیر ایپ کالیں نہیں پکڑ سکتی</string>
+    <string name="notif_btn">نوٹیفکیشن کی اجازت دیں</string>
+    <string name="notif_toast">فہرست میں TaxNest Caller ID ڈھونڈ کر آن کریں</string>
+
+    <string name="battery_on">✔ بیٹری سیٹنگ ٹھیک ہے — ایپ پیچھے چلتی رہے گی</string>
+    <string name="battery_off">✖ بیٹری آپٹیمائزیشن آن ہے — ایپ کبھی کبھی سو سکتی ہے</string>
+    <string name="battery_btn">بیٹری کی اجازت دیں</string>
+
+    <string name="test_btn">ٹیسٹ رِنگ بھیجیں</string>
+    <string name="test_sent">ٹیسٹ بھیج دیا — POS سیل اسکرین پر پاپ اپ دیکھیں</string>
+    <string name="feature_off_toast">کالر آئی ڈی POS سیٹنگز میں بند ہے — پہلے پورٹل سے آن کریں</string>
+
+    <string name="last_sent_fmt">آخری کال بھیجی: %1$s</string>
+    <string name="just_now">ابھی ابھی</string>
+    <string name="mins_ago_fmt">%1$d منٹ پہلے</string>
+
+    <string name="update_available">نیا ورژن آ گیا ہے</string>
+    <string name="update_btn">اپ ڈیٹ کریں</string>
+    <string name="logout_btn">لاگ آؤٹ</string>
+
+    <string name="howto_title">یہ کیسے کام کرتی ہے؟</string>
+    <string name="howto_body">یہ ایپ شاپ کے فون پر آنے والی کالوں (عام کال اور واٹس ایپ کال) کی نوٹیفکیشن پڑھتی ہے اور نمبر POS کو بھیج دیتی ہے — سیل اسکرین پر فوراً پاپ اپ آتا ہے کہ کون سا گاہک کال کر رہا ہے اور اس کی پرانی خریداری کیا ہے۔ ایپ کو کھلا رکھنے کی ضرورت نہیں، بس فون آن رہے۔</string>
+</resources>

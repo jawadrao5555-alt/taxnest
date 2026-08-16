@@ -661,6 +661,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         return back()->with('success', __('pos.language_saved'));
     })->name('pos.settings.default-language');
     Route::post('/settings/quick-type', [PosController::class, 'updateQuickType'])->name('pos.settings.quick-type');
+    // Caller ID (Task 1039): admin toggle + connected-phone status live on customize.
+    Route::post('/settings/caller-id', [\App\Http\Controllers\PosCallerIdController::class, 'toggle'])->name('pos.settings.caller-id');
     Route::post('/settings/receipt-autoclose', [PosController::class, 'updateReceiptAutoclose'])->name('pos.settings.receipt-autoclose');
     Route::post('/settings/cash-received-toggle', [PosController::class, 'toggleCashReceived'])->name('pos.settings.cash-received-toggle');
     Route::post('/settings/tax-pricing-mode', [PosController::class, 'updateTaxPricingMode'])->name('pos.settings.tax-pricing-mode');
@@ -766,6 +768,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/check-pin-session', [PosController::class, 'checkPinSession'])->name('pos.api.check-pin-session');
     Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
     Route::get('/api/boot-check', [PosController::class, 'bootCheck'])->name('pos.api.boot-check');
+    // Caller ID (Task 1039): sale-screen popup poll — fresh ring events + customer match.
+    Route::get('/api/caller-events', [\App\Http\Controllers\PosCallerIdController::class, 'events'])->name('pos.api.caller-events');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
     Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');
     // Print-failure telemetry beacon (Task #63 — 30 Jul vanished-bill case):
@@ -1509,6 +1513,18 @@ Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->group(functio
     Route::get('/me', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMe'])->name('riderapp.me');
     Route::get('/version', [\App\Http\Controllers\PosRiderTrackingController::class, 'appVersion'])->name('riderapp.version');
     Route::post('/logout', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogout'])->name('riderapp.logout');
+});
+
+// ── TaxNest Caller ID app API (Task 1039) — stateless bearer-token JSON.
+// Shop admin/manager signs in with the portal login; token rotates per login
+// (one active phone per company). CSRF-exempt via bootstrap/app.php
+// ('api/caller-app/*'). Open to all POS plans for now.
+Route::prefix('api/caller-app/v1')->middleware(['throttle:120,1'])->group(function () {
+    Route::post('/login', [\App\Http\Controllers\PosCallerIdController::class, 'appLogin'])->middleware('throttle:15,1')->name('callerapp.login');
+    Route::post('/ring', [\App\Http\Controllers\PosCallerIdController::class, 'appRing'])->name('callerapp.ring');
+    Route::get('/me', [\App\Http\Controllers\PosCallerIdController::class, 'appMe'])->name('callerapp.me');
+    Route::get('/version', [\App\Http\Controllers\PosCallerIdController::class, 'appVersion'])->name('callerapp.version');
+    Route::post('/logout', [\App\Http\Controllers\PosCallerIdController::class, 'appLogout'])->name('callerapp.logout');
 });
 
 Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {

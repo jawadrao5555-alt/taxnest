@@ -1,0 +1,62 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// CI signing: keystore path/password come from env — SAME keystore as the
+// rider/pos apps (repo is PUBLIC, never commit a keystore here).
+def ciKeystore = System.getenv("RIDER_KS")
+def ciKeystorePass = System.getenv("RIDER_KS_PASS")
+
+android {
+    namespace 'pk.taxnest.callerid'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "pk.taxnest.callerid"
+        // Android 8+ — NotificationListenerService call-category extras are
+        // reliable from O onward; matches the downloads-page "Android 8+".
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        ciRelease {
+            if (ciKeystore != null) {
+                storeFile file(ciKeystore)
+                storePassword ciKeystorePass
+                keyAlias "rider"
+                keyPassword ciKeystorePass
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ciKeystore != null) {
+                signingConfig signingConfigs.ciRelease
+            }
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}

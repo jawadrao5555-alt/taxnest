@@ -3761,6 +3761,46 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ── Caller ID popup (Task 1039) — non-blocking incoming-call card.
+         Sits below the toast slot; z-[60] like the toast (payment/receipt
+         modals never coexist — callerBlocked() defers rings while they're up).
+         No NEW arbitrary Tailwind classes (vite-arbitrary-classes.md):
+         width via inline style, z-[60]/text-[10px]/text-[11px] already built. --}}
+    <div x-show="callerPopup" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:330px; max-width:92vw;">
+        <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
+            <div class="flex items-center gap-2 px-4 py-2.5 text-white" :class="callerPopup && callerPopup.source === 'whatsapp' ? 'bg-green-600' : 'bg-sky-600'">
+                <svg class="w-4 h-4 animate-pulse flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                <span class="text-xs font-extrabold" x-text="callerPopup && callerPopup.source === 'whatsapp' ? window.TXT.caller_whatsapp_call : window.TXT.caller_incoming_call"></span>
+                <span class="ml-auto text-[10px] opacity-80 flex-shrink-0" x-text="callerPopup ? (callerPopup.at || '') : ''"></span>
+                <button type="button" @click="dismissCallerPopup()" class="flex-shrink-0 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition" title="{{ __('pos.close') }}">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-4">
+                <p class="text-base font-extrabold text-gray-900 dark:text-white truncate" x-text="callerPopup ? (((callerPopup.match && callerPopup.match.name) || callerPopup.name || callerPopup.phone) || window.TXT.caller_unknown) : ''"></p>
+                <p class="text-xs text-gray-500 dark:text-gray-400" x-show="callerPopup && callerPopup.phone && ((callerPopup.match && callerPopup.match.name) || callerPopup.name)" x-text="callerPopup ? (callerPopup.phone || '') : ''"></p>
+                <template x-if="callerPopup && callerPopup.match">
+                    <div class="mt-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 px-3 py-2">
+                        <p class="text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1" x-show="callerPopup.match.matched_by === 'name'">{{ __('pos.caller_matched_by_name') }}</p>
+                        <div class="flex items-center gap-3 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                            <span><span x-text="callerPopup.match.visits"></span> {{ __('pos.caller_visits') }}</span>
+                            <span>Rs <span x-text="(callerPopup.match.total_spent || 0).toLocaleString()"></span></span>
+                        </div>
+                        <p class="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5" x-show="callerPopup.match.last_order_at">
+                            {{ __('pos.caller_last_order') }}: <span x-text="callerPopup.match.last_order_at"></span>
+                            <template x-if="callerPopup.match.last_order_amount"><span> · Rs <span x-text="(callerPopup.match.last_order_amount || 0).toLocaleString()"></span></span></template>
+                        </p>
+                    </div>
+                </template>
+                <p x-show="callerPopup && !callerPopup.match" class="mt-1 text-[11px] text-gray-400">{{ __('pos.caller_new_customer') }}</p>
+                <div class="mt-3 flex gap-2">
+                    <button type="button" @click="callerStartBill()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_make_bill') }}</button>
+                    <button type="button" @click="dismissCallerPopup()" class="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition">{{ __('pos.close') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div x-show="toast.show" class="fixed top-4 right-4 z-[60] max-w-sm" :class="toast.show ? 'toast-enter' : 'toast-exit'">
         {{-- ZFC issue #12 (28 Jul 2026): NEW 'info' toast type — blue, i-icon.
              Info messages (e.g. waiter order loaded) looked like RED errors. --}}
@@ -4087,6 +4127,13 @@ function restaurantPos() {
         highlightIndex: 0,
         // Order Sound (Aug 2026): device-level chime pref for incoming waiter orders.
         orderSound: (function () { try { return localStorage.getItem('pos_order_sound') !== '0'; } catch (e) { return true; } })(),
+        // ── Caller ID (Task 1039): incoming-call popup ──────────────────────
+        // Baked flag — caller_id_enabled sits in the posConfigRev whitelist so
+        // a settings toggle refreshes offline-cached sale screens.
+        callerIdOn: {{ ($company->caller_id_enabled ?? false) ? 'true' : 'false' }},
+        callerPopup: null,   // the ring event currently on screen
+        callerQueue: [],     // rings deferred while a blocking modal is open
+        callerLastId: 0,     // server cursor (max event id already fetched)
         activeCartIndex: -1,
         cartMode: false,
         get mode() { return this.cartMode ? 'cart' : 'search'; },
@@ -4804,6 +4851,14 @@ function restaurantPos() {
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
             setTimeout(() => this._startAutoSync(), 4000);
+            // ── Caller ID (Task 1039): light 7s poll, feature-gated, paused
+            // while the tab is hidden. Cursor survives reloads via localStorage
+            // so an already-shown ring never re-alerts after a refresh.
+            if (this.callerIdOn) {
+                try { this.callerLastId = parseInt(localStorage.getItem('tn_caller_last_id') || '0', 10) || 0; } catch (e) {}
+                setTimeout(() => this.pollCallerEvents(), 2500);
+                setInterval(() => { if (!document.hidden) this.pollCallerEvents(); }, 7000);
+            }
         },
 
         // ─── AUTO-SYNC ENGINE ──────────────────────────────────────────────
@@ -10267,6 +10322,61 @@ function restaurantPos() {
                 }
                 return s + (cost * i.quantity);
             }, 0);
+        },
+        // ─── Caller ID popup (Task 1039) ───────────────────────────────────
+        // Non-blocking: silent while payment / receipt / manager-PIN / table-
+        // switch prompts are up — deferred rings surface right after (queue).
+        callerBlocked() {
+            return this.showPayModal || this.showReceipt || this.showManagerPinModal
+                || !!this.tableSwitchPrompt || this.submitting;
+        },
+        async pollCallerEvents() {
+            if (this._callerBusy) { return; }
+            this._callerBusy = true;
+            try {
+                const res = await fetch('/pos/api/caller-events?after=' + (this.callerLastId || 0), { headers: { 'Accept': 'application/json' } });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.enabled) {
+                        if (Array.isArray(data.events) && data.events.length) { this.callerQueue.push(...data.events); }
+                        const lid = parseInt(data.last_id, 10) || 0; // live-pdo-string-ints
+                        if (lid > this.callerLastId) {
+                            this.callerLastId = lid;
+                            try { localStorage.setItem('tn_caller_last_id', String(lid)); } catch (e) {}
+                        }
+                    }
+                }
+            } catch (e) {}
+            this._callerBusy = false;
+            this.maybeShowCallerPopup();
+        },
+        maybeShowCallerPopup() {
+            if (this.callerPopup || this.callerQueue.length === 0 || this.callerBlocked()) { return; }
+            this.callerPopup = this.callerQueue.shift();
+            clearTimeout(this._callerHideTimer);
+            this._callerHideTimer = setTimeout(() => { this.callerPopup = null; this.maybeShowCallerPopup(); }, 45000);
+        },
+        dismissCallerPopup() {
+            clearTimeout(this._callerHideTimer);
+            this.callerPopup = null;
+            this.maybeShowCallerPopup();
+        },
+        callerStartBill() {
+            const ev = this.callerPopup;
+            if (!ev) { return; }
+            const m = ev.match;
+            const name = (m && m.name) || ev.name || '';
+            const phone = (m && m.phone) || ev.phone || '';
+            if (m && m.customer_id) {
+                this.selectCustomerWithStats({ id: m.customer_id, name: name, phone: phone, address: m.address || '' });
+            } else {
+                // No saved customer — attach name/phone to the bill as-is (walk-in
+                // with phone); cashier can save the customer from the picker later.
+                this.selectedCustomer = { id: null, name: name || phone, phone: phone };
+                this.customerPhoneQuery = (name ? name : '') + (name && phone ? ' · ' : '') + (phone || '');
+                this.showToast(window.TXT.customer_prefix + (name || phone), 'success');
+            }
+            this.dismissCallerPopup();
         },
         showToast(msg, type) { this.toast = { show: true, message: msg, type }; setTimeout(() => this.toast.show = false, 2500); },
         triggerConfetti() {

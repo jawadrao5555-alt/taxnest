@@ -450,6 +450,10 @@ class Company extends Model
             // Bill Number Style (07 Aug 2026): receipt number display per stream —
             // a settings change must refresh cached sale screens.
             'pra_number_style', 'local_number_style',
+            // Task 1039: Caller ID popup flag is BAKED into the sale screen JS —
+            // a toggle must refresh cached sale screens. (Telemetry columns
+            // caller_app_last_seen_at etc. stay OUT — they churn per ring.)
+            'caller_id_enabled',
         ];
 
         $vals = [];

@@ -24,6 +24,13 @@
     $waiterApkVersion = trim((string) \App\Models\SystemSetting::get('waiter_app_latest_version', ''));
     $waiterApkSize = ($waiterApkVersion !== '' && is_file($waiterApkPath)) ? $fmtMb(filesize($waiterApkPath)) : null;
     $waiterApkVisible = $waiterApkVersion !== '' && is_file($waiterApkPath);
+    // Caller ID card (Task 1039): same gating pattern as DI/waiter — only visible
+    // when BOTH the APK file exists AND caller_app_latest_version is set, so the
+    // owner can phone-test the beta before anything is customer-visible.
+    $callerApkPath = public_path('downloads/taxnest-caller.apk');
+    $callerApkVersion = trim((string) \App\Models\SystemSetting::get('caller_app_latest_version', ''));
+    $callerApkSize = ($callerApkVersion !== '' && is_file($callerApkPath)) ? $fmtMb(filesize($callerApkPath)) : null;
+    $callerApkVisible = $callerApkVersion !== '' && is_file($callerApkPath);
 @endphp
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
@@ -145,6 +152,21 @@
                     <p class="text-sm text-gray-500 leading-relaxed flex-1">For restaurant waiters — take table orders on the phone, send them straight to the kitchen and keep an eye on order status without leaving the floor.</p>
                     <div class="mt-5">
                         <a href="{{ url('downloads/taxnest-waiter.apk') }}" class="block text-center bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">Download APK</a>
+                    </div>
+                </div>
+                @endif
+
+                <!-- TaxNest Caller ID App (Android) — only shown when caller_app_latest_version is set in admin settings -->
+                @if($callerApkVisible)
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col">
+                    <div class="w-11 h-11 rounded-lg bg-sky-50 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                    <h3 class="font-serif text-lg text-[#052730] mb-1">TaxNest Caller ID</h3>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Android 8+ · APK{{ $callerApkSize ? ' · ' . $callerApkSize : '' }}{{ $callerApkVersion ? ' · v' . $callerApkVersion : '' }}</p>
+                    <p class="text-sm text-gray-500 leading-relaxed flex-1">For the shop phone — when a customer calls (normal call or WhatsApp), the POS sale screen instantly shows who is calling with their purchase history, ready to start their bill.</p>
+                    <div class="mt-5">
+                        <a href="{{ url('downloads/taxnest-caller.apk') }}" class="block text-center bg-sky-700 hover:bg-sky-800 text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">Download APK</a>
                     </div>
                 </div>
                 @endif

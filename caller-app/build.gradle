@@ -1,0 +1,5 @@
+// TaxNest Caller ID — root build script (Task 1039; rider-app template)
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+    id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
+}

@@ -1,0 +1,439 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Company;
+use App\Models\PosCustomer;
+use App\Models\PosTransaction;
+use App\Models\SystemSetting;
+use App\Models\User;
+use App\Services\PkPhone;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+
+/**
+ * Caller ID (Task 1039) — Android companion app + POS sale-screen popup.
+ *
+ * Two halves (rider-app pattern, PosRiderTrackingController):
+ *  1. Stateless JSON API for the "TaxNest Caller ID" Android app
+ *     (/api/caller-app/v1/*, bearer token; SHA-256 stored on the COMPANY row —
+ *     one active device per shop). An admin/manager signs in with the normal
+ *     portal login; login rotates the token.
+ *  2. Sale-screen poll + settings toggle inside the /pos/* session group.
+ *
+ * Design notes:
+ *  - Open to all POS plans for now (owner may Unlimited-gate later).
+ *  - Ring events live in pos_caller_events, purged after ~2 days
+ *    opportunistically (no cron dependency).
+ *  - Client epoch-ms timestamps are converted with setTimezone(app TZ) —
+ *    the rider-app 5h-early trap (offline-first-pos-billing).
+ *  - Live PDO returns numeric columns as strings — cast ints in JSON.
+ *  - Companies-row writes for telemetry go through DB::table so updated_at
+ *    never churns (posConfigRev whitelist keeps the boot fingerprint safe,
+ *    but heartbeats every ring are still not worth an Eloquent touch).
+ */
+class PosCallerIdController extends Controller
+{
+    private const EVENT_RETENTION_HOURS = 48;  // ring rows purged after this
+    private const EVENT_FRESH_SECONDS = 120;   // poll never surfaces older rings
+    private const DEDUPE_SECONDS = 20;         // same caller re-ring collapse
+    private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-caller.apk';
+
+    // ─── Shared gates ───────────────────────────────────────────────────────
+
+    /** Resolve the company from the Bearer token or abort with JSON. */
+    private function companyFromToken(Request $request): Company
+    {
+        $token = (string) $request->bearerToken();
+        $companyId = (int) strtok($token, '|');
+        $company = $companyId > 0 ? Company::find($companyId) : null;
+
+        if (!$company || !$company->caller_app_token
+            || !hash_equals((string) $company->caller_app_token, hash('sha256', $token))) {
+            abort(response()->json(['ok' => false, 'error' => 'unauthorized'], 401));
+        }
+        $suspended = ($company->status ?? null) === 'suspended'
+            || ($company->company_status ?? null) === 'suspended';
+        if ($suspended) {
+            abort(response()->json(['ok' => false, 'error' => 'unauthorized'], 401));
+        }
+        return $company;
+    }
+
+    // ─── Caller app API (stateless) ─────────────────────────────────────────
+
+    /** POST /api/caller-app/v1/login {email, password, device?} */
+    public function appLogin(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+            'device' => 'nullable|string|max:120',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+        if (!$user || !$user->is_active || !Hash::check($request->password, $user->password)) {
+            return response()->json(['ok' => false, 'error' => 'invalid_credentials',
+                'message' => __('pos.caller_bad_login')], 401);
+        }
+        // Only POS admins/managers may bind the shop's Caller ID phone.
+        if (!$user->isPosAdmin()) {
+            return response()->json(['ok' => false, 'error' => 'not_admin',
+                'message' => __('pos.caller_admin_only')], 403);
+        }
+
+        $company = Company::find($user->company_id);
+        $suspended = $company && (($company->status ?? null) === 'suspended'
+            || ($company->company_status ?? null) === 'suspended');
+        if (!$company || $suspended) {
+            return response()->json(['ok' => false, 'error' => 'unauthorized'], 403);
+        }
+        if (!Schema::hasColumn('companies', 'caller_app_token')) {
+            return response()->json(['ok' => false, 'error' => 'server_not_ready'], 503);
+        }
+
+        // Rotate: one active device per company.
+        $plain = $company->id . '|' . Str::random(48);
+        DB::table('companies')->where('id', $company->id)->update([
+            'caller_app_token' => hash('sha256', $plain),
+            'caller_app_user_id' => $user->id,
+            'caller_app_device' => (string) $request->input('device', ''),
+            'caller_app_last_seen_at' => now(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'token' => $plain,
+            'company' => $company->name ?? '',
+            'user' => $user->name ?? '',
+            'enabled' => (bool) ($company->caller_id_enabled ?? false),
+        ]);
+    }
+
+    /** POST /api/caller-app/v1/ring {number?, name?, source, at?} */
+    public function appRing(Request $request)
+    {
+        $company = $this->companyFromToken($request);
+
+        $request->validate([
+            'phone' => 'nullable|string|max:40',
+            'number' => 'nullable|string|max:40',
+            'name' => 'nullable|string|max:120',
+            'source' => 'nullable|string|in:sim,whatsapp',
+            'at' => 'nullable|numeric',
+        ]);
+
+        DB::table('companies')->where('id', $company->id)
+            ->update(['caller_app_last_seen_at' => now()]);
+
+        if (!($company->caller_id_enabled ?? false)) {
+            // App keeps its token; popup feature is simply off right now.
+            return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'disabled']);
+        }
+
+        // App sends 'phone'; accept 'number' too (either key works).
+        $phone = PkPhone::normalize($request->input('phone') ?? $request->input('number'));
+        $name = trim((string) $request->input('name', ''));
+        $name = $name !== '' ? mb_substr($name, 0, 120) : null;
+        if (!$phone && !$name) {
+            return response()->json(['ok' => false, 'error' => 'empty'], 422);
+        }
+
+        // Ring time: client epoch ms → app TZ (rider trap). Reject stale (>10 min).
+        $ringAt = now();
+        if ($request->filled('at')) {
+            try {
+                $candidate = Carbon::createFromTimestampMs((float) $request->input('at'))
+                    ->setTimezone(config('app.timezone'));
+                if ($candidate->gt(now()->subMinutes(10)) && $candidate->lt(now()->addMinutes(5))) {
+                    $ringAt = $candidate;
+                }
+            } catch (\Throwable $e) {
+                // keep now()
+            }
+        }
+
+        // Dedupe: same caller within DEDUPE_SECONDS = one event (WhatsApp posts
+        // several notification updates per ring; SIM ring re-posts too).
+        $dupe = DB::table('pos_caller_events')
+            ->where('company_id', $company->id)
+            ->where('created_at', '>=', now()->subSeconds(self::DEDUPE_SECONDS))
+            ->when($phone, fn ($q) => $q->where('phone', $phone))
+            ->when(!$phone, fn ($q) => $q->whereNull('phone')->where('caller_name', $name))
+            ->exists();
+        if ($dupe) {
+            return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'duplicate']);
+        }
+
+        DB::table('pos_caller_events')->insert([
+            'company_id' => $company->id,
+            'phone' => $phone,
+            'caller_name' => $name,
+            'source' => $request->input('source') === 'whatsapp' ? 'whatsapp' : 'sim',
+            'ring_at' => $ringAt,
+            'created_at' => now(),
+        ]);
+
+        // Opportunistic purge (no cron dependency) — 1-in-10 lottery.
+        if (random_int(1, 10) === 1) {
+            DB::table('pos_caller_events')
+                ->where('created_at', '<', now()->subHours(self::EVENT_RETENTION_HOURS))
+                ->limit(500)->delete();
+        }
+
+        return response()->json(['ok' => true, 'accepted' => true]);
+    }
+
+    /** GET /api/caller-app/v1/me — status for the app's main screen. */
+    public function appMe(Request $request)
+    {
+        $company = $this->companyFromToken($request);
+        DB::table('companies')->where('id', $company->id)
+            ->update(['caller_app_last_seen_at' => now()]);
+
+        $lastEvent = DB::table('pos_caller_events')
+            ->where('company_id', $company->id)->orderByDesc('id')->first();
+
+        return response()->json([
+            'ok' => true,
+            'company' => $company->name ?? '',
+            'user' => optional(User::find($company->caller_app_user_id))->name ?? '',
+            'enabled' => (bool) ($company->caller_id_enabled ?? false),
+            'last_event_at' => $lastEvent ? Carbon::parse($lastEvent->created_at)->format('d M Y, h:i A') : null,
+        ]);
+    }
+
+    /** GET /api/caller-app/v1/version — semver update check (SystemSetting-driven). */
+    public function appVersion()
+    {
+        return response()->json([
+            'ok' => true,
+            'latest' => (string) SystemSetting::get('caller_app_latest_version', ''),
+            'apk_url' => self::APP_DOWNLOAD_URL,
+        ]);
+    }
+
+    /** POST /api/caller-app/v1/logout */
+    public function appLogout(Request $request)
+    {
+        $company = $this->companyFromToken($request);
+        DB::table('companies')->where('id', $company->id)->update([
+            'caller_app_token' => null,
+            'caller_app_user_id' => null,
+            'caller_app_device' => null,
+        ]);
+        return response()->json(['ok' => true]);
+    }
+
+    // ─── POS panel (session, /pos/*) ────────────────────────────────────────
+
+    /** POST /pos/settings/caller-id {enabled} — admin-only toggle. */
+    public function toggle(Request $request)
+    {
+        // Company-wide integration switch = admin/manager ONLY. A cashier with
+        // custom 'customize' access passes posCashierBlocked(), so enforce the
+        // same isPosAdmin() boundary the app-login uses.
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin() || $user->posCashierBlocked()) {
+            return response()->json(['ok' => false], 403);
+        }
+        if (!Schema::hasColumn('companies', 'caller_id_enabled')) {
+            return response()->json(['ok' => false, 'error' => 'server_not_ready'], 503);
+        }
+        $companyId = app('currentCompanyId');
+        $enabled = filter_var($request->input('enabled'), FILTER_VALIDATE_BOOLEAN);
+        // Eloquent update on purpose: caller_id_enabled is in the posConfigRev
+        // whitelist, and updated_at must bump so cached sale screens refresh.
+        Company::where('id', $companyId)->update(['caller_id_enabled' => $enabled]);
+        return response()->json(['ok' => true, 'enabled' => $enabled]);
+    }
+
+    /**
+     * GET /pos/api/caller-events?after={id} — sale-screen popup poll.
+     * Returns only FRESH rings (≤ 2 min) newer than the client's last seen id,
+     * each enriched with the matched-customer stats.
+     */
+    public function events(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company || !($company->caller_id_enabled ?? false)
+            || !Schema::hasTable('pos_caller_events')) {
+            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
+        }
+
+        $after = (int) $request->query('after', 0);
+        $rows = DB::table('pos_caller_events')
+            ->where('company_id', $companyId)
+            ->where('id', '>', $after)
+            ->where('created_at', '>=', now()->subSeconds(self::EVENT_FRESH_SECONDS))
+            ->orderBy('id')
+            ->limit(5)
+            ->get();
+
+        // Cursor semantics: when rows were delivered, advance only through the
+        // DELIVERED ids — a burst of >5 fresh rings must surface on the next
+        // poll, never be skipped. Only when nothing fresh is pending may the
+        // cursor jump past stale rows (so old unseen ids aren't re-scanned).
+        if ($rows->isNotEmpty()) {
+            $lastId = (int) $rows->max('id');
+        } else {
+            $lastId = (int) (DB::table('pos_caller_events')
+                ->where('company_id', $companyId)->max('id') ?? 0);
+        }
+
+        $events = $rows->map(function ($row) use ($companyId) {
+            return [
+                'id' => (int) $row->id,
+                'phone' => $this->displayPhone($row->phone),
+                'name' => $row->caller_name,
+                'source' => $row->source,
+                'at' => Carbon::parse($row->ring_at)->format('h:i A'),
+                'match' => $this->matchCustomer($companyId, $row->phone, $row->caller_name),
+            ];
+        })->values();
+
+        return response()->json([
+            'enabled' => true,
+            'last_id' => max($lastId, $after),
+            'events' => $events,
+        ]);
+    }
+
+    // ─── Customer matching ──────────────────────────────────────────────────
+
+    /** 923001234567 → 0300-1234567 for the popup; passthrough otherwise. */
+    private function displayPhone(?string $norm): ?string
+    {
+        if (!$norm) {
+            return null;
+        }
+        if (str_starts_with($norm, '92') && strlen($norm) === 12) {
+            $local = '0' . substr($norm, 2);
+            return substr($local, 0, 4) . '-' . substr($local, 4);
+        }
+        return '+' . $norm;
+    }
+
+    /**
+     * All raw formats a shop may have stored for a normalized number —
+     * pos_customers.phone / pos_transactions.customer_phone are RAW user input
+     * (PkPhone is not applied on save), so match by variant expansion.
+     */
+    private function phoneVariants(?string $norm): array
+    {
+        if (!$norm) {
+            return [];
+        }
+        $v = [$norm, '+' . $norm, '00' . $norm];
+        if (str_starts_with($norm, '92') && strlen($norm) === 12) {
+            $local = '0' . substr($norm, 2);   // 03001234567
+            $bare = substr($norm, 2);          // 3001234567
+            $v[] = $local;
+            $v[] = $bare;
+            $v[] = substr($local, 0, 4) . '-' . substr($local, 4);   // 0300-1234567
+            $v[] = substr($local, 0, 4) . ' ' . substr($local, 4);   // 0300 1234567
+            $v[] = '+92 ' . substr($norm, 2, 3) . ' ' . substr($norm, 5); // +92 300 1234567
+            $v[] = '92 ' . substr($norm, 2);   // 92 3001234567
+        }
+        return array_values(array_unique($v));
+    }
+
+    /**
+     * Match a ring against pos_customers + bill history.
+     * Phone first (variants, then normalize-compare fallback); WhatsApp
+     * saved-contact rings carry only a NAME → unique-name match, flagged
+     * matched_by='name' so the popup says so.
+     */
+    private function matchCustomer(int $companyId, ?string $phone, ?string $name): ?array
+    {
+        $variants = $this->phoneVariants($phone);
+        $customer = null;
+        $matchedBy = null;
+
+        if ($variants) {
+            $customer = PosCustomer::where('company_id', $companyId)
+                ->whereIn('phone', $variants)->orderByDesc('id')->first();
+            if (!$customer && strlen($phone) >= 9) {
+                // Fallback: same last-7-digits candidates, normalize-compare in PHP
+                // (covers stored oddballs like "0300 123 4567").
+                $last7 = substr($phone, -7);
+                $candidates = PosCustomer::where('company_id', $companyId)
+                    ->whereNotNull('phone')->where('phone', 'like', '%' . $last7 . '%')
+                    ->limit(25)->get();
+                $customer = $candidates->first(fn ($c) => PkPhone::normalize($c->phone) === $phone);
+            }
+            if ($customer) {
+                $matchedBy = 'phone';
+            }
+        }
+
+        if (!$customer && !$variants && $name) {
+            // Name-only (WhatsApp saved contact): only a UNIQUE exact match counts.
+            $named = PosCustomer::where('company_id', $companyId)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->limit(2)->get();
+            if ($named->count() === 1) {
+                $customer = $named->first();
+                $matchedBy = 'name';
+            }
+        }
+
+        // Bill history: by customer_id when known, else by raw phone variants
+        // (walk-in bills store the phone without a customer row).
+        $txn = PosTransaction::where('company_id', $companyId)->where('status', 'completed');
+        $hasIdentity = false;
+        $txn->where(function ($q) use ($customer, $variants, &$hasIdentity) {
+            if ($customer) {
+                $q->orWhere('customer_id', $customer->id);
+                if ($customer->phone) {
+                    $q->orWhere('customer_phone', $customer->phone);
+                }
+                $hasIdentity = true;
+            }
+            if ($variants) {
+                $q->orWhereIn('customer_phone', $variants);
+                $hasIdentity = true;
+            }
+        });
+        if (!$hasIdentity && !$customer) {
+            return null;
+        }
+
+        $typeReady = Schema::hasColumn('pos_transactions', 'transaction_type');
+        $signExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END" : '1';
+        $saleRowExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN 0 ELSE 1 END" : '1';
+        $agg = (clone $txn)->selectRaw(
+            "COALESCE(SUM({$saleRowExpr}),0) as visits, COALESCE(SUM(({$signExpr}) * total_amount),0) as spent"
+        )->first();
+
+        $lastQ = clone $txn;
+        if ($typeReady) {
+            $lastQ->where(function ($w) {
+                $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+            });
+        }
+        $last = $lastQ->orderByDesc('created_at')->first();
+
+        $visits = (int) ($agg->visits ?? 0);
+        if (!$customer && $visits === 0) {
+            return null; // nothing known about this caller
+        }
+
+        return [
+            'customer_id' => $customer ? (int) $customer->id : null,
+            'name' => $customer->name ?? ($last->customer_name ?? null),
+            'phone' => $customer->phone ?? ($last->customer_phone ?? $this->displayPhone($phone)),
+            'address' => $customer->address ?? null,
+            'matched_by' => $matchedBy ?? 'phone',
+            'visits' => $visits,
+            'total_spent' => (int) round((float) ($agg->spent ?? 0)),
+            'last_order_at' => $last ? Carbon::parse($last->created_at)->format('d M, h:i A') : null,
+            'last_order_amount' => $last ? (int) round((float) $last->total_amount) : null,
+        ];
+    }
+}

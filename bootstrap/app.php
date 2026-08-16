@@ -42,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'pos/*',
             'api/agent/*',
             'api/rider-app/*',
+            'api/caller-app/*',
             'webhooks/whatsapp/*', // Meta WA Cloud API status callbacks
             'bio-sync/*/iclock/*', // Biometric device ADMS push (no browser session)
             'iclock/*',            // Root ADMS push for domain-only firmware (K50/K40 — SN-identified)

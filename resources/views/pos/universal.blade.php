@@ -7732,7 +7732,9 @@ function restaurantPos() {
                         // branch chal chuki hoti hai, is liye navigateToTablesWhenIdle
                         // ka busy-wait chalti KOT print kabhi nahi kaat'ta. Offline par
                         // purana picker flow (tables page SW-cache mein nahi hoti).
-                        if (this.tablesFirstFlow && navigator.onLine) {
+                        if (this.tablesFirstFlow) {
+                            // Task 819: Tables-first flow — seedha big Tables screen,
+                            // online AND offline (SW ka TABLES_CACHE serve karta hai).
                             this.$nextTick(() => this.navigateToTablesWhenIdle());
                         } else {
                             this.$nextTick(() => this.openTablePicker());
@@ -8342,10 +8344,10 @@ function restaurantPos() {
         },
         // Receipt-close gateway: TRUE lautaye to caller kuch na kare (hum popup
         // ko print-chain khatam hone par khud band karke Tables par le jate hain).
-        // Flag OFF / offline (tables page SW-cache mein nahi) = FALSE → purana flow.
+        // Task 819: navigator.onLine guard HATA diya — Tables page ab TABLES_CACHE
+        // mein hai; offline par bhi cached snapshot milta hai.
         returnToTablesAfterReceipt() {
             if (!this.tablesFirstFlow || !this.tableBoardEnabled) return false;
-            if (!navigator.onLine) return false;
             if (this.tablesReturnPending) return true; // pehle se raste mein
             this.tablesReturnPending = true;
             const finish = () => { this.showReceipt = false; window.location.assign('/pos/restaurant/tables'); };

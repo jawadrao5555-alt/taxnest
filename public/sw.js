@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260815-195948-f7849f2c'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260816-tables-offline'; // Task 819: Tables-first offline caching
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -9,6 +9,12 @@ const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // /pos/api/boot-check when stale. Purged on ANY logout AND any /login POST
 // (per-user data is baked into the HTML — audit rule, July 2026).
 const SALE_CACHE = `${CACHE_VERSION}-sale`;
+// OFFLINE-FIRST TABLES BOARD (Task 819, Aug 2026): dedicated cache for
+// /pos/restaurant/tables — cache-first + background revalidate, same pattern
+// as SALE_CACHE. Tables-first shops navigate here after every KOT/payment;
+// cache lets the board open even with no internet (last-known snapshot).
+// Purged on logout so the next staff member never sees stale table statuses.
+const TABLES_CACHE = `${CACHE_VERSION}-tables`;
 const OFFLINE_PAGE = '/offline-splash';
 
 const STATIC_ASSETS = [
@@ -55,7 +61,7 @@ self.addEventListener('fetch', e => {
     // GET or POST) purges all cached authenticated pages so the next user on a shared
     // terminal can never see the previous session's pages, even offline.
     if (url.pathname.includes('/logout')) {
-        e.waitUntil(Promise.all([caches.delete(RUNTIME_CACHE), caches.delete(SALE_CACHE)]));
+        e.waitUntil(Promise.all([caches.delete(RUNTIME_CACHE), caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE)]));
         return;
     }
 
@@ -96,8 +102,34 @@ self.addEventListener('fetch', e => {
         return;
     }
 
+    // OFFLINE-FIRST TABLES BOARD (Task 819): exact match on /pos/restaurant/tables
+    // (no query string). Cache-first + background revalidate — identical pattern to
+    // the sale screen above. Page bakes live table statuses; offline shows the last-
+    // known snapshot and auto-reloads when connectivity returns (handled in tables.blade).
+    if (req.mode === 'navigate' && url.pathname === '/pos/restaurant/tables' && url.search === '') {
+        e.respondWith((async () => {
+            const c = await caches.open(TABLES_CACHE);
+            const cached = await c.match(req);
+            const network = fetch(req).then(res => {
+                const ct = res.headers.get('content-type') || '';
+                if (res.ok && !res.redirected && ct.includes('text/html')) {
+                    c.put(req, res.clone());
+                }
+                return res;
+            });
+            if (cached) {
+                network.catch(() => {}); // background revalidate
+                return cached;
+            }
+            try { return await network; } catch (err) {
+                return (await caches.match(OFFLINE_PAGE)) || Response.error();
+            }
+        })());
+        return;
+    }
+
     // Never cache: auth, API, admin, agent, FBR submit, payment posting, livewire, debugbar
-    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/fbr-pos/receipt-settings', '/return'];
+    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/fbr-pos/receipt-settings', '/return', '/pos/restaurant/tables'];
     if (skipPatterns.some(p => url.pathname.includes(p))) return;
 
     // HTML pages: network-first → cache → offline page

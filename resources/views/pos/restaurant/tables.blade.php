@@ -1,4 +1,26 @@
 <x-pos-layout>
+{{-- Task 819 (Aug 2026): Offline banner — tab dikhta hai jab SW cached snapshot
+     serve kare (net nahi). Wapas online par auto page-reload ho jata hai. --}}
+<div id="tn-tables-offline-bar" style="display:none" class="w-full bg-amber-500 text-white text-sm font-semibold text-center py-2 px-4">
+    📡 {{ __('pos.offline_cached_snapshot') }}
+    <span class="font-normal opacity-80 ml-1">{{ __('pos.offline_auto_refresh_hint') }}</span>
+</div>
+<script>
+(function () {
+    var bar = document.getElementById('tn-tables-offline-bar');
+    function sync() {
+        if (!navigator.onLine) {
+            if (bar) bar.style.display = '';
+        } else {
+            if (bar) bar.style.display = 'none';
+        }
+    }
+    sync();
+    window.addEventListener('offline', sync);
+    // Back online → reload to get fresh table statuses from server.
+    window.addEventListener('online', function () { location.reload(); });
+})();
+</script>
 <div x-data="tableView()" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>

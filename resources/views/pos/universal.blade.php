@@ -7049,15 +7049,35 @@ function restaurantPos() {
             // to us table par click = editing RESUME — sirf picker band, koi
             // warning nahi, dobara claim nahi (order pehle se cart mein hai).
             // Match order-id se (occupied tile ka table.order YA purple tile ka
-            // inc), aur fallback table-id se (recall ne selectedTable set kiya
-            // hota hai) taa-ke stale table-status poll bhi dead-end na banaye.
+            // inc), aur fallback table-id se — lekin sirf RECALLED order ke
+            // liye (recall hi selectedTable set karta hai; claimAndLoadIncoming
+            // selectedTable ko chhoota hi nahi, is liye claimed cart ke saath
+            // selectedTable koi PURANI reservation ho sakti hai — us par match
+            // karna ghalat "resume" hota aur picker bas band ho jata). Recalled
+            // fallback stale table-status poll ko dead-end banne se rokta hai.
             // Number() dono taraf — live PDO ids ko STRING deta hai.
             const cartOrderId = this.recalledOrderId || this.incomingOrderId;
             if (cartOrderId && (
                 (table.order && Number(table.order.id) === Number(cartOrderId)) ||
                 (inc && Number(inc.id) === Number(cartOrderId)) ||
-                (this.selectedTable && Number(this.selectedTable.id) === Number(table.id))
+                (this.recalledOrderId && this.selectedTable && Number(this.selectedTable.id) === Number(table.id))
             )) { this.showTablePicker = false; return; }
+            // Task 1027 (Task 975 hissa 2): cart mein kisi AUR table ka
+            // recalled/claimed order khula ho aur cashier DOOSRE table par
+            // click kare — pehle sirf warning toast milta tha aur cashier
+            // phans jata tha (Table 2 ka bill khulta hi nahi tha). Ab
+            // setOrderType precedent: pehla order apne table/DB par mehfooz
+            // hai (held/claimed row ko kuch nahi hota) — screen reset karo
+            // aur usi click ka NORMAL empty-cart flow neeche chalne do
+            // (occupied → board menu / direct open, purple → waiter-claim,
+            // free → reserve; dine_in_auto_kot + guided flow waise hi jaise
+            // khali cart par). Manual (bina recall) bhara cart neeche wale
+            // warning/prompt paths se hi guzarta hai — owner ka "cart kabhi
+            // silently discard na ho" rule unhi ke liye hai.
+            if (cartOrderId && this.cart.length) {
+                this.clearCart(); // order DB/table par jyon-ka-tyon; sirf screen reset
+                this.showToast(window.TXT.type_switch_order_safe, 'info');
+            }
             if (inc) {
                 if (table.order) {
                     // Task 867 (Aug 2026): table-status poll stale ho sakta hai — table.order

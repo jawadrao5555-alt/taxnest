@@ -7354,17 +7354,15 @@ function restaurantPos() {
             const o = this.heldMenu;
             this.heldMenu = null;
             if (!o) return;
-            if (o.kot_sent_at) {
-                // KOT kitchen ja chuki hai → bare confirm() ki jagah rich modal —
-                // items + Made/Not-Made checkboxes (buildOrderCancelAsk degrades to
-                // noTicks if heldOrders snapshot has no real item ids, par KOT alert
-                // aur made_item_ids path dono sahi kaam karte hain).
-                this.boardCancelAsk = this.buildOrderCancelAsk(o);
-                this.boardCancelMade = {};
-            } else {
-                // No KOT sent — bare confirm is fine (nothing was cooked yet).
-                this.deleteHeldOrder(o.id);
-            }
+            // Task #898: ALWAYS use the rich cancel modal (items checklist + KOT
+            // warning) instead of plain confirm().  For no-KOT orders the modal
+            // shows the items list but skips the "KOT ja chuki hai" alert and
+            // made/not-made toggles (buildOrderCancelAsk sets noTicks when item
+            // rows have no real DB ids; boardCancelConfirm sends {} body).
+            // This ensures made_item_ids is available on EVERY '…' menu delete,
+            // not just the KOT path.
+            this.boardCancelAsk = this.buildOrderCancelAsk(o);
+            this.boardCancelMade = {};
         },
         // Free table: reserved-only → release; any open order (cashier OR waiter,
         // Task #409) → confirm + soft-cancel via the same deleteOrder endpoint.

@@ -8528,11 +8528,16 @@ function restaurantPos() {
                 // NOT consume the waiter order — the order stays in Incoming until
                 // a final settles it (conscious decision per review).
                 if (this.incomingOrderId && data.transaction_id && !provisional) {
-                    // Task 646: storeInvoice already settled the order server-side
-                    // (waiter_order_settled) — only fall back to the old client
-                    // call when it didn't (older queued payload / settle failure).
-                    if (data.waiter_order_settled) { this.loadIncoming(); }
-                    else { this.completeIncomingOrder(this.incomingOrderId, data.transaction_id); }
+                    // Task 880 moved settleWaiterOrder inside the DB transaction, so
+                    // storeInvoice always returns waiter_order_settled:true for final
+                    // waiter bills. The client-side completeIncomingOrder fallback
+                    // (Task 646) is removed. If the flag is ever missing or false, we
+                    // surface a visible error immediately — no silent paper-over.
+                    if (data.waiter_order_settled !== true) {
+                        console.error('[processPaymentManual] waiter_order_settled missing/false', data);
+                        this.showToast((window.TXT.waiter_settle_failed || 'Waiter order settle failed — please refresh and check Incoming Orders.'), 'error');
+                    }
+                    this.loadIncoming();
                 }
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
@@ -9059,21 +9064,6 @@ function restaurantPos() {
             }
             fallback();
         },
-        async completeIncomingOrder(orderId, txnId) {
-            try {
-                const res = await fetch('/pos/api/incoming-orders/' + orderId + '/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ transaction_id: txnId }),
-                });
-                const data = await res.json().catch(() => null);
-                if (!data || !data.success) {
-                    console.warn('[completeIncomingOrder]', res.status, data);
-                }
-            } catch (e) { console.warn('[completeIncomingOrder] FAIL', e); }
-            this.loadIncoming();
-        },
-
         // Print invoice → KOT in strict order. Used by auto-print on successful pay.
         // Receipt ALWAYS prints first; KOT chains after receipt's print dialog closes.
         //

@@ -158,17 +158,22 @@ class LangPurityTest extends TestCase
     }
 
     /**
-     * Scan each pos.php source file for duplicate array keys.
+     * Scan every lang/**\/*.php source file for duplicate array keys.
      * PHP silently uses the last definition — duplicates are invisible bugs.
      * We parse the raw source instead of require()ing so we catch both definitions.
+     *
+     * Covers all existing and future lang files, not just pos.php.
      */
     public function test_no_duplicate_keys_in_any_lang_file(): void
     {
-        $duplicates = [];
-        foreach (['en', 'ur', 'rur'] as $locale) {
-            $file = __DIR__ . "/../../lang/{$locale}/pos.php";
-            $this->assertFileExists($file, "lang/{$locale}/pos.php missing");
+        $langDir = __DIR__ . '/../../lang';
+        $files   = glob("{$langDir}/**/*.php");
 
+        $this->assertNotEmpty($files, 'No PHP files found under lang/ — directory missing?');
+
+        $duplicates = [];
+        foreach ($files as $file) {
+            $relative = 'lang/' . ltrim(str_replace(realpath($langDir), '', realpath($file)), '/');
             $src = file_get_contents($file);
             // Match lines of the form:  'some_key'  =>  (any value)
             // Handles optional leading spaces and both ' and " quote chars.
@@ -182,13 +187,13 @@ class LangPurityTest extends TestCase
                 $seen[$key] = true;
             }
             if ($dupes) {
-                $duplicates[$locale] = array_unique($dupes);
+                $duplicates[$relative] = array_unique($dupes);
             }
         }
 
         $msg = '';
-        foreach ($duplicates as $locale => $keys) {
-            $msg .= "\n  lang/{$locale}/pos.php: " . implode(', ', $keys);
+        foreach ($duplicates as $relPath => $keys) {
+            $msg .= "\n  {$relPath}: " . implode(', ', $keys);
         }
         $this->assertSame([], $duplicates, 'Duplicate keys found in lang files:' . $msg);
     }

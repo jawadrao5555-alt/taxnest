@@ -9785,7 +9785,7 @@ function restaurantPos() {
                     this.lastOrderId = orderId || null;
                     this.lastTotal = Math.round(savedTotal || data.total_amount || 0); this.lastPaymentMethod = method;
                     this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
-                    this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : '';
+                    this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                     this.lastSaleAt = Date.now();
                     this.showReceipt = true;

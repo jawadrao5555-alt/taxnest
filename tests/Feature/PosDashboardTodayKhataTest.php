@@ -347,15 +347,62 @@ class PosDashboardTodayKhataTest extends TestCase
         $this->assertNull($khata['local'], 'local figures are admin/manager-only for both-scope users');
     }
 
-    public function test_both_scope_manager_gets_both_buckets(): void
+    /**
+     * Task 996: khufia hidden-local mode — pos_manager with local-check OFF
+     * must NOT see the Local ledger card (matches every other dashboard surface).
+     */
+    public function test_both_scope_manager_with_local_check_off_does_not_get_local_bucket(): void
     {
         $companyId = $this->makeCompany();
         $this->seedKhataDay($companyId);
 
+        // local-check is OFF by default (no session key) — manager is in khufia mode
+        session()->forget('pos_local_check');
+
         $khata = $this->dashboardKhata($companyId, $this->makeUser($companyId, 'pos_manager'));
 
         $this->assertNotNull($khata['pra']);
-        $this->assertNotNull($khata['local'], 'pos_manager is admin-equivalent — sees the local block');
+        $this->assertNull($khata['local'], 'manager in khufia mode (local-check OFF) must not see the local card');
+    }
+
+    /**
+     * Task 996: when the pos_manager activates khufia local-check mode
+     * (Ctrl+Alt+Shift+L → pos_local_check session flag), the Local card reappears.
+     */
+    public function test_both_scope_manager_with_local_check_on_gets_both_buckets(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->seedKhataDay($companyId);
+
+        // Simulate khufia local-check mode ON
+        session(['pos_local_check' => true]);
+
+        $khata = $this->dashboardKhata($companyId, $this->makeUser($companyId, 'pos_manager'));
+
+        $this->assertNotNull($khata['pra']);
+        $this->assertNotNull($khata['local'], 'manager with local-check ON must see the local card');
+        $this->assertSame(700.0, $khata['local']['sale']);
+
+        session()->forget('pos_local_check');
+    }
+
+    /**
+     * Task 996: a pos_manager whose billing scope is locked to 'local' is NOT
+     * subject to the khufia hide rule — they see their local world regardless.
+     */
+    public function test_local_scoped_manager_always_sees_local_bucket(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->seedKhataDay($companyId);
+
+        // local-check OFF — but scope forces local, so posHidesLocalStream() is false
+        session()->forget('pos_local_check');
+
+        $khata = $this->dashboardKhata($companyId, $this->makeUser($companyId, 'pos_manager', 'local'));
+
+        $this->assertNull($khata['pra'], 'local-scoped manager has no PRA access');
+        $this->assertNotNull($khata['local'], 'local-scoped manager always sees local regardless of local-check');
+        $this->assertSame(700.0, $khata['local']['sale']);
     }
 
     // ── 4. rendered partial ──────────────────────────────────────────────────

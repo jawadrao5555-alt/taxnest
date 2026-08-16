@@ -81,7 +81,10 @@ class PosTodayKhata
         };
 
         $showPra = $dashScope !== 'local';
-        $showLocal = $dashScope === 'local' || ($dashScope === 'both' && $user && $user->isPosAdmin());
+        // Task 996: mirror combinedSale() — managers in khufia hidden-local mode
+        // (posHidesLocalStream) must NOT see the Local ledger card, same as every
+        // other dashboard surface (Transactions tab, revenue card, Pending tile).
+        $showLocal = $dashScope === 'local' || ($dashScope === 'both' && $user && $user->isPosAdmin() && !$user->posHidesLocalStream());
 
         return [
             'scope'  => $dashScope,

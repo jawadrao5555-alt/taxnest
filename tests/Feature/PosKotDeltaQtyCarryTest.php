@@ -1127,6 +1127,124 @@ class PosKotDeltaQtyCarryTest extends TestCase
         $this->assertEquals(1.0, (float) $payload[0]['qty']);
     }
 
+    // ── 11. Waiter void-slip invariants ──────────────────────────────────────
+
+    /**
+     * Waiter appendItems is ADDITIVE ONLY — it can never remove a fired dish,
+     * so the void-slip path is never entered. Confirm that calling appendItems
+     * on an order that already has printed items creates zero kot_void print
+     * jobs and the response carries no void URL.
+     *
+     * This is the "waiter edits" regression: the waiter app has no endpoint to
+     * remove individual items from a running order; only appendItems (add) and
+     * cancelOrder (whole-order cancel) exist. Task 794's void detection lives
+     * exclusively in holdOrder's printed carry-pool — the appendItems path
+     * never touches that pool, so it is structurally impossible for it to fire
+     * a void slip.
+     */
+    public function test_waiter_append_items_does_not_fire_void_slip(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c); // set pos guard; appendItems uses auth('pos')->user()
+        $tableId = $this->makeTable($c);
+
+        // 1. Create a held order with a PRINTED item — kitchen already got the KOT.
+        $order = RestaurantOrder::create([
+            'company_id'      => $c->id,
+            'order_number'    => 'ORD-TEST-APPEND',
+            'table_id'        => $tableId,
+            'order_type'      => 'dine_in',
+            'status'          => 'held',
+            'source'          => 'waiter',
+            'subtotal'        => 100,
+            'total_amount'    => 100,
+            'created_by'      => Auth::guard('pos')->id(),
+            'kot_sent_at'     => now(),
+            'kot_print_count' => 1,
+        ]);
+        RestaurantOrderItem::create([
+            'order_id'       => $order->id,
+            'item_type'      => 'manual',
+            'item_name'      => 'Bottle',
+            'quantity'       => 1,
+            'unit_price'     => 100,
+            'subtotal'       => 100,
+            'kot_printed_at' => now(),
+            'kot_batch_no'   => 1,
+        ]);
+
+        // 2. Waiter APPENDS a new item (additive — Bottle stays untouched).
+        cache()->flush();
+        $req = \Illuminate\Http\Request::create(
+            '/pos/waiter/orders/' . $order->id . '/append', 'POST',
+            ['items' => [['name' => 'Chai', 'quantity' => 2, 'unit_price' => 50, 'item_id' => null]]]
+        );
+        $res = app(\App\Http\Controllers\RestaurantWaiterController::class)->appendItems($req, $order->id);
+
+        $this->assertSame(200, $res->getStatusCode(), $res->getContent());
+        $this->assertTrue(json_decode($res->getContent(), true)['success']);
+
+        // 3. Zero kot_void jobs must ever be created by the append path.
+        $voidJobs = DB::table('pos_print_jobs')->where('type', 'kot_void')->count();
+        $this->assertSame(0, $voidJobs, 'appendItems is additive-only — no void slip must be fired');
+
+        // 4. The printed Bottle is still there; the new Chai is unprinted (ready for delta KOT).
+        $items = RestaurantOrderItem::where('order_id', $order->id)->get();
+        $this->assertCount(2, $items);
+        $this->assertSame(1, $items->whereNotNull('kot_printed_at')->count(), 'Bottle stamp intact');
+        $this->assertSame(1, $items->whereNull('kot_printed_at')->count(), 'Chai queued for delta KOT');
+        $this->assertSame('Chai', $items->whereNull('kot_printed_at')->first()->item_name);
+    }
+
+    /**
+     * When a CASHIER recalls a waiter-originated order (source='waiter') and
+     * removes a dish that was already printed, the void slip IS fired through
+     * holdOrder's carry-pool logic — the waiter source flag has no effect on
+     * void detection (it runs on EVERY recalled re-hold with leftover printed
+     * chunks). This proves the food-waste hole is closed for waiter orders too.
+     */
+    public function test_cashier_recall_of_waiter_sourced_order_with_item_removal_fires_void(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        // 1. Create an order and mark it as waiter-sourced (simulates a waiter punch).
+        $res1 = $this->hold([
+            'items'      => [$this->bottle(1), ['item_type' => 'manual', 'item_name' => 'Fries', 'unit_price' => 50, 'quantity' => 2]],
+            'order_type' => 'dine_in',
+            'table_id'   => $tableId,
+        ]);
+        $this->assertSame(200, $res1->getStatusCode());
+        $oldId = json_decode($res1->getContent(), true)['order']['id'];
+        // Mark as waiter-sourced to prove source doesn't affect void detection.
+        DB::table('restaurant_orders')->where('id', $oldId)->update(['source' => 'waiter']);
+        $this->stampPrinted($oldId, 1); // kitchen already fired Bottle + Fries
+
+        // 2. Cashier recalls the waiter order and REMOVES the Fries (Bottle kept).
+        $res2 = $this->hold([
+            'items'              => [$this->bottle(1)],
+            'order_type'         => 'dine_in',
+            'table_id'           => $tableId,
+            'recalled_order_id'  => $oldId,
+        ]);
+        $this->assertSame(200, $res2->getStatusCode(), $res2->getContent());
+        $data = json_decode($res2->getContent(), true);
+
+        // 3. Void was detected: a non-null URL proves the carry pool found the
+        //    removed Fries qty and built a void payload for the kitchen.
+        $this->assertNotNull(
+            $data['kot_void_url'],
+            'removing a printed dish from a waiter-sourced order must produce a void slip URL'
+        );
+
+        // 4. The void payload must encode ONLY the removed Fries (not the Bottle).
+        $voidItems = $this->decodeVoidUrl($data['kot_void_url']);
+        $this->assertCount(1, $voidItems, 'unchanged Bottle must NOT appear on the void slip');
+        $this->assertSame('Fries', $voidItems[0]['item_name']);
+        $this->assertEquals(2.0, (float) $voidItems[0]['qty'], 'full printed Fries qty must be voided');
+    }
+
     public function test_pay_with_distinct_lines_keeps_them_separate(): void
     {
         // Genuinely different lines (different notes) must NOT merge on the bill.

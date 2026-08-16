@@ -3986,6 +3986,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'waiter_order_prefix' => 'Waiter order ',
     'waiter_more_label' => 'Mazeed options (takeaway, phone, note, cashier)',
     'waiter_orders_awaiting' => 'Waiter Orders — payment ka intezar',
+    'waiter_settle_failed' => 'Waiter order settle nakam — page refresh kar ke Incoming Orders check karein.',
     'waiter_tablet' => 'Waiter Tablet',
     'waiter_tablet_subtitle' => 'Order banayein, phir payment ke liye cashier ko bhejein.',
     'waiter_app_download' => 'Waiter App (APK)',

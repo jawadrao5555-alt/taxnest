@@ -419,6 +419,63 @@ class PosSplitPaymentPdfReceiptTest extends TestCase
         }
     }
 
+    /**
+     * Task 895 — 'Other' bucket path: a split-payment bill whose second leg is
+     * an online transfer (not cash, not a card alias) must render its own "Other"
+     * row on both receipt templates using the pos.receipt_pay_other translation key.
+     *
+     * This is the path that had never been exercised in a QA pass before this task.
+     * The test also confirms the row carries the correct amount and that the Cash
+     * row carries its own correct amount (no cross-contamination between buckets).
+     */
+    public function test_other_bucket_online_transfer_shows_own_row_on_both_templates(): void
+    {
+        $company = $this->makeCompany();
+
+        $cash   = new PosPayment(['payment_method' => 'cash',            'amount' => 600]);
+        $cash->id = 1; $cash->transaction_id = self::TXN_ID;
+        $online = new PosPayment(['payment_method' => 'online_transfer', 'amount' => 200]);
+        $online->id = 2; $online->transaction_id = self::TXN_ID;
+
+        $txn = $this->makeTxn($company, collect([$cash, $online]), ['total_amount' => 800]);
+
+        foreach (self::TEMPLATES as $tpl) {
+            $html = $this->renderPdfStyle($tpl, $txn, $company);
+
+            // Breakdown heading must be present (≥2 payment rows).
+            $this->assertStringContainsString(
+                __('pos.payment_breakdown'),
+                $html,
+                "{$tpl}: payment_breakdown heading must appear for cash+online_transfer split"
+            );
+
+            // Cash row with the correct label and amount.
+            $this->assertStringContainsString(
+                __('pos.receipt_pay_cash'),
+                $html,
+                "{$tpl}: Cash label must appear"
+            );
+            $this->assertStringContainsString('600.00', $html, "{$tpl}: cash amount 600");
+
+            // 'Other' row — online_transfer is not cash, not a card alias, so it
+            // must be bucketed as 'other:online_transfer' and labelled with
+            // pos.receipt_pay_other, NOT pos.receipt_pay_card.
+            $this->assertStringContainsString(
+                __('pos.receipt_pay_other'),
+                $html,
+                "{$tpl}: pos.receipt_pay_other label must appear for online_transfer leg"
+            );
+            $this->assertStringContainsString('200.00', $html, "{$tpl}: online_transfer amount 200");
+
+            // Card label must NOT appear — there is no card leg in this bill.
+            $this->assertStringNotContainsString(
+                __('pos.receipt_pay_card'),
+                $html,
+                "{$tpl}: Card label must NOT appear when no card payment is present"
+            );
+        }
+    }
+
     /** Three-way split (cash + card + other) — all three bucket labels must appear. */
     public function test_three_way_split_shows_all_three_bucket_labels(): void
     {

@@ -2917,7 +2917,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_qty' => 'Qty',
     'receipt_pay_cash' => 'Cash',
     'receipt_pay_card' => 'Card',
-    'receipt_pay_other' => 'Other',
+    'receipt_pay_other' => 'Doosra',
     'receipt_rate' => 'Rate',
     'receipt_rider' => 'Rider',
     'receipt_closed_by' => 'Closed by',

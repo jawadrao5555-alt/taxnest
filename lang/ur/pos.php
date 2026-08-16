@@ -3443,6 +3443,7 @@ return [
     'requeue_exempt_success_agent'  => '🟡 :invoice ڈیسک ٹاپ ایجنٹ کے لیے دوبارہ قطار میں لگ گیا — اگلے پول پر صفر ٹیکس ریٹ پر سبمٹ ہو جائے گا۔',
     'requeue_exempt_not_eligible'   => 'یہ بل دوبارہ قطار میں لگانے کے لیے اہل نہیں رہا (شاید پہلے ہی سبمٹ یا قطار میں لگ چکا ہے)۔',
     'only_owner_requeue_exempt'     => 'صرف شاپ کا مالک مستثنیٰ بلوں کو PRA کے لیے دوبارہ قطار میں لگا سکتا ہے۔',
+    'requeue_exempt_queued_reporting_off' => '🟡 :invoice PRA قطار میں شامل ہو گیا — PRA رپورٹنگ فی الحال بند ہے۔ جب رپورٹنگ دوبارہ آن ہو گی تو بل خود بخود سبمٹ ہو جائے گا۔',
     'submit_to_pra_make_final' => 'PRA کو سبمٹ کریں — حتمی بنائیں',
     'submitted_to_fbr' => 'FBR کو سبمٹ ہو گیا',
     'submitted_to_pra' => 'PRA کو سبمٹ ہو گیا',

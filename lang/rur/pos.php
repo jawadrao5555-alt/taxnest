@@ -3443,6 +3443,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'requeue_exempt_success_agent'  => '🟡 :invoice desktop agent ke liye queue ho gaya — agli poll par TaxRate 0 par submit ho jayega.',
     'requeue_exempt_not_eligible'   => 'Yeh bill dobara queue karne ke liye eligible nahi raha (shayad pehle se submit ya queue ho chuka hai).',
     'only_owner_requeue_exempt'     => 'Sirf shop ka owner exempt bills ko PRA ke liye dobara queue kar sakta hai.',
+    'requeue_exempt_queued_reporting_off' => '🟡 :invoice PRA queue mein aa gaya — PRA reporting filhal band hai. Jab reporting on karein ge, bill khud ba khud submit ho jayega.',
     'submit_to_pra_make_final' => 'PRA ko submit karein — Final karein',
     'submitted_to_fbr' => 'FBR ko submit ho gaya',
     'submitted_to_pra' => 'PRA ko submit ho gaya',

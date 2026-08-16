@@ -3381,6 +3381,17 @@ class PosController extends Controller
             ]));
         }
 
+        // Direct-server mode: if reporting is currently OFF, the bill is already
+        // queued (pending) — sendInvoice() would refuse with "PRA reporting is
+        // disabled" and the owner would see an error while the bill has already
+        // moved tabs. Instead, surface an explicit "queued, will submit when you
+        // turn reporting back on" message so the state and the UI agree.
+        if (!$company->praReportingActive()) {
+            return back()->with('success', __('pos.requeue_exempt_queued_reporting_off', [
+                'invoice' => $transaction->invoice_number,
+            ]));
+        }
+
         // Direct-server mode: attempt an immediate PRA submission.
         try {
             $praService = new PraIntegrationService($company);

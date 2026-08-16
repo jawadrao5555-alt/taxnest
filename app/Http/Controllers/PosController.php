@@ -10460,6 +10460,7 @@ class PosController extends Controller
             $orderTypes = $transactions
                 ->groupBy(fn ($t) => in_array($t->order_type, ['dine_in', 'takeaway', 'delivery'], true)
                     ? $t->order_type : 'other')
+                ->reject(fn ($g, $key) => $key === 'other')
                 ->map(function ($g, $key) use ($labelMap) {
                     return (object) [
                         'label'   => $labelMap[$key] ?? 'Other',

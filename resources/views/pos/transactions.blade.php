@@ -103,7 +103,7 @@
     @endphp
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
-        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 {{ !empty($company->restaurant_mode) ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-5' }} gap-4">
             <input type="hidden" name="tab" value="{{ $tab ?? 'pra' }}">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('pos.ph_search_invoice_customer') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <select name="payment_method" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">

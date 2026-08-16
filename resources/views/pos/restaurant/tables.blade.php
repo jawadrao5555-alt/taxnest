@@ -21,6 +21,25 @@
     window.addEventListener('online', function () { location.reload(); });
 })();
 </script>
+<script>
+// Task 823 (Aug 2026): TABLES_CACHE re-prime after a browser-data clear.
+// First visit after a clear = no controlling SW (it registers post-load), so
+// TABLES_CACHE stayed empty and a Tables-first shop going offline right after
+// a reset hit the offline splash instead of the cached board.
+// No controller yet → once the fresh SW activates, ask it to fetch+cache this
+// board in the background, so the very next open is offline-ready again.
+// (Same pattern as TN_PRIME_SALE_CACHE on the sale screen.)
+(function () {
+    try {
+        if (!('serviceWorker' in navigator) || navigator.serviceWorker.controller) return;
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.ready.then(function (reg) {
+                if (reg.active) reg.active.postMessage({ type: 'TN_PRIME_TABLES_CACHE' });
+            }).catch(function () {});
+        });
+    } catch (e) { /* best-effort */ }
+})();
+</script>
 <div x-data="tableView()" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>

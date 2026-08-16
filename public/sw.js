@@ -245,4 +245,24 @@ self.addEventListener('message', e => {
             } catch (err) { /* best-effort — normal second-load prime still applies */ }
         })());
     }
+    // Task 823 (Aug 2026): TABLES_CACHE re-prime after a browser-data clear.
+    // Same gap as TN_PRIME_SALE_CACHE above: the first /pos/restaurant/tables
+    // visit after a clear is NOT SW-controlled, so TABLES_CACHE stayed empty
+    // and a Tables-first shop going offline right after a reset hit the
+    // offline splash instead of the cached board. tables.blade posts this when
+    // it boots with no controller — fetch+cache once in the background. Fixed
+    // URL (never cache arbitrary pages); redirects/non-HTML rejected same as
+    // the navigate path above.
+    if (e.data && e.data.type === 'TN_PRIME_TABLES_CACHE') {
+        e.waitUntil((async () => {
+            try {
+                const url = '/pos/restaurant/tables';
+                const c = await caches.open(TABLES_CACHE);
+                if (await c.match(url)) return; // already primed
+                const res = await fetch(url, { credentials: 'same-origin' });
+                const ct = res.headers.get('content-type') || '';
+                if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(url, res.clone());
+            } catch (err) { /* best-effort — next online visit still primes via navigate path */ }
+        })());
+    }
 });

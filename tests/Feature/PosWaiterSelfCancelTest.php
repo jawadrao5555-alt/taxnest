@@ -39,6 +39,10 @@ class PosWaiterSelfCancelTest extends TestCase
             $table->string('name')->nullable();
             // Task 527: waiter self-cancel is admin-gated (default OFF).
             $table->boolean('pos_waiter_cancel_enabled')->default(false);
+            // Task 850: needed by KotPrintService::enqueueVoid.
+            $table->json('pos_printer_settings')->nullable();
+            $table->boolean('agent_enabled')->default(false);
+            $table->timestamp('agent_last_seen')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
@@ -101,6 +105,29 @@ class PosWaiterSelfCancelTest extends TestCase
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->string('special_notes')->nullable();
             $table->timestamp('kot_printed_at')->nullable();
+            $table->timestamps();
+        });
+
+        // Task 850: needed by KotPrintService::enqueueVoid (void slip path).
+        Schema::create('pos_stations', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->string('printer_name')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        Schema::create('pos_print_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('type')->default('kot');
+            $table->string('target_printer')->nullable();
+            $table->unsignedBigInteger('restaurant_order_id')->nullable();
+            $table->string('render_query')->nullable();
+            $table->json('printed_item_ids')->nullable();
+            $table->string('status')->default('pending');
+            $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
         });
     }
@@ -233,5 +260,104 @@ class PosWaiterSelfCancelTest extends TestCase
         $this->assertCount(1, $orders);
         $this->assertArrayHasKey('kot_sent_at', $orders[0]);
         $this->assertNotNull($orders[0]['kot_sent_at']);
+    }
+
+    /**
+     * Task 850: waiter cancels an order whose KOT already printed → a kot_void
+     * print job must be created so the kitchen knows to stop cooking.
+     */
+    public function test_printed_items_trigger_void_job_on_waiter_cancel(): void
+    {
+        [$companyId, $tableId, $waiterId] = $this->seedData();
+
+        // Enable silent printing with an agent that is "online" (last seen now).
+        DB::table('companies')->where('id', $companyId)->update([
+            'agent_enabled'        => true,
+            'agent_last_seen'      => now()->toDateTimeString(),
+            'pos_printer_settings' => json_encode([
+                'silent_print_enabled' => true,
+                'kot_printer'          => 'KitchenPrinter',
+            ]),
+        ]);
+
+        $orderId = $this->makeOrder($companyId, $tableId, $waiterId, 'held', now()->toDateTimeString());
+
+        // Mark one item as already printed (KOT reached the kitchen).
+        DB::table('restaurant_order_items')->insert([
+            'order_id'       => $orderId,
+            'item_type'      => 'manual',
+            'item_id'        => null,
+            'item_name'      => 'Biryani',
+            'quantity'       => 2,
+            'unit_price'     => 350,
+            'subtotal'       => 700,
+            'kot_printed_at' => now()->toDateTimeString(), // already sent to kitchen
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        $res = $this->cancel($orderId);
+
+        $this->assertSame(200, $res->getStatusCode());
+        $data = json_decode($res->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        // A kot_void job must exist for this order.
+        $job = DB::table('pos_print_jobs')
+            ->where('company_id', $companyId)
+            ->where('type', 'kot_void')
+            ->where('restaurant_order_id', $orderId)
+            ->first();
+        $this->assertNotNull($job, 'Expected a kot_void print job after waiter cancel of a printed order');
+        $this->assertSame('pending', $job->status);
+
+        // The response should confirm the void was queued.
+        $this->assertTrue($data['kot_void_queued']);
+    }
+
+    /**
+     * Task 850: waiter cancels an order whose KOT never printed (fresh hold) →
+     * no void job is created (kitchen never got the order, nothing to void).
+     */
+    public function test_unprinted_items_skip_void_on_waiter_cancel(): void
+    {
+        [$companyId, $tableId, $waiterId] = $this->seedData();
+
+        DB::table('companies')->where('id', $companyId)->update([
+            'agent_enabled'        => true,
+            'agent_last_seen'      => now()->toDateTimeString(),
+            'pos_printer_settings' => json_encode([
+                'silent_print_enabled' => true,
+                'kot_printer'          => 'KitchenPrinter',
+            ]),
+        ]);
+
+        $orderId = $this->makeOrder($companyId, $tableId, $waiterId, 'held', now()->toDateTimeString());
+
+        // Item with kot_printed_at = NULL (KOT never fired).
+        DB::table('restaurant_order_items')->insert([
+            'order_id'       => $orderId,
+            'item_type'      => 'manual',
+            'item_id'        => null,
+            'item_name'      => 'Chai',
+            'quantity'       => 1,
+            'unit_price'     => 50,
+            'subtotal'       => 50,
+            'kot_printed_at' => null,
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        $res = $this->cancel($orderId);
+
+        $this->assertSame(200, $res->getStatusCode());
+
+        // No void job — kitchen never received this order.
+        $count = DB::table('pos_print_jobs')
+            ->where('company_id', $companyId)
+            ->where('type', 'kot_void')
+            ->where('restaurant_order_id', $orderId)
+            ->count();
+        $this->assertSame(0, $count, 'No void job expected when KOT was never printed');
     }
 }

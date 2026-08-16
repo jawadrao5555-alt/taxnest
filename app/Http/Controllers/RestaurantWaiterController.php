@@ -606,14 +606,41 @@ class RestaurantWaiterController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
         }
 
+        // Company is needed for both the waiter-cancel gate AND the void enqueue
+        // below — load once here so the permission check and the KOT service share
+        // the same object.
+        $company = Company::find($companyId);
+
         // Task 527 (owner, 12 Aug 2026): waiter self-cancel is now an
         // admin-controlled permission, DEFAULT OFF (missing column reads null
         // → blocked, which IS the desired default). Waiters only —
         // admins/managers using the tablet keep cancel.
         if ($user->isPosWaiter()) {
-            $company = Company::find($companyId);
             if (!(bool) ($company->pos_waiter_cancel_enabled ?? false)) {
                 return response()->json(['success' => false, 'message' => __('pos.waiter_cancel_not_allowed')], 403);
+            }
+        }
+
+        // Task 850 — VOID SLIP pre-collection: gather every printed item BEFORE
+        // the cancel so we can tell the kitchen to stop cooking. Only items with
+        // a kot_printed_at stamp count — a fresh hold cancelled before any KOT
+        // printed stays silent (nothing sent = nothing to void). This read happens
+        // before the atomic UPDATE; if the UPDATE later loses the race (409), the
+        // collected items are simply discarded.
+        $orderForVoid = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $id)
+            ->with('items')
+            ->first();
+        $voidItems = [];
+        if ($orderForVoid) {
+            foreach ($orderForVoid->items->whereNotNull('kot_printed_at') as $oi) {
+                $voidItems[] = [
+                    'item_type' => $oi->item_type ?? 'product',
+                    'item_id'   => $oi->item_id,
+                    'item_name' => $oi->item_name ?? '',
+                    'notes'     => $oi->special_notes ?? '',
+                    'qty'       => (float) $oi->quantity,
+                ];
             }
         }
 
@@ -671,7 +698,30 @@ class RestaurantWaiterController extends Controller
         } catch (\Exception $auditEx) {
         }
 
-        return response()->json(['success' => true, 'message' => 'Order cancelled']);
+        // Task 850 — post-cancel void enqueue: tell the kitchen to stop cooking
+        // the cancelled dishes. Mirrors deleteOrder's best-effort pattern: a
+        // failed enqueue never rolls back the cancel. The waiter JS client only
+        // checks data.success and shows a toast — kot_void_queued/url are
+        // returned for parity with deleteOrder (future client enhancement).
+        $kotVoidQueued = false;
+        $kotVoidUrl    = null;
+        if (!empty($voidItems) && $company && $order) {
+            try {
+                $enqVoid = \App\Services\KotPrintService::enqueueVoid($company, $order, $voidItems, $user->id);
+                $kotVoidQueued = (bool) ($enqVoid['printed'] ?? false) && !empty($enqVoid['job_ids'] ?? []);
+            } catch (\Throwable $voidEx) {
+                \Illuminate\Support\Facades\Log::warning('cancelOrder (waiter) void KOT enqueue failed: ' . $voidEx->getMessage(), ['order_id' => $id]);
+            }
+            $kotVoidUrl = route('pos.restaurant.void-ticket', $id, false)
+                . '?void_items=' . urlencode(base64_encode(json_encode($voidItems)));
+        }
+
+        return response()->json([
+            'success'         => true,
+            'message'         => 'Order cancelled',
+            'kot_void_queued' => $kotVoidQueued,
+            'kot_void_url'    => $kotVoidUrl,
+        ]);
     }
 
     /** Cashier side — waiter orders waiting for payment (mine or unassigned; admins see all). */

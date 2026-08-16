@@ -1002,6 +1002,13 @@ function waiterApp() {
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data.success) {
                     this.showToast(@js(__('pos.order_cancelled_toast')), 'success');
+                    // Task 850 — void slip delivery: agent path (queued=true) needs no
+                    // client action. When the agent is offline, fall back to a hidden
+                    // iframe that triggers window.print() via auto_print=1 so the
+                    // kitchen still gets the VOID slip from the browser.
+                    if (!data.kot_void_queued && data.kot_void_url) {
+                        this._printVoidViaIframe(data.kot_void_url + '&auto_print=1');
+                    }
                 } else {
                     this.showToast(data.message || @js(__('pos.cancel_failed')), 'error');
                 }
@@ -1273,6 +1280,21 @@ function waiterApp() {
             this.toastType = type;
             clearTimeout(this._toastTimer);
             this._toastTimer = setTimeout(() => { this.toast = ''; }, 3000);
+        },
+
+        // Task 850 — void-slip iframe fallback: when the Desktop Agent is offline,
+        // load the void-ticket URL in a hidden iframe so auto_print=1 triggers
+        // window.print() inside it and the kitchen still gets the VOID slip.
+        // Mirrors the cashier sale screen's _printViaIframe pattern (universal.blade.php).
+        _printVoidViaIframe(url) {
+            let frame = document.getElementById('waiter-void-frame');
+            if (!frame) {
+                frame = document.createElement('iframe');
+                frame.id = 'waiter-void-frame';
+                frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+                document.body.appendChild(frame);
+            }
+            frame.src = url;
         },
     };
 }

@@ -69,7 +69,7 @@ self.addEventListener('fetch', e => {
     // starting a session — drop the cached sale screen, it bakes per-user data
     // (PRA toggle, role gates, discount limit, grid prefs).
     if (req.method === 'POST' && url.pathname.includes('/login')) {
-        // Tables board bakes per-session data — must be purged
+        // Tables board is cache-first + bakes per-session data — must be purged
         // alongside the sale screen on user-switch so a new login never sees the
         // previous session's table snapshot (cross-user exposure on shared terminals).
         e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE)]));
@@ -85,7 +85,7 @@ self.addEventListener('fetch', e => {
     // Aug 2026: /fbr-pos/create joined (FBR offline billing — PRA port).
     if (req.mode === 'navigate' && (url.pathname === '/pos/invoice/create' || url.pathname === '/fbr-pos/create') && url.search === '') {
         e.respondWith((async () => {
-                const c = await caches.open(SALE_CACHE);
+            const c = await caches.open(SALE_CACHE);
             const cached = await c.match(req);
             const network = fetch(req).then(res => {
                 const ct = res.headers.get('content-type') || '';
@@ -236,12 +236,14 @@ self.addEventListener('message', e => {
     if (e.data && e.data.type === 'TN_PRIME_SALE_CACHE') {
         e.waitUntil((async () => {
             try {
-                const url = e.data.url === '/fbr-pos/create' ? '/fbr-pos/create' : '/pos/invoice/create';
+                const saleUrls = ['/pos/invoice/create', '/fbr-pos/create'];
                 const c = await caches.open(SALE_CACHE);
-                if (await c.match(url)) return; // already primed
-                const res = await fetch(url, { credentials: 'same-origin' });
-                const ct = res.headers.get('content-type') || '';
-                if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(url, res.clone());
+                await Promise.all(saleUrls.map(async (u) => {
+                    if (await c.match(u)) return; // already primed
+                    const res = await fetch(u, { credentials: 'same-origin' });
+                    const ct = res.headers.get('content-type') || '';
+                    if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(u, res.clone());
+                }));
             } catch (err) { /* best-effort — normal second-load prime still applies */ }
         })());
     }

@@ -767,19 +767,27 @@
                 $qrUrl = \App\Support\QrImage::dataUri($publicUrl, 5, 4);
                 $qrCaption = __('pos.receipt_scan_menu');
             } else {
-                // No token AND no public profile — legacy text payload.
-                // ZFC issue #9 (28 Jul 2026): business name OFF => no name leak.
-                $qrLines = [
-                    $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
-                    $transaction->invoice_number,
-                    $transaction->created_at->format('d/m/Y H:i'),
-                    'Total: ' . number_format($transaction->total_amount, 2),
-                ];
-                if ($rp['show_business_name'] ?? true) {
-                    $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                // Task 777 — URL QR opens the public bill page; mirrors
+                // receipt_80mm, keep in sync.
+                $billPageTok = $transaction->publicBillToken();
+                if ($billPageTok) {
+                    $qrUrl = \App\Support\QrImage::dataUri(url('/bill/' . $billPageTok), 5, 4);
+                    $qrCaption = __('pos.receipt_scan_bill');
+                } else {
+                    // share_token column missing (PROD drift) — legacy text payload.
+                    // ZFC issue #9 (28 Jul 2026): business name OFF => no name leak.
+                    $qrLines = [
+                        $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
+                        $transaction->invoice_number,
+                        $transaction->created_at->format('d/m/Y H:i'),
+                        'Total: ' . number_format($transaction->total_amount, 2),
+                    ];
+                    if ($rp['show_business_name'] ?? true) {
+                        $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                    }
+                    $qrUrl = \App\Support\QrImage::dataUri(implode("\n", $qrLines), 5, 4);
+                    $qrCaption = __('pos.receipt_scan_details');
                 }
-                $qrUrl = \App\Support\QrImage::dataUri(implode("\n", $qrLines), 5, 4);
-                $qrCaption = __('pos.receipt_scan_details');
             }
         } else {
             $qrUrl = null;

@@ -107,6 +107,7 @@
     </div>
     @endif
 
+
     <table>
         <tr>
             <th>{{ __('pos.receipt_item') }}</th>
@@ -188,6 +189,7 @@
         @endforeach
     </table>
     @endif
+
 
     @if($menuUrl)
     <a class="menu-link" href="{{ $menuUrl }}">{{ __('pos.receipt_scan_menu') }} &rarr;</a>

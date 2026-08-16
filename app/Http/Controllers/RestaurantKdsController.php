@@ -220,6 +220,64 @@ class RestaurantKdsController extends Controller
         ]);
     }
 
+    /**
+     * Task 855: server-side void acknowledgement — clears the cancelled-dish badge
+     * for ALL KDS screens on this shop. Sets void_items = NULL so the next poll
+     * returns an empty array and hides the badge everywhere.
+     * NEVER touches kitchen_status, status, or any billing column.
+     *
+     * Race safety: the client sends the exact void_items array it observed
+     * (expected_void). The UPDATE is conditioned on the stored value matching —
+     * if a newer cancellation has replaced it before "Got it" was tapped, we
+     * return 409 so the UI refreshes and the cook sees the new list instead.
+     */
+    public function ackVoid(Request $request, $orderId)
+    {
+        $companyId = app('currentCompanyId');
+
+        $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => "Order #{$orderId} not found"], 404);
+        }
+
+        // Already null — idempotent: another screen ack'd it first, all good.
+        if ($order->void_items === null) {
+            return response()->json(['success' => true, 'message' => "Already acknowledged"]);
+        }
+
+        // Encode what the client observed so we can compare with the stored value.
+        $expectedRaw = $request->input('expected_void');
+        $expectedJson = is_array($expectedRaw) ? json_encode($expectedRaw) : null;
+
+        // Only clear when the stored JSON matches what the cook saw.
+        // If a newer cancellation has since updated void_items, affected = 0 → 409.
+        $query = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $order->id);
+
+        if ($expectedJson !== null) {
+            $query->where('void_items', $expectedJson);
+        } else {
+            $query->whereNotNull('void_items');
+        }
+
+        $affected = $query->update(['void_items' => null]);
+
+        if ($affected === 0) {
+            // A newer void list replaced the one this cook saw — send 409 so
+            // the client refreshes and the cook can acknowledge the new list.
+            return response()->json([
+                'success' => false,
+                'conflict' => true,
+                'message' => "A newer cancellation has been added — please review and acknowledge again",
+            ], 409);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Void acknowledged for {$order->order_number}",
+        ]);
+    }
+
     public function liveOrders()
     {
         $companyId = app('currentCompanyId');

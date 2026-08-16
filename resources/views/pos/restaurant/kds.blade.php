@@ -302,18 +302,35 @@ function kdsScreen() {
             return (this.acknowledgedVoids[String(order.id)] || '') !== sig;
         },
 
-        acknowledgeVoids(orderId, voidItems) {
-            const sig = JSON.stringify(voidItems || []);
-            this.acknowledgedVoids[String(orderId)] = sig;
+        async acknowledgeVoids(orderId, voidItems) {
+            // Task 855: send server-side ack so ALL KDS screens on this shop see
+            // the badge clear on their next poll (void_items set to NULL on the row).
+            // expected_void = the exact list the cook saw — server uses it as a
+            // conditional WHERE so a stale ack never erases a newer cancellation.
             try {
-                const stored = {};
-                try { Object.assign(stored, JSON.parse(localStorage.getItem('kds_acked_voids') || '{}')); } catch(e) {}
-                stored[String(orderId)] = sig;
-                // Prune stale entries (orders no longer on board).
-                const liveIds = new Set(this.orders.map(o => String(o.id)));
-                Object.keys(stored).forEach(k => { if (!liveIds.has(k)) delete stored[k]; });
-                localStorage.setItem('kds_acked_voids', JSON.stringify(stored));
-            } catch(e) {}
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/ack-void`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                    body: JSON.stringify({ expected_void: voidItems || [] }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    // Confirmed: hide immediately on this screen too.
+                    const order = this.orders.find(o => o.id === orderId);
+                    if (order) order.void_items = [];
+                } else if (res.status === 409) {
+                    // A newer cancellation replaced the one this cook saw — refresh
+                    // so the badge shows the updated list and the cook can ack again.
+                    this.showToast(@js(__('pos.kds_void_conflict')), 'error');
+                    this.refreshOrders();
+                } else {
+                    // Network / server error — refresh so the badge stays until the
+                    // cook can successfully acknowledge it.
+                    this.refreshOrders();
+                }
+            } catch(e) {
+                this.refreshOrders();
+            }
         },
 
         initAcknowledgedVoids() {

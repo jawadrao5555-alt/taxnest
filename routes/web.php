@@ -918,6 +918,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/kds/{id}/kitchen-status', [RestaurantKdsController::class, 'kitchenStatus'])->name('pos.restaurant.kds.kitchen-status');
     Route::post('/restaurant/kds/scan', [RestaurantKdsController::class, 'scanComplete'])->name('pos.restaurant.kds.scan');
     Route::post('/restaurant/kds/clear-all', [RestaurantKdsController::class, 'clearAll'])->name('pos.restaurant.kds.clear-all');
+    // Task 855: server-side void ack — clears cancelled-dish badge on ALL KDS screens.
+    Route::post('/restaurant/orders/{id}/ack-void', [RestaurantKdsController::class, 'ackVoid'])->name('pos.restaurant.kds.ack-void');
     Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
     Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
     // Task 794: VOID/CANCEL slip — dishes removed from a running order after their KOT fired.

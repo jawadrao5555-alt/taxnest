@@ -413,6 +413,52 @@
             </div>
         </div>
         @endif
+
+        {{-- Order Type breakdown (Task 982): dine-in vs takeaway vs delivery revenue.
+             Only shown for restaurant-mode companies with actual data in the range. --}}
+        @if(($ra->is_restaurant ?? false) && ($ra->order_types ?? collect())->isNotEmpty())
+        <div class="mt-6">
+            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.ra_order_type_breakdown') }}</h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm table-cards">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
+                            <th class="pb-2">{{ __('pos.th_order_type') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.th_bills') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.receipt_tax') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.th_share') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @php $otTotal = $ra->order_types->sum('revenue'); @endphp
+                        @foreach($ra->order_types as $ot)
+                        @php
+                            $otBadge = match(true) {
+                                str_contains(strtolower($ot->label), 'dine')     => 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+                                str_contains(strtolower($ot->label), 'delivery') => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+                                str_contains(strtolower($ot->label), 'takeaway') => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+                                default                                          => 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+                            };
+                            $otShare = $otTotal > 0 ? round($ot->revenue / $otTotal * 100, 1) : 0;
+                        @endphp
+                        <tr class="border-b border-gray-50 dark:border-gray-800">
+                            <td class="py-2.5">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $otBadge }}">
+                                    {{ $ot->label }}
+                                </span>
+                            </td>
+                            <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ number_format($ot->count) }}</td>
+                            <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($ot->revenue) }}</td>
+                            <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($ot->tax) }}</td>
+                            <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ $otShare }}%</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @endif
     </div>
 
     @if($ra->summary->bills > 0)

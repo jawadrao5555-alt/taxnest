@@ -10224,7 +10224,12 @@ class PosController extends Controller
             })
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
             ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
-            ->get(['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method']);
+            ->get(array_merge(
+                ['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method'],
+                // Schema-guarded: order_type column added Jul 2026; pre-migration PROD
+                // schemas omit it — unconditional selection would throw unknown-column SQL.
+                \Schema::hasColumn('pos_transactions', 'order_type') ? ['order_type'] : []
+            ));
 
         $ids = $transactions->pluck('id')->all();
         // PROFIT-FREEZE (Task 423, owner decision Aug 2026): cost basis = the cost_price
@@ -10411,6 +10416,31 @@ class PosController extends Controller
             ];
         })->sortByDesc('revenue');
 
+        // Order Type breakdown (Task 982): only meaningful for restaurant-mode
+        // companies; non-restaurant companies always have NULL order_type so the
+        // breakdown would be a single "General" row — hide it entirely.
+        $isRestaurant = (bool) ($company->restaurant_mode ?? false);
+        $orderTypes = collect();
+        if ($isRestaurant && \Schema::hasColumn('pos_transactions', 'order_type')) {
+            $labelMap = [
+                'dine_in'  => 'Dine-In',
+                'takeaway' => 'Takeaway',
+                'delivery' => 'Delivery',
+            ];
+            $orderTypes = $transactions
+                ->groupBy(fn ($t) => in_array($t->order_type, ['dine_in', 'takeaway', 'delivery'], true)
+                    ? $t->order_type : 'other')
+                ->map(function ($g, $key) use ($labelMap) {
+                    return (object) [
+                        'label'   => $labelMap[$key] ?? 'Other',
+                        'count'   => $g->count(),
+                        'revenue' => (float) $g->sum('total_amount'),
+                        'tax'     => (float) $g->sum('tax_amount'),
+                    ];
+                })
+                ->sortByDesc('revenue');
+        }
+
         // Previous equal-length period (immediately before the range, same filters).
         $days = $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1;
         $prevFrom = $from->copy()->subDays($days)->startOfDay();
@@ -10501,6 +10531,8 @@ class PosController extends Controller
             'waiters' => $waiters,
             'top_customers' => $topCustomers,
             'payments' => $payments,
+            'is_restaurant' => $isRestaurant,
+            'order_types' => $orderTypes,
         ];
     }
 

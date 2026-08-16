@@ -308,6 +308,19 @@ class PosKotDeltaQtyCarryTest extends TestCase
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+
+        // Task 794: void enqueue walks PosStation::activeFor — table must exist
+        // even when empty (zero stations = single job on the company KOT printer).
+        Schema::create('pos_stations', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->text('categories')->nullable();
+            $table->string('printer_name')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->integer('sort')->default(0);
+            $table->timestamps();
+        });
     }
 
     // ── Seed helpers ─────────────────────────────────────────────────────
@@ -807,6 +820,215 @@ class PosKotDeltaQtyCarryTest extends TestCase
         $this->assertSame(200, $res->getStatusCode());
         $html = $res->getContent();
         $this->assertSame(1, substr_count($html, 'Bottle'), 'agent proof job must list the dish ONCE with merged qty');
+    }
+
+    // ── 9. Task 794: VOID slip — kitchen told to STOP removed printed dishes ─
+
+    /** Decode the void_items payload baked into the iframe fallback URL. */
+    private function decodeVoidUrl(string $url): array
+    {
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
+        $items = json_decode(base64_decode((string) ($q['void_items'] ?? '')), true);
+        $this->assertIsArray($items, 'void_items must decode to a JSON array');
+        return $items;
+    }
+
+    public function test_qty_decrease_emits_void_slip_for_removed_printed_qty(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res1 = $this->hold(['items' => [$this->bottle(3)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $oldId = json_decode($res1->getContent(), true)['order']['id'];
+        $this->stampPrinted($oldId, 1); // kitchen already fired 3
+
+        $res2 = $this->hold([
+            'items' => [$this->bottle(1)], 'order_type' => 'dine_in',
+            'table_id' => $tableId, 'recalled_order_id' => $oldId,
+        ]);
+        $this->assertSame(200, $res2->getStatusCode(), $res2->getContent());
+        $data = json_decode($res2->getContent(), true);
+
+        $this->assertNotNull($data['kot_void_url'], 'decreased printed qty must produce a void slip URL');
+        $this->assertFalse($data['kot_void_queued'], 'agent disabled → not queued, client falls back to iframe');
+        $items = $this->decodeVoidUrl($data['kot_void_url']);
+        $this->assertCount(1, $items);
+        $this->assertSame('Bottle', $items[0]['item_name']);
+        $this->assertEquals(2.0, (float) $items[0]['qty'], 'void slip lists ONLY the removed qty (3 sent - 1 kept)');
+    }
+
+    public function test_item_removed_entirely_emits_void_slip_for_that_item(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res1 = $this->hold([
+            'items' => [$this->bottle(1), ['item_type' => 'manual', 'item_name' => 'Fries', 'unit_price' => 50, 'quantity' => 2]],
+            'order_type' => 'dine_in', 'table_id' => $tableId,
+        ]);
+        $oldId = json_decode($res1->getContent(), true)['order']['id'];
+        $this->stampPrinted($oldId, 1);
+
+        // Fries dropped; Bottle unchanged → void slip lists ONLY Fries.
+        $res2 = $this->hold([
+            'items' => [$this->bottle(1)], 'order_type' => 'dine_in',
+            'table_id' => $tableId, 'recalled_order_id' => $oldId,
+        ]);
+        $data = json_decode($res2->getContent(), true);
+
+        $this->assertNotNull($data['kot_void_url']);
+        $items = $this->decodeVoidUrl($data['kot_void_url']);
+        $this->assertCount(1, $items, 'unchanged Bottle must NOT appear on the void slip');
+        $this->assertSame('Fries', $items[0]['item_name']);
+        $this->assertEquals(2.0, (float) $items[0]['qty']);
+    }
+
+    public function test_no_void_slip_on_fresh_hold_or_pure_increase(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        // Fresh hold — nothing printed yet, nothing to void.
+        $res1 = $this->hold(['items' => [$this->bottle(2)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $data1 = json_decode($res1->getContent(), true);
+        $this->assertNull($data1['kot_void_url'], 'fresh hold must not void anything');
+        $this->assertFalse($data1['kot_void_queued']);
+
+        $oldId = $data1['order']['id'];
+        $this->stampPrinted($oldId, 1);
+
+        // Pure increase — every printed chunk re-claimed; delta prints, no void.
+        $res2 = $this->hold([
+            'items' => [$this->bottle(3)], 'order_type' => 'dine_in',
+            'table_id' => $tableId, 'recalled_order_id' => $oldId,
+        ]);
+        $data2 = json_decode($res2->getContent(), true);
+        $this->assertNull($data2['kot_void_url'], 'qty increase must keep printing normal delta slips, never a void');
+        $newId = $data2['order']['id'];
+        $this->assertSame(1, RestaurantOrderItem::where('order_id', $newId)->whereNull('kot_printed_at')->count(), 'delta row still created on increase');
+    }
+
+    public function test_unprinted_removed_item_does_not_void(): void
+    {
+        // Only PRINTED qty voids — removing a dish the kitchen never saw
+        // (recall before any KOT) must stay silent.
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res1 = $this->hold([
+            'items' => [$this->bottle(1), ['item_type' => 'manual', 'item_name' => 'Fries', 'unit_price' => 50, 'quantity' => 1]],
+            'order_type' => 'dine_in', 'table_id' => $tableId,
+        ]);
+        $oldId = json_decode($res1->getContent(), true)['order']['id'];
+        // NO stampPrinted — kitchen never got a slip.
+
+        $res2 = $this->hold([
+            'items' => [$this->bottle(1)], 'order_type' => 'dine_in',
+            'table_id' => $tableId, 'recalled_order_id' => $oldId,
+        ]);
+        $data = json_decode($res2->getContent(), true);
+        $this->assertNull($data['kot_void_url'], 'nothing printed was removed → no void slip');
+    }
+
+    public function test_agent_enabled_queues_kot_void_print_job(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+        DB::table('companies')->where('id', $c->id)->update([
+            'agent_enabled' => true,
+            'agent_last_seen' => now(),
+            'pos_printer_settings' => json_encode(['silent_print_enabled' => true, 'kot_printer' => 'Kitchen-1']),
+        ]);
+
+        $res1 = $this->hold(['items' => [$this->bottle(2)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $oldId = json_decode($res1->getContent(), true)['order']['id'];
+        $this->stampPrinted($oldId, 1);
+
+        $res2 = $this->hold([
+            'items' => [$this->bottle(1)], 'order_type' => 'dine_in',
+            'table_id' => $tableId, 'recalled_order_id' => $oldId,
+        ]);
+        $data = json_decode($res2->getContent(), true);
+        $this->assertTrue($data['kot_void_queued'], 'agent online + silent print ON → server queues the void job');
+
+        $job = DB::table('pos_print_jobs')->where('type', 'kot_void')->first();
+        $this->assertNotNull($job, 'kot_void print job row must exist');
+        $this->assertSame('Kitchen-1', $job->target_printer);
+        $this->assertSame('pending', $job->status);
+        $payload = json_decode($job->render_query, true);
+        $this->assertCount(1, $payload);
+        $this->assertSame('Bottle', $payload[0]['item_name']);
+        $this->assertEquals(1.0, (float) $payload[0]['qty']);
+    }
+
+    public function test_agent_kot_void_job_renders_void_slip(): void
+    {
+        // Desktop Agent path end-to-end: printJobContent must render the same
+        // void slip HTML the iframe route serves.
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res1 = $this->hold(['items' => [$this->bottle(1)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $orderId = json_decode($res1->getContent(), true)['order']['id'];
+
+        $jobId = DB::table('pos_print_jobs')->insertGetId([
+            'company_id' => $c->id, 'type' => 'kot_void',
+            'restaurant_order_id' => $orderId, 'status' => 'claimed',
+            'render_query' => json_encode([['item_type' => 'manual', 'item_id' => null, 'item_name' => 'Fries', 'notes' => '', 'qty' => 2]]),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        app()->setLocale('en');
+        $req = Request::create("/api/agent/print-jobs/{$jobId}/content", 'GET');
+        $req->attributes->set('agent_company', $c);
+        $res = app(\App\Http\Controllers\AgentController::class)->printJobContent($req, $jobId);
+        $this->assertSame(200, $res->getStatusCode());
+        $html = $res->getContent();
+        $this->assertStringContainsString(__('pos.kot_void_header'), $html);
+        $this->assertStringContainsString('Fries', $html);
+        $this->assertStringContainsString('const ticketHasItems = true', $html, 'auto-print blank-guard must count void items or the slip never prints');
+    }
+
+    public function test_void_ticket_route_renders_slim_bold_marker_no_normal_sections(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res1 = $this->hold(['items' => [$this->bottle(2)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $oldId = json_decode($res1->getContent(), true)['order']['id'];
+        $this->stampPrinted($oldId, 1);
+        $res2 = $this->hold([
+            'items' => [$this->bottle(1)], 'order_type' => 'dine_in',
+            'table_id' => $tableId, 'recalled_order_id' => $oldId,
+        ]);
+        $data = json_decode($res2->getContent(), true);
+        $newId = $data['order']['id'];
+        parse_str((string) parse_url($data['kot_void_url'], PHP_URL_QUERY), $q);
+
+        app()->setLocale('en');
+        $req = Request::create($data['kot_void_url'], 'GET', ['void_items' => $q['void_items']]);
+        $res = app(RestaurantPosController::class)->voidTicket($req, $newId);
+        $html = $res->render();
+
+        $this->assertStringContainsString(__('pos.kot_void_header'), $html);
+        $this->assertStringContainsString(__('pos.kot_void_subline'), $html);
+        $this->assertStringContainsString('Bottle', $html);
+        // Same order identity as the running order (kitchen pairs the slips).
+        $this->assertStringContainsString(RestaurantOrder::find($newId)->order_number, $html);
+        // Normal-KOT sections stay off a void slip.
+        $this->assertStringNotContainsString(__('pos.kot_updated_banner'), $html);
+        $this->assertStringNotContainsString(__('pos.kot_no_items_counter'), $html);
+        // Thermal-safe marker: slim bold lines only — no reversed white-on-black
+        // block (renders as an empty box on ESC/POS printers).
+        $this->assertStringNotContainsString('background: #000', $html);
+        $this->assertStringNotContainsString('background:#000', $html);
     }
 
     public function test_pay_with_distinct_lines_keeps_them_separate(): void

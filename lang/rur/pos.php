@@ -1653,6 +1653,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_addon_marker' => 'ADD-ON',
     'kot_updated_banner' => '*** UPDATE ORDER — MUKAMMAL TICKET ***',
     'kot_new_tag' => 'NAYA',
+    // Task 794: VOID slip — chalte order se KOT chapne ke BAAD item hataya gaya.
+    'kot_void_header' => 'CANCEL — ITEM KATA GAYA',
+    'kot_void_subline' => 'RUK JAYEN — neeche wale items MAT banayen',
+    'kot_void_sent' => 'Cancel parchi kitchen ko bhej di gayi',
     'kot_reprint_btn' => 'Dobara Print',
     'kot_resend_btn' => '↻ KOT Dobara Bhejo',
     // Task 753 (Pizza Master): missed-delta recovery — akhri add-on KOT batch ka reprint.

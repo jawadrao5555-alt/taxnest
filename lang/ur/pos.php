@@ -1653,6 +1653,10 @@ return [
     'kot_addon_marker' => 'ایڈ آن',
     'kot_updated_banner' => '*** اپڈیٹ آرڈر — مکمل ٹکٹ ***',
     'kot_new_tag' => 'نیا',
+    // Task 794: منسوخی پرچی — چلتے آرڈر سے پرچی چھپنے کے بعد آئٹم ہٹایا گیا۔
+    'kot_void_header' => 'منسوخ — آئٹم کٹ گیا',
+    'kot_void_subline' => 'رک جائیں — نیچے والے آئٹمز مت بنائیں',
+    'kot_void_sent' => 'منسوخی پرچی کچن کو بھیج دی گئی',
     'kot_reprint_btn' => 'دوبارہ پرنٹ کریں',
     'kot_resend_btn' => '↻ دوبارہ بھیجیں KOT',
     // Task 753 (Pizza Master): missed-delta recovery — آخری ایڈ آن KOT بیچ کا ری پرنٹ۔

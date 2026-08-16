@@ -7966,6 +7966,17 @@ function restaurantPos() {
                         // band ho, warna KDS apne device par sahi printer se chapta hai.
                         this.kotPrintOrPopup(data.order.id, true);
                     }
+                    // Task 794: VOID slip — cashier ne recall mein pehle-se-chhapi
+                    // dish hatayi / qty ghatayi. Kitchen ko STOP bolna zaroori hai.
+                    // Server ne agent job bana di ho (kot_void_queued) to sirf
+                    // confirm toast; warna hidden iframe se void-ticket print.
+                    // Normal KOT chain se ALAG frame id — dono aik saath fire ho
+                    // sakte hain (delta add + void ek hi re-hold mein mumkin).
+                    if (data.kot_void_queued) {
+                        this.showToast(window.TXT.kot_void_sent, 'success');
+                    } else if (data.kot_void_url) {
+                        this._printViaIframe('print-kot-void-frame', data.kot_void_url + '&auto_print=1', 'width=380,height=620');
+                    }
                     result = data;
                 } else { this.showToast(data.message || window.TXT.failed_word, 'error'); }
             } catch (e) { this.showToast(window.TXT.network_error, 'error'); }

@@ -920,6 +920,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/kds/clear-all', [RestaurantKdsController::class, 'clearAll'])->name('pos.restaurant.kds.clear-all');
     Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
     Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
+    // Task 794: VOID/CANCEL slip — dishes removed from a running order after their KOT fired.
+    Route::get('/restaurant/orders/{id}/void-ticket', [RestaurantPosController::class, 'voidTicket'])->name('pos.restaurant.void-ticket');
     Route::get('/restaurant/orders/{id}/proof-bill', [RestaurantPosController::class, 'proofBill'])->name('pos.restaurant.proof-bill');
     // Delivery KOT for order-less bills (rendered from the transaction itself).
     Route::get('/transactions/{id}/kitchen-ticket', [RestaurantPosController::class, 'transactionKitchenTicket'])->name('pos.transaction.kitchen-ticket');

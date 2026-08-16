@@ -401,6 +401,9 @@ class RestaurantPosController extends Controller
                             'qty' => (float) $oi->quantity,
                             'kot_printed_at' => $oi->kot_printed_at,
                             'kot_batch_no' => $oi->kot_batch_no,
+                            // Task 794: the pool key lowercases the name (identity
+                            // matching) — keep the display-cased name for the void slip.
+                            'display_name' => $oi->item_name,
                         ];
                         $hadPrintedRows = true;
                     }
@@ -559,6 +562,33 @@ class RestaurantPosController extends Controller
                 }
             }
 
+            // Task 794 VOID SLIP: leftover chunks in the carry pool = printed qty
+            // the new cart did NOT re-claim (cashier removed a dish / decreased a
+            // qty below what already went to the kitchen). Nothing new prints as
+            // a KOT (no phantom slips) — instead the kitchen gets a small VOID
+            // slip telling it to STOP making the removed qty. Collected here
+            // (inside the txn, pool is fully consumed); enqueued after commit.
+            $voidItems = [];
+            foreach ($printedPool as $poolKey => $chunks) {
+                $leftQty = 0.0;
+                $displayName = null;
+                foreach ($chunks as $chunk) {
+                    $leftQty += (float) $chunk['qty'];
+                    $displayName = $displayName ?? ($chunk['display_name'] ?? null);
+                }
+                if ($leftQty > 0.001) {
+                    // Key format mirrors kotCarryKey(): type|id|name(lowercased)|notes.
+                    $parts = explode('|', $poolKey, 4);
+                    $voidItems[] = [
+                        'item_type' => $parts[0] ?? 'product',
+                        'item_id'   => (isset($parts[1]) && $parts[1] !== '') ? $parts[1] : null,
+                        'item_name' => $displayName ?? ($parts[2] ?? ''),
+                        'notes'     => $parts[3] ?? '',
+                        'qty'       => round($leftQty, 2),
+                    ];
+                }
+            }
+
             if ($request->table_id) {
                 $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
                 // Int-cast both sides: some MySQL/PDO setups (emulated prepares on
@@ -613,6 +643,27 @@ class RestaurantPosController extends Controller
                 Log::warning('Hold-time delta KOT enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id]);
             }
 
+            // Task 794: VOID slip for removed/decreased printed items. Silent path
+            // first (Desktop Agent print job); the client falls back to the iframe
+            // void-ticket route when the agent didn't take it. Best-effort — a
+            // failed enqueue never blocks the hold. Unlike the delta enqueue above
+            // this is NOT gated on KDS auto-print: a void is a stop-work order,
+            // it must reach the kitchen whenever silent printing is available.
+            $kotVoidQueued = false;
+            $kotVoidUrl    = null;
+            if (!empty($voidItems)) {
+                try {
+                    $enqVoid = \App\Services\KotPrintService::enqueueVoid($company, $order, $voidItems, $user->id);
+                    $kotVoidQueued = (bool) ($enqVoid['printed'] ?? false) && !empty($enqVoid['job_ids'] ?? []);
+                } catch (\Throwable $e) {
+                    Log::warning('Hold-time void KOT enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id]);
+                }
+                // Iframe fallback URL — same relative-URL convention as other POS
+                // fetch/print URLs (route-absolute-https trap on plain-http dev).
+                $kotVoidUrl = route('pos.restaurant.void-ticket', $order->id, false)
+                    . '?void_items=' . urlencode(base64_encode(json_encode($voidItems)));
+            }
+
             try {
                 $auditMeta = ['order_number' => $orderNumber, 'total' => $totalAmount, 'items_count' => count($resolvedItems)];
                 if ($discountAmount > 0) {
@@ -636,6 +687,11 @@ class RestaurantPosController extends Controller
                 // Task 753: TRUE = server ne recall+append ki delta KOT queue kar
                 // di — client dobara fire na kare (sirf toast dikhaye).
                 'kot_delta_queued' => $kotDeltaQueued,
+                // Task 794: void slip — queued TRUE = Desktop Agent job already
+                // created (client shows a toast only); URL = iframe fallback the
+                // client opens when queued is FALSE. NULL url = nothing voided.
+                'kot_void_queued' => $kotVoidQueued,
+                'kot_void_url'    => $kotVoidUrl,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1804,6 +1860,45 @@ class RestaurantPosController extends Controller
         }
 
         return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel', 'newItemIds'));
+    }
+
+    /**
+     * Task 794 — GET /pos/restaurant/orders/{id}/void-ticket
+     * VOID / CANCEL slip: items removed (or qty decreased) from a running order
+     * AFTER their KOT already fired — the kitchen must STOP making them.
+     * void_items = base64(json([{item_type, item_id, item_name, notes, qty}]))
+     * built by holdOrder from the leftover carry-pool chunks. Iframe fallback
+     * path; the silent Desktop Agent path renders the same view via its
+     * kot_void print job (AgentController::printJobContent).
+     */
+    public function voidTicket(Request $request, $orderId)
+    {
+        $companyId = app('currentCompanyId');
+        $order = RestaurantOrder::where('company_id', $companyId)
+            ->with(['table', 'creator'])
+            ->findOrFail($orderId);
+        $company = Company::find($companyId);
+
+        $voidItems = collect();
+        if ($request->query('void_items')) {
+            $decoded = json_decode(base64_decode((string) $request->query('void_items'), true) ?: '', true);
+            if (is_array($decoded)) {
+                $voidItems = collect($decoded);
+            }
+        }
+
+        return view('pos.restaurant.kitchen-ticket', [
+            'order'        => $order,
+            'company'      => $company,
+            'void'         => true,
+            'voidItems'    => $voidItems,
+            'ticketItems'  => collect(),
+            'grouped'      => collect(),
+            'stationLabel' => null,
+            'delta'        => false,
+            'kotBatchNo'   => null,
+            'newItemIds'   => collect(),
+        ]);
     }
 
     /**

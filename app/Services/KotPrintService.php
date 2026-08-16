@@ -134,4 +134,106 @@ class KotPrintService
             return ['printed' => false, 'reason' => 'error'];
         }
     }
+
+    /**
+     * Task 794 — VOID / CANCEL slip enqueue: dishes removed from a running
+     * order AFTER their KOT already printed. The kitchen must STOP making the
+     * removed qty. Void items ride in render_query as JSON (kot_void jobs are
+     * never station-query-parsed, so the field is free for payload use):
+     *   [{item_type, item_id, item_name, notes, qty}, ...]
+     *
+     * Station routing: each void line is mapped through the SAME resolver as
+     * normal KOTs (PosStation::mapItems on item_type/item_id/name) so the void
+     * reaches the counter that got the original dish; one job per station that
+     * had a removed item. Zero stations => single job on the company KOT
+     * printer. Counter copy honored for dine-in like normal KOTs.
+     * Best-effort by design — never throws.
+     *
+     * @param array<int, array{item_type: string, item_id: mixed, item_name: string, notes: string, qty: float}> $voidItems
+     * @return array{printed: bool, reason?: string, job_ids?: array<int>}
+     */
+    public static function enqueueVoid(Company $company, RestaurantOrder $order, array $voidItems, ?int $userId): array
+    {
+        try {
+            if (empty($voidItems)) {
+                return ['printed' => true, 'job_ids' => []];
+            }
+            $settings = $company->printerSettings();
+            if (!$settings['silent_print_enabled']) {
+                return ['printed' => false, 'reason' => 'disabled'];
+            }
+            if (!$company->agentOnline()) {
+                return ['printed' => false, 'reason' => 'agent_offline'];
+            }
+
+            $makeVoidJob = function (?string $printer, array $items) use ($company, $order, $userId) {
+                return PosPrintJob::create([
+                    'company_id'          => $company->id,
+                    'type'                => 'kot_void',
+                    'target_printer'      => $printer,
+                    'restaurant_order_id' => $order->id,
+                    'render_query'        => json_encode(array_values($items)),
+                    'status'              => 'pending',
+                    'created_by'          => $userId,
+                ]);
+            };
+
+            // Counter copy (dine-in only, same policy as normal KOT copies) always
+            // carries the FULL void list — the counter oversees every station.
+            $counterCopy = function () use ($settings, $order, $makeVoidJob, $voidItems) {
+                try {
+                    if (!($settings['counter_kot_enabled'] ?? false)) return;
+                    $printer = $settings['counter_kot_printer'] ?? null;
+                    if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
+                    $makeVoidJob($printer, $voidItems);
+                } catch (\Throwable $e) { /* copy is optional */ }
+            };
+
+            $stations = PosStation::activeFor($company->id);
+
+            if ($stations->isEmpty()) {
+                if (!$settings['kot_printer']) {
+                    return ['printed' => false, 'reason' => 'no_printer'];
+                }
+                $job = $makeVoidJob($settings['kot_printer'], $voidItems);
+                $counterCopy();
+                return ['printed' => true, 'job_ids' => [$job->id]];
+            }
+
+            // Stations configured: route each void line to the station that got the
+            // original dish. mapItems keys on the item's type/id/name — shim rows
+            // (unsaved models) work because only attributes are read.
+            $shimRows = collect($voidItems)->map(function ($vi, $idx) {
+                $row = new \App\Models\RestaurantOrderItem([
+                    'item_type' => $vi['item_type'] ?? 'product',
+                    'item_id'   => $vi['item_id'] ?? null,
+                    'item_name' => $vi['item_name'] ?? '',
+                ]);
+                $row->id = $idx; // stable local key for the split below
+                return $row;
+            })->values();
+            $itemMap = PosStation::mapItems($company->id, $stations, $shimRows);
+
+            $byStation = [];
+            foreach ($shimRows as $row) {
+                $sid = $itemMap[$row->id] ?? PosStation::DEFAULT_ID;
+                $byStation[$sid][] = $voidItems[$row->id];
+            }
+
+            $jobIds = [];
+            foreach ($byStation as $sid => $items) {
+                $station = $sid === PosStation::DEFAULT_ID ? null : $stations->firstWhere('id', $sid);
+                $printer = ($station->printer_name ?? null) ?: $settings['kot_printer'];
+                if (!$printer) {
+                    return ['printed' => false, 'reason' => 'no_printer'];
+                }
+                $jobIds[] = $makeVoidJob($printer, $items)->id;
+            }
+            $counterCopy();
+            return ['printed' => true, 'job_ids' => $jobIds];
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService void enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id ?? null]);
+            return ['printed' => false, 'reason' => 'error'];
+        }
+    }
 }

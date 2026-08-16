@@ -225,7 +225,16 @@
     @endif
 </head>
 <body>
+    @php
+        // Task 794: VOID / CANCEL mode — this slip tells the kitchen to STOP
+        // making dishes removed from a running order after their KOT fired.
+        // Rendered by the void-ticket route (iframe) and the agent's kot_void
+        // print job. Normal-KOT sections are suppressed below in this mode.
+        $void = $void ?? false;
+        $voidItems = $voidItems ?? collect();
+    @endphp
     <div class="text-center">
+        @if(!$void)
         @if(($order->kot_print_count ?? 0) > 1 && empty($delta))
             {{-- Phase 5 — re-send marker so kitchen knows items changed.
                  Jul 2026 (Pizza Master feedback): the old white-on-black
@@ -245,6 +254,7 @@
         @if($kotFullUpdate)
             <p class="text-sm bold" style="color:#000; font-weight:900;">{{ __('pos.kot_updated_banner') }}</p>
         @endif
+        @endif {{-- !$void: reprint/updated banners never print on a void slip --}}
         {{-- 10 Aug 2026 (Pizza Master photo): URGENT top se hata kar neeche footer
              lines ke saath chhota sa — paper aur kam lage; render site is below,
              beside the order-by line. --}}
@@ -297,6 +307,16 @@
 
     <div class="separator"></div>
 
+    @if($void)
+    {{-- Task 794: VOID / CANCEL slip. Marker style: slim bold lines only —
+         NO reversed/white-on-black blocks (thermal printers render those as
+         empty boxes; same lesson as station headers / RUSH badge above). --}}
+    <div class="text-center" style="margin: 4px 0;">
+        <p class="bold" style="font-size: 16px; font-weight: 900; letter-spacing: 2px; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 3px 0; color: #000; background: #fff;">** {{ __('pos.kot_void_header') }} **</p>
+        <p class="text-sm bold" style="color:#000; font-weight:900;">{{ __('pos.kot_void_subline') }}</p>
+    </div>
+    @endif
+
     {{-- 10 Aug 2026 (owner): order-type badge + date + time on ONE line — saves a
          full printed line. Table number stays beside the badge when present. --}}
     <div class="flex">
@@ -339,12 +359,35 @@
         $stationNames = $grouped->keys()->toArray();
     @endphp
 
-    @if(($ticketItems ?? collect())->isEmpty())
+    @if($void)
+    {{-- Task 794: void items table — removed dish + removed qty, same layout
+         language as the normal items table so the kitchen reads it instantly. --}}
+    <table class="items-table">
+        <tr class="items-head">
+            <td class="name">{{ __('pos.receipt_item') }}</td>
+            <td class="qty">{{ __('pos.receipt_qty') }}</td>
+        </tr>
+        @foreach($voidItems as $vi)
+        <tr>
+            <td class="name">
+                <span class="bold">{{ $vi['item_name'] ?? '' }}</span>
+                @if(!empty($vi['notes']))
+                    <br><span class="note"><span class="note-label">&raquo; {{ __('pos.kot_note') }}</span><span class="note-text">{{ $vi['notes'] }}</span></span>
+                @endif
+            </td>
+            <td class="qty">@php $vq = (float) ($vi['qty'] ?? 0); @endphp{{ number_format($vq, $vq == intval($vq) ? 0 : 2) }}</td>
+        </tr>
+        @endforeach
+    </table>
+    @endif
+
+    @if(!$void && ($ticketItems ?? collect())->isEmpty())
     <div class="mt-1" style="border: 2px dashed #000; padding: 6px; text-align: center;">
         <span class="bold text-sm">{{ __('pos.kot_no_items_counter') }}</span>
     </div>
     @endif
 
+    @if(!$void)
     @foreach($grouped as $station => $items)
         <div class="station-section" data-station="{{ $station }}">
             @if($grouped->count() > 1)
@@ -373,8 +416,9 @@
             @endif
         </div>
     @endforeach
+    @endif {{-- !$void: normal items sections --}}
 
-    @if($kotShowKitchenNotes && $order->kitchen_notes)
+    @if(!$void && $kotShowKitchenNotes && $order->kitchen_notes)
     <div class="separator"></div>
     {{-- Aug 2026 (restaurant feedback): multi-item notes come as separate lines from
          the textarea — print each on its OWN line, numbered, so the kitchen can match
@@ -396,7 +440,7 @@
 
     {{-- KOT Print Style (Jul 2026): footer blocks individually toggleable per
          company — paper saving. Each hidden block also drops its separator. --}}
-    @if($kotShowOrderby)
+    @if(!$void && $kotShowOrderby)
     <div class="separator"></div>
 
     <div class="text-center text-sm">
@@ -418,11 +462,11 @@
     {{-- URGENT fallback: agar company ne order-by footer line hi band ki hui ho
          (kot_show_orderby OFF) to URGENT phir bhi chhapna zaroori hai — tab hi
          apni chhoti line par aata hai. Warna upar wali line ke side par hai. --}}
-    @if(!$kotShowOrderby && ($order->priority ?? false))
+    @if(!$void && !$kotShowOrderby && ($order->priority ?? false))
     <div class="text-center"><span class="priority-badge">{{ __('pos.kot_rush') }}</span></div>
     @endif
 
-    @if($kotShowBarcode)
+    @if(!$void && $kotShowBarcode)
     <div class="separator"></div>
     <div class="kot-barcode-box">
         <svg id="kotBarcode"></svg>
@@ -430,7 +474,7 @@
     </div>
     @endif
     @if($kotShowFooter)
-    @if(!$kotShowOrderby && !$kotShowBarcode)
+    @if($void || (!$kotShowOrderby && !$kotShowBarcode))
     <div class="separator"></div>
     @endif
     <p class="text-center bold text-sm">{{ $company->name ?? 'Restaurant' }}</p>
@@ -497,7 +541,10 @@
         // station ($stationLabel set), the legacy client-side ?station= name filter must
         // NOT run (its param is an id, not a section label — it would hide everything).
         const serverStationFiltered = {{ isset($stationLabel) && $stationLabel !== null ? 'true' : 'false' }};
-        const ticketHasItems = {{ ($ticketItems ?? collect())->count() > 0 ? 'true' : 'false' }};
+        // Task 794: void slips carry voidItems instead of ticketItems — the
+        // blank-print race guard must count the right list or auto_print
+        // silently refuses every void slip.
+        const ticketHasItems = {{ (($ticketItems ?? collect())->count() > 0 || (($void ?? false) && ($voidItems ?? collect())->count() > 0)) ? 'true' : 'false' }};
 
         window.onload = function() {
             renderBarcode();

@@ -971,6 +971,43 @@ class AgentController extends Controller
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
+        // Task 794 — VOID / CANCEL slip: dishes removed from a running order
+        // after their KOT fired. Void items ride in render_query as JSON
+        // (kot_void jobs never carry a station query — the split already
+        // happened at enqueue, one job per station). Same kitchen-ticket view
+        // in void mode as the iframe route (RestaurantPosController::voidTicket).
+        if ($job->type === 'kot_void') {
+            $order = \App\Models\RestaurantOrder::where('company_id', $company->id)
+                ->with(['table', 'creator'])
+                ->find($job->restaurant_order_id);
+            if (!$order) {
+                return response('', 204); // order gone — nothing to void-print
+            }
+            $this->setPrintLocale($order->creator?->language, $job, $company);
+            $voidItems = collect();
+            if ($job->render_query) {
+                $decoded = json_decode($job->render_query, true);
+                if (is_array($decoded)) {
+                    $voidItems = collect($decoded);
+                }
+            }
+            if ($voidItems->isEmpty()) {
+                return response('', 204); // no payload — never print a blank slip
+            }
+            return response(view('pos.restaurant.kitchen-ticket', [
+                'order'        => $order,
+                'company'      => $company,
+                'void'         => true,
+                'voidItems'    => $voidItems,
+                'ticketItems'  => collect(),
+                'grouped'      => collect(),
+                'stationLabel' => null,
+                'delta'        => false,
+                'kotBatchNo'   => null,
+                'newItemIds'   => collect(),
+            ])->render())->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
         return response()->json(['error' => 'Unknown job type'], 422);
     }
 

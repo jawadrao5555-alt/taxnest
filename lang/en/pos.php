@@ -1653,6 +1653,10 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'kot_addon_marker' => 'ADD-ON',
     'kot_updated_banner' => '*** UPDATED ORDER — FULL TICKET ***',
     'kot_new_tag' => 'NEW',
+    // Task 794: VOID slip — dishes removed from a running order after their KOT fired.
+    'kot_void_header' => 'VOID — ITEM CANCELLED',
+    'kot_void_subline' => 'STOP — do NOT make the items below',
+    'kot_void_sent' => 'Void slip sent to kitchen',
     'kot_reprint_btn' => 'Reprint',
     'kot_resend_btn' => '↻ Re-send KOT',
     // Task 753 (Pizza Master): missed-delta recovery — reprint the LAST add-on KOT batch.

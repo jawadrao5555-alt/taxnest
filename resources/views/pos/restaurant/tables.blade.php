@@ -94,6 +94,31 @@
         }
     }
 
+    // Recovery poller — only active when servedFromCache is true (i.e. the
+    // device is online but the SERVER was unreachable at navigate time).
+    // In that scenario navigator.onLine stays true throughout, so the 'online'
+    // event never fires and the page would never auto-reload without this.
+    // Every 10 s we probe the lightweight table-status API; on a 200 response
+    // we reload so the user gets a fresh snapshot. The interval is cleared as
+    // soon as the first success lands (or the page goes offline — re-entry
+    // is harmless but pointless while the NIC is down).
+    var recoveryTimer = null;
+    function startRecoveryPoller() {
+        if (recoveryTimer) return; // already running
+        recoveryTimer = setInterval(function () {
+            if (!navigator.onLine) return; // NIC offline — wait for 'online' event instead
+            fetch('{{ route("pos.restaurant.table-status") }}', { method: 'GET', cache: 'no-store' })
+                .then(function (res) {
+                    if (res.ok) {
+                        clearInterval(recoveryTimer);
+                        recoveryTimer = null;
+                        location.reload();
+                    }
+                })
+                .catch(function () { /* server still unreachable — keep polling */ });
+        }, 10000);
+    }
+
     // Two-step serve-mode check — handles "server down, navigator.onLine still true":
     // Step 1: ask the SW "what is my client ID?" via MessageChannel echo.
     //         Listener is registered BEFORE the message is sent — no receive race.
@@ -119,6 +144,10 @@
                         metaCache.delete(metaKey); // consume — one-shot
                         servedFromCache = true;
                         sync(); // re-evaluate: show bar even though navigator.onLine is true
+                        // Start polling so the page auto-recovers when the server comes
+                        // back — the 'online' event won't fire in this scenario because
+                        // the NIC stayed connected the whole time.
+                        startRecoveryPoller();
                     });
                 }).catch(function () {});
             };
@@ -129,8 +158,12 @@
     sync();           // immediate decision based on navigator.onLine
     checkServeMode(); // async, client-scoped correction via SW MessageChannel
     window.addEventListener('offline', sync);
-    // Back online → reload to get fresh table statuses from server.
-    window.addEventListener('online', function () { location.reload(); });
+    // Back online (NIC-level) → reload immediately; also clears the recovery poller
+    // (it would fire soon anyway, but this is faster and avoids a wasted fetch).
+    window.addEventListener('online', function () {
+        if (recoveryTimer) { clearInterval(recoveryTimer); recoveryTimer = null; }
+        location.reload();
+    });
 })();
 </script>
 <script>

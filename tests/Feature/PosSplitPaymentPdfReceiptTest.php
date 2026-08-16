@@ -499,6 +499,58 @@ class PosSplitPaymentPdfReceiptTest extends TestCase
         }
     }
 
+    /**
+     * Task 873 — Card-alias bucket collapse.
+     *
+     * A bill with TWO separate card-family payments ('debit_card' + 'credit_card')
+     * must produce exactly ONE "Card" row in the breakdown, not two separate rows.
+     * The displayed amount must equal the sum of both payment rows.
+     *
+     * If the alias list in the blade ever drifts (e.g. 'credit_card' removed from
+     * $rcptPayAliases), 'credit_card' would fall through to an 'other:credit_card'
+     * bucket and a second row would appear — this test catches that regression.
+     */
+    public function test_debit_card_and_credit_card_collapse_into_one_card_row(): void
+    {
+        $company = $this->makeCompany();
+
+        $debit  = new PosPayment(['payment_method' => 'debit_card',  'amount' => 250]);
+        $debit->id = 10; $debit->transaction_id = self::TXN_ID;
+
+        $credit = new PosPayment(['payment_method' => 'credit_card', 'amount' => 350]);
+        $credit->id = 11; $credit->transaction_id = self::TXN_ID;
+
+        $txn = $this->makeTxn($company, collect([$debit, $credit]));
+
+        $cardLabel   = __('pos.receipt_pay_card');
+        $combinedAmt = '600.00'; // 250 + 350
+
+        foreach (self::TEMPLATES as $tpl) {
+            $html = $this->renderPdfStyle($tpl, $txn, $company);
+
+            // Breakdown section must appear (≥2 payment rows).
+            $this->assertStringContainsString(
+                __('pos.payment_breakdown'),
+                $html,
+                "{$tpl}: payment breakdown heading must appear for a debit+credit card split"
+            );
+
+            // Exactly one Card label — substr_count must equal 1.
+            $this->assertSame(
+                1,
+                substr_count($html, $cardLabel),
+                "{$tpl}: 'debit_card' and 'credit_card' must collapse into exactly ONE Card row, not two"
+            );
+
+            // The combined amount must be displayed.
+            $this->assertStringContainsString(
+                $combinedAmt,
+                $html,
+                "{$tpl}: Card row amount must equal the sum of debit_card + credit_card (600.00)"
+            );
+        }
+    }
+
     /** Single-method bills (1 row) must NOT show the breakdown section. */
     public function test_single_method_bill_has_no_breakdown_on_pdf_templates(): void
     {

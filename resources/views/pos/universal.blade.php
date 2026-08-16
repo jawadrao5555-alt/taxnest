@@ -7442,6 +7442,8 @@ function restaurantPos() {
                 });
                 const data = res.ok ? await res.json().catch(() => null) : null;
                 if (data && data.success) {
+                    // Task 928: signal any open KDS tab on this device to refresh immediately.
+                    try { localStorage.setItem('pos_kds_void_signal', Date.now()); } catch(e) {}
                     this.heldOrders = this.heldOrders.filter(o => o.id !== ask.order.id);
                     // Held-orders list modal cleanup — match deleteHeldOrder() so the
                     // index doesn't point past the end and the modal auto-closes when empty.
@@ -8050,8 +8052,12 @@ function restaurantPos() {
                     // Normal KOT chain se ALAG frame id — dono aik saath fire ho
                     // sakte hain (delta add + void ek hi re-hold mein mumkin).
                     if (data.kot_void_queued) {
+                        // Task 928: partial-dish void — signal any open KDS tab to refresh immediately.
+                        try { localStorage.setItem('pos_kds_void_signal', Date.now()); } catch(e) {}
                         this.showToast(window.TXT.kot_void_sent, 'success');
                     } else if (data.kot_void_url) {
+                        // Task 928: partial-dish void — signal any open KDS tab to refresh immediately.
+                        try { localStorage.setItem('pos_kds_void_signal', Date.now()); } catch(e) {}
                         this._printViaIframe('print-kot-void-frame', data.kot_void_url + '&auto_print=1', 'width=380,height=620');
                     }
                     result = data;
@@ -9750,6 +9756,8 @@ function restaurantPos() {
                 if (!res.ok) { this.showToast(window.TXT.failed_delete_order_error + res.status + ')', 'error'); return; }
                 const data = await res.json();
                 if (data.success) {
+                    // Task 928: signal any open KDS tab on this device to refresh immediately.
+                    try { localStorage.setItem('pos_kds_void_signal', Date.now()); } catch(e) {}
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     if (this.activeHeldIndex >= this.heldOrders.length) this.activeHeldIndex = Math.max(0, this.heldOrders.length - 1);
                     // Auto-close the modal once the list is empty, otherwise the next

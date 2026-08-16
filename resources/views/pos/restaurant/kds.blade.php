@@ -412,6 +412,19 @@ function kdsScreen() {
             this.initAutoPrint();
             this.initAcknowledgedVoids();
             this.polling = setInterval(() => this.refreshOrders(), 15000);
+            // Task 928: instant KDS refresh when a void/cancel happens on another
+            // tab on the SAME device.  The POS sale screen writes pos_kds_void_signal
+            // to localStorage after every successful order delete or item void; the
+            // Web Storage 'storage' event fires on every OTHER tab in the same
+            // browser, so the KDS board refreshes within ~1 s instead of waiting up
+            // to 15 s for the regular poll.  The event never fires on the tab that
+            // wrote the key, so a cashier who also has KDS open in another tab gets
+            // the update without the writing tab doing redundant double-fetches.
+            try {
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'pos_kds_void_signal') { this.refreshOrders(); }
+                });
+            } catch(e) {}
             this.timerInterval = setInterval(() => {
                 this.orders.forEach(o => { o.elapsed_minutes++; });
                 const hasUrgent = this.orders.some(o => o.elapsed_minutes > 15 && (this.kstate(o) === 'new' || this.kstate(o) === 'preparing'));

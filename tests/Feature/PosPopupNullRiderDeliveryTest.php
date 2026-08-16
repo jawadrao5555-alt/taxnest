@@ -504,4 +504,82 @@ class PosPopupNullRiderDeliveryTest extends TestCase
         $res = (new PosRiderController())->updateStatus($this->jsonReq(['delivery_status' => 'delivered']), $bill->id);
         $this->assertSame(422, $res->getStatusCode());
     }
+
+    // ── 6. Task 984: rider assign on a PROVISIONAL delivery bill ─────────────
+
+    /** Provisional (local triple) delivery bill helper. */
+    private function makeProvisional(array $attrs = []): PosTransaction
+    {
+        return $this->makeFinal(array_merge([
+            'invoice_mode'       => 'local',
+            'pra_status'         => 'local',
+            'pra_invoice_number' => null,
+            'rider_id'           => null,
+            'delivery_status'    => null,
+        ], $attrs));
+    }
+
+    /**
+     * Task 984: the popup's rider dropdown now renders on PROVISIONAL delivery
+     * rows too — assign() only blocks settled/delivered/returned bills, so a
+     * provisional delivery bill accepts a rider (delivery_status → assigned).
+     */
+    public function test_assign_rider_on_provisional_delivery_bill_succeeds(): void
+    {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin, 'pos');
+
+        $riderId = $this->makeRider('Nadeem');
+        $bill = $this->makeProvisional();
+
+        $res = (new PosRiderController())->assign($this->jsonReq(['rider_id' => $riderId]), $bill->id);
+        $this->assertSame(200, $res->getStatusCode());
+        $json = $res->getData(true);
+        $this->assertTrue($json['success']);
+        $this->assertSame($riderId, (int) $json['rider_id']);
+        $this->assertSame('assigned', $json['delivery_status']);
+
+        $bill->refresh();
+        $this->assertSame($riderId, (int) $bill->rider_id);
+        $this->assertSame('assigned', $bill->delivery_status);
+        // Bill stays provisional — assign never touches invoice_mode/serials.
+        $this->assertSame('local', $bill->invoice_mode);
+        $this->assertSame('local', $bill->pra_status);
+    }
+
+    /**
+     * Task 984: popup payload — provisional delivery rows carry rider_id +
+     * rider_name after assign (assigned-rider chip), and the payload still
+     * exposes the riders list + can_assign_rider permission alongside them.
+     */
+    public function test_popup_provisional_row_exposes_rider_and_assign_permission(): void
+    {
+        $admin = $this->makeAdmin();
+        $this->actingAs($admin, 'pos');
+
+        // 'delivery' depends on 'customer_profile' in the feature resolver —
+        // without it the resolved delivery flag drops and can_assign_rider is false.
+        DB::table('companies')->where('id', $this->companyId)
+            ->update(['feature_flags' => json_encode(['delivery' => true, 'customer_profile' => true])]);
+        \App\Services\PosFeatureService::flushGateCaches();
+
+        $riderId = $this->makeRider('Shani');
+        $unassigned = $this->makeProvisional();
+        $assigned = $this->makeProvisional(['rider_id' => $riderId, 'delivery_status' => 'assigned']);
+
+        $data = (new PosController())->apiProvisionalBills(new Request())->getData(true);
+        $this->assertTrue($data['success']);
+
+        $bills = collect($data['bills']);
+        $rowU = $bills->firstWhere('id', $unassigned->id);
+        $rowA = $bills->firstWhere('id', $assigned->id);
+        $this->assertNotNull($rowU);
+        $this->assertNotNull($rowA);
+        $this->assertNull($rowU['rider_id'], 'Unassigned provisional row must expose rider_id=null (dropdown renders)');
+        $this->assertSame($riderId, (int) $rowA['rider_id']);
+        $this->assertSame('Shani', $rowA['rider_name'], 'Assigned provisional row must carry rider_name for the chip');
+
+        $this->assertTrue($data['can_assign_rider'], 'Admin with riders plan + delivery feature must get can_assign_rider');
+        $this->assertContains('Shani', collect($data['riders'])->pluck('name')->all());
+    }
 }

@@ -2061,11 +2061,14 @@ window.addEventListener('popstate', function() {
                                 </button>
                             </div>
                         </template>
-                        {{-- Task 517: UNASSIGNED final delivery bill — rider dropdown yahin se
+                        {{-- Task 517: UNASSIGNED delivery bill — rider dropdown yahin se
                              (POST fbrpos.deliveries.assign, same backend as the Deliveries board).
                              Renders only when the API's can_assign_rider allows (plan gate +
-                             Delivery feature + custom-access verdict, mirrored server-side). --}}
-                        <template x-if="bill.is_final && !bill.rider_id && canAssignRider && deliveryRiders.length > 0">
+                             Delivery feature + custom-access verdict, mirrored server-side).
+                             Task 984: PROVISIONAL rows par bhi — assign endpoint sirf
+                             settled/delivered/returned block karta hai, provisional allowed,
+                             so cashier Final se pehle hi rider chun sakta hai. --}}
+                        <template x-if="!bill.rider_id && canAssignRider && deliveryRiders.length > 0">
                             <div class="mb-2 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
                                 <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
@@ -2096,10 +2099,19 @@ window.addEventListener('popstate', function() {
                             </button>
                         </div>
                         </template>
+                        {{-- Task 984: UNASSIGNED final bill — "Delivered (bina rider)" bhi
+                             ab yahin se (Task 774 riderless updateStatus path; delivered_by
+                             stamp hota hai, khata/settlement untouched). Purana Task 521
+                             rider_id guard hata: backend ab riderless delivered ALLOW karta hai. --}}
+                        <template x-if="bill.is_final && !bill.rider_id && !bill.delivery_status">
+                            <button @click="markFinalDelivered(bill)" :disabled="deliveryFinalBusyId" class="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                <template x-if="deliveryFinalBusyId !== bill.id"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></template>
+                                {{ __('pos.delivered_no_rider_btn') }}
+                            </button>
+                        </template>
                         {{-- Task 521: FINAL bill — status chip + Delivered mark (PRA parity).
-                             Cash khata settle upar wale orange rider block se hota hai.
-                             rider_id guard: UNASSIGNED bill par chip/button nahi
-                             (updateStatus rider-less bill 404 karta); pehle rider lage. --}}
+                             Cash khata settle upar wale orange rider block se hota hai. --}}
                         <template x-if="bill.is_final && bill.rider_id">
                         <div class="flex gap-2 items-stretch">
                             <span class="flex items-center px-2.5 rounded-xl text-[10px] font-bold"
@@ -6567,6 +6579,11 @@ function restaurantPos() {
             } finally {
                 this.deliveryFinalBusyId = null;
             }
+            // Task 984: promote localBills se bill hata deta hai par lists refresh
+            // NAHI karta tha — freshly-final unassigned bill kabhi apne rider
+            // dropdown / "Delivered (bina rider)" ke saath wapas nahi aata tha
+            // aur popup chupchaap band ho jata tha. Pehle refresh, PHIR empty-check.
+            await this.loadLocalBills();
             if (this.pendingDeliveryBills().length === 0 && this.staleDeliveryBills().length === 0) this.showPendingDeliveries = false;
         },
         // Filtered view of localBills — matches invoice number, customer name,

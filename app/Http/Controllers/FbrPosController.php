@@ -46,6 +46,9 @@ class FbrPosController extends Controller
         $hasBizDate   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'business_date');
         $hasOrderType = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_type');
         $hasAddress   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'delivery_address');
+        $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_id');
+        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'delivery_status');
+        $hasSettleCol = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_settlement_id');
         $bills = \App\Models\FbrPosTransaction::where('company_id', $companyId)
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
@@ -55,8 +58,10 @@ class FbrPosController extends Controller
             ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'customer_name', 'customer_phone', 'payment_method',
                    ...($hasBizDate ? ['business_date'] : []),
                    ...($hasOrderType ? ['order_type'] : []),
-                   ...($hasAddress ? ['delivery_address'] : [])])
-            ->map(function ($b) use ($companyId, $hasBizDate, $hasOrderType, $hasAddress) {
+                   ...($hasAddress ? ['delivery_address'] : []),
+                   ...($hasRiderCols ? ['rider_id'] : []),
+                   ...($hasSettleCol ? ['rider_settlement_id'] : [])])
+            ->map(function ($b) use ($companyId, $hasBizDate, $hasOrderType, $hasAddress, $hasRiderCols, $hasSettleCol) {
                 return [
                     'id' => $b->id,
                     'invoice_number' => $b->invoice_number,
@@ -78,11 +83,14 @@ class FbrPosController extends Controller
                         : ($b->created_at ? \App\Services\PosBusinessDay::forMomentFbr((int) $companyId, $b->created_at) : null),
                     'order_type' => $hasOrderType ? $b->order_type : null,
                     'delivery_address' => $hasAddress ? $b->delivery_address : null,
-                    // FBR POS has no delivery riders — mirror fields stay empty
-                    // so the shared panel markup degrades gracefully.
+                    // Task 984: provisional delivery bills CAN carry a rider now
+                    // (popup dropdown assigns before Final) — expose the real
+                    // rider_id so the assigned-rider chip renders; rider_name is
+                    // filled from the batch lookup below. Khata figures stay 0 —
+                    // khata math only applies to finals.
                     'rider_name' => null,
-                    'rider_unsettled' => false,
-                    'rider_id' => null,
+                    'rider_unsettled' => (bool) ($hasRiderCols && $hasSettleCol && $b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash'),
+                    'rider_id' => ($hasRiderCols && $b->rider_id) ? (int) $b->rider_id : null,
                     'rider_open_count' => 0,
                     'rider_open_amount' => 0,
                     'kot_pending' => false,
@@ -94,9 +102,8 @@ class FbrPosController extends Controller
         // PRA popup / board pending tab (purane pre-feature delivery bills popup
         // ko flood na karein). Display + assign ONLY — promote (Final Cash/Card)
         // in par KABHI nahi chalta (bill pehle se final hai).
-        $hasRiderCols  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_id');
-        $hasDelStatus  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'delivery_status');
-        $hasSettleCol  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_settlement_id');
+        // ($hasRiderCols / $hasDelStatus / $hasSettleCol upar declare ho chuke —
+        // Task 984: provisional select bhi rider columns uthata hai.)
         // Task 521 (FBR port of PRA parity): the popup now ALSO lists assigned/
         // dispatched final bills and delivered-CASH bills still on the rider's
         // unsettled khata — Delivered mark + whole-khata Settle happen right in
@@ -157,7 +164,9 @@ class FbrPosController extends Controller
             // the cashier the real count+amount so "poore rider ka settle" is clear.
             $riderNames = [];
             $riderOpen  = []; // rider_id => ['count' => n, 'amount' => rs]
-            $riderIds = $finalBills->pluck('rider_id')->filter()->unique();
+            // Task 984: provisional rows can carry a rider too — include their
+            // ids so the assigned-rider chip gets a name on provisional bills.
+            $riderIds = $finalBills->pluck('rider_id')->merge($bills->pluck('rider_id'))->filter()->unique();
             if ($riderIds->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
                 $riderNames = DB::table('pos_riders')
                     ->where('company_id', $companyId)
@@ -176,6 +185,16 @@ class FbrPosController extends Controller
                     ->get()
                     ->mapWithKeys(fn ($r) => [$r->rider_id => ['count' => (int) $r->c, 'amount' => (float) $r->amt]])
                     ->all();
+            }
+
+            // Task 984: fill rider_name on provisional rows (chip on the popup).
+            if (!empty($riderNames)) {
+                $bills = $bills->map(function ($row) use ($riderNames) {
+                    if (!empty($row['rider_id'])) {
+                        $row['rider_name'] = $riderNames[$row['rider_id']] ?? null;
+                    }
+                    return $row;
+                });
             }
 
             $finalData = $finalBills

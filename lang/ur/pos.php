@@ -4135,6 +4135,7 @@ return [
     'old_del_hint' => 'پچھلے دنوں کے بغیر رائیڈر ڈیلیوری بل — رائیڈر اب بھی یہیں سے تفویض ہو سکتا ہے، یا سیدھا ڈیلیورڈ مارک کریں۔',
     // Task 774: unassigned delivered
     'del_no_rider_direct' => 'بغیر رائیڈر / براہِ راست',
+    'delivered_no_rider_btn' => 'ڈیلیور ہو گیا (بغیر رائیڈر)',
     'del_closed_by' => ':name نے',
     'del_closed_by_label' => 'بند کیا',
     'del_mark_delivered_confirm' => 'اس ڈیلیوری کو ڈیلیورڈ مارک کریں؟ کوئی رائیڈر تفویض نہیں تھا — یہ صرف بل بند کرے گا۔',

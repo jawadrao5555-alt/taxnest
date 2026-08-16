@@ -4135,6 +4135,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'old_del_hint' => 'Unassigned delivery bills from previous days — a rider can still be assigned here, or mark Delivered directly.',
     // Task 774 (16 Aug 2026): unassigned delivery bill marked delivered — no rider cash involved.
     'del_no_rider_direct' => 'No rider / direct',
+    'delivered_no_rider_btn' => 'Delivered (no rider)',
     'del_closed_by' => 'by :name',
     'del_closed_by_label' => 'Closed by',
     'del_mark_delivered_confirm' => 'Mark this delivery as delivered? No rider was assigned — this just closes the bill.',

@@ -198,6 +198,59 @@ class FbrPosPopupDeliveredSettleTest extends TestCase
         $this->assertTrue($deliveredRow['is_final']);
     }
 
+    // ── 1b. Task 984: provisional rows — rider assign + popup rider fields ──
+
+    /**
+     * Task 984: the popup's rider dropdown now renders on PROVISIONAL delivery
+     * rows too — FbrPosRiderController::assign only blocks settled/delivered/
+     * returned, so a provisional (local/local) delivery bill accepts a rider.
+     */
+    public function test_assign_rider_on_provisional_delivery_bill_succeeds(): void
+    {
+        $rider = $this->makeRider('Nadeem');
+        $bill = $this->makeFinal(['invoice_mode' => 'local', 'fbr_status' => 'local', 'rider_id' => null, 'delivery_status' => null]);
+
+        $res = (new FbrPosRiderController())->assign($this->jsonReq(['rider_id' => $rider->id]), $bill->id);
+        $this->assertSame(200, $res->getStatusCode());
+        $json = $res->getData(true);
+        $this->assertTrue($json['success']);
+        $this->assertSame('assigned', $json['delivery_status']);
+
+        $bill->refresh();
+        $this->assertSame($rider->id, (int) $bill->rider_id);
+        $this->assertSame('assigned', $bill->delivery_status);
+        // Bill stays provisional — assign never touches invoice_mode/serials.
+        $this->assertSame('local', $bill->invoice_mode);
+        $this->assertSame('local', $bill->fbr_status);
+    }
+
+    /**
+     * Task 984: popup payload — provisional (bills) rows expose real rider_id
+     * and rider_name once assigned (assigned-rider chip), and null rider_id
+     * while unassigned (dropdown renders).
+     */
+    public function test_popup_provisional_row_exposes_rider_fields(): void
+    {
+        $rider = $this->makeRider('Shani');
+        $unassigned = $this->makeFinal(['invoice_mode' => 'local', 'fbr_status' => 'local', 'rider_id' => null, 'delivery_status' => null]);
+        $assigned = $this->makeFinal(['invoice_mode' => 'local', 'fbr_status' => 'local', 'rider_id' => $rider->id, 'delivery_status' => 'assigned']);
+        // A rider-carrying FINAL too, so the finals block (and its rider-name
+        // batch lookup) definitely runs.
+        $this->makeFinal(['rider_id' => $rider->id, 'delivery_status' => 'assigned']);
+
+        $data = (new FbrPosController())->apiProvisionalBills(new Request())->getData(true);
+        $this->assertTrue($data['success']);
+
+        $bills = collect($data['bills']);
+        $rowU = $bills->firstWhere('id', $unassigned->id);
+        $rowA = $bills->firstWhere('id', $assigned->id);
+        $this->assertNotNull($rowU);
+        $this->assertNotNull($rowA);
+        $this->assertNull($rowU['rider_id']);
+        $this->assertSame($rider->id, (int) $rowA['rider_id']);
+        $this->assertSame('Shani', $rowA['rider_name'], 'Assigned provisional row must carry rider_name for the chip');
+    }
+
     // ── 2. Delivered mark (fbrpos.deliveries.status JSON path) ──────────────
 
     public function test_status_delivered_json_marks_and_stamps_delivered_at(): void

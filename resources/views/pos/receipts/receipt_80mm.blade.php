@@ -521,6 +521,29 @@
         @if($transaction->rider)
         <tr><td class="info-label">{{ __('pos.receipt_rider') }}:</td><td class="info-value">{{ $transaction->rider->name }}</td></tr>
         @endif
+        {{-- Task 830: no-rider delivery closed by a staff member (rider_id NULL, delivered_by set).
+             Schema guard = PROD drift convention. Explicit relation load — live has strict lazy loading. --}}
+        @php
+            $rcptClosedBy = null;
+            $rcptClosedAt = null;
+            try {
+                if (($transaction->order_type ?? null) === 'delivery'
+                    && empty($transaction->rider_id)
+                    && !empty($transaction->delivered_by)
+                    && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivered_by')) {
+                    $rcptClosedByUser = \App\Models\User::find($transaction->delivered_by);
+                    if ($rcptClosedByUser) {
+                        $rcptClosedBy = $rcptClosedByUser->name;
+                        $rcptClosedAt = !empty($transaction->delivered_at)
+                            ? \Carbon\Carbon::parse($transaction->delivered_at)->format('d M H:i')
+                            : null;
+                    }
+                }
+            } catch (\Throwable $e) { $rcptClosedBy = null; }
+        @endphp
+        @if($rcptClosedBy)
+        <tr><td class="info-label">{{ __('pos.receipt_closed_by') }}:</td><td class="info-value">{{ $rcptClosedBy }}@if($rcptClosedAt) · {{ $rcptClosedAt }}@endif</td></tr>
+        @endif
         <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value"><strong style="font-weight:bold; text-transform:uppercase;">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</strong></td></tr>
         @if($transaction->creator && $rp['show_cashier'])
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>

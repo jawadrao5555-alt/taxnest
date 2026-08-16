@@ -2913,6 +2913,7 @@ return [
     'receipt_pay_other' => 'دیگر',
     'receipt_rate' => 'ریٹ',
     'receipt_rider' => 'رائڈر',
+    'receipt_closed_by' => 'بند کیا',
     'receipt_waiter' => 'ویٹر',
     'receipt_table' => 'میز',
     'receipt_sale_receipt' => 'سیل رسید',

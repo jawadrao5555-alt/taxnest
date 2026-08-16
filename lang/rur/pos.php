@@ -2913,6 +2913,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_pay_other' => 'Other',
     'receipt_rate' => 'Rate',
     'receipt_rider' => 'Rider',
+    'receipt_closed_by' => 'Closed by',
     'receipt_waiter' => 'Waiter',
     'receipt_table' => 'Table',
     'receipt_sale_receipt' => 'SALE RASEED',

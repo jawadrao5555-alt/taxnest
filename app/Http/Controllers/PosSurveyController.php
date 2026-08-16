@@ -177,6 +177,129 @@ class PosSurveyController extends Controller
         ));
     }
 
+    /** Create a new survey (draft or immediately published). */
+    public function adminStore(\Illuminate\Http\Request $request)
+    {
+        $validated = $request->validate([
+            'title'          => 'required|string|max:200',
+            'intro'          => 'nullable|string|max:1000',
+            'questions_json' => 'required|string',
+            'allow_comment'  => 'nullable',
+            'audience'       => 'required|in:pos_all,pos_restaurant',
+            'is_published'   => 'nullable',
+        ]);
+
+        $questions = json_decode($validated['questions_json'], true);
+        $error = $this->validateQuestionsPayload($questions);
+        if ($error) {
+            return back()->with('error', $error)->withInput();
+        }
+
+        Survey::create([
+            'title'         => $validated['title'],
+            'intro'         => $validated['intro'] ?? null,
+            'questions'     => $questions,
+            'allow_comment' => $request->boolean('allow_comment'),
+            'audience'      => $validated['audience'],
+            'is_published'  => $request->boolean('is_published'),
+        ]);
+
+        return redirect()->route('admin.surveys')->with('success', 'Survey bana diya gaya!');
+    }
+
+    /** Update an existing survey. Blocked once published AND responses exist. */
+    public function adminUpdate(\Illuminate\Http\Request $request, $id)
+    {
+        $survey = Survey::findOrFail($id);
+        $hasResponses = $survey->responses()->exists();
+
+        if ($hasResponses && $survey->is_published) {
+            return back()->with('error', 'Published survey mein responses aa chuke hain — results consistent rakhne ke liye editing band hai. Pehle survey band karein, phir new survey banayein.');
+        }
+
+        $validated = $request->validate([
+            'title'          => 'required|string|max:200',
+            'intro'          => 'nullable|string|max:1000',
+            'questions_json' => 'required|string',
+            'allow_comment'  => 'nullable',
+            'audience'       => 'required|in:pos_all,pos_restaurant',
+            'is_published'   => 'nullable',
+        ]);
+
+        $questions = json_decode($validated['questions_json'], true);
+        $error = $this->validateQuestionsPayload($questions);
+        if ($error) {
+            return back()->with('error', $error)->withInput();
+        }
+
+        $survey->update([
+            'title'         => $validated['title'],
+            'intro'         => $validated['intro'] ?? null,
+            'questions'     => $questions,
+            'allow_comment' => $request->boolean('allow_comment'),
+            'audience'      => $validated['audience'],
+            'is_published'  => $request->boolean('is_published'),
+        ]);
+
+        return redirect()->route('admin.surveys')->with('success', 'Survey update ho gaya!');
+    }
+
+    /** Delete a survey — only allowed if no responses exist. */
+    public function adminDestroy($id)
+    {
+        $survey = Survey::findOrFail($id);
+        if ($survey->responses()->exists()) {
+            return back()->with('error', 'Is survey mein responses hain — delete nahi kar sakte. Results ke liye band karein.');
+        }
+        $survey->delete();
+
+        return redirect()->route('admin.surveys')->with('success', 'Survey delete ho gaya.');
+    }
+
+    /** Shared question-structure validator. Returns an error string or null. */
+    private function validateQuestionsPayload($questions): ?string
+    {
+        if (!is_array($questions) || count($questions) < 1) {
+            return 'Kam se kam ek sawal zaroori hai.';
+        }
+
+        $qKeys = [];
+        foreach ($questions as $i => $q) {
+            $n = $i + 1;
+            if (empty(trim($q['text'] ?? ''))) {
+                return "Sawal #{$n} ka text khali hai.";
+            }
+            $qKey = $q['key'] ?? null;
+            if (empty($qKey) || !is_string($qKey)) {
+                return "Sawal #{$n} ki key missing ya invalid hai.";
+            }
+            if (in_array($qKey, $qKeys, true)) {
+                return "Sawal #{$n} ki key duplicate hai — har sawal ki key unique honi chahiye.";
+            }
+            $qKeys[] = $qKey;
+
+            if (empty($q['options']) || !is_array($q['options']) || count($q['options']) < 2) {
+                return "Sawal #{$n} mein kam se kam 2 options chahiye.";
+            }
+            $optKeys = [];
+            foreach ($q['options'] as $j => $opt) {
+                if (empty(trim($opt['label'] ?? ''))) {
+                    return "Sawal #{$n}, Option #" . ($j + 1) . " ka label khali hai.";
+                }
+                $optKey = $opt['key'] ?? null;
+                if (empty($optKey) || !is_string($optKey)) {
+                    return "Sawal #{$n}, Option #" . ($j + 1) . " ki key missing ya invalid hai.";
+                }
+                if (in_array($optKey, $optKeys, true)) {
+                    return "Sawal #{$n}, Option #" . ($j + 1) . " ki key duplicate hai.";
+                }
+                $optKeys[] = $optKey;
+            }
+        }
+
+        return null;
+    }
+
     /** Close (stop showing on POS, keep results) or reopen. */
     public function toggleClose($id)
     {

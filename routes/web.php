@@ -1097,8 +1097,11 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     // POS Surveys (Task 1022 — Caller ID elaan / advice collection)
     Route::get('/surveys', [\App\Http\Controllers\PosSurveyController::class, 'adminIndex'])->name('admin.surveys');
     Route::post('/surveys/feature-toggle', [\App\Http\Controllers\PosSurveyController::class, 'toggleFeature'])->name('admin.surveys.feature-toggle');
+    Route::post('/surveys', [\App\Http\Controllers\PosSurveyController::class, 'adminStore'])->name('admin.surveys.store');
     Route::get('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminShow'])->name('admin.surveys.show');
     Route::post('/surveys/{id}/toggle-close', [\App\Http\Controllers\PosSurveyController::class, 'toggleClose'])->name('admin.surveys.toggle-close');
+    Route::post('/surveys/{id}/update', [\App\Http\Controllers\PosSurveyController::class, 'adminUpdate'])->name('admin.surveys.update');
+    Route::delete('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminDestroy'])->name('admin.surveys.destroy');
 
     // Madadgar AI bot — chat logs + settings (owner request 22 Jul 2026)
     Route::get('/madadgar-chats', [\App\Http\Controllers\MadadgarController::class, 'adminChats'])->name('admin.madadgar-chats');

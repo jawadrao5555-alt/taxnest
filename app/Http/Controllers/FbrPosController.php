@@ -4110,8 +4110,8 @@ class FbrPosController extends Controller
                 // understands (13 digits, dash-tolerant, globally unique).
                 'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
                 'print_paper_size' => 'nullable|in:thermal,thermal58,a4',
-                'kot_align_center' => 'nullable|in:0,1',
-                'kot_left_margin_mm' => 'nullable|integer|min:0|max:30',
+                'receipt_align_center' => 'nullable|in:0,1',
+                'receipt_left_margin_mm' => 'nullable|integer|min:0|max:30',
                 'receipt_footer_note' => 'nullable|string|max:255',
                 'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'remove_logo' => 'nullable|boolean',
@@ -4144,13 +4144,14 @@ class FbrPosController extends Controller
                 'show_footer' => $request->has('rd_show_footer'),
             ]);
 
-            // Print position (31 Jul 2026 — mirrors PRA slips): opt-in center /
-            // left-margin correction. hasColumn guards = prod self-heal parity.
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')) {
-                $company->kot_align_center = (bool) $request->input('kot_align_center');
+            // Print position (Task 828, Aug 2026): receipt_* columns are now the
+            // dedicated FBR receipt position — decoupled from KOT (kot_*) columns.
+            // hasColumn guards = prod self-heal parity (columns added Aug 14 2026).
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')) {
+                $company->receipt_align_center = (bool) $request->input('receipt_align_center');
             }
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
-                $company->kot_left_margin_mm = max(0, min(30, (int) $request->input('kot_left_margin_mm', 0)));
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_left_margin_mm')) {
+                $company->receipt_left_margin_mm = max(0, min(30, (int) $request->input('receipt_left_margin_mm', 0)));
             }
 
             $company->fill([
@@ -4160,9 +4161,10 @@ class FbrPosController extends Controller
                 'email' => $validated['email'] ?? null,
                 'ntn' => $validated['ntn'] ?? null,
                 'print_paper_size' => $validated['print_paper_size'] ?? 'thermal',
-                // Print position (31 Jul 2026): shared company columns with PRA slips.
-                'kot_align_center' => (bool) $request->input('kot_align_center', false),
-                'kot_left_margin_mm' => max(0, min(30, (int) $request->input('kot_left_margin_mm', 0))),
+                // Task 828: receipt_align_center / receipt_left_margin_mm are written
+                // via the hasColumn guard blocks above — omitting here keeps the
+                // fill() safe when the columns are absent (e.g. SQLite test schema
+                // that hasn't run the Aug-14 migration yet).
                 'receipt_footer_note' => $validated['receipt_footer_note'] ?? null,
                 'invoice_display_prefs' => $prefs,
             ]);

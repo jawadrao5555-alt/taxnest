@@ -478,11 +478,12 @@ class PosKotThemeTest extends TestCase
             );
         }
 
-        // FBR receipt + Z-report: kot_align_center IS the receipt position for
-        // fbrpos (receipt-kot-margin-split) — NULL must stay LEFT (`?? false`).
+        // FBR receipt + Z-report (Task 828): now read receipt_align_center, fully
+        // decoupled from kot_align_center — NULL must stay LEFT (`?? false`).
         foreach (['fbr-pos/receipt', 'fbr-pos/day-close-thermal'] as $view) {
             $src = file_get_contents(resource_path("views/{$view}.blade.php"));
-            $this->assertStringContainsString('$company->kot_align_center ?? false', $src, "{$view} must keep the left default");
+            $this->assertStringContainsString('$company->receipt_align_center ?? false', $src, "{$view} must use dedicated receipt column with left default");
+            $this->assertStringNotContainsString('$company->kot_align_center ?? false', $src, "{$view} must not fall back to kot column for receipt position");
         }
     }
 }

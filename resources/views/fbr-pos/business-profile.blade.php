@@ -193,20 +193,20 @@
                 @error('print_paper_size') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
 
-            {{-- Print position (31 Jul 2026 — mirrors PRA slips): opt-in per-company
-                 center / left-margin correction for printer-driver offsets. --}}
+            {{-- Print position (Task 828, Aug 2026): dedicated receipt_* columns
+                 so kitchen-slip (kot_*) and receipt position are independent. --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.print_position') }}</label>
-                    <select name="kot_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm">
-                        <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
-                        <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
+                    <select name="receipt_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm">
+                        <option value="0" {{ !($company->receipt_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
+                        <option value="1" {{ ($company->receipt_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
                     </select>
                     <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.print_pos_center_warn') }}</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
-                    <input type="number" name="kot_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
+                    <input type="number" name="receipt_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->receipt_left_margin_mm ?? 0) }}"
                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm">
                     <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
                 </div>

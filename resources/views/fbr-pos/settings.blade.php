@@ -13,7 +13,8 @@
     @php
         $fbrMode = $company->fbr_connection_mode ?? 'cloud';
         $isAgentMode = $fbrMode === 'fiscal_device';
-        $agentOnline = $company->agent_last_seen && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2));
+        // Canonical liveness check (Task 1062) — one verdict everywhere.
+        $agentOnline = $company->agentOnline();
     @endphp
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

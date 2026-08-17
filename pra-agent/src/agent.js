@@ -9,6 +9,22 @@ let heartbeatInterval = null;
 let currentConfig = null;
 let statusCallback = null;
 let updateCallback = null;
+
+// ─── Resilience state (Task 1062, Aug 2026) ─────────────────────────────────
+// Offline "flapping" root cause: a single failed heartbeat/sync just waited
+// for the next timer tick (30s/5s), the heartbeat awaited the whole callback-
+// queue flush inside itself (up to 50 sequential 10s POSTs = beats starved),
+// and nothing woke the agent after PC sleep / Wi-Fi drop. These guards keep
+// ticks from overlapping, retry a failed beat quickly with jitter, and expose
+// wakeAgent() so main.js can fire an immediate beat+sync on resume/reconnect.
+let heartbeatInFlight = false;
+let syncInFlight = false;
+let flushInFlight = false;
+let heartbeatRetryTimer = null;
+let heartbeatRetryCount = 0;
+// Generation counter: bumped on every start/stop so retry timers scheduled by
+// a previous run can never fire into a stopped/restarted agent.
+let runGen = 0;
 // Optional provider of extra heartbeat fields (set by main.js — e.g. NestPOS
 // Desktop Offline Mode telemetry). Must return a plain object; failures are
 // swallowed so telemetry can never break the heartbeat.
@@ -64,6 +80,18 @@ function enqueueCallback(payload) {
 }
 async function flushCallbackQueue() {
   if (!currentConfig) return;
+  // Single flusher at a time — the queue is replayed sequentially (ordered);
+  // an overlapping second flush would double-POST the same callbacks.
+  if (flushInFlight) return;
+  flushInFlight = true;
+  try {
+    await flushCallbackQueueInner();
+  } finally {
+    flushInFlight = false;
+  }
+}
+
+async function flushCallbackQueueInner() {
   let q = loadQueue();
   if (q.length === 0) {
     status.pendingCallbacks = 0;
@@ -71,7 +99,14 @@ async function flushCallbackQueue() {
   }
   log(`Flushing ${q.length} pending callback(s)…`);
   const remaining = [];
-  for (const item of q) {
+  for (let i = 0; i < q.length; i++) {
+    const item = q[i];
+    if (!currentConfig) {
+      // Agent stopped mid-flush — keep every unprocessed item as-is so a
+      // restart replays them (already-replayed ones are NOT re-queued).
+      remaining.push(...q.slice(i));
+      break;
+    }
     try {
       await axios.post(
         `${currentConfig.serverUrl}/submit-result`,
@@ -112,8 +147,39 @@ function log(...args) {
   console.log('[Agent]', new Date().toISOString(), ...args);
 }
 
+function clearHeartbeatRetry() {
+  if (heartbeatRetryTimer) {
+    clearTimeout(heartbeatRetryTimer);
+    heartbeatRetryTimer = null;
+  }
+}
+
+// After a FAILED beat, retry quickly (with jitter) instead of sitting red for
+// the rest of the 30s tick — brief blips (router hiccup, slow server) recover
+// in seconds. Capped at 2 quick retries; the regular interval remains the
+// long-term driver, so a genuinely-down network never causes a retry storm.
+function scheduleHeartbeatRetry() {
+  if (!currentConfig) return;
+  if (heartbeatRetryTimer) return;
+  if (heartbeatRetryCount >= 2) return;
+  heartbeatRetryCount += 1;
+  const base = heartbeatRetryCount === 1 ? 3000 : 8000;
+  const delay = base + Math.floor(Math.random() * 3000); // jitter
+  const gen = runGen;
+  heartbeatRetryTimer = setTimeout(() => {
+    heartbeatRetryTimer = null;
+    if (gen !== runGen || !currentConfig) return;
+    log(`Heartbeat quick-retry #${heartbeatRetryCount}…`);
+    heartbeat();
+  }, delay);
+}
+
 async function heartbeat() {
   if (!currentConfig) return;
+  // Overlap guard: a slow beat (10s timeout) must never stack with the next
+  // tick or a wake/retry-triggered beat.
+  if (heartbeatInFlight) return;
+  heartbeatInFlight = true;
   try {
     let extra = {};
     if (heartbeatExtraProvider) {
@@ -135,6 +201,8 @@ async function heartbeat() {
     status.connected = true;
     status.serverInfo = res.data.company;
     status.lastError = null;
+    heartbeatRetryCount = 0;
+    clearHeartbeatRetry();
 
     // Self-update: the server piggybacks the latest release info on every
     // heartbeat; main.js decides whether it is actually newer.
@@ -147,8 +215,11 @@ async function heartbeat() {
     const stuck = (res.data.stuck_transaction_ids || []).length;
     log(`Heartbeat OK · healed=${healed} repromoted=${repromoted} stuck=${stuck}`);
 
-    // Phase 4 — replay any callbacks that previously failed
-    await flushCallbackQueue();
+    // Phase 4 — replay any callbacks that previously failed. Runs in the
+    // BACKGROUND (still ordered — single flusher): up to 50 sequential 10s
+    // POSTs must never sit inside the heartbeat's critical path, or one bad
+    // patch of connectivity starves the beats and the badge flaps offline.
+    flushCallbackQueue().catch(() => {});
 
     // Phase 5 — if server reports stuck rows, trigger an immediate sync sweep
     if (stuck > 0 || repromoted > 0) {
@@ -158,13 +229,28 @@ async function heartbeat() {
     status.connected = false;
     status.lastError = `Heartbeat failed: ${e.message}`;
     log('Heartbeat failed:', e.message);
+    scheduleHeartbeatRetry();
+  } finally {
+    heartbeatInFlight = false;
   }
   notify();
 }
 
 async function syncOnce() {
   if (!currentConfig) return;
+  // Overlap guard: a shop with a slow PRA endpoint (30s/invoice) must never
+  // stack 5s-tick sweeps — that caused duplicate submits of the same pending
+  // rows to race each other.
+  if (syncInFlight) return;
+  syncInFlight = true;
+  try {
+    await syncOnceInner();
+  } finally {
+    syncInFlight = false;
+  }
+}
 
+async function syncOnceInner() {
   try {
     const res = await axios.get(`${currentConfig.serverUrl}/pending-invoices`, {
       headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
@@ -293,15 +379,30 @@ async function reportResult(txnId, success, praInvoiceNumber, response, error, o
   }
 }
 
+// Immediate beat + sync sweep — called by main.js on power resume and network
+// reconnect so the badge recovers within seconds instead of waiting for the
+// next 30s tick after PC sleep / Wi-Fi drop. In-flight guards make this safe
+// to call at any time; a stopped agent ignores it.
+function wakeAgent(reason) {
+  if (!currentConfig || !status.running) return;
+  log(`Wake trigger (${reason || 'unknown'}) — immediate heartbeat + sync`);
+  heartbeatRetryCount = 0;
+  clearHeartbeatRetry();
+  heartbeat().catch(() => {});
+  syncOnce().catch(() => {});
+}
+
 function startAgent(config, onStatusChange, onAgentUpdate) {
   if (pollInterval || heartbeatInterval) {
     stopAgent();
   }
 
+  runGen += 1;
   currentConfig = config;
   statusCallback = onStatusChange;
   updateCallback = onAgentUpdate || null;
   status.running = true;
+  heartbeatRetryCount = 0;
   notify();
 
   log('Starting agent', { server: config.serverUrl, company: config.companyId });
@@ -320,6 +421,9 @@ function startAgent(config, onStatusChange, onAgentUpdate) {
 
 function stopAgent() {
   stopPrinting();
+  runGen += 1; // invalidate any pending quick-retry timers
+  clearHeartbeatRetry();
+  heartbeatRetryCount = 0;
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;
@@ -334,4 +438,4 @@ function stopAgent() {
   log('Agent stopped');
 }
 
-module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider };
+module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, wakeAgent };

@@ -122,6 +122,39 @@ class AgentController extends Controller
             $update['agent_snapshot_at'] = $snapAt;
         }
 
+        // Self-update telemetry (Task 1062): agents v1.8.0+ report the LAST
+        // update attempt (target version, failure stage, error) so a shop
+        // stuck on an old version is visible in saas-admin instead of silent.
+        // Column-guarded (deploy-before-migration safe) AND only written when
+        // the agent actually sent the fields — old agents omitting them must
+        // never wipe stored values.
+        static $updateTelemetryCols = null;
+        if ($updateTelemetryCols === null) {
+            $updateTelemetryCols = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_update_target')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_update_stage')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_update_error')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_update_at');
+        }
+        if ($updateTelemetryCols && $request->filled('update_target')) {
+            $update['agent_update_target'] = mb_substr((string) $request->input('update_target'), 0, 32);
+            $update['agent_update_stage'] = $request->filled('update_stage')
+                ? mb_substr((string) $request->input('update_stage'), 0, 40) : null;
+            $update['agent_update_error'] = $request->filled('update_error')
+                ? mb_substr((string) $request->input('update_error'), 0, 800) : null;
+            $updAt = null;
+            if ($request->filled('update_attempted_at')) {
+                try {
+                    $updAt = \Carbon\Carbon::parse($request->input('update_attempted_at'));
+                    if ($updAt->gt(now())) {
+                        $updAt = now(); // wrong PC clock guard
+                    }
+                } catch (\Throwable $e) {
+                    $updAt = null;
+                }
+            }
+            $update['agent_update_at'] = $updAt ?: now();
+        }
+
         $this->telemetryUpdate($company, $update);
 
         // ===== FBR POS Fiscal Device company =====

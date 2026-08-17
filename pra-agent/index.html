@@ -360,7 +360,24 @@
     if (info && info.available) {
       $('updateBanner').style.display = 'block';
       $('upToDateBanner').style.display = 'none';
-      $('updateMsg').textContent = `New version ${info.latestBuild} is available (you have ${info.currentBuild}). Click to download.`;
+      if (info.downloading) {
+        // Auto-update in progress — no button, just progress.
+        $('updateBtn').style.display = 'none';
+        const pct = typeof info.progress === 'number' ? ` (${info.progress}%)` : '';
+        $('updateMsg').textContent = `Update v${info.latestBuild} download ho rahi hai${pct} — install khud-ba-khud hogi.`;
+      } else if (info.downloaded) {
+        $('updateBtn').style.display = 'none';
+        $('updateMsg').textContent = `Update v${info.latestBuild} install ho rahi hai — agent khud restart hoga.`;
+      } else if (info.autoRetrying) {
+        // A failed attempt with retries still pending — stay QUIET (no manual
+        // download button; a browser download would confuse the staff).
+        $('updateBtn').style.display = 'none';
+        $('updateMsg').textContent = `Update v${info.latestBuild} thori dair mein khud dobara try hogi — kuch karne ki zaroorat nahi.`;
+      } else {
+        // Manual fallback: auto-update exhausted its retries (or can't run).
+        $('updateBtn').style.display = 'inline-block';
+        $('updateMsg').textContent = `New version ${info.latestBuild} is available (you have ${info.currentBuild}). Click to download.`;
+      }
     } else if (info) {
       $('updateBanner').style.display = 'none';
       $('upToDateBanner').style.display = 'block';

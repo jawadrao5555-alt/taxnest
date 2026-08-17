@@ -50,13 +50,23 @@ class AgentManagementController extends Controller
                 ->count(),
         ];
 
-        $isOnline = $company->agent_last_seen
-            && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2));
+        // Canonical liveness check (Task 1062) — same verdict as the
+        // silent-print gate and every other surface.
+        $isOnline = $company->agentOnline();
 
         $release = $this->latestVersionInfo();
+
+        // Task 1062: version + self-update visibility. Outdated = a valid
+        // agent-semver release tag is newer than the running agent's version.
+        $latestAgentVersion = null;
+        if (!empty($release['tag']) && preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $release['tag'], $m)) {
+            $latestAgentVersion = "{$m[1]}.{$m[2]}.{$m[3]}";
+        }
+        $agentOutdated = $latestAgentVersion && $company->agent_version
+            && version_compare($company->agent_version, $latestAgentVersion, '<');
         $offlineAllowed = $this->offlineAllowed($company);
 
-        return view('company.agent', compact('company', 'stats', 'isOnline', 'release', 'offlineAllowed'));
+        return view('company.agent', compact('company', 'stats', 'isOnline', 'release', 'offlineAllowed', 'latestAgentVersion', 'agentOutdated'));
     }
 
     /**

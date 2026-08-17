@@ -94,7 +94,7 @@
 
                                             {{-- Delete: only if no responses --}}
                                             @if($sv->seen_count == 0)
-                                                <form method="POST" action="{{ route('admin.surveys.destroy', $sv->id) }}" onsubmit="return confirm('Survey permanently delete karein?');">
+                                                <form method="POST" action="{{ route('admin.surveys.destroy', $sv->id) }}" onsubmit="return confirm({{ Js::from(__('pos.survey_admin_delete_confirm')) }});">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-100">Delete</button>
@@ -104,7 +104,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="5" class="px-4 py-10 text-center text-gray-400">No surveys yet. "New Survey" se ek banayein.</td></tr>
+                                <tr><td colspan="5" class="px-4 py-10 text-center text-gray-400">{{ __('pos.survey_admin_empty') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -129,12 +129,12 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title <span class="text-red-500">*</span></label>
-                    <input type="text" name="title" required maxlength="200" placeholder="e.g. Caller ID feature ke bare mein aap ki ray" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    <input type="text" name="title" required maxlength="200" placeholder="{{ __('pos.survey_admin_title_placeholder') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Intro / description <span class="text-gray-400 font-normal">(optional — popup ke upar dikhta hai)</span></label>
-                    <textarea name="intro" rows="2" maxlength="1000" placeholder="Hum chahte hain ke aap ki rai lein taake NestPOS behtar bana sakein." class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Intro / description <span class="text-gray-400 font-normal">{{ __('pos.survey_admin_intro_hint') }}</span></label>
+                    <textarea name="intro" rows="2" maxlength="1000" placeholder="{{ __('pos.survey_admin_intro_placeholder') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm"></textarea>
                 </div>
 
                 {{-- Questions builder --}}
@@ -149,7 +149,7 @@
                             <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/40">
                                 <div class="flex items-start gap-2 mb-3">
                                     <span class="mt-2 text-xs font-bold text-gray-400 w-6 shrink-0" x-text="'Q' + (qi+1)"></span>
-                                    <input type="text" x-model="q.text" maxlength="300" placeholder="Sawal likhen..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm">
+                                    <input type="text" x-model="q.text" maxlength="300" placeholder="{{ __('pos.survey_admin_question_placeholder') }}" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm">
                                     <button type="button" @click="removeQuestion(qi)" x-show="questions.length > 1" class="mt-1.5 text-red-400 hover:text-red-600 text-lg leading-none" title="Remove question">&times;</button>
                                 </div>
 
@@ -218,7 +218,7 @@
 
             {{-- Warning banner when responses exist --}}
             <div id="editHasResponsesWarn" class="hidden mx-6 mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-sm text-amber-800 dark:text-amber-300">
-                ⚠️ Is survey mein responses aa chuke hain aur yeh published hai — results consistent rakhne ke liye question editing band hai. Naya survey banayein (existing results mehfooz rahenge).
+                {{ __('pos.survey_admin_responses_warn') }}
             </div>
 
             <form method="POST" id="editSurveyForm" action="" class="px-6 py-5 space-y-5">
@@ -247,7 +247,7 @@
                             <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/40">
                                 <div class="flex items-start gap-2 mb-3">
                                     <span class="mt-2 text-xs font-bold text-gray-400 w-6 shrink-0" x-text="'Q' + (qi+1)"></span>
-                                    <input type="text" x-model="q.text" maxlength="300" placeholder="Sawal likhen..." class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm">
+                                    <input type="text" x-model="q.text" maxlength="300" placeholder="{{ __('pos.survey_admin_question_placeholder') }}" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm">
                                     <button type="button" @click="removeQuestion(qi)" x-show="questions.length > 1" class="mt-1.5 text-red-400 hover:text-red-600 text-lg leading-none" title="Remove question">&times;</button>
                                 </div>
                                 <div class="ml-8 space-y-2">

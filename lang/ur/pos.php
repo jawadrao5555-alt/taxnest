@@ -4653,6 +4653,15 @@ return [
     'survey_pick_all' => 'ہر سوال کا جواب چنیں',
     'survey_thanks' => 'شکریہ! آپ کا جواب مل گیا۔',
 
+    // Admin survey management page strings
+    'survey_admin_delete_confirm' => 'کیا آپ اس سروے کو ہمیشہ کے لیے ڈیلیٹ کرنا چاہتے ہیں؟',
+    'survey_admin_empty' => 'ابھی کوئی سروے نہیں۔ "New Survey" سے ایک بنائیں۔',
+    'survey_admin_intro_hint' => '(اختیاری — پاپ اپ کے اوپر دکھائی دیتا ہے)',
+    'survey_admin_intro_placeholder' => 'ہم آپ کی رائے سے NestPOS کو اور بہتر بنانا چاہتے ہیں۔',
+    'survey_admin_responses_warn' => '⚠️ اس سروے میں جوابات آ چکے ہیں اور یہ شائع ہے — نتائج یکساں رکھنے کے لیے سوال میں ترمیم بند ہے۔ نیا سروے بنائیں (موجودہ نتائج محفوظ رہیں گے)۔',
+    'survey_admin_question_placeholder' => 'سوال لکھیں...',
+    'survey_admin_title_placeholder' => 'مثلاً: کالر آئی ڈی فیچر کے بارے میں آپ کی رائے',
+
     // Caller ID (Task 1039 — Android companion app + sale-screen popup)
     'caller_incoming_call' => 'کال آ رہی ہے',
     'caller_whatsapp_call' => 'واٹس ایپ کال',

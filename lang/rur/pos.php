@@ -4654,6 +4654,15 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'survey_pick_all' => 'Har sawal ka jawab chunein',
     'survey_thanks' => 'Shukriya! Aap ka jawab mil gaya.',
 
+    // Admin survey management page strings
+    'survey_admin_delete_confirm' => 'Kya aap is survey ko hamesha ke liye delete karna chahte hain?',
+    'survey_admin_empty' => 'Abhi koi survey nahi. "New Survey" se ek banao.',
+    'survey_admin_intro_hint' => '(ikhtiyari — popup ke upar dikhta hai)',
+    'survey_admin_intro_placeholder' => 'Hum aap ki rai se NestPOS aur behtar banana chahte hain.',
+    'survey_admin_responses_warn' => '⚠️ Is survey mein jawab aa chuke hain aur yeh publish hai — natayij ek jaise rakhne ke liye sawal edit nahi ho sakta. Naya survey banao (maujuda natayij mehfooz rahenge).',
+    'survey_admin_question_placeholder' => 'Sawal likhein...',
+    'survey_admin_title_placeholder' => 'Misal: Caller ID feature ke bare mein aap ki rai',
+
     // Caller ID (Task 1039 — Android companion app + sale-screen popup)
     'caller_incoming_call' => 'Call Aa Rahi Hai',
     'caller_whatsapp_call' => 'WhatsApp Call',

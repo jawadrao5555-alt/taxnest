@@ -4654,6 +4654,15 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'survey_pick_all' => 'Please answer every question',
     'survey_thanks' => 'Thank you! Your answer has been received.',
 
+    // Admin survey management page strings
+    'survey_admin_delete_confirm' => 'Permanently delete this survey?',
+    'survey_admin_empty' => 'No surveys yet. Create one using "New Survey".',
+    'survey_admin_intro_hint' => '(optional — shown above the popup)',
+    'survey_admin_intro_placeholder' => 'We want your feedback to help improve NestPOS.',
+    'survey_admin_responses_warn' => '⚠️ This survey has responses and is published — question editing is locked to keep results consistent. Create a new survey (existing results are preserved).',
+    'survey_admin_question_placeholder' => 'Write question...',
+    'survey_admin_title_placeholder' => 'e.g. Your opinion on the Caller ID feature',
+
     // Caller ID (Task 1039 — Android companion app + sale-screen popup)
     'caller_incoming_call' => 'Incoming Call',
     'caller_whatsapp_call' => 'WhatsApp Call',

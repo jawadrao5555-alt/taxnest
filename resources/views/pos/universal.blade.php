@@ -9611,7 +9611,10 @@ function restaurantPos() {
             if (!wantsReceipt && !wantsKot) {
                 // Nothing to print at pay-success = the 30 Jul failure signature
                 // (lastTransactionId missing → no receipt job was ever attempted).
-                if (this.silentBillPrint || this.silentKotPrint) this.printBeacon('auto-chain-nothing', { order_id: orderId || txnKotId, type: orderType || '' });
+                // dineinSkipReceipt = intentional feature-off for this company
+                // (print_on_pay_dinein false): don't beacon — it would fire on
+                // EVERY dine-in pay and bury real print failures in log noise.
+                if (!dineinSkipReceipt && (this.silentBillPrint || this.silentKotPrint)) this.printBeacon('auto-chain-nothing', { order_id: orderId || txnKotId, type: orderType || '' });
                 return;
             }
             // Task 565: opt-in Yes/No confirm — kuch print hone WALA hai aur flag

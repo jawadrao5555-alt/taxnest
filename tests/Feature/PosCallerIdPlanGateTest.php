@@ -350,6 +350,29 @@ class PosCallerIdPlanGateTest extends TestCase
         $this->assertFalse(PosFeatureService::planAllows($company, 'caller_id_enabled'));
     }
 
+    public function test_missing_column_fails_open_schema_lag_escape_hatch(): void
+    {
+        // Simulate a lagging production deploy where the migration that adds
+        // pricing_plans.caller_id_enabled has not yet run.  planAllows must
+        // return true (fail-open) so that paying users are NEVER locked out
+        // during the migration window.
+        $company = $this->makeCompany(['name' => 'Business', 'caller_id_enabled' => false]);
+
+        // Drop the column to reproduce the pre-migration schema state.
+        Schema::table('pricing_plans', function (Blueprint $t) {
+            $t->dropColumn('caller_id_enabled');
+        });
+
+        // Flush the per-request gate cache: a cached false from an earlier
+        // test on the same company id must not mask the fail-open result.
+        PosFeatureService::flushGateCaches();
+
+        $this->assertTrue(
+            PosFeatureService::planAllows($company, 'caller_id_enabled'),
+            'planAllows must fail OPEN when the pricing_plans.caller_id_enabled column is absent (schema-lag escape hatch)'
+        );
+    }
+
     // =========================================================================
     // Part 2: Controller endpoint — app login
     // =========================================================================

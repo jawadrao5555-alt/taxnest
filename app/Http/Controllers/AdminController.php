@@ -20,7 +20,10 @@ use App\Services\HsIntelligenceService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Response;
+use App\Models\Notification;
 use Carbon\Carbon;
 
 class AdminController extends Controller
@@ -298,11 +301,77 @@ class AdminController extends Controller
         SecurityLogService::log('company_approved', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
         AuditLogService::log('company_approved', 'Company', $company->id, null, ['name' => $company->name, 'assigned_plan' => $assigned?->pricingPlan?->name]);
 
+        $this->sendActivationNotification($company);
+
         $msg = 'Company approved successfully.';
         if ($assigned) {
             $msg .= " {$assigned->pricingPlan->name} package activated for 1 year (until {$assigned->end_date->format('d M Y')}).";
         }
         return redirect('/admin/company/' . $company->id)->with('success', $msg);
+    }
+
+    /**
+     * Send an in-app notification row and activation email to the company after
+     * approval. Mirrors SaasAdmin\AdminCompanyController::sendActivationNotification —
+     * failure here is non-fatal and NEVER blocks the approval action.
+     */
+    private function sendActivationNotification(Company $company): void
+    {
+        try {
+            [$productLabel, $panelName, $ctaUrl] = match ($company->product_type) {
+                'pos'    => ['NestPOS', 'NestPOS — PRA Point of Sale', url('/pos/login')],
+                'fbrpos' => ['FBR POS', 'Nest FBR POS', url('/fbr-pos/login')],
+                default  => ['TaxNest Digital Invoice', 'Digital Invoicing', url('/login')],
+            };
+
+            $title   = 'Account approved — welcome to ' . $productLabel;
+            $message = "Your {$productLabel} account has been approved. You can now log in and start using the system.";
+
+            Notification::create([
+                'company_id' => $company->id,
+                'type'       => 'account_approved',
+                'title'      => $title,
+                'message'    => $message,
+                'read'       => false,
+                'metadata'   => ['product_type' => $company->product_type],
+            ]);
+
+            $admin = $company->users()->where('role', 'company_admin')->orderBy('id')->first();
+            $email = $admin?->email ?? $company->email
+                ?? $company->users()->whereNotNull('email')->orderBy('id')->value('email');
+
+            if ($email) {
+                try {
+                    Mail::to($email)->send(new \App\Mail\TrialReminderMail(
+                        subjectLine: 'Your TaxNest account has been approved',
+                        companyName: $company->name ?? 'your company',
+                        headline: 'Your account is approved — you\'re all set!',
+                        paragraphs: [
+                            "We are pleased to inform you that your {$productLabel} account for {$company->name} has been approved.",
+                            "You can now log in and start using {$productLabel} right away.",
+                            'Thank you for choosing TaxNest.',
+                        ],
+                        ctaUrl: $ctaUrl,
+                        ctaLabel: 'Log In Now',
+                        panelName: $panelName,
+                    ));
+
+                    \App\Services\MailHealth::recordSuccess();
+                } catch (\Throwable $e) {
+                    Log::warning('Activation email failed after company approval', [
+                        'company_id' => $company->id,
+                        'error'      => $e->getMessage(),
+                    ]);
+
+                    \App\Services\MailHealth::recordFailure('Activation email on approval', $e);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('sendActivationNotification failed', [
+                'company_id' => $company->id ?? null,
+                'error'      => $e->getMessage(),
+            ]);
+        }
     }
 
     public function rejectCompany(Company $company)

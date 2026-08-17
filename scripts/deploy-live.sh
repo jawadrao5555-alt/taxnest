@@ -456,6 +456,10 @@ step "Preflight: PWA refresh-button check (slow-install wait, no-update reload+t
 node scripts/pwa-refresh-check.mjs \
   || fail "pwa-refresh check FAILED — the header update icon click contract regressed (Task 706); fix before deploying"
 
+step "Preflight: multi-word product search check (cheese loaded half → Cheese Loaded Fries (Half); blade sync)"
+node scripts/pos-search-rank-test.mjs \
+  || fail "pos-search check FAILED — nameMatchRank/searchTokens regressed or universal↔waiter blade sync broken (Task 1045); fix before deploying"
+
 step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Pro Max/Unlimited)"
 if [ "${SKIP_PLAN_GATE_CHECK:-0}" = "1" ]; then
   echo "SKIPPED (SKIP_PLAN_GATE_CHECK=1) — only skip for emergency hotfixes." >&2

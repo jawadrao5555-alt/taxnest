@@ -4473,7 +4473,7 @@ function restaurantPos() {
         // customer ke number ki wa.me chat, bill message + public receipt link
         // prefilled — cashier sirf Send dabata hai. Dono flags posConfigRev boot
         // fingerprint mein shamil hain (SW-cached copy toggle par refresh hoti hai).
-        waBillEnabled: {{ !empty($company->pos_whatsapp_bill_enabled) ? 'true' : 'false' }},
+        waBillEnabled: {{ (!empty($company->pos_whatsapp_bill_enabled) && \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled')) ? 'true' : 'false' }},
         waBillAutoOpen: {{ !empty($company->pos_whatsapp_bill_auto_open) ? 'true' : 'false' }},
         waShopName: @json($company->name ?? ''),
         lastWaPhone: null,

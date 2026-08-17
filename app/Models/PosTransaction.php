@@ -364,6 +364,7 @@ class PosTransaction extends Model
             if (!$company
                 || !\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
                 || !$company->pos_whatsapp_bill_enabled
+                || !\App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled')
                 || $this->isDeliberateProvisional()) {
                 return $out;
             }

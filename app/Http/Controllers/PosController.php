@@ -167,6 +167,13 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 422);
         }
         $companyId = app('currentCompanyId');
+        // Pro+ plan gate (owner, 17 Aug 2026): turning anything ON needs the
+        // plan; turning OFF is always allowed.
+        $turningOn = ($update['pos_whatsapp_bill_enabled'] ?? false)
+            || ($update['pos_whatsapp_bill_auto_open'] ?? false);
+        if ($turningOn && !\App\Services\PosFeatureService::planAllows(Company::find($companyId), 'whatsapp_enabled')) {
+            return response()->json(['success' => false, 'message' => __('pos.wa_bill_plan_locked_api')], 403);
+        }
         Company::where('id', $companyId)->update($update);
         return response()->json(['success' => true]);
     }
@@ -3885,7 +3892,8 @@ class PosController extends Controller
         $company = Company::find($companyId);
         $waBillOn = $company
             && \Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
-            && $company->pos_whatsapp_bill_enabled;
+            && $company->pos_whatsapp_bill_enabled
+            && \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled');
 
         // Table name per bill (dine-in): batch lookup via restaurant_orders →
         // restaurant_tables so the Reprint list can show "Dine-in • Table 5".
@@ -4935,8 +4943,9 @@ class PosController extends Controller
         // also gates minting; missing column fails OPEN (feature default is
         // ON — prod schema drift must not kill the pre-existing Share button).
         $company = Company::find($companyId);
-        $shareOn = !\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
-            || (bool) ($company?->pos_whatsapp_bill_enabled ?? true);
+        $shareOn = (!\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+                || (bool) ($company?->pos_whatsapp_bill_enabled ?? true))
+            && \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled');
         if (!$shareOn || $transaction->isDeliberateProvisional()) {
             return response()->json([
                 'success' => false,

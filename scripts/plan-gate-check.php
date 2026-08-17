@@ -61,10 +61,12 @@ $EXPECTED_GATE_ORDER = [
     'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled',
     'qr_menu_enabled', 'offline_enabled', 'excel_enabled',
     'khata_enabled', 'loyalty_enabled', 'kot_enabled', 'caller_id_enabled',
+    'whatsapp_enabled',
 ];
 $MATRIX = [
-    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id]
+    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id, whatsapp]
     // 17 Aug 2026 (owner): Caller ID (Android app + sale-screen popup) = Unlimited ONLY.
+    // 17 Aug 2026 (owner): WhatsApp Bill (receipt share + auto-open) = Pro and above.
     // 9 Aug 2026 (owner): rider LIVE tracking moved back UP — Unlimited ONLY.
     // 9 Aug 2026 strict binding: reports_enabled gates CSV/PDF exports only —
     // Starter card promises basic report PAGES (ungated) but NOT exports, so
@@ -74,11 +76,11 @@ $MATRIX = [
     // was gated on them before). The FBR ladder flip comes later.
     // 13 Aug 2026 (owner, market-capture move): Business gains Kitchen mode
     // (restaurant_enabled — asserted separately below) + Analytics.
-    'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false],
-    'Business'  => [true,  false, false, true,  true,  false, false, false, true,  true,  true, true, true, false],
-    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true,  true,  true, true, true, false],
-    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true,  true, true, true, false],
-    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true, true],
+    'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false],
+    'Business'  => [true,  false, false, true,  true,  false, false, false, true,  true,  true, true, true, false, false],
+    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true,  true,  true, true, true, false, true],
+    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true,  true, true, true, false, true],
+    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true, true,  true],
 ];
 // Derived-surface expectations per plan:
 $CUSTOM_SET_PLANS = ['Unlimited'];                   // customSet() honored only here

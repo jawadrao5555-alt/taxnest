@@ -106,7 +106,8 @@
                 $shareCo = \App\Models\Company::find(app('currentCompanyId'));
                 $shareAllowed = !$transaction->isDeliberateProvisional()
                     && (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
-                        || (bool) ($shareCo?->pos_whatsapp_bill_enabled ?? true));
+                        || (bool) ($shareCo?->pos_whatsapp_bill_enabled ?? true))
+                    && \App\Services\PosFeatureService::planAllows($shareCo, 'whatsapp_enabled');
             @endphp
             @if($shareAllowed)
             <div x-data="shareInvoice({{ $transaction->id }})" class="relative">

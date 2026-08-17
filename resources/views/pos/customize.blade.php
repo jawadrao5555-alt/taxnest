@@ -419,8 +419,10 @@
                 </div>
 
                 {{-- WhatsApp Bill (Task 1036, owner voice note 17 Aug 2026): receipt popup ka
-                     WhatsApp button (default ON) + optional auto-open mode (default OFF). --}}
-                <div x-data="{ waOn: {{ ($company->pos_whatsapp_bill_enabled ?? true) ? 'true' : 'false' }}, waAutoOn: {{ ($company->pos_whatsapp_bill_auto_open ?? false) ? 'true' : 'false' }}, savingWa: false,
+                     WhatsApp button (default ON) + optional auto-open mode (default OFF).
+                     Pro+ plan gate (owner, 17 Aug 2026): locked below Pro. --}}
+                @php $tnWaPlanAllowed = \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled'); @endphp
+                <div x-data="{ waOn: {{ ($tnWaPlanAllowed && ($company->pos_whatsapp_bill_enabled ?? true)) ? 'true' : 'false' }}, waAutoOn: {{ ($company->pos_whatsapp_bill_auto_open ?? false) ? 'true' : 'false' }}, savingWa: false,
                         saveWa(payload, revert) { this.savingWa = true; fetch('{{ route('pos.settings.whatsapp-bill-toggle') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify(payload)}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { revert(); alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ revert(); alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ this.savingWa = false; }); } }"
                      class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
                     <div class="flex items-center gap-3">
@@ -431,12 +433,21 @@
                             <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.wa_bill_toggle') }}</p>
                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.wa_bill_toggle_sub') }}</p>
                         </div>
+                        @if($tnWaPlanAllowed)
                         <button type="button"
                             @click="waOn=!waOn; saveWa({enabled: waOn}, () => { waOn=!waOn; })"
                             class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="waOn ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'">
                             <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="waOn && 'translate-x-6'"></span>
                         </button>
+                        @else
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">🔒 Pro+</span>
+                        @endif
                     </div>
+                    @unless($tnWaPlanAllowed)
+                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                        <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.wa_bill_plan_locked') }}</p>
+                    </div>
+                    @endunless
                     {{-- Auto-open sub-option — only meaningful while the feature is ON --}}
                     <div x-show="waOn" x-collapse.duration.150ms class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-3">
                         <div class="min-w-0 flex-1">

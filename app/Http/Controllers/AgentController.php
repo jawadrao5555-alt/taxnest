@@ -610,6 +610,33 @@ class AgentController extends Controller
      * Stored inside companies.pos_printer_settings so the Printer Settings page
      * can offer real dropdowns.
      */
+    /**
+     * Task 1075: Detect a Windows text-only/generic driver from the printer queue
+     * name or display name.  Conservative patterns only — known thermal model names
+     * (POS-80, XP-80, TM-T88, RP-80, etc.) are deliberately NOT flagged because
+     * those are valid thermal queues.  Only flag strings that unmistakably identify
+     * a plain-text driver (no ESC/POS, no graphics, no bold).
+     */
+    private static function detectTextOnlyPrinter(string $name, string $displayName): bool
+    {
+        foreach ([$name, $displayName] as $candidate) {
+            $lower = strtolower($candidate);
+            // "Generic / Text Only", "Generic Text Only", "Generic Text"
+            if (str_contains($lower, 'generic text') || str_contains($lower, 'generic/text') || str_contains($lower, 'generic / text')) {
+                return true;
+            }
+            // "Text Only", "Text-Only", "TextOnly"
+            if (str_contains($lower, 'text only') || str_contains($lower, 'text-only') || str_contains($lower, 'textonly')) {
+                return true;
+            }
+            // "Raw Text" (some legacy PostScript / text-passthrough drivers)
+            if (str_contains($lower, 'raw text')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function reportPrinters(Request $request)
     {
         $company = $request->attributes->get('agent_company');
@@ -626,6 +653,11 @@ class AgentController extends Controller
             'name' => $p['name'],
             'displayName' => $p['displayName'] ?? $p['name'],
             'isDefault' => (bool) ($p['isDefault'] ?? false),
+            // Task 1075: flag text-only/generic drivers so the Printer Settings
+            // page can warn before garbled receipts happen. Conservative patterns
+            // only — known thermal model names (POS-80, XP-80, TM-T88…) are never
+            // flagged even though they can look similar.
+            'isTextOnly' => self::detectTextOnlyPrinter($p['name'], $p['displayName'] ?? $p['name']),
         ])->values()->all();
         $settings['printers_reported_at'] = now()->toIso8601String();
 

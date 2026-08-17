@@ -80,6 +80,17 @@
                  (customer feedback Jul 2026 — Pizza Master couldn't find where
                  the kitchen printer is set). Empty list = dropdowns show only
                  "Not set" + the amber hint explains how to fill them. --}}
+            @php
+                // Task 1075: build a lookup set of text-only printer names so the
+                // dropdowns below can show an amber warning without extra queries.
+                $textOnlyNames = collect($settings['available_printers'])
+                    ->filter(fn($p) => !empty($p['isTextOnly']))
+                    ->pluck('name')
+                    ->flip()
+                    ->all();
+                $receiptIsTextOnly = $settings['receipt_printer'] && isset($textOnlyNames[$settings['receipt_printer']]);
+                $kotIsTextOnly     = $settings['kot_printer']     && isset($textOnlyNames[$settings['kot_printer']]);
+            @endphp
             @if(count($settings['available_printers']))
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
                     {{ __('pos.printers_found_on_agent') }}
@@ -102,6 +113,9 @@
                             @endforeach
                         </select>
                         <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.bill_printer_hint') }}</p>
+                        @if($receiptIsTextOnly)
+                        <div class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">{{ __('pos.printer_text_only_warn') }}</div>
+                        @endif
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ __('pos.kitchen_kot_printer') }}</label>
@@ -112,6 +126,9 @@
                             @endforeach
                         </select>
                         <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.kot_printer_hint') }}</p>
+                        @if($kotIsTextOnly)
+                        <div class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">{{ __('pos.printer_text_only_warn') }}</div>
+                        @endif
                     </div>
                     {{-- Counter KOT Copy (owner request 30 Jul 2026): DINE-IN orders
                          only — every KOT also prints one full copy on this counter

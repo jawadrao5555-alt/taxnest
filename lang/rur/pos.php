@@ -2632,6 +2632,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'printer_settings_sub' => 'Silent printing se bills aur kitchen tickets seedha aapke printer par TaxNest Desktop Agent ke zariye chale jaate hain — koi print popup nahi, koi extra clicks nahi. Agar agent offline ho jaye, to printing khud-ba-khud normal popup par wapas aa jati hai.',
     'printer_size_hint' => 'Apne POS terminals par use hone wala thermal printer paper size select karein.',
     'printers_found_on_agent' => 'Agent PC par milne wale printers',
+    'printer_text_only_warn' => '⚠️ Yeh driver sirf saada text print karta hai — receipts garbled aayengi, koi bold nahi, koi QR nahi, layout bilkul nahi hogi. Apne printer ka asli driver install karein (jaise Xprinter, Epson, ya printer model ka khud ka driver) taake receipts theek aayein.',
     'printing' => 'Print ho raha hai...',
     'pro_unlimited_plan' => 'Pro / Unlimited plan',
     'process_refund' => 'Refund process karein',

@@ -348,6 +348,14 @@ class PosTransaction extends Model
     }
 
     /**
+     * Task 1093 test hook: set to true in unit tests to simulate a
+     * deploy-window class-skew that makes waBillPayload() throw BEFORE its
+     * own inner catch, exercising the outer controller-level \Throwable guard.
+     * Only honoured when app()->environment('testing') — zero production impact.
+     */
+    public static bool $__testForceWaBillThrow = false;
+
+    /**
      * Task 1036 — WhatsApp Bill extras for FINAL-bill JSON responses.
      * Returns ['wa_phone' => ..., 'share_url' => ...]; both null when the
      * company feature is off, the bill is a deliberate provisional (still
@@ -359,6 +367,11 @@ class PosTransaction extends Model
      */
     public function waBillPayload(?Company $company): array
     {
+        // Test hook (Task 1093): lets tests drive the outer controller catch.
+        if (static::$__testForceWaBillThrow && app()->environment('testing')) {
+            throw new \RuntimeException('[test] forced waBillPayload failure (Task 1093)');
+        }
+
         $out = ['wa_phone' => null, 'share_url' => null];
         try {
             if (!$company

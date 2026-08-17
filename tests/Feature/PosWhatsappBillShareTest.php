@@ -653,4 +653,175 @@ class PosWhatsappBillShareTest extends TestCase
         $this->assertTrue($rows->isNotEmpty());
         $this->assertTrue($rows->every(fn ($r) => ($r['wa_phone'] ?? null) === null));
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Task 1092/1093 — waBillPayload throw AFTER commit: all 4 outer catches
+    // must degrade to success:true + null extras, never bubble a 500.
+    // The static hook bypasses waBillPayload's own inner try/catch so the
+    // outer controller-level \Throwable guard is the one under test.
+    // ════════════════════════════════════════════════════════════════════════
+
+    protected function tearDown(): void
+    {
+        \App\Models\PosTransaction::$__testForceWaBillThrow = false;
+        parent::tearDown();
+    }
+
+    // ── Outer-catch path 1: PosController::storeInvoice JSON ─────────────
+
+    public function test_store_invoice_wabill_throw_degrades_to_success_with_null_extras(): void
+    {
+        // Task 1093: even when waBillPayload() throws (deploy-window class skew),
+        // an already-committed bill must return success:true — not a 500.
+        $companyId = $this->makeCompany();
+        $this->subscribe($companyId);
+        $user = $this->makeUser($companyId);
+
+        \App\Models\PosTransaction::$__testForceWaBillThrow = true;
+
+        $response = $this->actingAs($user, 'pos')
+            ->postJson('/pos/invoice/store', $this->storePayload());
+
+        $response->assertOk()->assertJson(['success' => true]);
+        $this->assertNull($response->json('wa_phone'),   'wa_phone must be null when extras throw');
+        $this->assertNull($response->json('share_url'),  'share_url must be null when extras throw');
+        // The bill must still have been committed.
+        $this->assertDatabaseCount('pos_transactions', 1);
+    }
+
+    // ── Outer-catch path 2: PosController::apiPromoteProvisional ─────────
+
+    public function test_promote_provisional_wabill_throw_degrades_to_success_with_null_extras(): void
+    {
+        // Task 1093: promote commits the bill inside a DB::transaction; the
+        // outer waBillPayload catch fires strictly post-commit.
+        $companyId = $this->makeCompany();
+        $this->subscribe($companyId);
+        $user = $this->makeUser($companyId);
+
+        // 1. Create a provisional so there is something to promote.
+        $storeResp = $this->actingAs($user, 'pos')
+            ->postJson('/pos/invoice/store', $this->storePayload(['save_as_provisional' => true]));
+        $storeResp->assertOk()->assertJson(['success' => true]);
+        $txId = (int) DB::table('pos_transactions')->value('id');
+        $this->assertNotEmpty($txId);
+
+        // 2. Arm the hook so waBillPayload throws during the promote response.
+        \App\Models\PosTransaction::$__testForceWaBillThrow = true;
+
+        $promoteResp = $this->actingAs($user, 'pos')
+            ->postJson("/pos/api/provisional-bills/{$txId}/promote", ['send_to_pra' => true]);
+
+        $promoteResp->assertOk()->assertJson(['success' => true]);
+        $this->assertNull($promoteResp->json('wa_phone'),  'wa_phone must be null when extras throw');
+        $this->assertNull($promoteResp->json('share_url'), 'share_url must be null when extras throw');
+        // The bill must have been promoted (pra_status cleared from local).
+        $row = DB::table('pos_transactions')->where('id', $txId)->first();
+        $this->assertNotSame('local', $row->invoice_mode, 'bill must have been promoted out of local mode');
+    }
+
+    // ── Outer-catch path 3: RestaurantPosController::payOrder ─────────────
+
+    public function test_restaurant_pay_order_wabill_throw_degrades_to_success_with_null_extras(): void
+    {
+        // Task 1093: the bill is committed inside payOrder's DB::transaction;
+        // the waBillPayload outer catch fires after the commit.
+        $companyId = $this->makeRestaurantCompany();
+        $orderId   = $this->makeOrder($companyId);
+        $user      = $this->makeUser($companyId);
+
+        \App\Models\PosTransaction::$__testForceWaBillThrow = true;
+
+        $response = $this->actingAs($user, 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", ['payment_method' => 'cash']);
+
+        $response->assertOk()->assertJson(['success' => true]);
+        $this->assertNull($response->json('wa_phone'),  'wa_phone must be null when extras throw');
+        $this->assertNull($response->json('share_url'), 'share_url must be null when extras throw');
+        $this->assertDatabaseCount('pos_transactions', 1);
+    }
+
+    // ── Outer-catch path 4: RestaurantPosController::replayPayByUuid ──────
+
+    public function test_restaurant_replay_pay_uuid_wabill_throw_degrades_to_success_with_null_extras(): void
+    {
+        // Task 1093: the replay path returns the ORIGINAL bill's payload with
+        // WhatsApp extras. When waBillPayload throws the outer catch must
+        // degrade to null extras and still return success:true (replayed=true).
+        $companyId = $this->makeRestaurantCompany();
+        $orderId   = $this->makeOrder($companyId);
+        $user      = $this->makeUser($companyId);
+
+        // Pre-plant a completed transaction with a known offline_uuid so the
+        // payOrder handler finds it immediately via replayPayByUuid (before any
+        // DB insert) — this is exactly the lost-response retry scenario.
+        $replayUuid = 'task-1093-replay-' . uniqid();
+        DB::table('pos_transactions')->insert([
+            'company_id'     => $companyId,
+            'invoice_number' => 'L-REPLAY-001',
+            'business_date'  => now()->toDateString(),
+            'status'         => 'completed',
+            'invoice_mode'   => 'pra',
+            'pra_status'     => null,
+            'offline_uuid'   => $replayUuid,
+            'customer_phone' => '0300-1234567',
+            'subtotal'       => 100,
+            'total_amount'   => 116,
+            'payment_method' => 'cash',
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        \App\Models\PosTransaction::$__testForceWaBillThrow = true;
+
+        $response = $this->actingAs($user, 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", [
+                'payment_method' => 'cash',
+                'pay_uuid'       => $replayUuid,
+            ]);
+
+        $response->assertOk()->assertJson(['success' => true, 'replayed' => true]);
+        $this->assertNull($response->json('wa_phone'),  'wa_phone must be null when extras throw on replay');
+        $this->assertNull($response->json('share_url'), 'share_url must be null when extras throw on replay');
+    }
+
+    // ── Client-side: null wa fields hide the WhatsApp button ─────────────
+
+    /**
+     * Task 1093: sanity-check that the sale screen's x-show guard uses &&
+     * on both lastWaPhone and lastShareUrl, so null extras from either a
+     * feature-off response or a degraded throw never show an empty wa.me link.
+     *
+     * This is a static blade/JS assertion — not an HTTP test — because the
+     * actual Alpine evaluation happens in the browser. We grep the compiled
+     * blade to confirm the guard expression is present.
+     */
+    public function test_sale_screen_wa_button_xshow_guards_both_fields(): void
+    {
+        // The universal sale screen must gate the WhatsApp button on BOTH
+        // lastWaPhone AND lastShareUrl so a null from a degraded pay never
+        // opens an empty wa.me link.
+        $blade = file_get_contents(base_path('resources/views/pos/universal.blade.php'));
+        $this->assertNotFalse($blade, 'universal.blade.php must be readable');
+
+        // The x-show expression must AND both fields (the exact guard from the
+        // task-1036 implementation; grep is line-level so we check substrings).
+        $this->assertStringContainsString(
+            'lastWaPhone && lastShareUrl',
+            $blade,
+            'WhatsApp button x-show must guard on both lastWaPhone AND lastShareUrl'
+        );
+
+        // setWaBill() coerces nulls so neither field is ever a truthy empty string.
+        $this->assertStringContainsString(
+            '(data && data.wa_phone) || null',
+            $blade,
+            'setWaBill must coerce wa_phone to null (not empty string) on null/missing'
+        );
+        $this->assertStringContainsString(
+            '(data && data.share_url) || null',
+            $blade,
+            'setWaBill must coerce share_url to null (not empty string) on null/missing'
+        );
+    }
 }

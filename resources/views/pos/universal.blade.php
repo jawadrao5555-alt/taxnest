@@ -9614,7 +9614,10 @@ function restaurantPos() {
                 // dineinSkipReceipt = intentional feature-off for this company
                 // (print_on_pay_dinein false): don't beacon — it would fire on
                 // EVERY dine-in pay and bury real print failures in log noise.
-                if (!dineinSkipReceipt && (this.silentBillPrint || this.silentKotPrint)) this.printBeacon('auto-chain-nothing', { order_id: orderId || txnKotId, type: orderType || '' });
+                // skipReceiptOverride = cashier deliberately unticked the per-bill
+                // receipt checkbox (Task 514): intentional skip, same as dineinSkipReceipt
+                // — don't beacon or every manual skip floods the telemetry log.
+                if (!dineinSkipReceipt && !skipReceiptOverride && (this.silentBillPrint || this.silentKotPrint)) this.printBeacon('auto-chain-nothing', { order_id: orderId || txnKotId, type: orderType || '' });
                 return;
             }
             // Task 565: opt-in Yes/No confirm — kuch print hone WALA hai aur flag

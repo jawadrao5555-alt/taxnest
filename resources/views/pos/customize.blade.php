@@ -448,8 +448,12 @@
                         @endif
                     </div>
                     @unless($tnWaPlanAllowed)
-                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
                         <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.wa_bill_plan_locked') }}</p>
+                        <a href="{{ route('pos.billing') }}" class="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline">
+                            <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                            {{ __('pos.upgrade_plan_btn') }}
+                        </a>
                     </div>
                     @endunless
                     {{-- Auto-open sub-option — only meaningful while the feature is ON --}}

@@ -4688,6 +4688,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'caller_id_last_event' => 'Last call event',
     'caller_id_download' => 'Download Caller ID App (Beta)',
     'caller_id_download_hint' => 'Install on the shop\'s Android phone, sign in with your admin login and allow notification access.',
+    'caller_id_plan_locked' => 'Caller ID is included only in the Unlimited package — upgrade to see the caller\'s name and purchase history pop up on the sale screen.',
+    'caller_plan_locked_api' => 'Caller ID is not included in your package. Upgrade to Unlimited to use the Caller ID app.',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',

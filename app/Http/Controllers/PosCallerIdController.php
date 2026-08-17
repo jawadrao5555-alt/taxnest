@@ -64,6 +64,16 @@ class PosCallerIdController extends Controller
         return $company;
     }
 
+    /**
+     * Unlimited-package gate (owner, 17 Aug 2026): Caller ID is plan-locked
+     * to Unlimited. planAllows keeps the usual escape hatches (internal
+     * accounts, active overrides, active trials) and fails OPEN on schema lag.
+     */
+    private function planLocked(Company $company): bool
+    {
+        return !\App\Services\PosFeatureService::planAllows($company, 'caller_id_enabled');
+    }
+
     // ─── Caller app API (stateless) ─────────────────────────────────────────
 
     /** POST /api/caller-app/v1/login {email, password, device?} */
@@ -94,6 +104,11 @@ class PosCallerIdController extends Controller
         }
         if (!Schema::hasColumn('companies', 'caller_app_token')) {
             return response()->json(['ok' => false, 'error' => 'server_not_ready'], 503);
+        }
+        // Unlimited gate: don't bind a device to a shop whose plan can't use it.
+        if ($this->planLocked($company)) {
+            return response()->json(['ok' => false, 'error' => 'plan_locked',
+                'message' => __('pos.caller_plan_locked_api')], 403);
         }
 
         // Rotate: one active device per company.
@@ -130,6 +145,10 @@ class PosCallerIdController extends Controller
         DB::table('companies')->where('id', $company->id)
             ->update(['caller_app_last_seen_at' => now()]);
 
+        if ($this->planLocked($company)) {
+            // Plan downgraded after binding: keep the token, surface the lock.
+            return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'plan_locked']);
+        }
         if (!($company->caller_id_enabled ?? false)) {
             // App keeps its token; popup feature is simply off right now.
             return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'disabled']);
@@ -198,11 +217,13 @@ class PosCallerIdController extends Controller
         $lastEvent = DB::table('pos_caller_events')
             ->where('company_id', $company->id)->orderByDesc('id')->first();
 
+        $planLocked = $this->planLocked($company);
         return response()->json([
             'ok' => true,
             'company' => $company->name ?? '',
             'user' => optional(User::find($company->caller_app_user_id))->name ?? '',
-            'enabled' => (bool) ($company->caller_id_enabled ?? false),
+            'enabled' => (bool) ($company->caller_id_enabled ?? false) && !$planLocked,
+            'plan_locked' => $planLocked,
             'last_event_at' => $lastEvent ? Carbon::parse($lastEvent->created_at)->format('d M Y, h:i A') : null,
         ]);
     }
@@ -246,6 +267,11 @@ class PosCallerIdController extends Controller
         }
         $companyId = app('currentCompanyId');
         $enabled = filter_var($request->input('enabled'), FILTER_VALIDATE_BOOLEAN);
+        // Unlimited gate: turning ON needs the plan; turning OFF is always allowed.
+        if ($enabled && $this->planLocked(Company::find($companyId))) {
+            return response()->json(['ok' => false, 'error' => 'plan_locked',
+                'message' => __('pos.caller_plan_locked_api')], 403);
+        }
         // Eloquent update on purpose: caller_id_enabled is in the posConfigRev
         // whitelist, and updated_at must bump so cached sale screens refresh.
         Company::where('id', $companyId)->update(['caller_id_enabled' => $enabled]);
@@ -262,6 +288,7 @@ class PosCallerIdController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company || !($company->caller_id_enabled ?? false)
+            || $this->planLocked($company)
             || !Schema::hasTable('pos_caller_events')) {
             return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
         }

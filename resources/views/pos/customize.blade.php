@@ -279,6 +279,8 @@
                     // download button can never 404.
                     $tnCallerApkLive = trim((string) \App\Models\SystemSetting::get('caller_app_latest_version', '')) !== ''
                         && is_file(public_path('downloads/taxnest-caller.apk'));
+                    // Unlimited gate (owner, 17 Aug 2026): Caller ID is plan-locked.
+                    $tnCallerPlanAllowed = \App\Services\PosFeatureService::planAllows($company, 'caller_id_enabled');
                 @endphp
                 @if($tnCallerReady)
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm" x-data="{ callerOn: {{ $tnCallerOn ? 'true' : 'false' }} }">
@@ -290,13 +292,20 @@
                             <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.caller_id_title') }}</p>
                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.caller_id_sub') }}</p>
                         </div>
+                        @if($tnCallerPlanAllowed)
                         <button type="button"
                             @click="callerOn=!callerOn; fetch('/pos/settings/caller-id', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:callerOn})}).catch(()=>{})"
                             class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="callerOn ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600'">
                             <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="callerOn && 'translate-x-6'"></span>
                         </button>
+                        @else
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">🔒 {{ __('pos.auth_unlimited') }}</span>
+                        @endif
                     </div>
                     <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                        @unless($tnCallerPlanAllowed)
+                            <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.caller_id_plan_locked') }}</p>
+                        @endunless
                         @if($tnCallerUser)
                             <p class="text-[11px] text-gray-600 dark:text-gray-300">
                                 <span class="font-bold">{{ __('pos.caller_id_device') }}:</span>
@@ -309,7 +318,7 @@
                         @if($tnCallerLastEvent)
                             <p class="text-[11px] text-gray-600 dark:text-gray-300"><span class="font-bold">{{ __('pos.caller_id_last_event') }}:</span> {{ \Carbon\Carbon::parse($tnCallerLastEvent)->diffForHumans() }}</p>
                         @endif
-                        @if($tnCallerApkLive)
+                        @if($tnCallerApkLive && $tnCallerPlanAllowed)
                             <div class="pt-2">
                                 <a href="{{ url('downloads/taxnest-caller.apk') }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>

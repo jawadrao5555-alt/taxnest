@@ -4688,6 +4688,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_id_last_event' => 'Aakhri call event',
     'caller_id_download' => 'Caller ID App Download Karein (Beta)',
     'caller_id_download_hint' => 'Shop ke Android phone par install karein, apne admin login se sign in kar ke notification access dein.',
+    'caller_id_plan_locked' => 'Caller ID sirf Unlimited package mein shamil hai — upgrade karein taake call aate hi customer ka naam aur purani kharidari sale screen par nazar aaye.',
+    'caller_plan_locked_api' => 'Caller ID aap ke package mein shamil nahi. Caller ID app istemal karne ke liye Unlimited par upgrade karein.',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',

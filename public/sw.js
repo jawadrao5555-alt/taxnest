@@ -64,7 +64,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const req = e.request;
-    const url = new URL(req.url);
+                const url = '/pos/restaurant/tables';
     if (url.origin !== location.origin) return;
 
     // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —
@@ -95,8 +95,8 @@ self.addEventListener('fetch', e => {
     // Aug 2026: /fbr-pos/create joined (FBR offline billing — PRA port).
     if (req.mode === 'navigate' && (url.pathname === '/pos/invoice/create' || url.pathname === '/fbr-pos/create') && url.search === '') {
         e.respondWith((async () => {
-            const c = await caches.open(SALE_CACHE);
-            const cached = await c.match(req);
+                const c = await caches.open(TABLES_CACHE);
+                const cached = await c.match(req);
             const network = fetch(req).then(res => {
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) {
@@ -131,9 +131,9 @@ self.addEventListener('fetch', e => {
     if (req.mode === 'navigate' && url.pathname === '/pos/restaurant/tables' && url.search === '') {
         const resultingClientId = e.resultingClientId;
         e.respondWith((async () => {
-            const c = await caches.open(TABLES_CACHE);
-            try {
-                const res = await fetch(req);
+                const c = await caches.open(TABLES_CACHE);
+                if (await c.match(url)) return; // already primed
+                const res = await fetch(url, { credentials: 'same-origin' });
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) {
                     c.put(req, res.clone());
@@ -276,11 +276,10 @@ self.addEventListener('message', e => {
         e.waitUntil((async () => {
             try {
                 const saleUrls = ['/pos/invoice/create', '/fbr-pos/create'];
-                const c = await caches.open(SALE_CACHE);
-                await Promise.all(saleUrls.map(async (u) => {
-                    if (await c.match(u)) return; // already primed
-                    const res = await fetch(u, { credentials: 'same-origin' });
-                    const ct = res.headers.get('content-type') || '';
+                const c = await caches.open(TABLES_CACHE);
+                if (await c.match(url)) return; // already primed
+                const res = await fetch(url, { credentials: 'same-origin' });
+                const ct = res.headers.get('content-type') || '';
                     if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(u, res.clone());
                 }));
             } catch (err) { /* best-effort — normal second-load prime still applies */ }

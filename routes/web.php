@@ -2,6 +2,31 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+
+// ── Stateless machine endpoints (Task 1090) ─────────────────────────────────
+// Token/webhook-authenticated endpoints hit by machines (Desktop Agent every
+// 5-30s per shop, rider/caller apps, biometric devices, WA webhooks). They
+// live in routes/web.php so by default they get the FULL web group: cookies +
+// StartSession + session-dependent middleware. With SESSION_DRIVER=database on
+// live, every such request (axios keeps no cookies) did a sessions SELECT +
+// a brand-new sessions INSERT + gc-lottery DELETEs — thousands of garbage
+// session rows and 3 extra DB statements per poll. During the 17 Aug 2026
+// night rush this contributed to MySQL "Too many connections" (1040).
+// Stripping session/cookie middleware makes these requests session-free.
+// NOTE: the impersonation/consultant/locale middleware below call
+// $request->session() unguarded, so they MUST come off together with
+// StartSession or every request would 500.
+$statelessMachine = [
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    \App\Http\Middleware\ReadOnlyImpersonation::class,
+    \App\Http\Middleware\LogImpersonatedWrites::class,
+    \App\Http\Middleware\ConsultantSwitchGuard::class,
+    \App\Http\Middleware\SetPosLocale::class,
+];
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\AdminController;
@@ -55,8 +80,8 @@ Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('share.invoice.pdf');
 
 // Meta WhatsApp Cloud API status webhook (per-company; public + CSRF-exempt).
-Route::get('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'verify'])->whereNumber('company');
-Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'receive'])->whereNumber('company');
+Route::get('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'verify'])->whereNumber('company')->withoutMiddleware($statelessMachine);
+Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'receive'])->whereNumber('company')->withoutMiddleware($statelessMachine);
 
 Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
     ->where('role', 'super_admin|company_admin|demo');
@@ -229,14 +254,14 @@ Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePd
 // Biometric ADMS push endpoint (4 Aug 2026) — PUBLIC, no POS auth.
 // ZKTeco and compatible devices call /bio-sync/{token}/iclock/cdata.
 // Token identifies + scopes the company; no session/CSRF needed.
-Route::get('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshake'])->name('pos.bio-sync.adms-get');
-Route::post('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunches'])->name('pos.bio-sync.adms-post');
+Route::get('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshake'])->name('pos.bio-sync.adms-get')->withoutMiddleware($statelessMachine);
+Route::post('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunches'])->name('pos.bio-sync.adms-post')->withoutMiddleware($statelessMachine);
 // Root ADMS endpoints (4 Aug 2026) — K50/K40-class firmware only accepts a bare
 // server address (no URL path), so those devices push to /iclock/cdata at the
 // domain root. Device is identified by ?SN= (must be pre-registered on /pos/bio-sync).
 // Throttled per-IP: devices poll every ~30-60s + push bursts; 120/min is generous
 // for real hardware but blocks SN-enumeration scans and punch-flood abuse.
-Route::middleware('throttle:120,1')->group(function () {
+Route::middleware('throttle:120,1')->withoutMiddleware($statelessMachine)->group(function () {
     Route::get('/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshakeBySn'])->name('pos.bio-sync.adms-root-get');
     Route::post('/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunchesBySn'])->name('pos.bio-sync.adms-root-post');
     Route::match(['get', 'post'], '/iclock/getrequest', [\App\Http\Controllers\PosBiometricController::class, 'admsNoCommand'])->name('pos.bio-sync.adms-getrequest');
@@ -1510,7 +1535,7 @@ Route::get('/setup-seed-xK9mP2', function () {
 // ── TaxNest Rider app API (Aug 2026) — stateless bearer-token JSON.
 // Rider signs in with his portal login; token rotates per login (one device).
 // CSRF-exempt via bootstrap/app.php ('api/rider-app/*').
-Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->group(function () {
+Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
     Route::post('/login', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogin'])->middleware('throttle:15,1')->name('riderapp.login');
     Route::post('/duty', [\App\Http\Controllers\PosRiderTrackingController::class, 'appDuty'])->name('riderapp.duty');
     Route::post('/locations', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLocations'])->name('riderapp.locations');
@@ -1523,7 +1548,7 @@ Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->group(functio
 // Shop admin/manager signs in with the portal login; token rotates per login
 // (one active phone per company). CSRF-exempt via bootstrap/app.php
 // ('api/caller-app/*'). Open to all POS plans for now.
-Route::prefix('api/caller-app/v1')->middleware(['throttle:120,1'])->group(function () {
+Route::prefix('api/caller-app/v1')->middleware(['throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
     Route::post('/login', [\App\Http\Controllers\PosCallerIdController::class, 'appLogin'])->middleware('throttle:15,1')->name('callerapp.login');
     Route::post('/ring', [\App\Http\Controllers\PosCallerIdController::class, 'appRing'])->name('callerapp.ring');
     Route::get('/me', [\App\Http\Controllers\PosCallerIdController::class, 'appMe'])->name('callerapp.me');
@@ -1531,7 +1556,7 @@ Route::prefix('api/caller-app/v1')->middleware(['throttle:120,1'])->group(functi
     Route::post('/logout', [\App\Http\Controllers\PosCallerIdController::class, 'appLogout'])->name('callerapp.logout');
 });
 
-Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {
+Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {
     Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);
     Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);
     Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);

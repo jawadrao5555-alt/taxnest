@@ -272,7 +272,15 @@ class AdminCompanyController extends Controller
             ->filter(fn ($c) => $c->agentLongOffline())
             ->values();
 
-        return view('saas-admin.companies.index', compact('companies', 'offlineAgents'));
+        // Task 1066: latest agent version for the outdated-agent badge in the list.
+        // One cached call (600s) — never per-row.
+        $releaseInfo = \App\Http\Controllers\AgentManagementController::latestReleaseInfo();
+        $latestAgentVersion = null;
+        if (!empty($releaseInfo['tag']) && preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $releaseInfo['tag'], $m)) {
+            $latestAgentVersion = "{$m[1]}.{$m[2]}.{$m[3]}";
+        }
+
+        return view('saas-admin.companies.index', compact('companies', 'offlineAgents', 'latestAgentVersion'));
     }
 
     public function show($id)

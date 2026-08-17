@@ -88,6 +88,16 @@
                                 <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Agent Offline
                             </span>
                             @endif
+                            @if($company->agent_enabled && $latestAgentVersion && $company->agent_version && version_compare($company->agent_version, $latestAgentVersion, '<'))
+                            @php
+                                $agentStuck = !empty($company->agent_update_error);
+                            @endphp
+                            <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold {{ $agentStuck ? 'bg-red-900/50 text-red-400' : 'bg-amber-900/40 text-amber-400' }}"
+                                  title="{{ $agentStuck ? 'Agent update stuck — ' . $company->agent_update_error . ' | Running: v' . $company->agent_version . ' → Latest: v' . $latestAgentVersion : 'Agent outdated — running v' . $company->agent_version . ', latest v' . $latestAgentVersion }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $agentStuck ? 'bg-red-500' : 'bg-amber-400' }}"></span>
+                                {{ $agentStuck ? 'Update Stuck' : 'Agent Purana' }}
+                            </span>
+                            @endif
                             <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->owner_name ?? '' }}</p>
                             {{-- Package picked at registration — what approval will activate for 1 year --}}
                             @if($company->status === 'pending' && $company->requestedPlan)

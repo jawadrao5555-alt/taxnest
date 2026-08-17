@@ -2106,13 +2106,21 @@ window.addEventListener('popstate', function() {
                     <div class="w-12 h-12 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-2">
                         <svg class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.947-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
                     </div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ __('pos.unsent_items_in_cart') }}</p>
+                    <p x-show="tableSwitchPrompt?.kind !== 'recall'" class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ __('pos.unsent_items_in_cart') }}</p>
+                    <p x-show="tableSwitchPrompt?.kind === 'recall'" class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ __('pos.recall_dirty_title') }}</p>
                     <p class="text-2xl font-black text-gray-900 dark:text-white mt-1" x-text="tableSwitchTargetLabel()"></p>
-                    <p class="text-[12px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.unsent_take_or_remove_q') }}</p>
+                    <p x-show="tableSwitchPrompt?.kind !== 'recall'" class="text-[12px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.unsent_take_or_remove_q') }}</p>
+                    <p x-show="tableSwitchPrompt?.kind === 'recall'" class="text-[12px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.recall_dirty_q') }}</p>
+                    <p x-show="tableSwitchPrompt?.kind === 'recall' && !tableSwitchPrompt?.canSave" class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.recall_dirty_save_na_hint') }}</p>
                 </div>
-                <div class="p-4 space-y-2">
+                {{-- Task 1028: recall-dirty variant — save-first (jab mumkin) / discard / cancel --}}
+                <div x-show="tableSwitchPrompt?.kind !== 'recall'" class="p-4 space-y-2">
                     <button @click="confirmTableSwitch('move')" class="w-full py-3 rounded-xl text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 transition ring-offset-2 dark:ring-offset-gray-900" :class="tableSwitchIndex === 0 ? 'ring-2 ring-purple-500' : ''">1 · {{ __('pos.unsent_take_items_btn') }}</button>
                     <button @click="confirmTableSwitch('discard')" class="w-full py-3 rounded-xl text-sm font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 hover:bg-red-100 hover:border-red-400 transition ring-offset-2 dark:ring-offset-gray-900" :class="tableSwitchIndex === 1 ? 'ring-2 ring-red-500' : ''">2 · {{ __('pos.unsent_remove_items_btn') }}</button>
+                </div>
+                <div x-show="tableSwitchPrompt?.kind === 'recall'" class="p-4 space-y-2">
+                    <button x-show="tableSwitchPrompt?.canSave" @click="confirmTableSwitch('save')" class="w-full py-3 rounded-xl text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 transition ring-offset-2 dark:ring-offset-gray-900" :class="tableSwitchIndex === 0 ? 'ring-2 ring-purple-500' : ''">1 · {{ __('pos.recall_save_switch_btn') }}</button>
+                    <button @click="confirmTableSwitch('discard')" class="w-full py-3 rounded-xl text-sm font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 hover:bg-red-100 hover:border-red-400 transition ring-offset-2 dark:ring-offset-gray-900" :class="(tableSwitchPrompt?.canSave ? tableSwitchIndex === 1 : tableSwitchIndex === 0) ? 'ring-2 ring-red-500' : ''"><span x-text="tableSwitchPrompt?.canSave ? '2' : '1'"></span> · {{ __('pos.recall_discard_switch_btn') }}</button>
                 </div>
                 <div class="px-4 pb-4">
                     <button @click="tableSwitchPrompt = null" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_esc') }}</button>
@@ -4531,6 +4539,9 @@ function restaurantPos() {
         mobileView: 'menu',
         priorityOrder: false,
         recalledOrderId: null,
+        // Task 1028: recall/claim ke waqt cart ka fingerprint snapshot — switch
+        // se pehle compare hota hai (dirty = explicit choice, kabhi silent reset nahi).
+        _recallCartBaseline: null,
         toast: { show: false, message: '', type: 'success' },
         lastHoldTime: 0,
         lastPayTime: 0,
@@ -5547,7 +5558,7 @@ function restaurantPos() {
             // ZFC SWITCH PROMPT open + focus raced back into the search box:
             // forward Enter to the prompt's confirm (same pattern as below) —
             // it must never re-run search/guided logic behind the modal.
-            if (this.tableSwitchPrompt) { if (!e?.repeat) this.confirmTableSwitch(this.tableSwitchIndex === 1 ? 'discard' : 'move'); return; }
+            if (this.tableSwitchPrompt) { if (!e?.repeat) this.confirmTableSwitch(this.tableSwitchEnterAction()); return; }
             // TABLE PICKER open + focus raced back into the search box: the input's
             // .stop keeps Enter from reaching handleKey's picker branch, so forward
             // it here (same pattern as the type-step forwarding above) — Enter must
@@ -6307,10 +6318,13 @@ function restaurantPos() {
             // into the picker/search behind it.
             // ═══════════════════════════════════════════════════════════════
             if (this.tableSwitchPrompt) {
-                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Tab') { e.preventDefault(); this.tableSwitchIndex = this.tableSwitchIndex === 0 ? 1 : 0; return; }
+                // Task 1028: recall-dirty prompt bina save-option ke SINGLE action
+                // button rakhta hai — arrows/'2' highlight ko us se hata na saken.
+                const tswSingle = this.tableSwitchPrompt.kind === 'recall' && !this.tableSwitchPrompt.canSave;
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Tab') { e.preventDefault(); if (!tswSingle) this.tableSwitchIndex = this.tableSwitchIndex === 0 ? 1 : 0; return; }
                 if (e.key === '1') { e.preventDefault(); this.tableSwitchIndex = 0; return; }
-                if (e.key === '2') { e.preventDefault(); this.tableSwitchIndex = 1; return; }
-                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); this.confirmTableSwitch(this.tableSwitchIndex === 1 ? 'discard' : 'move'); return; }
+                if (e.key === '2') { e.preventDefault(); if (!tswSingle) this.tableSwitchIndex = 1; return; }
+                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); this.confirmTableSwitch(this.tableSwitchEnterAction()); return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.tableSwitchPrompt = null; return; }
                 if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;
@@ -6843,7 +6857,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -6873,8 +6887,47 @@ function restaurantPos() {
         tableSwitchTargetLabel() {
             const p = this.tableSwitchPrompt;
             if (!p) return '';
-            if (p.kind === 'table') return window.TXT.table_t_prefix2 + p.table.table_number;
+            if (p.kind === 'table' || p.kind === 'recall') return window.TXT.table_t_prefix2 + p.table.table_number;
             return p.type === 'delivery' ? window.TXT.delivery : window.TXT.takeaway;
+        },
+        // ── Task 1028 (Task 975 hissa 3): recall/claim ke baad cart-edit dirty check ──
+        // Recall/claim par cart ka lightweight fingerprint snapshot hota hai
+        // (_recallCartBaseline); doosre table par switch se pehle compare — item
+        // add/remove, qty, unit price, per-item notes/discount, kitchen notes,
+        // priority aur bill-level discount sab pakre jate hain. SIRF wohi fields
+        // jo recall/claim SYNC set karta hai — customer/delivery-address nahi
+        // (unke async loaders bina-tabdeeli recall par false-positive bana dete).
+        cartEditFingerprint() {
+            return JSON.stringify({
+                items: this.cart.map(i => [i.item_id ?? null, i.item_type || '', i.item_name || '', Number(i.quantity) || 0, Number(i.unit_price) || 0, i.special_notes || '', !!i.is_tax_exempt, i.item_discount_type || 'percentage', Number(i.item_discount_value) || 0]),
+                notes: this.kitchenNotes || '',
+                priority: !!this.priorityOrder,
+                dtype: this.discountType || 'percentage',
+                dval: Number(this.discountValue) || 0,
+            });
+        },
+        recalledCartDirty() {
+            if (!(this.recalledOrderId || this.incomingOrderId)) return false;
+            // Snapshot hi na ho (purane path se aaya state) → pichhle task (1027)
+            // ka behaviour: reset+switch. Dirty sirf PROVE hone par.
+            if (!this._recallCartBaseline) return false;
+            return this.cartEditFingerprint() !== this._recallCartBaseline;
+        },
+        // Save-first option sirf wahan jahan Hold/F5 sach mein chalega: claimed
+        // waiter orders payment par settle hote hain (P7 re-hold guard), manual/
+        // deal lines aur non-dine-in types holdOrder khud reject karta hai —
+        // un cases mein prompt sirf discard/cancel dikhata hai.
+        canSaveRecalledEdits() {
+            return !!this.recalledOrderId && !this.incomingOrderId && !this.editingBillId
+                && this.canHold() && !this.hasManualItems() && !this.hasDealItems()
+                && !(this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable);
+        },
+        // Enter → action mapping (document handler + search-input race path dono
+        // isi se guzarte hain taake mapping kabhi diverge na ho).
+        tableSwitchEnterAction() {
+            const p = this.tableSwitchPrompt;
+            if (p && p.kind === 'recall') return (p.canSave && this.tableSwitchIndex === 0) ? 'save' : 'discard';
+            return this.tableSwitchIndex === 1 ? 'discard' : 'move';
         },
         // Lighter than clearCart(): sirf UNSENT items + unke saath chalne wala
         // state saaf hota hai (kitchen notes, discount, delivery charge input,
@@ -6901,6 +6954,25 @@ function restaurantPos() {
             const p = this.tableSwitchPrompt;
             if (!p) return;
             this.tableSwitchPrompt = null;
+            // Task 1028: recall/claim ke BAAD edited cart + doosre table par click.
+            // 'save' = maujooda Hold/F5 flow (recalled order update + KOT delta/void
+            // chain wahi ka wahi), phir usi table-click ka normal flow aage chale.
+            // 'discard' = held/claimed row DB/table par jyon-ka-tyon — sirf screen
+            // ki UNSAVED tabdeeli jati hai (clearCart), phir switch.
+            if (p.kind === 'recall') {
+                if (action === 'save') {
+                    const held = await this.holdOrder({ stayOnScreen: true });
+                    // Save fail (network/422): cart + tabdeeli barqarar — cashier
+                    // dobara try kar sakta hai; switch cancel ho jata hai.
+                    if (!held) return;
+                    await this.selectTable(p.table, { skipSwitchPrompt: true });
+                    return;
+                }
+                this.clearCart();
+                this.showToast(window.TXT.recall_discard_done, 'info');
+                await this.selectTable(p.table, { skipSwitchPrompt: true });
+                return;
+            }
             if (action === 'discard') this.discardUnsentCart();
             // Re-run the original move with the prompt skipped — "move" then
             // follows today's exact path (reserve + dine_in_auto_kot etc.),
@@ -7190,6 +7262,16 @@ function restaurantPos() {
             // warning/prompt paths se hi guzarta hai — owner ka "cart kabhi
             // silently discard na ho" rule unhi ke liye hai.
             if (cartOrderId && this.cart.length) {
+                // Task 1028 (Task 975 hissa 3): recall/claim ke BAAD cart mein
+                // tabdeeli hui ho (item add/remove, qty, notes, discount) to
+                // seedha reset cashier ki mehnat chupke se kha jata — pehle
+                // explicit choice (save-first / discard / cancel, tableSwitchPrompt
+                // pattern). Bina tabdeeli wala recall pichhle task jaisa seedha
+                // reset+switch hi rehta hai (koi extra prompt nahi).
+                if (!(opts && opts.skipSwitchPrompt) && this.recalledCartDirty()) {
+                    this.openTableSwitchPrompt({ kind: 'recall', table, canSave: this.canSaveRecalledEdits() });
+                    return;
+                }
                 this.clearCart(); // order DB/table par jyon-ka-tyon; sirf screen reset
                 this.showToast(window.TXT.type_switch_order_safe, 'info');
             }
@@ -8293,7 +8375,12 @@ function restaurantPos() {
                     // Task 1001: hold succeeded — next hold is a fresh attempt.
                     this.holdAttemptUuid = null;
                     this.showToast(successMsg, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
-                    if (wasDineIn && this.tableBoardEnabled) {
+                    // Task 1028 save-first switch: caller khud agla qadam chalata
+                    // hai (clicked table ka normal flow) — yahan ka tables-page/
+                    // picker navigation + focus us raste mein fire na ho.
+                    if (opts.stayOnScreen) {
+                        // no-op — navigation suppressed
+                    } else if (wasDineIn && this.tableBoardEnabled) {
                         // Task 779: Tables-first flow ON → chhota picker NAHI, seedha
                         // full-screen Tables page. $nextTick tak neeche wali KOT-print
                         // branch chal chuki hoti hai, is liye navigateToTablesWhenIdle
@@ -8667,6 +8754,9 @@ function restaurantPos() {
                     // payAttemptUuid intentionally NOT cleared — the retry must ride
                     // the same uuid so the server can dedupe a lost-response success.
                     this.recalledOrderId = holdData.order.id;
+                    // Task 1028: cart is waqt bilkul wahi hai jo abhi hold hua —
+                    // baseline yahin le lo taake BAAD ki edits hi dirty ginein.
+                    this._recallCartBaseline = this.cartEditFingerprint();
                     this.submitting = false;
                     return;
                 }
@@ -9389,6 +9479,9 @@ function restaurantPos() {
                 ? { id: null, name: o.customer_name || 'Walk-in', phone: o.customer_phone || '' }
                 : null;
             this.kitchenNotes = o.kitchen_notes || '';
+            // Task 1028: claim ke foran baad ka fingerprint — table-switch par
+            // edited claimed carts ko bhi explicit choice (discard/cancel) milti hai.
+            this._recallCartBaseline = this.cartEditFingerprint();
             this.showIncoming = false;
             this.activeCartIndex = this.cart.length ? 0 : -1;
             this.flowStep = 'cart';
@@ -10515,6 +10608,9 @@ function restaurantPos() {
             // leaves heldOrders on the next line, so KOT gating + the cancel
             // modal would otherwise lose kot_sent_at / order_number.
             this.recalledOrderMeta = { order_number: order.order_number || null, kot_sent_at: order.kot_sent_at || null, source: order.source || null };
+            // Task 1028: recall ke foran baad ka fingerprint — table-switch par
+            // isi se compare ho kar dirty (edited) carts ko explicit choice milti hai.
+            this._recallCartBaseline = this.cartEditFingerprint();
             this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast(window.TXT.order_recalled_for_editing, 'success');
         },
 

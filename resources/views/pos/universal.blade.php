@@ -5399,6 +5399,58 @@ function restaurantPos() {
             const all = [...this.allProducts, ...this.allServices];
             return all.find(it => it.name && parseFloat(it.price) > 0 && this.isExactCodeMatch(it, q)) || null;
         },
+        // ---- MULTI-WORD SEARCH (live restaurant video, 16 Aug 2026) ----
+        // A cashier typing "cheese loaded half" must find "Cheese Loaded Fries
+        // (Half)". Both modes previously treated the WHOLE query as ONE token, so
+        // any query with a space dead-ended. Now the QUERY is tokenized; a hit =
+        // every typed token prefix-matches a word of the name. Words are split on
+        // NON-alphanumeric runs so parentheses/punctuation never block a match
+        // ("(Half)" yields "half"). Non-ASCII chars (Urdu names) count as word
+        // chars. BOTH surfaces (dropdown + grid) call nameMatchRank so they can
+        // never diverge.
+        searchTokens(s) {
+            return String(s || '').toLowerCase().split(/[^a-z0-9\u0080-\uffff]+/).filter(Boolean);
+        },
+        // Rank a product name against the typed query. 0 = no match; higher =
+        // better (contiguous/in-order matches sort above scattered-word ones so
+        // "(Full)"/"(Half)" pairs order sensibly):
+        //   4 = name starts with the raw query (exactly the old startsWith rule)
+        //   3 = tokens match CONSECUTIVE name words in order
+        //   2 = tokens match name words in order with gaps ("cheese half")
+        //   1 = every token matches some word, but out of order
+        // anyWord=false keeps the STRICT PREFIX rule (owner, 24 Jul 2026 — do NOT
+        // loosen): the FIRST token must still match the very START of the name;
+        // only the LATER tokens are free to prefix-match any later word. Single-
+        // word queries therefore behave exactly as before in both modes.
+        nameMatchRank(name, q, anyWord) {
+            const lname = String(name).toLowerCase();
+            if (lname.startsWith(q)) return 4;
+            const tokens = this.searchTokens(q);
+            if (!tokens.length) return 0;
+            if (!anyWord && !lname.startsWith(tokens[0])) return 0;
+            const words = this.searchTokens(lname);
+            for (let s = 0; s + tokens.length <= words.length; s++) {
+                if (tokens.every((t, k) => words[s + k].startsWith(t))) return 3;
+            }
+            let wi = 0, inOrder = true;
+            for (const t of tokens) {
+                while (wi < words.length && !words[wi].startsWith(t)) wi++;
+                if (wi >= words.length) { inOrder = false; break; }
+                wi++;
+            }
+            if (inOrder) return 2;
+            // Scattered: every token prefix-matches a DISTINCT word (longest tokens
+            // claim first) — two tokens must never both count the same word, or
+            // "chicken ch" would drag "Chicken Roll" into the results.
+            const used = new Array(words.length).fill(false);
+            const ok = [...tokens].sort((a, b) => b.length - a.length).every(t => {
+                for (let j = 0; j < words.length; j++) {
+                    if (!used[j] && words[j].startsWith(t)) { used[j] = true; return true; }
+                }
+                return false;
+            });
+            return ok ? 1 : 0;
+        },
         onSearchInput() {
             // Toggle dropdown synchronously so empty-state hides instantly (no flicker).
             const q = this.searchQuery.trim().toLowerCase();
@@ -5419,44 +5471,48 @@ function restaurantPos() {
                     // on some other category.
                     const all = [...this.allDeals, ...this.allProducts, ...this.allServices];
                     // FIRST-LETTER PRIORITY (customer suggestion, 21 Jul 2026): names that
-                    // START with the typed text rank above mid-word matches. Two buckets —
-                    // the scan can't stop at 12 total hits, because a LATER prefix match must
-                    // still outrank an EARLIER mid-word one; stop only once 12 prefix hits exist.
+                    // START with the typed text rank above other matches — preserved via
+                    // nameMatchRank's rank ordering (rank 4/3 = name-start/contiguous sort
+                    // above scattered hits). Name hits bucket separately from barcode hits.
                     const pref = [], other = [];
-                    // STRICT PREFIX (owner, 24 Jul 2026): NAME matches only from the very
-                    // START of the name — mid-name/mid-word hits are excluded so the list
-                    // stays short ("zi" → only names starting with "Zi").
+                    // STRICT PREFIX (owner, 24 Jul 2026): the first token matches only from
+                    // the very START of the name — "zi" → only names starting with "Zi".
+                    // MULTI-WORD (16 Aug 2026): later tokens prefix-match any later word —
+                    // "cheese loaded half" finds "Cheese Loaded Fries (Half)".
                     // BARCODE/SKU substring matching stays (scanners type the digits, which
                     // never match a product name) but ONLY when the query contains a digit
                     // or symbol — letters-only typing is a NAME search, otherwise SKUs like
                     // "CHI-001" leak unrelated products into a name search.
                     const codeSearch = /[^a-z\s]/.test(q);
-                    // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): any_word matches
-                    // the start of ANY word right away; prefix = strict 24 Jul rule.
-                    const nameHit = (name) => this.searchAnyWord
-                        ? name.toLowerCase().split(/\s+/).some(w => w.startsWith(q))
-                        : name.toLowerCase().startsWith(q);
-                    for (let i = 0; i < all.length && pref.length < 12; i++) {
+                    // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): any_word lets EVERY
+                    // token (incl. the first) match any word; prefix = strict 24 Jul rule.
+                    for (let i = 0; i < all.length; i++) {
                         const it = all[i];
                         if (!it.name || !(parseFloat(it.price) > 0)) continue;
-                        if (nameHit(it.name)) {
-                            pref.push(it);
-                        } else if (codeSearch && ((it.barcode && String(it.barcode).toLowerCase().includes(q))
+                        const r = this.nameMatchRank(it.name, q, this.searchAnyWord);
+                        if (r > 0) {
+                            pref.push({ it, r, i });
+                        } else if (codeSearch && other.length < 12
+                            && ((it.barcode && String(it.barcode).toLowerCase().includes(q))
                             || (it.sku && String(it.sku).toLowerCase().includes(q)))) {
-                            if (other.length < 12) other.push(it);
+                            other.push(it);
                         }
                     }
-                    // WORD-START FALLBACK (owner, Aug 2026): if NO name starts with the
-                    // query ("win" vs "5 Piece Hot Wings"), rescan matching the start of
-                    // any WORD in the name — dropdown must never dead-end on real menus.
+                    // WORD-START FALLBACK (owner, Aug 2026): if the strict-first rule finds
+                    // NOTHING ("win" vs "5 Piece Hot Wings", "loaded half" typed without the
+                    // name's first word), rescan in any-word mode — the dropdown must never
+                    // dead-end on real menus. No-op in any_word mode (same predicate ran).
                     if (!pref.length && q) {
-                        for (let i = 0; i < all.length && pref.length < 12; i++) {
+                        for (let i = 0; i < all.length; i++) {
                             const it = all[i];
                             if (!it.name || !(parseFloat(it.price) > 0)) continue;
-                            if (it.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q))) pref.push(it);
+                            const r = this.nameMatchRank(it.name, q, true);
+                            if (r > 0) pref.push({ it, r, i });
                         }
                     }
-                    const out = [...pref, ...other].slice(0, 12);
+                    // Higher rank first; catalog order within a rank (stable tiebreak).
+                    pref.sort((a, b) => (b.r - a.r) || (a.i - b.i));
+                    const out = [...pref.slice(0, 12).map(p => p.it), ...other].slice(0, 12);
                     // (Scanner safety: pool is global now, so an exact barcode/SKU match is
                     // always already in scope — the old category-filter rescue is unnecessary.)
                     // Exact barcode/SKU match jumps to the top so the scanner's trailing
@@ -5573,26 +5629,35 @@ function restaurantPos() {
             }
             if (this.searchQuery) {
                 const q = this.searchQuery.trim().toLowerCase();
-                // STRICT PREFIX (owner, 24 Jul 2026): NAME matches only from the very START
-                // of the name (mirrors the dropdown matcher); BARCODE/SKU substring matching
-                // only when the query has a digit/symbol (letters-only = name search).
+                // STRICT PREFIX (owner, 24 Jul 2026) + MULTI-WORD (16 Aug 2026): same
+                // shared matcher as the dropdown (nameMatchRank) — the two surfaces must
+                // never diverge. BARCODE/SKU substring matching only when the query has
+                // a digit/symbol (letters-only = name search).
                 const codeSearch = /[^a-z\s]/.test(q);
-                // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): 'any_word' matches the
-                // start of ANY word right away; 'prefix' keeps the strict 24 Jul rule.
-                const wordHit = i => i.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q));
-                let matches = items.filter(i => (this.searchAnyWord ? wordHit(i) : i.name.toLowerCase().startsWith(q))
-                    || (codeSearch && ((i.barcode && String(i.barcode).toLowerCase().includes(q))
-                        || (i.sku && String(i.sku).toLowerCase().includes(q)))));
+                // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): 'any_word' lets every
+                // token match any word; 'prefix' keeps the strict 24 Jul first-token rule.
+                const rank = new Map();
+                let matches = items.filter(i => {
+                    const r = this.nameMatchRank(i.name, q, this.searchAnyWord);
+                    if (r > 0) { rank.set(i, r); return true; }
+                    return codeSearch && ((i.barcode && String(i.barcode).toLowerCase().includes(q))
+                        || (i.sku && String(i.sku).toLowerCase().includes(q)));
+                });
                 // WORD-START FALLBACK (owner, Aug 2026 — "Win" must find "5 Piece Hot
-                // Wings"; menus often lead with sizes/counts): ONLY when strict prefix
-                // finds NOTHING, match the start of any WORD in the name. No mid-word
-                // hits; a no-op in any_word mode (same predicate already ran above).
+                // Wings"; menus often lead with sizes/counts): ONLY when the strict-first
+                // rule finds NOTHING, rescan in any-word mode. A no-op in any_word mode
+                // (same predicate already ran above).
                 if (!matches.length) {
-                    matches = items.filter(wordHit);
+                    matches = items.filter(i => {
+                        const r = this.nameMatchRank(i.name, q, true);
+                        if (r > 0) { rank.set(i, r); return true; }
+                        return false;
+                    });
                 }
-                // Name-prefix matches float above barcode/SKU-only matches; stable sort
-                // keeps the original order within each group.
-                matches.sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
+                // Name matches float above barcode/SKU-only matches, better (contiguous/
+                // in-order) ranks above scattered ones; stable sort keeps the original
+                // order within each group.
+                matches.sort((a, b) => (rank.get(b) || 0) - (rank.get(a) || 0));
                 items = matches;
             }
             this.filteredItems = items;

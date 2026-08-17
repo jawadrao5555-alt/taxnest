@@ -15,6 +15,7 @@ export const modules: ModuleMap = {
   "./components/mockups/kot/Current.tsx": () => import("../components/mockups/kot/Current.tsx"),
   "./components/mockups/nestpos-dashboard/After.tsx": () => import("../components/mockups/nestpos-dashboard/After.tsx"),
   "./components/mockups/nestpos-dashboard/Before.tsx": () => import("../components/mockups/nestpos-dashboard/Before.tsx"),
+  "./components/mockups/kot/Current.tsx": () => import("../components/mockups/kot/Current.tsx"),
   "./components/mockups/pos-cart/AbhiWala.tsx": () => import("../components/mockups/pos-cart/AbhiWala.tsx"),
   "./components/mockups/pos-cart/DonoSaleScreens.tsx": () => import("../components/mockups/pos-cart/DonoSaleScreens.tsx"),
   "./components/mockups/pos-cart/NayaDesign.tsx": () => import("../components/mockups/pos-cart/NayaDesign.tsx"),

@@ -824,6 +824,51 @@ function waiterApp() {
             });
         },
 
+        // ---- MULTI-WORD SEARCH (16 Aug 2026 — same matcher as the cashier
+        // universal screen; owner rule: ALL sale surfaces search the same way).
+        // The query is tokenized; a hit = every typed token prefix-matches a word
+        // of the name. Words split on NON-alphanumeric runs so "(Half)" yields
+        // "half"; non-ASCII chars (Urdu names) count as word chars.
+        searchTokens(s) {
+            return String(s || '').toLowerCase().split(/[^a-z0-9\u0080-\uffff]+/).filter(Boolean);
+        },
+        // Rank a name against the query. 0 = no match; higher = better (contiguous/
+        // in-order matches sort above scattered ones so "(Full)"/"(Half)" pairs
+        // order sensibly): 4 = name starts with the raw query, 3 = tokens match
+        // CONSECUTIVE name words, 2 = in order with gaps, 1 = scattered word hits.
+        // anyWord=false keeps the STRICT PREFIX rule (owner, 24 Jul 2026): the
+        // FIRST token must match the very START of the name; later tokens are free.
+        // Single-word queries behave exactly as before in both modes.
+        nameMatchRank(name, q, anyWord) {
+            const lname = String(name).toLowerCase();
+            if (lname.startsWith(q)) return 4;
+            const tokens = this.searchTokens(q);
+            if (!tokens.length) return 0;
+            if (!anyWord && !lname.startsWith(tokens[0])) return 0;
+            const words = this.searchTokens(lname);
+            for (let s = 0; s + tokens.length <= words.length; s++) {
+                if (tokens.every((t, k) => words[s + k].startsWith(t))) return 3;
+            }
+            let wi = 0, inOrder = true;
+            for (const t of tokens) {
+                while (wi < words.length && !words[wi].startsWith(t)) wi++;
+                if (wi >= words.length) { inOrder = false; break; }
+                wi++;
+            }
+            if (inOrder) return 2;
+            // Scattered: every token prefix-matches a DISTINCT word (longest tokens
+            // claim first) — two tokens must never both count the same word, or
+            // "chicken ch" would drag "Chicken Roll" into the results.
+            const used = new Array(words.length).fill(false);
+            const ok = [...tokens].sort((a, b) => b.length - a.length).every(t => {
+                for (let j = 0; j < words.length; j++) {
+                    if (!used[j] && words[j].startsWith(t)) { used[j] = true; return true; }
+                }
+                return false;
+            });
+            return ok ? 1 : 0;
+        },
+
         filterProducts() {
             const q = this.search.trim().toLowerCase();
             // Effective visibility = user pref ?? admin show_on_sale (pref-less
@@ -835,32 +880,43 @@ function waiterApp() {
             this.categories = [...new Set(pool.map(p => p.category))].sort();
             if (this.activeCategory !== 'all' && !this.categories.includes(this.activeCategory)) this.activeCategory = 'all';
             // STRICT PREFIX (ZFC, 1 Aug 2026 — same rule as the cashier sale
-            // screen, owner 24 Jul 2026): NAME matches only from the very START
-            // of the name ("f" = Fries…, NOT "Beef Loaded Fries"). Barcode
+            // screen, owner 24 Jul 2026): the FIRST token matches only from the
+            // very START of the name ("f" = Fries…, NOT "Beef Loaded Fries").
+            // MULTI-WORD (16 Aug 2026): later tokens prefix-match any later word
+            // ("cheese loaded half" → "Cheese Loaded Fries (Half)"). Barcode
             // matching only when the query has a digit/symbol.
-            // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): 'any_word' matches the
-            // start of ANY word right away ("win" → "5 Piece Hot Wings").
+            // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): 'any_word' lets every
+            // token match any word right away ("win" → "5 Piece Hot Wings").
             // GLOBAL SEARCH (owner, 4 Aug 2026 — same rule as the cashier universal
             // screen, 22 Jul): while the waiter is TYPING a search, the whole catalog
             // is searchable — hidden (show_on_sale=false / user-pref-hidden) items and
             // every category included. Hide/Show only declutters the idle browsing
             // grid; a search must NEVER come up empty because an item was hidden.
             const codeSearch = /[^a-z\s]/.test(q);
-            const wordHit = p => p.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q));
             const scoped = q
                 ? this.products
                 : pool.filter(p => this.activeCategory === 'all' || p.category === this.activeCategory);
-            let hits = scoped.filter(p =>
-                !q || (this.searchAnyWord ? wordHit(p) : p.name.toLowerCase().startsWith(q))
-                    || (codeSearch && p.barcode && String(p.barcode).toLowerCase().includes(q))
-            );
+            const rank = new Map();
+            let hits = scoped.filter(p => {
+                if (!q) return true;
+                const r = this.nameMatchRank(p.name, q, this.searchAnyWord);
+                if (r > 0) { rank.set(p, r); return true; }
+                return codeSearch && p.barcode && String(p.barcode).toLowerCase().includes(q);
+            });
             // WORD-START FALLBACK (owner, Aug 2026 — Pizza Master: "Win" found nothing
-            // because items are named "5 Piece Hot Wings"): ONLY when strict prefix
-            // yields ZERO results, match the start of any WORD in the name. Still no
-            // mid-word hits; a no-op in any_word mode (same predicate already ran).
+            // because items are named "5 Piece Hot Wings"): ONLY when the strict-first
+            // rule yields ZERO results, rescan in any-word mode. A no-op in any_word
+            // mode (same predicate already ran).
             if (q && !hits.length) {
-                hits = scoped.filter(wordHit);
+                hits = scoped.filter(p => {
+                    const r = this.nameMatchRank(p.name, q, true);
+                    if (r > 0) { rank.set(p, r); return true; }
+                    return false;
+                });
             }
+            // While searching, better (name-start/contiguous/in-order) ranks float
+            // above scattered and barcode-only hits; stable within each rank.
+            if (q) hits.sort((a, b) => (rank.get(b) || 0) - (rank.get(a) || 0));
             this.filtered = hits;
         },
 

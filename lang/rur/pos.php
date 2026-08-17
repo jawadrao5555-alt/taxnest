@@ -3178,7 +3178,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'search_label' => 'Talash karein',
     'search_mode_any_word' => 'Kisi bhi lafz se — "win" likhne par "5 Piece Hot Wings" bhi mil jaye ga',
     'search_mode_hint' => 'Sale aur waiter screen par product search naam ko kaise match kare.',
-    'search_mode_prefix' => 'Sirf naam ke shuru se — "f" par sirf F se shuru hone wale naam',
+    'search_mode_prefix' => 'Naam ke shuru se — pehla lafz naam ke shuru se ho; baqi alfaz kisi bhi lafz se mil jate hain ("cheese half" se "Cheese Loaded Fries (Half)" mil jata hai)',
     'search_mode_saved' => 'Product search ka tareeqa save ho gaya.',
     'search_mode_title' => 'Product Search ka Tareeqa',
     'search_name_hs_ph' => 'Naam, HS code se talash karein...',

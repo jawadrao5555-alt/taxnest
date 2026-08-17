@@ -270,10 +270,13 @@
                     $tnCallerLastEvent = ($tnCallerReady && \Illuminate\Support\Facades\Schema::hasTable('pos_caller_events'))
                         ? \Illuminate\Support\Facades\DB::table('pos_caller_events')->where('company_id', $company->id)->orderByDesc('id')->value('created_at')
                         : null;
-                    {{-- Release gate: SystemSetting AND the hosted file must both exist
-                         (APKs are scp'd to live public/downloads, never committed —
-                         repo is public; same pattern as rider/waiter apps) so the
-                         download button can never 404. --}}
+                    // NOTE: Blade {{-- --}} comments are NOT stripped inside @php
+                    // blocks — one here compiled to invalid PHP and 500'd the page
+                    // (white-screen preflight caught it). Use PHP comments only.
+                    // Release gate: SystemSetting AND the hosted file must both exist
+                    // (APKs are scp'd to live public/downloads, never committed —
+                    // repo is public; same pattern as rider/waiter apps) so the
+                    // download button can never 404.
                     $tnCallerApkLive = trim((string) \App\Models\SystemSetting::get('caller_app_latest_version', '')) !== ''
                         && is_file(public_path('downloads/taxnest-caller.apk'));
                 @endphp

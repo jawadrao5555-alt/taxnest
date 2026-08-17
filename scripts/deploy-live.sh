@@ -50,6 +50,42 @@ step() { echo ""; echo "==> $*"; }
 
 run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 
+# Post-deploy cache-freshness tripwire (Task 1053): after a deploy, NO source
+# file that feeds Laravel's caches may be newer than the built route cache on
+# live. If any is, the cache rebuild silently didn't take — the exact state
+# that 500'd every admin page on Aug 17 2026 ("Route [...] not defined").
+# HARD FAIL: a deploy that leaves stale caches is not a successful deploy.
+verify_live_cache_fresh() {
+  step "Verify: live caches fresh (no source file newer than route cache — Task 1053)"
+  local OUT
+  OUT=$(run_ssh bash -s <<'FRESHPROBE' 2>/dev/null
+cd /home/taxnestc/public_html || { echo PROBE_CD_FAIL; exit 0; }
+RC=$(ls -t bootstrap/cache/routes-*.php 2>/dev/null | head -1)
+[ -z "$RC" ] && { echo PROBE_NO_ROUTE_CACHE; exit 0; }
+NEWER=$(find routes app config resources/views bootstrap/app.php \
+          -name '*.php' -newer "$RC" -print 2>/dev/null | head -5)
+[ composer.lock -nt "$RC" ] && NEWER="composer.lock
+$NEWER"
+if [ -n "$NEWER" ]; then
+  echo PROBE_STALE
+  echo "$NEWER"
+else
+  echo PROBE_FRESH
+fi
+FRESHPROBE
+)
+  case "$OUT" in
+    PROBE_FRESH*) echo "Live caches fresh: route cache is newer than every source file." ;;
+    PROBE_STALE*)
+      echo "$OUT" | tail -n +2 | sed 's/^/  newer than route cache: /' >&2
+      fail "live caches STALE after deploy — source files are newer than the route cache; re-run cache rebuild on live (config/route/view:cache + OPcache reset)" ;;
+    PROBE_NO_ROUTE_CACHE*)
+      fail "no route cache found on live after deploy — route:cache did not run/take" ;;
+    *)
+      fail "cache-freshness probe could not run over SSH (output: ${OUT:-empty}) — verify live caches manually" ;;
+  esac
+}
+
 # Post-deploy live screen smoke (Task 714): login as QA company 35 and grep
 # feature markers on key pages. BEST-EFFORT — warning-only, never blocks or
 # fails the deploy (deploy already succeeded when this runs).
@@ -409,7 +445,9 @@ record_deploy_marker() {
   local NOW_TS
   NOW_TS=$(date +%s)
   step "Recording deploy marker (${NOW_TS}|${COMMIT})"
-  run_ssh "printf '%s\n' '${NOW_TS}|${COMMIT}' > /home/taxnestc/.taxnest-last-deploy-marker && echo MARKER_WRITTEN" 2>/dev/null \
+  # Task 1053: a successful manual deploy also clears the cron watcher's
+  # failure marker (the failure state it flagged has been remediated).
+  run_ssh "rm -f /home/taxnestc/.taxnest-autodeploy-FAILED; printf '%s\n' '${NOW_TS}|${COMMIT}' > /home/taxnestc/.taxnest-last-deploy-marker && echo MARKER_WRITTEN" 2>/dev/null \
     | grep -q "MARKER_WRITTEN" \
     || fail "deploy marker write FAILED on live — the deploy code is live but the marker was not recorded. Fix manually: SSH to live and run: printf '${NOW_TS}|${COMMIT}\n' > /home/taxnestc/.taxnest-last-deploy-marker — then re-verify the next elaan check will pass."
   echo "Deploy marker recorded: ${NOW_TS}|${COMMIT} → /home/taxnestc/.taxnest-last-deploy-marker"
@@ -504,6 +542,7 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   echo "GET $LIVE_URL/ -> $HTTP_CODE"
   [ "$HTTP_CODE" = "200" ] || fail "homepage returned $HTTP_CODE after refresh"
 
+  verify_live_cache_fresh
   check_live_logging
   post_deploy_screen_smoke
 
@@ -674,6 +713,7 @@ else
 fi
 rm -f "$TRIAGE_TMP"
 
+verify_live_cache_fresh
 check_live_logging
 post_deploy_screen_smoke
 

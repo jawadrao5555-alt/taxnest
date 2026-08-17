@@ -1,7 +1,14 @@
 #!/bin/bash
-# cPanel AUTO-DEPLOY runner — invoked by .cpanel.yml on every push to origin main
-# (including platform task merges). Runs ON THE cPANEL SERVER with cwd = the
+# cPanel AUTO-DEPLOY runner — invoked by .cpanel.yml when a cPanel
+# "Pull or Deploy" task runs. Runs ON THE cPANEL SERVER with cwd = the
 # cPanel repository clone (the directory .cpanel.yml executes from).
+#
+# TRIGGER REALITY (Task 1053, verified 17 Aug 2026): pushes to origin main do
+# NOT trigger this — the GitHub repo has NO webhook, and cPanel only queues a
+# VersionControl deploy task when someone clicks Pull/Deploy in the cPanel Git
+# UI (~/.cpanel/logs/user_task_runner.log is the evidence trail). Treat
+# deploy-live.sh as the authoritative deploy; this script just keeps the
+# manual cPanel path safe if the owner ever uses it.
 #
 # Why this exists (Task 711): the old .cpanel.yml copied new views/layouts into
 # public_html FIRST and only rebuilt the route cache minutes later (after
@@ -30,7 +37,12 @@ set -u
 DEPLOYPATH="/home/$USER/public_html"
 PHP="/usr/local/bin/php"
 LIVE_URL="https://taxnest.com.pk"
-REPO_DIR="$(pwd)"
+# Task 1053: derive the repo-clone dir from THIS script's own location (it
+# always lives at <clone>/scripts/), falling back to cwd — so a caller with a
+# wrong working directory (e.g. cron's $HOME default) can never make us stage
+# from the wrong tree.
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." 2>/dev/null && pwd)"
+[ -n "$REPO_DIR" ] && [ -f "$REPO_DIR/.cpanel.yml" ] || REPO_DIR="$(pwd)"
 LOCKFILE="/home/$USER/.taxnest-deploy.lock"
 
 log()  { echo "[autodeploy] $*"; }

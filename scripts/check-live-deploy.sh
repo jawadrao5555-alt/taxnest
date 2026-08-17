@@ -1,12 +1,23 @@
 #!/bin/bash
 # Deploy-gap check: compare workspace HEAD vs live (cPanel) HEAD.
 # Usage: bash scripts/check-live-deploy.sh
-# Exit 0 = live is up to date with workspace HEAD (or ahead/equal).
-# Exit 1 = DEPLOY GAP (live is behind) — run the deploy runbook.
+# Exit 0 = live is up to date with workspace HEAD (or ahead/equal) AND its
+#          caches are fresh (rebuilt after the code last changed).
+# Exit 1 = DEPLOY GAP (live is behind) OR STALE LIVE CACHES (Task 1053: code
+#          on live is newer than its route cache — the exact state that 500s
+#          with "Route [...] not defined"). Fix for both: bash scripts/deploy-live.sh
+#          (its refresh path rebuilds caches even when HEAD already matches).
 # Exit 2 = could not check (SSH/network problem) or REAL drift — verify manually.
 # Exit 3 = RECONCILABLE lineage divergence (Task 703): origin/main's tree is
 #          byte-identical to a workspace-lineage commit — deploy-live.sh will
 #          auto-reconcile (merge -s ours) and deploy; callers should run it.
+#
+# WHY the cache tripwire exists (Task 1053, Aug 17 2026 incident): the cPanel
+# .cpanel.yml "auto-deploy" only runs when a cPanel Pull&Deploy task fires —
+# and the GitHub repo has NO webhook, so a plain push to origin main deploys
+# NOTHING by itself. Code reaches live via deploy-live.sh or ad-hoc pulls; an
+# ad-hoc pull without a cache rebuild leaves new routes/web.php against an old
+# route cache → every page 500s. This check makes that state loud.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,17 +32,63 @@ if [ -z "$LOCAL_HEAD" ]; then
   exit 2
 fi
 
-LIVE_HEAD=$(timeout 25 ssh -i "$KEY" -p 22 -o BatchMode=yes -o ConnectTimeout=10 \
-  -o StrictHostKeyChecking=accept-new "$HOST" \
-  "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null)
+# ONE SSH round-trip: live HEAD + cache-freshness evidence (Task 1053).
+# Freshness rule: NO source file that feeds Laravel's caches (routes/, app/,
+# config/, resources/views/, bootstrap/app.php, composer.lock) may be NEWER
+# than the built route cache. Every sanctioned deploy path (deploy-live.sh,
+# cpanel-autodeploy.sh) rebuilds caches AFTER the code lands, so fresh = cache
+# mtime >= code mtimes. mtime-based (not commit-date-based) so it catches ALL
+# delivery mechanisms: git pull, cp -R, tar-deploy, scp hot-fix.
+LIVE_OUT=$(timeout 30 ssh -i "$KEY" -p 22 -o BatchMode=yes -o ConnectTimeout=10 \
+  -o StrictHostKeyChecking=accept-new "$HOST" bash -s <<'LIVEPROBE' 2>/dev/null
+cd /home/taxnestc/public_html || { echo "HEAD="; exit 0; }
+echo "HEAD=$(git rev-parse HEAD 2>/dev/null)"
+RC=$(ls -t bootstrap/cache/routes-*.php 2>/dev/null | head -1)
+if [ -z "$RC" ]; then
+  echo "STALE=NO_ROUTE_CACHE"
+else
+  echo "ROUTECACHE=$RC ($(stat -c %y "$RC" 2>/dev/null | cut -d. -f1))"
+  NEWER=$(find routes app config resources/views bootstrap/app.php \
+            -name '*.php' -newer "$RC" -print 2>/dev/null | head -5)
+  [ composer.lock -nt "$RC" ] && NEWER="composer.lock
+$NEWER"
+  [ -n "$NEWER" ] && { echo "STALE=CODE_NEWER_THAN_ROUTE_CACHE"; echo "$NEWER" | sed 's/^/NEWERFILE=/'; }
+fi
+# Task 1053: durable failure signal from the cron autodeploy watcher on live.
+if [ -f /home/taxnestc/.taxnest-autodeploy-FAILED ]; then
+  echo "WATCHFAIL=$(tr '\n' ' ' < /home/taxnestc/.taxnest-autodeploy-FAILED | head -c 300)"
+fi
+LIVEPROBE
+)
+LIVE_HEAD=$(echo "$LIVE_OUT" | sed -n 's/^HEAD=//p' | head -1)
 
 if [ -z "${LIVE_HEAD:-}" ]; then
   echo "check-live-deploy: WARNING — could not reach live server over SSH; verify live HEAD manually." >&2
   exit 2
 fi
 
+STALE_REASON=$(echo "$LIVE_OUT" | sed -n 's/^STALE=//p' | head -1)
+
+# Cron autodeploy watcher left a durable failure marker on live (Task 1053) —
+# a push-triggered deploy FAILED or live diverged; live may be in maintenance.
+WATCHFAIL=$(echo "$LIVE_OUT" | sed -n 's/^WATCHFAIL=//p' | head -1)
+if [ -n "$WATCHFAIL" ]; then
+  echo "check-live-deploy: AUTODEPLOY WATCHER FAILURE flagged on live:" >&2
+  echo "  $WATCHFAIL" >&2
+  echo "  See /home/taxnestc/.taxnest-autodeploy-watch.log on live. Fix: bash scripts/deploy-live.sh" >&2
+  echo "  (a successful deploy-live.sh clears the marker)." >&2
+  exit 1
+fi
+
 if [ "$LIVE_HEAD" = "$LOCAL_HEAD" ]; then
-  echo "check-live-deploy: OK — live HEAD matches workspace HEAD ($LOCAL_HEAD)."
+  if [ -n "$STALE_REASON" ]; then
+    echo "check-live-deploy: STALE LIVE CACHES ($STALE_REASON) — code on live is newer than its route cache." >&2
+    echo "$LIVE_OUT" | sed -n 's/^NEWERFILE=/  newer than cache: /p' >&2
+    echo "  This is the exact state that 500s with 'Route [...] not defined' (Aug 17 2026 incident)." >&2
+    echo "  Fix: bash scripts/deploy-live.sh  (refresh path rebuilds caches + OPcache even at matching HEAD)" >&2
+    exit 1
+  fi
+  echo "check-live-deploy: OK — live HEAD matches workspace HEAD ($LOCAL_HEAD) and caches are fresh."
   exit 0
 fi
 

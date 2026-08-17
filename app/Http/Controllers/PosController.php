@@ -2729,7 +2729,14 @@ class PosController extends Controller
         if ($request->wantsJson()) {
             // Task 1036: WhatsApp Bill extras ride the pay response (no extra
             // client fetch) — nulls when feature off / no routable number.
-            $waShare = $transaction->waBillPayload($company);
+            // Task 1092: post-commit — extras failure (e.g. deploy-window class
+            // skew) must never 500 an already-committed bill.
+            try {
+                $waShare = $transaction->waBillPayload($company);
+            } catch (\Throwable $waE) {
+                Log::warning('[PAY] waBillPayload failed post-commit (degraded to null extras): ' . $waE->getMessage());
+                $waShare = ['wa_phone' => null, 'share_url' => null];
+            }
             return response()->json([
                 'success' => true,
                 'transaction_id' => $transaction->id,
@@ -4278,7 +4285,13 @@ class PosController extends Controller
         // Task 1036: promoted bill is now FINAL — WhatsApp Bill extras ride every
         // success variant below (delivery-clear/promote is a final-bill path too).
         $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
-        $waShare = $tx ? $tx->waBillPayload($company) : ['wa_phone' => null, 'share_url' => null];
+        // Task 1092: post-commit — extras failure must never fail the promote.
+        try {
+            $waShare = $tx ? $tx->waBillPayload($company) : ['wa_phone' => null, 'share_url' => null];
+        } catch (\Throwable $waE) {
+            Log::warning('[PAY] waBillPayload failed post-commit (degraded to null extras): ' . $waE->getMessage());
+            $waShare = ['wa_phone' => null, 'share_url' => null];
+        }
 
         if (!$reportingOn) {
             return response()->json([

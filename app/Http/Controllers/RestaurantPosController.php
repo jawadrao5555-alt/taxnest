@@ -1479,7 +1479,16 @@ class RestaurantPosController extends Controller
 
             // Task 1036: WhatsApp Bill extras ride the pay response (no extra
             // client fetch) — nulls when feature off / no routable number.
-            $waShare = $transaction->waBillPayload($company);
+            // Task 1092: the bill is COMMITTED at this point — receipt extras
+            // must never fail the pay (live 17 Aug 2026: deploy-window class
+            // skew made waBillPayload() momentarily undefined and 500'd a
+            // completed bill). Catch \Throwable (incl. \Error) and degrade.
+            try {
+                $waShare = $transaction->waBillPayload($company);
+            } catch (\Throwable $waE) {
+                Log::warning('[PAY] waBillPayload failed post-commit (degraded to null extras): ' . $waE->getMessage());
+                $waShare = ['wa_phone' => null, 'share_url' => null];
+            }
             return response()->json([
                 'success' => true,
                 'message' => "Payment received. Invoice: {$invoiceNumber}",
@@ -1583,7 +1592,13 @@ class RestaurantPosController extends Controller
         Log::info('[PAY] Replayed by pay_uuid', ['transaction_id' => $existingTxn->id, 'pay_uuid' => $payUuid]);
         // Task 1036: replay = the SAME canonical success payload — WhatsApp
         // extras included so a lost-response retry still offers the button.
-        $waShare = $existingTxn->waBillPayload(Company::find($companyId));
+        // Task 1092: replay path is post-commit too — never let extras fail it.
+        try {
+            $waShare = $existingTxn->waBillPayload(Company::find($companyId));
+        } catch (\Throwable $waE) {
+            Log::warning('[PAY] waBillPayload failed on replay (degraded to null extras): ' . $waE->getMessage());
+            $waShare = ['wa_phone' => null, 'share_url' => null];
+        }
         return response()->json([
             'success' => true,
             'replayed' => true,

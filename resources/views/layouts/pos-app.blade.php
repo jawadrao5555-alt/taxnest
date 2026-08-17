@@ -578,8 +578,8 @@
                                 // Submission mode pill — Agent Sync vs Direct (agentHandlesPra(),
                                 // NOT agent_enabled: Direct shops may keep the agent for printing).
                                 $agentOn = $companyLayout->agentHandlesPra();
-                                $agentOnline = $agentOn && $companyLayout->agent_last_seen
-                                    && \Carbon\Carbon::parse($companyLayout->agent_last_seen)->gt(now()->subMinutes(2));
+                                // Liveness = canonical agentOnline() (Task 1062 — one verdict everywhere).
+                                $agentOnline = $agentOn && $companyLayout->agentOnline();
                             @endphp
                             {{-- Agent page = customize feature; members denied customize see no link (nav stays in sync with the route gate). --}}
                             @if($posNavCan('customize'))

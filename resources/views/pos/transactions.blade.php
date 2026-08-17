@@ -7,7 +7,10 @@
         // Direct Production shops submit server-side, so no agent-sync banner for them.
         $__agentEnabled = $__company && $__company->agentHandlesPra();
         $__agentLastSeen = $__company?->agent_last_seen;
-        $__agentOnline = $__agentEnabled && $__agentLastSeen && \Carbon\Carbon::parse($__agentLastSeen)->gt(now()->subMinutes(3));
+        // Liveness = canonical agentOnline() (2-min window — same verdict the
+        // silent-print gate uses). Task 1062: was a hand-rolled 3-min check,
+        // so this banner could say Online while printing already fell back.
+        $__agentOnline = $__agentEnabled && $__company->agentOnline();
     @endphp
 
     {{-- Phase 6: Agent Status Banner (trust signal) --}}

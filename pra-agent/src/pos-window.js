@@ -66,6 +66,63 @@ function deriveOrigin(config) {
   }
 }
 
+// ─── Silent downloads (Task 1062) ───────────────────────────────────────────
+// Neither POS session had a will-download handler, so any export/PDF link
+// popped Chromium's default Save dialog in front of the cashier. Instead:
+// auto-save into the PC's Downloads folder (collision-safe name), then a
+// Roman Urdu notification confirms it — clicking the notification opens the
+// file. Registered ONCE per session; child popup windows share the same
+// partition, so this single handler covers them too.
+const downloadWiredSessions = new WeakSet();
+
+function wireSilentDownloads(ses) {
+  try {
+    if (!ses || downloadWiredSessions.has(ses)) return;
+    downloadWiredSessions.add(ses);
+    ses.on('will-download', (event, item) => {
+      try {
+        const downloadsDir = app.getPath('downloads');
+        const rawName = String(item.getFilename() || 'download').replace(/[\\/:*?"<>|]/g, '_');
+        const ext = path.extname(rawName);
+        const base = path.basename(rawName, ext) || 'download';
+        let target = path.join(downloadsDir, base + ext);
+        for (let i = 1; i < 200 && fs.existsSync(target); i++) {
+          target = path.join(downloadsDir, `${base} (${i})${ext}`);
+        }
+        // setSavePath BEFORE any await/return = no Save dialog, ever.
+        item.setSavePath(target);
+        item.once('done', (_e, state) => {
+          try {
+            if (!Notification.isSupported()) return;
+            if (state === 'completed') {
+              const n = new Notification({
+                title: 'File download ho gayi',
+                body: path.basename(target) + ' — Downloads folder mein save ho gayi. Kholne ke liye yahan click karein.',
+              });
+              n.on('click', () => {
+                // Open the file itself; if Windows has no app for it, at least
+                // reveal it in the Downloads folder.
+                shell.openPath(target).then((err) => {
+                  if (err) { try { shell.showItemInFolder(target); } catch (e2) {} }
+                }).catch(() => { try { shell.showItemInFolder(target); } catch (e2) {} });
+              });
+              n.show();
+            } else {
+              new Notification({
+                title: 'Download mukammal nahi hui',
+                body: path.basename(target) + ' download nahi ho saki — dobara koshish karein.',
+              }).show();
+            }
+          } catch (e) {}
+        });
+      } catch (e) {
+        // Never block the download pipeline on our own failure — worst case
+        // Chromium falls back to its default behavior.
+      }
+    });
+  } catch (e) {}
+}
+
 function getPosWindowRef() {
   return posWindow && !posWindow.isDestroyed() ? posWindow : null;
 }
@@ -169,6 +226,10 @@ function openPosWindow(config, opts = {}) {
       posWindow.webContents.setUserAgent(ua + ' NestPOSDesktop/' + app.getVersion());
     }
   } catch (e) {}
+
+  // Exports/PDFs save silently to Downloads (covers child popups too — same
+  // session partition).
+  wireSilentDownloads(posWindow.webContents.session);
 
   // Agent AUTO-CONFIG (v1.5.0): once the cashier is logged in (any authed
   // /pos/ page loaded), let main.js pull the company's agent credentials
@@ -366,6 +427,9 @@ function openFbrPosWindow(config, opts = {}) {
       fbrWindow.webContents.setUserAgent(ua + ' NestPOSDesktop/' + app.getVersion());
     }
   } catch (e) {}
+
+  // Identical silent-download behavior for the FBR window (persist:fbrpos).
+  wireSilentDownloads(fbrWindow.webContents.session);
 
   fbrWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3) return;

@@ -93,12 +93,45 @@
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Inventory</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->inventory_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->inventory_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </div>
-                @php $praAgentOnline = $company->agent_last_seen && $company->agent_last_seen->gt(now()->subMinutes(2)); @endphp
+                @php
+                    // Canonical liveness check (Task 1062) — one verdict everywhere.
+                    $praAgentOnline = $company->agentOnline();
+                    // Version vs latest release (cached 10 min) + last self-update attempt.
+                    $__latestAgentTag = \App\Http\Controllers\AgentManagementController::latestReleaseInfo()['tag'] ?? null;
+                    $__latestAgentVer = ($__latestAgentTag && preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $__latestAgentTag, $__lm))
+                        ? "{$__lm[1]}.{$__lm[2]}.{$__lm[3]}" : null;
+                    $__agentOutdated = $__latestAgentVer && $company->agent_version
+                        && version_compare($company->agent_version, $__latestAgentVer, '<');
+                    $__updateStuck = $__agentOutdated && !empty($company->agent_update_error ?? null);
+                @endphp
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Desktop Agent</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words {{ $praAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
                         {{ $praAgentOnline ? 'Online' : ($company->agent_last_seen ? 'Offline' : 'Never connected') }}{{ $company->agent_version ? ' · v' . $company->agent_version : '' }}
                     </span>
                 </div>
+                @if($company->agent_version && $__latestAgentVer)
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Agent Version</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words {{ $__agentOutdated ? ($__updateStuck ? 'bg-red-900/30 text-red-400' : 'bg-amber-900/30 text-amber-400') : 'bg-emerald-900/30 text-emerald-400' }}">
+                        @if(!$__agentOutdated)
+                            Up to date (v{{ $company->agent_version }})
+                        @elseif($__updateStuck)
+                            UPDATE STUCK · v{{ $company->agent_version }} → v{{ $__latestAgentVer }}
+                        @else
+                            Outdated · v{{ $company->agent_version }} (latest v{{ $__latestAgentVer }})
+                        @endif
+                    </span>
+                </div>
+                @endif
+                @if($__agentOutdated && ($company->agent_update_target ?? null))
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Last Update Attempt</span>
+                    <span class="text-right min-w-0 break-words text-xs {{ $company->agent_update_error ? 'text-red-400' : 'text-gray-300' }}">
+                        v{{ $company->agent_update_target }}{{ $company->agent_update_stage ? ' · ' . $company->agent_update_stage : '' }}{{ $company->agent_update_at ? ' · ' . $company->agent_update_at->diffForHumans() : '' }}
+                        @if($company->agent_update_error)
+                            <br>{{ \Illuminate\Support\Str::limit($company->agent_update_error, 140) }}
+                        @endif
+                    </span>
+                </div>
+                @endif
                 @if(!is_null($company->agent_offline_mode))
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Offline Mode</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words {{ $company->agent_offline_mode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
@@ -190,12 +223,28 @@
             };
         }
     </script>
-    @php $vpsAgentOnline = $company->agent_last_seen && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2)); @endphp
+    @php
+        // Canonical liveness check (Task 1062) — one verdict everywhere.
+        $vpsAgentOnline = $company->agentOnline();
+        $__vpsLatestTag = \App\Http\Controllers\AgentManagementController::latestReleaseInfo()['tag'] ?? null;
+        $__vpsLatestVer = ($__vpsLatestTag && preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $__vpsLatestTag, $__vm))
+            ? "{$__vm[1]}.{$__vm[2]}.{$__vm[3]}" : null;
+        $__vpsOutdated = $__vpsLatestVer && $company->agent_version
+            && version_compare($company->agent_version, $__vpsLatestVer, '<');
+    @endphp
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="vpsSetupCard()">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-white">VPS / Fiscal Device Setup</h3>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $vpsAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
-                Agent {{ $vpsAgentOnline ? 'Online' : ($company->agent_enabled ? 'Offline' : 'Disabled') }}
+            <span class="inline-flex items-center gap-1.5">
+                @if($__vpsOutdated)
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ !empty($company->agent_update_error ?? null) ? 'bg-red-900/30 text-red-400' : 'bg-amber-900/30 text-amber-400' }}"
+                      title="{{ $company->agent_update_error ? 'Last update attempt: ' . \Illuminate\Support\Str::limit($company->agent_update_error, 200) : 'Waiting for self-update' }}">
+                    {{ !empty($company->agent_update_error ?? null) ? 'UPDATE STUCK' : 'Outdated' }} · v{{ $company->agent_version }} → v{{ $__vpsLatestVer }}
+                </span>
+                @endif
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $vpsAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
+                    Agent {{ $vpsAgentOnline ? 'Online' : ($company->agent_enabled ? 'Offline' : 'Disabled') }}{{ $company->agent_version ? ' · v' . $company->agent_version : '' }}
+                </span>
             </span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">

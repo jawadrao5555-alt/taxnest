@@ -57,7 +57,27 @@
                             Last seen: {{ $company->agent_last_seen ? $company->agent_last_seen->diffForHumans() : 'Never connected' }}
                         </p>
                         @if($company->agent_version)
-                            <p class="text-xs text-indigo-200 mt-1">Version: {{ $company->agent_version }}</p>
+                            <p class="text-xs text-indigo-200 mt-1">
+                                Version: {{ $company->agent_version }}
+                                @if(!empty($agentOutdated))
+                                    <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-bold uppercase">
+                                        Purani version — latest v{{ $latestAgentVersion }}
+                                    </span>
+                                @elseif(!empty($latestAgentVersion))
+                                    <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/80 text-white text-[10px] font-bold uppercase">Up to date</span>
+                                @endif
+                            </p>
+                            @if(!empty($agentOutdated))
+                                <p class="text-xs text-indigo-100 mt-1">
+                                    Agent khud update hone ki koshish karta hai — PC on aur internet chalta rahe to nayi version khud lag jayegi.
+                                </p>
+                                @if($company->agent_update_error ?? null)
+                                    <p class="text-xs text-amber-200 mt-1 break-words">
+                                        Aakhri update koshish{{ $company->agent_update_target ? ' (v' . $company->agent_update_target . ')' : '' }} fail hui{{ $company->agent_update_at ? ' ' . $company->agent_update_at->diffForHumans() : '' }}:
+                                        {{ \Illuminate\Support\Str::limit($company->agent_update_error, 120) }}
+                                    </p>
+                                @endif
+                            @endif
                         @endif
                         @if(!is_null($company->agent_offline_mode))
                             <p class="text-xs text-indigo-200 mt-1">

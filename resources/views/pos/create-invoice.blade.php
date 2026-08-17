@@ -212,7 +212,9 @@
             // Direct Production shops keep the agent connected for printing only.
             $__agentEnabled = $company->agentHandlesPra();
             $__agentLastSeen = $company->agent_last_seen ?? null;
-            $__agentOnline = $__agentEnabled && $__agentLastSeen && \Carbon\Carbon::parse($__agentLastSeen)->gt(now()->subMinutes(3));
+            // Liveness = canonical agentOnline() (2-min window, same as the
+            // silent-print gate) — every surface shows ONE verdict (Task 1062).
+            $__agentOnline = $__agentEnabled && $company->agentOnline();
         @endphp
 
         @if($__agentEnabled)

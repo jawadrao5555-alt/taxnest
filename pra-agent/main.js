@@ -13,13 +13,13 @@ const os = require('os');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
-const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider } = require('./src/agent');
+const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, wakeAgent } = require('./src/agent');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260811-1';
+const BUILD_TIMESTAMP = '20260817-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -32,7 +32,18 @@ let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 // updater .cmd that kills this app, robocopies the new files over the install
 // folder and relaunches. No NSIS installer / code-signing needed.
 let updateInProgress = false;
-const attemptedVersions = new Set();
+// Per-version retry state (Task 1062): a failed download/extract used to be
+// blocked for the WHOLE app run (attemptedVersions Set) — and shop agents run
+// for weeks, so one bad Wi-Fi moment stranded the shop on the old version
+// with a "Click to download" banner. Now each newer version is re-attempted
+// on a backoff schedule while the server still advertises it, hard-capped so
+// a truly poisoned zip can never download/restart-loop the shop.
+const UPDATE_MAX_ATTEMPTS = 6;
+const UPDATE_BACKOFF_MS = [2 * 60e3, 5 * 60e3, 15 * 60e3, 30 * 60e3, 60 * 60e3];
+const updateAttempts = new Map(); // version -> { count, nextAt }
+// Last self-update attempt outcome — piggybacked on the heartbeat so a stuck
+// shop is VISIBLE server-side instead of silent.
+let lastUpdateAttempt = null; // { target, stage, error, at }
 
 function parseVer(v) {
   const m = String(v || '').trim().replace(/^v/i, '').match(/^(\d+)\.(\d+)\.(\d+)$/);
@@ -51,6 +62,7 @@ function isNewerVersion(remote, local) {
 }
 
 async function handleAgentUpdate(info) {
+  let updStage = 'check'; // telemetry: which phase a failure happened in
   try {
     if (!info || !info.version || !info.zip_url) return;
     // Host pin: only ever download update zips from our own GitHub releases.
@@ -70,19 +82,43 @@ async function handleAgentUpdate(info) {
     if (process.platform !== 'win32' || !app.isPackaged) return;
     if (updateInProgress) return;
     if (!isNewerVersion(info.version, app.getVersion())) return;
-    // One attempt per version per app run — a bad zip can never cause a
-    // download/restart loop.
-    if (attemptedVersions.has(info.version)) return;
-    attemptedVersions.add(info.version);
+    // Backoff-gated retry (was: one attempt per version per run). This runs
+    // on every heartbeat (~30s); the nextAt gate turns that into 2m/5m/15m/
+    // 30m/60m re-attempts, capped at UPDATE_MAX_ATTEMPTS per app run.
+    const attemptState = updateAttempts.get(info.version) || { count: 0, nextAt: 0 };
+    if (attemptState.count >= UPDATE_MAX_ATTEMPTS) {
+      // Auto-retry exhausted — NOW surface the manual download banner as the
+      // way out (until then it stays quiet while retries are still pending).
+      if (!updateInfo.manualRequired) {
+        updateInfo = {
+          available: true,
+          downloading: false,
+          latestBuild: info.version,
+          currentBuild: BUILD_TIMESTAMP,
+          downloadUrl: DOWNLOAD_URL,
+          autoRetrying: false,
+          manualRequired: true,
+          error: updateInfo.error || 'Auto-update failed repeatedly',
+        };
+        sendUpdateState();
+      }
+      return;
+    }
+    if (Date.now() < attemptState.nextAt) return;
+    const backoff = UPDATE_BACKOFF_MS[Math.min(attemptState.count, UPDATE_BACKOFF_MS.length - 1)];
+    updateAttempts.set(info.version, { count: attemptState.count + 1, nextAt: Date.now() + backoff });
     updateInProgress = true;
 
     console.log(`[self-update] v${app.getVersion()} -> v${info.version} — downloading ${info.zip_url}`);
+    updStage = 'download';
     updateInfo = {
       available: true,
       downloading: true,
       latestBuild: info.version,
       currentBuild: BUILD_TIMESTAMP,
       downloadUrl: DOWNLOAD_URL,
+      autoRetrying: false,
+      manualRequired: false,
       progress: 0,
     };
     sendUpdateState();
@@ -128,12 +164,14 @@ async function handleAgentUpdate(info) {
       res.data.pipe(out);
     });
 
+    updStage = 'verify';
     const gotSize = fs.statSync(zipPath).size;
     if (info.zip_size && gotSize !== info.zip_size) {
       throw new Error(`Downloaded size ${gotSize} != expected ${info.zip_size}`);
     }
 
     // Extract with PowerShell — zero extra npm dependencies.
+    updStage = 'extract';
     await new Promise((resolve, reject) => {
       const psq = (s) => `'${String(s).replace(/'/g, "''")}'`;
       const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
@@ -145,6 +183,7 @@ async function handleAgentUpdate(info) {
     });
 
     // Locate the folder holding the new exe (zip root folder = TaxNest-PRA-Agent).
+    updStage = 'locate';
     const exeName = path.basename(process.execPath);
     let srcDir = null;
     const candidates = [extractDir,
@@ -156,30 +195,44 @@ async function handleAgentUpdate(info) {
     }
     if (!srcDir) throw new Error(`${exeName} not found inside the update zip`);
 
+    updStage = 'handoff';
     const destDir = path.dirname(process.execPath);
+    const backupDir = path.join(workDir, 'backup');
     const cmdPath = path.join(workDir, 'apply-update.cmd');
+    const exePath = path.join(destDir, exeName);
     // NOTE: no parenthesized if-blocks around %RETRIES% — plain %VAR% expansion
     // inside ( ) reads the stale value (classic batch pitfall).
+    // Safe swap (Task 1062): back up the current install FIRST; if the copy
+    // still fails after 5 passes, RESTORE the backup — the shop is never left
+    // with a half-swapped dead agent (old version relaunches intact instead).
+    // If even the backup fails (disk full/locked), skip the swap entirely and
+    // just relaunch the current exe.
     const script = [
       '@echo off',
       'timeout /t 3 /nobreak >nul',
       `taskkill /F /IM "${exeName}" >nul 2>&1`,
       'timeout /t 2 /nobreak >nul',
+      `robocopy "${destDir}" "${backupDir}" /E /R:2 /W:2 >nul`,
+      'if %ERRORLEVEL% GEQ 8 goto launch',
       'set RETRIES=0',
       ':copyloop',
       `robocopy "${srcDir}" "${destDir}" /E /R:5 /W:2 >nul`,
-      'if %ERRORLEVEL% LSS 8 goto copydone',
+      'if %ERRORLEVEL% LSS 8 goto launch',
       'set /a RETRIES+=1',
-      'if %RETRIES% GEQ 5 goto copydone',
+      'if %RETRIES% GEQ 5 goto restore',
       'timeout /t 3 /nobreak >nul',
       'goto copyloop',
-      ':copydone',
-      `start "" "${path.join(destDir, exeName)}"`,
+      ':restore',
+      `robocopy "${backupDir}" "${destDir}" /E /R:5 /W:2 >nul`,
+      ':launch',
+      `if not exist "${exePath}" robocopy "${backupDir}" "${destDir}" /E /R:5 /W:2 >nul`,
+      `start "" "${exePath}"`,
       'exit',
     ].join('\r\n');
     fs.writeFileSync(cmdPath, script);
 
     console.log('[self-update] handing off to updater script, quitting…');
+    lastUpdateAttempt = { target: info.version, stage: 'handoff', error: null, at: new Date().toISOString() };
     updateInfo = { ...updateInfo, downloading: false, downloaded: true, progress: 100 };
     sendUpdateState();
 
@@ -189,11 +242,26 @@ async function handleAgentUpdate(info) {
     stopAgent();
     setTimeout(() => app.quit(), 500);
   } catch (e) {
-    console.log('[self-update] failed:', e && e.message);
-    updateInfo = { ...updateInfo, downloading: false, error: (e && e.message) || 'Update failed' };
+    console.log('[self-update] failed at stage', updStage, ':', e && e.message);
+    const attemptsSoFar = (updateAttempts.get(info && info.version) || { count: 0 }).count;
+    const retryPending = attemptsSoFar < UPDATE_MAX_ATTEMPTS;
+    // Heartbeat telemetry — the server stores this so a stuck shop is visible.
+    lastUpdateAttempt = {
+      target: (info && info.version) || null,
+      stage: updStage,
+      error: (e && e.message) || 'Update failed',
+      at: new Date().toISOString(),
+    };
+    // While auto-retry is still pending, keep the banner QUIET (no "Click to
+    // download" button) — staff should never need to act; retries handle it.
+    updateInfo = {
+      ...updateInfo,
+      downloading: false,
+      error: (e && e.message) || 'Update failed',
+      autoRetrying: retryPending,
+      manualRequired: !retryPending,
+    };
     sendUpdateState();
-    // Allow a FUTURE version to retry; this same version stays blocked for
-    // this run via attemptedVersions.
     updateInProgress = false;
   }
 }
@@ -541,8 +609,41 @@ if (!gotInstanceLock) {
       } catch (e) {
         out.snapshot_saved_at = null;
       }
+      // Self-update telemetry (Task 1062): only sent AFTER an attempt happened
+      // this run — absent fields must never wipe server-stored values.
+      if (lastUpdateAttempt && lastUpdateAttempt.target) {
+        out.update_target = lastUpdateAttempt.target;
+        out.update_stage = lastUpdateAttempt.stage || null;
+        out.update_error = lastUpdateAttempt.error || null;
+        out.update_attempted_at = lastUpdateAttempt.at || null;
+      }
       return out;
     });
+
+    // Wake triggers (Task 1062): after PC sleep/resume or a Wi-Fi drop the
+    // agent used to sit "Offline" until the next timer tick happened to
+    // succeed. Fire an immediate beat + sync on power resume, screen unlock
+    // and network reconnect so the badge recovers within seconds. powerMonitor
+    // is only usable after app ready. Failures here must never touch the agent.
+    try {
+      const { powerMonitor, net } = require('electron');
+      powerMonitor.on('resume', () => { try { wakeAgent('power-resume'); } catch (e) {} });
+      powerMonitor.on('unlock-screen', () => { try { wakeAgent('screen-unlock'); } catch (e) {} });
+      // No network 'online' event in the main process — poll the OS
+      // connectivity flag and fire on the offline→online transition.
+      let wasOnline = true;
+      try { wasOnline = net.isOnline(); } catch (e) {}
+      setInterval(() => {
+        let onlineNow;
+        try { onlineNow = net.isOnline(); } catch (e) { return; }
+        if (onlineNow && !wasOnline) {
+          try { wakeAgent('network-reconnect'); } catch (e) {}
+        }
+        wasOnline = onlineNow;
+      }, 10000);
+    } catch (e) {
+      console.log('[wake-triggers] setup failed:', e && e.message);
+    }
 
     // Launched via the NestPOS desktop icon (--pos): go straight to the POS
     // screen, keep the agent window hidden in the tray.

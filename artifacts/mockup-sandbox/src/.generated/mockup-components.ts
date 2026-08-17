@@ -12,7 +12,6 @@ export const modules: ModuleMap = {
   "./components/mockups/hidden-products-sale/ClassicCBand.tsx": () => import("../components/mockups/hidden-products-sale/ClassicCBand.tsx"),
   "./components/mockups/hidden-products-sale/ClassicTotalBand.tsx": () => import("../components/mockups/hidden-products-sale/ClassicTotalBand.tsx"),
   "./components/mockups/hidden-products-sale/CustomerPanel.tsx": () => import("../components/mockups/hidden-products-sale/CustomerPanel.tsx"),
-  "./components/mockups/kot/Current.tsx": () => import("../components/mockups/kot/Current.tsx"),
   "./components/mockups/nestpos-dashboard/After.tsx": () => import("../components/mockups/nestpos-dashboard/After.tsx"),
   "./components/mockups/nestpos-dashboard/Before.tsx": () => import("../components/mockups/nestpos-dashboard/Before.tsx"),
   "./components/mockups/kot/Current.tsx": () => import("../components/mockups/kot/Current.tsx"),

@@ -408,7 +408,10 @@
                     </ul>
                 </div>
                 @endif
-                @php($tnMailFailure = \App\Services\MailHealth::current())
+                {{-- Block-form @php: an inline @php(...) mis-pairs with any later
+                     @endphp in the file (Blade raw-block regex), swallowing the
+                     markup between them as raw PHP → whole layout 500s. --}}
+                @php $tnMailFailure = \App\Services\MailHealth::current(); @endphp
                 @if($tnMailFailure)
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
@@ -432,7 +435,7 @@
                     </div>
                 </div>
                 @endif
-                @php($tnSupportMailFailure = \App\Services\SupportMailHealth::current())
+                @php $tnSupportMailFailure = \App\Services\SupportMailHealth::current(); @endphp
                 @if($tnSupportMailFailure)
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
@@ -453,7 +456,7 @@
                     </div>
                 </div>
                 @endif
-                @php($tnLogHealthFailure = \App\Services\LogHealth::current())
+                @php $tnLogHealthFailure = \App\Services\LogHealth::current(); @endphp
                 @if($tnLogHealthFailure)
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">
@@ -476,7 +479,7 @@
                     </div>
                 </div>
                 @endif
-                @php($tnHeartbeatWarn = \App\Services\HeartbeatHealth::warning())
+                @php $tnHeartbeatWarn = \App\Services\HeartbeatHealth::warning(); @endphp
                 @if($tnHeartbeatWarn)
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">

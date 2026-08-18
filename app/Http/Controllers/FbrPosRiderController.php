@@ -352,6 +352,11 @@ class FbrPosRiderController extends Controller
 
         $isAdminOrManager = $this->isAdmin();
 
+        // Task 1132: low-battery marker in the assign dropdown — hasColumn
+        // guarded (PROD drift rule); old APKs report NULL → no marker.
+        $hasBatteryPct = Schema::hasColumn('pos_riders', 'last_battery_pct')
+            && Schema::hasColumn('pos_riders', 'on_duty');
+
         // Task 786: load names for users who closed unassigned bills — keyed by user id.
         $deliveredByUsers = [];
         if (Schema::hasColumn('fbr_pos_transactions', 'delivered_by')) {
@@ -371,7 +376,7 @@ class FbrPosRiderController extends Controller
         return view('fbr-pos.deliveries', compact(
             'bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts',
             'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager',
-            'deliveredByUsers'
+            'deliveredByUsers', 'hasBatteryPct'
         ));
     }
 

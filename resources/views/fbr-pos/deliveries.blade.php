@@ -322,7 +322,8 @@
                                     <option value="">{{ __('pos.no_rider_opt') }}</option>
                                     @foreach($riders as $r)
                                     @if($r->is_active || (int) $b->rider_id === (int) $r->id)
-                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ ($openDeliveryCounts[$r->id] ?? 0) > 0 ? ' — ' . __('pos.rider_out_pill', ['count' => $openDeliveryCounts[$r->id]]) : '' }}{{ $r->is_active ? '' : __('pos.sfx_inactive_paren') }}</option>
+                                    {{-- Task 1132: 🪫 low-battery marker (≤20%, on-duty only) — rider ka phone raste mein band na ho jaye. --}}
+                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ ($openDeliveryCounts[$r->id] ?? 0) > 0 ? ' — ' . __('pos.rider_out_pill', ['count' => $openDeliveryCounts[$r->id]]) : '' }}{{ (!empty($hasBatteryPct) && $r->last_battery_pct !== null && (int) $r->last_battery_pct <= 20 && $r->on_duty) ? ' 🪫 ' . (int) $r->last_battery_pct . '%' : '' }}{{ $r->is_active ? '' : __('pos.sfx_inactive_paren') }}</option>
                                     @endif
                                     @endforeach
                                 </select>

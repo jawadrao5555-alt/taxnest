@@ -540,6 +540,8 @@ class PosRiderController extends Controller
         // Pre-built <option> suffix per rider — ONE string reused by both assign
         // dropdowns (main table + old-unassigned section). Non-tracking plans
         // get exactly the old ":count out" suffix, nothing more.
+        $hasBatteryPct = Schema::hasColumn('pos_riders', 'last_battery_pct')
+            && Schema::hasColumn('pos_riders', 'on_duty');
         $riderOptionSuffix = [];
         foreach ($riders as $r) {
             $bits = [];
@@ -558,6 +560,15 @@ class PosRiderController extends Controller
             }
             if ($h && $h['distance_km'] !== null) {
                 $bits[] = __('pos.rider_km_away', ['km' => number_format($h['distance_km'], 1)]);
+            }
+            // Task 1132: low-battery marker at assign time — the cashier picking
+            // a rider should know his phone may die mid-delivery. Denormalized
+            // pos_riders.last_battery_pct (Task #1106 APK heartbeat); NULL (old
+            // APK / never reported) shows nothing. Only while on duty — an
+            // off-duty rider's last reading is stale. hasColumn: PROD drift rule.
+            if ($hasBatteryPct && $r->last_battery_pct !== null
+                && (int) $r->last_battery_pct <= 20 && $r->on_duty) {
+                $bits[] = '🪫 ' . (int) $r->last_battery_pct . '%';
             }
             $riderOptionSuffix[$r->id] = count($bits) ? ' — ' . implode(' · ', $bits) : '';
         }

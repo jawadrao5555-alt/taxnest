@@ -2582,8 +2582,9 @@ window.addEventListener('popstate', function() {
                                         :disabled="riderAssignBusyId"
                                         class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50">
                                     <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                    {{-- Task 1132: 🪫 low-battery marker (≤20%, on-duty; NULL = old APK, shows nothing) --}}
                                     <template x-for="r in deliveryRiders" :key="r.id">
-                                        <option :value="r.id" x-text="r.name"></option>
+                                        <option :value="r.id" x-text="r.name + (r.battery_pct != null && r.battery_pct <= 20 ? ' 🪫 ' + r.battery_pct + '%' : '')"></option>
                                     </template>
                                 </select>
                                 <template x-if="riderAssignBusyId === bill.id">
@@ -2676,7 +2677,7 @@ window.addEventListener('popstate', function() {
                                                         class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50">
                                                     <option value="">{{ __('pos.no_rider_opt') }}</option>
                                                     <template x-for="r in deliveryRiders" :key="'oldr-' + r.id">
-                                                        <option :value="r.id" x-text="r.name"></option>
+                                                        <option :value="r.id" x-text="r.name + (r.battery_pct != null && r.battery_pct <= 20 ? ' 🪫 ' + r.battery_pct + '%' : '')"></option>
                                                     </template>
                                                 </select>
                                                 <template x-if="riderAssignBusyId === bill.id">

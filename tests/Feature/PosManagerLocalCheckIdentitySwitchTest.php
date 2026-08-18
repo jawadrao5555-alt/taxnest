@@ -419,6 +419,44 @@ class PosManagerLocalCheckIdentitySwitchTest extends TestCase
         $this->assertSame(0, DB::table('pos_user_sessions')->count(), 'identity switch must NEVER create a hazri row');
     }
 
+    public function test_identity_switch_reverse_from_fresh_pra_login(): void
+    {
+        // Owner test 18 Aug 2026: the key must work from BOTH sides. A fresh
+        // login on the PRA-side ID (no session memory) flips to the single
+        // local cashier that points at it.
+        $cid = $this->makeCompany();
+        $pra = $this->makeUser($cid, ['pos_billing_scope' => 'pra']);
+        $local = $this->makeUser($cid, ['pos_billing_scope' => 'local', 'pos_counterpart_user_id' => $pra->id]);
+        $this->actAs($pra, $cid);
+
+        $resp = (new PosController())->identitySwitch(Request::create('/pos/api/identity-switch', 'POST'));
+        $this->assertTrue($resp->getData(true)['switched'], 'fresh PRA-side login must reverse-switch to its linked local cashier');
+        $this->assertSame('local', $resp->getData(true)['direction']);
+        $this->assertSame($local->id, Auth::guard('pos')->id());
+
+        // Next press: normal forward branch (local → PRA) keeps the toggle going.
+        $resp = (new PosController())->identitySwitch(Request::create('/pos/api/identity-switch', 'POST'));
+        $this->assertTrue($resp->getData(true)['switched']);
+        $this->assertSame($pra->id, Auth::guard('pos')->id());
+
+        $this->assertSame(0, DB::table('pos_user_sessions')->count(), 'reverse switch must NEVER create a hazri row');
+    }
+
+    public function test_identity_switch_reverse_noop_when_two_locals_share_the_pra_id(): void
+    {
+        // Two stations sharing one PRA ID = ambiguous reverse target → silent
+        // no-op (the switched-forward session still returns via original-id).
+        $cid = $this->makeCompany();
+        $pra = $this->makeUser($cid, ['pos_billing_scope' => 'pra']);
+        $this->makeUser($cid, ['pos_billing_scope' => 'local', 'pos_counterpart_user_id' => $pra->id]);
+        $this->makeUser($cid, ['pos_billing_scope' => 'local', 'pos_counterpart_user_id' => $pra->id]);
+        $this->actAs($pra, $cid);
+
+        $resp = (new PosController())->identitySwitch(Request::create('/pos/api/identity-switch', 'POST'));
+        $this->assertFalse($resp->getData(true)['switched'], 'ambiguous reverse link must stay a silent no-op');
+        $this->assertSame($pra->id, Auth::guard('pos')->id());
+    }
+
     public function test_identity_switch_silent_noop_when_ineligible(): void
     {
         $cid = $this->makeCompany();

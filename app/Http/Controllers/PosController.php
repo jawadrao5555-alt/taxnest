@@ -4658,23 +4658,48 @@ class PosController extends Controller
             return response()->json(['switched' => true, 'direction' => 'back']);
         }
 
-        // ── Switch FORWARD: only a LOCAL-scoped cashier with an owner-set link ──
-        if (!$user->isPosCashier() || $user->posBillingScope() !== 'local'
-            || !(int) ($user->pos_counterpart_user_id ?? 0)) {
+        // ── Switch FORWARD: a LOCAL-scoped cashier with an owner-set link ──
+        if (!$user->isPosCashier()) {
             return $noop; // unlinked/ineligible = silent no-op (task rule)
         }
-        $target = User::where('company_id', $companyId)
-            ->where('id', (int) $user->pos_counterpart_user_id)
-            ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
+        if ($user->posBillingScope() === 'local') {
+            if (!(int) ($user->pos_counterpart_user_id ?? 0)) {
+                return $noop;
+            }
+            $target = User::where('company_id', $companyId)
+                ->where('id', (int) $user->pos_counterpart_user_id)
+                ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
+                ->where('is_active', true)
+                ->first();
+            if (!$target || $target->posBillingScope() === 'local') {
+                return $noop;
+            }
+            session(['pos_identity_original_id' => $user->id]);
+            $this->identitySwitchLogin($target);
+
+            return response()->json(['switched' => true, 'direction' => 'pra']);
+        }
+
+        // ── Switch REVERSE (owner test, 18 Aug 2026): the key must work from
+        // BOTH sides. A fresh login on the PRA-side ID (no session memory)
+        // flips to the LOCAL cashier that points at it — but ONLY when exactly
+        // one active local cashier is linked (two stations sharing one PRA ID
+        // = ambiguous, silent no-op; the switched-forward session still goes
+        // back via the original-id branch above). Same trust boundary as
+        // forward: owner-set link, cashier roles only, same company.
+        $locals = User::where('company_id', $companyId)
+            ->where('pos_counterpart_user_id', $user->id)
+            ->where('pos_role', 'pos_cashier')
             ->where('is_active', true)
-            ->first();
-        if (!$target || $target->posBillingScope() === 'local') {
+            ->get()
+            ->filter(fn ($u) => $u->posBillingScope() === 'local')
+            ->values();
+        if ($locals->count() !== 1) {
             return $noop;
         }
-        session(['pos_identity_original_id' => $user->id]);
-        $this->identitySwitchLogin($target);
+        $this->identitySwitchLogin($locals->first());
 
-        return response()->json(['switched' => true, 'direction' => 'pra']);
+        return response()->json(['switched' => true, 'direction' => 'local']);
     }
 
     /**

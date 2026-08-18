@@ -323,4 +323,26 @@ class PraElaanTallyTest extends TestCase
         $response = $this->actingAsAdmin()->get('/admin/feature-suggestions');
         $response->assertStatus(200);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 6. Drifted schema: source column missing → tally block hidden, no 500
+    //    (Task 1220: computePraElaanTally returns null when column absent)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function test_tally_block_hidden_and_no_500_when_source_column_missing(): void
+    {
+        // Simulate a drifted production schema by dropping the source column.
+        Schema::table('feature_suggestions', function (Blueprint $table) {
+            $table->dropColumn('source');
+        });
+
+        // The page must still respond 200 — computePraElaanTally returns null
+        // when Schema::hasColumn('feature_suggestions','source') is false, and
+        // the view's @if(!empty($praElaanTally)) guard hides the whole block.
+        $response = $this->actingAsAdmin()->get('/admin/feature-suggestions');
+        $response->assertStatus(200);
+
+        // Tally block must not appear (no "responses from" summary line).
+        $response->assertDontSee('responses from', false);
+    }
 }

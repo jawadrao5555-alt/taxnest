@@ -4804,4 +4804,16 @@ return [
     'wa_popup_blocked' => 'براؤزر نے واٹس ایپ ونڈو روک دی — سبز واٹس ایپ بٹن دبائیں۔',
     'wa_link_failed' => 'رسید کا لنک نہیں بن سکا — دوبارہ کوشش کریں۔',
     'wa_share_not_allowed' => 'شیئر لنک صرف حتمی بلوں کے لیے دستیاب ہے۔',
+
+    // Task 1143 — Firebase instant-push status banner on the riders page
+    'rider_push_on_title' => '"Firebase" کلید کنفیگر ہو گئی — فوری اطلاع فعال',
+    'rider_push_on_body' => '"Firebase" سروس اکاؤنٹ کلید اپ لوڈ ہو چکی ہے۔ جب بھی کوئی ڈیلیوری تفویض ہوگی، رائیڈر کو <strong>2–5 سیکنڈ</strong> میں اطلاع جائے گی (ایپ بند ہو تب بھی) — بشرطیکہ رائیڈر نے "v1.5.0" انسٹال کیا ہو اور "FCM" ٹوکن رجسٹرڈ ہو۔ 15 منٹ والا پول فال بیک بھی چلتا رہتا ہے۔',
+    'rider_push_off_title' => 'فوری اطلاع بند — "Firebase" کلید اپ لوڈ نہیں ہوئی',
+    'rider_push_off_body' => 'رائیڈرز ابھی بھی 15 منٹ والے پول پر کام کر رہے ہیں۔ فوری اطلاع فعال کرنے کے لیے "Firebase" سروس اکاؤنٹ "JSON" فائل اپ لوڈ کریں:',
+    'rider_push_step_1' => '"cPanel" میں <strong>"File Manager"</strong> کھولیں',
+    'rider_push_step_2' => '<strong>"public_html"</strong> ← <strong>"storage"</strong> ← <strong>"app"</strong> ← <strong>"firebase"</strong> فولڈر میں جائیں',
+    'rider_push_step_3' => '"Firebase Console" سے ڈاؤن لوڈ شدہ "JSON" فائل اپ لوڈ کریں',
+    'rider_push_step_4' => 'فائل کا نام <strong>"rider-fcm.json"</strong> رکھیں (ضرورت ہو تو نام تبدیل کریں)',
+    'rider_push_step_5' => 'یہ صفحہ ریفریش کریں — اسٹیٹس سبز ہو جائے گا',
+    'rider_push_secure_note' => '"JSON" فائل چیٹ یا کسی اور جگہ پیسٹ نہ کریں — محفوظ رکھیں۔',
 ];

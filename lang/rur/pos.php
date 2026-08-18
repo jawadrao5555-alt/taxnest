@@ -4805,4 +4805,16 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'wa_popup_blocked' => 'Browser ne WhatsApp window rok di — green WhatsApp button dabayen.',
     'wa_link_failed' => 'Receipt link nahi ban saka — dobara koshish karein.',
     'wa_share_not_allowed' => 'Share link sirf final bills ke liye milta hai.',
+
+    // Task 1143 — Firebase instant-push status banner on the riders page
+    'rider_push_on_title' => 'Firebase Key Configured — Instant Push Enabled',
+    'rider_push_on_body' => 'Firebase service-account key upload ho chuka hai. Jab bhi koi delivery assign hogi, rider ko <strong>2–5 seconds</strong> mein notification jaayegi (app band ho tab bhi) — agar rider ne v1.5.0 install kiya ho aur FCM token register ho. 15-minute poll fallback bhi chal raha hai.',
+    'rider_push_off_title' => 'Instant Push OFF — Firebase key upload nahi hua',
+    'rider_push_off_body' => 'Riders abhi bhi 15-minute poll se kaam kar rahe hain. Instant push ON karne ke liye Firebase service-account JSON file upload karein:',
+    'rider_push_step_1' => 'cPanel → <strong>File Manager</strong> kholein',
+    'rider_push_step_2' => '<strong>public_html</strong> → <strong>storage</strong> → <strong>app</strong> → <strong>firebase</strong> folder mein jaayein',
+    'rider_push_step_3' => 'Firebase Console se downloaded JSON file upload karein',
+    'rider_push_step_4' => 'File ka naam <strong>rider-fcm.json</strong> rakhein (rename karein agar zaroorat ho)',
+    'rider_push_step_5' => 'Yeh page refresh karein — status green ho jaayega',
+    'rider_push_secure_note' => 'JSON file chat ya kisi aur jagah paste na karein — secure rakhein.',
 ];

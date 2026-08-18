@@ -65,10 +65,11 @@
     <div class="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
         <span class="mt-0.5 text-emerald-600 dark:text-emerald-400 text-lg shrink-0">✅</span>
         <div>
-            <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Instant Push Active — Firebase key mila hua hai</p>
+            <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Firebase Key Configured — Instant Push Enabled</p>
             <p class="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
-                Jab bhi koi delivery assign hogi, rider ko <strong>2–5 seconds</strong> mein notification aa jaayegi (app band ho tab bhi).
-                15-minute poll fallback bhi chal raha hai un riders ke liye jinke phone pe Play Services nahi hain.
+                Firebase service-account key upload ho chuka hai. Jab bhi koi delivery assign hogi, rider ko
+                <strong>2–5 seconds</strong> mein notification jaayegi (app band ho tab bhi) — agar rider ne
+                v1.5.0 install kiya ho aur FCM token register ho. 15-minute poll fallback bhi chal raha hai.
             </p>
         </div>
     </div>

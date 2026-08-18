@@ -64,7 +64,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const req = e.request;
-                const url = '/pos/restaurant/tables';
+    const url = new URL(req.url);
     if (url.origin !== location.origin) return;
 
     // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —
@@ -95,8 +95,8 @@ self.addEventListener('fetch', e => {
     // Aug 2026: /fbr-pos/create joined (FBR offline billing — PRA port).
     if (req.mode === 'navigate' && (url.pathname === '/pos/invoice/create' || url.pathname === '/fbr-pos/create') && url.search === '') {
         e.respondWith((async () => {
-                const c = await caches.open(TABLES_CACHE);
-                const cached = await c.match(req);
+            const c = await caches.open(SALE_CACHE);
+            const cached = await c.match(req);
             const network = fetch(req).then(res => {
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) {
@@ -133,8 +133,7 @@ self.addEventListener('fetch', e => {
         e.respondWith((async () => {
             const c = await caches.open(TABLES_CACHE);
             try {
-                if (await c.match(url)) return; // already primed
-                const res = await fetch(url, { credentials: 'same-origin' });
+                const res = await fetch(req);
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) {
                     c.put(req, res.clone());

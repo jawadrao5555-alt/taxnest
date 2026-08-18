@@ -50,6 +50,16 @@
     <string name="pm_card">کارڈ</string>
     <string name="pm_online">آن لائن</string>
 
+    <!-- Delivered button (v1.6.0, Task #1160) -->
+    <string name="delivered_btn">✓ ڈیلیور ہو گیا</string>
+    <string name="delivered_confirm_title">ڈیلیوری کی تصدیق</string>
+    <string name="delivered_confirm_msg">کیا یہ آرڈر گاہک کو دے دیا گیا ہے؟\n\n%1$s</string>
+    <string name="delivered_yes">جی ہاں، ڈیلیور ہو گیا</string>
+    <string name="delivered_no">ابھی نہیں</string>
+    <string name="delivered_done">دکان کو اطلاع ہو گئی — آرڈر ڈیلیور ہو گیا</string>
+    <string name="delivered_failed">اطلاع نہیں گئی — انٹرنیٹ چیک کر کے دوبارہ کوشش کریں</string>
+    <string name="delivered_gone">یہ بل اب آپ کے پاس نہیں — لسٹ تازہ کر دی گئی ہے</string>
+
     <!-- New-delivery notifications (v1.4.0) -->
     <string name="notif_deliveries_channel">نئے آرڈر کی اطلاع</string>
     <string name="notif_new_delivery_one">نیا آرڈر آیا ہے — ڈیلیوری کے لیے!</string>

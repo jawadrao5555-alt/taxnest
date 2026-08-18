@@ -499,6 +499,16 @@ class PosRiderTrackingController extends Controller
     {
         $rider = $this->riderFromToken($request);
 
+        return response()->json($this->mePayload($rider));
+    }
+
+    /**
+     * Shared /me-shaped payload — used by appMe AND appMarkDelivered (Task
+     * #1160) so the app can re-render its whole home screen from either
+     * response with the same code path.
+     */
+    private function mePayload(PosRider $rider): array
+    {
         // Owner fix #4 (3 Aug 2026): rider app ab sirf ginti nahi, poori list
         // dikhaye — bill no, customer, phone, address, raqam, maps link, aur
         // kitni der se assign hai. Purane APK is extra field ko ignore karte
@@ -537,7 +547,7 @@ class PosRiderTrackingController extends Controller
             ];
         });
 
-        return response()->json([
+        return [
             'ok' => true,
             'rider' => ['id' => (int) $rider->id, 'name' => $rider->name],
             'duty' => (bool) $rider->on_duty,
@@ -546,7 +556,52 @@ class PosRiderTrackingController extends Controller
             'deliveries' => $deliveries,
             'khata_owed' => $rider->openCashRemaining(),
             'last_located_at' => optional($rider->last_located_at)->toIso8601String(),
-        ]);
+        ];
+    }
+
+    /**
+     * POST /api/rider-app/v1/deliveries/{txnId}/delivered — Task #1160.
+     *
+     * Rider marks his OWN bill delivered from the Android app — mirror of the
+     * web portal's portalMarkDelivered with the SAME guards:
+     *  - bearer token double-scopes to rider + company (riderFromToken also
+     *    re-checks plan/suspension gates like every other app call);
+     *  - bill must be the rider's own, currently assigned/dispatched
+     *    (terminal states delivered/returned can't be re-flipped), and not
+     *    settled (rider_settlement_id NULL);
+     *  - stamps delivered_at once (never overwrites; now() is app TZ);
+     *  - NEVER touches invoice_mode / pra_status / serials / totals / khata.
+     *
+     * Returns the refreshed /me payload so the app re-renders in one shot.
+     * 404 also carries the refreshed payload — the bill was reassigned /
+     * already delivered elsewhere, so the app should resync, not error-loop.
+     */
+    public function appMarkDelivered(Request $request, $txnId)
+    {
+        $rider = $this->riderFromToken($request);
+
+        $txn = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $rider->company_id)
+            ->where('rider_id', $rider->id)
+            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->whereNull('rider_settlement_id')
+            ->find($txnId);
+
+        if (!$txn) {
+            // Array union keeps LEFT keys — ok:false wins over payload's ok:true.
+            return response()->json(
+                ['ok' => false, 'error' => 'not_found'] + $this->mePayload($rider),
+                404
+            );
+        }
+
+        $upd = ['delivery_status' => 'delivered'];
+        if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
+            $upd['delivered_at'] = now();
+        }
+        $txn->update($upd);
+
+        return response()->json($this->mePayload($rider));
     }
 
     /** GET /api/rider-app/v1/version — app self-update check (public). */

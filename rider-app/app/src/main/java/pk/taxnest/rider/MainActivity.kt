@@ -323,26 +323,36 @@ class MainActivity : AppCompatActivity() {
             val (code, body) = ApiClient.get("/me", Prefs.token(this))
             if (code == 401) { runOnUiThread { sessionExpired() }; return@thread }
             if (code in 200..299 && body?.optBoolean("ok") == true) {
-                val serverDuty = body.optBoolean("duty", false)
-                val deliveries = body.optInt("open_deliveries", 0)
-                val khata = body.optDouble("khata_owed", 0.0)
-                val deliveriesArr = body.optJSONArray("deliveries") ?: JSONArray()
-                // Nayi assigned delivery → phone par awaz ke saath ittila
-                // (background thread — notifications are thread-safe).
-                DeliveryNotifier.process(this, deliveriesArr)
-                runOnUiThread {
-                    // Server is the boss for duty state.
-                    if (Prefs.duty(this) != serverDuty) {
-                        Prefs.setDuty(this, serverDuty)
-                        if (!serverDuty) stopService(Intent(this, TrackingService::class.java))
-                        else ContextCompat.startForegroundService(this, Intent(this, TrackingService::class.java))
-                    }
-                    summaryText.text = getString(R.string.open_deliveries, deliveries) + "\n" +
-                        getString(R.string.khata_owed, String.format(Locale.US, "%,.0f", khata))
-                    renderState()
-                    updateDeliveriesList(deliveriesArr)
-                }
+                applyMePayload(body)
             }
+        }
+    }
+
+    /**
+     * Renders a /me-shaped payload (duty flag, summary counts, deliveries
+     * list). The delivered endpoint (v1.6.0) returns the same shape, so both
+     * paths share this. Call from a BACKGROUND thread — the DeliveryNotifier
+     * pass runs here, then UI work hops to the main thread itself.
+     */
+    private fun applyMePayload(body: JSONObject) {
+        val serverDuty = body.optBoolean("duty", false)
+        val deliveries = body.optInt("open_deliveries", 0)
+        val khata = body.optDouble("khata_owed", 0.0)
+        val deliveriesArr = body.optJSONArray("deliveries") ?: JSONArray()
+        // Nayi assigned delivery → phone par awaz ke saath ittila
+        // (background thread — notifications are thread-safe).
+        DeliveryNotifier.process(this, deliveriesArr)
+        runOnUiThread {
+            // Server is the boss for duty state.
+            if (Prefs.duty(this) != serverDuty) {
+                Prefs.setDuty(this, serverDuty)
+                if (!serverDuty) stopService(Intent(this, TrackingService::class.java))
+                else ContextCompat.startForegroundService(this, Intent(this, TrackingService::class.java))
+            }
+            summaryText.text = getString(R.string.open_deliveries, deliveries) + "\n" +
+                getString(R.string.khata_owed, String.format(Locale.US, "%,.0f", khata))
+            renderState()
+            updateDeliveriesList(deliveriesArr)
         }
     }
 
@@ -435,7 +445,64 @@ class MainActivity : AppCompatActivity() {
             minsView.text = if (mins >= 0) getString(R.string.assigned_mins_ago, mins)
                             else getString(R.string.assigned_just_now)
 
+            // Delivered button (v1.6.0, Task #1160) — /me only lists
+            // assigned/dispatched bills, but gate on status anyway so a future
+            // payload change can't show the button on a terminal-state bill.
+            val status = item.optString("status")
+            val deliveredBtn = row.findViewById<Button>(R.id.deliveredBtn)
+            if (status == "assigned" || status == "dispatched") {
+                deliveredBtn.visibility = View.VISIBLE
+                deliveredBtn.setOnClickListener { confirmDelivered(item, deliveredBtn) }
+            } else {
+                deliveredBtn.visibility = View.GONE
+            }
+
             deliveriesContainer.addView(row)
+        }
+    }
+
+    // ── Delivered button (v1.6.0, Task #1160) ──────────────────────────────
+
+    /** Confirm dialog before marking a bill delivered — mis-taps are cheap here. */
+    private fun confirmDelivered(item: JSONObject, btn: Button) {
+        val billNo = item.optString("invoice_number").ifBlank { "#${item.optInt("id")}" }
+        val customer = item.optString("customer_name").ifBlank { getString(R.string.unknown_customer) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delivered_confirm_title)
+            .setMessage(getString(R.string.delivered_confirm_msg, "$billNo · $customer"))
+            .setPositiveButton(R.string.delivered_yes) { _, _ -> markDelivered(item.optInt("id"), btn) }
+            .setNegativeButton(R.string.delivered_no, null)
+            .show()
+    }
+
+    private fun markDelivered(txnId: Int, btn: Button) {
+        btn.isEnabled = false
+        thread {
+            val (code, body) = ApiClient.post("/deliveries/$txnId/delivered", JSONObject(), Prefs.token(this))
+            when {
+                code in 200..299 && body?.optBoolean("ok") == true -> {
+                    // Response is the refreshed /me payload — one-shot re-render
+                    // (the delivered card drops out, counts update).
+                    applyMePayload(body)
+                    runOnUiThread { showMsg(getString(R.string.delivered_done)) }
+                }
+                code == 404 && body != null -> {
+                    // Bill no longer ours (reassigned / delivered elsewhere) —
+                    // payload rides on the 404 too, so resync instead of erroring.
+                    applyMePayload(body)
+                    runOnUiThread { showMsg(getString(R.string.delivered_gone)) }
+                }
+                code == 401 -> runOnUiThread { sessionExpired() }
+                code == 403 -> runOnUiThread {
+                    btn.isEnabled = true
+                    showMsg(body?.optString("message")?.ifBlank { null } ?: getString(R.string.plan_locked))
+                }
+                else -> runOnUiThread {
+                    // Offline / transient failure — re-enable so the rider can retry.
+                    btn.isEnabled = true
+                    showMsg(getString(R.string.delivered_failed))
+                }
+            }
         }
     }
 

@@ -88,4 +88,18 @@
         android:textSize="11sp"
         android:textColor="#98A2B3" />
 
+    <!-- Row 6: Delivered button (v1.6.0, Task #1160) — visible only while the
+         bill is assigned/dispatched; MainActivity toggles visibility. -->
+    <Button
+        android:id="@+id/deliveredBtn"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#059669"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:text="@string/delivered_btn"
+        android:visibility="gone" />
+
 </LinearLayout>

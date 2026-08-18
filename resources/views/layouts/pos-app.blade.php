@@ -793,6 +793,14 @@
                                         {{ __('pos.nav_rider_tracking') }}
                                     </a>
                                     @endif
+                                    {{-- Rider Performance Report (Task #1103): same visibility rules as Live
+                                         Tracking; plan-locked companies land on the Unlimited upgrade card. --}}
+                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('riders', !$isCashierLayout))
+                                    <a href="{{ route('pos.riders.report') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                        {{ __('pos.nav_rider_report') }}
+                                    </a>
+                                    @endif
 
                                     @if($posNavCan('reports') || $posNavCan('tax_reports') || $posNavCan('day_close', $dayCloseNavDefault) || ($isRestaurantLayout && $posNavCan('reports')))
                                     <div class="px-3 pt-3 pb-1">

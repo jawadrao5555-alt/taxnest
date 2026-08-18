@@ -1047,6 +1047,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/riders/tracking/resolve-link', [\App\Http\Controllers\PosRiderTrackingController::class, 'resolveShopLink'])->name('pos.riders.tracking.resolve');
         // Task #1115: per-company idle/silent/auto-off threshold overrides
         Route::post('/riders/tracking/settings', [\App\Http\Controllers\PosRiderTrackingController::class, 'saveRiderTrackingSettings'])->name('pos.riders.tracking.settings');
+        // Task #1103: Rider performance report & ranking (same Unlimited gates as tracking)
+        Route::get('/riders/report', [\App\Http\Controllers\PosRiderTrackingController::class, 'reportPage'])->name('pos.riders.report');
     });
     // Rider portal — pos_rider role is confined to these routes by PosAuth
     // (exact 'pos/rider' + 'pos/rider/' prefix; /pos/riders stays admin-only).

@@ -1036,4 +1036,247 @@ class PosRiderTrackingController extends Controller
         }
         return response()->json(['ok' => true] + $this->publicTrackPayload($bill, $company));
     }
+
+    // ─── Task #1103: Rider performance report & ranking ─────────────────────
+
+    // A hop faster than this is a bad GPS fix (teleport) — skipped from km.
+    private const REPORT_MAX_SPEED_KMH = 90;
+    // A hop shorter than this is GPS jitter while standing — skipped from km
+    // (jitter otherwise accumulates fake kilometres on a parked rider).
+    private const REPORT_JITTER_MIN_M = 12;
+    // Assigned→delivered spans beyond this are stale stamps (bill marked
+    // delivered next day) — excluded from the average so they don't poison it.
+    private const REPORT_MAX_DELIVERY_MINUTES = 24 * 60;
+
+    /**
+     * GET /pos/riders/report — per-rider, per-day performance report.
+     * Same Unlimited gates + locked-card upsell as the tracking page.
+     *
+     * range=day (default, single date) | 7 | 30 (ranking: best rider on top).
+     * Calendar days (same convention as the trail endpoint), NOT business days.
+     */
+    public function reportPage(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $locked = !PosFeatureService::planAllows($company, 'riders_enabled')
+            || !PosFeatureService::planAllows($company, 'rider_tracking_enabled');
+        if ($locked) {
+            return view('pos.rider-report', [
+                'locked' => true, 'range' => 'day', 'date' => now()->format('Y-m-d'),
+                'from' => now()->format('Y-m-d'), 'to' => now()->format('Y-m-d'),
+                'rows' => [], 'hasDeliveryStamps' => false,
+            ]);
+        }
+
+        $range = (string) $request->query('range', 'day');
+        if (!in_array($range, ['day', '7', '30'], true)) {
+            $range = 'day';
+        }
+
+        if ($range === 'day') {
+            try {
+                $day = Carbon::createFromFormat('Y-m-d', (string) $request->query('date'))->startOfDay();
+            } catch (\Throwable $e) {
+                $day = now()->startOfDay();
+            }
+            if ($day->gt(now())) {
+                $day = now()->startOfDay();
+            }
+            $from = $day->copy()->startOfDay();
+            $to = $day->copy()->endOfDay();
+        } else {
+            $day = now()->startOfDay();
+            $from = now()->subDays((int) $range - 1)->startOfDay();
+            $to = now()->endOfDay();
+        }
+
+        $movement = $this->movementStats($companyId, $from, $to);
+        $delivery = $this->deliveryStats($companyId, $from, $to);
+
+        $rows = [];
+        foreach (PosRider::where('company_id', $companyId)->orderBy('name')->get() as $r) {
+            $m = $movement[$r->id] ?? null;
+            $d = $delivery[$r->id] ?? null;
+            if (!$r->is_active && !$m && !$d) {
+                continue; // inactive rider with zero activity in the window
+            }
+            $rows[] = [
+                'rider'        => $r,
+                'km'           => $m ? round($m['km'], 1) : 0.0,
+                'duty_minutes' => $m['duty_minutes'] ?? 0,
+                'days_active'  => $m['days_active'] ?? 0,
+                'delivered'    => $d['delivered'] ?? 0,
+                'avg_minutes'  => $d['avg_minutes'] ?? null,
+            ];
+        }
+
+        // Ranking: most deliveries first, then fastest average, then most km.
+        usort($rows, function ($a, $b) {
+            if ($a['delivered'] !== $b['delivered']) {
+                return $b['delivered'] <=> $a['delivered'];
+            }
+            $avg = ($a['avg_minutes'] ?? PHP_INT_MAX) <=> ($b['avg_minutes'] ?? PHP_INT_MAX);
+            if ($avg !== 0) {
+                return $avg;
+            }
+            return $b['km'] <=> $a['km'];
+        });
+
+        return view('pos.rider-report', [
+            'locked' => false,
+            'range'  => $range,
+            'date'   => $range === 'day' ? $from->format('Y-m-d') : $day->format('Y-m-d'),
+            'from'   => $from->format('Y-m-d'),
+            'to'     => $to->format('Y-m-d'),
+            'rows'   => $rows,
+            // Avg column renders only when both stamps exist (PROD schema drift).
+            'hasDeliveryStamps' => Schema::hasColumn('pos_transactions', 'rider_assigned_at')
+                && Schema::hasColumn('pos_transactions', 'delivered_at'),
+        ]);
+    }
+
+    /**
+     * Per-rider km + duty-span aggregation over pos_rider_locations.
+     *
+     * km: haversine over consecutive same-day points, skipping
+     *  - gap segments (Δt ≥ GAP_THRESHOLD_MINUTES — same rule the trail
+     *    endpoint uses to break the polyline),
+     *  - implausible jumps (speed > REPORT_MAX_SPEED_KMH — bad GPS fix),
+     *  - sub-jitter hops (< REPORT_JITTER_MIN_M — stationary GPS noise).
+     *
+     * Duty: APPROXIMATED as first→last location point per day (there is no
+     * duty session log — the UI states this approximation explicitly).
+     *
+     * Streams with cursor() — a 30-day window over several riders can be
+     * hundreds of thousands of rows; never ->get() this.
+     *
+     * @return array<int, array{km: float, duty_minutes: int, days_active: int}>
+     */
+    private function movementStats(int $companyId, Carbon $from, Carbon $to): array
+    {
+        if (!Schema::hasTable('pos_rider_locations')) {
+            return []; // pre-migration PROD window
+        }
+
+        $gapSecs = self::GAP_THRESHOLD_MINUTES * 60;
+        $stats = [];
+        $prev = null; // [rider_id, dayKey, ts, lat, lng]
+
+        $points = DB::table('pos_rider_locations')
+            ->where('company_id', $companyId)
+            ->whereBetween('recorded_at', [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')])
+            ->orderBy('rider_id')->orderBy('recorded_at')
+            ->select(['rider_id', 'lat', 'lng', 'recorded_at'])
+            ->cursor();
+
+        foreach ($points as $p) {
+            $rid = (int) $p->rider_id;
+            $ts = strtotime((string) $p->recorded_at);
+            $dayKey = substr((string) $p->recorded_at, 0, 10);
+            // Live PDO returns decimals as STRINGS — cast (live-pdo convention).
+            $lat = (float) $p->lat;
+            $lng = (float) $p->lng;
+
+            if (!isset($stats[$rid])) {
+                $stats[$rid] = ['km' => 0.0, 'days' => []];
+            }
+            if (!isset($stats[$rid]['days'][$dayKey])) {
+                $stats[$rid]['days'][$dayKey] = ['first' => $ts, 'last' => $ts];
+            } else {
+                if ($ts < $stats[$rid]['days'][$dayKey]['first']) {
+                    $stats[$rid]['days'][$dayKey]['first'] = $ts;
+                }
+                if ($ts > $stats[$rid]['days'][$dayKey]['last']) {
+                    $stats[$rid]['days'][$dayKey]['last'] = $ts;
+                }
+            }
+
+            if ($prev && $prev[0] === $rid && $prev[1] === $dayKey) {
+                $dt = $ts - $prev[2];
+                if ($dt > 0 && $dt < $gapSecs) {
+                    $hopKm = PosRider::haversineKm($prev[3], $prev[4], $lat, $lng);
+                    $speedKmh = $hopKm / ($dt / 3600);
+                    if ($hopKm * 1000 >= self::REPORT_JITTER_MIN_M
+                        && $speedKmh <= self::REPORT_MAX_SPEED_KMH) {
+                        $stats[$rid]['km'] += $hopKm;
+                    }
+                }
+            }
+            $prev = [$rid, $dayKey, $ts, $lat, $lng];
+        }
+
+        foreach ($stats as &$s) {
+            $mins = 0;
+            foreach ($s['days'] as $dd) {
+                $mins += intdiv(max(0, $dd['last'] - $dd['first']), 60);
+            }
+            $s['duty_minutes'] = $mins;
+            $s['days_active'] = count($s['days']);
+            unset($s['days']);
+        }
+        unset($s);
+
+        return $stats;
+    }
+
+    /**
+     * Per-rider delivered counts + average assigned→delivered minutes.
+     * Both timestamp columns stay behind hasColumn guards (PROD schema drift);
+     * without delivered_at the window falls back to created_at and the
+     * average is simply unavailable. Carbon 3 diffs are signed — abs().
+     *
+     * @return array<int, array{delivered: int, avg_minutes: int|null}>
+     */
+    private function deliveryStats(int $companyId, Carbon $from, Carbon $to): array
+    {
+        if (!Schema::hasTable('pos_transactions') || !Schema::hasColumn('pos_transactions', 'rider_id')) {
+            return [];
+        }
+        $hasDelivered = Schema::hasColumn('pos_transactions', 'delivered_at');
+        $hasAssigned = Schema::hasColumn('pos_transactions', 'rider_assigned_at');
+        // Attribute each bill to the day it was DELIVERED; settled-backfill rows
+        // keep delivered_at NULL (settle time ≠ delivery time) → created_at.
+        $tsExpr = $hasDelivered ? 'COALESCE(delivered_at, created_at)' : 'created_at';
+
+        $cols = ['rider_id'];
+        if ($hasAssigned) {
+            $cols[] = 'rider_assigned_at';
+        }
+        if ($hasDelivered) {
+            $cols[] = 'delivered_at';
+        }
+
+        $bills = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereNotNull('rider_id')
+            ->where('delivery_status', 'delivered')
+            ->whereRaw("{$tsExpr} BETWEEN ? AND ?", [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')])
+            ->select($cols)
+            ->cursor();
+
+        $stats = [];
+        foreach ($bills as $b) {
+            $rid = (int) $b->rider_id;
+            $stats[$rid] ??= ['delivered' => 0, 'mins_total' => 0, 'mins_count' => 0];
+            $stats[$rid]['delivered']++;
+            if ($hasAssigned && $hasDelivered && $b->rider_assigned_at && $b->delivered_at) {
+                $mins = (int) abs(Carbon::parse($b->rider_assigned_at)
+                    ->diffInMinutes(Carbon::parse($b->delivered_at)));
+                if ($mins <= self::REPORT_MAX_DELIVERY_MINUTES) {
+                    $stats[$rid]['mins_total'] += $mins;
+                    $stats[$rid]['mins_count']++;
+                }
+            }
+        }
+        foreach ($stats as &$s) {
+            $s['avg_minutes'] = $s['mins_count'] > 0
+                ? (int) round($s['mins_total'] / $s['mins_count']) : null;
+            unset($s['mins_total'], $s['mins_count']);
+        }
+        unset($s);
+
+        return $stats;
+    }
 }

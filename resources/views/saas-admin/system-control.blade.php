@@ -68,11 +68,26 @@
         </div>
     </div>
 
-    {{-- MySQL connection ratio: Threads_connected / max_connections — auto-refreshes every 30 s --}}
-    <div class="mb-6 rounded-xl border p-4 flex items-start gap-3"
+    {{-- MySQL connection ratio: Threads_connected / max_connections — auto-refreshes every 30 s.
+         Initial band colours are SERVER-rendered (testable + correct before Alpine hydrates);
+         the Alpine :class object bindings then toggle the same classes on live refresh. --}}
+    @php
+        $mysqlBad    = $mysqlPct !== null && $mysqlPct > 70;
+        $mysqlWarn   = $mysqlPct !== null && $mysqlPct > 50 && $mysqlPct <= 70;
+        $mysqlOk     = $mysqlPct !== null && $mysqlPct <= 50;
+        $mysqlBorder = $mysqlBad  ? 'border-red-800/60 bg-red-900/15'
+                     : ($mysqlWarn ? 'border-amber-700/60 bg-amber-900/10'
+                     : ($mysqlOk   ? 'border-emerald-800/50 bg-emerald-900/10'
+                                   : 'border-gray-700/50 bg-gray-900/20'));
+        $mysqlDot    = $mysqlBad  ? 'bg-red-500'
+                     : ($mysqlWarn ? 'bg-amber-400'
+                     : ($mysqlOk   ? 'bg-emerald-500'
+                                   : 'bg-gray-500'));
+    @endphp
+    <div class="mb-6 rounded-xl border p-4 flex items-start gap-3 {{ $mysqlBorder }}" data-testid="mysql-row"
          x-data="mysqlHealth({{ (int)($mysqlThreads ?? 0) }}, {{ (int)($mysqlMaxConn ?? 0) }}, {{ $mysqlPct !== null ? (float)$mysqlPct : 'null' }})"
          :class="borderClass">
-        <span class="mt-0.5 inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" :class="dotClass"></span>
+        <span class="mt-0.5 inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 {{ $mysqlDot }}" data-testid="mysql-dot" :class="dotClass"></span>
         <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
                 <p class="text-sm font-semibold text-white">MySQL Connections</p>
@@ -118,28 +133,39 @@
             get warn() { return this.pct !== null && this.pct > 50 && this.pct <= 70; },
             get ok()   { return this.pct !== null && this.pct <= 50; },
 
+            // Object syntax so Alpine actively REMOVES classes when a band
+            // flips on refresh — string returns would leave the server-rendered
+            // initial classes stuck on the element.
             get borderClass() {
-                if (this.bad)  return 'border-red-800/60 bg-red-900/15';
-                if (this.warn) return 'border-amber-700/60 bg-amber-900/10';
-                if (this.ok)   return 'border-emerald-800/50 bg-emerald-900/10';
-                return 'border-gray-700/50 bg-gray-900/20';
+                return {
+                    'border-red-800/60 bg-red-900/15':       this.bad,
+                    'border-amber-700/60 bg-amber-900/10':   this.warn,
+                    'border-emerald-800/50 bg-emerald-900/10': this.ok,
+                    'border-gray-700/50 bg-gray-900/20':     this.pct === null,
+                };
             },
             get dotClass() {
-                if (this.bad)  return 'bg-red-500';
-                if (this.warn) return 'bg-amber-400';
-                if (this.ok)   return 'bg-emerald-500';
-                return 'bg-gray-500';
+                return {
+                    'bg-red-500':     this.bad,
+                    'bg-amber-400':   this.warn,
+                    'bg-emerald-500': this.ok,
+                    'bg-gray-500':    this.pct === null,
+                };
             },
             get txtClass() {
-                if (this.bad)  return 'text-red-400';
-                if (this.warn) return 'text-amber-400';
-                if (this.ok)   return 'text-gray-400';
-                return 'text-gray-500';
+                return {
+                    'text-red-400':   this.bad,
+                    'text-amber-400': this.warn,
+                    'text-gray-400':  this.ok,
+                    'text-gray-500':  this.pct === null,
+                };
             },
             get pctClass() {
-                if (this.bad)  return 'text-red-300';
-                if (this.warn) return 'text-amber-300';
-                return 'text-emerald-300';
+                return {
+                    'text-red-300':     this.bad,
+                    'text-amber-300':   this.warn,
+                    'text-emerald-300': !this.bad && !this.warn,
+                };
             },
 
             init() {

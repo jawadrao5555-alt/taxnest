@@ -27,6 +27,8 @@ Thumbs.db
 
 pra-agent/dist/
 .local/rider-signing/
+# Firebase per-app config (owner drop-in; repo is public — keep it out)
+rider-app/app/google-services.json
 .agents/
 .local/
 tools/video-pipeline/out/

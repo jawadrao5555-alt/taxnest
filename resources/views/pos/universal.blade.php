@@ -566,6 +566,21 @@ window.addEventListener('popstate', function() {
                       x-text="failedBills.length + offlineQueueCount"></span>
             </button>
 
+            {{-- PRA/LOCAL billing-MODE badge (Task 1164, owner 18 Aug 2026) — always-visible
+                 stream sign so nobody has to open Switches to know which mode the screen is
+                 billing in. Bound to root praEnabled → an admin flip in the Switches dropdown
+                 updates it instantly; scope-locked cashiers keep the server-baked static value.
+                 DISTINCT from the Auto-Sync pill (that one = network): shield icon + PRA ON /
+                 LOCAL wording, no status dot. Hidden for Standalone-edition companies. --}}
+            @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
+            <span class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide border flex-shrink-0 select-none"
+                  :class="praEnabled ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'"
+                  :title="praEnabled ? window.TXT.ti_pra_mode_on : window.TXT.ti_pra_mode_local">
+                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span x-text="praEnabled ? window.TXT.pra_mode_on : window.TXT.pra_mode_local"></span>
+            </span>
+            @endif
+
             {{-- Switches dropdown — PRA Reporting / Auto-Print / Auto-KOT (same handlers
                  as the mobile toggles strip; cashiers see the read-only PRA badge).
                  NOTE: wrapper is intentionally NOT `relative` — the panel is position:fixed
@@ -1032,6 +1047,16 @@ window.addEventListener('popstate', function() {
                   :class="syncStatus === 'online' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'"
                   x-text="failedBills.length + offlineQueueCount"></span>
         </button>
+        {{-- PRA/LOCAL billing-MODE badge (Task 1164) — mobile copy of the nav badge.
+             Same praEnabled binding; distinct from Auto-Sync (network) pill above. --}}
+        @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
+        <span x-cloak class="flex md:hidden items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide border select-none"
+              :class="praEnabled ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'"
+              :title="praEnabled ? window.TXT.ti_pra_mode_on : window.TXT.ti_pra_mode_local">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <span x-text="praEnabled ? window.TXT.pra_mode_on : window.TXT.pra_mode_local"></span>
+        </span>
+        @endif
         {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
         @if($uBillScope !== 'pra')
         <button @click="openLocalBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">

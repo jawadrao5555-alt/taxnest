@@ -71,6 +71,36 @@ class PosRiderTrackingController extends Controller
     }
 
     // ─── Task #1102: auto duty-off (lazy, no cron dependency) ───────────────
+    // ─── Task #1115: per-company threshold overrides ─────────────────────────
+
+    /**
+     * Read company-level rider tracking overrides (Task #1115).
+     * Returns validated values; NULL columns fall back to the class constants.
+     * hasColumn guards keep this safe before the migration runs on live.
+     */
+    private function riderTrackingConfig(int $companyId): array
+    {
+        $c = Company::find($companyId);
+        $idleMin   = null;
+        $silentMin = null;
+        $autoOffHr = null;
+        if ($c) {
+            if (Schema::hasColumn('companies', 'rider_idle_minutes') && $c->rider_idle_minutes !== null) {
+                $idleMin = max(5, min(60, (int) $c->rider_idle_minutes));
+            }
+            if (Schema::hasColumn('companies', 'rider_silent_minutes') && $c->rider_silent_minutes !== null) {
+                $silentMin = max(3, min(30, (int) $c->rider_silent_minutes));
+            }
+            if (Schema::hasColumn('companies', 'rider_auto_off_hour') && $c->rider_auto_off_hour !== null) {
+                $autoOffHr = max(0, min(8, (int) $c->rider_auto_off_hour));
+            }
+        }
+        return [
+            'idle_minutes'   => $idleMin   ?? self::IDLE_MINUTES,
+            'silent_minutes' => $silentMin ?? self::SILENT_MINUTES,
+            'auto_off_hour'  => $autoOffHr ?? self::AUTO_OFF_HOUR,
+        ];
+    }
 
     /**
      * Most recent late-night cutoff moment (app TZ). Duty sessions that
@@ -78,9 +108,9 @@ class PosRiderTrackingController extends Controller
      * A rider who re-enables duty after the cutoff sets duty_started_at=now()
      * (> cutoff) and is naturally exempt until the next night — idempotent.
      */
-    private function autoOffCutoff(): Carbon
+    private function autoOffCutoff(int $hour = self::AUTO_OFF_HOUR): Carbon
     {
-        $cutoff = now()->setTime(self::AUTO_OFF_HOUR, 0, 0);
+        $cutoff = now()->setTime($hour, 0, 0);
 
         return $cutoff->gt(now()) ? $cutoff->subDay() : $cutoff;
     }
@@ -93,7 +123,8 @@ class PosRiderTrackingController extends Controller
      */
     private function sweepAutoDutyOff(int $companyId): void
     {
-        $cutoff = $this->autoOffCutoff();
+        $cfg    = $this->riderTrackingConfig($companyId);
+        $cutoff = $this->autoOffCutoff($cfg['auto_off_hour']);
         $update = ['on_duty' => false];
         if (Schema::hasColumn('pos_riders', 'duty_auto_off_at')) {
             $update['duty_auto_off_at'] = now();
@@ -117,8 +148,11 @@ class PosRiderTrackingController extends Controller
     {
         // NULL duty_started_at = session age unprovable — leave it alone
         // (mirrors sweepAutoDutyOff; every real duty-on stamps the column).
-        if (!$rider->on_duty || !$rider->duty_started_at
-            || $rider->duty_started_at->gt($this->autoOffCutoff())) {
+        if (!$rider->on_duty || !$rider->duty_started_at) {
+            return;
+        }
+        $cfg = $this->riderTrackingConfig((int) $rider->company_id);
+        if ($rider->duty_started_at->gt($this->autoOffCutoff($cfg['auto_off_hour']))) {
             return;
         }
         $update = ['on_duty' => false];
@@ -126,6 +160,40 @@ class PosRiderTrackingController extends Controller
             $update['duty_auto_off_at'] = now();
         }
         $rider->update($update);
+    }
+
+    /**
+     * POST /pos/riders/tracking/settings — save per-company threshold overrides.
+     * PosAdminOnly group; cashier 403 guard.
+     */
+    public function saveRiderTrackingSettings(\Illuminate\Http\Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+        if ($user && $user->posCashierBlocked()) {
+            abort(403, __('pos.admin_only_action'));
+        }
+        $company = Company::find($companyId);
+        if (!$company) {
+            abort(404);
+        }
+        if (!PosFeatureService::planAllows($company, 'riders_enabled')
+            || !PosFeatureService::planAllows($company, 'rider_tracking_enabled')) {
+            abort(403, __('pos.plan_locked_feature'));
+        }
+        if (!Schema::hasColumn('companies', 'rider_idle_minutes')) {
+            return back()->with('error', 'Schema update pending — please try again shortly.');
+        }
+
+        $data = $request->validate([
+            'rider_idle_minutes'   => 'required|integer|min:5|max:60',
+            'rider_silent_minutes' => 'required|integer|min:3|max:30',
+            'rider_auto_off_hour'  => 'required|integer|min:0|max:8',
+        ]);
+
+        $company->update($data);
+
+        return back()->with('success', __('pos.rt_tracking_settings_saved'));
     }
 
     /** Resolve the rider from the Bearer token or abort with JSON. */
@@ -636,11 +704,14 @@ class PosRiderTrackingController extends Controller
             ->get();
 
         // ── Task #1102: "ruka hua" idle detection (cheap) ────────────────────
+        // Task #1115: thresholds read from company overrides (with constant defaults).
         // Candidates: on duty + open deliveries + still uploading. One grouped
-        // indexed query over the last IDLE_MINUTES gives each candidate's
+        // indexed query over the last idleMinutes gives each candidate's
         // bounding box — if the box stayed tiny across (nearly) the whole
         // window, the rider is stationary.
-        $silentSecs = self::SILENT_MINUTES * 60;
+        $cfg        = $this->riderTrackingConfig($companyId);
+        $idleMin    = $cfg['idle_minutes'];
+        $silentSecs = $cfg['silent_minutes'] * 60;
         $isSilent = function ($r) use ($silentSecs) {
             if (!$r->on_duty) {
                 return false;
@@ -667,13 +738,13 @@ class PosRiderTrackingController extends Controller
             $moveBoxes = DB::table('pos_rider_locations')
                 ->where('company_id', $companyId)
                 ->whereIn('rider_id', $idleCandidates)
-                ->where('recorded_at', '>=', now()->subMinutes(self::IDLE_MINUTES)->format('Y-m-d H:i:s'))
+                ->where('recorded_at', '>=', now()->subMinutes($idleMin)->format('Y-m-d H:i:s'))
                 ->groupBy('rider_id')
                 ->selectRaw('rider_id, MIN(lat) AS mnlat, MAX(lat) AS mxlat, MIN(lng) AS mnlng, MAX(lng) AS mxlng, COUNT(*) AS c, MIN(recorded_at) AS oldest')
                 ->get()->keyBy('rider_id');
         }
 
-        $isIdle = function ($r) use ($moveBoxes) {
+        $isIdle = function ($r) use ($moveBoxes, $idleMin) {
             $box = $moveBoxes[$r->id] ?? null;
             if (!$box || (int) $box->c < 3) {
                 return false;
@@ -681,7 +752,7 @@ class PosRiderTrackingController extends Controller
             // Coverage: points must span (almost) the whole window — a rider
             // on duty for only 5 minutes cannot be judged yet.
             $oldestAge = now()->getTimestamp() - strtotime((string) $box->oldest);
-            if ($oldestAge < (self::IDLE_MINUTES - 3) * 60) {
+            if ($oldestAge < ($idleMin - 3) * 60) {
                 return false;
             }
             // Bounding-box span in metres (Pakistan ≈ 30°N: 1° lng ≈ 96.5 km).

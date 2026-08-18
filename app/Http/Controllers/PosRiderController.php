@@ -152,7 +152,23 @@ class PosRiderController extends Controller
             ->limit(20)
             ->get();
 
-        return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderPasswords', 'settlements'));
+        // Task #1115: pass current tracking thresholds so the settings form
+        // can pre-fill with saved values (or the system defaults when NULL).
+        $company = Company::find($companyId);
+        $trackingEnabled = $company
+            && PosFeatureService::planAllows($company, 'riders_enabled')
+            && PosFeatureService::planAllows($company, 'rider_tracking_enabled')
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'rider_idle_minutes');
+        $riderTrackingSettings = null;
+        if ($trackingEnabled) {
+            $riderTrackingSettings = [
+                'idle_minutes'   => (int) ($company->rider_idle_minutes   ?? 15),
+                'silent_minutes' => (int) ($company->rider_silent_minutes ?? 10),
+                'auto_off_hour'  => (int) ($company->rider_auto_off_hour  ?? 3),
+            ];
+        }
+
+        return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderPasswords', 'settlements', 'trackingEnabled', 'riderTrackingSettings'));
     }
 
     public function store(Request $request)

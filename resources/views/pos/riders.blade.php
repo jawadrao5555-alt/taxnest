@@ -197,6 +197,52 @@
         </div>
     </div>
 
+    {{-- ── Task #1115: Live Tracking Settings (admin/manager only, tracking plan gate) ─── --}}
+    @if($trackingEnabled && $riderTrackingSettings !== null)
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 mb-6">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.rt_tracking_settings_title') }}</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.rt_tracking_settings_hint') }}</p>
+        <form method="POST" action="{{ route('pos.riders.tracking.settings') }}">
+            @csrf
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        {{ __('pos.rt_idle_minutes_label') }}
+                    </label>
+                    <input type="number" name="rider_idle_minutes" required min="5" max="60"
+                           value="{{ old('rider_idle_minutes', $riderTrackingSettings['idle_minutes']) }}"
+                           class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">{{ __('pos.rt_idle_minutes_hint') }}</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        {{ __('pos.rt_silent_minutes_label') }}
+                    </label>
+                    <input type="number" name="rider_silent_minutes" required min="3" max="30"
+                           value="{{ old('rider_silent_minutes', $riderTrackingSettings['silent_minutes']) }}"
+                           class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">{{ __('pos.rt_silent_minutes_hint') }}</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                        {{ __('pos.rt_auto_off_hour_label') }}
+                    </label>
+                    <input type="number" name="rider_auto_off_hour" required min="0" max="8"
+                           value="{{ old('rider_auto_off_hour', $riderTrackingSettings['auto_off_hour']) }}"
+                           class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">{{ __('pos.rt_auto_off_hour_hint') }}</p>
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition">
+                    {{ __('pos.save_changes') }}
+                </button>
+            </div>
+        </form>
+    </div>
+    @endif
+
     {{-- Edit rider modal --}}
     <div x-show="editRider" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/50" @click="editRider = null"></div>

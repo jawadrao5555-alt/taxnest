@@ -169,7 +169,13 @@ class PosRiderController extends Controller
             ];
         }
 
-        return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderPasswords', 'settlements', 'trackingEnabled', 'riderTrackingSettings'));
+        $pushConfigured = \App\Services\RiderPushService::isConfigured();
+        if ($pushConfigured) {
+            // Log once so the owner can confirm in laravel.log after uploading the key.
+            \Illuminate\Support\Facades\Log::info('RiderPushService: Firebase credential is present — instant push is ACTIVE.');
+        }
+
+        return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderPasswords', 'settlements', 'trackingEnabled', 'riderTrackingSettings', 'pushConfigured'));
     }
 
     public function store(Request $request)

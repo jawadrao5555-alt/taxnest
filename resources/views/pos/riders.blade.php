@@ -58,6 +58,42 @@
         </a>
     </div>
 
+    {{-- Firebase instant-push status banner (Task #1139).
+         Green = Firebase key is uploaded and push is live.
+         Amber = key is missing; shows cPanel upload instructions in Roman Urdu. --}}
+    @if($pushConfigured)
+    <div class="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
+        <span class="mt-0.5 text-emerald-600 dark:text-emerald-400 text-lg shrink-0">✅</span>
+        <div>
+            <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Instant Push Active — Firebase key mila hua hai</p>
+            <p class="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                Jab bhi koi delivery assign hogi, rider ko <strong>2–5 seconds</strong> mein notification aa jaayegi (app band ho tab bhi).
+                15-minute poll fallback bhi chal raha hai un riders ke liye jinke phone pe Play Services nahi hain.
+            </p>
+        </div>
+    </div>
+    @else
+    <div class="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+        <span class="mt-0.5 text-amber-500 dark:text-amber-400 text-lg shrink-0">⚠️</span>
+        <div>
+            <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">Instant Push OFF — Firebase key upload nahi hua</p>
+            <p class="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                Riders abhi bhi 15-minute poll se kaam kar rahe hain. Instant push ON karne ke liye Firebase service-account JSON file upload karein:
+            </p>
+            <ol class="mt-2 text-xs text-amber-800 dark:text-amber-200 list-decimal pl-4 space-y-1">
+                <li>cPanel &rarr; <strong>File Manager</strong> khulein</li>
+                <li><strong>public_html</strong> &rarr; <strong>storage</strong> &rarr; <strong>app</strong> &rarr; <strong>firebase</strong> folder mein jaayein</li>
+                <li>Firebase Console se downloaded JSON file upload karein</li>
+                <li>File ka naam <strong>rider-fcm.json</strong> rakhein (rename karein agar zaroorat ho)</li>
+                <li>Yeh page refresh karein — status green ho jaayega</li>
+            </ol>
+            <p class="text-xs text-amber-600 dark:text-amber-400 mt-2 italic">
+                ⚠️ JSON file chat ya kisi aur jagah paste na karein — secure rakhein.
+            </p>
+        </div>
+    </div>
+    @endif
+
     {{-- Add rider --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 mb-6">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.add_new_rider') }}</h3>

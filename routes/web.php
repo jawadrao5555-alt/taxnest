@@ -685,6 +685,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->name('pos.survey.dismiss');
     // Task 767: one-time "KOT centering still ON — verify your printout" banner dismiss (admin/manager only, gated in controller).
     Route::post('/kot-center-notice/dismiss', [PosController::class, 'dismissKotCenterNotice'])->name('pos.kot-center-notice.dismiss');
+    // Task 1202: PRA provisional-billing elaan popup — raay collection (admin/manager gated in controller).
+    Route::post('/pra-elaan/respond', [\App\Http\Controllers\FeatureSuggestionController::class, 'praElaanRespond'])->name('pos.pra-elaan.respond')->middleware('throttle:10,1');
+    Route::post('/pra-elaan/dismiss', [\App\Http\Controllers\FeatureSuggestionController::class, 'praElaanDismiss'])->name('pos.pra-elaan.dismiss');
     // Feature Suggestion box (owner request 20 Jul 2026) — customers submit feature requests.
     Route::get('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'index'])->name('pos.suggestions');
     Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'store'])->name('pos.suggestions.store')->middleware('throttle:10,1');

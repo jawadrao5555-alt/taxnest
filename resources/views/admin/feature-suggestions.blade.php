@@ -12,6 +12,57 @@
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
 
+            {{-- Task 1202: PRA provisional-billing elaan — raay tally (source='pra_elaan') --}}
+            @if(!empty($praElaanTally))
+                @php
+                    $peChoiceMeta = [
+                        'band' => ['Yes — turn it off', 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'],
+                        'jari' => ['No — keep it', 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'],
+                        'aur'  => ['Other suggestion', 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'],
+                    ];
+                @endphp
+                <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                    <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/10">
+                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">📢 PRA Elaan — "Should provisional billing be turned off?"</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $praElaanTally['total'] }} {{ Str::plural('response', $praElaanTally['total']) }} from {{ $praElaanTally['companies'] }} {{ Str::plural('company', $praElaanTally['companies']) }} (one answer per user).</p>
+                    </div>
+                    <div class="px-5 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/15 px-4 py-3">
+                            <div class="text-2xl font-bold text-green-700 dark:text-green-300">{{ $praElaanTally['counts']['band'] ?? 0 }}</div>
+                            <div class="text-xs font-medium text-green-800 dark:text-green-300 mt-0.5">Yes, turn it off</div>
+                        </div>
+                        <div class="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/15 px-4 py-3">
+                            <div class="text-2xl font-bold text-red-700 dark:text-red-300">{{ $praElaanTally['counts']['jari'] ?? 0 }}</div>
+                            <div class="text-xs font-medium text-red-800 dark:text-red-300 mt-0.5">No, keep it running</div>
+                        </div>
+                        <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/15 px-4 py-3">
+                            <div class="text-2xl font-bold text-amber-700 dark:text-amber-300">{{ $praElaanTally['counts']['aur'] ?? 0 }}</div>
+                            <div class="text-xs font-medium text-amber-800 dark:text-amber-300 mt-0.5">Other suggestion</div>
+                        </div>
+                    </div>
+                    <div class="divide-y divide-gray-100 dark:divide-gray-700 border-t border-gray-100 dark:border-gray-700 overflow-y-auto" style="max-height: 320px;">
+                        @foreach($praElaanTally['rows'] as $peRow)
+                            @php $peKey = array_search($peRow->title, \App\Models\FeatureSuggestion::PRA_ELAAN_CHOICES, true); @endphp
+                            <div class="px-5 py-2.5 flex items-start justify-between gap-3 flex-wrap">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $peRow->company->name ?? 'Company #' . $peRow->company_id }}</span>
+                                        <span class="text-[11px] text-gray-400">{{ $peRow->user->name ?? 'User #' . $peRow->user_id }}</span>
+                                        @if($peKey !== false)
+                                            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold {{ $peChoiceMeta[$peKey][1] }}">{{ $peChoiceMeta[$peKey][0] }}</span>
+                                        @endif
+                                    </div>
+                                    @if($peRow->details)
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-2xl whitespace-pre-line">💬 {{ $peRow->details }}</p>
+                                    @endif
+                                </div>
+                                <div class="text-[11px] text-gray-400 flex-shrink-0 whitespace-nowrap">{{ $peRow->created_at->format('d M Y') }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- High-demand detector: similar open suggestions from 2+ companies --}}
             @if(!empty($hotGroups))
                 <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -94,6 +145,8 @@
                                             <span class="font-medium text-gray-800 dark:text-gray-100">{{ $sugg->title }}</span>
                                             @if(($sugg->source ?? 'user') === 'madadgar')
                                                 <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">🤖 Madadgar Bot</span>
+                                            @elseif(($sugg->source ?? 'user') === \App\Models\FeatureSuggestion::PRA_ELAAN_SOURCE)
+                                                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">📢 PRA Elaan</span>
                                             @endif
                                         </div>
                                         @if($sugg->details)

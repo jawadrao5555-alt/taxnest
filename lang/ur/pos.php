@@ -4710,6 +4710,8 @@ return [
     'khata_total_tax' => 'کل ٹیکس',
     'khata_cash_tax' => 'کیش پر ٹیکس',
     'khata_card_tax' => 'کارڈ پر ٹیکس',
+    'khata_cash_sale' => 'کیش پر سیل',
+    'khata_card_sale' => 'کارڈ پر سیل',
     'khata_exempt_items' => 'چھوٹ والی اشیا (بل کے اندر)',
     'khata_exempt_bills' => 'چھوٹ والے بل',
     // Task 712: Receipt Themes picker + live preview (PRA + FBR receipt-settings)

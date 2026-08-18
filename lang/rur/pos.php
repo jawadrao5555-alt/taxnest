@@ -4711,6 +4711,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'khata_total_tax' => 'Total tax',
     'khata_cash_tax' => 'Cash par tax',
     'khata_card_tax' => 'Card par tax',
+    'khata_cash_sale' => 'Cash par sale',
+    'khata_card_sale' => 'Card par sale',
     'khata_exempt_items' => 'Exempt items (bill ke andar)',
     'khata_exempt_bills' => 'Exempt bills',
     // Task 712: Receipt Themes picker + live preview (PRA + FBR receipt-settings)

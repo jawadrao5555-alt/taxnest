@@ -72,6 +72,15 @@
                     <span class="text-gray-600 dark:text-gray-400 pl-3">{{ __('pos.khata_card_tax') }}</span>
                     <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['card_tax'], 0) }}</span>
                 </div>
+                {{-- Task 1163: sale split by payment bucket, next to the tax split (signed the same way — returns negate) --}}
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-600 dark:text-gray-400 pl-3">{{ __('pos.khata_cash_sale') }}</span>
+                    <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['cash_sale'] ?? 0, 0) }}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-600 dark:text-gray-400 pl-3">{{ __('pos.khata_card_sale') }}</span>
+                    <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['card_sale'] ?? 0, 0) }}</span>
+                </div>
                 <div class="flex items-center justify-between text-xs">
                     <span class="text-gray-600 dark:text-gray-400">{{ __('pos.khata_exempt_items') }}</span>
                     <span class="font-semibold text-gray-700 dark:text-gray-300">Rs {{ number_format($s['exempt_items'], 0) }}</span>

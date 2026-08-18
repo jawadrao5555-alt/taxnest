@@ -53,8 +53,17 @@ class PosTodayKhata
         $cardTaxExpr = $hasPayMethod
             ? "COALESCE(SUM(CASE WHEN payment_method IN ({$cardIn}) THEN ({$signExpr}) * {$taxExpr} ELSE 0 END),0)"
             : '0';
+        // Task 1163: sale split by payment bucket — same signed sums and the
+        // same payment_method drift guard as the tax split above (cash =
+        // exactly 'cash', card = full alias bucket; anything else is neither).
+        $cashSaleExpr = $hasPayMethod
+            ? "COALESCE(SUM(CASE WHEN payment_method = '{$cash}' THEN ({$signExpr}) * total_amount ELSE 0 END),0)"
+            : '0';
+        $cardSaleExpr = $hasPayMethod
+            ? "COALESCE(SUM(CASE WHEN payment_method IN ({$cardIn}) THEN ({$signExpr}) * total_amount ELSE 0 END),0)"
+            : '0';
 
-        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr) {
+        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr, $cashSaleExpr, $cardSaleExpr) {
             $row = PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', $bizToday)
@@ -62,6 +71,8 @@ class PosTodayKhata
                 ->selectRaw("
                     COALESCE(SUM({$saleRowExpr}),0) as bills,
                     COALESCE(SUM(({$signExpr}) * total_amount),0) as sale,
+                    {$cashSaleExpr} as cash_sale,
+                    {$cardSaleExpr} as card_sale,
                     COALESCE(SUM(({$signExpr}) * {$taxExpr}),0) as tax,
                     {$cashTaxExpr} as cash_tax,
                     {$cardTaxExpr} as card_tax,
@@ -72,6 +83,8 @@ class PosTodayKhata
             return [
                 'bills'        => (int) ($row->bills ?? 0),
                 'sale'         => (float) ($row->sale ?? 0),
+                'cash_sale'    => (float) ($row->cash_sale ?? 0),
+                'card_sale'    => (float) ($row->card_sale ?? 0),
                 'tax'          => (float) ($row->tax ?? 0),
                 'cash_tax'     => (float) ($row->cash_tax ?? 0),
                 'card_tax'     => (float) ($row->card_tax ?? 0),

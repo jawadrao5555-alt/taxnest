@@ -4712,6 +4712,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'khata_total_tax' => 'Total tax',
     'khata_cash_tax' => 'Tax on cash',
     'khata_card_tax' => 'Tax on card',
+    'khata_cash_sale' => 'Sale on cash',
+    'khata_card_sale' => 'Sale on card',
     'khata_exempt_items' => 'Exempt items (inside bills)',
     'khata_exempt_bills' => 'Exempt bills',
     // Task 712: Receipt Themes picker + live preview (PRA + FBR receipt-settings)

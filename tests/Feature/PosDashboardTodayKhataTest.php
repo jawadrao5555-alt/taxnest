@@ -287,6 +287,9 @@ class PosDashboardTodayKhataTest extends TestCase
         $this->assertSame(238.0, $pra['tax'], '170 + 85 − 17');
         $this->assertSame(153.0, $pra['cash_tax'], '170 − 17 return');
         $this->assertSame(85.0, $pra['card_tax']);
+        // Task 1163: sale split by payment bucket, same signed convention.
+        $this->assertSame(1053.0, $pra['cash_sale'], '1170 − 117 return');
+        $this->assertSame(585.0, $pra['card_sale']);
         $this->assertSame(100.0, $pra['exempt_items'], 'mixed-bill exempt share (header exempt_amount)');
         $this->assertSame(1053.0, $pra['reported'], 'submitted only, return netted: 1170 − 117');
 
@@ -296,6 +299,8 @@ class PosDashboardTodayKhataTest extends TestCase
         $this->assertSame(80.0, $local['tax']);
         $this->assertSame(50.0, $local['cash_tax']);
         $this->assertSame(30.0, $local['card_tax'], "legacy 'card' alias must land in the card bucket");
+        $this->assertSame(500.0, $local['cash_sale']);
+        $this->assertSame(200.0, $local['card_sale'], "legacy 'card' alias must land in the card sale bucket too");
         $this->assertSame(20.0, $local['exempt_items']);
 
         // Exempt bills live ONLY in their own bucket — never inside a stream.
@@ -421,6 +426,11 @@ class PosDashboardTodayKhataTest extends TestCase
         $this->assertStringContainsString('Rs 1,638', $html);
         $this->assertStringContainsString('Rs 700', $html);
         $this->assertStringContainsString('Rs 1,053', $html, 'PRA reported line');
+        // Task 1163: sale-split rows on BOTH stream cards.
+        $this->assertSame(2, substr_count($html, __('pos.khata_cash_sale')), 'cash-sale row on both stream cards');
+        $this->assertSame(2, substr_count($html, __('pos.khata_card_sale')), 'card-sale row on both stream cards');
+        $this->assertStringContainsString('Rs 585', $html, 'PRA card sale');
+        $this->assertStringContainsString('Rs 500', $html, 'Local cash sale');
         $this->assertSame(1, substr_count($html, __('pos.khata_exempt_bills')), 'exempt bills row rendered exactly ONCE');
         $this->assertStringContainsString('Rs 300', $html);
     }

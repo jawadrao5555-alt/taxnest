@@ -12,6 +12,12 @@
     .tn-embedded .topnav-bar { display: none !important; }
     .tn-embedded .tn-embed-hide { display: none !important; }
 </style>
+@if(!empty($custLocReady))
+{{-- Task 1105: customer pin mini-map (self-hosted Leaflet — same vendor copy
+     as the rider tracking page; no external CDN from PK). --}}
+<link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}?v=1">
+<script src="{{ asset('vendor/leaflet/leaflet.js') }}?v=1"></script>
+@endif
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
      x-data="{ settleRider: null, settleTotal: 0, settleAmount: '', retBill: null, retBulk: null, retCount: 0, recalcSettle(form) {
          let t = 0;
@@ -358,6 +364,21 @@
                         <td class="px-4 py-3">
                             <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
                             @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
+                            {{-- Task 1105: customer pin + ETA chip + public track link (Unlimited tracking, open bills only) --}}
+                            @if(!empty($custLocReady) && $activeTab === 'pending' && !in_array($b->delivery_status, ['delivered', 'returned']))
+                            @php $hasPin = $b->customer_lat !== null && $b->customer_lng !== null; @endphp
+                            <div class="mt-1 flex items-center gap-1 flex-wrap">
+                                <button type="button"
+                                        class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold {{ $hasPin ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300' }} hover:opacity-75 transition"
+                                        @click="$dispatch('tn-loc-open', { id: {{ (int) $b->id }}, invoice: {{ Js::from($b->invoice_number ?: ('#' . $b->id)) }}, lat: {{ $hasPin ? (float) $b->customer_lat : 'null' }}, lng: {{ $hasPin ? (float) $b->customer_lng : 'null' }}, rlat: {{ isset($rememberedLoc[$b->id]) ? (float) $rememberedLoc[$b->id]['lat'] : 'null' }}, rlng: {{ isset($rememberedLoc[$b->id]) ? (float) $rememberedLoc[$b->id]['lng'] : 'null' }} })">📍 {{ $hasPin ? __('pos.cl_located_chip') : __('pos.cl_locate_btn') }}</button>
+                                @if($hasPin)
+                                <span data-eta-bill="{{ $b->id }}" class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 {{ isset($billEtas[$b->id]) ? '' : 'hidden' }}">{{ isset($billEtas[$b->id]) ? __('pos.cl_eta_chip', ['km' => $billEtas[$b->id]['km'], 'min' => $billEtas[$b->id]['min']]) : '' }}</span>
+                                <button type="button"
+                                        class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:opacity-75 transition"
+                                        @click="$dispatch('tn-share-open', { id: {{ (int) $b->id }} })">🔗 {{ __('pos.cl_track_btn') }}</button>
+                                @endif
+                            </div>
+                            @endif
                         </td>
                         <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
                         <td class="px-4 py-3">
@@ -689,6 +710,61 @@
             </div>
         </div>
     </template>
+
+    {{-- ── Task 1105: customer pin + public track link modals ─────────────────
+         One nested Alpine component; row buttons talk to it via window events
+         ($dispatch('tn-loc-open' / 'tn-share-open')). Mini map = same Carto
+         Voyager tiles + PK maxBounds conventions as the rider tracking page. --}}
+    @if(!empty($custLocReady))
+    <div x-data="tnCustLoc()" @tn-loc-open.window="openLoc($event.detail)" @tn-share-open.window="openShare($event.detail)">
+        {{-- Locate modal --}}
+        <div x-show="locOpen" x-cloak @keydown.escape.window="locOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/50" @click="locOpen = false"></div>
+            <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-5">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1" x-text="{{ Js::from(__('pos.cl_modal_title', ['invoice' => ':invoice'])) }}.replace(':invoice', locInvoice)"></h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.cl_paste_hint') }}</p>
+                <p x-show="remembered" x-cloak class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-2">{{ __('pos.cl_remembered_note') }}</p>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" x-model="pasteText" @keydown.enter.prevent="resolvePaste()"
+                           placeholder="{{ __('pos.cl_paste_ph') }}"
+                           autocomplete="off" name="cl_paste_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                    <button type="button" @click="resolvePaste()"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition"
+                            x-text="resolving ? '…' : {{ Js::from(__('pos.cl_resolve_btn')) }}"></button>
+                </div>
+                <div id="cl-map" style="height: 260px;" class="rounded-lg border border-gray-200 dark:border-gray-700 mb-2 z-0"></div>
+                <p class="text-[11px] mb-3 min-h-[14px]" :class="msgErr ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="msg"></p>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="locOpen = false">{{ __('pos.cancel') }}</button>
+                    <button type="button" :disabled="!pin || saving"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            @click="saveLoc()">{{ __('pos.cl_save_btn') }}</button>
+                </div>
+            </div>
+        </div>
+        {{-- Track-link share modal --}}
+        <div x-show="shareOpen" x-cloak @keydown.escape.window="shareOpen = false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/50" @click="shareOpen = false"></div>
+            <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-5">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.cl_share_title') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.cl_share_hint') }}</p>
+                <template x-if="shareLoading"><p class="text-xs text-gray-400 mb-3">…</p></template>
+                <template x-if="!shareLoading && shareUrl">
+                    <div>
+                        <input type="text" readonly :value="shareUrl" @click="$event.target.select()"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 mb-3">
+                        <div class="flex gap-2 justify-end">
+                            <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="copyShare()">{{ __('pos.cl_copy_btn') }}</button>
+                            <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition" @click="waShare()">{{ __('pos.cl_whatsapp_btn') }}</button>
+                        </div>
+                    </div>
+                </template>
+                <p class="text-[11px] mt-2 min-h-[14px]" :class="shareErr ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="shareMsg"></p>
+            </div>
+        </div>
+    </div>
+    @endif
 </div>
 <script>
 (function () {
@@ -727,4 +803,209 @@
     });
 })();
 </script>
+@if(!empty($custLocReady))
+<script>
+// ── Task 1105: customer pin + track link component ──────────────────────────
+// Relative fetch URLs only — route() would bake https into plain-http dev.
+window.tnShopPin = @js(!empty($shopPin) ? [(float) $shopPin['lat'], (float) $shopPin['lng']] : null);
+function tnCustLoc() {
+    return {
+        locOpen: false, shareOpen: false, billId: null, locInvoice: '',
+        pasteText: '', resolving: false, saving: false, msg: '', msgErr: false,
+        remembered: false, pin: null, map: null, marker: null,
+        shareUrl: '', shareWaText: '', sharePhone: '', shareLoading: false, shareMsg: '', shareErr: false,
+
+        csrf() {
+            var m = document.querySelector('meta[name="csrf-token"]');
+            return m ? m.content : '';
+        },
+
+        openLoc(d) {
+            this.billId = d.id;
+            this.locInvoice = d.invoice || ('#' + d.id);
+            this.pasteText = '';
+            this.msg = ''; this.msgErr = false;
+            this.remembered = (d.lat == null && d.rlat != null);
+            this.locOpen = true;
+            this.$nextTick(() => this.initMap(d));
+        },
+
+        initMap(d) {
+            var shopPin = window.tnShopPin || null;
+            var start = (d.lat != null) ? [d.lat, d.lng]
+                : (d.rlat != null) ? [d.rlat, d.rlng]
+                : (shopPin || [31.5204, 74.3587]);
+            if (!this.map) {
+                this.map = L.map('cl-map', {
+                    maxBounds: [[22.8, 60.4], [37.5, 77.6]],
+                    maxBoundsViscosity: 1.0,
+                    minZoom: 5
+                });
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap &middot; &copy; CARTO'
+                }).addTo(this.map);
+                this.map.on('click', (e) => this.setPin(e.latlng.lat, e.latlng.lng));
+            }
+            if (this.marker) { this.map.removeLayer(this.marker); this.marker = null; }
+            this.pin = null;
+            this.map.setView(start, (d.lat != null || d.rlat != null) ? 16 : (shopPin ? 14 : 12));
+            // Modal was display:none at L.map() time — recalc tiles once visible.
+            setTimeout(() => this.map.invalidateSize(), 150);
+            if (d.lat != null) this.setPin(d.lat, d.lng);
+            else if (d.rlat != null) this.setPin(d.rlat, d.rlng);
+        },
+
+        setPin(lat, lng) {
+            this.pin = { lat: lat, lng: lng };
+            if (!this.marker) {
+                this.marker = L.marker([lat, lng], { draggable: true }).addTo(this.map);
+                this.marker.on('dragend', () => {
+                    var p = this.marker.getLatLng();
+                    this.pin = { lat: p.lat, lng: p.lng };
+                });
+            } else {
+                this.marker.setLatLng([lat, lng]);
+            }
+        },
+
+        // "31.5204, 74.3587" style pasted coordinates (PK bounds).
+        parseLatLng(text) {
+            var m = (text || '').trim().match(/^(-?\d{1,2}(?:\.\d+)?)[,\s]+(-?\d{1,3}(?:\.\d+)?)$/);
+            if (!m) return null;
+            var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+            if (lat < 22.8 || lat > 37.5 || lng < 60.4 || lng > 77.6) return null;
+            return { lat: lat, lng: lng };
+        },
+
+        async resolvePaste() {
+            var t = this.pasteText.trim();
+            if (!t || this.resolving) return;
+            this.msg = ''; this.msgErr = false;
+            var ll = this.parseLatLng(t);
+            if (ll) {
+                this.setPin(ll.lat, ll.lng);
+                this.map.setView([ll.lat, ll.lng], 16);
+                return;
+            }
+            this.resolving = true;
+            try {
+                var resp = await fetch('/pos/deliveries/' + this.billId + '/customer-location', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': this.csrf(), 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: t, resolve_only: 1 })
+                });
+                var data = await resp.json().catch(() => ({}));
+                if (resp.ok && data.ok) {
+                    this.setPin(data.lat, data.lng);
+                    this.map.setView([data.lat, data.lng], 16);
+                } else {
+                    this.msg = data.message || @js(__('pos.cl_resolve_fail'));
+                    this.msgErr = true;
+                }
+            } catch (e) {
+                this.msg = @js(__('pos.cl_resolve_fail'));
+                this.msgErr = true;
+            }
+            this.resolving = false;
+        },
+
+        async saveLoc() {
+            if (!this.pin || this.saving) return;
+            this.saving = true;
+            this.msg = ''; this.msgErr = false;
+            try {
+                var resp = await fetch('/pos/deliveries/' + this.billId + '/customer-location', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': this.csrf(), 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lat: this.pin.lat, lng: this.pin.lng })
+                });
+                var data = await resp.json().catch(() => ({}));
+                if (resp.ok && data.ok) {
+                    this.msg = @js(__('pos.cl_saved'));
+                    // Server-rendered chips/buttons need a fresh render — same
+                    // page-reload rhythm as every other board action (forms).
+                    setTimeout(() => window.location.reload(), 600);
+                    return;
+                }
+                this.msg = data.message || @js(__('pos.cl_save_fail'));
+                this.msgErr = true;
+            } catch (e) {
+                this.msg = @js(__('pos.cl_save_fail'));
+                this.msgErr = true;
+            }
+            this.saving = false;
+        },
+
+        async openShare(d) {
+            this.shareOpen = true;
+            this.shareLoading = true;
+            this.shareUrl = ''; this.shareWaText = ''; this.sharePhone = '';
+            this.shareMsg = ''; this.shareErr = false;
+            try {
+                var resp = await fetch('/pos/deliveries/' + d.id + '/track-link', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': this.csrf(), 'Accept': 'application/json' }
+                });
+                var data = await resp.json().catch(() => ({}));
+                if (resp.ok && data.ok) {
+                    this.shareUrl = data.url;
+                    this.shareWaText = data.wa_text || data.url;
+                    this.sharePhone = data.phone || '';
+                } else {
+                    this.shareMsg = data.message || @js(__('pos.cl_link_fail'));
+                    this.shareErr = true;
+                }
+            } catch (e) {
+                this.shareMsg = @js(__('pos.cl_link_fail'));
+                this.shareErr = true;
+            }
+            this.shareLoading = false;
+        },
+
+        copyShare() {
+            if (!this.shareUrl) return;
+            navigator.clipboard.writeText(this.shareUrl).then(() => {
+                this.shareMsg = @js(__('pos.cl_copied'));
+                this.shareErr = false;
+            });
+        },
+
+        waShare() {
+            if (!this.shareUrl) return;
+            // PK phone → wa.me digits: 0300… → 92300…; already-92 stays.
+            var ph = (this.sharePhone || '').replace(/\D/g, '');
+            if (ph.startsWith('0')) ph = '92' + ph.slice(1);
+            else if (ph.length === 10 && ph.startsWith('3')) ph = '92' + ph;
+            var base = ph.length >= 11 ? ('https://wa.me/' + ph) : 'https://wa.me/';
+            window.open(base + '?text=' + encodeURIComponent(this.shareWaText), '_blank');
+        }
+    };
+}
+
+// ── ETA chip refresh poll (30s) — only while located bills are on screen ────
+(function () {
+    if (!document.querySelector('[data-eta-bill]')) return;
+    var tpl = @js(__('pos.cl_eta_chip', ['km' => ':km', 'min' => ':min']));
+    async function tick() {
+        try {
+            var r = await fetch('/pos/deliveries/eta/data', { headers: { 'Accept': 'application/json' } });
+            if (!r.ok) return;
+            var j = await r.json();
+            if (!j.ok || !j.etas) return;
+            document.querySelectorAll('[data-eta-bill]').forEach(function (el) {
+                var e = j.etas[el.getAttribute('data-eta-bill')];
+                if (e) {
+                    el.textContent = tpl.replace(':km', e.km).replace(':min', e.min);
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+        } catch (e) { /* poll must never break the board */ }
+    }
+    setInterval(tick, 30000);
+})();
+</script>
+@endif
 </x-pos-layout>

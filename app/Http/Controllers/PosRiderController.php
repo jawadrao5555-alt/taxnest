@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Delivery Riders (PRA POS restaurant module, Jul 2026).
@@ -599,7 +600,200 @@ class PosRiderController extends Controller
             }
         }
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix'));
+        // ─── Task 1105: customer location + distance/ETA chips ─────────────
+        // Only on tracking plans (Unlimited) AND once the customer_lat columns
+        // landed (fresh idempotent migration — cPanel PROD drift guard).
+        $custLocReady = $trackingHints && Schema::hasColumn('pos_transactions', 'customer_lat')
+            && Schema::hasColumn('pos_transactions', 'track_token');
+        $billEtas = [];
+        $rememberedLoc = [];
+        $shopPin = null;
+        if ($custLocReady) {
+            if ($hasShopLocation) {
+                $shopPin = ['lat' => (float) $company->shop_lat, 'lng' => (float) $company->shop_lng];
+            }
+            $riderById = $riders->keyBy('id');
+            foreach ($openBillsFresh as $b) {
+                if ($b->customer_lat === null || $b->customer_lng === null || !$b->rider_id) continue;
+                if (!in_array($b->delivery_status, ['assigned', 'dispatched'], true)) continue;
+                $r = $riderById->get((int) $b->rider_id);
+                // Chip only for an ON-DUTY rider with a FRESH fix (≤6h — same
+                // freshness rule as the assign-dropdown distance hints).
+                if (!$r || !$r->on_duty || $r->last_lat === null || $r->last_lng === null) continue;
+                if (!$r->last_located_at || abs(now()->diffInMinutes($r->last_located_at)) > 360) continue;
+                $km = PosRider::haversineKm((float) $r->last_lat, (float) $r->last_lng, (float) $b->customer_lat, (float) $b->customer_lng);
+                $billEtas[$b->id] = ['km' => round($km, 1), 'min' => PosRider::etaMinutes($km)];
+            }
+            // Remembered per-phone pin → locate modal opens pre-pinned next time.
+            if (Schema::hasColumn('pos_customers', 'geo_lat')) {
+                $phones = $openBillsFresh
+                    ->filter(fn ($b) => $b->customer_lat === null && $b->customer_phone)
+                    ->pluck('customer_phone')->unique()->values();
+                if ($phones->count()) {
+                    $known = \App\Models\PosCustomer::where('company_id', $companyId)
+                        ->whereIn('phone', $phones)
+                        ->whereNotNull('geo_lat')->whereNotNull('geo_lng')
+                        ->get(['phone', 'geo_lat', 'geo_lng'])->keyBy('phone');
+                    foreach ($openBillsFresh as $b) {
+                        if ($b->customer_lat === null && $b->customer_phone && ($c = $known->get($b->customer_phone))) {
+                            $rememberedLoc[$b->id] = ['lat' => (float) $c->geo_lat, 'lng' => (float) $c->geo_lng];
+                        }
+                    }
+                }
+            }
+        }
+
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix', 'custLocReady', 'billEtas', 'rememberedLoc', 'shopPin'));
+    }
+
+    // ─── Task 1105: customer pin, public track link & ETA poll ─────────────
+
+    /** Shared gate: Unlimited tracking plan + schema readiness. Null = OK. */
+    private function customerTrackGateError()
+    {
+        $company = Company::find(app('currentCompanyId'));
+        if (!PosFeatureService::planAllows($company, 'riders_enabled')
+            || !PosFeatureService::planAllows($company, 'rider_tracking_enabled')) {
+            return response()->json(['ok' => false, 'error' => 'plan_locked', 'message' => __('pos.rt_plan_locked_api')], 403);
+        }
+        if (!Schema::hasColumn('pos_transactions', 'customer_lat')
+            || !Schema::hasColumn('pos_transactions', 'track_token')) {
+            return response()->json(['ok' => false, 'error' => 'schema_not_ready'], 503);
+        }
+        return null;
+    }
+
+    /**
+     * POST /pos/deliveries/{id}/customer-location — save the customer's
+     * delivery pin on a bill. Accepts EITHER lat/lng (mini-map pick /
+     * client-parsed "31.52, 74.35" text) OR url (Google Maps link — the
+     * server follows redirects; SSRF-safe allowlist in GoogleMapsLinkResolver,
+     * same flow as the shop-location paste). Also remembers the pin on the
+     * matching pos_customers row (by phone) for the next order.
+     */
+    public function saveCustomerLocation(Request $request, $txnId)
+    {
+        if ($err = $this->customerTrackGateError()) return $err;
+        $companyId = app('currentCompanyId');
+        $txn = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)->findOrFail($txnId);
+        if (!$this->streamScopeAllowsTxn($txn)) abort(403);
+        if (in_array($txn->delivery_status, ['delivered', 'returned'], true)) {
+            return response()->json(['ok' => false, 'error' => 'already_closed'], 422);
+        }
+
+        if ($request->filled('url')) {
+            $data = $request->validate(['url' => 'required|string|max:600']);
+            if (!\App\Services\GoogleMapsLinkResolver::isResolvableUrl($data['url'])) {
+                return response()->json(['ok' => false, 'error' => 'not_a_maps_link'], 422);
+            }
+            $ll = \App\Services\GoogleMapsLinkResolver::resolve($data['url']);
+            if (!$ll) {
+                return response()->json(['ok' => false, 'error' => 'not_found'], 404);
+            }
+            $lat = (float) $ll['lat'];
+            $lng = (float) $ll['lng'];
+            // Map is PK-locked — mirror the shop-location bounds.
+            if ($lat < 22.8 || $lat > 37.5 || $lng < 60.4 || $lng > 77.6) {
+                return response()->json(['ok' => false, 'error' => 'out_of_bounds'], 422);
+            }
+            // "Find" button: resolve the link only — the cashier checks the
+            // pin on the mini map first, Save then posts plain lat/lng.
+            if ($request->boolean('resolve_only')) {
+                return response()->json(['ok' => true, 'resolved' => true, 'lat' => round($lat, 7), 'lng' => round($lng, 7)]);
+            }
+        } else {
+            $data = $request->validate([
+                'lat' => 'required|numeric|between:22.8,37.5',
+                'lng' => 'required|numeric|between:60.4,77.6',
+            ]);
+            $lat = (float) $data['lat'];
+            $lng = (float) $data['lng'];
+        }
+
+        $txn->update(['customer_lat' => round($lat, 7), 'customer_lng' => round($lng, 7)]);
+
+        // Remember per phone — best-effort only, never blocks the bill save.
+        if ($txn->customer_phone && Schema::hasColumn('pos_customers', 'geo_lat')) {
+            try {
+                \App\Models\PosCustomer::where('company_id', $companyId)
+                    ->where('phone', $txn->customer_phone)
+                    ->update(['geo_lat' => round($lat, 7), 'geo_lng' => round($lng, 7)]);
+            } catch (\Throwable $e) {
+                // ignore — remembered pin is a convenience, not a record
+            }
+        }
+
+        return response()->json(['ok' => true, 'lat' => round($lat, 7), 'lng' => round($lng, 7)]);
+    }
+
+    /**
+     * POST /pos/deliveries/{id}/track-link — mint (or reuse) the public
+     * customer tracking URL for a bill. Token = 48-char random (unguessable);
+     * the public endpoints go dead once the bill is delivered/returned, so a
+     * closed bill refuses to mint. Absolute URL from the live request host —
+     * route() would force https on plain-http dev (memory rule).
+     */
+    public function trackLink(Request $request, $txnId)
+    {
+        if ($err = $this->customerTrackGateError()) return $err;
+        $companyId = app('currentCompanyId');
+        $txn = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)->findOrFail($txnId);
+        if (!$this->streamScopeAllowsTxn($txn)) abort(403);
+        if (in_array($txn->delivery_status, ['delivered', 'returned'], true)) {
+            return response()->json(['ok' => false, 'error' => 'already_closed'], 422);
+        }
+
+        if (!$txn->track_token) {
+            $txn->update(['track_token' => Str::random(48)]);
+        }
+        $url = $request->getSchemeAndHttpHost() . '/track/' . $txn->track_token;
+        $shop = Company::find($companyId)?->name ?: 'TaxNest POS';
+
+        return response()->json([
+            'ok'      => true,
+            'url'     => $url,
+            'wa_text' => __('pos.cl_wa_message', ['shop' => $shop, 'link' => $url]),
+            'phone'   => (string) ($txn->customer_phone ?? ''),
+        ]);
+    }
+
+    /**
+     * GET /pos/deliveries/eta/data — lightweight board poll: distance/ETA for
+     * every open located bill with an on-duty rider. Straight-line haversine ×
+     * city-speed factor (PosRider::etaMinutes) — deliberately no routing API.
+     */
+    public function etaData(Request $request)
+    {
+        if ($err = $this->customerTrackGateError()) return $err;
+        $companyId = app('currentCompanyId');
+
+        $q = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereNotNull('rider_id')
+            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->whereNotNull('customer_lat')->whereNotNull('customer_lng');
+        $this->applyStreamScope($q);
+        $bills = $q->get(['id', 'rider_id', 'customer_lat', 'customer_lng']);
+
+        $etas = [];
+        if ($bills->count() && Schema::hasColumn('pos_riders', 'last_lat')) {
+            $riders = PosRider::where('company_id', $companyId)
+                ->whereIn('id', $bills->pluck('rider_id')->unique()->values())
+                ->get()->keyBy('id');
+            foreach ($bills as $b) {
+                $r = $riders->get((int) $b->rider_id);
+                if (!$r || !$r->on_duty || $r->last_lat === null || $r->last_lng === null) continue;
+                // Carbon 3 signed diffs — abs(); freshness rule same as board hints (≤6h).
+                if (!$r->last_located_at || abs(now()->diffInMinutes($r->last_located_at)) > 360) continue;
+                $km = PosRider::haversineKm((float) $r->last_lat, (float) $r->last_lng, (float) $b->customer_lat, (float) $b->customer_lng);
+                // Live PDO returns numerics as strings — cast for JS (memory rule).
+                $etas[(string) $b->id] = ['km' => round($km, 1), 'min' => PosRider::etaMinutes($km)];
+            }
+        }
+
+        return response()->json(['ok' => true, 'etas' => $etas]);
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */

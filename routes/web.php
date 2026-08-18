@@ -251,6 +251,21 @@ Route::post('/pos/guest-language', function (\Illuminate\Http\Request $request) 
 
 Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
 
+// Customer live tracking (Task 1105) — PUBLIC tokenized "aapka rider yahan
+// hai" page + poll. Token = 48-char random tied to ONE bill; both endpoints
+// re-check the company's plan on every call (downgrade kills live links) and
+// flip to a read-only "Delivered" state once the bill closes. Throttled
+// per-IP (tokens stay unenumerable); stateless — no session-row churn from
+// customers' phones polling every 10s.
+Route::get('/track/{token}', [\App\Http\Controllers\PosRiderTrackingController::class, 'publicTrackPage'])
+    ->where('token', '[A-Za-z0-9]{20,64}')
+    ->middleware('throttle:60,1')->withoutMiddleware($statelessMachine)
+    ->name('pos.track.public');
+Route::get('/track/{token}/data', [\App\Http\Controllers\PosRiderTrackingController::class, 'publicTrackData'])
+    ->where('token', '[A-Za-z0-9]{20,64}')
+    ->middleware('throttle:60,1')->withoutMiddleware($statelessMachine)
+    ->name('pos.track.public.data');
+
 // Biometric ADMS push endpoint (4 Aug 2026) — PUBLIC, no POS auth.
 // ZKTeco and compatible devices call /bio-sync/{token}/iclock/cdata.
 // Token identifies + scopes the company; no session/CSRF needed.
@@ -1011,6 +1026,12 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/deliveries/{id}/unmark-prepaid', [\App\Http\Controllers\PosRiderController::class, 'unmarkPrepaid'])->name('pos.deliveries.unmark-prepaid');
     Route::post('/deliveries/rider/{riderId}/bulk-status', [\App\Http\Controllers\PosRiderController::class, 'bulkStatus'])->name('pos.deliveries.bulk');
     Route::post('/riders/{id}/settle', [\App\Http\Controllers\PosRiderController::class, 'settle'])->name('pos.riders.settle');
+    // Task 1105: customer delivery pin + public track link + ETA chip poll.
+    // Board roles (cashier included — same people who run the board); every
+    // endpoint is plan-gated in the controller (Unlimited tracking only).
+    Route::post('/deliveries/{id}/customer-location', [\App\Http\Controllers\PosRiderController::class, 'saveCustomerLocation'])->name('pos.deliveries.customer-location');
+    Route::post('/deliveries/{id}/track-link', [\App\Http\Controllers\PosRiderController::class, 'trackLink'])->name('pos.deliveries.track-link');
+    Route::get('/deliveries/eta/data', [\App\Http\Controllers\PosRiderController::class, 'etaData'])->name('pos.deliveries.eta');
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
         Route::get('/riders', [\App\Http\Controllers\PosRiderController::class, 'index'])->name('pos.riders');
         Route::post('/riders', [\App\Http\Controllers\PosRiderController::class, 'store'])->name('pos.riders.store');

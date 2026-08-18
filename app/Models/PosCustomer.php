@@ -11,6 +11,9 @@ class PosCustomer extends Model
         'city', 'ntn', 'cnic', 'type', 'is_active',
         'loyalty_points', 'loyalty_tier', 'total_spent', 'total_orders',
         'khata_balance',
+        // Remembered delivery pin (Task 1105) — filled when a bill for this
+        // phone gets a customer location; pre-pins the next locate modal.
+        'geo_lat', 'geo_lng',
     ];
 
     protected $casts = [

@@ -932,4 +932,108 @@ class PosRiderTrackingController extends Controller
             'gaps'   => $gaps,
         ]);
     }
+
+    // ─── Public customer tracking (Task 1105) ───────────────────────────────
+    // "Aapka rider yahan hai" — tokenized, NO login, no company data beyond
+    // shop name + rider position + delivery status. Routes sit OUTSIDE the pos
+    // auth / company-approval groups, throttled per-IP, stateless.
+
+    /** Bill lookup by public token; null when schema not ready or no match. */
+    private function billByTrackToken(string $token): ?PosTransaction
+    {
+        $len = strlen($token);
+        if ($len < 20 || $len > 64) {
+            return null;
+        }
+        if (!Schema::hasColumn('pos_transactions', 'track_token')) {
+            return null;
+        }
+        return PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('track_token', $token)
+            ->first();
+    }
+
+    /**
+     * Shared payload for the public page boot + poll. ONLY: shop name, status,
+     * rider lat/lng (fresh + on duty), customer pin, straight-line km + ETA.
+     */
+    private function publicTrackPayload(PosTransaction $bill, Company $company): array
+    {
+        $status = $bill->delivery_status;
+        $done = in_array($status, ['delivered', 'returned'], true);
+        $out = [
+            'shop'     => (string) $company->name,
+            'status'   => $done ? $status : ($status ?: 'preparing'),
+            'done'     => $done,
+            'customer' => ($bill->customer_lat !== null && $bill->customer_lng !== null)
+                ? ['lat' => (float) $bill->customer_lat, 'lng' => (float) $bill->customer_lng]
+                : null,
+            'rider'    => null,
+            'km'       => null,
+            'eta_min'  => null,
+        ];
+        if (!$done && $bill->rider_id && Schema::hasColumn('pos_riders', 'last_lat')) {
+            $r = PosRider::where('company_id', $bill->company_id)
+                ->where('id', $bill->rider_id)->first();
+            // Fresh (≤6h) fix from an on-duty rider only — a stale ping must
+            // not show "aapka rider" parked at yesterday's location.
+            // Carbon 3 signed diffs — abs().
+            if ($r && $r->on_duty && $r->last_lat !== null && $r->last_lng !== null
+                && $r->last_located_at
+                && abs(now()->diffInMinutes(Carbon::parse($r->last_located_at))) <= 360) {
+                $out['rider'] = [
+                    'lat' => (float) $r->last_lat,
+                    'lng' => (float) $r->last_lng,
+                    'seconds_ago' => (int) abs(now()->diffInSeconds(Carbon::parse($r->last_located_at))),
+                ];
+                if ($out['customer']) {
+                    $km = PosRider::haversineKm(
+                        (float) $r->last_lat, (float) $r->last_lng,
+                        (float) $bill->customer_lat, (float) $bill->customer_lng
+                    );
+                    $out['km'] = round($km, 1);
+                    $out['eta_min'] = PosRider::etaMinutes($km);
+                }
+            }
+        }
+        return $out;
+    }
+
+    /** GET /track/{token} — public customer live-map page. */
+    public function publicTrackPage(string $token)
+    {
+        $bill = $this->billByTrackToken($token);
+        $company = $bill ? Company::find($bill->company_id) : null;
+        // Plan re-checked at page load AND on every poll — a downgrade kills
+        // live links immediately. One neutral 410 "gone" page for bad token /
+        // plan lapse: no signal distinguishing never-existed from expired.
+        $allowed = $bill && $company
+            && PosFeatureService::planAllows($company, 'riders_enabled')
+            && PosFeatureService::planAllows($company, 'rider_tracking_enabled');
+        if (!$allowed) {
+            return response()->view('pos.track-public', [
+                'state' => 'gone', 'shopName' => null, 'token' => $token, 'boot' => null,
+            ], 410);
+        }
+        $boot = $this->publicTrackPayload($bill, $company);
+        return view('pos.track-public', [
+            'state'    => $boot['done'] ? 'done' : 'live',
+            'shopName' => $company->name,
+            'token'    => $token,
+            'boot'     => $boot,
+        ]);
+    }
+
+    /** GET /track/{token}/data — public poll (plan re-checked EVERY call). */
+    public function publicTrackData(string $token)
+    {
+        $bill = $this->billByTrackToken($token);
+        $company = $bill ? Company::find($bill->company_id) : null;
+        if (!$bill || !$company
+            || !PosFeatureService::planAllows($company, 'riders_enabled')
+            || !PosFeatureService::planAllows($company, 'rider_tracking_enabled')) {
+            return response()->json(['ok' => false, 'error' => 'gone'], 410);
+        }
+        return response()->json(['ok' => true] + $this->publicTrackPayload($bill, $company));
+    }
 }

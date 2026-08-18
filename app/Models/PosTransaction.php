@@ -33,6 +33,8 @@ class PosTransaction extends Model
         'transaction_type', 'parent_transaction_id',
         // Rider auto-return wastage flag (Task 586) — spoiled goods, stock NOT restored.
         'is_wastage',
+        // Customer live tracking (Task 1105) — delivery pin + public track token.
+        'customer_lat', 'customer_lng', 'track_token',
     ];
 
     /**

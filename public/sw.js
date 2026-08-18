@@ -169,7 +169,7 @@ self.addEventListener('fetch', e => {
     }
 
     // Never cache: auth, API, admin, agent, FBR submit, payment posting, livewire, debugbar
-    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/fbr-pos/receipt-settings', '/return', '/pos/restaurant/tables'];
+    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/fbr-pos/receipt-settings', '/return', '/pos/restaurant/tables', '/track/'];
     if (skipPatterns.some(p => url.pathname.includes(p))) return;
 
     // HTML pages: network-first → cache → offline page

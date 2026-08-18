@@ -96,4 +96,17 @@ class PosRider extends Model
             + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
         return 6371.0 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
+
+    // ── Customer ETA (Task 1105) ─────────────────────────────────────────────
+    // Straight-line km × road factor ÷ city speed — deliberately NO paid
+    // routing API. Single truth used by the deliveries board chips AND the
+    // public /track page so both always show the same number.
+    public const ETA_ROAD_FACTOR = 1.3;   // straight line → real streets
+    public const ETA_CITY_SPEED_KMH = 22; // bike through PK city traffic
+
+    /** Rough minutes for a rider to cover $km straight-line km in city traffic. */
+    public static function etaMinutes(float $km): int
+    {
+        return max(2, (int) round($km * self::ETA_ROAD_FACTOR / self::ETA_CITY_SPEED_KMH * 60));
+    }
 }

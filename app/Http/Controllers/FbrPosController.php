@@ -252,12 +252,27 @@ class FbrPosController extends Controller
         }
         $assignRiders = [];
         if ($canAssignRider && $hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
+            // Task 1132: ship last_battery_pct (+ on_duty) so the popup dropdown
+            // can flag a rider whose phone may die mid-delivery (🪫 ≤20%, on-duty
+            // only). hasColumn-guarded — PROD drift rule; old APKs report NULL.
+            $riderCols = ['id', 'name'];
+            $hasBatteryPct = \Illuminate\Support\Facades\Schema::hasColumn('pos_riders', 'last_battery_pct')
+                && \Illuminate\Support\Facades\Schema::hasColumn('pos_riders', 'on_duty');
+            if ($hasBatteryPct) {
+                $riderCols[] = 'last_battery_pct';
+                $riderCols[] = 'on_duty';
+            }
             $assignRiders = DB::table('pos_riders')
                 ->where('company_id', $companyId)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name])
+                ->get($riderCols)
+                ->map(fn ($r) => [
+                    'id' => (int) $r->id,
+                    'name' => $r->name,
+                    'battery_pct' => ($hasBatteryPct && $r->last_battery_pct !== null && $r->on_duty)
+                        ? (int) $r->last_battery_pct : null,
+                ])
                 ->values()
                 ->all();
         }

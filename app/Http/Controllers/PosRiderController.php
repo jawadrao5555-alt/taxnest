@@ -170,13 +170,28 @@ class PosRiderController extends Controller
         }
 
         $pushConfigured = \App\Services\RiderPushService::isConfigured();
-        if ($pushConfigured && !\Illuminate\Support\Facades\Cache::has('fcm_key_logged')) {
-            // Log once per 24 h so the owner can confirm in laravel.log after uploading the key.
-            \Illuminate\Support\Facades\Log::info('RiderPushService: Firebase credential is present — instant push is ACTIVE.');
-            \Illuminate\Support\Facades\Cache::put('fcm_key_logged', true, now()->addHours(24));
-        }
+        self::logFcmKeyPresenceOnce();
 
         return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderPasswords', 'settlements', 'trackingEnabled', 'riderTrackingSettings', 'pushConfigured'));
+    }
+
+    /**
+     * Log once per 24 h that a Firebase credential is present.
+     *
+     * Extracted as a public static so the test can invoke it directly
+     * against real production logic (cache key, TTL, log message) without
+     * going through the full authenticated HTTP stack.
+     */
+    public static function logFcmKeyPresenceOnce(): void
+    {
+        if (\App\Services\RiderPushService::isConfigured()
+            && !\Illuminate\Support\Facades\Cache::has('fcm_key_logged')) {
+            // Log once so the owner can confirm in laravel.log after uploading the key.
+            \Illuminate\Support\Facades\Log::info(
+                'RiderPushService: Firebase credential is present — instant push is ACTIVE.'
+            );
+            \Illuminate\Support\Facades\Cache::put('fcm_key_logged', true, now()->addHours(24));
+        }
     }
 
     public function store(Request $request)

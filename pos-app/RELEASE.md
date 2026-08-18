@@ -1,0 +1,89 @@
+# TaxNest POS APK (WebView shell) — Build & Release Runbook
+
+Last updated: Aug 2026 (v1.1.0 FCM instant push)
+
+The shell mirrors the rider-app toolchain and rules — see `rider-app/RELEASE.md`
+for the full prerequisite setup. This file covers the POS-specific bits.
+
+---
+
+## Firebase prerequisite (v1.1.0+ instant push) — one-time owner setup
+
+Push is OPTIONAL at build time: without the config below the APK still builds
+and runs exactly like v1.0.x. To enable instant push (naya order / order
+tayyar / day-close):
+
+1. **Use the EXISTING Firebase project** (the one created for the rider app —
+   do NOT create a second project; the server credential
+   `storage/app/firebase/rider-fcm.json` is project-wide and already covers
+   this app).
+2. Firebase console → Project settings → **Add app** → Android, package name
+   **`pk.taxnest.pos`** → download **`google-services.json`** → drop it at
+   **`pos-app/app/google-services.json`**.
+   It is gitignored (public repo — NEVER commit it). Keep a copy with the
+   keystore backup at `~/rider-signing/` on live.
+   The gradle plugin applies itself automatically when the file exists;
+   nothing else to edit.
+3. **No new server credential needed** — `rider-fcm.json` (rider-app step 3)
+   is a project-level service account and sends to every app in the project.
+4. Build WITHOUT the file = push stays dormant (Push.kt catches the missing
+   Firebase init silently); everything else works.
+
+---
+
+## Prerequisites & build
+
+Same toolchain as the rider app (`rider-app/RELEASE.md`): nix jdk17,
+`/home/runner/android-sdk` (platforms;android-34 + build-tools;34.0.0),
+gradle-8.7 under `/home/runner/tools` — all outside the workspace,
+re-download after container reset (~10 min).
+
+```bash
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+export ANDROID_HOME=/home/runner/android-sdk
+export RIDER_KS=.local/rider-signing/rider-release.p12
+export RIDER_KS_PASS=$(cat .local/rider-signing/password.txt)
+
+/home/runner/tools/gradle-8.7/bin/gradle -p pos-app assembleRelease
+```
+
+Output APK: `pos-app/app/build/outputs/apk/release/app-release.apk`
+
+**Same shared keystore as ALL TaxNest APKs** (alias `rider`) — losing it
+breaks in-place updates for everything. NEVER commit it (public repo).
+
+---
+
+## Release checklist
+
+1. **Code merged & version bumped** — `pos-app/app/build.gradle`:
+   `versionCode` N+1 (never reuse), `versionName "X.Y.Z"`.
+2. **Server side deployed** — push to origin (`.cpanel.yml` auto-deploys),
+   `ea-php84 artisan migrate --force` on live, verify the live commit.
+3. **Build the signed APK** (above) and verify the signature is the shared key.
+4. **Host as a versioned BETA first**:
+   `scp … taxnestc@cpanel.taxnest.com.pk:public_html/public/downloads/taxnest-pos-<ver>.apk`
+   **NEVER GitHub Releases** — desktop agents self-update from
+   `releases/latest` of this repo and would try to install the APK.
+5. **Owner phone-tests the beta** (mandatory rollout rule). For a push
+   release: every notification type arrives within seconds with the app
+   CLOSED, tapping it opens the app, logout stops pushes, and
+   downloads / uploads / fullscreen video still work.
+6. **Only after owner sign-off**: copy the beta over
+   `public_html/public/downloads/taxnest-pos.apk`, bump the
+   `pos_app_latest_version` SystemSetting (admin panel → Settings) so old
+   shells (UA `TaxNestPOSApp/<ver>`) see the update banner, and create the
+   What's New `AppUpdate` row announcing the release.
+
+---
+
+## Version history
+
+| Version | versionCode | Notes |
+|---------|-------------|-------|
+| 1.0.0   | 1           | Initial WebView shell (downloads with session cookie, uploads, target=_blank, external schemes, Urdu offline page, rotation-safe) |
+| 1.0.1   | 2           | Download cookie rule — first-party only, agent-installer links rewritten to public endpoint |
+| 1.0.2   | 3           | Minor shell fixes |
+| 1.0.3   | 4           | Fullscreen video (onShowCustomView/onHideCustomView) |
+| 1.0.4   | 5           | Shell polish |
+| 1.1.0   | 6           | **Instant push (FCM)** — naya order → cashiers, order tayyar → waiter, day-close summary → owner/manager; token upload on login / clear on logout; needs the Firebase prerequisite above, builds fine without it |

@@ -4806,4 +4806,16 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'wa_popup_blocked' => 'Browser blocked the WhatsApp window — tap the green WhatsApp button.',
     'wa_link_failed' => 'Could not create the receipt link — please try again.',
     'wa_share_not_allowed' => 'Share link is only available for final bills.',
+
+    // Task 1143 — Firebase instant-push status banner on the riders page
+    'rider_push_on_title' => 'Firebase Key Configured — Instant Push Enabled',
+    'rider_push_on_body' => 'The Firebase service-account key is uploaded. Whenever a delivery is assigned, the rider gets a notification within <strong>2–5 seconds</strong> (even with the app closed) — provided the rider has installed v1.5.0 and the FCM token is registered. The 15-minute poll fallback keeps running too.',
+    'rider_push_off_title' => 'Instant Push OFF — Firebase key not uploaded',
+    'rider_push_off_body' => 'Riders are still working on the 15-minute poll. To turn instant push ON, upload the Firebase service-account JSON file:',
+    'rider_push_step_1' => 'Open cPanel → <strong>File Manager</strong>',
+    'rider_push_step_2' => 'Go into the <strong>public_html</strong> → <strong>storage</strong> → <strong>app</strong> → <strong>firebase</strong> folder',
+    'rider_push_step_3' => 'Upload the JSON file downloaded from the Firebase Console',
+    'rider_push_step_4' => 'Name the file <strong>rider-fcm.json</strong> (rename it if needed)',
+    'rider_push_step_5' => 'Refresh this page — the status will turn green',
+    'rider_push_secure_note' => 'Never paste the JSON file into chat or anywhere else — keep it secure.',
 ];

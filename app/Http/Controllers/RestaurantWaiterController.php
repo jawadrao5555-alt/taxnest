@@ -333,7 +333,7 @@ class RestaurantWaiterController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.dine_in_table_required')], 422);
         }
 
-        return DB::transaction(function () use ($companyId, $validated, $cashier, $orderType, $tableId, $user, $company) {
+        $storeOrderResponse = DB::transaction(function () use ($companyId, $validated, $cashier, $orderType, $tableId, $user, $company) {
             if ($tableId) {
                 $table = RestaurantTable::where('company_id', $companyId)
                     ->where('id', $tableId)->where('is_active', true)
@@ -421,6 +421,21 @@ class RestaurantWaiterController extends Controller
                 'message' => $msg,
             ]);
         });
+
+        // Instant cashier phone push (Task #1142) — queued only AFTER the
+        // transaction committed (success responses carry order_id; the 4xx
+        // early-returns inside the closure never do). Fire-and-forget:
+        // a push problem can never fail the punch.
+        try {
+            $storeOrderJson = json_decode($storeOrderResponse->getContent(), true);
+            if (!empty($storeOrderJson['success']) && !empty($storeOrderJson['order_id'])) {
+                \App\Services\PosPushService::queueWaiterOrderPush((int) $storeOrderJson['order_id']);
+            }
+        } catch (\Throwable $e) {
+            // push is additive — the order is already saved
+        }
+
+        return $storeOrderResponse;
     }
 
     /** Append items to an already-sent held order — the delta prints alone (kot_printed_at NULL rows). */

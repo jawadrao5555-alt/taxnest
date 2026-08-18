@@ -94,6 +94,17 @@ class RestaurantKdsController extends Controller
             ], 400);
         }
 
+        // Waiter phone push (Task #1142): kitchen marked READY → tell the
+        // creating waiter. Queued fire-and-forget (runs after the response
+        // flushes) — a push problem can never fail the status change.
+        if ($new === 'ready') {
+            try {
+                \App\Services\PosPushService::queueOrderReadyPush((int) $order->id);
+            } catch (\Throwable $e) {
+                // push is additive — status is already saved
+            }
+        }
+
         $label = $new === 'cleared' ? 'CLEARED' : ucfirst($new);
         return response()->json([
             'success' => true,

@@ -5,4 +5,5 @@
     <string name="offline_body">Apna WiFi ya mobile data check karein, phir dobara koshish karein.</string>
     <string name="offline_retry">Dobara Koshish</string>
     <string name="download_started">Download shuru ho gaya — notification dekhein</string>
+    <string name="notif_channel_pos">POS Alerts (orders, day close)</string>
 </resources>

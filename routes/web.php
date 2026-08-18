@@ -630,6 +630,18 @@ Route::middleware('auth')->group(function () {
 // Madadgar AI support bot (owner request 22 Jul 2026) — pos.auth ONLY, NO
 // company.approval: pending companies may chat (their POSTs would be 403'd
 // otherwise). ALL POS roles allowed, including cashiers (owner explicit).
+// POS shell-app FCM token registration (Task #1142) — pos.auth ONLY, no
+// company.approval (a pending shop's device registering is harmless; approval
+// gating on a fire-and-forget POST would only create silent retry noise).
+// The shell posts natively with the WebView session cookie; /pos/* is already
+// CSRF-exempt and the controller requires the X-TaxNest-App header instead.
+Route::middleware(['pos.auth'])->post('/pos/app/fcm-token', [\App\Http\Controllers\PosAppPushController::class, 'register'])
+    ->middleware('throttle:30,1')->name('pos.app.fcm-token');
+// Logout-time clear is STATELESS (session already destroyed when the shell
+// detects the login page) — authenticated by possession of the token itself.
+Route::post('/api/pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPushController::class, 'clear'])
+    ->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->name('pos.app.fcm-clear');
+
 Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
     Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('pos.madadgar.history');
     Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('pos.madadgar.message')->middleware('throttle:20,1');

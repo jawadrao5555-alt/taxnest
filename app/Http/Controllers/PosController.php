@@ -11604,6 +11604,20 @@ class PosController extends Controller
             }
         });
 
+        // Owner/manager phone push with the day's totals (Task #1142) — queued
+        // only AFTER the report transaction committed; fire-and-forget (can
+        // never fail the close). Bulk/auto closes notify per closed day too.
+        try {
+            \App\Services\PosPushService::queueDayClosePush($companyId, [
+                'date' => $date,
+                'total' => (float) ($data['total_amount'] ?? 0),
+                'cash' => (float) ($data['cash_amount'] ?? 0),
+                'invoices' => (int) ($data['total_invoices'] ?? 0),
+            ]);
+        } catch (\Throwable $e) {
+            // push is additive — the close already succeeded
+        }
+
         return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'deleted' => $deletedCount, 'report_number' => $reportNumber, 'summary' => $localSummary, 'finalize_sweep' => $finalizeSweep];
     }
 

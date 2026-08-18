@@ -352,10 +352,14 @@ class FbrPosRiderController extends Controller
 
         $isAdminOrManager = $this->isAdmin();
 
-        // Task 1132: low-battery marker in the assign dropdown — hasColumn
+        // Task 1132/1138: low-battery marker in the assign dropdown — hasColumn
         // guarded (PROD drift rule); old APKs report NULL → no marker.
+        // Task 1138: freshness gate — only show when last_located_at ≤ 6 h old
+        // (same window as the distance hint); stale freeze misleads the cashier.
         $hasBatteryPct = Schema::hasColumn('pos_riders', 'last_battery_pct')
             && Schema::hasColumn('pos_riders', 'on_duty');
+        $hasBatteryLocatedAt = $hasBatteryPct
+            && Schema::hasColumn('pos_riders', 'last_located_at');
 
         // Task 786: load names for users who closed unassigned bills — keyed by user id.
         $deliveredByUsers = [];
@@ -376,7 +380,7 @@ class FbrPosRiderController extends Controller
         return view('fbr-pos.deliveries', compact(
             'bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts',
             'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager',
-            'deliveredByUsers', 'hasBatteryPct'
+            'deliveredByUsers', 'hasBatteryPct', 'hasBatteryLocatedAt'
         ));
     }
 

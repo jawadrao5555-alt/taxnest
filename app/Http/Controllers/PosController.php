@@ -3838,27 +3838,41 @@ class PosController extends Controller
             && (auth('pos')->user()?->posBillingScope() ?? 'both') !== 'local';
         $assignRiders = [];
         if ($canAssignRider && $hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
-            // Task 1132: ship last_battery_pct (+ on_duty) so the popup dropdown
-            // can flag a rider whose phone may die mid-delivery (🪫 ≤20%, on-duty
-            // only). hasColumn-guarded — PROD drift rule; old APKs report NULL.
+            // Task 1132/1138: ship last_battery_pct (+ on_duty) so the popup
+            // dropdown can flag a rider whose phone may die mid-delivery
+            // (🪫 ≤20%, on-duty, last heartbeat ≤6 h). hasColumn-guarded —
+            // PROD drift rule; old APKs report NULL. Task 1138: freshness gate
+            // via last_located_at (same 6-hour window as the distance hint);
+            // a frozen reading from hours ago suppressed rather than shown stale.
             $riderCols = ['id', 'name'];
             $hasBatteryPct = \Illuminate\Support\Facades\Schema::hasColumn('pos_riders', 'last_battery_pct')
                 && \Illuminate\Support\Facades\Schema::hasColumn('pos_riders', 'on_duty');
+            $hasBatteryLocatedAt = $hasBatteryPct
+                && \Illuminate\Support\Facades\Schema::hasColumn('pos_riders', 'last_located_at');
             if ($hasBatteryPct) {
                 $riderCols[] = 'last_battery_pct';
                 $riderCols[] = 'on_duty';
+            }
+            if ($hasBatteryLocatedAt) {
+                $riderCols[] = 'last_located_at';
             }
             $assignRiders = \DB::table('pos_riders')
                 ->where('company_id', $companyId)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get($riderCols)
-                ->map(fn ($r) => [
-                    'id' => (int) $r->id,
-                    'name' => $r->name,
-                    'battery_pct' => ($hasBatteryPct && $r->last_battery_pct !== null && $r->on_duty)
-                        ? (int) $r->last_battery_pct : null,
-                ])
+                ->map(function ($r) use ($hasBatteryPct, $hasBatteryLocatedAt) {
+                    $batteryFresh = $hasBatteryLocatedAt
+                        && !empty($r->last_located_at)
+                        && abs(\Carbon\Carbon::parse($r->last_located_at)->diffInMinutes(now())) <= 360;
+                    return [
+                        'id' => (int) $r->id,
+                        'name' => $r->name,
+                        'battery_pct' => ($hasBatteryPct && $batteryFresh
+                            && $r->last_battery_pct !== null && $r->on_duty)
+                            ? (int) $r->last_battery_pct : null,
+                    ];
+                })
                 ->values()
                 ->all();
         }

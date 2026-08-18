@@ -549,6 +549,12 @@ class PosRiderController extends Controller
         // get exactly the old ":count out" suffix, nothing more.
         $hasBatteryPct = Schema::hasColumn('pos_riders', 'last_battery_pct')
             && Schema::hasColumn('pos_riders', 'on_duty');
+        // Task 1138: battery freshness proxy — same 6-hour window as the
+        // distance hint (Task 1104). last_located_at rides the same APK
+        // heartbeat as last_battery_pct, so a stale fix = stale reading.
+        // hasColumn guard: PROD drift rule.
+        $hasBatteryLocatedAt = $hasBatteryPct
+            && Schema::hasColumn('pos_riders', 'last_located_at');
         $riderOptionSuffix = [];
         foreach ($riders as $r) {
             $bits = [];
@@ -568,12 +574,14 @@ class PosRiderController extends Controller
             if ($h && $h['distance_km'] !== null) {
                 $bits[] = __('pos.rider_km_away', ['km' => number_format($h['distance_km'], 1)]);
             }
-            // Task 1132: low-battery marker at assign time — the cashier picking
-            // a rider should know his phone may die mid-delivery. Denormalized
-            // pos_riders.last_battery_pct (Task #1106 APK heartbeat); NULL (old
-            // APK / never reported) shows nothing. Only while on duty — an
-            // off-duty rider's last reading is stale. hasColumn: PROD drift rule.
-            if ($hasBatteryPct && $r->last_battery_pct !== null
+            // Task 1132/1138: low-battery marker at assign time. Hidden when
+            // the last APK heartbeat (last_located_at) is older than 6 h —
+            // a frozen reading from hours ago misleads more than it helps.
+            // NULL battery (old APK) or NULL/stale last_located_at → no marker.
+            $batteryFresh = $hasBatteryLocatedAt
+                && $r->last_located_at
+                && abs(now()->diffInMinutes($r->last_located_at)) <= 360;
+            if ($hasBatteryPct && $batteryFresh && $r->last_battery_pct !== null
                 && (int) $r->last_battery_pct <= 20 && $r->on_duty) {
                 $bits[] = '🪫 ' . (int) $r->last_battery_pct . '%';
             }

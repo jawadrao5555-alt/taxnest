@@ -103,6 +103,9 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.logoutBtn).setOnClickListener {
             thread { ApiClient.post("/logout", JSONObject(), Prefs.token(this)) }
+            // v1.5.0 (Task #1106): kill push locally too — the /logout call
+            // clears the server copy, this invalidates the device token.
+            Fcm.clear()
             stopService(Intent(this, TrackingService::class.java))
             DeliveryCheckWorker.cancel(this)
             Prefs.clearSession(this)
@@ -471,6 +474,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sessionExpired() {
+        // v1.5.0 (Task #1106): another device logged in (app_token rotated) —
+        // its login also rotated the server-side FCM token, so pushes already
+        // target the new phone; this just invalidates OUR device token.
+        Fcm.clear()
         stopService(Intent(this, TrackingService::class.java))
         DeliveryCheckWorker.cancel(this)
         Prefs.clearSession(this)

@@ -18,6 +18,8 @@ class PosRider extends Model
         'on_duty', 'duty_started_at', 'last_lat', 'last_lng', 'last_located_at', 'app_token',
         // Task #1102: night sweep auto-ended duty stamp
         'duty_auto_off_at',
+        // Task #1106: instant push + battery reporting
+        'fcm_token', 'last_battery_pct',
     ];
 
     protected $casts = [
@@ -26,6 +28,7 @@ class PosRider extends Model
         'duty_started_at' => 'datetime',
         'last_located_at' => 'datetime',
         'duty_auto_off_at' => 'datetime',
+        'last_battery_pct' => 'integer',
     ];
 
     public function company()

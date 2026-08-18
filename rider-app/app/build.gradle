@@ -17,8 +17,8 @@ android {
         applicationId "pk.taxnest.rider"
         minSdk 24
         targetSdk 34
-        versionCode 7
-        versionName "1.4.2"
+        versionCode 8
+        versionName "1.5.0"
     }
 
     signingConfigs {
@@ -60,4 +60,17 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     // v1.4.0: background delivery-check job (15-min periodic)
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    // v1.5.0 (Task #1106): instant new-delivery push. Compiles WITHOUT
+    // google-services.json; at runtime Fcm.kt catches the "not initialized"
+    // throw so a config-less build silently falls back to the 15-min poll.
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-messaging'
+}
+
+// Task #1106: Google Services plugin can only run with a real
+// google-services.json (owner's Firebase console download). Conditional apply
+// keeps the project building before the config drop-in exists — push simply
+// stays dormant and DeliveryCheckWorker keeps covering notifications.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
 }

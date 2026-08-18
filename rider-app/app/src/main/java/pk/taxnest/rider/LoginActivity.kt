@@ -75,6 +75,10 @@ class LoginActivity : AppCompatActivity() {
                             // then start the 15-min background delivery check.
                             Prefs.setSeenDeliveryIds(this, emptySet())
                             DeliveryCheckWorker.schedule(this)
+                            // v1.5.0 (Task #1106): register this phone for
+                            // instant push. Async + fail-safe — login never
+                            // waits on Firebase; poll covers if it fails.
+                            Fcm.register(this)
                             goMain()
                         }
                         code == 403 && body?.optString("error") == "plan_locked" -> {

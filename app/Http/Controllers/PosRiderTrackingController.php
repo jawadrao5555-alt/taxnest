@@ -182,7 +182,17 @@ class PosRiderTrackingController extends Controller
 
         // Rotate: one active device per rider.
         $plain = $rider->id . '|' . Str::random(48);
-        $rider->update(['app_token' => hash('sha256', $plain)]);
+        $update = ['app_token' => hash('sha256', $plain)];
+        // Task #1106: FCM token rotates WITH app_token — the new device either
+        // sends its own token here (v1.5.0+) or registers it moments later via
+        // /fcm-token; either way the old device's token must die now so pushes
+        // never land on a logged-out phone. Old APKs send nothing → NULL →
+        // poll fallback. hasColumn guard: PROD schema drift.
+        if (Schema::hasColumn('pos_riders', 'fcm_token')) {
+            $fcm = trim((string) $request->input('fcm_token', ''));
+            $update['fcm_token'] = ($fcm !== '' && strlen($fcm) <= 4096) ? $fcm : null;
+        }
+        $rider->update($update);
 
         return response()->json([
             'ok' => true,
@@ -194,6 +204,23 @@ class PosRiderTrackingController extends Controller
             ],
             'duty' => (bool) $rider->on_duty,
         ]);
+    }
+
+    /**
+     * POST /api/rider-app/v1/fcm-token {token} — Task #1106.
+     * FCM tokens arrive asynchronously (initial fetch after login, and
+     * Firebase rotates them at will via onNewToken), so registration needs
+     * its own endpoint besides the login piggyback. Empty token = clear.
+     */
+    public function appFcmToken(Request $request)
+    {
+        $rider = $this->riderFromToken($request);
+        if (!Schema::hasColumn('pos_riders', 'fcm_token')) {
+            return response()->json(['ok' => true]); // pre-migration: accept quietly
+        }
+        $fcm = trim((string) $request->input('token', ''));
+        $rider->update(['fcm_token' => ($fcm !== '' && strlen($fcm) <= 4096) ? $fcm : null]);
+        return response()->json(['ok' => true]);
     }
 
     /** POST /api/rider-app/v1/duty {on: bool} */
@@ -255,6 +282,7 @@ class PosRiderTrackingController extends Controller
 
         $rows      = [];
         $newestLive = null; // newest fresh (non-offline) point — drives regression guard
+        $newestLiveBat = null; // battery % riding on the newest live point (Task #1106)
         $oldestAccepted = now()->subDays(self::POINT_MAX_AGE_DAYS);
 
         foreach ($points as $p) {
@@ -324,6 +352,11 @@ class PosRiderTrackingController extends Controller
             if (!$isOffline) {
                 if ($newestLive === null || $row['recorded_at'] > $newestLive['recorded_at']) {
                     $newestLive = $row;
+                    // Task #1106: optional battery % piggybacked per point
+                    // (v1.5.0+ APKs; old APKs send none → stays NULL). Tracked
+                    // OUTSIDE $row — pos_rider_locations has no such column.
+                    $newestLiveBat = (isset($p['bat']) && is_numeric($p['bat']))
+                        ? min(100, max(0, (int) $p['bat'])) : null;
                 }
             }
         }
@@ -345,11 +378,20 @@ class PosRiderTrackingController extends Controller
                     ? $rider->last_located_at->format('Y-m-d H:i:s')
                     : null;
                 if ($currentLocatedAt === null || $newestLive['recorded_at'] > $currentLocatedAt) {
-                    $rider->update([
+                    $denorm = [
                         'last_lat'        => $newestLive['lat'],
                         'last_lng'        => $newestLive['lng'],
                         'last_located_at' => $newestLive['recorded_at'],
-                    ]);
+                    ];
+                    // Task #1106: denormalize battery alongside the position —
+                    // same regression guard, so a stale drain batch can never
+                    // overwrite a fresher battery reading. NULL from a v1.5.0
+                    // point is NOT written (a transient read failure on the
+                    // phone must not blank a known level). hasColumn: drift.
+                    if ($newestLiveBat !== null && Schema::hasColumn('pos_riders', 'last_battery_pct')) {
+                        $denorm['last_battery_pct'] = $newestLiveBat;
+                    }
+                    $rider->update($denorm);
                 }
             }
         }
@@ -457,7 +499,13 @@ class PosRiderTrackingController extends Controller
     public function appLogout(Request $request)
     {
         $rider = $this->riderFromToken($request);
-        $rider->update(['app_token' => null, 'on_duty' => false]);
+        $update = ['app_token' => null, 'on_duty' => false];
+        // Task #1106: voluntary logout kills push too — no notifications on a
+        // phone whose rider signed out. hasColumn guard: PROD schema drift.
+        if (Schema::hasColumn('pos_riders', 'fcm_token')) {
+            $update['fcm_token'] = null;
+        }
+        $rider->update($update);
         return response()->json(['ok' => true]);
     }
 
@@ -644,6 +692,8 @@ class PosRiderTrackingController extends Controller
         };
 
         $hasAutoOff = Schema::hasColumn('pos_riders', 'duty_auto_off_at');
+        // Task #1106: battery kam hai indicator — hasColumn: PROD drift.
+        $hasBattery = Schema::hasColumn('pos_riders', 'last_battery_pct');
 
         $riders = $rows->map(fn ($r) => [
             'id' => (int) $r->id,
@@ -665,6 +715,14 @@ class PosRiderTrackingController extends Controller
             'is_silent' => $isSilent($r),                       // red: uploads stopped
             'is_idle' => !$isSilent($r) && $isIdle($r),         // amber: stationary w/ open bills
             'auto_off' => $hasAutoOff && !$r->on_duty && $r->duty_auto_off_at !== null,
+            // Task #1106: battery % piggybacked on location uploads (v1.5.0+
+            // APKs; NULL = old APK / no reading yet). Low badge only while ON
+            // DUTY — an off-duty rider's last reading is stale noise.
+            // Live PDO returns ints as strings — cast.
+            'battery_pct' => ($hasBattery && $r->last_battery_pct !== null)
+                ? (int) $r->last_battery_pct : null,
+            'low_battery' => $hasBattery && (bool) $r->on_duty
+                && $r->last_battery_pct !== null && (int) $r->last_battery_pct <= 20,
         ])->values();
 
         return response()->json(['ok' => true, 'riders' => $riders, 'server_time' => now()->toIso8601String()]);

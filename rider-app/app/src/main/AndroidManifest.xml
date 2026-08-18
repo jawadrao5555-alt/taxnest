@@ -40,6 +40,16 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <!-- Task #1106: instant new-delivery push (FCM). Harmless when the
+             build has no google-services.json — Firebase never starts it. -->
+        <service
+            android:name=".PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

@@ -57,4 +57,16 @@ return [
         'subject' => env('VAPID_SUBJECT', 'mailto:admin@taxnest.com.pk'),
     ],
 
+    'fcm' => [
+        // Firebase service-account credential for rider-app push (Task #1106).
+        // Preferred on cPanel live: upload the service-account JSON file to
+        // storage/app/firebase/rider-fcm.json (outside the public repo; the
+        // whole storage/app dir is gitignored). Alternatively paste the JSON
+        // (raw or base64) into FIREBASE_CREDENTIALS_JSON in .env.
+        // Missing credential = push silently disabled; 15-min poll fallback
+        // keeps working. NEVER commit the JSON — repo is public.
+        'credentials_file' => env('FIREBASE_CREDENTIALS_FILE', storage_path('app/firebase/rider-fcm.json')),
+        'credentials_json' => env('FIREBASE_CREDENTIALS_JSON', ''),
+    ],
+
 ];

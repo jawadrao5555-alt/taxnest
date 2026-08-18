@@ -2659,6 +2659,14 @@ class PosController extends Controller
             return back()->withInput()->with('error', $errMsg);
         }
 
+        // Task #1106: rider assigned at billing time → instant FCM push.
+        // Queued AFTER the commit; fires in app()->terminating() (after the
+        // response is flushed) and swallows every failure — the pay path can
+        // never be blocked or degraded by push (WhatsApp-extras rule).
+        if ($riderId) {
+            \App\Services\RiderPushService::queuePush((int) $riderId);
+        }
+
         // Deduct from the RESOLVED items (not raw request): resolved rows carry the
         // frozen deal_snapshot so deal components move stock too (deal lines
         // themselves are type 'deal' → skipped by the deduction loop).

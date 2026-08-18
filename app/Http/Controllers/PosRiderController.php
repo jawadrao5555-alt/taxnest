@@ -625,6 +625,10 @@ class PosRiderController extends Controller
             }
         }
 
+        // Task #1106: push only on a genuinely NEW assignment for this rider —
+        // re-saving the same rider must not re-ping his phone.
+        $isNewAssignment = $riderId && (int) $txn->rider_id !== (int) $riderId;
+
         $upd = [
             'rider_id' => $riderId,
             'delivery_status' => $riderId ? ($txn->delivery_status && $txn->delivery_status !== 'returned' ? $txn->delivery_status : 'assigned') : null,
@@ -640,6 +644,14 @@ class PosRiderController extends Controller
             }
         }
         $txn->update($upd);
+
+        // Task #1106: instant FCM push to the newly assigned rider. Fire-and-
+        // forget (runs in app()->terminating, all failures swallowed) — the
+        // assign itself can never block or fail because of push. The 15-min
+        // app poll stays as fallback for phones where push is unavailable.
+        if ($isNewAssignment) {
+            \App\Services\RiderPushService::queuePush((int) $riderId);
+        }
 
         // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —
         // JSON clients get JSON; the Deliveries board form keeps back().

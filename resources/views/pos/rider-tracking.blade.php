@@ -46,6 +46,8 @@
         }
         .rt-warn-pill.idle { background: #f59e0b; color: #fff; }
         .rt-warn-pill.silent { background: #ef4444; color: #fff; }
+        /* Task #1106: battery kam hai */
+        .rt-warn-pill.battery { background: #dc2626; color: #fff; }
         .rt-warn-map { pointer-events: none; }
     </style>
 
@@ -85,6 +87,9 @@
             'pause' => __('pos.rt_pause'),
             'stopped_here' => __('pos.rt_stopped_here'),
             'speed_legend' => __('pos.rt_speed_legend'),
+            {{-- Task #1106: battery kam hai indicator --}}
+            'battery_low_badge' => __('pos.rt_battery_low_badge'),
+            'battery_label' => __('pos.rt_battery_label'),
         ],
     ]))" x-init="init()">
 
@@ -151,6 +156,13 @@
                         </template>
                         <template x-if="r.is_idle">
                             <div class="mt-1"><span class="rt-warn-pill idle" x-text="i18n.idle_badge"></span></div>
+                        </template>
+                        {{-- Task #1106: battery — % chip always (when reported), red low-battery pill on ≤20% while on duty --}}
+                        <template x-if="r.low_battery">
+                            <div class="mt-1"><span class="rt-warn-pill battery" x-text="'🪫 ' + i18n.battery_low_badge + ' (' + r.battery_pct + '%)'"></span></div>
+                        </template>
+                        <template x-if="!r.low_battery && r.battery_pct !== null && r.on_duty">
+                            <div class="mt-1 text-[10px] text-gray-400 dark:text-gray-500" x-text="'🔋 ' + i18n.battery_label + ' ' + r.battery_pct + '%'"></div>
                         </template>
                         <template x-if="r.auto_off">
                             <div class="mt-1 text-[10px] text-gray-400 dark:text-gray-500" x-text="i18n.auto_off_note"></div>
@@ -326,14 +338,20 @@
                     bounds.push([r.lat, r.lng]);
                     const color = this.dotColor(r);
                     // Task #1102: warning badge — silent (red) beats idle (amber).
-                    const warn = r.is_silent ? 'silent' : (r.is_idle ? 'idle' : null);
+                    // Task #1106: low battery is third priority (connectivity
+                    // problems are more urgent than a draining phone).
+                    const warn = r.is_silent ? 'silent' : (r.is_idle ? 'idle' : (r.low_battery ? 'battery' : null));
                     const warnLabel = warn === 'silent' ? this.i18n.silent_badge
-                        : (warn === 'idle' ? this.i18n.idle_badge : '');
+                        : (warn === 'idle' ? this.i18n.idle_badge
+                        : (warn === 'battery' ? ('🪫 ' + this.i18n.battery_low_badge + ' (' + r.battery_pct + '%)') : ''));
                     const popup = '<b>' + this.esc(r.name) + '</b><br>'
                         + (r.on_duty ? this.i18n.on_duty : this.i18n.off_duty)
                         + '<br>' + this.esc(this.agoText(r))
                         + (r.open_deliveries ? '<br>' + this.i18n.open_deliveries + ': ' + r.open_deliveries : '')
-                        + (warn ? '<br><b style="color:' + (warn === 'silent' ? '#ef4444' : '#d97706') + '">'
+                        + (r.battery_pct !== null ? '<br>' + (r.low_battery ? '🪫' : '🔋') + ' '
+                            + this.esc(this.i18n.battery_label) + ' <b' + (r.low_battery ? ' style="color:#dc2626"' : '') + '>'
+                            + r.battery_pct + '%</b>' : '')
+                        + (warn ? '<br><b style="color:' + (warn === 'silent' ? '#ef4444' : (warn === 'idle' ? '#d97706' : '#dc2626')) + '">'
                             + this.esc(warnLabel) + '</b>' : '');
                     // Pill floats above the dot; recreating it every poll is cheap (few riders).
                     if (this.warnBadges[r.id]) {

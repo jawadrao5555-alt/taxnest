@@ -1,6 +1,30 @@
 # TaxNest Rider APK — Build & Release Runbook
 
-Last updated: Aug 2026 (v1.2.0 offline-buffering release)
+Last updated: Aug 2026 (v1.5.0 FCM push + battery reporting)
+
+---
+
+## Firebase prerequisite (v1.5.0+ instant push) — one-time owner setup
+
+Push is OPTIONAL at build time: without the config below the APK still
+builds and runs exactly like v1.4.x (15-min poll notifications). To enable
+instant push:
+
+1. **Create a free Firebase project** at https://console.firebase.google.com
+   (any name, e.g. "TaxNest Rider"; Analytics not needed).
+2. **Add an Android app** with package name **`pk.taxnest.rider`** and
+   download **`google-services.json`** → drop it at
+   **`rider-app/app/google-services.json`**.
+   It is gitignored (public repo) — keep a copy with the keystore backup at
+   `~/rider-signing/` on live. The gradle plugin applies itself automatically
+   when the file exists; nothing else to edit.
+3. **Server credential** — Firebase console → Project settings →
+   Service accounts → *Generate new private key* (JSON). Upload it to live at
+   **`storage/app/firebase/rider-fcm.json`** (outside public_html web root,
+   dir is gitignored). **NEVER commit this file — it is a private key.**
+   Alternative: base64 the JSON into `FIREBASE_CREDENTIALS_JSON` in `.env`.
+4. No server restart needed — the push service picks the file up per request;
+   while it's absent, pushes are silently skipped and the poll covers.
 
 ---
 
@@ -13,20 +37,23 @@ Last updated: Aug 2026 (v1.2.0 offline-buffering release)
 nix-env -iA nixpkgs.jdk17
 export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
 
-# 2. Android SDK command-line tools
+# 2. Android SDK command-line tools  (verified Aug 2026 — curl needs -L,
+#    the zip's inner dir must be RENAMED to latest/, and sdkmanager rejects
+#    packages combined with --licenses in one call)
 mkdir -p /home/runner/android-sdk/cmdline-tools
 cd /home/runner/android-sdk/cmdline-tools
-curl -O https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-unzip commandlinetools-linux-11076708_latest.zip -d latest && rm *.zip
+curl -sLO https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+unzip -q commandlinetools-linux-11076708_latest.zip && rm *.zip
+mv cmdline-tools latest
 export ANDROID_HOME=/home/runner/android-sdk
-yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-  "platforms;android-34" "build-tools;34.0.0" --licenses
+yes | latest/bin/sdkmanager --licenses
+latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
-# 3. Gradle 8.7
+# 3. Gradle 8.7 (curl needs -L — services.gradle.org redirects)
 mkdir -p /home/runner/tools
 cd /home/runner/tools
-curl -O https://services.gradle.org/distributions/gradle-8.7-bin.zip
-unzip gradle-8.7-bin.zip && rm *.zip
+curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
+unzip -q gradle-8.7-bin.zip && rm *.zip
 ```
 
 ---
@@ -59,12 +86,11 @@ rider-app/app/build/outputs/apk/release/app-release.apk
    versionName  "X.Y.Z"
    ```
 
-3. **Server version constant** — `app/Http/Controllers/PosRiderTrackingController.php`:
-   ```php
-   private const APP_LATEST_VERSION = 'X.Y.Z';
-   ```
-   Must match `versionName` exactly (app polls `/api/rider-app/v1/version`
-   and shows an update banner when they differ).
+3. **Server latest-version setting** — the `rider_app_latest_version`
+   SystemSetting (admin panel; Task 443) must be set to `X.Y.Z`, matching
+   `versionName` exactly (app polls `/api/rider-app/v1/version` and shows an
+   update banner when the server version is semver-newer). Bump it ONLY
+   after the APK is hosted, or riders get a banner pointing at the old file.
 
 4. **Build the APK** (see above).
 
@@ -118,3 +144,5 @@ rider-app/app/build/outputs/apk/release/app-release.apk
 | 1.1.0   | 2           | Delivery list + maps links + /me improvements |
 | 1.2.0   | 3           | **Offline route buffering** — buffer cap 5000 pts (~27h), 401 preserves queue (token-only evict), backend dedupe on (rider_id, client_ts_ms) |
 | 1.3.0   | 4           | **Offline buffering hardened** — drain outside duty (onResume + login + NetworkCallback); offline end-duty queued + reconciled on reconnect; server accepts past-timestamp buffered points when duty=OFF (per-point gate); removeFirst(stored) precise trim; regression guard restricted to live (non-offline) points only |
+| 1.4.x   | 5–7         | **New-delivery notifications** — 15-min DeliveryCheckWorker poll + DeliveryNotifier dedupe (Touseef case); in-app APK update download |
+| 1.5.0   | 8           | **Instant push (FCM)** — data-only push through the same DeliveryNotifier dedupe (poll stays as fallback); FCM token rotates with login/logout; **battery %** on location points → admin map "battery kam hai" badge. Needs the Firebase prerequisite above; builds/runs fine without it |

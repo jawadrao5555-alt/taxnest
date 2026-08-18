@@ -13,7 +13,7 @@ object PointQueue {
     private const val CAP = 5000
     private val lock = Any()
 
-    fun add(c: Context, lat: Double, lng: Double, accuracyM: Int?) {
+    fun add(c: Context, lat: Double, lng: Double, accuracyM: Int?, batteryPct: Int? = null) {
         synchronized(lock) {
             val arr = load(c)
             val p = JSONObject()
@@ -21,6 +21,10 @@ object PointQueue {
                 .put("lng", lng)
                 .put("at", System.currentTimeMillis())
             if (accuracyM != null) p.put("acc", accuracyM)
+            // v1.5.0 (Task #1106): battery % rides on each point; the server
+            // denormalizes the newest live reading for the admin map. Optional
+            // — old server builds simply ignore the extra key.
+            if (batteryPct != null) p.put("bat", batteryPct)
             arr.put(p)
             // Cap: drop oldest.
             val trimmed = if (arr.length() > CAP) {

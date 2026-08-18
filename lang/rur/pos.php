@@ -3120,6 +3120,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_pause' => 'Rokein',
     'rt_stopped_here' => 'Yahan ruka (:min min)',
     'rt_speed_legend' => 'Rang = raftar: orange aahista · green normal · blue tez',
+    // Task #1106: battery reporting on the live map
+    'rt_battery_low_badge' => 'Battery kam hai',
+    'rt_battery_label' => 'Battery',
     'rt_upgrade_btn' => 'Packages dekhein',
     'running_amount_sfx' => ' chalu',
     'rush_badge' => 'URGENT',

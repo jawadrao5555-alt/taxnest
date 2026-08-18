@@ -3120,6 +3120,9 @@ return [
     'rt_pause' => 'روکیں',
     'rt_stopped_here' => 'یہاں رکا (:min منٹ)',
     'rt_speed_legend' => 'رنگ = رفتار: نارنجی آہستہ · سبز نارمل · نیلا تیز',
+    // Task #1106: battery reporting on the live map
+    'rt_battery_low_badge' => 'بیٹری کم ہے',
+    'rt_battery_label' => 'بیٹری',
     'rt_upgrade_btn' => 'پیکجز دیکھیں',
     'running_amount_sfx' => ' جاری',
     'rush_badge' => 'فوری',

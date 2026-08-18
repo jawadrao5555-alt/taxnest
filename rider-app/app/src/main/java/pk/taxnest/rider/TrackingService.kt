@@ -117,11 +117,25 @@ class TrackingService : Service(), LocationListener {
         if (location.hasAccuracy() && location.accuracy > 150f) return
         PointQueue.add(
             this, location.latitude, location.longitude,
-            if (location.hasAccuracy()) location.accuracy.toInt() else null
+            if (location.hasAccuracy()) location.accuracy.toInt() else null,
+            batteryPct()
         )
         if (PointQueue.size(this) >= FLUSH_AT_POINTS) {
             netHandler.post { flush() }
         }
+    }
+
+    /**
+     * v1.5.0 (Task #1106): battery % piggybacked on each point so the admin
+     * map can warn "battery kam hai". Best-effort — null on any failure
+     * (server treats missing battery as "old APK", nothing breaks).
+     */
+    private fun batteryPct(): Int? = try {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
+        val v = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        if (v in 1..100) v else null
+    } catch (e: Exception) {
+        null
     }
 
     @Deprecated("Deprecated in Java")

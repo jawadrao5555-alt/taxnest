@@ -1541,6 +1541,8 @@ Route::get('/setup-seed-xK9mP2', function () {
 Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
     Route::post('/login', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogin'])->middleware('throttle:15,1')->name('riderapp.login');
     Route::post('/duty', [\App\Http\Controllers\PosRiderTrackingController::class, 'appDuty'])->name('riderapp.duty');
+    // Task #1106: FCM push-token registration (async — token arrives after login / rotates via onNewToken).
+    Route::post('/fcm-token', [\App\Http\Controllers\PosRiderTrackingController::class, 'appFcmToken'])->name('riderapp.fcmtoken');
     Route::post('/locations', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLocations'])->name('riderapp.locations');
     Route::get('/me', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMe'])->name('riderapp.me');
     Route::get('/version', [\App\Http\Controllers\PosRiderTrackingController::class, 'appVersion'])->name('riderapp.version');

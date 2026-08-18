@@ -408,9 +408,9 @@
                     </ul>
                 </div>
                 @endif
-                {{-- Block-form @php: an inline @php(...) mis-pairs with any later
-                     @endphp in the file (Blade raw-block regex), swallowing the
-                     markup between them as raw PHP → whole layout 500s. --}}
+                {{-- NOTE: never use the inline paren form of the php directive in this file —
+                     a LATER php/endphp block makes Blade's storePhpBlocks regex swallow
+                     everything between as raw PHP (white-screens the whole admin panel). --}}
                 @php $tnMailFailure = \App\Services\MailHealth::current(); @endphp
                 @if($tnMailFailure)
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">

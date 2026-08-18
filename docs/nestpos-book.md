@@ -433,8 +433,33 @@ Kitchen Settings par hi ek naya section — KOT ki parchi chhoti karne aur print
 - **Show Customer Name / "Order by" & Item Count / Barcode / Business Name**: jo cheez kitchen ko nahi chahiye OFF kar dein — parchi aur chhoti. (Barcode OFF karne se KDS ka scan-to-clear band ho jata hai — sirf tab OFF karein jab kitchen ticket scan nahi karti.)
 - **Print Position**: default "Left edge" (sab se mehfooz). Print side par aata ho to **Left Margin (mm)** mein 3–5 dalein — print utna right sarak jayega. "Center of paper" SIRF tab chunein jab Windows printer ki paper size 80mm roll set ho — A4/Letter queue par Center se parchi khali nikalti hai.
 
-### Counters / Stations (KOT routing)
-"+ Add Counter" → Counter Name (jaise "Grill") → Printer chunein → Product Categories tick karein — un categories ke items ka KOT usi counter par jayega.
+### Counters / Stations — har counter ka apna KOT printer
+
+Ek kitchen mein alag alag stations hain (maslan Grill, Ice Cream, Beverages) aur har station ka printer alag hai? Counters/Stations feature KOT ko automatic split kar deta hai — ek order ka grill wala item Grill counter par print hoga, ice cream wala Ice Cream counter par, sab ek saath.
+
+**Prerequisites:**
+- Desktop Sync Agent chalta hona chahiye (printer list Agent se aati hai).
+- Kitchen Settings mein "Kitchen Printer" ON hona chahiye.
+- Products par Categories set honi chahiye.
+
+**Setup ke qadam:**
+1. **/pos/restaurant/kitchen-settings** kholein (ya /pos/customize → "Kitchen & KOT Settings" card).
+2. Neeche "Counters/Stations" section mein **"+ Add Counter"** dabayein (sirf admin/manager ko dikhta hai).
+3. **Counter Name** likhein — maslan "Grill", "Ice Cream", "Hot Drinks".
+4. **Printer** dropdown se us counter ka printer chunein (Desktop Agent ki list). Khali chhorna = company ka aam KOT printer use hoga.
+5. **Product Categories** checkboxes mein us counter ki categories tick karein.
+6. **Active** tick ON rakhen aur counter save karein.
+7. Baqi counters ke liye yehi repeat karein.
+8. Sab counters set ho jayein to **sale screen refresh (F5)** zaroor karein.
+
+**Routing ke usool:**
+- Ek category sirf ek counter par assign ho sakti hai — doosrے counter mein assign ho to pehle wahan se untick karein.
+- Kisi counter mein assign NA kiya gaya item (ya manual item, service) hamesha company ke default KOT printer par jata hai.
+- Kisi counter par koi items nahi: khali ticket kabhi print nahi hoti.
+- Ek order mein 3 counters ke items hon to 3 alag tickets niklengi — har counter ko sirf apna ticket.
+- Zero counters = routing dormant, poora order ek KOT mein (purana tareeqa).
+
+`[SCREENSHOT: Kitchen Settings — Counters/Stations section]`
 
 ### KDS — Kitchen Display System (/pos/restaurant/kds)
 - Kitchen account login karta hai (Kitchen role — /pos/team se; team limit mein nahi ginta, sirf KDS dekhta hai).

@@ -173,7 +173,42 @@ Sale screen ki mazeed cheezein:
 - Kitchen Settings (/pos/restaurant/kitchen-settings) ke toggles: Kitchen Display System (KDS), Kitchen Printer, Print KOT on Hold, Dine-In Auto KOT on Table Select, Print Receipt on Pay. "Save Kitchen Settings" se save.
 - Asaan rasta (1 Aug 2026): /pos/customize hub par "Kitchen & KOT Settings" ka card bhi hai (sirf restaurant-mode companies ko dikhta hai) — wahan se aik click mein isi page par pahunch jayen.
 - KOT PRINT par kya dikhe — isi page par alag switches hain: "Customer dikhayein", "Order By (staff naam)", "Barcode dikhayein" (SCAN BARCODE TO CLEAR wala — jo dukan KDS use nahi karti wo isay OFF kar de), aur "Footer dikhayein" (KOT ke neeche business ka naam). Har switch alag hai — sirf naam hatana ho to sirf Footer OFF karein, barcode apni jagah rahega.
-- Counters/Stations (KOT routing): kitchen-settings par "+ Add Counter" → Counter Name (jaise "Grill") → Printer chunein (Desktop Agent ki list) → Product Categories tick karein — un categories ke items ka KOT usi counter par jayega.
+- Counters/Stations — har counter ka apna KOT printer:
+
+  **Kya hai yeh feature?**
+  Ek hi kitchen mein alag alag stations hain (maslan Grill, Ice Cream, Beverages) aur har station ka apna alag printer — to har station sirf apne items ki KOT chahta hai. Yeh feature KOT ko automatic split kar deta hai: ek order ka grill wala item Grill counter par print hoga, ice cream wala Ice Cream counter par — sab ek hi order se, ek hi waqt mein.
+
+  **Prerequisites (pehle yeh check karein):**
+  1. Desktop Agent chalta hona chahiye (printer ki list Agent se aati hai).
+  2. Kitchen Settings mein "Kitchen Printer" ON hona chahiye (Silent KOT Print).
+  3. Products par Categories set honi chahiye — jis product ki category NA ho wo counter routing mein shamil nahi hoga, default kitchen par jayega.
+
+  **Setup ke qadam (/pos/restaurant/kitchen-settings):**
+  1. /pos/restaurant/kitchen-settings kholein (ya /pos/customize → "Kitchen & KOT Settings" card se shortcut).
+  2. Neeche "Counters/Stations" wala section hai — sirf admin/manager ko nazar aata hai.
+  3. "+ Add Counter" dabayein.
+  4. Counter Name likhein (maslan "Grill", "Ice Cream", "Hot Drinks" — 60 harf tak).
+  5. Printer dropdown se us counter ka printer chunein (Desktop Agent ki list) — khali chhorna = company ka aam KOT printer use hoga.
+  6. Product Categories checkboxes mein un categories ko tick karein jo is counter ki hain.
+  7. "Active" tick ON rakhen.
+  8. Counter save karein.
+  9. Baqi counters ke liye yehi repeat karein.
+  10. Sab counters set ho jayein to sale screen refresh (F5) zaroor karein taake nayi routing live ho jaye.
+
+  **Ek-category-ek-counter ka usool:**
+  Ek category ek hi counter par assign ho sakti hai — agar category pehle se kisi counter mein tick hai to doosre counter mein wo tick nahi hogi (gray/disabled nazar aayegi).
+
+  **Routing ka bartao:**
+  - Jis counter ki category mein item hai: us counter ka printer KOT print karta hai.
+  - Kisi counter mein assign NA kiya gaya item (ya manual item, service): hamesha company ke aam KOT printer (default kitchen) par jata hai.
+  - Agar kisi counter par koi items NAHI hain: us counter ke liye khali ticket kabhi print nahi hoti (bekar kaghaz nahi nikalta).
+  - Ek order mein 3 counters ke items hon to 3 alag tickets niklengi — har counter ko sirf apna ticket.
+  - Agar kisi item ka counter to set hai magar printer Agent mein nahi mila (agent offline ya printer ka naam badal gaya): system popup print dialog khol deta hai taake koi item chhoota na jaye.
+
+  **Zero counters = purana tareeqa:**
+  Agar koi bhi counter add nahi kiya to system waise hi chalega jaise pehle tha — poora order ek hi KOT mein default kitchen par.
+
+  **Setup ke baad sale screen refresh (F5) zaroori hai** — routing change sirf nayi sessions mein lagti hai.
 - KDS (/pos/restaurant/kds): kitchen account login karta hai; order cards par order number, table, URGENT tag aur timer; buttons: "Start Preparing" → "Mark Ready" → "Clear"; upar Refresh, Clear All, Camera Scan aur List/Aggregate view switcher. KOT ka barcode scan karne se order khud clear ho jata hai (scanner active rehta hai).
 - Kitchen account: /pos/team se Kitchen role ka login — sirf KDS dekhta hai, team limit mein nahi ginta.
 - Waiter (/pos/waiter): waiter apne login se — Dine In/Take Away chunein → "Choose Table" (Available sabz, Occupied laal) → items search kar ke cart mein dalein (har item par note bhi likh sakta hai) → customer naam/phone (optional) → kitchen note → cashier select → "SEND TO CASHIER". Pehle se bheje order mein "My Orders" → "Add Items" se aur items add ho sakte hain. Waiter payment/discount/delete NAHI kar sakta.
@@ -332,6 +367,10 @@ Sale screen ki mazeed cheezein:
 - "Dashboard par Opening Cash nazar nahi aa raha": din pehle hi close ho chuka hai — kal subah enter karein.
 - "Deal ki price ghalat lag rahi hai": deal ke din/dates check karein — deal sirf apne set kiye dino par chalti hai.
 - "KOT kitchen par nahi aa raha": /pos/restaurant/kitchen-settings par counter/printer check karein aur Desktop Agent chalta ho.
+- "Counter routing ka printer dropdown khali hai / koi printer nazar nahi aa raha": Desktop Agent chalta nahi ya abhi start ho raha hai — agent ka status check karein (/pos/agent). Agent online aahe ke baad page dobara kholein, dropdown mein printers aa jayenge.
+- "Counter mein category tick nahi ho rahi (gray/disabled lag rahi hai)": woh category pehle se kisi doosre counter mein assign hai — ek category sirf ek counter par ho sakti hai. Pehle us doosre counter ki edit form mein jao aur wahan se category untick karo, phir naye counter mein tick kar lo.
+- "Counter routing set karne ke baad bhi sab kuch ek hi printer par ja raha hai (split nahi ho raha)": do wajahaat — (a) setup ke baad sale screen refresh (F5) nahi ki — ek dafa refresh karein; (b) /pos/restaurant/kitchen-settings par "Kitchen Printer" (Silent KOT Print) ON nahi — wo ON karein aur Desktop Agent chalta ho.
+- "KOT print karte waqt popup/dialog khul gaya (silent nahi gaya) jab counter routing ON hai": jis counter ka printer Agent mein nahi mila — ya to Agent offline hai ya printer ka naam Agent mein alag hai (driver reinstall se naam badal sakta hai). Agent online karein, phir counter ki printer dropdown mein sahi naam dobara set karein aur save karein.
 - "KOT 'sent' / 'print par bhej diya' ka message aata hai lekin kitchen mein kuch print nahi hota, koi error bhi nahi": SAB SE PEHLE Kitchen Settings mein "KDS Auto-Print" check karein. Yeh ON ho to KOT sirf KDS screen wali device se print hota hai — cashier/counter se bilkul nahi bhejta (double print rokne ke liye). Agar kitchen mein KDS screen chal hi nahi rahi to KOT kahin se bhi print nahi hoga. Hal: (a) KDS istemal nahi karte to /pos/restaurant/kitchen-settings par KDS Auto-Print OFF karein — KOT wapas cashier se kitchen printer par khud print hoga, YA (b) KDS chalayen: /pos/team se Kitchen role ka login banayen aur kitchen ki device par /pos/restaurant/kds khula rakhein.
 - "KOT adhoora aata hai / sirf naye items print hote hain": /pos/restaurant/kitchen-settings par "Always Print Full KOT" ON karein — order update par poora order print hoga, naye items par NEW ka nishaan hoga.
 - "KOT bohat lamba hai / paper zyada lagta hai / KOT chhota karna hai" (27 Jul 2026, naya): /pos/restaurant/kitchen-settings par "KOT Print Style — Paper Saving" section aa gaya hai. "Compact KOT" ON karein (chhote fonts, tang spacing — parchi kaafi chhoti ho jati hai) aur jo cheezein kitchen ko nahi chahiye unko OFF kar dein: Customer Name, "Order by" wali lines, Barcode (KHAYAL RAHE: barcode OFF karne se KDS ka scan-to-clear kaam nahi karega — sirf tab OFF karein jab kitchen ticket scan nahi karti), aur neeche wala Business Name. Sab OFF + Compact ON = sab se chhoti parchi.

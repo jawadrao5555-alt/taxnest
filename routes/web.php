@@ -1268,6 +1268,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/franchises/{id}/toggle', [AdminFranchiseController::class, 'toggleStatus'])->name('saas.admin.franchises.toggle');
     Route::get('/company-usage', [AdminUsageController::class, 'index'])->name('saas.admin.usage');
     Route::get('/system-control', [AdminSystemController::class, 'index'])->name('saas.admin.system');
+    Route::get('/system-control/mysql-health', [AdminSystemController::class, 'mysqlHealth'])->name('saas.admin.system.mysql-health');
     Route::post('/system-control/{key}/toggle', [AdminSystemController::class, 'toggle'])->name('saas.admin.system.toggle');
     Route::get('/settings', [AdminSettingsController::class, 'index'])->name('saas.admin.settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');

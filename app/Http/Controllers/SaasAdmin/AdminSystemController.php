@@ -123,6 +123,51 @@ class AdminSystemController extends Controller
         ));
     }
 
+    public function mysqlHealth()
+    {
+        $threads = null;
+        $maxConn = null;
+        $pct     = null;
+        try {
+            $rows = \Illuminate\Support\Facades\DB::select("
+                SELECT 'Threads_connected' AS name, VARIABLE_VALUE AS value
+                  FROM information_schema.GLOBAL_STATUS
+                 WHERE VARIABLE_NAME = 'Threads_connected'
+                UNION ALL
+                SELECT 'max_connections' AS name, VARIABLE_VALUE AS value
+                  FROM information_schema.GLOBAL_VARIABLES
+                 WHERE VARIABLE_NAME = 'max_connections'
+            ");
+            $map = [];
+            foreach ($rows as $row) {
+                $map[$row->name] = (int) $row->value;
+            }
+            if (isset($map['Threads_connected'], $map['max_connections']) && $map['max_connections'] > 0) {
+                $threads = $map['Threads_connected'];
+                $maxConn = $map['max_connections'];
+                $pct     = round($threads / $maxConn * 100, 1);
+            }
+        } catch (\Throwable $e) {
+            try {
+                $t = \Illuminate\Support\Facades\DB::select("SHOW STATUS LIKE 'Threads_connected'");
+                $m = \Illuminate\Support\Facades\DB::select("SHOW VARIABLES LIKE 'max_connections'");
+                if (isset($t[0], $m[0]) && (int) $m[0]->Value > 0) {
+                    $threads = (int) $t[0]->Value;
+                    $maxConn = (int) $m[0]->Value;
+                    $pct     = round($threads / $maxConn * 100, 1);
+                }
+            } catch (\Throwable $e2) {
+                // Unavailable — return null values.
+            }
+        }
+
+        return response()->json([
+            'threads'         => $threads,
+            'max_connections' => $maxConn,
+            'pct'             => $pct,
+        ]);
+    }
+
     public function toggle(Request $request, $key)
     {
         $control = SystemControl::toggle($key, auth('admin')->id());

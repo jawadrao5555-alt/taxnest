@@ -67,7 +67,13 @@ async function reportPrinters() {
     }));
     await axios.post(
       `${cfg.serverUrl}/printers`,
-      { printers },
+      {
+        printers,
+        // Per-counter routing (v1.9.0): this PC's own printer list is stored
+        // on its device row so the admin can pick a printer PER counter.
+        device_uid: cfg.deviceUid || null,
+        hostname: cfg.hostname || null,
+      },
       { headers: { Authorization: `Bearer ${cfg.apiKey}` }, timeout: 10000 }
     );
     printStatus.printersReported = printers.length;
@@ -164,7 +170,11 @@ async function reportJobResult(jobId, success, error) {
   try {
     await axios.post(
       `${cfg.serverUrl}/print-jobs/${jobId}/result`,
-      { success, error: error ? String(error).slice(0, 500) : null },
+      {
+        success,
+        error: error ? String(error).slice(0, 500) : null,
+        device_uid: cfg.deviceUid || null,
+      },
       { headers: { Authorization: `Bearer ${cfg.apiKey}` }, timeout: 10000 }
     );
   } catch (e) {
@@ -189,7 +199,10 @@ async function pollPrintJobs() {
   let nextDelay = 1500;
   try {
     // timeout must comfortably exceed the server's max hold (8s).
-    const res = await axios.get(`${cfg.serverUrl}/print-jobs?wait=8`, {
+    // device_uid (v1.9.0): the server hands us our own counter's stamped jobs
+    // plus unstamped company-wide jobs; another counter's jobs are never ours.
+    const deviceParam = cfg.deviceUid ? `&device_uid=${encodeURIComponent(cfg.deviceUid)}` : '';
+    const res = await axios.get(`${cfg.serverUrl}/print-jobs?wait=8${deviceParam}`, {
       headers: { Authorization: `Bearer ${cfg.apiKey}` },
       timeout: 15000,
     });

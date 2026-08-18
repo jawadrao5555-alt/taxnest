@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.9.0 (2026-08-18)
+**Per-counter printer routing — har cashier ka apna printer (Task 1166)**
+
+- **Persistent device identity**: every install now generates a one-time random device UID (stored with the config) and reports it + the PC hostname on heartbeat, printer reports, print-job polling and job results. Multi-counter shops (same company key on several PCs) appear as separate named "Counters" on the Printer Settings page.
+- **Own-counter claiming**: a device-aware agent claims ONLY jobs stamped for its own counter plus unstamped company-wide jobs — two agents no longer race for each other's bills. Old agents/servers keep exactly the old behavior (UID simply ignored).
+- Purely additive: single-PC shops see zero change and need zero reconfiguration.
+
 ## v1.6.2 (2026-08-08)
 **Instant silent printing (long-poll)**
 

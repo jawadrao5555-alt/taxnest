@@ -31,6 +31,75 @@ class AgentController extends Controller
     }
 
     /**
+     * Task 1166 — per-counter printer routing. Column/table guards for the
+     * multi-counter device registry, cached per request (deploy window where
+     * code lands before the migration must never 500 an agent call).
+     */
+    public static function deviceRoutingReady(): bool
+    {
+        static $ready = null;
+        // Tests share one PHP process across many Schema::dropAllTables()
+        // rebuilds — a cached answer from another suite's schema would poison
+        // every later test. Production is one process per request: cache there.
+        if ($ready === null || app()->runningUnitTests()) {
+            try {
+                $ready = \Illuminate\Support\Facades\Schema::hasTable('pos_agent_devices')
+                    && \Illuminate\Support\Facades\Schema::hasColumn('pos_print_jobs', 'device_uid');
+            } catch (\Throwable $e) {
+                $ready = false;
+            }
+        }
+        return $ready;
+    }
+
+    /**
+     * Sanitized device UID from an agent request (query or body), or null.
+     * Old agents send nothing → null → exact legacy behavior everywhere.
+     */
+    private function requestDeviceUid(Request $request): ?string
+    {
+        $uid = trim((string) $request->input('device_uid', $request->query('device_uid', '')));
+        if ($uid === '' || strlen($uid) > 64 || !preg_match('/^[A-Za-z0-9._-]+$/', $uid)) {
+            return null;
+        }
+        return $uid;
+    }
+
+    /**
+     * Upsert this agent install's device row (multi-counter registry).
+     * Fire-and-forget telemetry: throttled to one write per 60s per device
+     * (heartbeat is every 30s and claim polls are near-continuous), and any
+     * failure is swallowed — a registry hiccup must never break printing.
+     */
+    private function syncAgentDevice($company, Request $request, array $extra = []): void
+    {
+        $uid = $this->requestDeviceUid($request);
+        if (!$uid || !self::deviceRoutingReady()) {
+            return;
+        }
+        $throttleKey = 'agent_device_beat_' . $company->id . '_' . md5($uid);
+        if (empty($extra) && !\Illuminate\Support\Facades\Cache::add($throttleKey, 1, 60)) {
+            return; // plain last-seen beat already written recently
+        }
+        try {
+            $attrs = ['last_seen_at' => now()] + $extra;
+            if ($request->filled('hostname')) {
+                $attrs['hostname'] = mb_substr(trim((string) $request->input('hostname')), 0, 120);
+            }
+            if ($request->filled('version')) {
+                $attrs['agent_version'] = mb_substr((string) $request->input('version'), 0, 32);
+            }
+            \App\Models\PosAgentDevice::updateOrCreate(
+                ['company_id' => $company->id, 'device_uid' => $uid],
+                $attrs
+            );
+        } catch (\Throwable $e) {
+            // Unique-key race between two first beats, or transient DB issue —
+            // the next beat self-heals. Never block the agent call.
+        }
+    }
+
+    /**
      * Self-update advertisement for v1.3.0+ agents, piggybacked on the
      * heartbeat response. Reuses the cached GitHub latest-release info so
      * agents never hit api.github.com directly (shared-ISP rate limits).
@@ -156,6 +225,10 @@ class AgentController extends Controller
         }
 
         $this->telemetryUpdate($company, $update);
+
+        // Task 1166: multi-counter registry — agents v1.9.0+ identify their
+        // counter PC with a persistent device_uid + hostname on every beat.
+        $this->syncAgentDevice($company, $request);
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {
@@ -666,6 +739,15 @@ class AgentController extends Controller
             'agent_last_seen' => now(),
         ]);
 
+        // Task 1166: also store THIS counter's own printer list on its device
+        // row, so the Printer Settings page can offer a per-device dropdown.
+        // Company-wide list above stays exactly as before (legacy fallback —
+        // last reporter wins, same as today).
+        $this->syncAgentDevice($company, $request, [
+            'printers' => $settings['available_printers'],
+            'printers_reported_at' => now(),
+        ]);
+
         return response()->json(['ok' => true, 'count' => count($settings['available_printers'])]);
     }
 
@@ -677,6 +759,31 @@ class AgentController extends Controller
     public function claimPrintJobs(Request $request)
     {
         $company = $request->attributes->get('agent_company');
+
+        // Task 1166 — per-counter routing. Claim visibility rules:
+        //   agent WITH device_uid    → its own stamped jobs + unstamped (legacy) jobs
+        //   agent WITHOUT device_uid → unstamped jobs ONLY (a legacy agent must
+        //                              never race another counter's stamped bill)
+        // Column-guarded: pre-migration prod behaves exactly as before.
+        $deviceUid = self::deviceRoutingReady() ? $this->requestDeviceUid($request) : null;
+        $deviceAware = self::deviceRoutingReady();
+        if ($deviceAware) {
+            // Poll beats keep the device row's last_seen fresh (throttled) so
+            // the Printer Settings page and enqueue-time routing see it online.
+            $this->syncAgentDevice($company, $request);
+        }
+        $deviceScope = function ($q) use ($deviceAware, $deviceUid) {
+            if (!$deviceAware) {
+                return; // column not migrated yet — legacy behavior
+            }
+            if ($deviceUid) {
+                $q->where(function ($w) use ($deviceUid) {
+                    $w->whereNull('device_uid')->orWhere('device_uid', $deviceUid);
+                });
+            } else {
+                $q->whereNull('device_uid');
+            }
+        };
 
         // Housekeeping (stale requeue + purge) is throttled to once per 30s per
         // company — with long-polling agents this endpoint runs far more often
@@ -704,6 +811,7 @@ class AgentController extends Controller
         $pendingExists = fn () => DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
+            ->where($deviceScope)
             ->exists();
         $hasPending = $pendingExists();
         if ($wait > 0 && !$hasPending) {
@@ -748,6 +856,7 @@ class AgentController extends Controller
         DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
             ->where('status', 'pending')
+            ->where($deviceScope)
             ->orderBy('id')
             ->limit(10)
             ->update([
@@ -840,6 +949,51 @@ class AgentController extends Controller
      */
     private function printJobsHousekeeping($company): void
     {
+        // Task 1166 — stranded stamped-job rescue: a job stamped for a counter
+        // whose agent stopped claiming (PC shut down right after enqueue, agent
+        // downgraded mid-flight) must NEVER sit pending forever. Rescue ONLY
+        // when the assigned device itself has gone OFFLINE (row gone or
+        // last_seen past the 2-min online window — an actively polling agent
+        // beats last_seen at least every 60s): a busy-but-alive counter working
+        // through a print backlog must never have its queued bills released to
+        // another counter just because they aged past a timer. For a genuinely
+        // dead counter, wait 90s of no claim, then unstamp so any company agent
+        // picks the job up, retargeting bill/proof to the company default
+        // receipt printer when one is set (the per-device printer may not
+        // exist on the rescuing PC). Enqueue-time routing only stamps ONLINE
+        // devices, so this is rare.
+        if (self::deviceRoutingReady()) {
+            $deviceOfflineBefore = now()->subSeconds(120);
+            $stranded = DB::table('pos_print_jobs as j')
+                ->leftJoin('pos_agent_devices as d', function ($join) use ($company) {
+                    $join->on('d.device_uid', '=', 'j.device_uid')
+                        ->where('d.company_id', '=', $company->id);
+                })
+                ->where('j.company_id', $company->id)
+                ->where('j.status', 'pending')
+                ->whereNotNull('j.device_uid')
+                ->where('j.created_at', '<', now()->subSeconds(90))
+                ->where(function ($q) use ($deviceOfflineBefore) {
+                    $q->whereNull('d.id')                                  // device row vanished
+                        ->orWhereNull('d.last_seen_at')                    // never seen
+                        ->orWhere('d.last_seen_at', '<', $deviceOfflineBefore); // offline
+                })
+                ->get(['j.id', 'j.type']);
+            if ($stranded->isNotEmpty()) {
+                $defaultReceipt = $company->printerSettings()['receipt_printer'] ?? null;
+                foreach ($stranded as $row) {
+                    $upd = ['device_uid' => null, 'updated_at' => now()];
+                    if ($defaultReceipt && in_array($row->type, ['bill', 'proof'], true)) {
+                        $upd['target_printer'] = $defaultReceipt;
+                    }
+                    DB::table('pos_print_jobs')->where('id', $row->id)->update($upd);
+                }
+                Log::info('PRINT_ROUTING stranded stamped jobs rescued to company scope', [
+                    'company_id' => $company->id, 'count' => $stranded->count(),
+                ]);
+            }
+        }
+
         // Stale-claim requeue: a job stuck 'printing' >2 min means the agent
         // died mid-print. Retry up to 3 attempts, then park as failed.
         DB::table('pos_print_jobs')
@@ -1104,6 +1258,10 @@ class AgentController extends Controller
             'success' => 'required|boolean',
             'error' => 'nullable|string|max:2000',
         ]);
+
+        // Task 1166: result reports also carry the device identity (throttled
+        // last-seen beat — keeps the counter visibly online while printing).
+        $this->syncAgentDevice($company, $request);
 
         $job = \App\Models\PosPrintJob::where('company_id', $company->id)->find($id);
         if (!$job) {

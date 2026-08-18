@@ -537,8 +537,29 @@ class PosController extends Controller
             $counterKot = trim((string) ($validated['counter_kot_printer'] ?? ''));
             $settings['counter_kot_printer'] = ($counterKot !== '' && in_array($counterKot, $known, true)) ? $counterKot : null;
             $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+
+            // Task 1166 — per-counter devices: persist the multi-counter section
+            // BEFORE the master eligibility check so a shop configured ONLY with
+            // per-counter printers (no company-wide pick) can still enable silent
+            // printing in the same save. Validated per-device; no-op on legacy
+            // schemas / single-counter shops (form posts nothing).
+            $this->savePrinterDeviceSettings($request, $companyId);
+
+            // Master toggle needs at least ONE real print target: a company-wide
+            // receipt/KOT printer, or any counter with its own receipt printer
+            // (multi-counter shops may not set a company default at all).
+            $hasDevicePrinter = false;
+            if (\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+                try {
+                    $hasDevicePrinter = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                        ->whereNotNull('receipt_printer')
+                        ->exists();
+                } catch (\Throwable $e) {
+                    $hasDevicePrinter = false;
+                }
+            }
             $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
-                && ($settings['receipt_printer'] || $settings['kot_printer']);
+                && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
             // Task 565: opt-in Yes/No print-confirm dialog — independent of the
             // silent-print master (works for iframe/popup shops too).
             $settings['print_confirm_ask'] = $request->boolean('print_confirm_ask');
@@ -559,7 +580,80 @@ class PosController extends Controller
             ->limit(10)
             ->get();
 
-        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed'));
+        // Task 1166 — multi-counter registry (empty collections on legacy schema
+        // or single-counter shops whose agent predates device identity).
+        $devices = collect();
+        $assignableTeam = collect();
+        if (\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+            $devices = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                ->orderByDesc('last_seen_at')
+                ->get();
+            if ($devices->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')) {
+                // Everyone who can press Print on a bill: owner/admins, managers,
+                // cashiers. Kitchen/waiter/rider roles never create bill jobs.
+                $assignableTeam = User::where('company_id', $companyId)
+                    ->where(function ($q) {
+                        $q->where('role', 'company_admin')
+                          ->orWhereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier']);
+                    })
+                    ->orderByRaw("CASE WHEN pos_role = 'pos_admin' OR role = 'company_admin' THEN 0 WHEN pos_role = 'pos_manager' THEN 1 ELSE 2 END")
+                    ->orderBy('name')
+                    ->get();
+            }
+        }
+
+        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'devices', 'assignableTeam'));
+    }
+
+    /**
+     * Task 1166 — persist the multi-counter section of the Printer Settings
+     * form: device_receipt_printer[uid], device_name[uid], user_device[userId].
+     * Every value is validated against THIS company's registered devices and
+     * each device's own reported printer list — a printer another counter
+     * reported can never be saved onto this one.
+     */
+    private function savePrinterDeviceSettings(Request $request, int $companyId): void
+    {
+        if (!\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+            return;
+        }
+        $devices = \App\Models\PosAgentDevice::where('company_id', $companyId)->get()->keyBy('device_uid');
+        if ($devices->isEmpty()) {
+            return;
+        }
+
+        $printerPicks = (array) $request->input('device_receipt_printer', []);
+        $names = (array) $request->input('device_name', []);
+        foreach ($devices as $uid => $device) {
+            $dirty = [];
+            if (array_key_exists($uid, $printerPicks)) {
+                $pick = trim((string) $printerPicks[$uid]);
+                $own = collect($device->printers ?? [])->pluck('name')->all();
+                $dirty['receipt_printer'] = ($pick !== '' && in_array($pick, $own, true)) ? $pick : null;
+            }
+            if (array_key_exists($uid, $names)) {
+                $name = mb_substr(trim((string) $names[$uid]), 0, 60);
+                $dirty['name'] = $name !== '' ? $name : null;
+            }
+            if ($dirty) {
+                $device->update($dirty);
+            }
+        }
+
+        if ($request->has('user_device') && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')) {
+            foreach ((array) $request->input('user_device', []) as $userId => $uid) {
+                if (!is_numeric($userId)) {
+                    continue;
+                }
+                $member = User::where('company_id', $companyId)->find((int) $userId);
+                if (!$member) {
+                    continue;
+                }
+                $uid = trim((string) $uid);
+                $member->pos_device_uid = ($uid !== '' && $devices->has($uid)) ? $uid : null;
+                $member->save();
+            }
+        }
     }
 
     /**
@@ -662,6 +756,39 @@ class PosController extends Controller
     }
 
     /**
+     * Task 1166 — resolve the pressing user's assigned counter for bill/proof
+     * silent prints. Returns ['device_uid' => ..., 'printer' => ...] ONLY when
+     * every link in the chain holds:
+     *   user has an assignment → device row exists (this company) → agent on
+     *   that PC heartbeat within 2 min → admin picked that counter's receipt
+     *   printer. Otherwise null = company-wide behavior (today's path), so a
+     *   bill can never be stamped for a counter that cannot print it.
+     * Schema-guarded: pre-migration prod short-circuits to null.
+     */
+    private function resolveUserPrintDevice($user, int $companyId): ?array
+    {
+        try {
+            if (!\App\Http\Controllers\AgentController::deviceRoutingReady()
+                || !\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')) {
+                return null;
+            }
+            $uid = $user->pos_device_uid ?? null;
+            if (!$uid) {
+                return null;
+            }
+            $device = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                ->where('device_uid', $uid)
+                ->first();
+            if (!$device || !$device->isOnline() || !$device->receipt_printer) {
+                return null;
+            }
+            return ['device_uid' => $device->device_uid, 'printer' => $device->receipt_printer];
+        } catch (\Throwable $e) {
+            return null; // routing must never break the print fallback chain
+        }
+    }
+
+    /**
      * Session-authed enqueue of a silent print job (bill receipt or KOT).
      * Returns 409 when silent printing cannot happen right now (disabled,
      * printer not chosen, or agent offline) — the sale screen falls back to
@@ -698,9 +825,17 @@ class PosController extends Controller
             return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
         }
 
+        // Task 1166 — per-counter routing (bill + proof only; KOT/kitchen
+        // routing is deliberately untouched): if the pressing cashier is
+        // assigned to a counter whose agent is ONLINE and has its own receipt
+        // printer, stamp the job for that counter. Anything short of that
+        // (no assignment, device never seen, offline, no per-device printer,
+        // pre-migration schema) → NULL route = today's company-wide behavior.
+        $deviceRoute = $this->resolveUserPrintDevice($user, $companyId);
+
         // ── BILL: single job, receipt printer (unchanged behavior) ─────────
         if ($validated['type'] === 'bill') {
-            if (!$settings['receipt_printer']) {
+            if (!$deviceRoute && !$settings['receipt_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
             $exists = PosTransaction::withoutGlobalScope('hide_archived')
@@ -717,6 +852,10 @@ class PosController extends Controller
             // matches the agent's stale-requeue window), don't enqueue a second
             // copy; report success with a deduped flag so the UI can explain.
             // Once the job is done, a fresh press = legitimate reprint (allowed).
+            // Task 1166: the dedupe key deliberately stays TRANSACTION-scoped
+            // (not per-device) — a second press for the same bill from another
+            // counter within the window is still a duplicate physical copy of
+            // one bill, exactly what this guard exists to prevent.
             $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
                 ->where('type', 'bill')
                 ->where('transaction_id', (int) $validated['transaction_id'])
@@ -730,7 +869,8 @@ class PosController extends Controller
             $job = \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'bill',
-                'target_printer' => $settings['receipt_printer'],
+                'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
+                'device_uid' => $deviceRoute['device_uid'] ?? null,
                 'transaction_id' => (int) $validated['transaction_id'],
                 'status' => 'pending',
                 'created_by' => $user->id,
@@ -741,7 +881,7 @@ class PosController extends Controller
         // ── PROOF BILL (ZFC 28 Jul 2026): pre-bill on the RECEIPT printer —
         // silent path so the desktop app never pops the Windows print dialog. ──
         if ($validated['type'] === 'proof') {
-            if (!$settings['receipt_printer']) {
+            if (!$deviceRoute && !$settings['receipt_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
             $exists = \App\Models\RestaurantOrder::where('company_id', $companyId)
@@ -765,7 +905,8 @@ class PosController extends Controller
             $job = \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'proof',
-                'target_printer' => $settings['receipt_printer'],
+                'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
+                'device_uid' => $deviceRoute['device_uid'] ?? null,
                 'restaurant_order_id' => (int) $validated['restaurant_order_id'],
                 'status' => 'pending',
                 'created_by' => $user->id,

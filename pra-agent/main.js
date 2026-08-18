@@ -677,10 +677,32 @@ if (!gotInstanceLock) {
   });
 }
 
+// Per-counter printer routing (v1.9.0, Task 1166): every install identifies
+// itself with a persistent random device UID (generated once, stored in the
+// same electron-store as the config) + the PC hostname. Multi-counter shops
+// run the SAME company key on several PCs — the UID is what tells the server
+// which counter is which, so each cashier's bills print on their own counter.
+function getDeviceUid() {
+  let uid = store.get('deviceUid');
+  if (!uid || typeof uid !== 'string') {
+    const rand = require('crypto').randomBytes(12).toString('hex');
+    uid = 'dev-' + rand;
+    store.set('deviceUid', uid);
+    console.log('[device-id] generated persistent device UID:', uid);
+  }
+  return uid;
+}
+
 // Attach the real app version/build so heartbeats report them to the server
 // (the server piggybacks `agent_update` info on the heartbeat response).
 function withAppMeta(config) {
-  return { ...config, appVersion: app.getVersion(), appBuild: BUILD_TIMESTAMP };
+  return {
+    ...config,
+    appVersion: app.getVersion(),
+    appBuild: BUILD_TIMESTAMP,
+    deviceUid: getDeviceUid(),
+    hostname: (() => { try { return os.hostname(); } catch (e) { return null; } })(),
+  };
 }
 
 app.on('window-all-closed', (e) => {

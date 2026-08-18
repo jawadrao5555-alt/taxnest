@@ -191,6 +191,10 @@ async function heartbeat() {
         version: currentConfig.appVersion || '1.0.0',
         build: currentConfig.appBuild || null,
         company_id: currentConfig.companyId,
+        // Per-counter routing (v1.9.0): persistent device identity so the
+        // server can tell multi-counter installs (same key) apart.
+        device_uid: currentConfig.deviceUid || null,
+        hostname: currentConfig.hostname || null,
         ...extra,
       },
       {

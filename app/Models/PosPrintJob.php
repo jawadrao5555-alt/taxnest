@@ -17,6 +17,8 @@ class PosPrintJob extends Model
         'render_query',
         'status',
         'claim_token',
+        'device_uid', // Task 1166: per-counter routing — NULL = company-wide job
+
         'printed_item_ids',
         'error',
         'attempts',

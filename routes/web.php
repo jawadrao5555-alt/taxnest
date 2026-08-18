@@ -913,6 +913,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/team/cashier/{id}/toggle', [PosController::class, 'toggleCashier'])->name('pos.team.toggle-cashier');
         Route::post('/team/cashier/{id}/pra', [PosController::class, 'setCashierPra'])->name('pos.team.set-pra');
         Route::post('/team/scope-permission', [PosController::class, 'setBillingScopePermission'])->name('pos.team.scope-permission');
+        // Task 1197: owner-only "Cashier sirf apni sale dekhe" switch (default ON).
+        Route::post('/team/own-sales', [PosController::class, 'setCashierOwnSales'])->name('pos.team.own-sales');
         // Custom Access (Task #111): per-member feature tick-boxes.
         Route::post('/team/cashier/{id}/access', [PosController::class, 'setCashierAccess'])->name('pos.team.set-access');
 

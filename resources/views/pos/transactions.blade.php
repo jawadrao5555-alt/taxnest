@@ -57,6 +57,9 @@
                         $q->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                     });
                 }
+                // Task 1197: an isolated cashier's badge counts only their own
+                // failed bills (bulkRetryPra applies the same predicate).
+                \App\Models\PosTransaction::applyCashierIsolation($failedCountQuery, auth('pos')->user());
                 $failedCount = $failedCountQuery->count();
             @endphp
             @if($failedCount > 0)
@@ -127,6 +130,19 @@
             @endif
             <input type="date" name="date_from" value="{{ request('date_from') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <input type="date" name="date_to" value="{{ request('date_to') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+            {{-- Task 1197: per-cashier filter (admin/manager only — mirrors the
+                 Reports dropdown). Isolated cashiers are server-forced onto
+                 their own bills and see a badge below instead. --}}
+            @if(!($txnIsolated ?? false) && ($user?->isPosAdmin() ?? false) && ($teamMembers ?? collect())->isNotEmpty())
+            <select name="cashier" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                <option value="all" {{ ($selectedCashier ?? 'all') === 'all' ? 'selected' : '' }}>{{ __('pos.opt_all_company_sales') }}</option>
+                @foreach($teamMembers as $member)
+                <option value="{{ $member->id }}" {{ ($selectedCashier ?? 'all') == $member->id ? 'selected' : '' }}>
+                    {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? __('pos.role_admin') : ($member->pos_role === 'pos_manager' ? __('pos.role_manager') : __('pos.role_cashier')) }})
+                </option>
+                @endforeach
+            </select>
+            @endif
             <div class="flex items-center gap-3">
                 <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">{{ __("pos.filter_btn") }}</button>
                 {{-- Wastage filter (Task 593): spoiled-goods return bills only --}}
@@ -136,6 +152,22 @@
                 </label>
             </div>
         </form>
+        {{-- Task 1197: what the list is scoped to — isolated cashier badge, or
+             the admin's selected team member (mirrors the Reports badges). --}}
+        @if($txnIsolated ?? false)
+        <div class="mt-3">
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                {{ __('pos.showing_my_sales') }}
+            </span>
+        </div>
+        @elseif(($selectedCashier ?? 'all') !== 'all' && ($teamMembers ?? collect())->isNotEmpty())
+        <div class="mt-3 flex items-center gap-2">
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                {{ __('pos.showing_name', ['name' => $teamMembers->firstWhere('id', $selectedCashier)?->name ?? __('pos.th_staff')]) }}
+            </span>
+            <a href="{{ route('pos.transactions', array_filter(['tab' => $tab ?? null, 'search' => request('search'), 'payment_method' => request('payment_method'), 'order_type' => request('order_type'), 'date_from' => request('date_from'), 'date_to' => request('date_to'), 'cashier' => 'all'])) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">{{ __('pos.clear') }}</a>
+        </div>
+        @endif
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">

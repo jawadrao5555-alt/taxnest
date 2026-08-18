@@ -2614,6 +2614,10 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
 
         $user = auth('pos')->user();
+        // Admin/manager/owner ONLY — cashiers (and every other role) are
+        // redirected to the sale screen, so the company-wide figures below are
+        // never exposed to an isolated cashier (Task 1197): no per-cashier
+        // filtering is needed on this dashboard by construction.
         if ($user && !in_array($user->pos_role, ['pos_admin', 'pos_manager'], true) && $user->role !== 'company_admin') {
             return redirect('/pos/invoice/create');
         }
@@ -2889,6 +2893,11 @@ class RestaurantPosController extends Controller
             ->with(['items', 'payments', 'creator', 'terminal'])
             ->findOrFail($transactionId);
 
+        // Task 1197: per-cashier isolation — an isolated cashier can't render
+        // another cashier's receipt via this restaurant reprint path either
+        // (parity with PosController::receipt's billingScopeAllowsRow guard).
+        abort_unless($transaction->allowedForCashierIsolationOf(auth('pos')->user()), 403);
+
         // Restaurant POS sale-time + reprint now use the SAME beautiful
         // typewriter-style thermal receipt as the universal Reports flow
         // (pos.receipts.receipt_80mm / receipt_58mm). Single source of truth
@@ -2918,6 +2927,10 @@ class RestaurantPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $txn = PosTransaction::where('company_id', $companyId)->findOrFail($transactionId);
+        // Cashier sales isolation (Task 1197): an isolated cashier can't view
+        // another cashier's receipt, so they must not be able to mutate its
+        // printed/reprint status via a direct POST either.
+        abort_unless($txn->allowedForCashierIsolationOf(auth('pos')->user()), 403);
         if ($txn->receipt_printed_at) {
             $txn->increment('reprint_count');
             return response()->json(['success' => true, 'reprint' => true, 'count' => $txn->reprint_count]);

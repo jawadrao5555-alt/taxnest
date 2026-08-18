@@ -1705,6 +1705,12 @@ return [
     'billing_scope_perm_on' => 'منتظمین کو اجازت ہے — بند کرنے کے لیے دبائیں',
     'billing_scope_perm_off' => 'صرف مالک — منتظمین کو اجازت دینے کے لیے دبائیں',
     'billing_scope_perm_saved' => 'بلنگ دائرہ کی اجازت محفوظ ہو گئی۔',
+    // Task 1197: per-cashier sales isolation (owner-only switch, default ON).
+    'cashier_own_sales_title' => 'خزانچی صرف اپنی فروخت دیکھے',
+    'cashier_own_sales_hint' => 'کھلا (معمول) ہو تو ہر خزانچی کو صرف اپنے بنائے بل نظر آتے ہیں — لین دین، دوبارہ چھپائی اور مرکزی صفحہ میں۔ منتظم اور مالک کو ہمیشہ پوری دکان دکھتی ہے۔ بند کریں تو خزانچی ایک دوسرے کے بل دیکھ سکتے ہیں (رپورٹوں میں خزانچی کو ہمیشہ صرف اپنی فروخت ہی دکھتی ہے)۔',
+    'cashier_own_sales_on' => 'صرف اپنی فروخت — مشترکہ دیکھنے کے لیے دبائیں',
+    'cashier_own_sales_off' => 'مشترکہ منظر — الگ کرنے کے لیے دبائیں',
+    'cashier_own_sales_saved' => 'خزانچی کی فروخت کی ترتیب محفوظ ہو گئی۔',
     // Task 1186: derived default — har cashier ko by default apni stream dikhti hai.
     'billing_scope_auto' => 'خودکار — اپنا سلسلہ (رپورٹنگ کے مطابق)',
     'billing_scope_auto_pra' => 'خودکار — پی آر اے (رپورٹنگ حالت کے مطابق)',

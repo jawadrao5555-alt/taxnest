@@ -1705,6 +1705,12 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'billing_scope_perm_on' => 'Admins allowed — click to turn off',
     'billing_scope_perm_off' => 'Owner only — click to allow admins',
     'billing_scope_perm_saved' => 'Billing Scope permission updated.',
+    // Task 1197: per-cashier sales isolation (owner-only switch, default ON).
+    'cashier_own_sales_title' => 'Cashier sees only their own sales',
+    'cashier_own_sales_hint' => 'When on (default), every cashier sees only the bills they made — in transactions, reprint and dashboard. Managers and the owner always see everything. Turn off for shared bill lists between cashiers (in reports a cashier always sees only their own sales).',
+    'cashier_own_sales_on' => 'Own sales only — click for shared view',
+    'cashier_own_sales_off' => 'Shared view — click to isolate cashiers',
+    'cashier_own_sales_saved' => 'Cashier sales visibility updated.',
     // Task 1186: derived default — every cashier sees their own stream by default.
     'billing_scope_auto' => 'Auto — own stream (follows PRA reporting)',
     'billing_scope_auto_pra' => 'Auto — PRA (follows reporting status)',

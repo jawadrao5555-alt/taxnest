@@ -57,6 +57,9 @@ class PosQuickReturnLookupTest extends TestCase
             $table->boolean('agent_submits_pra')->default(false);
             $table->boolean('inventory_enabled')->default(false);
             $table->boolean('pos_setup_completed')->default(true);
+            // Cashier sales isolation OFF: quick-lookup matching + return
+            // rights on a shared-visibility shop (missing column = default ON).
+            $table->boolean('pos_cashier_own_sales_only')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -107,6 +110,7 @@ class PosQuickReturnLookupTest extends TestCase
         $this->companyId = DB::table('companies')->insertGetId([
             'name' => 'Lookup Shop',
             'pos_setup_completed' => true,
+            'pos_cashier_own_sales_only' => false, // shared shop: lookup + rights, not isolation, under test
             'created_at' => now(), 'updated_at' => now(),
         ]);
         app()->bind('currentCompanyId', fn () => $this->companyId);

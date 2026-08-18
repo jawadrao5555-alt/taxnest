@@ -51,6 +51,7 @@ class PosDashboardTodayKhataTest extends TestCase
             $table->boolean('is_internal_account')->default(false);
             $table->integer('invoice_limit_override')->nullable();
             $table->boolean('pra_reporting_enabled')->default(false);
+            $table->boolean('pos_cashier_own_sales_only')->nullable();
             $table->string('pra_connection_mode')->nullable();
             $table->boolean('pos_setup_completed')->default(true);
             $table->string('pos_dashboard_style')->nullable();
@@ -174,6 +175,9 @@ class PosDashboardTodayKhataTest extends TestCase
     {
         return (int) DB::table('companies')->insertGetId(array_merge([
             'name' => 'Khata Co',
+            // Shared shop: khata bucket/scope math under test, not isolation
+            // (missing column = default ON would zero the cashier buckets).
+            'pos_cashier_own_sales_only' => false,
             'product_type' => 'pos',
             'status' => 'active',
             'pos_setup_completed' => true,

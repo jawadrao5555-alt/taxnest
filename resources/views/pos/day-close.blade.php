@@ -62,6 +62,9 @@
                     <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('pos.closed_on', ['datetime' => $existingReport->created_at->format('d M Y h:i A')]) }}</p>
                 </div>
             </div>
+            {{-- Task 1197: Z prints are COMPANY-WIDE documents — isolated
+                 cashiers get no links (the routes redirect them anyway). --}}
+            @if(!($dcIso ?? false))
             <div class="flex items-center gap-2">
                 <a href="{{ route('pos.day-close-thermal', $existingReport->id) }}" target="_blank" class="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-900 transition flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -72,6 +75,7 @@
                     {{ __('pos.download_pdf') }}
                 </a>
             </div>
+            @endif
         </div>
     </div>
     @endif
@@ -385,7 +389,8 @@
     </div>
 
             {{-- Cash reconciliation (stored on closed report) --}}
-            @if($existingReport && ($existingReport->counted_cash !== null || $existingReport->opening_float !== null))
+            {{-- Task 1197: frozen shop-wide drawer figures — hidden from isolated cashiers. --}}
+            @if($existingReport && !($dcIso ?? false) && ($existingReport->counted_cash !== null || $existingReport->opening_float !== null))
             @php $variance = (float) $existingReport->cash_variance; @endphp
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
                 <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -1013,7 +1018,8 @@
     </div>
     @endif
 
-    @if($existingReport && is_array($existingReport->local_summary) && (collect($existingReport->local_summary)->sum('count') > 0 || collect($existingReport->local_summary)->sum('finalized') > 0))
+    {{-- Task 1197: frozen wash summary is company-wide — isolated cashiers see their live localWash preview instead. --}}
+    @if($existingReport && !($dcIso ?? false) && is_array($existingReport->local_summary) && (collect($existingReport->local_summary)->sum('count') > 0 || collect($existingReport->local_summary)->sum('finalized') > 0))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.local_bills_closed_with_day') }}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1042,7 +1048,8 @@
 
     {{-- Delivery Riders (Jul 2026): rider day detail stored on the closed report.
          Same placement logic as the wash summary — shows even when PRA sales are zero. --}}
-    @if($existingReport && is_array($existingReport->rider_summary) && !empty($existingReport->rider_summary['riders']))
+    {{-- Task 1197: frozen rider recon is company-wide — hidden from isolated cashiers. --}}
+    @if($existingReport && !($dcIso ?? false) && is_array($existingReport->rider_summary) && !empty($existingReport->rider_summary['riders']))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.delivery_riders_day_summary') }}</h3>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">

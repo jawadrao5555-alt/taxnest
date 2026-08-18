@@ -62,7 +62,12 @@ class PosReturnController extends Controller
         // Task 1186: effective scope (derived default included) + own-bill
         // exemption — a derived-scope cashier can always return apna hi
         // banaya bill, whichever stream it landed in.
-        if (!$txn->allowedForBillingScopeOf(auth('pos')->user())) {
+        // Task 1197: AND the per-cashier isolation verdict — an isolated
+        // cashier can only return their OWN bills; returns on other cashiers'
+        // bills are manager/owner work.
+        $viewer = auth('pos')->user();
+        if (!$txn->allowedForBillingScopeOf($viewer)
+            || !$txn->allowedForCashierIsolationOf($viewer)) {
             abort(403, __('pos.return_manager_only'));
         }
     }
@@ -182,7 +187,10 @@ class PosReturnController extends Controller
 
         // Stream lock (Task 678): same per-row predicate as reports/lists.
         // Task 1186: effective scope + own-bill exemption (derived only).
-        if (!$txn->allowedForBillingScopeOf(auth('pos')->user())) {
+        // Task 1197: isolated cashier can only quick-return their OWN bills.
+        $viewer = auth('pos')->user();
+        if (!$txn->allowedForBillingScopeOf($viewer)
+            || !$txn->allowedForCashierIsolationOf($viewer)) {
             return response()->json(['error' => __('pos.return_manager_only')], 403);
         }
 

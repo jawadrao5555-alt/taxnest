@@ -1705,6 +1705,12 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'billing_scope_perm_on' => 'Admins ko ijazat hai — band karne ke liye dabayen',
     'billing_scope_perm_off' => 'Sirf owner — admins ko ijazat dene ke liye dabayen',
     'billing_scope_perm_saved' => 'Billing Scope ki ijazat update ho gayi.',
+    // Task 1197: per-cashier sales isolation (owner-only switch, default ON).
+    'cashier_own_sales_title' => 'Cashier sirf apni sale dekhe',
+    'cashier_own_sales_hint' => 'ON (default) ho to har cashier ko sirf apne banaye bills nazar aate hain — transactions, reprint aur dashboard mein. Manager aur owner ko hamesha poori dukaan dikhti hai. OFF karein to cashiers aik doosre ke bills dekh sakte hain (reports mein cashier ko hamesha sirf apni sale hi dikhti hai).',
+    'cashier_own_sales_on' => 'Sirf apni sale — shared view ke liye dabayen',
+    'cashier_own_sales_off' => 'Shared view — alag karne ke liye dabayen',
+    'cashier_own_sales_saved' => 'Cashier sale ki visibility update ho gayi.',
     // Task 1186: derived default — har cashier ko by default apni stream dikhti hai.
     'billing_scope_auto' => 'Auto — apni stream (reporting ke mutabiq)',
     'billing_scope_auto_pra' => 'Auto — PRA (reporting status ke mutabiq)',

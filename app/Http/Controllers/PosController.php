@@ -851,9 +851,15 @@ class PosController extends Controller
             if (!$deviceRoute && !$settings['receipt_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
+            // Task 1197: query-side creator constraint — an isolated cashier
+            // cannot silent-print a peer's bill receipt; peer IDs mirror
+            // not_found (same no-existence-oracle stance as pra-status).
+            // KOT/proof branches stay shared: kitchen slips are the shared
+            // restaurant workflow (explicitly out of isolation scope).
             $exists = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('id', (int) $validated['transaction_id'])
+                ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, $user))
                 ->exists();
             if (!$exists) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
@@ -1244,6 +1250,33 @@ class PosController extends Controller
             };
         }
 
+        // Task 1197 — per-cashier day figures: an ISOLATED cashier's dashboard
+        // KPIs count ONLY their own bills (company switch "Cashier sirf apni
+        // sale dekhe", default ON); an admin/manager may inspect any single
+        // cashier via ?cashier=ID (the per-cashier selector). One variable
+        // drives every KPI query below — ANDs with the scope filters (compose,
+        // never replace). Drafts / notifications / opening cash stay shared
+        // (holds are a handover workflow, not sales).
+        $dashUser = auth('pos')->user();
+        $dashCashierId = null;
+        if ($dashUser?->posSalesIsolated()) {
+            $dashCashierId = (int) $dashUser->id;
+        } elseif (($dashUser?->isPosAdmin() ?? false) && $request->filled('cashier') && $request->get('cashier') !== 'all') {
+            $dashCashierId = (int) $request->get('cashier');
+        }
+        $dashOnly = function ($q) use ($dashCashierId) {
+            if ($dashCashierId) {
+                $q->where('created_by', $dashCashierId);
+            }
+            return $q;
+        };
+        $dashOnlyRaw = function ($q) use ($dashCashierId) {
+            if ($dashCashierId) {
+                $q->where('t.created_by', $dashCashierId);
+            }
+            return $q;
+        };
+
         // Return / credit-note netting (Task 578, same convention as day-close &
         // reports, Task 570): revenue figures are SIGNED (returns subtract),
         // bill counts stay SALES-only. Schema-guarded for prod drift —
@@ -1265,6 +1298,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', $bizToday)
             ->where($excludeLocal)
+            ->tap($dashOnly)
             ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
             ->first();
         // (Task 988: the avg_ticket figure is gone — the Avg. Order card was
@@ -1283,12 +1317,14 @@ class PosController extends Controller
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
             ->where('business_date', $bizToday)
+            ->tap($dashOnly)
             ->count();
 
         $monthStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->startOfMonth()->toDateString())
             ->where($excludeLocal)
+            ->tap($dashOnly)
             ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
             ->first();
 
@@ -1319,6 +1355,7 @@ class PosController extends Controller
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
                 ->where($dashExcludeReturnsRaw)
+                ->tap($dashOnlyRaw)
                 ->selectRaw('
                     COALESCE(SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN i.subtotal ELSE 0 END), 0) as gross_revenue,
                     COALESCE(SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN i.cost_price * i.quantity ELSE 0 END), 0) as total_cost
@@ -1336,6 +1373,7 @@ class PosController extends Controller
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
                 ->where($dashExcludeReturnsRaw)
+                ->tap($dashOnlyRaw)
                 ->selectRaw('
                     COALESCE(SUM(i.subtotal), 0) as gross_revenue,
                     COALESCE(SUM(COALESCE(p.cost_price, 0) * i.quantity), 0) as total_cost
@@ -1346,6 +1384,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', '>=', $periodStart)
             ->where($excludeLocal)
+            ->tap($dashOnly)
             ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
             ->first();
 
@@ -1381,6 +1420,7 @@ class PosController extends Controller
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->where($excludeLocalRaw)
             ->where($dashExcludeReturnsRaw)
+            ->tap($dashOnlyRaw)
             ->where('i.item_type', 'product')
             ->selectRaw('i.item_id, MAX(i.item_name) as name, SUM(i.quantity) as qty, SUM(i.subtotal) as revenue')
             ->groupBy('i.item_id')
@@ -1398,6 +1438,7 @@ class PosController extends Controller
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
                 ->where($dashExcludeReturnsRaw)
+                ->tap($dashOnlyRaw)
                 ->where('i.item_type', 'product')
                 ->where('i.cost_price', '>', 0)   // only lines with a frozen snapshot
                 ->selectRaw('
@@ -1421,6 +1462,7 @@ class PosController extends Controller
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
                 ->where($dashExcludeReturnsRaw)
+                ->tap($dashOnlyRaw)
                 ->where('i.item_type', 'product')
                 ->selectRaw('
                     i.item_id, MAX(i.item_name) as name,
@@ -1456,6 +1498,7 @@ class PosController extends Controller
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
                 ->where($dashExcludeReturnsRaw)
+                ->tap($dashOnlyRaw)
                 ->where('i.item_type', 'product')
                 ->selectRaw('COUNT(*) as total, SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN 1 ELSE 0 END) as with_cost')
                 ->first();
@@ -1476,6 +1519,7 @@ class PosController extends Controller
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
+            ->tap($dashOnly)
             ->with('creator')
             ->orderBy('created_at', 'desc')
             ->take(10)
@@ -1485,6 +1529,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', $bizToday)
             ->where($excludeLocal)
+            ->tap($dashOnly)
             ->selectRaw("payment_method, COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as total")
             ->groupBy('payment_method')
             ->get();
@@ -1506,7 +1551,7 @@ class PosController extends Controller
         // ── Task 666: "Aaj ka Khaata" — stream-wise today sale/tax summary ──
         // Build extracted to PosTodayKhata (14 Aug 2026) so the RESTAURANT
         // dashboard shows the identical card; conventions documented there.
-        $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizToday, $user);
+        $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizToday, $user, $dashCashierId);
         // ─────────────────────────────────────────────────────────────────────
 
         // Task 988 (owner video, 16 Aug 2026): the Today's Revenue card shows the
@@ -1516,10 +1561,10 @@ class PosController extends Controller
         // PRA-scoped / hidden-local users stay PRA-only, local-scoped stay
         // local-only). The chart / profit / payment tiles keep their existing
         // single-stream sources ($todayStats et al.).
-        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizToday, $bizToday);
+        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizToday, $bizToday, $dashCashierId);
         // Monthly card gets the same combined treatment so the two revenue
         // cards can never contradict each other.
-        $monthTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, now()->startOfMonth()->toDateString());
+        $monthTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, now()->startOfMonth()->toDateString(), null, $dashCashierId);
 
         // Task 988: "New Customers" card (replaces Avg. Order — owner voice note):
         // customers added in the current BUSINESS day + this calendar month.
@@ -1531,15 +1576,29 @@ class PosController extends Controller
         );
         // hasTable drift guard (PROD schema-drift policy): a schema without
         // pos_customers must still render the dashboard — counts show 0.
+        // Task 1197: with a staff filter active ($dashCashierId — isolated
+        // cashier OR admin's per-cashier view) the card counts only new
+        // customers that appear on THAT cashier's bills (pos_customers has no
+        // created_by column, so bill linkage is the attributable metric —
+        // never the company-wide total, which would leak/mislead).
         $hasCustomersTable = \Schema::hasTable('pos_customers');
-        $newCustomersToday = $hasCustomersTable
-            ? PosCustomer::where('company_id', $companyId)
-                ->where('created_at', '>=', $newCustWindowStart)->count()
-            : 0;
-        $newCustomersMonth = $hasCustomersTable
-            ? PosCustomer::where('company_id', $companyId)
-                ->where('created_at', '>=', now()->startOfMonth())->count()
-            : 0;
+        $newCustQ = function ($since) use ($companyId, $dashCashierId) {
+            $q = PosCustomer::where('company_id', $companyId)
+                ->where('created_at', '>=', $since);
+            if ($dashCashierId) {
+                if (!\Schema::hasColumn('pos_transactions', 'customer_id')) {
+                    return 0; // drift guard: fail closed, never company-wide
+                }
+                $q->whereIn('id', PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->where('created_by', $dashCashierId)
+                    ->whereNotNull('customer_id')
+                    ->select('customer_id'));
+            }
+            return $q->count();
+        };
+        $newCustomersToday = $hasCustomersTable ? $newCustQ($newCustWindowStart) : 0;
+        $newCustomersMonth = $hasCustomersTable ? $newCustQ(now()->startOfMonth()) : 0;
 
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
@@ -1554,7 +1613,7 @@ class PosController extends Controller
             // Task 988: vs-kal delta must compare like-with-like — yesterday's
             // figure is the same scope-aware COMBINED sale as the today card.
             $saafYesterdayBiz = \Carbon\Carbon::parse($bizToday)->subDay()->toDateString();
-            $yesterdayRevenue = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $saafYesterdayBiz, $saafYesterdayBiz);
+            $yesterdayRevenue = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $saafYesterdayBiz, $saafYesterdayBiz, $dashCashierId);
             // Synced-bill count stays SALES-only (a submitted credit note is
             // not a bill; counting it would disagree with the today tile).
             $praSyncedToday = (int) PosTransaction::where('company_id', $companyId)
@@ -1562,6 +1621,7 @@ class PosController extends Controller
                 ->where('business_date', $bizToday)
                 ->where($excludeLocal)
                 ->where('pra_status', 'submitted')
+                ->tap($dashOnly)
                 ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as c")
                 ->value('c');
         }
@@ -1597,6 +1657,17 @@ class PosController extends Controller
         // no cron). Admin/manager-only card, same visibility as pending bills.
         $inactiveRegulars = $isAdmin ? \App\Services\PosRepeatCustomerAlert::listFor($companyId) : collect();
 
+        // Task 1197: per-cashier selector data for the day figures
+        // (admin/manager only — an isolated cashier is forced onto self and
+        // never gets the dropdown).
+        $dashTeamMembers = $isAdmin
+            ? User::where('company_id', $companyId)
+                ->whereNotNull('pos_role')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'pos_role'])
+            : collect();
+
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
@@ -1604,7 +1675,7 @@ class PosController extends Controller
             'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
             'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata',
             'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
-            'inactiveRegulars'
+            'inactiveRegulars', 'dashTeamMembers', 'dashCashierId'
         ));
     }
 
@@ -2959,6 +3030,12 @@ class PosController extends Controller
             ->with('items')
             ->findOrFail($id);
 
+        // Task 1197: isolated cashier edits ONLY their own bill — peer IDs 403
+        // even via direct URL (editing peers' bills is manager/owner work).
+        if (!$transaction->allowedForCashierIsolationOf(auth('pos')->user())) {
+            abort(403);
+        }
+
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
                 ->with('error', __('pos.cannot_edit_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
@@ -2999,6 +3076,14 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
+
+        // Task 1197: isolated cashier updates ONLY their own bill.
+        if (!$transaction->allowedForCashierIsolationOf(auth('pos')->user())) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => __('pos.custom_access_denied')], 403);
+            }
+            abort(403);
+        }
 
         if ($transaction->pra_invoice_number) {
             if ($request->wantsJson()) {
@@ -3494,6 +3579,11 @@ class PosController extends Controller
         }
         $transaction = $retryQuery->findOrFail($id);
 
+        // Task 1197: isolated cashier retries ONLY their own bill.
+        if (!$transaction->allowedForCashierIsolationOf(auth('pos')->user())) {
+            return back()->with('error', __('pos.custom_access_denied'));
+        }
+
         if ($transaction->pra_invoice_number) {
             return back()->with('error', __('pos.invoice_already_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
         }
@@ -3735,6 +3825,8 @@ class PosController extends Controller
                 $q->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
             });
         }
+        // Task 1197: an isolated cashier's bulk "Sync all" sweeps ONLY their own bills.
+        $bulkQuery->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()));
         $pendingInvoices = $bulkQuery->orderBy('id', 'asc')->get();
 
         if ($pendingInvoices->isEmpty()) {
@@ -3821,6 +3913,12 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
+            // Task 1197: an isolated cashier sees only their OWN provisionals
+            // in the F10 modal. The FINAL delivery-bill half below stays
+            // SHARED deliberately — delivery tracking / rider settle is a
+            // shared workflow (mirrors the Task 807/1186 stream-agnostic
+            // decision; isolating it would break rider handover).
+            ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
             ->orderBy('id', 'desc')
             ->limit(100)
             ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at',
@@ -4130,6 +4228,9 @@ class PosController extends Controller
                     $q->orWhere('created_by', $tbUser->id);
                 }
             })
+            // Task 1197: isolated cashier's Reprint list = OWN bills only.
+            // ANDs with the scope closure above (compose, never replace).
+            ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
             ->orderBy('id', 'desc')
             ->limit(300)
             ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'customer_phone', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
@@ -4440,6 +4541,19 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.billing_scope_pra_only')], 403);
         }
 
+        // Task 1197: isolated cashier promotes/finalizes ONLY their own
+        // provisional — a peer's ID gets 403 BEFORE any state change (guards
+        // BOTH branches below: LOCAL FINAL and send-to-PRA promote). created_by
+        // never changes, so a pre-check is race-safe here.
+        $isoUser = auth('pos')->user();
+        if ($isoUser && $isoUser->posSalesIsolated()) {
+            $isoTx = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)->where('id', $id)->first(['id', 'created_by']);
+            if ($isoTx && !$isoTx->allowedForCashierIsolationOf($isoUser)) {
+                return response()->json(['success' => false, 'message' => __('pos.custom_access_denied')], 403);
+            }
+        }
+
         // ── LOCAL FINAL (owner request Jul 2026): finalize WITHOUT sending to PRA ──
         // The bill keeps its local invoice number, amounts and payment method exactly
         // as saved, and is archived immediately — it leaves the F10 provisional list
@@ -4614,6 +4728,11 @@ class PosController extends Controller
         if (!$tx) {
             return response()->json(['success' => false], 404);
         }
+        // Task 1197: a peer bill's fiscal state is invisible to an isolated
+        // cashier — mirror not-found so the endpoint is no existence oracle.
+        if (!$tx->allowedForCashierIsolationOf(auth('pos')->user())) {
+            return response()->json(['success' => false], 404);
+        }
         return response()->json([
             'success' => true,
             'pra_status' => $tx->pra_status,
@@ -4639,6 +4758,8 @@ class PosController extends Controller
         $bills = PosTransaction::where('company_id', $companyId)
             ->whereIn('pra_status', ['failed', 'offline', 'pending'])
             ->whereNull('pra_invoice_number')
+            // Task 1197: isolated cashier's F11 queued/failed list = own bills.
+            ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
             ->orderBy('id', 'desc')
             ->limit(100)
             ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'pra_status', 'pra_response_code', 'pra_error_message', 'created_at']);
@@ -4695,6 +4816,10 @@ class PosController extends Controller
             ->where('id', $id)
             ->whereNull('pra_invoice_number')
             ->whereIn('pra_status', ['pending', 'failed', 'offline'])
+            // Task 1197: creator constraint INSIDE the atomic claim — an
+            // isolated cashier can never claim a peer's failed bill, even
+            // in a race (the UPDATE simply matches zero rows).
+            ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
             ->update(['pra_status' => 'pending', 'pra_response_code' => null]);
 
         if ($claimed === 0) {
@@ -4703,6 +4828,10 @@ class PosController extends Controller
             $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
             if (!$tx) {
                 return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
+            }
+            // Task 1197: peer bill — explicit 403, not a misleading status hint.
+            if (!$tx->allowedForCashierIsolationOf(auth('pos')->user())) {
+                return response()->json(['success' => false, 'message' => __('pos.custom_access_denied')], 403);
             }
             if ($tx->pra_invoice_number) {
                 return response()->json([
@@ -4962,9 +5091,22 @@ class PosController extends Controller
                 ->withSum('items as items_returned_total', 'returned_quantity');
         }
 
+        // Task 1197 — per-cashier sales isolation + admin per-cashier view:
+        // an ISOLATED cashier (company switch, default ON) is FORCED onto
+        // their own bills; admin/manager may inspect any one team member via
+        // ?cashier=ID (dropdown mirrors the Reports filter). Composes with
+        // the billing-scope/tab predicates (AND, never replace).
+        $txnIsolated = (bool) ($user?->posSalesIsolated() ?? false);
+        $cashierFilter = 'all';
+        if ($txnIsolated) {
+            $cashierFilter = (string) $user->id;
+        } elseif (($user?->isPosAdmin() ?? false) && $request->filled('cashier') && $request->get('cashier') !== 'all') {
+            $cashierFilter = (string) (int) $request->get('cashier');
+        }
+
         // Task 1186: derived-scope viewers get their own cross-stream rows
         // unioned into their forced tab (own-bill exemption on the list).
-        $this->applyReportFilters($query, $tab, null, $user);
+        $this->applyReportFilters($query, $tab, $cashierFilter, $user);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -5014,7 +5156,18 @@ class PosController extends Controller
         $hasPinSet = !empty($company->confidential_pin);
         $localCount = 0;
 
-        return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user', 'company'));
+        // Task 1197: cashier-filter dropdown data (admin/manager only —
+        // mirrors reports()). Cashiers never get the list.
+        $teamMembers = ($user?->isPosAdmin() ?? false)
+            ? User::where('company_id', $companyId)
+                ->whereNotNull('pos_role')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'pos_role'])
+            : collect();
+        $selectedCashier = $cashierFilter;
+
+        return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user', 'company', 'teamMembers', 'selectedCashier', 'txnIsolated'));
     }
 
     /**
@@ -5028,7 +5181,13 @@ class PosController extends Controller
         // Single predicate (Task 647): exempt bills are visible to EVERY scope.
         // Task 1186: effective scope + own-bill exemption (derived default only)
         // — a viewer's own bill is always readable/printable.
-        return $txn->allowedForBillingScopeOf(auth('pos')->user());
+        // Task 1197: AND the per-cashier isolation verdict — an isolated
+        // cashier gets 403 on another cashier's bill even via direct link
+        // (detail page, receipt reprint, PDF download).
+        $rowUser = auth('pos')->user();
+
+        return $txn->allowedForBillingScopeOf($rowUser)
+            && $txn->allowedForCashierIsolationOf($rowUser);
     }
 
     public function transactionShow($id)
@@ -5222,6 +5381,16 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        // Task 1197: an isolated cashier can't mint a share link (WhatsApp
+        // Bill) for another cashier's bill — read-guard parity with the
+        // receipt/PDF paths.
+        if (!$transaction->allowedForCashierIsolationOf(auth('pos')->user())) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.wa_share_not_allowed'),
+            ], 403);
+        }
 
         // Task 1036 (review-locked): public receipt links are FINAL-bill only.
         // A deliberate provisional (pra_status='local') is still editable /
@@ -7259,6 +7428,42 @@ class PosController extends Controller
             auth('pos')->id()
         );
         return back()->with('success', __('pos.billing_scope_perm_saved'));
+    }
+
+    /**
+     * Task 1197 — "Cashier sirf apni sale dekhe" switch (owner-only, Team
+     * page): DEFAULT ON for every company (missing/NULL column reads as ON —
+     * User::posSalesIsolated). OFF restores the old shared visibility for
+     * this shop. Mirrors setBillingScopePermission: base role company_admin
+     * only, schema-drift guarded, direct assignment + save (non-$fillable
+     * column), always audited.
+     */
+    public function setCashierOwnSales(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (($user->role ?? null) !== 'company_admin') {
+            abort(403);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cashier_own_sales_only')) {
+            return back()->with('error', __('pos.unknown_error'));
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        // NULL (pre-backfill row) reads as ON — audit the EFFECTIVE old value.
+        $oldEnabled = (bool) ($company->pos_cashier_own_sales_only ?? true);
+        $newEnabled = $request->boolean('enabled');
+        $company->pos_cashier_own_sales_only = $newEnabled;
+        $company->save();
+        AuditLogService::log(
+            'pos_cashier_own_sales_toggled',
+            'Company',
+            $companyId,
+            ['pos_cashier_own_sales_only' => $oldEnabled],
+            ['pos_cashier_own_sales_only' => $newEnabled],
+            $companyId,
+            auth('pos')->id()
+        );
+        return back()->with('success', __('pos.cashier_own_sales_saved'));
     }
 
     public function setCashierPra(Request $request, $id)
@@ -9472,6 +9677,11 @@ class PosController extends Controller
 
         $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
 
+        // Task 1197: an isolated cashier may not lock (edit-claim) a peer's bill.
+        if (!$transaction->allowedForCashierIsolationOf(auth('pos')->user())) {
+            return response()->json(['success' => false, 'message' => __('pos.custom_access_denied')], 403);
+        }
+
         if ($transaction->isLocked() && $transaction->locked_by_terminal_id != $terminalId) {
             $lockedTerminal = PosTerminal::find($transaction->locked_by_terminal_id);
             $terminalName = $lockedTerminal ? $lockedTerminal->terminal_name : 'Unknown';
@@ -9491,6 +9701,13 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        // Task 1197: releasing a peer's edit-lock would let an isolated cashier
+        // interfere with a colleague's in-progress edit — same guard as lock.
+        if (!$transaction->allowedForCashierIsolationOf(auth('pos')->user())) {
+            return response()->json(['success' => false, 'message' => __('pos.custom_access_denied')], 403);
+        }
+
         $transaction->releaseLock();
         return response()->json(['success' => true]);
     }
@@ -9914,6 +10131,12 @@ class PosController extends Controller
         // bills join the day-close set — their drawer cash must reconcile even
         // when e.g. a reporting-ON cashier took F10 provisionals today.
         $dayCloseDerived = (bool) ($dayCloseUser?->posBillingScopeIsDerived() ?? false);
+        // Task 1197: an ISOLATED cashier's day-close PREVIEW shows own-bills
+        // figures only (reachable via the cashier-day-close company switch /
+        // Custom Access tick). The actual close (performDayClose) and the
+        // stored Z-report stay COMPANY-WIDE — this filter touches the preview
+        // page figures only, never the frozen report.
+        $dayCloseIso = (bool) ($dayCloseUser?->posSalesIsolated() ?? false);
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('business_date', $date)
             ->where(function ($q) use ($dayCloseScope, $dayCloseDerived, $dayCloseUser) {
@@ -9928,6 +10151,7 @@ class PosController extends Controller
                     $q->orWhere('created_by', $dayCloseUser->id);
                 }
             })
+            ->when($dayCloseIso, fn ($q) => $q->where('created_by', $dayCloseUser->id))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -9958,7 +10182,9 @@ class PosController extends Controller
         // For a CLOSED day prefer the snapshot frozen on the Z-report (Task 682):
         // the wash may have archived/deleted local return rows — the live query
         // below would silently lose them on past days' pages.
-        if ($existingReport && is_array($existingReport->returns_detail ?? null)) {
+        // Task 1197: the frozen snapshot is COMPANY-WIDE — isolated cashiers
+        // fall through to the live branch, which filters to their own returns.
+        if ($existingReport && is_array($existingReport->returns_detail ?? null) && !$dayCloseIso) {
             $dcSnapRows = collect($existingReport->returns_detail)
                 ->filter(fn ($r) => $dayCloseScope === 'both'
                     || in_array($r['stream'] ?? 'pra', ['exempt', $dayCloseScope], true))
@@ -9987,8 +10213,10 @@ class PosController extends Controller
                     ->orderBy('created_at')
                     // Task 1186: user-aware guard — derived viewers keep their
                     // own cross-stream returns in the audit list.
+                    // Task 1197: isolated cashier's preview audits own returns only.
                     ->get()
-                    ->filter(fn ($t) => $t->allowedForBillingScopeOf($dayCloseUser))
+                    ->filter(fn ($t) => $t->allowedForBillingScopeOf($dayCloseUser)
+                        && $t->allowedForCashierIsolationOf($dayCloseUser))
                     ->values()
                 : collect();
             // Parent invoice numbers resolved in one query — parents can be from
@@ -10044,10 +10272,14 @@ class PosController extends Controller
             ];
         });
 
-        $previousReports = PosDayCloseReport::where('company_id', $companyId)
-            ->orderBy('report_date', 'desc')
-            ->limit(10)
-            ->get();
+        // Task 1197: stored Z-reports hold COMPANY-WIDE figures — an isolated
+        // cashier gets no history list (the report views 403 them anyway).
+        $previousReports = $dayCloseIso
+            ? collect()
+            : PosDayCloseReport::where('company_id', $companyId)
+                ->orderBy('report_date', 'desc')
+                ->limit(10)
+                ->get();
 
         // Comprehensive day-close (owner request Jul 2026): show what the wash WILL
         // touch — this day's local bills PLUS backlog left over from earlier
@@ -10056,7 +10288,10 @@ class PosController extends Controller
         // filters archived rows).
         $pendingBase = fn () => PosTransaction::where('company_id', $companyId)
             ->where('business_date', '<=', $date)
-            ->whereNull('pra_invoice_number');
+            ->whereNull('pra_invoice_number')
+            // Task 1197: isolated cashier's wash preview (localWash figures +
+            // bill-by-bill list) shows own pending bills only.
+            ->when($dayCloseIso, fn ($q) => $q->where('created_by', $dayCloseUser->id));
         // Bill-by-bill list (Task 677): the page shows each pending bill with
         // its own action selector — fetch display columns too. Rider columns
         // are schema-guarded (prod drift self-heal convention).
@@ -10128,9 +10363,11 @@ class PosController extends Controller
         // CLOSED day prefer the figures frozen on the report (the wash may
         // have deleted reporting-OFF finals — live recompute would undercount);
         // otherwise compute live from today's set.
-        $streamSplit = ($existingReport && is_array($existingReport->stream_summary ?? null))
+        // Task 1197: an isolated cashier NEVER sees the frozen company-wide
+        // summary — their preview recomputes live from the own-bills set.
+        $streamSplit = ($existingReport && is_array($existingReport->stream_summary ?? null) && !$dayCloseIso)
             ? $existingReport->stream_summary
-            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date));
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $dayCloseIso ? (int) $dayCloseUser->id : null));
 
         // Task 705: Z/X display mode-gating — normal mode = PRA section only;
         // khufia local-check mode ON = Local stream figures too. LOCAL-scoped
@@ -10139,7 +10376,7 @@ class PosController extends Controller
 
         // Delivery Riders (Jul 2026): live rider cash figures for the recon preview
         // (unsettled rider cash is OUT of the drawer; earlier-day settlements are IN).
-        $riderFigures = $this->buildRiderDayFigures($companyId, $date);
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date, $dayCloseIso ? (int) $dayCloseUser->id : null);
 
         // Opening Cash Balance (Jul 2026): day-start entry auto-fills the
         // reconciliation's opening float for this date.
@@ -10166,7 +10403,11 @@ class PosController extends Controller
         // rider unsettled cash is a WARNING only (khata legitimately carries).
         $pendingDeliveries = $this->undispatchedDeliverySummary($companyId, $company, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents'));
+        // Task 1197: $dcIso gates the blade's COMPANY-WIDE Z sections (frozen
+        // cash recon, local/rider summaries, Z print links) for isolated cashiers.
+        $dcIso = $dayCloseIso;
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso'));
     }
 
     /**
@@ -11067,7 +11308,7 @@ class PosController extends Controller
      * cash_amount; the per-rider rows cover ALL rider bills of the day (operational
      * truth for the shop). Schema-guarded — returns inactive on prod mid-deploy.
      */
-    private function buildRiderDayFigures(int $companyId, string $date): array
+    private function buildRiderDayFigures(int $companyId, string $date, ?int $onlyCreatedBy = null): array
     {
         $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
         try {
@@ -11075,10 +11316,14 @@ class PosController extends Controller
                 return $empty;
             }
 
+            // Task 1197: an isolated cashier's day-close/X-report PREVIEW scopes
+            // rider recon to bills THEY created (settling stays shared work —
+            // this narrows the preview figures only, never the stored Z).
             $dayBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('business_date', $date)
                 ->whereNotNull('rider_id')
+                ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 ->get();
 
             // rider_settled_at stays on the REAL calendar date (settlement
@@ -11100,7 +11345,8 @@ class PosController extends Controller
                 ->where('business_date', '<', $date)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-                });
+                })
+                ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy));
             if ($hasAllocation) {
                 $legacyCashInQ->whereNotIn('rider_settlement_id', function ($q) use ($companyId) {
                     $q->select('id')->from('pos_rider_settlements')
@@ -11111,18 +11357,33 @@ class PosController extends Controller
             $cashIn = (float) $legacyCashInQ->sum('total_amount');
             if ($hasAllocation) {
                 $allocCashIn = 0.0;
-                \App\Models\PosRiderSettlement::where('company_id', $companyId)
+                $allocSettlements = \App\Models\PosRiderSettlement::where('company_id', $companyId)
                     ->where('panel', 'pra')
                     ->whereNotNull('allocation')
                     ->whereDate('created_at', $date)
-                    ->get()
-                    ->each(function ($s) use (&$allocCashIn, $date) {
-                        foreach ((array) $s->allocation as $entry) {
-                            if (!empty($entry['business_date']) && $entry['business_date'] < $date) {
-                                $allocCashIn += (float) ($entry['amount'] ?? 0);
-                            }
+                    ->get();
+                // Task 1197: allocation entries carry bill_id — the isolated
+                // preview counts only rupees applied to the viewer's OWN bills.
+                $ownBillIds = null;
+                if ($onlyCreatedBy && $allocSettlements->isNotEmpty()) {
+                    $allocIds = $allocSettlements->flatMap(fn ($s) => collect((array) $s->allocation)->pluck('bill_id'))->filter()->unique()->values();
+                    $ownBillIds = $allocIds->isEmpty() ? collect() : PosTransaction::withoutGlobalScope('hide_archived')
+                        ->where('company_id', $companyId)
+                        ->whereIn('id', $allocIds)
+                        ->where('created_by', $onlyCreatedBy)
+                        ->pluck('id')
+                        ->flip();
+                }
+                $allocSettlements->each(function ($s) use (&$allocCashIn, $date, $ownBillIds) {
+                    foreach ((array) $s->allocation as $entry) {
+                        if ($ownBillIds !== null && !isset($ownBillIds[(int) ($entry['bill_id'] ?? 0)])) {
+                            continue;
                         }
-                    });
+                        if (!empty($entry['business_date']) && $entry['business_date'] < $date) {
+                            $allocCashIn += (float) ($entry['amount'] ?? 0);
+                        }
+                    }
+                });
                 $cashIn += $allocCashIn;
             }
 
@@ -11924,6 +12185,11 @@ class PosController extends Controller
         if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
             return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
         }
+        // Task 1197: the stored Z-report is COMPANY-WIDE — an isolated cashier's
+        // day-close access is preview-only, never the frozen shop document.
+        if ($dayCloseUser && $dayCloseUser->posSalesIsolated()) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
@@ -11995,6 +12261,11 @@ class PosController extends Controller
         // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
         $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
         if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        // Task 1197: the stored Z-report is COMPANY-WIDE — an isolated cashier's
+        // day-close access is preview-only, never the frozen shop document.
+        if ($dayCloseUser && $dayCloseUser->posSalesIsolated()) {
             return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
         }
         $companyId = app('currentCompanyId');
@@ -12145,7 +12416,7 @@ class PosController extends Controller
      * after the wash); dedupe by id (LOCAL-scoped viewers' set already
      * contains these rows).
      */
-    private function withLocalStreamRows($transactions, int $companyId, string $date)
+    private function withLocalStreamRows($transactions, int $companyId, string $date, ?int $onlyCreatedBy = null)
     {
         try {
             $locals = PosTransaction::withoutGlobalScope('hide_archived')
@@ -12153,6 +12424,10 @@ class PosController extends Controller
                 ->where('business_date', $date)
                 ->where('status', 'completed')
                 ->where('invoice_mode', 'local')
+                // Task 1197: an isolated cashier's PREVIEW merges only their
+                // own local rows — otherwise the streamSplit boxes would leak
+                // company-wide local counts/amounts around the filtered set.
+                ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 ->orderBy('created_at')
                 ->get();
         } catch (\Throwable $e) {
@@ -12293,11 +12568,16 @@ class PosController extends Controller
         // Live PRA-mode set — hide_archived stays ACTIVE (X-Report is for the
         // still-open day; nothing has been washed yet). Local (non-PRA) bills
         // excluded exactly like the Z-report figure set.
+        // Task 1197: X-Report is a PREVIEW print — an isolated cashier's copy
+        // narrows to their own bills, same as the day-close preview page. The
+        // stored Z-report (performDayClose) stays company-wide.
+        $xIso = (bool) ($user?->posSalesIsolated() ?? false);
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('business_date', $date)
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
+            ->when($xIso, fn ($q) => $q->where('created_by', $user->id))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -12328,12 +12608,14 @@ class PosController extends Controller
         $report->created_at = now();
 
         // Live rider figures (informational — same shape the views read).
-        $riderFigures = $this->buildRiderDayFigures($companyId, $date);
+        // Task 1197: isolated cashier's X-report scopes rider figures + the
+        // local-stream merge to their own bills, like the day-close preview.
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date, $xIso ? (int) $user->id : null);
         if (!empty($riderFigures['active'])) {
             $report->rider_summary = $riderFigures;
         }
 
-        $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date));
+        $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null));
 
         // Task 705: X display mode-gating (same rule as the Z page/PDF).
         $showLocalStream = (bool) session('pos_local_check')

@@ -28,7 +28,12 @@ use Illuminate\Support\Facades\Schema;
  */
 class PosTodayKhata
 {
-    public static function build(int $companyId, string $bizToday, $user): array
+    /**
+     * @param int|null $onlyCreatedBy Task 1197 — per-cashier isolation / admin
+     *   per-cashier view: when set, every aggregate narrows to bills created
+     *   by this user id (ANDs with the stream split — compose, never replace).
+     */
+    public static function build(int $companyId, string $bizToday, $user, ?int $onlyCreatedBy = null): array
     {
         $dashScope = $user?->posBillingScope() ?? 'both';
 
@@ -63,10 +68,11 @@ class PosTodayKhata
             ? "COALESCE(SUM(CASE WHEN payment_method IN ({$cardIn}) THEN ({$signExpr}) * total_amount ELSE 0 END),0)"
             : '0';
 
-        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr, $cashSaleExpr, $cardSaleExpr) {
+        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr, $cashSaleExpr, $cardSaleExpr, $onlyCreatedBy) {
             $row = PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', $bizToday)
+                ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 ->tap(fn ($q) => PosTransaction::applyStreamTab($q, $tab))
                 ->selectRaw("
                     COALESCE(SUM({$saleRowExpr}),0) as bills,
@@ -125,18 +131,21 @@ class PosTodayKhata
      * $bizTo null = open-ended range (business_date >= $bizFrom) for the
      * retail Monthly card; pass the same date twice for a single day.
      */
-    public static function combinedSale(int $companyId, $user, string $bizFrom, ?string $bizTo = null): float
+    public static function combinedSale(int $companyId, $user, string $bizFrom, ?string $bizTo = null, ?int $onlyCreatedBy = null): float
     {
         $scope = $user?->posBillingScope() ?? 'both';
 
         $typeReady = Schema::hasColumn('pos_transactions', 'transaction_type');
         $signExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END" : '1';
 
-        $sum = function (string $tab) use ($companyId, $bizFrom, $bizTo, $signExpr) {
+        // Task 1197 ($onlyCreatedBy): per-cashier isolation / admin
+        // per-cashier view — narrows every stream sum to one creator.
+        $sum = function (string $tab) use ($companyId, $bizFrom, $bizTo, $signExpr, $onlyCreatedBy) {
             return (float) (PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', '>=', $bizFrom)
                 ->when($bizTo !== null, fn ($q) => $q->where('business_date', '<=', $bizTo))
+                ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
                 ->tap(fn ($q) => PosTransaction::applyStreamTab($q, $tab))
                 ->selectRaw("COALESCE(SUM(({$signExpr}) * total_amount),0) as sale")
                 ->value('sale') ?? 0);

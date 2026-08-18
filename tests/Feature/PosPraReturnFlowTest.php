@@ -65,6 +65,9 @@ class PosPraReturnFlowTest extends TestCase
             $table->boolean('agent_submits_pra')->default(false);
             $table->boolean('inventory_enabled')->default(false);
             $table->boolean('pos_setup_completed')->default(true);
+            // Cashier sales isolation is OFF here: this suite tests return
+            // RIGHTS on a shared-visibility shop (missing column = default ON).
+            $table->boolean('pos_cashier_own_sales_only')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -196,6 +199,7 @@ class PosPraReturnFlowTest extends TestCase
         $this->companyId = DB::table('companies')->insertGetId([
             'name' => 'Return Shop',
             'pos_setup_completed' => true,
+            'pos_cashier_own_sales_only' => false, // shared shop: rights, not isolation, under test
             'created_at' => now(), 'updated_at' => now(),
         ]);
         app()->bind('currentCompanyId', fn () => $this->companyId);

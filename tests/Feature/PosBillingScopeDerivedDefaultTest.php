@@ -69,6 +69,10 @@ class PosBillingScopeDerivedDefaultTest extends TestCase
             $table->integer('user_limit_override')->nullable();
             // Billing scope feature columns
             $table->boolean('billing_scope_admin_enabled')->default(false);
+            // Task 1197: per-cashier sales isolation switch — OFF here so this
+            // suite keeps testing billing-scope semantics in a SHARED shop
+            // (isolation has its own suite: PosCashierSalesIsolationTest).
+            $table->boolean('pos_cashier_own_sales_only')->nullable();
             // Bill Number Style columns (for bill_token tests)
             $table->string('local_number_style', 10)->default('serial');
             $table->string('pra_number_style', 10)->default('serial');
@@ -355,6 +359,7 @@ class PosBillingScopeDerivedDefaultTest extends TestCase
             'invoice_limit_override'       => -1, // unlimited bills
             'user_limit_override'          => -1, // unlimited users
             'billing_scope_admin_enabled'  => false,
+            'pos_cashier_own_sales_only'   => false, // Task 1197 switch OFF — shared shop
             'local_number_style'           => 'serial',
             'pra_number_style'             => 'serial',
             'bill_token_counter_local'     => 0,

@@ -61,6 +61,9 @@ class PosAgentPraStatusPollTest extends TestCase
             $table->boolean('agent_enabled')->default(false);
             $table->boolean('agent_submits_pra')->default(false);
             $table->boolean('pos_setup_completed')->default(true);
+            // Task 1197: missing column = isolation ON (fail-closed); this suite
+            // models the SHARED poll behavior, so the switch is explicitly off.
+            $table->boolean('pos_cashier_own_sales_only')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -117,6 +120,7 @@ class PosAgentPraStatusPollTest extends TestCase
             'pra_connection_mode' => 'fiscal_device',
             'agent_enabled' => true,
             'agent_submits_pra' => true,
+            'pos_cashier_own_sales_only' => false,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->otherCompanyId = DB::table('companies')->insertGetId([

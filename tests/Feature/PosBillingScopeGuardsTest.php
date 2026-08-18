@@ -50,6 +50,7 @@ class PosBillingScopeGuardsTest extends TestCase
             $table->string('status')->nullable();
             $table->boolean('is_internal_account')->default(false);
             $table->boolean('pra_reporting_enabled')->default(false);
+            $table->boolean('pos_cashier_own_sales_only')->nullable();
             $table->boolean('agent_enabled')->default(false);
             $table->string('pra_connection_mode')->nullable();
             $table->string('pra_environment')->nullable();
@@ -270,6 +271,9 @@ class PosBillingScopeGuardsTest extends TestCase
     {
         return (int) DB::table('companies')->insertGetId(array_merge([
             'name'                         => 'Scope Test Co',
+            // Shared shop: this suite pins billing-SCOPE semantics; cashier
+            // sales isolation (default ON when column missing) must stay out.
+            'pos_cashier_own_sales_only'   => false,
             'product_type'                 => 'pos',
             'status'                       => 'active',
             'is_internal_account'          => false,

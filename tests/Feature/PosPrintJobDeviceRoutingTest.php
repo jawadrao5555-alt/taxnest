@@ -66,6 +66,9 @@ class PosPrintJobDeviceRoutingTest extends TestCase
             $t->string('agent_version')->nullable();
             $t->text('pos_printer_settings')->nullable();
             $t->string('receipt_printer_size')->nullable();
+            // Task 1197: missing column = cashier isolation ON (fail-closed);
+            // this suite models SHARED company-wide printing, so switch off.
+            $t->boolean('pos_cashier_own_sales_only')->nullable();
             $t->softDeletes();
             $t->timestamps();
         });
@@ -151,6 +154,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
             'agent_api_key' => $this->agentKey,
             'agent_enabled' => true,
             'agent_last_seen' => $now,
+            'pos_cashier_own_sales_only' => false,
             'pos_printer_settings' => json_encode([
                 'silent_print_enabled' => true,
                 'receipt_printer' => 'Manager-POS80',

@@ -12,6 +12,10 @@
     // Task 705: PRA counterpart link (khufia station identity switch) — same
     // owner-only visibility as billing scope. PROD schema-drift guard.
     $counterpartColReady = \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_counterpart_user_id');
+    // Task 1197: "Cashier sirf apni sale dekhe" — DEFAULT ON (missing/NULL
+    // column reads ON, same verdict as User::posSalesIsolated).
+    $ownSalesColReady = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cashier_own_sales_only');
+    $ownSalesOn = !$ownSalesColReady || (($tnTeamCompany->pos_cashier_own_sales_only ?? true) === null ? true : (bool) ($tnTeamCompany->pos_cashier_own_sales_only ?? true));
 @endphp
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
@@ -120,6 +124,25 @@
             </button>
         </form>
     </div>
+
+    {{-- Task 1197: "Cashier sirf apni sale dekhe" (owner-only, DEFAULT ON) —
+         har cashier ko har jagah sirf APNI sales dikhti hain; OFF karne se
+         purana shared view wapas aa jata hai. --}}
+    @if($ownSalesColReady)
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.cashier_own_sales_title') }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.cashier_own_sales_hint') }}</p>
+        </div>
+        <form method="POST" action="{{ route('pos.team.own-sales') }}" class="shrink-0">
+            @csrf
+            <input type="hidden" name="enabled" value="{{ $ownSalesOn ? 0 : 1 }}">
+            <button type="submit" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition {{ $ownSalesOn ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300' }}">
+                {{ $ownSalesOn ? __('pos.cashier_own_sales_on') : __('pos.cashier_own_sales_off') }}
+            </button>
+        </form>
+    </div>
+    @endif
     @endif
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">

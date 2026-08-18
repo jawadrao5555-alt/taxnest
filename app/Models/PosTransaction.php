@@ -261,6 +261,38 @@ class PosTransaction extends Model
     }
 
     /**
+     * Task 1197 — per-cashier sales isolation (query side): when the viewer is
+     * an ISOLATED cashier (User::posSalesIsolated, company switch default ON)
+     * every bill list/aggregate narrows to their own rows. ANDs with the
+     * billing-scope predicates — compose, never replace. method_exists guard:
+     * analytics builders may pass a lightweight stub user (tests / internal
+     * callers) — treat it as not isolated.
+     */
+    public static function applyCashierIsolation($query, $user)
+    {
+        if ($user && method_exists($user, 'posSalesIsolated') && $user->posSalesIsolated()) {
+            $query->where('created_by', $user->id);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Task 1197 — per-cashier sales isolation (row side): may this user open /
+     * print / share / return THIS bill? Non-isolated viewers always pass.
+     * NULL created_by counts as NOT own (strict — an unattributed bill is
+     * manager/owner work, never a loophole).
+     */
+    public function allowedForCashierIsolationOf($user): bool
+    {
+        if (!$user || !method_exists($user, 'posSalesIsolated') || !$user->posSalesIsolated()) {
+            return true;
+        }
+
+        return $this->created_by !== null && (int) $this->created_by === (int) $user->id;
+    }
+
+    /**
      * "Local" bill for display/tag purposes = no PRA fiscal trail at all:
      * deliberate provisionals (invoice_mode='local') OR reporting-OFF finals
      * (pra_status NULL + no fiscal number). Anything with a non-NULL pra_status

@@ -153,6 +153,50 @@ class User extends Authenticatable
         self::$_scopeColumnReady = null;
     }
 
+    /** @var bool|null — per-instance memo for posSalesIsolated() (avoids a
+     *  Company::find + hasColumn probe per KPI query on the dashboard). */
+    private ?bool $_salesIsolatedMemo = null;
+
+    /**
+     * Task 1197 — per-cashier COMPLETE sales isolation (owner-approved strict
+     * rule, default ON): a pos_cashier sees ONLY bills they created themselves
+     * — Transactions list, Reprint list, dashboard KPIs, provisional/failed
+     * lists, read guards. SINGLE SOURCE OF TRUTH: every surface must read this
+     * helper, never the column directly.
+     *
+     * True only for pos_role='pos_cashier' when the company switch is ON.
+     * Managers / owner / confined roles are never isolated. Missing column,
+     * NULL value or any error = ON (isolation is the default for every
+     * company, existing and new — no backfill). Owner flips it OFF via the
+     * Team-page switch (companies.pos_cashier_own_sales_only = false).
+     *
+     * ANDs with Billing Scope: isolation composes with (never replaces) the
+     * stream lock — both predicates apply together.
+     */
+    public function posSalesIsolated($company = null): bool
+    {
+        if (($this->pos_role ?? null) !== 'pos_cashier') {
+            return false;
+        }
+        if ($this->_salesIsolatedMemo !== null) {
+            return $this->_salesIsolatedMemo;
+        }
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cashier_own_sales_only')) {
+                return $this->_salesIsolatedMemo = true; // pre-migration = default ON
+            }
+            if (!$company) {
+                $cid = app()->bound('currentCompanyId') ? app('currentCompanyId') : $this->company_id;
+                $company = $cid ? \App\Models\Company::find($cid) : null;
+            }
+            $val = $company->pos_cashier_own_sales_only ?? null;
+
+            return $this->_salesIsolatedMemo = ($val === null ? true : (bool) $val);
+        } catch (\Throwable $e) {
+            return $this->_salesIsolatedMemo = true; // fail CLOSED — isolation is the default
+        }
+    }
+
     /**
      * Billing Scope MANAGEMENT permission (owner request 07 Aug 2026): by
      * default sirf company OWNER (base role company_admin) hi staff ka scope

@@ -159,6 +159,37 @@
         </div>
         @endif
 
+        {{-- ─── Task 1197: per-cashier day figures (admin/manager only) —
+             merged company-wide view by default; pick one team member to see
+             sirf us ki sale in every KPI below. Cashiers never see this
+             (isolated cashiers are server-forced onto their own figures). ─── --}}
+        @if($isAdmin && ($dashTeamMembers ?? collect())->isNotEmpty())
+        <div class="mb-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm p-3">
+            <form method="GET" action="{{ route('pos.dashboard') }}" class="flex flex-col sm:flex-row sm:items-end gap-3">
+                @if(request()->filled('period'))<input type="hidden" name="period" value="{{ request('period') }}">@endif
+                <div class="w-full sm:w-auto">
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_view_sales_by') }}</label>
+                    <select name="cashier" onchange="this.form.submit()" class="w-full sm:w-56 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
+                        <option value="all" {{ empty($dashCashierId) ? 'selected' : '' }}>{{ __('pos.opt_all_company_sales') }}</option>
+                        @foreach($dashTeamMembers as $member)
+                        <option value="{{ $member->id }}" {{ (int) ($dashCashierId ?? 0) === (int) $member->id ? 'selected' : '' }}>
+                            {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? __('pos.role_admin') : ($member->pos_role === 'pos_manager' ? __('pos.role_manager') : __('pos.role_cashier')) }})
+                        </option>
+                        @endforeach
+                    </select>
+                </div>
+                @if(!empty($dashCashierId))
+                <div class="flex items-center gap-2 pb-1">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                        {{ __('pos.showing_name', ['name' => $dashTeamMembers->firstWhere('id', $dashCashierId)?->name ?? __('pos.th_staff')]) }}
+                    </span>
+                    <a href="{{ route('pos.dashboard', array_filter(['period' => request('period')])) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">{{ __('pos.clear') }}</a>
+                </div>
+                @endif
+            </form>
+        </div>
+        @endif
+
         {{-- ─── PROFIT + BI WIDGETS (v18) — admin only, sits above the chosen dashboard style (hidden on Saaf: its own profit KPI covers this) ─── --}}
         @if(!$isCashier && isset($profitStats) && ($dashboardStyle ?? 'default') !== 'saaf')
         @php

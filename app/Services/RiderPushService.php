@@ -132,6 +132,10 @@ class RiderPushService
             ]);
 
         if ($resp->successful()) {
+            Log::info('RiderPushService: push sent', [
+                'rider_id'       => $riderId,
+                'delivery_count' => count($deliveries),
+            ]);
             return;
         }
 

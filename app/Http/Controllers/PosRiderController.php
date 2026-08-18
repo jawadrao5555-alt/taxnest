@@ -901,6 +901,10 @@ class PosRiderController extends Controller
         // assign itself can never block or fail because of push. The 15-min
         // app poll stays as fallback for phones where push is unavailable.
         if ($isNewAssignment) {
+            \Illuminate\Support\Facades\Log::info('RiderPushService: queued from Deliveries-board assign', [
+                'rider_id' => $riderId,
+                'txn_id'   => $txn->id,
+            ]);
             \App\Services\RiderPushService::queuePush((int) $riderId);
         }
 

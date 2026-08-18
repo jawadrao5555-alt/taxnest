@@ -61,6 +61,44 @@ class AdminSystemController extends Controller
             || ($queueHeartbeatAt && $queueHeartbeatAt->lt(now()->subMinutes(30)))
             || (!$queueHeartbeatAt && $heartbeatAt && !$heartbeatStale);
 
+        // MySQL connection health: Threads_connected vs max_connections.
+        $mysqlThreads = null;
+        $mysqlMaxConn = null;
+        $mysqlPct     = null;
+        try {
+            $rows = \Illuminate\Support\Facades\DB::select("
+                SELECT 'Threads_connected' AS name, VARIABLE_VALUE AS value
+                  FROM information_schema.GLOBAL_STATUS
+                 WHERE VARIABLE_NAME = 'Threads_connected'
+                UNION ALL
+                SELECT 'max_connections' AS name, VARIABLE_VALUE AS value
+                  FROM information_schema.GLOBAL_VARIABLES
+                 WHERE VARIABLE_NAME = 'max_connections'
+            ");
+            $map = [];
+            foreach ($rows as $row) {
+                $map[$row->name] = (int) $row->value;
+            }
+            if (isset($map['Threads_connected'], $map['max_connections']) && $map['max_connections'] > 0) {
+                $mysqlThreads = $map['Threads_connected'];
+                $mysqlMaxConn = $map['max_connections'];
+                $mysqlPct     = round($mysqlThreads / $mysqlMaxConn * 100, 1);
+            }
+        } catch (\Throwable $e) {
+            // Fallback: SHOW STATUS / SHOW VARIABLES (older MariaDB versions).
+            try {
+                $t = \Illuminate\Support\Facades\DB::select("SHOW STATUS LIKE 'Threads_connected'");
+                $m = \Illuminate\Support\Facades\DB::select("SHOW VARIABLES LIKE 'max_connections'");
+                if (isset($t[0], $m[0]) && (int) $m[0]->Value > 0) {
+                    $mysqlThreads = (int) $t[0]->Value;
+                    $mysqlMaxConn = (int) $m[0]->Value;
+                    $mysqlPct     = round($mysqlThreads / $mysqlMaxConn * 100, 1);
+                }
+            } catch (\Throwable $e2) {
+                // Unavailable — view will render a "Could not read" state.
+            }
+        }
+
         // Logging health: daily logs:health-check probe (LogHealth service).
         $logHealthFailure = \App\Services\LogHealth::current();
         $logHealthLastPassRaw = SystemSetting::get('log_health_last_success_at');
@@ -80,7 +118,8 @@ class AdminSystemController extends Controller
         return view('saas-admin.system-control', compact(
             'controls', 'heartbeatAt', 'heartbeatStale',
             'queueHeartbeatAt', 'queueStale', 'stuckJobs', 'oldestStuckAt',
-            'logHealthFailure', 'logHealthLastPassAt', 'logHealthStale'
+            'logHealthFailure', 'logHealthLastPassAt', 'logHealthStale',
+            'mysqlThreads', 'mysqlMaxConn', 'mysqlPct'
         ));
     }
 

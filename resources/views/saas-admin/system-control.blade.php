@@ -68,6 +68,47 @@
         </div>
     </div>
 
+    {{-- MySQL connection ratio: Threads_connected / max_connections --}}
+    @php
+        $mysqlBad    = $mysqlPct !== null && $mysqlPct > 70;
+        $mysqlWarn   = $mysqlPct !== null && $mysqlPct > 50 && $mysqlPct <= 70;
+        $mysqlOk     = $mysqlPct !== null && $mysqlPct <= 50;
+        $mysqlBorder = $mysqlBad  ? 'border-red-800/60 bg-red-900/15'
+                     : ($mysqlWarn ? 'border-amber-700/60 bg-amber-900/10'
+                     : ($mysqlOk   ? 'border-emerald-800/50 bg-emerald-900/10'
+                                   : 'border-gray-700/50 bg-gray-900/20'));
+        $mysqlDot    = $mysqlBad  ? 'bg-red-500'
+                     : ($mysqlWarn ? 'bg-amber-400'
+                     : ($mysqlOk   ? 'bg-emerald-500'
+                                   : 'bg-gray-500'));
+        $mysqlTxt    = $mysqlBad  ? 'text-red-400'
+                     : ($mysqlWarn ? 'text-amber-400'
+                     : ($mysqlOk   ? 'text-gray-400'
+                                   : 'text-gray-500'));
+    @endphp
+    <div class="mb-6 rounded-xl border p-4 flex items-start gap-3 {{ $mysqlBorder }}">
+        <span class="mt-0.5 inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 {{ $mysqlDot }}"></span>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-white">MySQL Connections</p>
+            @if($mysqlPct !== null)
+                <p class="text-xs mt-0.5 {{ $mysqlTxt }}">
+                    Threads_connected: <span class="font-mono font-medium text-white">{{ $mysqlThreads }}</span>
+                    / max_connections: <span class="font-mono font-medium text-white">{{ $mysqlMaxConn }}</span>
+                    &mdash;
+                    <span class="font-semibold {{ $mysqlBad ? 'text-red-300' : ($mysqlWarn ? 'text-amber-300' : 'text-emerald-300') }}">{{ $mysqlPct }}%</span>
+                    in use
+                </p>
+                @if($mysqlBad)
+                    <p class="text-xs text-red-400 mt-1 font-medium">Warning: connection usage above 70% — shops may receive "Too many connections" errors if usage keeps climbing. Raise <code class="text-red-300">max_connections</code> in WHM or reduce long-lived connections.</p>
+                @elseif($mysqlWarn)
+                    <p class="text-xs text-amber-400 mt-1">Connection usage is elevated (50–70%). Monitor closely; a sudden spike could saturate the pool.</p>
+                @endif
+            @else
+                <p class="text-xs text-gray-500 mt-0.5">Could not read MySQL status — the database user may lack <code class="text-gray-400">PROCESS</code> or <code class="text-gray-400">SUPER</code> privilege to query <code class="text-gray-400">information_schema.GLOBAL_STATUS</code>.</p>
+            @endif
+        </div>
+    </div>
+
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">Emergency switches to control platform-wide features. Changes take effect immediately.</p>
 

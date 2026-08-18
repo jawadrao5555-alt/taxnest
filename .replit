@@ -129,7 +129,7 @@ externalPort = 9000
 
 [[ports]]
 localPort = 23636
-externalPort = 3000
+externalPort = 80
 
 [nix]
 channel = "stable-25_05"

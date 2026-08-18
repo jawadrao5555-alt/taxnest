@@ -68,8 +68,8 @@
     <div class="center-card">
         <div class="card">
             <div class="big">🔗</div>
-            <h1>Link expire ho gaya</h1>
-            <p>Yeh tracking link ab kaam nahi kar raha.<br>This tracking link is no longer active.</p>
+            <h1>{{ __('pos.rt_pub_expired_h', [], 'rur') }}</h1>
+            <p>{{ __('pos.rt_pub_expired_p', [], 'rur') }}<br>{{ __('pos.rt_pub_expired_p', [], 'en') }}</p>
         </div>
     </div>
 @elseif($state === 'done')
@@ -78,12 +78,12 @@
         <div class="card">
             @if(($boot['status'] ?? '') === 'returned')
             <div class="big">↩️</div>
-            <h1>Order wapas ho gaya</h1>
-            <p>Yeh order wapas kar diya gaya hai.<br>This order was returned.</p>
+            <h1>{{ __('pos.rt_pub_returned_h', [], 'rur') }}</h1>
+            <p>{{ __('pos.rt_pub_returned_p', [], 'rur') }}<br>{{ __('pos.rt_pub_returned_p', [], 'en') }}</p>
             @else
             <div class="big">✅</div>
-            <h1>Order deliver ho gaya!</h1>
-            <p>Aap ka order pahunch chuka hai — shukriya!<br>Your order has been delivered — thank you!</p>
+            <h1>{{ __('pos.rt_pub_delivered_h', [], 'rur') }}</h1>
+            <p>{{ __('pos.rt_pub_delivered_p', [], 'rur') }}<br>{{ __('pos.rt_pub_delivered_p', [], 'en') }}</p>
             @endif
         </div>
     </div>
@@ -93,20 +93,21 @@
         <span id="st-chip" class="chip preparing">…</span>
         <span id="st-eta" class="eta"></span>
     </div>
-    <div id="stale-note" class="stale">Rider ka signal thori der se nahi aaya — thora intezar karein. (Rider signal delayed.)</div>
+    <div id="stale-note" class="stale">{{ __('pos.rt_pub_stale', [], 'rur') }} ({{ __('pos.rt_pub_stale', [], 'en') }})</div>
     <div id="map"></div>
-    <div class="note">Aap ka rider live map par — page khud refresh hota hai. · Your rider, live — updates automatically.</div>
+    <div class="note">{{ __('pos.rt_pub_note', [], 'rur') }} · {{ __('pos.rt_pub_note', [], 'en') }}</div>
     <script>
     (function () {
         var TOKEN = @js($token);
         var boot = @js($boot);
-        // Bilingual status labels — page has no locale (Roman Urdu + English).
+        // Bilingual status labels — page has no locale (Roman Urdu + English),
+        // strings live in lang/{rur,en}/pos.php (Task #1131 lang-key cleanup).
         var LABELS = {
-            preparing:  'Tayyar ho raha hai · Preparing',
-            assigned:   'Rider mil gaya · Rider assigned',
-            dispatched: 'Rider rawana hai · On the way',
-            delivered:  'Deliver ho gaya · Delivered',
-            returned:   'Wapas ho gaya · Returned'
+            preparing:  @js(__('pos.rt_pub_st_preparing', [], 'rur') . ' · ' . __('pos.rt_pub_st_preparing', [], 'en')),
+            assigned:   @js(__('pos.rt_pub_st_assigned', [], 'rur') . ' · ' . __('pos.rt_pub_st_assigned', [], 'en')),
+            dispatched: @js(__('pos.rt_pub_st_dispatched', [], 'rur') . ' · ' . __('pos.rt_pub_st_dispatched', [], 'en')),
+            delivered:  @js(__('pos.rt_pub_st_delivered', [], 'rur') . ' · ' . __('pos.rt_pub_st_delivered', [], 'en')),
+            returned:   @js(__('pos.rt_pub_st_returned', [], 'rur') . ' · ' . __('pos.rt_pub_st_returned', [], 'en'))
         };
         var map = L.map('map', {
             maxBounds: [[22.8, 60.4], [37.5, 77.6]],

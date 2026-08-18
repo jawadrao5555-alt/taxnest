@@ -170,6 +170,9 @@ class PosRiderController extends Controller
         }
 
         $pushConfigured = \App\Services\RiderPushService::isConfigured();
+        // Firebase setup banner is platform-internal info (cPanel steps) — real
+        // customer shops must never see it; only internal/QA accounts do.
+        $pushBannerVisible = (bool) ($company->is_internal_account ?? false);
         self::logFcmKeyPresenceOnce();
 
         return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderPasswords', 'settlements', 'trackingEnabled', 'riderTrackingSettings', 'pushConfigured'));

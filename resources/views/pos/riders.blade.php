@@ -60,7 +60,9 @@
 
     {{-- Firebase instant-push status banner (Task #1139).
          Green = Firebase key is uploaded and push is live.
-         Amber = key is missing; shows cPanel upload instructions in Roman Urdu. --}}
+         Amber = key is missing; shows cPanel upload instructions in Roman Urdu.
+         Internal accounts ONLY — customer shops must never see platform setup steps. --}}
+    @if($pushBannerVisible ?? false)
     @if($pushConfigured)
     <div class="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
         <span class="mt-0.5 text-emerald-600 dark:text-emerald-400 text-lg shrink-0">✅</span>
@@ -93,6 +95,7 @@
             </p>
         </div>
     </div>
+    @endif
     @endif
 
     {{-- Add rider --}}

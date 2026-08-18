@@ -1583,6 +1583,8 @@ Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->withoutMiddle
     Route::post('/fcm-token', [\App\Http\Controllers\PosRiderTrackingController::class, 'appFcmToken'])->name('riderapp.fcmtoken');
     Route::post('/locations', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLocations'])->name('riderapp.locations');
     Route::get('/me', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMe'])->name('riderapp.me');
+    // Task #1160: rider marks his own bill delivered from the app (additive — old APKs unaffected).
+    Route::post('/deliveries/{txnId}/delivered', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMarkDelivered'])->name('riderapp.delivered');
     Route::get('/version', [\App\Http\Controllers\PosRiderTrackingController::class, 'appVersion'])->name('riderapp.version');
     Route::post('/logout', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogout'])->name('riderapp.logout');
 });

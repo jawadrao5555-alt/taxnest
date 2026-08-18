@@ -49,6 +49,16 @@
     <string name="pm_card">Card</string>
     <string name="pm_online">Online</string>
 
+    <!-- Delivered button (v1.6.0, Task #1160) -->
+    <string name="delivered_btn">✓ Delivered</string>
+    <string name="delivered_confirm_title">Confirm delivery</string>
+    <string name="delivered_confirm_msg">Has this order been handed to the customer?\n\n%1$s</string>
+    <string name="delivered_yes">Yes, delivered</string>
+    <string name="delivered_no">Not yet</string>
+    <string name="delivered_done">Shop notified — order marked delivered</string>
+    <string name="delivered_failed">Could not notify — check internet and try again</string>
+    <string name="delivered_gone">This bill is no longer yours — list refreshed</string>
+
     <!-- New-delivery notifications (v1.4.0) -->
     <string name="notif_deliveries_channel">New order alerts</string>
     <string name="notif_new_delivery_one">New order for delivery!</string>

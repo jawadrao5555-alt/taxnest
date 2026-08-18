@@ -16,6 +16,8 @@ class PosRider extends Model
         'company_id', 'name', 'phone', 'cnic', 'vehicle_no', 'is_active', 'user_id',
         // Live tracking (Aug 2026)
         'on_duty', 'duty_started_at', 'last_lat', 'last_lng', 'last_located_at', 'app_token',
+        // Task #1102: night sweep auto-ended duty stamp
+        'duty_auto_off_at',
     ];
 
     protected $casts = [
@@ -23,6 +25,7 @@ class PosRider extends Model
         'on_duty' => 'boolean',
         'duty_started_at' => 'datetime',
         'last_located_at' => 'datetime',
+        'duty_auto_off_at' => 'datetime',
     ];
 
     public function company()

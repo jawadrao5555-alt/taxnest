@@ -39,6 +39,12 @@ class PosRiderTrackingController extends Controller
     private const GAP_THRESHOLD_MINUTES = 5; // default gap detection threshold
     private const OFFLINE_HEURISTIC_MINUTES = 5; // created_at - recorded_at delta for offline tag
 
+    // Task #1102: live-map warnings + auto duty-off.
+    private const IDLE_MINUTES = 15;    // stationary-with-open-deliveries warning window
+    private const IDLE_RADIUS_M = 120;  // movement below this across the window = "ruka hua"
+    private const SILENT_MINUTES = 10;  // no upload while on duty = "GPS/net band"
+    private const AUTO_OFF_HOUR = 3;    // late-night duty cutoff (app timezone)
+
     // APK hosted on OUR server (never a GitHub
     // release — desktop agents auto-update from this repo's releases/latest).
     // Latest version lives in the rider_app_latest_version SystemSetting (Task 443).
@@ -62,6 +68,64 @@ class PosRiderTrackingController extends Controller
             return __('pos.rt_plan_locked_api');
         }
         return null;
+    }
+
+    // ─── Task #1102: auto duty-off (lazy, no cron dependency) ───────────────
+
+    /**
+     * Most recent late-night cutoff moment (app TZ). Duty sessions that
+     * STARTED before this moment have run past the cutoff and get flipped off.
+     * A rider who re-enables duty after the cutoff sets duty_started_at=now()
+     * (> cutoff) and is naturally exempt until the next night — idempotent.
+     */
+    private function autoOffCutoff(): Carbon
+    {
+        $cutoff = now()->setTime(self::AUTO_OFF_HOUR, 0, 0);
+
+        return $cutoff->gt(now()) ? $cutoff->subDay() : $cutoff;
+    }
+
+    /**
+     * Company-wide lazy sweep — piggybacks on the admin trackingData poll
+     * (like the retention lottery: live cPanel may have no cron; never rely
+     * on Schedule:: alone). Single indexed UPDATE; flipped rows no longer
+     * match the WHERE, so calling it on every 20s poll is safe.
+     */
+    private function sweepAutoDutyOff(int $companyId): void
+    {
+        $cutoff = $this->autoOffCutoff();
+        $update = ['on_duty' => false];
+        if (Schema::hasColumn('pos_riders', 'duty_auto_off_at')) {
+            $update['duty_auto_off_at'] = now();
+        }
+        // NULL duty_started_at is left alone: every duty-on stamps it, so NULL
+        // means we cannot prove the session crossed the cutoff — don't guess.
+        PosRider::where('company_id', $companyId)
+            ->where('on_duty', true)
+            ->whereNotNull('duty_started_at')
+            ->where('duty_started_at', '<=', $cutoff)
+            ->update($update);
+    }
+
+    /**
+     * Per-rider variant for the upload path: an admin who never opens the map
+     * must not leave riders uploading all night. Flipping duty here makes the
+     * very same request hit the per-point duty gate → 409 → the app flips its
+     * local state (existing self-correct mechanism, no APK change).
+     */
+    private function maybeAutoDutyOff(PosRider $rider): void
+    {
+        // NULL duty_started_at = session age unprovable — leave it alone
+        // (mirrors sweepAutoDutyOff; every real duty-on stamps the column).
+        if (!$rider->on_duty || !$rider->duty_started_at
+            || $rider->duty_started_at->gt($this->autoOffCutoff())) {
+            return;
+        }
+        $update = ['on_duty' => false];
+        if (Schema::hasColumn('pos_riders', 'duty_auto_off_at')) {
+            $update['duty_auto_off_at'] = now();
+        }
+        $rider->update($update);
     }
 
     /** Resolve the rider from the Bearer token or abort with JSON. */
@@ -138,9 +202,16 @@ class PosRiderTrackingController extends Controller
         $rider = $this->riderFromToken($request);
         $on = filter_var($request->input('on'), FILTER_VALIDATE_BOOLEAN);
 
-        $rider->update($on
+        // Any explicit duty toggle from the app clears the "auto off" stamp —
+        // the note only describes the CURRENT off-duty state (hasColumn guard:
+        // prod schema drift safe).
+        $update = $on
             ? ['on_duty' => true, 'duty_started_at' => now()]
-            : ['on_duty' => false]);
+            : ['on_duty' => false];
+        if (Schema::hasColumn('pos_riders', 'duty_auto_off_at')) {
+            $update['duty_auto_off_at'] = null;
+        }
+        $rider->update($update);
 
         return response()->json(['ok' => true, 'duty' => $on]);
     }
@@ -161,6 +232,11 @@ class PosRiderTrackingController extends Controller
     public function appLocations(Request $request)
     {
         $rider = $this->riderFromToken($request);
+
+        // Task #1102: lazy auto duty-off on the upload path — duty that ran
+        // past the late-night cutoff flips off HERE, so the duty gate below
+        // rejects the fresh points and the 409 tells the app to stop.
+        $this->maybeAutoDutyOff($rider);
 
         // v1.3.0+: per-point duty enforcement replaces the old upfront global
         // 409 gate.  Fresh points (no `at` field, or server-computed lag <
@@ -493,6 +569,10 @@ class PosRiderTrackingController extends Controller
             return response()->json(['ok' => false, 'error' => 'plan_locked'], 403);
         }
 
+        // Task #1102: lazy auto duty-off sweep piggybacks on the poll
+        // (like the retention lottery — live cPanel may have no cron).
+        $this->sweepAutoDutyOff($companyId);
+
         $open = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->whereNotNull('rider_id')
@@ -502,27 +582,90 @@ class PosRiderTrackingController extends Controller
                     ? 'COALESCE(rider_assigned_at, created_at)' : 'created_at') . ') AS oldest')
             ->groupBy('rider_id')->get()->keyBy('rider_id');
 
-        $riders = PosRider::where('company_id', $companyId)
+        $rows = PosRider::where('company_id', $companyId)
             ->where('is_active', true)
             ->orderByDesc('on_duty')->orderBy('name')
-            ->get()
-            ->map(fn ($r) => [
-                'id' => (int) $r->id,
-                'name' => $r->name,
-                'phone' => $r->phone,
-                'on_duty' => (bool) $r->on_duty,
-                'duty_started_at' => optional($r->duty_started_at)->toIso8601String(),
-                'lat' => $r->last_lat !== null ? (float) $r->last_lat : null,
-                'lng' => $r->last_lng !== null ? (float) $r->last_lng : null,
-                'located_at' => optional($r->last_located_at)->toIso8601String(),
-                'seconds_ago' => $r->last_located_at
-                    ? (int) abs(now()->diffInSeconds($r->last_located_at)) : null,
-                'open_deliveries' => (int) ($open[$r->id]->c ?? 0),
-                // Kitne DIN se sab se purana bill atka hai (owner, 7 Aug 2026) —
-                // Carbon 3 signed diff, abs() zaroori.
-                'oldest_open_days' => (isset($open[$r->id]) && $open[$r->id]->oldest)
-                    ? (int) floor(abs(now()->diffInHours(\Carbon\Carbon::parse($open[$r->id]->oldest))) / 24) : 0,
-            ])->values();
+            ->get();
+
+        // ── Task #1102: "ruka hua" idle detection (cheap) ────────────────────
+        // Candidates: on duty + open deliveries + still uploading. One grouped
+        // indexed query over the last IDLE_MINUTES gives each candidate's
+        // bounding box — if the box stayed tiny across (nearly) the whole
+        // window, the rider is stationary.
+        $silentSecs = self::SILENT_MINUTES * 60;
+        $isSilent = function ($r) use ($silentSecs) {
+            if (!$r->on_duty) {
+                return false;
+            }
+            // Freshness reference = the LATER of duty-start and last fix, so a
+            // rider who just came on duty gets the full window as grace before
+            // the red badge (his last fix may be hours old from yesterday).
+            $refTs = max(
+                $r->last_located_at ? $r->last_located_at->getTimestamp() : 0,
+                $r->duty_started_at ? $r->duty_started_at->getTimestamp() : 0
+            );
+            if ($refTs === 0) {
+                return true; // on duty, no fix ever, no known start — silent
+            }
+            return (now()->getTimestamp() - $refTs) > $silentSecs;
+        };
+
+        $idleCandidates = $rows->filter(fn ($r) => $r->on_duty
+            && (int) ($open[$r->id]->c ?? 0) > 0
+            && !$isSilent($r))->pluck('id')->all();
+
+        $moveBoxes = collect();
+        if ($idleCandidates) {
+            $moveBoxes = DB::table('pos_rider_locations')
+                ->where('company_id', $companyId)
+                ->whereIn('rider_id', $idleCandidates)
+                ->where('recorded_at', '>=', now()->subMinutes(self::IDLE_MINUTES)->format('Y-m-d H:i:s'))
+                ->groupBy('rider_id')
+                ->selectRaw('rider_id, MIN(lat) AS mnlat, MAX(lat) AS mxlat, MIN(lng) AS mnlng, MAX(lng) AS mxlng, COUNT(*) AS c, MIN(recorded_at) AS oldest')
+                ->get()->keyBy('rider_id');
+        }
+
+        $isIdle = function ($r) use ($moveBoxes) {
+            $box = $moveBoxes[$r->id] ?? null;
+            if (!$box || (int) $box->c < 3) {
+                return false;
+            }
+            // Coverage: points must span (almost) the whole window — a rider
+            // on duty for only 5 minutes cannot be judged yet.
+            $oldestAge = now()->getTimestamp() - strtotime((string) $box->oldest);
+            if ($oldestAge < (self::IDLE_MINUTES - 3) * 60) {
+                return false;
+            }
+            // Bounding-box span in metres (Pakistan ≈ 30°N: 1° lng ≈ 96.5 km).
+            // Live PDO returns decimals as strings — cast.
+            $latSpanM = ((float) $box->mxlat - (float) $box->mnlat) * 111320;
+            $lngSpanM = ((float) $box->mxlng - (float) $box->mnlng) * 96500;
+            return max($latSpanM, $lngSpanM) < self::IDLE_RADIUS_M;
+        };
+
+        $hasAutoOff = Schema::hasColumn('pos_riders', 'duty_auto_off_at');
+
+        $riders = $rows->map(fn ($r) => [
+            'id' => (int) $r->id,
+            'name' => $r->name,
+            'phone' => $r->phone,
+            'on_duty' => (bool) $r->on_duty,
+            'duty_started_at' => optional($r->duty_started_at)->toIso8601String(),
+            'lat' => $r->last_lat !== null ? (float) $r->last_lat : null,
+            'lng' => $r->last_lng !== null ? (float) $r->last_lng : null,
+            'located_at' => optional($r->last_located_at)->toIso8601String(),
+            'seconds_ago' => $r->last_located_at
+                ? (int) abs(now()->diffInSeconds($r->last_located_at)) : null,
+            'open_deliveries' => (int) ($open[$r->id]->c ?? 0),
+            // Kitne DIN se sab se purana bill atka hai (owner, 7 Aug 2026) —
+            // Carbon 3 signed diff, abs() zaroori.
+            'oldest_open_days' => (isset($open[$r->id]) && $open[$r->id]->oldest)
+                ? (int) floor(abs(now()->diffInHours(\Carbon\Carbon::parse($open[$r->id]->oldest))) / 24) : 0,
+            // Task #1102: warning badges + auto-off note.
+            'is_silent' => $isSilent($r),                       // red: uploads stopped
+            'is_idle' => !$isSilent($r) && $isIdle($r),         // amber: stationary w/ open bills
+            'auto_off' => $hasAutoOff && !$r->on_duty && $r->duty_auto_off_at !== null,
+        ])->values();
 
         return response()->json(['ok' => true, 'riders' => $riders, 'server_time' => now()->toIso8601String()]);
     }
@@ -630,6 +773,10 @@ class PosRiderTrackingController extends Controller
                     (float) $p->lat,
                     (float) $p->lng,
                     Carbon::parse($p->recorded_at)->format('H:i'),
+                    // Task #1102: epoch seconds — client computes segment speed
+                    // + stop durations + playback readout from deltas (extra
+                    // array slot is backward-compatible for old clients).
+                    strtotime((string) $p->recorded_at),
                 ];
             }
         }

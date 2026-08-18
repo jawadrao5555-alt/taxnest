@@ -34,6 +34,19 @@
         }
         .rt-gap-pill.stopped { background: #f59e0b; color: #fff; }
         .rt-gap-pill.offline { background: #6366f1; color: #fff; }
+        /* Task #1102: rider warning badges (map + list) */
+        .rt-warn-pill {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+            box-shadow: 0 1px 4px rgba(0,0,0,.18);
+        }
+        .rt-warn-pill.idle { background: #f59e0b; color: #fff; }
+        .rt-warn-pill.silent { background: #ef4444; color: #fff; }
+        .rt-warn-map { pointer-events: none; }
     </style>
 
     <div class="px-3 sm:px-4 py-3" x-data="riderTracking(@js([
@@ -64,6 +77,14 @@
             'gap_stopped' => __('pos.rt_gap_recording_stopped'),
             'gap_offline' => __('pos.rt_gap_offline_sync'),
             'pin_dropped' => __('pos.rt_pin_dropped'),
+            {{-- Task #1102: warnings, playback, auto-off --}}
+            'idle_badge' => __('pos.rt_idle_badge'),
+            'silent_badge' => __('pos.rt_silent_badge'),
+            'auto_off_note' => __('pos.rt_auto_off_note'),
+            'play' => __('pos.rt_play'),
+            'pause' => __('pos.rt_pause'),
+            'stopped_here' => __('pos.rt_stopped_here'),
+            'speed_legend' => __('pos.rt_speed_legend'),
         ],
     ]))" x-init="init()">
 
@@ -124,6 +145,16 @@
                                 <span :class="r.oldest_open_days >= 1 ? 'text-red-600 dark:text-red-400 font-bold' : ''"> · <span x-text="r.open_deliveries"></span> {{ __('pos.rt_bills_short') }}<span x-show="r.oldest_open_days >= 1" x-text="' · ' + r.oldest_open_days + ' ' + i18n.days_short"></span></span>
                             </template>
                         </div>
+                        {{-- Task #1102: warning badges + auto-off note --}}
+                        <template x-if="r.is_silent">
+                            <div class="mt-1"><span class="rt-warn-pill silent" x-text="i18n.silent_badge"></span></div>
+                        </template>
+                        <template x-if="r.is_idle">
+                            <div class="mt-1"><span class="rt-warn-pill idle" x-text="i18n.idle_badge"></span></div>
+                        </template>
+                        <template x-if="r.auto_off">
+                            <div class="mt-1 text-[10px] text-gray-400 dark:text-gray-500" x-text="i18n.auto_off_note"></div>
+                        </template>
                         <div class="text-[11px] text-gray-400 dark:text-gray-500" x-text="agoText(r)"></div>
                     </button>
                 </template>
@@ -164,6 +195,18 @@
                 <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500" x-show="selected" x-cloak>
                     <span x-text="i18n.trail"></span>: <span x-text="selected ? selected.name : ''"></span>
                     <button type="button" class="underline ml-1" @click="clearTrail()">{{ __('pos.rt_clear_trail') }}</button>
+                    {{-- Task #1102: trail playback + speed legend --}}
+                    <template x-if="trailPts.length >= 2">
+                        <span>
+                            <button type="button" class="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold text-white"
+                                    :class="playing ? 'bg-gray-500 hover:bg-gray-600' : 'bg-indigo-600 hover:bg-indigo-700'"
+                                    @click="togglePlay()">
+                                <span x-text="playing ? '⏸ ' + i18n.pause : '▶ ' + i18n.play"></span>
+                            </button>
+                            <span class="ml-1.5 font-semibold text-gray-600 dark:text-gray-300" x-show="playReadout" x-text="playReadout"></span>
+                            <span class="ml-1.5" x-text="i18n.speed_legend"></span>
+                        </span>
+                    </template>
                 </p>
             </div>
         </div>
@@ -180,8 +223,16 @@
             statusLine: '',
             map: null,
             markers: {},
+            warnBadges: {},   // Task #1102: rider-id → warning pill marker
             polyline: null,
             gapLayers: [],
+            // Task #1102: trail playback state
+            trailPts: [],
+            playing: false,
+            playIdx: 0,
+            playTimer: null,
+            playMarker: null,
+            playReadout: '',
             timer: null,
             didFit: false,
             searchQ: '',
@@ -274,10 +325,31 @@
                     if (r.lat === null || r.lng === null) return;
                     bounds.push([r.lat, r.lng]);
                     const color = this.dotColor(r);
+                    // Task #1102: warning badge — silent (red) beats idle (amber).
+                    const warn = r.is_silent ? 'silent' : (r.is_idle ? 'idle' : null);
+                    const warnLabel = warn === 'silent' ? this.i18n.silent_badge
+                        : (warn === 'idle' ? this.i18n.idle_badge : '');
                     const popup = '<b>' + this.esc(r.name) + '</b><br>'
                         + (r.on_duty ? this.i18n.on_duty : this.i18n.off_duty)
                         + '<br>' + this.esc(this.agoText(r))
-                        + (r.open_deliveries ? '<br>' + this.i18n.open_deliveries + ': ' + r.open_deliveries : '');
+                        + (r.open_deliveries ? '<br>' + this.i18n.open_deliveries + ': ' + r.open_deliveries : '')
+                        + (warn ? '<br><b style="color:' + (warn === 'silent' ? '#ef4444' : '#d97706') + '">'
+                            + this.esc(warnLabel) + '</b>' : '');
+                    // Pill floats above the dot; recreating it every poll is cheap (few riders).
+                    if (this.warnBadges[r.id]) {
+                        this.warnBadges[r.id].remove();
+                        delete this.warnBadges[r.id];
+                    }
+                    if (warn) {
+                        const bicon = L.divIcon({
+                            className: 'rt-warn-map',
+                            html: '<span class="rt-warn-pill ' + warn + '">' + this.esc(warnLabel) + '</span>',
+                            iconAnchor: [30, 32],
+                        });
+                        this.warnBadges[r.id] = L.marker([r.lat, r.lng], {
+                            icon: bicon, interactive: false, zIndexOffset: 800
+                        }).addTo(this.map);
+                    }
                     if (this.markers[r.id]) {
                         this.markers[r.id].setLatLng([r.lat, r.lng]);
                         this.markers[r.id].setStyle({ color: color, fillColor: color });
@@ -404,6 +476,7 @@
                         this.clearTrailLayers();
                         const pts = j.points || [];
                         const gaps = j.gaps || [];
+                        this.trailPts = pts; // Task #1102: playback source
                         if (!pts.length) return;
 
                         // Build gap index: after_idx → gap meta
@@ -417,7 +490,9 @@
                         const segments = [];
                         let seg = [];
                         pts.forEach((p, i) => {
-                            seg.push([p[0], p[1]]);
+                            // Keep the FULL point (lat, lng, 'H:i', epoch) — the
+                            // speed colouring needs the timestamp (Task #1102).
+                            seg.push(p);
                             if (segmentBreaks.has(i)) {
                                 // Segment ends at pts[i] (inclusive).
                                 // Next segment starts fresh at pts[i+1] — do NOT
@@ -431,21 +506,21 @@
                         if (seg.length) segments.push({ pts: seg, gapAfter: null });
 
                         const allBounds = [];
-                        const solidStyle = { color: '#4f46e5', weight: 4, opacity: 0.75 };
 
                         segments.forEach((s, si) => {
                             if (s.pts.length >= 2) {
-                                const pl = L.polyline(s.pts, solidStyle).addTo(this.map);
-                                this.gapLayers.push(pl);
-                                s.pts.forEach(p => allBounds.push(p));
+                                // Task #1102: speed-coloured sub-polylines instead
+                                // of one solid indigo line.
+                                this.drawSpeedSegment(s.pts);
+                                s.pts.forEach(p => allBounds.push([p[0], p[1]]));
                             } else if (s.pts.length === 1) {
-                                allBounds.push(s.pts[0]);
+                                allBounds.push([s.pts[0][0], s.pts[0][1]]);
                             }
 
                             // If there's a gap after this segment, draw a dashed connector.
                             if (s.gapAfter && si + 1 < segments.length) {
-                                const fromPt = s.pts[s.pts.length - 1];
-                                const toPt   = segments[si + 1].pts[0];
+                                const fromPt = [s.pts[s.pts.length - 1][0], s.pts[s.pts.length - 1][1]];
+                                const toPt   = [segments[si + 1].pts[0][0], segments[si + 1].pts[0][1]];
                                 const isOffline = s.gapAfter.is_offline_after;
                                 const gapColor = isOffline ? '#6366f1' : '#f59e0b';
 
@@ -472,6 +547,9 @@
                             }
                         });
 
+                        // Task #1102: dots where the rider stood still ≥3 min.
+                        this.markStops(pts);
+
                         if (allBounds.length >= 2) {
                             this.map.fitBounds(allBounds, { padding: [40, 40] });
                         } else if (allBounds.length === 1) {
@@ -480,14 +558,120 @@
                     })
                     .catch(() => {});
             },
+            // ---- Task #1102: speed colouring, stops, playback ----
+            // Equirectangular distance in metres — fine for adjacent GPS fixes.
+            distM(a, b) {
+                const R = 6371000, rad = Math.PI / 180;
+                const dLat = (b[0] - a[0]) * rad;
+                const dLng = (b[1] - a[1]) * rad * Math.cos(((a[0] + b[0]) / 2) * rad);
+                return Math.sqrt(dLat * dLat + dLng * dLng) * R;
+            },
+            // km/h between two trail points, or null when timestamps unusable.
+            segSpeed(a, b) {
+                const t1 = a[3], t2 = b[3];
+                if (!t1 || !t2 || t2 <= t1) return null;
+                return this.distM(a, b) / (t2 - t1) * 3.6;
+            },
+            speedColor(kmh) {
+                if (kmh === null) return '#4f46e5';
+                if (kmh < 6) return '#f97316';    // slow — walking pace / crawling
+                if (kmh <= 25) return '#10b981';  // normal city riding
+                return '#4f46e5';                 // fast
+            },
+            // One solid segment → runs of same-colour pairs merged into polylines
+            // (avoids thousands of 2-point layers on long trails).
+            drawSpeedSegment(segPts) {
+                let run = [segPts[0]], runColor = null;
+                const flush = () => {
+                    if (run.length >= 2) {
+                        this.gapLayers.push(L.polyline(run.map(p => [p[0], p[1]]), {
+                            color: runColor || '#4f46e5', weight: 4, opacity: 0.8
+                        }).addTo(this.map));
+                    }
+                };
+                for (let k = 1; k < segPts.length; k++) {
+                    const c = this.speedColor(this.segSpeed(segPts[k - 1], segPts[k]));
+                    if (runColor === null) runColor = c;
+                    if (c !== runColor) {
+                        flush();
+                        run = [segPts[k - 1]];
+                        runColor = c;
+                    }
+                    run.push(segPts[k]);
+                }
+                flush();
+            },
+            // Cluster consecutive points within ~45 m; ≥3 min inside = a stop dot.
+            markStops(pts) {
+                let i = 0;
+                while (i < pts.length) {
+                    if (!pts[i][3]) { i++; continue; }
+                    let j = i;
+                    while (j + 1 < pts.length && pts[j + 1][3]
+                        && this.distM(pts[i], pts[j + 1]) < 45) j++;
+                    const dur = (pts[j][3] || 0) - (pts[i][3] || 0);
+                    if (j > i && dur >= 180) {
+                        const label = this.i18n.stopped_here.replace(':min', Math.round(dur / 60));
+                        const cm = L.circleMarker([pts[i][0], pts[i][1]], {
+                            radius: 7, weight: 2, color: '#b45309', fillColor: '#f59e0b', fillOpacity: 0.9
+                        }).addTo(this.map).bindPopup('<b>' + this.esc(label) + '</b><br>' + this.esc(pts[i][2] || ''));
+                        this.gapLayers.push(cm);
+                        i = j + 1;
+                    } else {
+                        i++;
+                    }
+                }
+            },
+            togglePlay() {
+                if (this.playing) { this.pausePlay(); return; }
+                if (this.trailPts.length < 2) return;
+                if (this.playIdx >= this.trailPts.length - 1) this.playIdx = 0;
+                this.playing = true;
+                this.ensurePlayMarker();
+                // Whole day compresses to ~45 s regardless of point count.
+                const iv = Math.max(20, Math.min(280, Math.round(45000 / this.trailPts.length)));
+                this.playTimer = setInterval(() => this.playTick(), iv);
+            },
+            pausePlay() {
+                this.playing = false;
+                if (this.playTimer) { clearInterval(this.playTimer); this.playTimer = null; }
+            },
+            ensurePlayMarker() {
+                const p = this.trailPts[this.playIdx];
+                if (!p) return;
+                if (this.playMarker) { this.playMarker.setLatLng([p[0], p[1]]); return; }
+                const icon = L.divIcon({
+                    className: '',
+                    html: '<div style="font-size:24px; line-height:1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4));">🛵</div>',
+                    iconSize: [24, 24], iconAnchor: [12, 12],
+                });
+                this.playMarker = L.marker([p[0], p[1]], { icon: icon, zIndexOffset: 900, interactive: false })
+                    .addTo(this.map);
+            },
+            playTick() {
+                if (this.playIdx >= this.trailPts.length - 1) { this.pausePlay(); return; }
+                this.playIdx++;
+                const prev = this.trailPts[this.playIdx - 1];
+                const cur = this.trailPts[this.playIdx];
+                if (this.playMarker) this.playMarker.setLatLng([cur[0], cur[1]]);
+                const kmh = this.segSpeed(prev, cur);
+                this.playReadout = (cur[2] || '')
+                    + (kmh !== null ? ' · ' + Math.round(kmh) + ' km/h' : '');
+            },
             clearTrailLayers() {
                 if (this.polyline) { this.polyline.remove(); this.polyline = null; }
                 this.gapLayers.forEach(l => { try { l.remove(); } catch(e) {} });
                 this.gapLayers = [];
+                // Task #1102: reset playback with the layers it animates over.
+                this.pausePlay();
+                this.playIdx = 0;
+                this.playReadout = '';
+                if (this.playMarker) { try { this.playMarker.remove(); } catch(e) {} this.playMarker = null; }
             },
             clearTrail() {
                 this.selected = null;
                 this.clearTrailLayers();
+                this.trailPts = [];
             },
             // BEST centering (owner, Aug 2026): company profile ki APNI city par
             // khulo — IP-guess se zyada bharosemand. Nominatim se aik dafa

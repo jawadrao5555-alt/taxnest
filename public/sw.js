@@ -131,7 +131,8 @@ self.addEventListener('fetch', e => {
     if (req.mode === 'navigate' && url.pathname === '/pos/restaurant/tables' && url.search === '') {
         const resultingClientId = e.resultingClientId;
         e.respondWith((async () => {
-                const c = await caches.open(TABLES_CACHE);
+            const c = await caches.open(TABLES_CACHE);
+            try {
                 if (await c.match(url)) return; // already primed
                 const res = await fetch(url, { credentials: 'same-origin' });
                 const ct = res.headers.get('content-type') || '';
@@ -276,10 +277,11 @@ self.addEventListener('message', e => {
         e.waitUntil((async () => {
             try {
                 const saleUrls = ['/pos/invoice/create', '/fbr-pos/create'];
-                const c = await caches.open(TABLES_CACHE);
-                if (await c.match(url)) return; // already primed
-                const res = await fetch(url, { credentials: 'same-origin' });
-                const ct = res.headers.get('content-type') || '';
+                const c = await caches.open(SALE_CACHE);
+                await Promise.all(saleUrls.map(async (u) => {
+                    if (await c.match(u)) return; // already primed
+                    const res = await fetch(u, { credentials: 'same-origin' });
+                    const ct = res.headers.get('content-type') || '';
                     if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(u, res.clone());
                 }));
             } catch (err) { /* best-effort — normal second-load prime still applies */ }

@@ -3,7 +3,13 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
             <a href="{{ route('pos.customers') }}" class="text-xs text-purple-600 hover:text-purple-700">← {{ __('pos.back_to_customers') }}</a>
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $customer->name }}</h1>
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white mt-1">
+                {{ $customer->name }}
+                {{-- Task 1161: khamosh-repeat chip — same PosRepeatCustomerAlert service as the dashboard card. --}}
+                @if(!empty($inactiveInfo))
+                <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 align-middle whitespace-nowrap" title="{{ __('pos.inactive_orders_count', ['count' => $inactiveInfo['orders']]) }}">{{ __('pos.inactive_chip', ['days' => $inactiveInfo['days']]) }}</span>
+                @endif
+            </h1>
             <p class="text-sm text-gray-500">
                 {{ $customer->phone ?: __('pos.no_phone') }}
                 @if($customer->city) · {{ $customer->city }} @endif

@@ -4821,4 +4821,12 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'rider_push_step_4' => 'Name the file <strong>rider-fcm.json</strong> (rename it if needed)',
     'rider_push_step_5' => 'Refresh this page — the status will turn green',
     'rider_push_secure_note' => 'Never paste the JSON file into chat or anywhere else — keep it secure.',
+
+    // Task 1161 — Repeat-customer inactivity alert ("Purane Customer Khamosh Hain")
+    'inactive_regulars_title' => 'Regular customers gone quiet',
+    'inactive_regulars_hint' => 'These repeat customers (:min+ orders) have not ordered in :days+ days — a quick call may bring them back.',
+    'inactive_orders_count' => ':count orders',
+    'inactive_last_order_days' => 'last order :days days ago',
+    'inactive_chip' => 'Quiet — :days days',
+    'inactive_more_note' => '+ :count more on the Customers page',
 ];

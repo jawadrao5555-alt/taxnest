@@ -2841,6 +2841,10 @@ class RestaurantPosController extends Controller
                 ->where('created_at', '>=', now()->startOfMonth())->count()
             : 0;
 
+        // Task 1161: "Purane customer khamosh hain" — same shared partial +
+        // cached service as the retail dashboard (admin/manager-only card).
+        $inactiveRegulars = $isAdmin ? \App\Services\PosRepeatCustomerAlert::listFor($companyId) : collect();
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
@@ -2851,7 +2855,8 @@ class RestaurantPosController extends Controller
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier',
             'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
             'counterOrdersCount', 'todayKhata',
-            'todayTotalSale', 'yesterdayTotalSale', 'newCustomersToday', 'newCustomersMonth'
+            'todayTotalSale', 'yesterdayTotalSale', 'newCustomersToday', 'newCustomersMonth',
+            'inactiveRegulars'
         ));
     }
 

@@ -4820,4 +4820,12 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rider_push_step_4' => 'File ka naam <strong>rider-fcm.json</strong> rakhein (rename karein agar zaroorat ho)',
     'rider_push_step_5' => 'Yeh page refresh karein — status green ho jaayega',
     'rider_push_secure_note' => 'JSON file chat ya kisi aur jagah paste na karein — secure rakhein.',
+
+    // Task 1161 — Repeat-customer inactivity alert ("Purane Customer Khamosh Hain")
+    'inactive_regulars_title' => 'Purane Customer Khamosh Hain',
+    'inactive_regulars_hint' => 'In purane customers (:min+ orders) ne :days+ din se koi order nahi kiya — call kar ke pooch lein, shayad wapas aa jayen.',
+    'inactive_orders_count' => ':count orders',
+    'inactive_last_order_days' => 'aakhri order :days din pehle',
+    'inactive_chip' => 'Khamosh — :days din',
+    'inactive_more_note' => '+ :count aur Customers page par',
 ];

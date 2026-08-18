@@ -135,7 +135,14 @@
                     @forelse($customers as $customer)
                     <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="custRow({{ (int) $customer->id }})"
                         data-search="{{ Str::lower(trim(($customer->name ?? '') . ' ' . ($customer->phone ?? '') . ' ' . ($customer->email ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->cnic ?? '') . ' ' . ($customer->ntn ?? ''))) }}">
-                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $customer->name }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                            {{ $customer->name }}
+                            {{-- Task 1161: khamosh-repeat chip — same PosRepeatCustomerAlert service as the dashboard card. --}}
+                            @php $icRow = ($inactiveMap ?? [])[$customer->id] ?? null; @endphp
+                            @if($icRow)
+                            <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 whitespace-nowrap align-middle" title="{{ __('pos.inactive_orders_count', ['count' => $icRow['orders']]) }} · {{ __('pos.inactive_last_order_days', ['days' => $icRow['days']]) }}">{{ __('pos.inactive_chip', ['days' => $icRow['days']]) }}</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ $customer->phone ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $customer->email ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $customer->city ?? '—' }}</td>

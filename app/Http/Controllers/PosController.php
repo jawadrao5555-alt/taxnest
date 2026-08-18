@@ -1415,13 +1415,19 @@ class PosController extends Controller
         $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId);
         $canDayClose = \App\Services\PosAccessService::dayCloseAllowed(auth('pos')->user(), $company);
 
+        // Task 1161: "Purane customer khamosh hain" — repeat customers whose
+        // last order is older than the inactivity window (cached per company,
+        // no cron). Admin/manager-only card, same visibility as pending bills.
+        $inactiveRegulars = $isAdmin ? \App\Services\PosRepeatCustomerAlert::listFor($companyId) : collect();
+
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
             'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
             'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata',
-            'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth'
+            'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
+            'inactiveRegulars'
         ));
     }
 
@@ -8560,7 +8566,10 @@ class PosController extends Controller
         $customers = $query->orderBy('name')->paginate(100)->withQueryString();
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        return view('pos.customers', compact('customers', 'isCashier', 'q', 'totalCount'));
+        // Task 1161: khamosh-repeat chip — same cached service as the dashboard
+        // card so the definition never drifts.
+        $inactiveMap = \App\Services\PosRepeatCustomerAlert::mapFor($companyId);
+        return view('pos.customers', compact('customers', 'isCashier', 'q', 'totalCount', 'inactiveMap'));
     }
 
     public function storeCustomer(Request $request)
@@ -8955,7 +8964,10 @@ class PosController extends Controller
         $avgOrder = $totalOrders > 0 ? $totalSpent / $totalOrders : 0;
         $lastOrder = $transactions->first();
 
-        return view('pos.customer-history', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders', 'avgOrder', 'lastOrder'));
+        // Task 1161: khamosh-repeat chip on the header (same service as dashboard).
+        $inactiveInfo = \App\Services\PosRepeatCustomerAlert::mapFor($companyId)[$customer->id] ?? null;
+
+        return view('pos.customer-history', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders', 'avgOrder', 'lastOrder', 'inactiveInfo'));
     }
 
     /**

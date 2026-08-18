@@ -4819,4 +4819,12 @@ return [
     'rider_push_step_4' => 'فائل کا نام <strong>"rider-fcm.json"</strong> رکھیں (ضرورت ہو تو نام تبدیل کریں)',
     'rider_push_step_5' => 'یہ صفحہ ریفریش کریں — اسٹیٹس سبز ہو جائے گا',
     'rider_push_secure_note' => '"JSON" فائل چیٹ یا کسی اور جگہ پیسٹ نہ کریں — محفوظ رکھیں۔',
+
+    // Task 1161 — Repeat-customer inactivity alert ("Purane Customer Khamosh Hain")
+    'inactive_regulars_title' => 'پرانے گاہک خاموش ہیں',
+    'inactive_regulars_hint' => 'ان پرانے گاہکوں (:min+ آرڈرز) نے :days+ دن سے کوئی آرڈر نہیں کیا — کال کر کے پوچھ لیں، شاید واپس آ جائیں۔',
+    'inactive_orders_count' => ':count آرڈرز',
+    'inactive_last_order_days' => 'آخری آرڈر :days دن پہلے',
+    'inactive_chip' => 'خاموش — :days دن',
+    'inactive_more_note' => '+ :count مزید گاہک، گاہکوں کے صفحے پر',
 ];

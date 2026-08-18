@@ -546,7 +546,108 @@ class PraElaanPopupTest extends TestCase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 7. Two users in same company each get their own row
+    // 7. Survey suppression — elaan must not compete with an active survey
+    //    (blade gate line 1511: $praElaanShow && !$whatsNewPopup &&
+    //     !($surveyPopup && !$surveyDismissedSession))
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Create the surveys + survey_responses tables so the layout's
+     * Schema::hasTable('surveys') guard passes.  Safe to call once per test —
+     * each test gets a fresh in-memory SQLite DB (setUp drops all tables first).
+     */
+    private function createSurveyTables(): void
+    {
+        Schema::create('surveys', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+            $table->text('intro')->nullable();
+            $table->json('questions')->nullable();
+            $table->boolean('allow_comment')->default(false);
+            $table->string('audience')->default('pos_all');
+            $table->boolean('is_published')->default(true);
+            $table->timestamp('closed_at')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('survey_responses', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('survey_id');
+            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->json('answers')->nullable();
+            $table->text('comment')->nullable();
+            $table->timestamp('answered_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Active survey present, admin has no SurveyResponse → elaan must be hidden.
+     *
+     * Blade condition: $surveyPopup && !$surveyDismissedSession is TRUE
+     *   ⇒ the outer AND is FALSE ⇒ data-pra-elaan-popup must NOT appear.
+     */
+    public function test_elaan_hidden_when_active_survey_is_showing(): void
+    {
+        $this->createSurveyTables();
+
+        // Ensure the surveys master switch is on (default, but be explicit).
+        \App\Models\SystemSetting::set('pos_surveys_enabled', '1', 'test');
+
+        // Insert an active, published survey targeting all POS companies.
+        $surveyId = DB::table('surveys')->insertGetId([
+            'title'        => 'Caller ID Survey',
+            'audience'     => 'pos_all',
+            'is_published' => true,
+            'closed_at'    => null,
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
+
+        // No SurveyResponse row for the admin — survey is unanswered.
+        // No session dismissal key either.
+
+        $resp = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        // The survey popup is active and not session-dismissed → elaan suppressed.
+        $resp->assertDontSee(self::MARKER, false);
+    }
+
+    /**
+     * Same active survey, but the admin chose "Baad mein" (session dismiss) →
+     * $surveyDismissedSession is TRUE so the outer condition becomes FALSE →
+     * elaan is free to render.
+     */
+    public function test_elaan_appears_when_survey_is_dismissed_for_session(): void
+    {
+        $this->createSurveyTables();
+
+        \App\Models\SystemSetting::set('pos_surveys_enabled', '1', 'test');
+
+        $surveyId = DB::table('surveys')->insertGetId([
+            'title'        => 'Caller ID Survey',
+            'audience'     => 'pos_all',
+            'is_published' => true,
+            'closed_at'    => null,
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
+
+        // Simulate "Baad mein": the layout reads session('pos_survey_dismissed_<id>').
+        $resp = $this->actingAs(User::find($this->adminId), 'pos')
+            ->withSession(['pos_survey_dismissed_' . $surveyId => true])
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        // Survey is dismissed for this session → elaan is no longer suppressed.
+        $resp->assertSee(self::MARKER, false);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 8. Two users in same company each get their own row
     // ─────────────────────────────────────────────────────────────────────────
 
     public function test_admin_and_manager_each_get_their_own_row(): void

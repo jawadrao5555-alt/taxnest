@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rider Warning Badge QA — Task #1116 (all 3 locales)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+body { margin: 0; font-family: system-ui, sans-serif; background: #f3f4f6; font-size: 13px; }
+.wrap { display: flex; gap: 0; height: 100vh; }
+#map { flex: 1; }
+.panel { width: 300px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+         background:#f9fafb; border-left:1px solid #e5e7eb; }
+.card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px; }
+.card.sel { border-color:#818cf8; box-shadow:0 0 0 2px #e0e7ff; }
+.dot { width:9px;height:9px;border-radius:9999px;display:inline-block;vertical-align:middle; }
+.section-label { font-size:10px; font-weight:700; color:#6b7280; letter-spacing:.05em; text-transform:uppercase; margin:6px 0 2px; }
+/* ── Exact CSS from rider-tracking.blade.php Task #1102 ── */
+.rt-gap-pill {
+    display:inline-block; padding:2px 8px; border-radius:9999px;
+    font-size:11px; font-weight:600; white-space:nowrap;
+    box-shadow:0 1px 4px rgba(0,0,0,.18); pointer-events:none;
+}
+.rt-gap-pill.stopped { background:#f59e0b; color:#fff; }
+.rt-gap-pill.offline  { background:#6366f1; color:#fff; }
+.rt-warn-pill {
+    display:inline-block; padding:1px 7px; border-radius:9999px;
+    font-size:10px; font-weight:700; white-space:nowrap;
+    box-shadow:0 1px 4px rgba(0,0,0,.18);
+    unicode-bidi: plaintext;   /* Urdu self-directs RTL, English stays LTR */
+}
+.rt-warn-pill.idle   { background:#f59e0b; color:#fff; }
+.rt-warn-pill.silent { background:#ef4444; color:#fff; }
+/* Leaflet divIcon container defaults to 12×12px — centering transform MUST
+   live on the inner pill span (translate(-50%) = 50% of the PILL width, not 6px) */
+.rt-warn-map { pointer-events:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="map"></div>
+  <div class="panel">
+
+    <div class="section-label">English (en)</div>
+
+    <div class="card sel">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>Ali Kamran</b> <span class="dot" style="background:#f59e0b"></span>
+      </div>
+      <div style="color:#6b7280">On Duty</div>
+      <div style="margin-top:4px"><span class="rt-warn-pill silent">GPS/net off</span></div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">Last seen: 15 min ago</div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>Hassan Raza</b> <span class="dot" style="background:#f59e0b"></span>
+      </div>
+      <div style="color:#6b7280">On Duty · 2 bills · 1 d</div>
+      <div style="margin-top:4px"><span class="rt-warn-pill idle">Stationary</span></div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">Last seen: 4 min ago</div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>Bilal Ahmed</b> <span class="dot" style="background:#10b981"></span>
+      </div>
+      <div style="color:#6b7280">On Duty</div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">Last seen: just now</div>
+    </div>
+    <div class="card" style="background:#fef3c7;border-color:#fcd34d">
+      <div style="font-size:10px;color:#92400e"><b>Auto-off note (en):</b></div>
+      <div style="font-size:10px;color:#78350f">Duty auto-ended at night</div>
+    </div>
+
+    <div class="section-label">Roman Urdu (rur)</div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>Kamran Butt</b> <span class="dot" style="background:#ef4444"></span>
+      </div>
+      <div style="color:#6b7280">On Duty</div>
+      <div style="margin-top:4px"><span class="rt-warn-pill silent">GPS/net band</span></div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">Last seen: 12 min pehle</div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>Asad Malik</b> <span class="dot" style="background:#f59e0b"></span>
+      </div>
+      <div style="color:#6b7280">On Duty · 1 bill</div>
+      <div style="margin-top:4px"><span class="rt-warn-pill idle">Ruka hua hai</span></div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px">Last seen: 5 min pehle</div>
+    </div>
+    <div class="card" style="background:#fef3c7;border-color:#fcd34d">
+      <div style="font-size:10px;color:#92400e"><b>Auto-off note (rur):</b></div>
+      <div style="font-size:10px;color:#78350f">Duty raat ko khud off hui</div>
+    </div>
+
+    <div class="section-label">Urdu (ur)</div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b style="direction:rtl">ظفر علی</b> <span class="dot" style="background:#f59e0b"></span>
+      </div>
+      <div style="color:#6b7280;direction:rtl">آن ڈیوٹی</div>
+      <div style="margin-top:4px"><span class="rt-warn-pill silent" dir="rtl">جی پی ایس/نیٹ بند</span></div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px;direction:rtl">آخری مقام: ۱۵ منٹ پہلے</div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b style="direction:rtl">نعمان خان</b> <span class="dot" style="background:#f59e0b"></span>
+      </div>
+      <div style="color:#6b7280;direction:rtl">آن ڈیوٹی · 3 بِل</div>
+      <div style="margin-top:4px"><span class="rt-warn-pill idle" dir="rtl">رکا ہوا ہے</span></div>
+      <div style="color:#9ca3af;font-size:10px;margin-top:2px;direction:rtl">آخری مقام: 4 منٹ پہلے</div>
+    </div>
+    <div class="card" style="background:#fef3c7;border-color:#fcd34d">
+      <div style="font-size:10px;color:#92400e;direction:rtl"><b>auto-off note (ur):</b></div>
+      <div style="font-size:10px;color:#78350f;direction:rtl">ڈیوٹی رات کو خود آف ہوئی</div>
+    </div>
+
+    <div class="section-label">Speed legend</div>
+    <div class="card" style="font-size:11px;line-height:1.7">
+      <span style="color:#f97316">●</span> orange = slow (&lt;6 km/h)<br>
+      <span style="color:#10b981">●</span> green = normal (6–25 km/h)<br>
+      <span style="color:#4f46e5">●</span> blue = fast (&gt;25 km/h)<br>
+      <b>Stop dot</b> (amber) = rider paused ≥3 min<br>
+      <b>Dashed line</b> = GPS gap (purple=offline sync)
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Map setup ──────────────────────────────────────────────────────────────
+const pkBounds = L.latLngBounds([22.8,60.4],[37.5,77.6]);
+const map = L.map('map', {
+    maxBounds:pkBounds, maxBoundsViscosity:1.0, minZoom:5
+}).setView([31.528,74.39],13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+    maxZoom:19, subdomains:'abcd', attribution:'© OpenStreetMap © CARTO'
+}).addTo(map);
+
+function esc(s){
+    return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Rider set — ALL THREE LOCALES have map divIcon badges ──────────────────
+//    i18n strings exactly match lang/en/pos.php, lang/rur/pos.php, lang/ur/pos.php
+const riders = [
+    // English locale riders
+    { id:1, name:'Ali Kamran',  lat:31.5240, lng:74.3640, color:'#f59e0b', warn:'silent',
+      label_en:'GPS/net off',   badge_class:'silent' },
+    { id:2, name:'Hassan Raza', lat:31.5310, lng:74.3830, color:'#f59e0b', warn:'idle',
+      label_en:'Stationary',    badge_class:'idle' },
+    { id:3, name:'Bilal Ahmed', lat:31.5180, lng:74.3700, color:'#10b981', warn:null,
+      label_en:'',              badge_class:'' },
+    // Roman Urdu locale riders
+    { id:4, name:'Kamran Butt', lat:31.5450, lng:74.3600, color:'#f59e0b', warn:'silent',
+      label_en:'GPS/net band',  badge_class:'silent' },
+    { id:5, name:'Asad Malik',  lat:31.5380, lng:74.3900, color:'#f59e0b', warn:'idle',
+      label_en:'Ruka hua hai',  badge_class:'idle' },
+    // Urdu locale riders (RTL)
+    { id:6, name:'ظفر علی',    lat:31.5400, lng:74.4050, color:'#f59e0b', warn:'silent',
+      label_en:'جی پی ایس/نیٹ بند', badge_class:'silent' },
+    { id:7, name:'نعمان خان',  lat:31.5490, lng:74.3750, color:'#f59e0b', warn:'idle',
+      label_en:'رکا ہوا ہے',   badge_class:'idle' },
+];
+
+riders.forEach(r => {
+    const popup = '<b>' + esc(r.name) + '</b>'
+        + (r.warn ? '<br><b style="color:' + (r.warn==='silent'?'#ef4444':'#d97706') + '">'
+            + esc(r.label_en) + '</b>' : '');
+
+    // ── Warning badge pill — transform on THE PILL SPAN, not the 12×12 container ──
+    // translate(-50%) uses the pill's own rendered width → self-centers above the dot
+    // regardless of language or pill width (en ~60px, rur ~90px, ur ~110px+).
+    if (r.warn) {
+        const bicon = L.divIcon({
+            className: 'rt-warn-map',
+            html: '<span class="rt-warn-pill ' + r.badge_class + '" '
+                + 'style="display:inline-block;transform:translate(-50%,calc(-100% - 10px));">'
+                + esc(r.label_en) + '</span>',
+            iconAnchor: [0, 0],  // pill's top-left at marker position; pill shifts itself
+        });
+        L.marker([r.lat,r.lng],{icon:bicon,interactive:false,zIndexOffset:800}).addTo(map);
+    }
+
+    L.circleMarker([r.lat,r.lng],{
+        radius:9,weight:2.5,color:r.color,fillColor:r.color,fillOpacity:0.55
+    }).addTo(map).bindPopup(popup);
+});
+
+// ── Trail (seeded data shape, from actual trail endpoint response) ──────────
+// These points match the 165-row INSERT seeded into pos_rider_locations for rider_id=6.
+// Shape: [lat, lng, 'H:MM', epoch_seconds] — same 4-tuple the trail endpoint returns.
+const now = Math.floor(Date.now()/1000);
+const trail = [];
+function addSeg(startAgo,endAgo,sLat,sLng,eLat,eLng,stepSec){
+    for(let t=startAgo;t>=endAgo;t-=stepSec/60){
+        const f=(startAgo-t)/Math.max(1,startAgo-endAgo);
+        const ep=now-t*60;
+        trail.push([sLat+(eLat-sLat)*f,sLng+(eLng-sLng)*f,
+            new Date(ep*1000).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}),ep]);
+    }
+}
+// Mirrors the seeded SQL trail segments exactly
+addSeg(187,175,31.5200,74.3580,31.5204,74.3584,60);  // slow walk
+addSeg(175,117,31.5204,74.3584,31.5640,74.4200,60);  // fast delivery run
+addSeg(117, 95,31.5640,74.4200,31.5641,74.4201,90);  // stop 1 (22 min)
+addSeg( 95, 67,31.5641,74.4201,31.5280,74.3700,60);  // fast return
+addSeg( 67, 57,31.5280,74.3700,31.5283,74.3705,60);  // slow approach
+addSeg( 57, 27,31.5283,74.3705,31.5284,74.3706,90);  // stop 2 (30 min)
+// 25-min gap — no points between -27 and -22 ↑↓
+addSeg( 22, 15,31.5450,74.3880,31.5455,74.3885,60);  // offline resume
+addSeg( 15,  8,31.5455,74.3885,31.5467,74.3890,60);  // live approach
+
+function distM(a,b){
+    const R=6371000,rad=Math.PI/180,dLat=(b[0]-a[0])*rad,
+          dLng=(b[1]-a[1])*rad*Math.cos(((a[0]+b[0])/2)*rad);
+    return Math.sqrt(dLat*dLat+dLng*dLng)*R;
+}
+function segSpeed(a,b){const t1=a[3],t2=b[3];if(!t1||!t2||t2<=t1)return null;return distM(a,b)/(t2-t1)*3.6;}
+function speedColor(kmh){if(kmh===null)return'#4f46e5';if(kmh<6)return'#f97316';if(kmh<=25)return'#10b981';return'#4f46e5';}
+
+const layers=[];
+let run=[trail[0]],runColor=null;
+function flushRun(){
+    if(run.length>=2) layers.push(L.polyline(run.map(p=>[p[0],p[1]]),
+        {color:runColor||'#4f46e5',weight:4,opacity:0.8}).addTo(map));
+}
+for(let k=1;k<trail.length;k++){
+    if(trail[k][3]-trail[k-1][3]>600){  // gap > 10 min
+        flushRun();
+        // dashed offline gap connector
+        layers.push(L.polyline([[trail[k-1][0],trail[k-1][1]],[trail[k][0],trail[k][1]]],
+            {color:'#6366f1',weight:2.5,dashArray:'7 11',opacity:0.85}).addTo(map));
+        const mLat=(trail[k-1][0]+trail[k][0])/2,mLng=(trail[k-1][1]+trail[k][1])/2;
+        layers.push(L.marker([mLat,mLng],{interactive:false,icon:L.divIcon({
+            className:'',
+            html:'<span class="rt-gap-pill offline" style="transform:translate(-50%,-50%);display:inline-block;">25 min — offline sync</span>',
+            iconAnchor:[0,0]})}).addTo(map));
+        run=[trail[k]];runColor=null;continue;
+    }
+    const c=speedColor(segSpeed(trail[k-1],trail[k]));
+    if(runColor===null)runColor=c;
+    if(c!==runColor){flushRun();run=[trail[k-1]];runColor=c;}
+    run.push(trail[k]);
+}
+flushRun();
+
+// Stop dots (≥3 min stationary, <45m radius)
+let i=0;
+while(i<trail.length){
+    if(!trail[i][3]){i++;continue;}
+    let j=i;
+    while(j+1<trail.length&&trail[j+1][3]&&distM(trail[i],trail[j+1])<45)j++;
+    const dur=(trail[j][3]||0)-(trail[i][3]||0);
+    if(j>i&&dur>=180){
+        const mins=Math.round(dur/60);
+        layers.push(L.circleMarker([trail[i][0],trail[i][1]],
+            {radius:7,weight:2,color:'#b45309',fillColor:'#f59e0b',fillOpacity:0.9})
+            .addTo(map).bindPopup('<b>Stopped here ('+mins+' min)</b><br>'+trail[i][2]));
+        i=j+1;
+    }else{i++;}
+}
+
+// Fit to trail
+map.fitBounds(trail.map(p=>[p[0],p[1]]),{padding:[40,40]});
+
+// ── Playback ────────────────────────────────────────────────────────────────
+let playIdx=0,playing=false,playTimer=null,playMarker=null;
+function ensurePlayMarker(){
+    const p=trail[playIdx];
+    const icon=L.divIcon({className:'',html:'<div style="font-size:22px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">🛵</div>',
+        iconSize:[22,22],iconAnchor:[11,11]});
+    if(playMarker){playMarker.setLatLng([p[0],p[1]]);return;}
+    playMarker=L.marker([p[0],p[1]],{icon,zIndexOffset:900,interactive:false}).addTo(map);
+}
+function playTick(){
+    if(playIdx>=trail.length-1){stopPlay();return;}
+    playIdx++;
+    const cur=trail[playIdx];
+    if(playMarker)playMarker.setLatLng([cur[0],cur[1]]);
+    const kmh=segSpeed(trail[playIdx-1],cur);
+    document.getElementById('readout').textContent=
+        (cur[2]||'')+(kmh!==null?' · '+Math.round(kmh)+' km/h':'');
+}
+function stopPlay(){playing=false;if(playTimer){clearInterval(playTimer);playTimer=null;}
+    document.getElementById('playbtn').textContent='▶ Play route';}
+
+// Play controls overlay
+const ctrl=document.createElement('div');
+ctrl.style='position:absolute;bottom:14px;left:calc(50% - 150px);z-index:1000;display:flex;align-items:center;gap:8px;background:#ffffffee;padding:6px 12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.18);font-size:12px';
+ctrl.innerHTML='<button id="playbtn" style="padding:3px 10px;border-radius:6px;background:#4f46e5;color:#fff;border:0;cursor:pointer;font-weight:700">▶ Play route</button>'
+    +'<span id="readout" style="color:#4b5563;font-weight:600;min-width:120px"></span>'
+    +'<span style="color:#6b7280"><span style="color:#f97316">●</span> slow <span style="color:#10b981">●</span> normal <span style="color:#4f46e5">●</span> fast</span>';
+document.querySelector('.wrap').appendChild(ctrl);
+document.getElementById('playbtn').onclick=function(){
+    if(playing){stopPlay();}else{
+        if(playIdx>=trail.length-1)playIdx=0;
+        playing=true;ensurePlayMarker();
+        const iv=Math.max(20,Math.min(280,Math.round(45000/trail.length)));
+        playTimer=setInterval(playTick,iv);
+        this.textContent='⏸ Pause';
+    }
+};
+</script>
+</body>
+</html>

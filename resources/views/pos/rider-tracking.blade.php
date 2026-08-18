@@ -43,11 +43,20 @@
             font-weight: 700;
             white-space: nowrap;
             box-shadow: 0 1px 4px rgba(0,0,0,.18);
+            /* Urdu/Arabic script is strong-RTL via Unicode Bidi; plaintext
+               lets each label self-direct so "GPS/net off" stays LTR and
+               "جی پی ایس/نیٹ بند" stays RTL inside the same pill class. */
+            unicode-bidi: plaintext;
         }
         .rt-warn-pill.idle { background: #f59e0b; color: #fff; }
         .rt-warn-pill.silent { background: #ef4444; color: #fff; }
         /* Task #1106: battery kam hai */
         .rt-warn-pill.battery { background: #dc2626; color: #fff; }
+        /* .rt-warn-map is the Leaflet divIcon container.  Leaflet defaults it to
+           12×12 px, so a transform here shifts by only 6px — not by the pill's
+           actual width.  The centering transform is applied INLINE on the pill
+           span itself inside renderMarkers() so translate(-50%) uses the pill's
+           own rendered width, working correctly for any language. */
         .rt-warn-map { pointer-events: none; }
     </style>
 
@@ -366,8 +375,16 @@
                     if (warn) {
                         const bicon = L.divIcon({
                             className: 'rt-warn-map',
-                            html: '<span class="rt-warn-pill ' + warn + '">' + this.esc(warnLabel) + '</span>',
-                            iconAnchor: [30, 32],
+                            // Transform on the PILL SPAN itself (not the container):
+                            // Leaflet's default divIcon container is 12×12 px, so
+                            // translate(-50%) on the container shifts only 6 px.
+                            // On the inline-block pill span, translate(-50%) uses the
+                            // pill's own rendered width → correct centering in any lang.
+                            // iconAnchor:[0,0] = container top-left at marker position;
+                            // the pill's transform then moves it left by half its width
+                            // and fully above the dot with a 10 px gap.
+                            html: '<span class="rt-warn-pill ' + warn + '" style="display:inline-block;transform:translate(-50%,calc(-100% - 10px));">' + this.esc(warnLabel) + '</span>',
+                            iconAnchor: [0, 0],
                         });
                         this.warnBadges[r.id] = L.marker([r.lat, r.lng], {
                             icon: bicon, interactive: false, zIndexOffset: 800

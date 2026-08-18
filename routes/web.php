@@ -941,6 +941,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
             Route::delete('/ingredients/{id}', [IngredientController::class, 'destroy'])->name('pos.restaurant.ingredients.delete');
             Route::get('/recipes', [IngredientController::class, 'recipes'])->name('pos.restaurant.recipes');
             Route::post('/recipes', [IngredientController::class, 'storeRecipe'])->name('pos.restaurant.recipes.store');
+            // Task 1162: Excel bulk upload (template + import) — same feature gate.
+            Route::get('/recipes/template', [IngredientController::class, 'downloadRecipeTemplate'])->name('pos.restaurant.recipes.template');
+            Route::post('/recipes/import', [IngredientController::class, 'importRecipes'])->name('pos.restaurant.recipes.import');
             Route::put('/recipes/{id}', [IngredientController::class, 'updateRecipe'])->name('pos.restaurant.recipes.update');
             Route::delete('/recipes/{id}', [IngredientController::class, 'deleteRecipe'])->name('pos.restaurant.recipes.delete');
         });

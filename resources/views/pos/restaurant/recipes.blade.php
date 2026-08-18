@@ -1,6 +1,7 @@
 <x-pos-layout>
 <div x-data="{
         showAddModal: false,
+        showImport: false,
         q: '',
         recipeNames: {{ json_encode($recipes->map(fn($g) => mb_strtolower($g->first()->product->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }},
         selectedProduct: '',
@@ -15,7 +16,10 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.recipes_bom') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.recipes_subtitle') }}</p>
         </div>
-        <button @click="openAdd()" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">{{ __('pos.add_recipe_btn') }}</button>
+        <div class="flex items-center gap-2 flex-wrap justify-end">
+            <button @click="showImport = !showImport" class="px-4 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-sm font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20">📄 {{ __('pos.recipes_import_toggle') }}</button>
+            <button @click="openAdd()" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">{{ __('pos.add_recipe_btn') }}</button>
+        </div>
     </div>
 
     @if(session('success'))
@@ -24,6 +28,28 @@
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>
     @endif
+    @if($errors->any())
+    <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{{ $errors->first() }}</div>
+    @endif
+
+    {{-- Task 1162: Excel bulk upload (template + import) --}}
+    <div x-show="showImport" x-cloak class="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.recipes_import_title') }}</h3>
+        <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3">
+            <p class="text-xs text-blue-800 dark:text-blue-300">{{ __('pos.recipes_import_hint') }}</p>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <a href="{{ route('pos.restaurant.recipes.template') }}" class="inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition no-underline">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                {{ __('pos.recipes_import_template_btn') }}
+            </a>
+            <form method="POST" action="{{ route('pos.restaurant.recipes.import') }}" enctype="multipart/form-data" class="flex flex-1 flex-col sm:flex-row sm:items-center gap-3">
+                @csrf
+                <input type="file" name="excel_file" accept=".xlsx,.xls" required class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
+                <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 whitespace-nowrap">{{ __('pos.recipes_import_upload_btn') }}</button>
+            </form>
+        </div>
+    </div>
 
     @if($recipes->count() > 0)
     <div class="mb-4 relative w-full sm:max-w-md">

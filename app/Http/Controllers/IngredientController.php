@@ -6,9 +6,20 @@ use App\Models\Ingredient;
 use App\Models\ProductRecipe;
 use App\Models\PosProduct;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class IngredientController extends Controller
 {
+    // Template sample rows carry this EXPLICIT product-name marker so the
+    // import can identify them reliably. Never infer "sample" from business
+    // values (a real Chicken Burger + Bun qty-1 recipe must always import).
+    private const RECIPE_SAMPLE_MARKER = 'Misal:';
+
+    // Row cap for the bulk import (data rows, excluding header). A 200-dish
+    // menu with 10 ingredients each is 2,000 rows — plenty of headroom.
+    private const RECIPE_IMPORT_MAX_ROWS = 2000;
+
     public function index()
     {
         $companyId = app('currentCompanyId');
@@ -209,6 +220,304 @@ class IngredientController extends Controller
         }
 
         return back()->with('success', $msg);
+    }
+
+    /**
+     * Recipes Excel template (Task 1162): real .xlsx (never CSV — CSV round-trips
+     * mangle code columns into scientific notation). One ingredient per row;
+     * repeating the product name groups rows into one recipe on import.
+     */
+    public function downloadRecipeTemplate()
+    {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Recipes');
+
+        $headers = ['Product Name', 'Product Code (SKU/Barcode)', 'Ingredient Name', 'Unit', 'Quantity Needed', 'Cost per Unit (optional)'];
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->getStyle('A1:F1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:F1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('E9D5FF');
+        foreach (['A' => 28, 'B' => 24, 'C' => 24, 'D' => 10, 'E' => 16, 'F' => 20] as $col => $w) {
+            $sheet->getColumnDimension($col)->setWidth($w);
+        }
+        // Product Code column forced to TEXT so Excel never converts long
+        // barcodes to scientific notation or strips leading zeros.
+        $sheet->getStyle('B:B')->getNumberFormat()
+            ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+
+        // Sample rows are marked with the explicit 'Misal:' prefix — the import
+        // recognizes the marker (never the values) and skips them with a clear
+        // reason, so an untouched template can't create junk data.
+        $samples = [
+            [self::RECIPE_SAMPLE_MARKER . ' Chicken Burger', '', 'Bun', 'pcs', 1, 15],
+            [self::RECIPE_SAMPLE_MARKER . ' Chicken Burger', '', 'Chicken Patty', 'pcs', 1, 60],
+            [self::RECIPE_SAMPLE_MARKER . ' Chicken Burger', '', 'Mayo Sauce', 'g', 20, 0.4],
+            [self::RECIPE_SAMPLE_MARKER . ' Zinger Large Pizza', 'PZ-001', 'Pizza Dough', 'g', 350, 0.15],
+            [self::RECIPE_SAMPLE_MARKER . ' Zinger Large Pizza', 'PZ-001', 'Cheese', 'g', 120, 1.2],
+        ];
+        $rowNum = 2;
+        foreach ($samples as $s) {
+            $sheet->setCellValue('A' . $rowNum, $s[0]);
+            $sheet->setCellValueExplicit('B' . $rowNum, (string) $s[1], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('C' . $rowNum, $s[2]);
+            $sheet->setCellValue('D' . $rowNum, $s[3]);
+            $sheet->setCellValue('E' . $rowNum, $s[4]);
+            $sheet->setCellValue('F' . $rowNum, $s[5]);
+            $rowNum++;
+        }
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, 'recipes_template.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    /**
+     * Bulk recipe import (Task 1162). Per-row: resolve product company-scoped
+     * (code → name), find-or-create ingredient (name+unit), upsert the recipe
+     * row (duplicate product+ingredient UPDATES quantity — never errors). Bad
+     * rows are skipped with a reason; they never abort the file.
+     */
+    public function importRecipes(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'excel_file' => 'required|file|mimes:xlsx,xls|max:5120',
+        ], [
+            'excel_file.required' => 'Pehle Excel file chunein.',
+            'excel_file.mimes' => 'File Excel (.xlsx) honi chahiye — template download kar ke usi file mein likhein.',
+            'excel_file.max' => 'File 5 MB se choti honi chahiye.',
+        ]);
+
+        try {
+            $rows = $this->readRecipeRowsExcel($request->file('excel_file')->getRealPath());
+        } catch (\Throwable $e) {
+            Log::error('POS recipe import parse failed: ' . $e->getMessage());
+            return back()->with('error', 'File parhi nahi ja saki — file kharab ya password-protected lag rahi hai. Template dobara download kar ke usi file mein recipes likhein.');
+        }
+
+        if (count($rows) < 2) {
+            return back()->with('error', 'File khali hai — header ke neeche recipe rows likhein.');
+        }
+        if (count($rows) > self::RECIPE_IMPORT_MAX_ROWS + 1) {
+            return back()->with('error', 'Ek waqt mein zyada se zyada ' . self::RECIPE_IMPORT_MAX_ROWS . ' rows import karein — file do hisson mein todein.');
+        }
+
+        $header = array_map(function ($h) {
+            return strtolower(trim(preg_replace('/[\x{FEFF}]/u', '', (string) $h)));
+        }, $rows[0]);
+
+        $productIdx = $this->findRecipeColumn($header, ['product name', 'product', 'item name', 'item']);
+        $codeIdx = $this->findRecipeColumn($header, ['product code (sku/barcode)', 'product code (sku / barcode)', 'product code', 'code', 'sku', 'barcode', 'item code']);
+        $ingIdx = $this->findRecipeColumn($header, ['ingredient name', 'ingredient']);
+        $unitIdx = $this->findRecipeColumn($header, ['unit', 'uom', 'unit (uom)']);
+        $qtyIdx = $this->findRecipeColumn($header, ['quantity needed', 'qty needed', 'quantity', 'qty', 'miqdaar']);
+        $costIdx = $this->findRecipeColumn($header, ['cost per unit (optional)', 'cost per unit', 'cost', 'rate']);
+
+        if (($productIdx === false && $codeIdx === false) || $ingIdx === false || $qtyIdx === false) {
+            return back()->with('error', 'File mein "Product Name", "Ingredient Name" aur "Quantity Needed" columns nahi mile. Template download kar ke USI file mein recipes likh kar dobara upload karein — pehli header row delete na karein.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // Preload company catalog + ingredients + existing recipes ONCE.
+            // Maps updated after each create so later rows in the same file
+            // match what earlier rows created.
+            $byBarcode = []; $bySku = []; $byName = [];
+            foreach (PosProduct::where('company_id', $companyId)->get() as $p) {
+                if (trim((string) $p->barcode) !== '') $byBarcode[strtolower(trim($p->barcode))] = $p;
+                if (trim((string) $p->sku) !== '') $bySku[strtolower(trim($p->sku))] = $p;
+                $byName[strtolower(trim($p->name))] = $p;
+            }
+
+            $ingByNameUnit = []; $ingByName = [];
+            foreach (Ingredient::where('company_id', $companyId)->get() as $ing) {
+                $ingByNameUnit[strtolower(trim($ing->name)) . '|' . strtolower(trim($ing->unit))] = $ing;
+                $ingByName[strtolower(trim($ing->name))] ??= $ing;
+            }
+
+            $recipeByKey = [];
+            foreach (ProductRecipe::where('company_id', $companyId)->get() as $r) {
+                $recipeByKey[$r->product_id . '|' . $r->ingredient_id] = $r;
+            }
+
+            $added = 0; $updated = 0; $newIngredients = 0; $skipped = 0; $samplesSkipped = 0;
+            $errors = [];
+
+            for ($i = 1; $i < count($rows); $i++) {
+                $data = $rows[$i];
+                $rowNo = $i + 1;
+
+                $rowEmpty = true;
+                foreach ($data as $cell) { if (trim((string) $cell) !== '') { $rowEmpty = false; break; } }
+                if ($rowEmpty) continue;
+
+                $productName = $productIdx !== false ? trim((string) ($data[$productIdx] ?? '')) : '';
+                $code = $codeIdx !== false ? $this->cleanRecipeCode($data[$codeIdx] ?? null) : null;
+                $ingName = trim((string) ($data[$ingIdx] ?? ''));
+                $unit = $unitIdx !== false ? strtolower(trim((string) ($data[$unitIdx] ?? ''))) : '';
+                $qty = $this->cleanRecipeNumber($data[$qtyIdx] ?? '');
+                $cost = $costIdx !== false ? $this->cleanRecipeNumber($data[$costIdx] ?? '') : null;
+
+                // Untouched template sample rows (explicit 'Misal:' marker) are
+                // skipped — identified by the marker ONLY, never by values.
+                if ($productName !== '' && stripos($productName, self::RECIPE_SAMPLE_MARKER) === 0) {
+                    $samplesSkipped++;
+                    continue;
+                }
+
+                if ($productName === '' && $code === null) {
+                    $errors[] = "Row {$rowNo}: product ka naam/code khali hai";
+                    $skipped++;
+                    continue;
+                }
+                if ($ingName === '') {
+                    $errors[] = "Row {$rowNo}: ingredient ka naam khali hai";
+                    $skipped++;
+                    continue;
+                }
+                if ($qty === null || $qty <= 0) {
+                    $errors[] = "Row {$rowNo}: '{$ingName}' ki miqdaar samajh nahi aayi (" . trim((string) ($data[$qtyIdx] ?? '')) . ")";
+                    $skipped++;
+                    continue;
+                }
+
+                // Product match precedence: barcode → SKU → name (company-scoped).
+                $product = null;
+                if ($code !== null) {
+                    $product = $byBarcode[strtolower($code)] ?? $bySku[strtolower($code)] ?? null;
+                }
+                if (!$product && $productName !== '') {
+                    $product = $byName[strtolower($productName)] ?? null;
+                }
+                if (!$product) {
+                    $label = $productName !== '' ? $productName : $code;
+                    $errors[] = "Row {$rowNo}: product '{$label}' nahi mila — naam/code Products page jaisa likhein";
+                    $skipped++;
+                    continue;
+                }
+
+                // Find-or-create ingredient (name+unit — same rule as the modal).
+                $ingredient = null;
+                if ($unit !== '') {
+                    $ingredient = $ingByNameUnit[strtolower($ingName) . '|' . $unit] ?? null;
+                } else {
+                    $ingredient = $ingByName[strtolower($ingName)] ?? null;
+                }
+                if (!$ingredient) {
+                    $ingredient = Ingredient::create([
+                        'company_id' => $companyId,
+                        'name' => $ingName,
+                        'unit' => $unit !== '' ? $unit : 'pcs',
+                        'cost_per_unit' => $cost !== null && $cost >= 0 ? $cost : 0,
+                        'current_stock' => 0,
+                        'min_stock_level' => 0,
+                        'is_active' => true,
+                    ]);
+                    $newIngredients++;
+                    $ingByNameUnit[strtolower($ingName) . '|' . strtolower($ingredient->unit)] = $ingredient;
+                    $ingByName[strtolower($ingName)] ??= $ingredient;
+                }
+
+                // Upsert: duplicate product+ingredient UPDATES quantity.
+                $key = $product->id . '|' . $ingredient->id;
+                if (isset($recipeByKey[$key])) {
+                    $recipeByKey[$key]->update(['quantity_needed' => $qty]);
+                    $updated++;
+                } else {
+                    $recipeByKey[$key] = ProductRecipe::create([
+                        'company_id' => $companyId,
+                        'product_id' => $product->id,
+                        'ingredient_id' => $ingredient->id,
+                        'quantity_needed' => $qty,
+                    ]);
+                    $added++;
+                }
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
+        $parts = [];
+        if ($added > 0) $parts[] = "{$added} nayi recipe rows add hui";
+        if ($updated > 0) $parts[] = "{$updated} update hui";
+        if ($newIngredients > 0) $parts[] = "{$newIngredients} naye ingredients bane";
+        if ($samplesSkipped > 0) $parts[] = "{$samplesSkipped} template sample rows chhori gayi";
+        if ($skipped > 0) $parts[] = "{$skipped} rows skip hui";
+        $msg = $parts ? implode(', ', $parts) . '.' : 'File mein koi recipe row nahi mili.';
+        if (!empty($errors)) {
+            $msg .= ' Masail: ' . implode('; ', array_slice($errors, 0, 5)) . (count($errors) > 5 ? ' (+' . (count($errors) - 5) . ' aur)' : '');
+        }
+
+        if ($added === 0 && $updated === 0) {
+            return back()->with('error', $msg);
+        }
+        return back()->with('success', $msg);
+    }
+
+    private function readRecipeRowsExcel(string $path): array
+    {
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // Row-cap BEFORE materializing the sheet — a 5MB xlsx can hold hundreds
+        // of thousands of rows (zip compression); toArray() on that would OOM
+        // shared cPanel PHP before any post-parse count check ran.
+        if ($sheet->getHighestDataRow() > self::RECIPE_IMPORT_MAX_ROWS + 1) {
+            $spreadsheet->disconnectWorksheets();
+            return array_fill(0, self::RECIPE_IMPORT_MAX_ROWS + 2, []); // triggers the friendly cap error upstream
+        }
+
+        $rows = $sheet->toArray(null, true, false, false);
+        $spreadsheet->disconnectWorksheets();
+        return $rows;
+    }
+
+    // "Rs 1,200", "0.25", "16%" → float; anything non-numeric → null.
+    private function cleanRecipeNumber($raw): ?float
+    {
+        if (is_int($raw) || is_float($raw)) return (float) $raw;
+        $s = trim((string) $raw);
+        if ($s === '') return null;
+        $s = str_ireplace(['rs.', 'rs', 'pkr', '%'], '', $s);
+        $s = str_replace([',', ' '], '', $s);
+        if (!is_numeric($s)) return null;
+        return (float) $s;
+    }
+
+    // Code cleaner: Excel numeric cells arrive as floats (8901234567890.0) and
+    // scientific notation ("8.9E+12") — both restored to plain digit strings.
+    private function cleanRecipeCode($raw): ?string
+    {
+        if ($raw === null) return null;
+        if (is_int($raw) || is_float($raw)) return sprintf('%.0f', (float) $raw);
+        $s = trim((string) $raw);
+        if ($s === '') return null;
+        if (preg_match('/^\d+(\.\d+)?E\+?\d+$/i', $s)) return sprintf('%.0f', (float) $s);
+        if (preg_match('/^\d+\.0+$/', $s)) return preg_replace('/\.0+$/', '', $s);
+        return $s;
+    }
+
+    private function findRecipeColumn(array $header, array $names): int|false
+    {
+        foreach ($names as $name) {
+            $idx = array_search($name, $header);
+            if ($idx !== false) return $idx;
+        }
+        return false;
     }
 
     public function updateRecipe(Request $request, $id)

@@ -194,4 +194,104 @@ class FcmKeyPresentLogDedupeTest extends TestCase
 
         $this->assertFalse(RiderPushService::isConfigured());
     }
+
+    // ─── Key-delete-then-re-upload edge cases (Task #1148) ──────────────────
+
+    /**
+     * Sequence: first load with key → cache set → key deleted (isConfigured=false)
+     * → load while key absent (guard must stay silent + cache key must survive)
+     * → key re-uploaded within TTL → load again → log still silent (cache hit).
+     *
+     * The stale cache hit is the CORRECT behaviour: the guard already logged once
+     * for this 24-hour window, so neither the absent-key load nor the re-upload
+     * should produce a second log entry.
+     */
+    public function test_log_stays_silent_after_key_reuploaded_within_ttl(): void
+    {
+        Log::spy();
+
+        // First load — key present, cache empty → log fires + cache key written.
+        PosRiderController::logFcmKeyPresenceOnce();
+        $this->assertTrue(Cache::has(self::CACHE_KEY), 'cache key set after first load');
+
+        // ── deletion phase ───────────────────────────────────────────────────
+        config(['services.fcm.credentials_json' => '', 'services.fcm.credentials_file' => '']);
+        $this->resetRiderPushServiceMemo();
+
+        // Guard called while key is absent — must be silent.
+        $this->assertFalse(RiderPushService::isConfigured(), 'key is absent');
+        PosRiderController::logFcmKeyPresenceOnce();
+
+        // Deletion-state load must NOT have cleared the cache key.
+        $this->assertTrue(
+            Cache::has(self::CACHE_KEY),
+            'Cache key must survive a load with no credential.'
+        );
+
+        // ── re-upload phase ─────────────────────────────────────────────────
+        config(['services.fcm.credentials_json' => json_encode(self::FAKE_CREDENTIAL)]);
+        $this->resetRiderPushServiceMemo();
+
+        $this->assertTrue(RiderPushService::isConfigured(), 'key is back');
+        PosRiderController::logFcmKeyPresenceOnce();
+
+        // Only the very first load should have logged.
+        Log::shouldHaveReceived('info')
+            ->once()
+            ->with(self::LOG_MSG);
+
+        $this->assertTrue(
+            Cache::has(self::CACHE_KEY),
+            'Cache key must still be present after re-upload within TTL.'
+        );
+    }
+
+    /**
+     * After a Cache::forget the log MUST fire again on the next load, even if
+     * the key was only briefly absent and has since been re-uploaded.
+     *
+     * Sequence: first load → cache set → key deleted → load while absent (silent)
+     * → Cache::forget → key re-uploaded → next load → log fires once more.
+     */
+    public function test_log_fires_again_after_cache_forget_and_key_reupload(): void
+    {
+        Log::spy();
+
+        // First load — logs + sets cache.
+        PosRiderController::logFcmKeyPresenceOnce();
+        $this->assertTrue(Cache::has(self::CACHE_KEY), 'cache key set after first load');
+
+        // ── deletion phase ───────────────────────────────────────────────────
+        config(['services.fcm.credentials_json' => '', 'services.fcm.credentials_file' => '']);
+        $this->resetRiderPushServiceMemo();
+
+        $this->assertFalse(RiderPushService::isConfigured(), 'key is absent');
+        PosRiderController::logFcmKeyPresenceOnce(); // silent — isConfigured() false
+
+        // Cache key must still be set (absent-key load must not touch it).
+        $this->assertTrue(
+            Cache::has(self::CACHE_KEY),
+            'Cache key must survive a deletion-state load.'
+        );
+
+        // Operator explicitly clears the dedup key (e.g. after a credential rotation).
+        Cache::forget(self::CACHE_KEY);
+        $this->assertFalse(Cache::has(self::CACHE_KEY), 'cache key cleared by operator');
+
+        // ── re-upload phase ─────────────────────────────────────────────────
+        config(['services.fcm.credentials_json' => json_encode(self::FAKE_CREDENTIAL)]);
+        $this->resetRiderPushServiceMemo();
+
+        $this->assertTrue(RiderPushService::isConfigured(), 'key is back');
+        PosRiderController::logFcmKeyPresenceOnce(); // cache was forgotten → must log again
+
+        Log::shouldHaveReceived('info')
+            ->twice()   // original + post-forget re-fire
+            ->with(self::LOG_MSG);
+
+        $this->assertTrue(
+            Cache::has(self::CACHE_KEY),
+            'Cache key must be re-written after the post-forget log fires.'
+        );
+    }
 }

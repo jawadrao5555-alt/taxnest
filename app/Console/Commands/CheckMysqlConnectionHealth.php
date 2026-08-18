@@ -84,6 +84,10 @@ class CheckMysqlConnectionHealth extends Command
             return self::SUCCESS;
         }
 
+        // Persist the breach timestamp and ratio so the admin panel can show a
+        // persistent banner for up to 10 minutes after the last high-water mark.
+        $this->recordBreach($pct);
+
         // Threshold exceeded.
         Log::warning('mysql-conn-health: connection threshold exceeded', [
             'threads_connected' => $threads,
@@ -196,18 +200,45 @@ class CheckMysqlConnectionHealth extends Command
     /**
      * Clear the alert flag when the ratio drops back below/at the threshold, so
      * the next spike generates a fresh alert immediately.
-     * Deletes the row rather than nulling the value — system_settings.value
+     * Also clears the breach keys so the admin-panel banner disappears.
+     * Deletes rows rather than nulling values — system_settings.value
      * is a non-nullable TEXT column on prod.
      */
     private function clearAlertFlag(): void
     {
         try {
-            $deleted = SystemSetting::where('key', 'mysql_conn_alert_last_sent_at')->delete();
+            $deleted = SystemSetting::whereIn('key', [
+                'mysql_conn_alert_last_sent_at',
+                'mysql_conn_last_breach_at',
+                'mysql_conn_last_breach_pct',
+            ])->delete();
             if ($deleted) {
-                Log::debug('mysql-conn-health: cooldown flag cleared (ratio back at/below threshold)');
+                Log::debug('mysql-conn-health: cooldown + breach flags cleared (ratio back at/below threshold)');
             }
         } catch (\Throwable $e) {
             Log::warning('mysql-conn-health: could not clear alert cooldown flag', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Write (or refresh) the breach timestamp and ratio so the admin panel
+     * banner always shows the most recent high-water mark.
+     */
+    private function recordBreach(float $pct): void
+    {
+        try {
+            SystemSetting::set(
+                'mysql_conn_last_breach_at',
+                now()->toDateTimeString(),
+                'Last time MySQL Threads_connected exceeded the warning threshold (written by mysql-conn-health).'
+            );
+            SystemSetting::set(
+                'mysql_conn_last_breach_pct',
+                (string) $pct,
+                'Percentage of max_connections in use at the last breach (written by mysql-conn-health).'
+            );
+        } catch (\Throwable $e) {
+            Log::warning('mysql-conn-health: could not write breach flags', ['error' => $e->getMessage()]);
         }
     }
 

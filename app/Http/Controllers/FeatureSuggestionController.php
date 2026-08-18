@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FeatureSuggestion;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class FeatureSuggestionController extends Controller
 {
@@ -68,6 +69,93 @@ class FeatureSuggestionController extends Controller
         return redirect('/pos/suggestions')->with('success', 'Shukriya! Aap ki tajweez hum tak pohnch gayi hai. Hamari team is par ghor karegi.');
     }
 
+    // ============ PRA ELAAN (Task 1202) ============
+
+    /**
+     * PRA provisional-billing elaan popup: quick-choice + optional mashwara
+     * from PRA POS admins/managers. ONE answer per user (firstOrCreate on
+     * user_id+source — a repeat submit never duplicates or overwrites).
+     * Answering also stamps users.pra_elaan_seen_at so the popup never
+     * re-appears. Rows land in feature-suggestions with source='pra_elaan'
+     * (Madadgar escalation pattern) for the admin tally.
+     */
+    public function praElaanRespond(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['ok' => false], 403);
+        }
+
+        $choice = $request->input('choice');
+        if (!is_string($choice) || !array_key_exists($choice, FeatureSuggestion::PRA_ELAAN_CHOICES)) {
+            return response()->json(['ok' => false, 'message' => 'Pehle ek jawab chunein.'], 422);
+        }
+        $mashwara = is_string($request->input('mashwara'))
+            ? (mb_substr(trim($request->input('mashwara')), 0, 2000) ?: null)
+            : null;
+
+        try {
+            // source column ships with the Madadgar migration — on a drifted
+            // prod schema (column missing) we still record the raay as a plain
+            // suggestion rather than 500 the popup.
+            if (Schema::hasColumn('feature_suggestions', 'source')) {
+                FeatureSuggestion::firstOrCreate(
+                    ['user_id' => $user->id, 'source' => FeatureSuggestion::PRA_ELAAN_SOURCE],
+                    [
+                        'company_id' => $user->company_id,
+                        'product' => 'pos',
+                        'title' => FeatureSuggestion::PRA_ELAAN_CHOICES[$choice],
+                        'details' => $mashwara,
+                        'status' => 'pending',
+                    ]
+                );
+            } else {
+                FeatureSuggestion::create([
+                    'company_id' => $user->company_id,
+                    'user_id' => $user->id,
+                    'product' => 'pos',
+                    'title' => FeatureSuggestion::PRA_ELAAN_CHOICES[$choice],
+                    'details' => $mashwara,
+                    'status' => 'pending',
+                ]);
+            }
+            $this->praElaanStampSeen($user);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['ok' => false], 500);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** "Baad mein" — stamp seen so the popup never re-appears (no dismiss loop). */
+    public function praElaanDismiss()
+    {
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['ok' => false], 403);
+        }
+
+        try {
+            $this->praElaanStampSeen($user);
+        } catch (\Throwable $e) { /* popup is hidden client-side for this page anyway */
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function praElaanStampSeen($user): void
+    {
+        // DIRECT assignment, not mass assignment: a non-$fillable column would
+        // silently drop (Eloquent missing-attribute convention). hasColumn
+        // guard: pre-migration prod must not 500.
+        if (Schema::hasColumn('users', 'pra_elaan_seen_at') && $user->pra_elaan_seen_at === null) {
+            $user->pra_elaan_seen_at = now();
+            $user->save();
+        }
+    }
+
     // ============ ADMIN SIDE ============
 
     public function adminIndex(Request $request)
@@ -81,8 +169,44 @@ class FeatureSuggestionController extends Controller
         $suggestions = $query->paginate(25)->withQueryString();
         $counts = FeatureSuggestion::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
         $hotGroups = $this->computeHotGroups();
+        $praElaanTally = $this->computePraElaanTally();
 
-        return view('admin.feature-suggestions', compact('suggestions', 'counts', 'status', 'hotGroups'));
+        return view('admin.feature-suggestions', compact('suggestions', 'counts', 'status', 'hotGroups', 'praElaanTally'));
+    }
+
+    /**
+     * Task 1202: tally of PRA-elaan raay responses (Haan / Nahi / Kuch aur) +
+     * distinct companies + the full rows (for comments). Null when there are
+     * no responses yet — the view hides the whole block.
+     */
+    private function computePraElaanTally(): ?array
+    {
+        try {
+            if (!Schema::hasColumn('feature_suggestions', 'source')) {
+                return null;
+            }
+            // Eager-load user+company: prod runs preventLazyLoading (fatal).
+            $rows = FeatureSuggestion::with(['user', 'company'])
+                ->where('source', FeatureSuggestion::PRA_ELAAN_SOURCE)
+                ->orderByDesc('created_at')
+                ->get();
+            if ($rows->isEmpty()) {
+                return null;
+            }
+            $countsByChoice = [];
+            foreach (FeatureSuggestion::PRA_ELAAN_CHOICES as $key => $title) {
+                $countsByChoice[$key] = $rows->where('title', $title)->count();
+            }
+
+            return [
+                'total' => $rows->count(),
+                'companies' => $rows->pluck('company_id')->unique()->count(),
+                'counts' => $countsByChoice,
+                'rows' => $rows,
+            ];
+        } catch (\Throwable $e) {
+            return null; // never break the admin page over the tally
+        }
     }
 
     /**
@@ -93,8 +217,16 @@ class FeatureSuggestionController extends Controller
      */
     private function computeHotGroups(): array
     {
-        $open = FeatureSuggestion::whereIn('status', ['pending', 'planned'])
-            ->orderByDesc('created_at')->limit(500)
+        $openQuery = FeatureSuggestion::whereIn('status', ['pending', 'planned']);
+        // Task 1202: PRA-elaan raay rows carry IDENTICAL titles across many
+        // companies — without this exclusion they would instantly fake a
+        // "BUILD NOW" high-demand group. hasColumn guard: prod schema drift.
+        if (Schema::hasColumn('feature_suggestions', 'source')) {
+            $openQuery->where(function ($q) {
+                $q->whereNull('source')->orWhere('source', '!=', FeatureSuggestion::PRA_ELAAN_SOURCE);
+            });
+        }
+        $open = $openQuery->orderByDesc('created_at')->limit(500)
             ->get(['id', 'company_id', 'title', 'status', 'created_at']);
         if ($open->count() < 2) {
             return [];

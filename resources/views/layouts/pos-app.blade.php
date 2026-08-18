@@ -203,6 +203,24 @@
             $kotCenterNoticeShow = true;
         }
     } catch (\Throwable $e) { /* never break POS pages */ }
+    // Task 1202: PRA provisional-billing elaan popup (raay collection) — PRA POS
+    // ONLY (this layout; FBR POS / DI panels untouched). EXACT What's New skip
+    // rules: admin/manager only, company not pending, no read-only impersonation.
+    // Seen stamp = users.pra_elaan_seen_at (set on answer OR "Baad mein" dismiss)
+    // so there is no dismiss loop; hasColumn guard = pre-migration prod stays alive.
+    $praElaanShow = false;
+    try {
+        $peAllowed = $posUserLayout && $posUserLayout->isPosAdmin();
+        $pePending = ($companyLayout->status ?? null) === 'pending';
+        $peImp = session('impersonation');
+        $peReadonlyImp = is_array($peImp) && !empty($peImp['readonly']);
+        if ($peAllowed && !$pePending && !$peReadonlyImp
+            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pra_elaan_seen_at')
+            && $posUserLayout->pra_elaan_seen_at === null
+            && \App\Models\SystemSetting::get('pos_pra_elaan_enabled', '1') === '1') {
+            $praElaanShow = true;
+        }
+    } catch (\Throwable $e) { /* keep POS pages alive */ }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -1487,6 +1505,111 @@
                     </button>
                 </div>
                 <p x-show="!svDone && !svComplete()" class="px-6 pb-4 -mt-1 text-center text-[11px] text-gray-400">{{ __('pos.survey_pick_all') }}</p>
+            </div>
+        </div>
+        @endif
+        @if($praElaanShow && !$whatsNewPopup && !($surveyPopup && !$surveyDismissedSession))
+        {{-- Task 1202: PRA provisional-billing elaan + raay collection popup.
+             Renders ONLY when no What's New / survey popup is pending this
+             pageload (no stacked backdrops — it simply appears on a later page
+             once those are done). Answer OR "Baad mein" both stamp
+             users.pra_elaan_seen_at server-side → never re-appears (no dismiss
+             loop). Responses go to feature-suggestions with source='pra_elaan'. --}}
+        <div x-data="{ peOpen: true, peChoice: '', peComment: '', peDone: false, peBusy: false,
+                peDismiss() {
+                    this.peOpen = false;
+                    fetch('/pos/pra-elaan/dismiss', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                },
+                async peSubmit() {
+                    if (!this.peChoice || this.peBusy) return;
+                    this.peBusy = true;
+                    try {
+                        const r = await fetch('/pos/pra-elaan/respond', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ choice: this.peChoice, mashwara: this.peComment })
+                        });
+                        const j = await r.json().catch(() => ({}));
+                        if (r.ok && j.ok) {
+                            this.peDone = true;
+                            setTimeout(() => { this.peOpen = false; }, 1800);
+                        } else { this.peBusy = false; }
+                    } catch (e) { this.peBusy = false; }
+                } }"
+             x-show="peOpen" x-cloak data-pra-elaan-popup="1"
+             class="fixed inset-0 flex items-center justify-center p-4"
+             style="z-index: 120; background: rgba(15, 10, 40, 0.55); backdrop-filter: blur(4px);">
+            <div class="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-90"
+                 x-transition:enter-end="opacity-100 scale-100">
+                <div class="px-6 py-4 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
+                    <div class="text-3xl mb-1">📢</div>
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-white/80">{{ __('pos.pra_elaan_badge') }}</p>
+                    <h2 class="text-lg font-extrabold text-white leading-snug">{{ __('pos.pra_elaan_title') }}</h2>
+                </div>
+                <div x-show="peDone" x-cloak class="px-6 py-10 text-center">
+                    <div class="text-4xl mb-2">🙏</div>
+                    <p class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ __('pos.pra_elaan_thanks') }}</p>
+                </div>
+                <div x-show="!peDone" class="px-6 py-4 overflow-y-auto" style="max-height: 56vh;">
+                    {{-- 1. PRA kya chahta hai --}}
+                    <p class="text-[12px] font-extrabold uppercase tracking-wide text-red-600 dark:text-red-400 mb-1.5">{{ __('pos.pra_elaan_sec_pra') }}</p>
+                    <ul class="space-y-1.5 mb-4">
+                        @foreach(['pra_elaan_pra_p1', 'pra_elaan_pra_p2', 'pra_elaan_pra_p3'] as $pePoint)
+                            <li class="flex items-start gap-2 text-[13px] leading-snug text-gray-700 dark:text-gray-200">
+                                <span class="flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                <span>{{ __('pos.' . $pePoint) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    {{-- 2. Hamare software mein kya hai --}}
+                    <p class="text-[12px] font-extrabold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-1.5">{{ __('pos.pra_elaan_sec_soft') }}</p>
+                    <ul class="space-y-1.5 mb-4">
+                        @foreach(['pra_elaan_soft_p1', 'pra_elaan_soft_p2'] as $pePoint)
+                            <li class="flex items-start gap-2 text-[13px] leading-snug text-gray-700 dark:text-gray-200">
+                                <span class="flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                <span>{{ __('pos.' . $pePoint) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    {{-- 3. Sawal + quick choice --}}
+                    <div class="rounded-xl bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-800 p-3.5">
+                        <p class="text-[12px] font-extrabold uppercase tracking-wide text-amber-700 dark:text-amber-300 mb-1">{{ __('pos.pra_elaan_sec_q') }}</p>
+                        <p class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-2.5">{{ __('pos.pra_elaan_question') }}</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" @click="peChoice = 'band'"
+                                    :class="peChoice === 'band' ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-purple-400'"
+                                    class="px-3.5 py-2 rounded-xl text-[13px] font-bold border transition cursor-pointer">{{ __('pos.pra_elaan_opt_yes') }}</button>
+                            <button type="button" @click="peChoice = 'jari'"
+                                    :class="peChoice === 'jari' ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-purple-400'"
+                                    class="px-3.5 py-2 rounded-xl text-[13px] font-bold border transition cursor-pointer">{{ __('pos.pra_elaan_opt_no') }}</button>
+                            <button type="button" @click="peChoice = 'aur'"
+                                    :class="peChoice === 'aur' ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-purple-400'"
+                                    class="px-3.5 py-2 rounded-xl text-[13px] font-bold border transition cursor-pointer">{{ __('pos.pra_elaan_opt_other') }}</button>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-[12px] font-bold text-gray-600 dark:text-gray-300 mb-1.5">{{ __('pos.pra_elaan_comment_label') }}</label>
+                        {{-- anti-autofill guard set (POS convention) --}}
+                        <textarea x-model="peComment" rows="2" maxlength="2000"
+                                  name="pra_elaan_mashwara_nofill" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                  placeholder="{{ __('pos.pra_elaan_comment_ph') }}"
+                                  class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></textarea>
+                    </div>
+                </div>
+                <div x-show="!peDone" class="px-6 pb-5 pt-1 flex items-center gap-2.5">
+                    <button type="button" @click="peSubmit()" :disabled="!peChoice || peBusy"
+                            :class="peChoice && !peBusy ? 'bg-purple-600 hover:bg-purple-700 cursor-pointer' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'"
+                            class="flex-1 py-3 rounded-xl text-white font-bold text-sm shadow-sm transition">
+                        {{ __('pos.pra_elaan_send_btn') }}
+                    </button>
+                    <button type="button" @click="peDismiss()"
+                            class="px-4 py-3 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition cursor-pointer">
+                        {{ __('pos.pra_elaan_later_btn') }}
+                    </button>
+                </div>
+                <p x-show="!peDone && !peChoice" class="px-6 pb-4 -mt-1 text-center text-[11px] text-gray-400">{{ __('pos.pra_elaan_pick_hint') }}</p>
             </div>
         </div>
         @endif

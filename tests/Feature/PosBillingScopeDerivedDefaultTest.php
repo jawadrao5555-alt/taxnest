@@ -429,7 +429,11 @@ class PosBillingScopeDerivedDefaultTest extends TestCase
         return (int) DB::table('pos_transactions')->insertGetId(array_merge([
             'company_id'     => $companyId,
             'invoice_number' => 'L-' . rand(100, 999),
-            'business_date'  => now()->toDateString(),
+            // Mirror the PosTransaction creating hook: 00:00–cutoff belongs to
+            // YESTERDAY's business day. Stamping plain today made this suite
+            // fail whenever it ran between midnight and 06:00 (day-close and
+            // report pages resolve the business day via PosBusinessDay too).
+            'business_date'  => \App\Services\PosBusinessDay::forMoment($companyId, now()),
             'status'         => 'completed',
             'invoice_mode'   => 'local',
             'pra_status'     => 'local',

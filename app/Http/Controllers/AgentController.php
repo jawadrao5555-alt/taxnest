@@ -717,6 +717,108 @@ class AgentController extends Controller
         return false;
     }
 
+    /**
+     * Task 1187 — Agent setup printer picker.
+     *
+     * Called when the shopkeeper explicitly picks a printer from the agent setup
+     * form and saves. Two effects:
+     *  1. Stores the choice on this device's row (pos_agent_devices.receipt_printer)
+     *     so the Printer Settings page reflects it without extra admin work.
+     *  2. When explicit=true (real thermal printer, not PDF/XPS/OneNote):
+     *     enables company-level silent receipt printing the same way the
+     *     one-click enable prompt does — prompt_dismissed_at is stamped so the
+     *     shop is never nagged afterwards.
+     *
+     * Precedence rules (owner voice note):
+     *  - explicit=true  → device printer + activate company silent print
+     *  - explicit=false → device printer only (restart carrying saved choice,
+     *                     dropdown was never changed — precedence preserved)
+     *  - blank printer  → no-op (never wipe an existing choice on either side)
+     *  - admin edit from Printer Settings survives agent restarts because an
+     *    unchanged dropdown sends explicit=false (no activation, no wipe).
+     *  - a deliberately-OFF shop is only re-enabled by a fresh explicit pick,
+     *    never by an unchanged re-save.
+     */
+    public function setDevicePrinter(Request $request)
+    {
+        $company = $request->attributes->get('agent_company');
+
+        $validated = $request->validate([
+            'receipt_printer' => 'nullable|string|max:255',
+            'explicit'        => 'nullable|boolean',
+        ]);
+
+        $printer  = trim((string) ($validated['receipt_printer'] ?? ''));
+        $explicit = (bool) ($validated['explicit'] ?? false);
+
+        // Blank printer = never wipe; return current state and exit.
+        if ($printer === '') {
+            return response()->json([
+                'ok'                    => true,
+                'silent_print_enabled'  => $company->printerSettings()['silent_print_enabled'],
+            ]);
+        }
+
+        // 1. Update per-device receipt_printer so Printer Settings page reflects
+        //    the agent-side pick without any admin action.
+        if (self::deviceRoutingReady()) {
+            $uid = $this->requestDeviceUid($request);
+            if ($uid) {
+                try {
+                    \App\Models\PosAgentDevice::updateOrCreate(
+                        ['company_id' => $company->id, 'device_uid' => $uid],
+                        [
+                            'receipt_printer' => $printer,
+                            'last_seen_at'    => now(),
+                            // Keep hostname/name in sync (heartbeat may not have
+                            // run yet if the shopkeeper saves on first launch).
+                            ...(trim((string) $request->input('hostname', '')) !== ''
+                                ? ['hostname' => mb_substr(trim((string) $request->input('hostname')), 0, 120)]
+                                : []),
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    // Race on first beat — next save self-heals; never block.
+                }
+            }
+        }
+
+        // 2. Explicit real-printer pick → enable company-level silent printing.
+        //    "Silent print OFF by default" shops get printing in one step from
+        //    the agent setup form — no separate panel visit required.
+        $silentNowEnabled = $company->printerSettings()['silent_print_enabled'];
+
+        if ($explicit) {
+            $settings = $company->printerSettings();
+            $settings['silent_print_enabled'] = true;
+            // Stamp dismiss so the one-click banner never re-appears (deliberate
+            // human choice from the agent setup form = same semantic as the banner).
+            $settings['prompt_dismissed_at'] = now()->toIso8601String();
+            // Single-counter shops: set the company-level receipt_printer too so
+            // bills route correctly even before the admin visits Printer Settings.
+            // Multi-counter shops already have per-device routing; company-level
+            // stays as-is if already set by the admin (most-recent-deliberate-
+            // choice rule: the admin panel wins if they set it explicitly there).
+            if (empty($settings['receipt_printer'])) {
+                $settings['receipt_printer'] = $printer;
+            }
+            // telemetryUpdate: does NOT bump companies.updated_at (sale-screen boot
+            // fingerprint must not flap on every agent save — same guard as heartbeat).
+            $this->telemetryUpdate($company, ['pos_printer_settings' => $settings]);
+            $silentNowEnabled = true;
+
+            Log::info('Agent: silent print activated from setup form', [
+                'company_id'      => $company->id,
+                'receipt_printer' => $printer,
+            ]);
+        }
+
+        return response()->json([
+            'ok'                   => true,
+            'silent_print_enabled' => $silentNowEnabled,
+        ]);
+    }
+
     public function reportPrinters(Request $request)
     {
         $company = $request->attributes->get('agent_company');

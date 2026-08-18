@@ -15,11 +15,11 @@ const axios = require('axios');
 const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, wakeAgent } = require('./src/agent');
 const offlineSnapshot = require('./src/offline-snapshot');
-const { printHtml: printHtmlSilent } = require('./src/printer');
+const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260818-1';
+const BUILD_TIMESTAMP = '20260818-2';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -724,17 +724,57 @@ function sendStatusUpdate(status) {
 
 ipcMain.handle('get-config', () => {
   const cfg = store.get('config') || {};
-  // Always surface pcName from config so the UI field loads correctly.
-  return { ...cfg, pcName: cfg.pcName || '' };
+  // Always surface pcName and receiptPrinter so the UI fields load correctly.
+  return { ...cfg, pcName: cfg.pcName || '', receiptPrinter: cfg.receiptPrinter || '' };
 });
 
-ipcMain.handle('save-config', (event, config) => {
-  // Persist pcName alongside the other config fields (empty string = not set).
-  const toStore = { ...config, pcName: (config.pcName || '').trim() };
+ipcMain.handle('save-config', async (event, config) => {
+  // Persist pcName + receiptPrinter alongside the other config fields.
+  const toStore = {
+    ...config,
+    pcName: (config.pcName || '').trim(),
+    receiptPrinter: (config.receiptPrinter || '').trim(),
+  };
   store.set('config', toStore);
   stopAgent();
   startAgent(withAppMeta(toStore), sendStatusUpdate, handleAgentUpdate);
-  return { ok: true };
+
+  // Task 1187: if the shopkeeper explicitly chose a real (non-virtual) printer,
+  // activate silent receipt printing on the server right now so the very next
+  // bill prints silently — no extra step on the Printer Settings page required.
+  // blank/virtual = printerExplicit is false, so we skip and never touch the
+  // server's existing setting (precedence rule: only a deliberate new pick wins).
+  let printerActivated = false;
+  if (config.printerExplicit && toStore.receiptPrinter && toStore.serverUrl && toStore.apiKey) {
+    try {
+      const resp = await axios.post(
+        `${toStore.serverUrl}/device-printer`,
+        {
+          receipt_printer: toStore.receiptPrinter,
+          explicit: true,
+          device_uid: getDeviceUid(),
+          hostname: (() => { try { return os.hostname(); } catch (e) { return null; } })(),
+        },
+        { headers: { Authorization: `Bearer ${toStore.apiKey}` }, timeout: 10000 }
+      );
+      printerActivated = !!(resp.data && resp.data.silent_print_enabled);
+    } catch (e) {
+      console.log('[save-config] printer activation failed (non-fatal):', e && e.message);
+    }
+  }
+
+  return { ok: true, printerActivated };
+});
+
+// Task 1187: enumerate this PC's installed printers for the setup-form
+// Receipt Printer dropdown. Called on form load + manual refresh.
+ipcMain.handle('get-printers', async () => {
+  try {
+    const printers = await getLocalPrinters();
+    return { ok: true, printers };
+  } catch (e) {
+    return { ok: false, printers: [], error: e && e.message };
+  }
 });
 
 ipcMain.handle('get-status', () => {

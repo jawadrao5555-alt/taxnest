@@ -1609,6 +1609,8 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($state
     Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);
     Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);
     // Silent printer routing — agent reports printers + polls/prints queued jobs.
+    // Task 1187: agent setup form saves the chosen receipt printer directly.
+    Route::post('/device-printer', [\App\Http\Controllers\AgentController::class, 'setDevicePrinter']);
     Route::post('/printers', [\App\Http\Controllers\AgentController::class, 'reportPrinters']);
     Route::get('/print-jobs', [\App\Http\Controllers\AgentController::class, 'claimPrintJobs']);
     Route::get('/print-jobs/{id}/content', [\App\Http\Controllers\AgentController::class, 'printJobContent']);

@@ -300,4 +300,26 @@ function stopPrinting() {
 
 // printHtml is also used by the NestPOS Desktop POS window bridge
 // (pos-print-html IPC) for in-app silent receipt printing.
-module.exports = { startPrinting, stopPrinting, getPrintStatus, printHtml };
+
+/**
+ * Return the list of printers installed on this PC — used by the agent
+ * setup screen's Receipt Printer dropdown so the shopkeeper can pick
+ * their counter's printer without leaving the setup form.
+ * Reuses the shared hidden print window (creates one if not yet open).
+ */
+async function getLocalPrinters() {
+  try {
+    const win = getPrintWindow();
+    const list = await win.webContents.getPrintersAsync();
+    return (list || []).map(p => ({
+      name: p.name,
+      displayName: p.displayName || p.name,
+      isDefault: !!p.isDefault,
+    }));
+  } catch (e) {
+    plog('getLocalPrinters failed:', e.message);
+    return [];
+  }
+}
+
+module.exports = { startPrinting, stopPrinting, getPrintStatus, printHtml, getLocalPrinters };

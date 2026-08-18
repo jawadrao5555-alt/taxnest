@@ -1,12 +1,13 @@
 # TaxNest PRA Sync Agent — Changelog
 
 ## v1.9.0 (2026-08-18)
-**Per-counter printer routing + PC Name — har cashier ka apna printer (Task 1166 + 1182)**
+**Per-counter printer routing + PC Name + setup-form printer picker — har cashier ka apna printer (Task 1166 + 1182 + 1187)**
 
 - **Persistent device identity**: every install now generates a one-time random device UID (stored with the config) and reports it + the PC hostname on heartbeat, printer reports, print-job polling and job results. Multi-counter shops (same company key on several PCs) appear as separate named "Counters" on the Printer Settings page.
 - **Own-counter claiming**: a device-aware agent claims ONLY jobs stamped for its own counter plus unstamped company-wide jobs — two agents no longer race for each other's bills. Old agents/servers keep exactly the old behavior (UID simply ignored).
 - **New: PC Name field** — the agent setup form now has an optional "PC Name" field (e.g. "Counter 1", "Manager PC"). The shopkeeper fills it in once during setup; the Printer Settings page then shows each counter's card under that friendly name instead of the cryptic Windows hostname. The admin can also rename any device directly from the Printer Settings page (useful for shops whose agents predate this field).
-- Purely additive: single-PC shops and old agents see zero change and need zero reconfiguration. Leaving PC Name blank keeps today's behavior.
+- **New: Receipt Printer picker in setup form** — below the PC Name field, the setup form now lists all printers installed on this PC (populated on load + manual ↻ refresh). Virtual/software printers (PDF, XPS, OneNote, Fax) are separated and clearly labelled so they are never accidentally picked. Choosing a real thermal printer and saving activates silent receipt printing immediately — no visit to the panel Printer Settings page required. The choice is stored on this device's card so the admin/owner sees "Counter 1 → XP-80C" on the Printer Settings page without doing anything extra. Precedence is preserved: blank/unchanged dropdown = no-op (never wipes a printer the admin already set); an admin panel edit survives agent restarts; a shop that deliberately turned silent printing OFF is only re-enabled by a fresh explicit printer pick, never by an unchanged re-save.
+- Purely additive: single-PC shops and old agents see zero change and need zero reconfiguration. Leaving PC Name and the printer dropdown blank keeps today's behavior.
 
 ## v1.6.2 (2026-08-08)
 **Instant silent printing (long-poll)**

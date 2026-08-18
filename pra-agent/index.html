@@ -196,6 +196,21 @@
     <label>PC Name <span style="font-size:10px; color:#a78bfa; font-weight:normal;">(optional — Counter 1 / Manager PC)</span></label>
     <input type="text" id="pcName" placeholder="e.g. Counter 1, Manager PC" autocomplete="off" maxlength="60">
 
+    <label style="margin-top:4px;">
+      Receipt Printer
+      <span style="font-size:10px; color:#a78bfa; font-weight:normal;">(is counter ka printer — bill silently print hoga)</span>
+    </label>
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <select id="printerSelect" style="flex:1; padding:10px 12px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.3); color:#fff; border-radius:8px; font-size:13px; appearance:auto;">
+        <option value="">-- Pehle printer list load karein ↻ --</option>
+      </select>
+      <button id="refreshPrintersBtn" class="btn btn-secondary" title="Printers dobara load karein" style="padding:10px 14px; white-space:nowrap;">↻</button>
+    </div>
+    <p id="printerHint" style="font-size:11px; color:#a78bfa; margin-bottom:12px; line-height:1.5;">
+      Yahan apne counter ka receipt printer chunein — Save karte hi us counter par silent printing <b>foran chalu</b> ho jayegi (koi aur step nahi).
+      PDF / XPS / OneNote jaise virtual printers automatically neechay list honge — inhen na chunein.
+    </p>
+
     <div class="btn-row">
       <button id="testBtn" class="btn btn-secondary">🔌 Test Connection</button>
       <button id="saveBtn" class="btn btn-primary">💾 Save & Connect</button>
@@ -263,12 +278,68 @@
 <script>
   const $ = (id) => document.getElementById(id);
 
+  // ─── Printer helpers ───────────────────────────────────────────────────────
+  // Printers whose names/display-names match these patterns are software
+  // (PDF renderers, document writers) — not real thermal receipt printers.
+  // They are shown last in the list and NEVER treated as "explicit real picks"
+  // (so saving with one selected never auto-enables silent printing).
+  function isVirtualPrinter(name) {
+    return /pdf|xps|onenote|fax|cutepdf|bullzip|nitro|novapdf|print2pdf|pdfcreator|docuworks|fineprint|dopdf|adobe.*acrobat|ghostscript|virtual|imagewriter/i
+      .test(name || '');
+  }
+
+  // Populate the Receipt Printer dropdown.
+  // preSelect = printer name to pre-select (from saved config).
+  // keepSelected = if true, keep whatever is currently selected (refresh hit
+  // while a printer is already chosen — don't reset the user's pick).
+  async function loadPrinters(preSelect) {
+    const sel = $('printerSelect');
+    const currently = sel.value; // remember before we rebuild
+    sel.innerHTML = '<option value="">-- Printer chunein (optional) --</option>';
+
+    const r = await window.agentAPI.getPrinters();
+    const all = r.printers || [];
+    const real = all.filter(p => !isVirtualPrinter(p.name));
+    const virtual = all.filter(p => isVirtualPrinter(p.name));
+
+    const wantSelected = preSelect !== undefined ? preSelect : currently;
+
+    for (const p of real) {
+      const opt = document.createElement('option');
+      opt.value = p.name;
+      opt.textContent = (p.displayName || p.name) + (p.isDefault ? ' ★' : '');
+      if (p.name === wantSelected) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    if (virtual.length) {
+      // Separator optgroup keeps virtual printers visible (user may need to
+      // identify them) but clearly separated from real printers.
+      const grp = document.createElement('optgroup');
+      grp.label = '── Virtual / PDF — receipt ke liye use na karein ──';
+      for (const p of virtual) {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.style.color = '#888';
+        opt.textContent = (p.displayName || p.name) + ' [PDF/Virtual]';
+        if (p.name === wantSelected) opt.selected = true;
+        grp.appendChild(opt);
+      }
+      sel.appendChild(grp);
+    }
+
+    if (all.length === 0) {
+      $('printerHint').textContent = '⚠ Is PC par koi printer nahi mila. Printer install karein ya ↻ Refresh dabayein.';
+    }
+  }
+
   async function loadConfig() {
     const cfg = await window.agentAPI.getConfig();
     $('serverUrl').value = cfg.serverUrl || '';
     $('companyId').value = cfg.companyId || '';
     $('apiKey').value = cfg.apiKey || '';
     $('pcName').value = cfg.pcName || '';
+    // Load printers and pre-select the saved choice (if any).
+    await loadPrinters(cfg.receiptPrinter || '');
   }
 
   function renderStatus(s) {
@@ -330,12 +401,29 @@
     }
   });
 
+  $('refreshPrintersBtn').addEventListener('click', async () => {
+    const btn = $('refreshPrintersBtn');
+    btn.disabled = true;
+    btn.textContent = '⟳';
+    await loadPrinters(); // keepSelected = currently selected
+    btn.disabled = false;
+    btn.textContent = '↻';
+  });
+
   $('saveBtn').addEventListener('click', async () => {
+    const printerVal = $('printerSelect').value;
+    // "Explicit real pick" = user selected a non-blank, non-virtual printer.
+    // Blank = no change (never wipe server setting).
+    // Virtual = software printer (PDF/XPS/OneNote) = no auto-enable.
+    const printerExplicit = printerVal !== '' && !isVirtualPrinter(printerVal);
+
     const cfg = {
       serverUrl: $('serverUrl').value.trim().replace(/\/+$/, ''),
       companyId: $('companyId').value.trim(),
       apiKey: $('apiKey').value.trim(),
       pcName: $('pcName').value.trim(),
+      receiptPrinter: printerVal,
+      printerExplicit,
     };
     const tr = $('testResult');
     if (!cfg.serverUrl || !cfg.apiKey) {
@@ -345,9 +433,18 @@
       return;
     }
     if (!cfg.companyId) cfg.companyId = 'auto';
-    await window.agentAPI.saveConfig(cfg);
+
+    tr.style.color = '#c4b5fd';
+    tr.textContent = 'Saving…';
+    const res = await window.agentAPI.saveConfig(cfg);
     tr.style.color = '#10b981';
-    tr.textContent = '✅ Configuration saved. Agent connecting...';
+    if (res && res.printerActivated) {
+      tr.textContent = '✅ Config save ho gaya — ' + printerVal + ' par silent printing chalu ho gayi! 🖨️';
+    } else if (printerExplicit) {
+      tr.textContent = '✅ Configuration saved. Agent connecting… (printer setting server tak pahunch rahi hai)';
+    } else {
+      tr.textContent = '✅ Configuration saved. Agent connecting...';
+    }
   });
 
   $('toggleBtn').addEventListener('click', async () => {

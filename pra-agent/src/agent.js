@@ -195,6 +195,9 @@ async function heartbeat() {
         // server can tell multi-counter installs (same key) apart.
         device_uid: currentConfig.deviceUid || null,
         hostname: currentConfig.hostname || null,
+        // PC Name (v1.9.0): shopkeeper-entered friendly name ("Counter 1").
+        // Sent only when non-blank; server never wipes an existing name on blank.
+        pc_name: currentConfig.pcName || null,
         ...extra,
       },
       {

@@ -19,7 +19,7 @@ const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260817-1';
+const BUILD_TIMESTAMP = '20260818-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -702,6 +702,8 @@ function withAppMeta(config) {
     appBuild: BUILD_TIMESTAMP,
     deviceUid: getDeviceUid(),
     hostname: (() => { try { return os.hostname(); } catch (e) { return null; } })(),
+    // PC Name (v1.9.0): shopkeeper-entered friendly label; empty = not set.
+    pcName: (config && config.pcName) ? String(config.pcName).trim() : '',
   };
 }
 
@@ -721,13 +723,17 @@ function sendStatusUpdate(status) {
 }
 
 ipcMain.handle('get-config', () => {
-  return store.get('config') || {};
+  const cfg = store.get('config') || {};
+  // Always surface pcName from config so the UI field loads correctly.
+  return { ...cfg, pcName: cfg.pcName || '' };
 });
 
 ipcMain.handle('save-config', (event, config) => {
-  store.set('config', config);
+  // Persist pcName alongside the other config fields (empty string = not set).
+  const toStore = { ...config, pcName: (config.pcName || '').trim() };
+  store.set('config', toStore);
   stopAgent();
-  startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
+  startAgent(withAppMeta(toStore), sendStatusUpdate, handleAgentUpdate);
   return { ok: true };
 });
 

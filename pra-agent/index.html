@@ -193,6 +193,9 @@
     <label>API Key</label>
     <input type="password" id="apiKey" placeholder="tnk_xxxxxxxxxxxxx">
 
+    <label>PC Name <span style="font-size:10px; color:#a78bfa; font-weight:normal;">(optional — Counter 1 / Manager PC)</span></label>
+    <input type="text" id="pcName" placeholder="e.g. Counter 1, Manager PC" autocomplete="off" maxlength="60">
+
     <div class="btn-row">
       <button id="testBtn" class="btn btn-secondary">🔌 Test Connection</button>
       <button id="saveBtn" class="btn btn-primary">💾 Save & Connect</button>
@@ -265,6 +268,7 @@
     $('serverUrl').value = cfg.serverUrl || '';
     $('companyId').value = cfg.companyId || '';
     $('apiKey').value = cfg.apiKey || '';
+    $('pcName').value = cfg.pcName || '';
   }
 
   function renderStatus(s) {
@@ -308,6 +312,7 @@
       serverUrl: $('serverUrl').value.trim().replace(/\/+$/, ''),
       companyId: $('companyId').value.trim(),
       apiKey: $('apiKey').value.trim(),
+      pcName: $('pcName').value.trim(),
     };
     const tr = $('testResult');
     tr.textContent = 'Testing...';
@@ -330,6 +335,7 @@
       serverUrl: $('serverUrl').value.trim().replace(/\/+$/, ''),
       companyId: $('companyId').value.trim(),
       apiKey: $('apiKey').value.trim(),
+      pcName: $('pcName').value.trim(),
     };
     const tr = $('testResult');
     if (!cfg.serverUrl || !cfg.apiKey) {

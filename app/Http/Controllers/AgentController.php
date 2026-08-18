@@ -89,6 +89,13 @@ class AgentController extends Controller
             if ($request->filled('version')) {
                 $attrs['agent_version'] = mb_substr((string) $request->input('version'), 0, 32);
             }
+            // PC Name (v1.9.0): shopkeeper-given friendly label sent by the agent.
+            // Only stored when non-blank — a blank/absent pc_name must never
+            // wipe a name that the admin set via the Printer Settings page.
+            $pcName = trim((string) $request->input('pc_name', ''));
+            if ($pcName !== '') {
+                $attrs['name'] = mb_substr($pcName, 0, 60);
+            }
             \App\Models\PosAgentDevice::updateOrCreate(
                 ['company_id' => $company->id, 'device_uid' => $uid],
                 $attrs

@@ -42,18 +42,42 @@ class PosCallerIdController extends Controller
     private const EVENT_FRESH_SECONDS = 120;   // poll never surfaces older rings
     private const DEDUPE_SECONDS = 20;         // same caller re-ring collapse
     private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-caller.apk';
+    private const DEVICE_CAP = 3;              // paired phones per shop (v2)
+    // "Offline" = no ring/API contact for this long. The app has NO periodic
+    // heartbeat (contacts only on rings + app-open /me), so keep this lenient
+    // to avoid crying wolf on a quiet afternoon.
+    public const OFFLINE_AFTER_MINUTES = 360;
+
+    /** Device row (pos_caller_devices) the current bearer token matched, if any. */
+    private ?object $authedDevice = null;
 
     // ─── Shared gates ───────────────────────────────────────────────────────
 
-    /** Resolve the company from the Bearer token or abort with JSON. */
+    /**
+     * Resolve the company from the Bearer token or abort with JSON.
+     * v2 (Task 1101): device rows first (multi-phone), then the LEGACY
+     * companies-row token so an already-paired beta phone keeps working.
+     */
     private function companyFromToken(Request $request): Company
     {
         $token = (string) $request->bearerToken();
         $companyId = (int) strtok($token, '|');
         $company = $companyId > 0 ? Company::find($companyId) : null;
+        if (!$company) {
+            abort(response()->json(['ok' => false, 'error' => 'unauthorized'], 401));
+        }
 
-        if (!$company || !$company->caller_app_token
-            || !hash_equals((string) $company->caller_app_token, hash('sha256', $token))) {
+        $hash = hash('sha256', $token);
+        $this->authedDevice = null;
+        if (Schema::hasTable('pos_caller_devices')) {
+            $this->authedDevice = DB::table('pos_caller_devices')
+                ->where('company_id', $company->id)
+                ->where('token_hash', $hash)
+                ->first();
+        }
+        if (!$this->authedDevice
+            && !($company->caller_app_token
+                && hash_equals((string) $company->caller_app_token, $hash))) {
             abort(response()->json(['ok' => false, 'error' => 'unauthorized'], 401));
         }
         $suspended = ($company->status ?? null) === 'suspended'
@@ -62,6 +86,35 @@ class PosCallerIdController extends Controller
             abort(response()->json(['ok' => false, 'error' => 'unauthorized'], 401));
         }
         return $company;
+    }
+
+    /** Heartbeat: stamp last_seen on the matched device row (or legacy column). */
+    private function touchDevice(Company $company): void
+    {
+        if ($this->authedDevice) {
+            DB::table('pos_caller_devices')->where('id', $this->authedDevice->id)
+                ->update(['last_seen_at' => now(), 'updated_at' => now()]);
+        } else {
+            DB::table('companies')->where('id', $company->id)
+                ->update(['caller_app_last_seen_at' => now()]);
+        }
+    }
+
+    /** Any paired phone (device row or legacy) contacted us recently? */
+    public static function anyDeviceOnline(Company $company): bool
+    {
+        $cutoff = now()->subMinutes(self::OFFLINE_AFTER_MINUTES);
+        if (($company->caller_app_last_seen_at ?? null)
+            && Carbon::parse($company->caller_app_last_seen_at)->gt($cutoff)) {
+            return true;
+        }
+        if (Schema::hasTable('pos_caller_devices')) {
+            return DB::table('pos_caller_devices')
+                ->where('company_id', $company->id)
+                ->where('last_seen_at', '>', $cutoff)
+                ->exists();
+        }
+        return false;
     }
 
     /**
@@ -111,14 +164,37 @@ class PosCallerIdController extends Controller
                 'message' => __('pos.caller_plan_locked_api')], 403);
         }
 
-        // Rotate: one active device per company.
         $plain = $company->id . '|' . Str::random(48);
-        DB::table('companies')->where('id', $company->id)->update([
-            'caller_app_token' => hash('sha256', $plain),
-            'caller_app_user_id' => $user->id,
-            'caller_app_device' => (string) $request->input('device', ''),
-            'caller_app_last_seen_at' => now(),
-        ]);
+        if (Schema::hasTable('pos_caller_devices')) {
+            // v2 (Task 1101): each login pairs a NEW device row — the SIM phone
+            // and the WhatsApp phone stay paired together. Small cap: at the
+            // limit the LEAST-recently-seen device is bumped to make room.
+            $count = DB::table('pos_caller_devices')->where('company_id', $company->id)->count();
+            if ($count >= self::DEVICE_CAP) {
+                $oldest = DB::table('pos_caller_devices')->where('company_id', $company->id)
+                    ->orderByRaw('COALESCE(last_seen_at, created_at) asc')->orderBy('id')->first();
+                if ($oldest) {
+                    DB::table('pos_caller_devices')->where('id', $oldest->id)->delete();
+                }
+            }
+            DB::table('pos_caller_devices')->insert([
+                'company_id' => $company->id,
+                'user_id' => $user->id,
+                'device' => (string) $request->input('device', ''),
+                'token_hash' => hash('sha256', $plain),
+                'last_seen_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } else {
+            // Pre-migration window: legacy rotate (one active device).
+            DB::table('companies')->where('id', $company->id)->update([
+                'caller_app_token' => hash('sha256', $plain),
+                'caller_app_user_id' => $user->id,
+                'caller_app_device' => (string) $request->input('device', ''),
+                'caller_app_last_seen_at' => now(),
+            ]);
+        }
 
         return response()->json([
             'ok' => true,
@@ -142,8 +218,7 @@ class PosCallerIdController extends Controller
             'at' => 'nullable|numeric',
         ]);
 
-        DB::table('companies')->where('id', $company->id)
-            ->update(['caller_app_last_seen_at' => now()]);
+        $this->touchDevice($company);
 
         if ($this->planLocked($company)) {
             // Plan downgraded after binding: keep the token, surface the lock.
@@ -211,8 +286,7 @@ class PosCallerIdController extends Controller
     public function appMe(Request $request)
     {
         $company = $this->companyFromToken($request);
-        DB::table('companies')->where('id', $company->id)
-            ->update(['caller_app_last_seen_at' => now()]);
+        $this->touchDevice($company);
 
         $lastEvent = DB::table('pos_caller_events')
             ->where('company_id', $company->id)->orderByDesc('id')->first();
@@ -242,11 +316,16 @@ class PosCallerIdController extends Controller
     public function appLogout(Request $request)
     {
         $company = $this->companyFromToken($request);
-        DB::table('companies')->where('id', $company->id)->update([
-            'caller_app_token' => null,
-            'caller_app_user_id' => null,
-            'caller_app_device' => null,
-        ]);
+        if ($this->authedDevice) {
+            // v2: unpair ONLY this phone — the other paired phone keeps working.
+            DB::table('pos_caller_devices')->where('id', $this->authedDevice->id)->delete();
+        } else {
+            DB::table('companies')->where('id', $company->id)->update([
+                'caller_app_token' => null,
+                'caller_app_user_id' => null,
+                'caller_app_device' => null,
+            ]);
+        }
         return response()->json(['ok' => true]);
     }
 
@@ -362,7 +441,143 @@ class PosCallerIdController extends Controller
             'enabled' => true,
             'last_id' => max($lastId, $after),
             'events' => $events,
+            // v2: offline warning — has ANY paired phone contacted us recently?
+            'online' => self::anyDeviceOnline($company),
         ]);
+    }
+
+    /**
+     * GET /pos/api/caller-recent — missed/recent calls list (last 24h).
+     * Same gating as events. Newest first, deduped display comes from the
+     * DEDUPE_SECONDS collapse at ingest. Unseen counting is CLIENT-side
+     * (localStorage cursor), so this endpoint is read-only.
+     */
+    public function recentCalls(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company || !($company->caller_id_enabled ?? false)
+            || $this->planLocked($company)
+            || !Schema::hasTable('pos_caller_events')) {
+            return response()->json(['enabled' => false, 'calls' => []]);
+        }
+
+        $rows = DB::table('pos_caller_events')
+            ->where('company_id', $companyId)
+            ->where('created_at', '>=', now()->subHours(24))
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get();
+
+        $calls = $rows->map(function ($row) use ($companyId) {
+            return [
+                'id' => (int) $row->id,
+                'phone' => $this->displayPhone($row->phone),
+                'name' => $row->caller_name,
+                'source' => $row->source,
+                'at' => Carbon::parse($row->ring_at)->format('h:i A'),
+                'match' => $this->matchCustomer($companyId, $row->phone, $row->caller_name),
+            ];
+        })->values();
+
+        return response()->json(['enabled' => true, 'calls' => $calls]);
+    }
+
+    /**
+     * GET /pos/api/caller-last-order?customer_id=&phone= — repeat-order source.
+     * Returns the caller's LAST completed (non-return) bill's product/service
+     * lines as {item_type, item_id, name, quantity}. The CLIENT re-prices from
+     * its baked catalog (current prices); deal/manual lines are reported as
+     * skipped names — deals are billing-flow-only (server-enforced price +
+     * snapshot, pos-deals-feature) and manual lines have no product identity.
+     */
+    public function lastOrder(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company || !($company->caller_id_enabled ?? false) || $this->planLocked($company)) {
+            return response()->json(['ok' => false, 'error' => 'disabled'], 403);
+        }
+
+        $customerId = (int) $request->query('customer_id', 0);
+        $phone = PkPhone::normalize($request->query('phone'));
+        $variants = $this->phoneVariants($phone);
+        if ($customerId <= 0 && !$variants) {
+            return response()->json(['ok' => false, 'error' => 'empty'], 422);
+        }
+
+        $q = PosTransaction::where('company_id', $companyId)->where('status', 'completed');
+        if (Schema::hasColumn('pos_transactions', 'transaction_type')) {
+            $q->where(function ($w) {
+                $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+            });
+        }
+        $q->where(function ($w) use ($customerId, $variants) {
+            if ($customerId > 0) {
+                $w->orWhere('customer_id', $customerId);
+            }
+            if ($variants) {
+                $w->orWhereIn('customer_phone', $variants);
+            }
+        });
+        $last = $q->orderByDesc('id')->first();
+        if (!$last) {
+            return response()->json(['ok' => true, 'items' => [], 'skipped' => []]);
+        }
+
+        $items = [];
+        $skipped = [];
+        $lines = DB::table('pos_transaction_items')->where('transaction_id', $last->id)->get();
+        foreach ($lines as $line) {
+            $type = (string) ($line->item_type ?? 'product');
+            if (in_array($type, ['product', 'service'], true) && ($line->item_id ?? null)) {
+                $items[] = [
+                    'item_type' => $type,
+                    'item_id' => (int) $line->item_id,      // live-pdo-string-ints
+                    'name' => (string) $line->item_name,
+                    'quantity' => (float) $line->quantity,
+                ];
+            } else {
+                $skipped[] = (string) $line->item_name;
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'bill_at' => Carbon::parse($last->created_at)->format('d M, h:i A'),
+            'items' => $items,
+            'skipped' => $skipped,
+        ]);
+    }
+
+    /**
+     * POST /pos/settings/caller-devices/revoke {device_id: int | 'legacy'} —
+     * admin-only, same boundary as toggle(). Unpairs ONE phone.
+     */
+    public function revokeDevice(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin() || $user->posCashierBlocked()) {
+            return response()->json(['ok' => false], 403);
+        }
+        $companyId = app('currentCompanyId');
+        $deviceId = $request->input('device_id');
+
+        if ($deviceId === 'legacy') {
+            DB::table('companies')->where('id', $companyId)->update([
+                'caller_app_token' => null,
+                'caller_app_user_id' => null,
+                'caller_app_device' => null,
+            ]);
+            return response()->json(['ok' => true]);
+        }
+        if (Schema::hasTable('pos_caller_devices')) {
+            DB::table('pos_caller_devices')
+                ->where('company_id', $companyId)
+                ->where('id', (int) $deviceId)
+                ->delete();
+        }
+        return response()->json(['ok' => true]);
     }
 
     // ─── Customer matching ──────────────────────────────────────────────────
@@ -491,6 +706,9 @@ class PosCallerIdController extends Controller
             'phone' => $customer->phone ?? ($last->customer_phone ?? $this->displayPhone($phone)),
             'address' => $customer->address ?? null,
             'matched_by' => $matchedBy ?? 'phone',
+            // v2: udhaar visibility — whole rupees, cast defensively
+            // (live PDO returns decimals as strings).
+            'khata_balance' => $customer ? (int) round((float) ($customer->khata_balance ?? 0)) : 0,
             'visits' => $visits,
             'total_spent' => (int) round((float) ($agg->spent ?? 0)),
             'last_order_at' => $last ? Carbon::parse($last->created_at)->format('d M, h:i A') : null,

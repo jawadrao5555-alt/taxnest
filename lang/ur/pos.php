@@ -4707,6 +4707,22 @@ return [
     'caller_id_download_hint' => 'دکان کے اینڈرائیڈ فون پر انسٹال کریں، اپنے ایڈمن لاگ اِن سے سائن اِن کر کے نوٹیفکیشن کی اجازت دیں۔',
     'caller_id_plan_locked' => 'کالر آئی ڈی صرف انلمیٹڈ پیکج میں شامل ہے — اپ گریڈ کریں تاکہ کال آتے ہی گاہک کا نام اور پرانی خریداری سیل اسکرین پر نظر آئے۔',
     'caller_plan_locked_api' => 'کالر آئی ڈی آپ کے پیکج میں شامل نہیں۔ کالر آئی ڈی ایپ استعمال کرنے کے لیے انلمیٹڈ پر اپ گریڈ کریں۔',
+    // Caller ID v2 (Task 1101)
+    'caller_khata_due' => 'کھاتہ ادھار',
+    'caller_repeat_order' => 'پچھلا آرڈر دوبارہ',
+    'caller_save_customer' => 'گاہک محفوظ کریں',
+    'caller_log_title' => 'حالیہ کالیں (24 گھنٹے)',
+    'caller_log_empty' => 'پچھلے 24 گھنٹوں میں کوئی کال نہیں',
+    'caller_make_bill_short' => 'بل',
+    'caller_queued_calls' => 'کالیں انتظار میں',
+    'caller_phone_offline_warn' => 'کالر آئی ڈی آن ہے مگر کوئی فون کافی دیر سے جڑا نہیں — دکان کے فون پر کالر آئی ڈی ایپ دیکھیں۔',
+    'caller_repeat_done' => 'پچھلا آرڈر کارٹ میں ڈال دیا گیا',
+    'caller_repeat_none' => 'اس گاہک کا کوئی پچھلا بل نہیں ملا',
+    'caller_repeat_skipped' => 'کچھ اشیاء اب دستیاب نہیں: ',
+    'caller_dev_online' => 'جڑا ہوا',
+    'caller_dev_offline' => 'غیر جڑا',
+    'caller_dev_revoke' => 'ہٹائیں',
+    'caller_dev_revoke_confirm' => 'اس فون کو الگ کریں؟ کالیں بھیجنے کے لیے دوبارہ لاگ اِن کرنا ہوگا۔',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'واٹس ایپ بل',

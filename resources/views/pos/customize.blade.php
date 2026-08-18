@@ -281,6 +281,32 @@
                         && is_file(public_path('downloads/taxnest-caller.apk'));
                     // Unlimited gate (owner, 17 Aug 2026): Caller ID is plan-locked.
                     $tnCallerPlanAllowed = \App\Services\PosFeatureService::planAllows($company, 'caller_id_enabled');
+                    // v2 (Task 1101): multi-device rows — legacy companies-row phone
+                    // shows alongside as a 'legacy' pseudo-row so an old pairing stays
+                    // visible/revocable. Online = contact within the controller window.
+                    $tnCallerOffCutoff = now()->subMinutes(\App\Http\Controllers\PosCallerIdController::OFFLINE_AFTER_MINUTES);
+                    $tnCallerDevices = [];
+                    if ($tnCallerReady && \Illuminate\Support\Facades\Schema::hasTable('pos_caller_devices')) {
+                        foreach (\Illuminate\Support\Facades\DB::table('pos_caller_devices')->where('company_id', $company->id)->orderByDesc('id')->get() as $tnCdRow) {
+                            $tnCdSeen = $tnCdRow->last_seen_at ? \Carbon\Carbon::parse($tnCdRow->last_seen_at) : null;
+                            $tnCallerDevices[] = [
+                                'id' => (int) $tnCdRow->id,
+                                'user' => optional(\App\Models\User::find($tnCdRow->user_id))->name ?? '—',
+                                'device' => (string) ($tnCdRow->device ?? ''),
+                                'seen' => $tnCdSeen ? $tnCdSeen->diffForHumans() : null,
+                                'online' => $tnCdSeen ? $tnCdSeen->gt($tnCallerOffCutoff) : false,
+                            ];
+                        }
+                    }
+                    if ($tnCallerUser) {
+                        $tnCallerDevices[] = [
+                            'id' => 'legacy',
+                            'user' => $tnCallerUser->name,
+                            'device' => (string) ($company->caller_app_device ?? ''),
+                            'seen' => $tnCallerSeen ? $tnCallerSeen->diffForHumans() : null,
+                            'online' => $tnCallerSeen ? $tnCallerSeen->gt($tnCallerOffCutoff) : false,
+                        ];
+                    }
                 @endphp
                 @if($tnCallerReady)
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm" x-data="{ callerOn: {{ $tnCallerOn ? 'true' : 'false' }} }">
@@ -310,12 +336,22 @@
                                 {{ __('pos.upgrade_plan_btn') }}
                             </a>
                         @endunless
-                        @if($tnCallerUser)
-                            <p class="text-[11px] text-gray-600 dark:text-gray-300">
-                                <span class="font-bold">{{ __('pos.caller_id_device') }}:</span>
-                                {{ $tnCallerUser->name }}{{ ($company->caller_app_device ?? '') !== '' ? ' · ' . $company->caller_app_device : '' }}
-                                @if($tnCallerSeen) · {{ __('pos.caller_id_last_seen') }}: {{ $tnCallerSeen->diffForHumans() }} @endif
-                            </p>
+                        @if(count($tnCallerDevices))
+                            @foreach($tnCallerDevices as $tnCd)
+                                <div class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300" x-data="{ revoked: false }" x-show="!revoked">
+                                    <span class="inline-flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold {{ $tnCd['online'] ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' }}">
+                                        <span class="w-1.5 h-1.5 rounded-full {{ $tnCd['online'] ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                                        {{ $tnCd['online'] ? __('pos.caller_dev_online') : __('pos.caller_dev_offline') }}
+                                    </span>
+                                    <span class="truncate min-w-0">
+                                        <span class="font-bold">{{ $tnCd['user'] }}</span>{{ $tnCd['device'] !== '' ? ' · ' . $tnCd['device'] : '' }}
+                                        @if($tnCd['seen']) · {{ __('pos.caller_id_last_seen') }}: {{ $tnCd['seen'] }} @endif
+                                    </span>
+                                    <button type="button"
+                                        @click="if (confirm('{{ __('pos.caller_dev_revoke_confirm') }}')) { revoked = true; fetch('{{ route('pos.settings.caller-devices.revoke') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({device_id: '{{ $tnCd['id'] }}'})}).catch(()=>{}); }"
+                                        class="ml-auto shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-bold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 transition">{{ __('pos.caller_dev_revoke') }}</button>
+                                </div>
+                            @endforeach
                         @else
                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.caller_id_no_device') }}</p>
                         @endif

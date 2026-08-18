@@ -688,6 +688,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/quick-type', [PosController::class, 'updateQuickType'])->name('pos.settings.quick-type');
     // Caller ID (Task 1039): admin toggle + connected-phone status live on customize.
     Route::post('/settings/caller-id', [\App\Http\Controllers\PosCallerIdController::class, 'toggle'])->name('pos.settings.caller-id');
+    Route::post('/settings/caller-devices/revoke', [\App\Http\Controllers\PosCallerIdController::class, 'revokeDevice'])->name('pos.settings.caller-devices.revoke');
     Route::post('/settings/receipt-autoclose', [PosController::class, 'updateReceiptAutoclose'])->name('pos.settings.receipt-autoclose');
     Route::post('/settings/cash-received-toggle', [PosController::class, 'toggleCashReceived'])->name('pos.settings.cash-received-toggle');
     Route::post('/settings/whatsapp-bill-toggle', [PosController::class, 'toggleWhatsappBill'])->name('pos.settings.whatsapp-bill-toggle');
@@ -796,6 +797,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/boot-check', [PosController::class, 'bootCheck'])->name('pos.api.boot-check');
     // Caller ID (Task 1039): sale-screen popup poll — fresh ring events + customer match.
     Route::get('/api/caller-events', [\App\Http\Controllers\PosCallerIdController::class, 'events'])->name('pos.api.caller-events');
+    Route::get('/api/caller-recent', [\App\Http\Controllers\PosCallerIdController::class, 'recentCalls'])->name('pos.api.caller-recent');
+    Route::get('/api/caller-last-order', [\App\Http\Controllers\PosCallerIdController::class, 'lastOrder'])->name('pos.api.caller-last-order');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
     Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');
     // Print-failure telemetry beacon (Task #63 — 30 Jul vanished-bill case):

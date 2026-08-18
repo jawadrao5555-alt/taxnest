@@ -4708,6 +4708,22 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_id_download_hint' => 'Shop ke Android phone par install karein, apne admin login se sign in kar ke notification access dein.',
     'caller_id_plan_locked' => 'Caller ID sirf Unlimited package mein shamil hai — upgrade karein taake call aate hi customer ka naam aur purani kharidari sale screen par nazar aaye.',
     'caller_plan_locked_api' => 'Caller ID aap ke package mein shamil nahi. Caller ID app istemal karne ke liye Unlimited par upgrade karein.',
+    // Caller ID v2 (Task 1101)
+    'caller_khata_due' => 'Khata udhaar',
+    'caller_repeat_order' => 'Pichla order dobara',
+    'caller_save_customer' => 'Customer save karo',
+    'caller_log_title' => 'Haaliya calls (24 ghante)',
+    'caller_log_empty' => 'Pichle 24 ghante mein koi call nahi',
+    'caller_make_bill_short' => 'Bill',
+    'caller_queued_calls' => 'call intezar mein',
+    'caller_phone_offline_warn' => 'Caller ID ON hai magar koi phone kaafi der se connect nahi hua — shop ke phone par Caller ID app check karein.',
+    'caller_repeat_done' => 'Pichla order cart mein daal diya',
+    'caller_repeat_none' => 'Is customer ka koi pichla bill nahi mila',
+    'caller_repeat_skipped' => 'Kuch items ab dastiyab nahi: ',
+    'caller_dev_online' => 'Online',
+    'caller_dev_offline' => 'Offline',
+    'caller_dev_revoke' => 'Hatao',
+    'caller_dev_revoke_confirm' => 'Is phone ko unpair karein? Calls bhejne ke liye dobara login karna hoga.',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',

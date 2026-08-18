@@ -807,10 +807,31 @@ class RestaurantWaiterController extends Controller
     }
 
     /** Cashier side — waiter orders waiting for payment (mine or unassigned; admins see all). */
-    public function incomingOrders()
+    public function incomingOrders(?Request $request = null)
     {
+        $request   = $request ?? request();
         $companyId = app('currentCompanyId');
-        $user = auth('pos')->user();
+        $user      = auth('pos')->user();
+
+        // ── Fast-path: If-None-Match ETag (Task 1097) ────────────────────────
+        // Composite fingerprint across orders + items — same reasoning as
+        // heldOrdersEtag() in RestaurantPosController:
+        //   • Same-second new order  → different MAX(id) on orders.
+        //   • Order removed          → different COUNT.
+        //   • KOT stamp (raw update) → different MAX(kot_printed_at) on items.
+        //   • New item same second   → different MAX(id) on items.
+        $isCashier = $user->isPosCashier();
+        $etag = $this->incomingOrdersEtag($companyId, $user->id, $isCashier);
+
+        // KDS liveness flag — always re-read even on 304 so the header stays fresh.
+        $kdsSeen  = (int) \Illuminate\Support\Facades\Cache::get('kds_seen_' . $companyId, 0);
+        $kdsAlive = (time() - $kdsSeen) < 90;
+
+        if ($request->header('If-None-Match') === $etag) {
+            return response('', 304)
+                ->header('ETag', $etag)
+                ->header('X-KDS-Alive', $kdsAlive ? '1' : '0');
+        }
 
         $q = RestaurantOrder::where('company_id', $companyId)
             ->where('source', 'waiter')
@@ -834,10 +855,9 @@ class RestaurantWaiterController extends Controller
         // keep working. "Alive" = KDS board polled within the last 90s (its own
         // poll is every 15s). Drives the KDS-auto-print fallback: KDS closed →
         // cashier-side auto-KOT resumes instead of tickets silently vanishing.
-        $kdsSeen = (int) \Illuminate\Support\Facades\Cache::get('kds_seen_' . $companyId, 0);
-        $kdsAlive = (time() - $kdsSeen) < 90;
-
-        return response()->json($orders)->header('X-KDS-Alive', $kdsAlive ? '1' : '0');
+        return response()->json($orders)
+            ->header('ETag', $etag)
+            ->header('X-KDS-Alive', $kdsAlive ? '1' : '0');
     }
 
     /**
@@ -865,7 +885,9 @@ class RestaurantWaiterController extends Controller
                 $w->whereNull('assigned_cashier_id')->orWhere('assigned_cashier_id', $user->id);
             });
         }
-        $claimed = $claimQuery->update(['assigned_cashier_id' => $user->id]);
+        // Task 1097: bump updated_at so the incoming-orders ETag digest (which
+        // hashes updated_at per row) detects the assignment change on every poll.
+        $claimed = $claimQuery->update(['assigned_cashier_id' => $user->id, 'updated_at' => now()]);
 
         if (!$claimed) {
             // MySQL reports 0 affected rows when the value is unchanged (order
@@ -1006,6 +1028,75 @@ class RestaurantWaiterController extends Controller
                   $x->whereNull('table_id')->whereIn('status', ['preparing', 'ready']);
               });
         });
+    }
+
+    /**
+     * Task 1097 — collision-resistant ETag for the incoming-orders poll.
+     *
+     * Uses the same per-row digest strategy as RestaurantPosController::heldOrdersEtag:
+     * fetch minimal columns (id, updated_at, kot_printed_at) for orders AND items,
+     * hash in PHP.  This correctly detects every mutation including:
+     *   • Non-max item deleted / updated / KOT-stamped (all miss MAX-only approaches).
+     *   • Two orders created in the same second (different ids → different hash).
+     *   • Any order status change (status included in order rows).
+     *
+     * Items are scoped via a subquery over the already-filtered order set —
+     * no PHP-side pluck/WHERE-IN, one query per table.
+     *
+     * $isCashier controls whether the scope is narrowed to this user's orders
+     * (must mirror the main query filter exactly).
+     */
+    private function incomingOrdersEtag(int $companyId, int $userId, bool $isCashier): string
+    {
+        $scopeOrders = function ($q) use ($companyId, $userId, $isCashier) {
+            $q->from('restaurant_orders')
+              ->where('company_id', $companyId)
+              ->where('source', 'waiter')
+              ->where(function ($w) {
+                  $w->where('status', 'held')
+                    ->orWhere(function ($x) {
+                        $x->whereNull('table_id')->whereIn('status', ['preparing', 'ready']);
+                    });
+              });
+            if ($isCashier) {
+                $q->where(function ($w) use ($userId) {
+                    $w->where('assigned_cashier_id', $userId)->orWhereNull('assigned_cashier_id');
+                });
+            }
+        };
+
+        $orderRows = DB::table('restaurant_orders')
+            ->where('company_id', $companyId)
+            ->where('source', 'waiter')
+            ->where(function ($w) {
+                $w->where('status', 'held')
+                  ->orWhere(function ($x) {
+                      $x->whereNull('table_id')->whereIn('status', ['preparing', 'ready']);
+                  });
+            })
+            ->when($isCashier, fn ($q) => $q->where(function ($w) use ($userId) {
+                $w->where('assigned_cashier_id', $userId)->orWhereNull('assigned_cashier_id');
+            }))
+            ->orderBy('id')
+            // Include assigned_cashier_id: claimIncoming() sets it via a raw
+            // query-builder update (now also bumps updated_at, but including
+            // the field directly is defense-in-depth for any future raw updates).
+            ->get(['id', 'status', 'updated_at', 'assigned_cashier_id']);
+
+        $itemRows = DB::table('restaurant_order_items')
+            ->whereIn('order_id', function ($q) use ($scopeOrders) {
+                $q->select('id');
+                $scopeOrders($q);
+            })
+            ->orderBy('id')
+            ->get(['id', 'updated_at', 'kot_printed_at']);
+
+        $payload =
+            $orderRows->map(fn($r) => $r->id . ':' . $r->status . ':' . ($r->updated_at ?? '') . ':' . ($r->assigned_cashier_id ?? ''))->join(',')
+            . '|'
+            . $itemRows->map(fn($r) => $r->id . ':' . ($r->updated_at ?? '') . ':' . ($r->kot_printed_at ?? ''))->join(',');
+
+        return '"inc-' . $companyId . '-' . $userId . '-' . md5($payload) . '"';
     }
 
     private function orderJson(RestaurantOrder $o): array

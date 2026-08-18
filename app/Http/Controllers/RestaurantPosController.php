@@ -1858,9 +1858,23 @@ class RestaurantPosController extends Controller
      * loadHeldOrders() can hot-swap this.heldOrders every 25 s, making a
      * cancel on Terminal B visible on Terminal A within one poll cycle.
      */
-    public function listHeldOrders()
+    public function listHeldOrders(\Illuminate\Http\Request $request)
     {
         $companyId = app('currentCompanyId');
+
+        // ── Fast-path: If-None-Match ETag (Task 1097) ────────────────────────
+        // A composite fingerprint across both orders AND items covers every
+        // case that a plain MAX(updated_at) misses:
+        //   • Two orders land in the same second  → different MAX(id) on orders.
+        //   • An order is cancelled               → different COUNT.
+        //   • KOT stamp (kot_printed_at bumped by a raw query-builder update
+        //     that does NOT touch updated_at)     → different MAX(kot_printed_at).
+        //   • New item added same second           → different MAX(id) on items.
+        $etag = $this->heldOrdersEtag($companyId);
+        if ($request->header('If-None-Match') === $etag) {
+            return response('', 304)->header('ETag', $etag);
+        }
+
         $orders = RestaurantOrder::where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])
             ->with(['table', 'items'])
@@ -1907,7 +1921,53 @@ class RestaurantPosController extends Controller
             ];
         })->values();
 
-        return response()->json($json);
+        return response()->json($json)->header('ETag', $etag);
+    }
+
+    /**
+     * Task 1097 — collision-resistant ETag for the held-orders poll.
+     *
+     * Requirements for correctness:
+     *  • New order arrives (including same second)   → different fingerprint.
+     *  • Order status changes / cancelled            → different fingerprint.
+     *  • ANY item changes (including a non-max row)  → different fingerprint.
+     *  • KOT stamp (raw query-builder, no updated_at bump) → different fingerprint.
+     *  • Non-max item deleted                        → different fingerprint.
+     *
+     * MAX-only aggregates fail on non-max row changes.  The only aggregate
+     * that is sensitive to every row is a SUM-of-row-hashes — but that
+     * requires DB-specific functions.
+     *
+     * Instead we fetch the minimal columns needed for the digest (3 columns,
+     * no relations, ordered by id) and hash in PHP.  This is one subquery-scoped
+     * query per table, much cheaper than the full eager-load they replace when
+     * nothing has changed.
+     */
+    private function heldOrdersEtag(int $companyId): string
+    {
+        $DB = \Illuminate\Support\Facades\DB::class;
+
+        $orderRows = $DB::table('restaurant_orders')
+            ->where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->orderBy('id')
+            ->get(['id', 'status', 'updated_at']);
+
+        $itemRows = $DB::table('restaurant_order_items')
+            ->whereIn('order_id', function ($q) use ($companyId) {
+                $q->select('id')->from('restaurant_orders')
+                    ->where('company_id', $companyId)
+                    ->whereIn('status', ['held', 'preparing', 'ready']);
+            })
+            ->orderBy('id')
+            ->get(['id', 'updated_at', 'kot_printed_at']);
+
+        $payload =
+            $orderRows->map(fn($r) => $r->id . ':' . $r->status . ':' . $r->updated_at)->join(',')
+            . '|'
+            . $itemRows->map(fn($r) => $r->id . ':' . ($r->updated_at ?? '') . ':' . ($r->kot_printed_at ?? ''))->join(',');
+
+        return '"held-' . $companyId . '-' . md5($payload) . '"';
     }
 
     public function getOrdersByTable($tableId)

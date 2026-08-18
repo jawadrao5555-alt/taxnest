@@ -286,10 +286,34 @@ class PosCallerIdController extends Controller
     public function events(Request $request)
     {
         $companyId = app('currentCompanyId');
+
+        // ── Task 1097: cheap early-exit ───────────────────────────────────────
+        // Avoid a full Company::find (all columns) and a Schema::hasTable
+        // (information_schema query) on every 20-second poll.
+        //
+        // 1. Read only the one flag we need with a scalar query.
+        // 2. Cache the table-existence check for 5 minutes — DDL never runs
+        //    mid-session, so stale reads here are harmless.
+        $enabled = (bool) DB::table('companies')
+            ->where('id', $companyId)
+            ->value('caller_id_enabled');
+
+        if (!$enabled) {
+            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
+        }
+
+        $tableExists = \Illuminate\Support\Facades\Cache::remember(
+            'caller_events_table_exists',
+            300,
+            fn () => Schema::hasTable('pos_caller_events')
+        );
+        if (!$tableExists) {
+            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
+        }
+
+        // planLocked needs the full Company model — only load it when the flag is ON.
         $company = Company::find($companyId);
-        if (!$company || !($company->caller_id_enabled ?? false)
-            || $this->planLocked($company)
-            || !Schema::hasTable('pos_caller_events')) {
+        if (!$company || $this->planLocked($company)) {
             return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
         }
 
@@ -306,11 +330,21 @@ class PosCallerIdController extends Controller
         // DELIVERED ids — a burst of >5 fresh rings must surface on the next
         // poll, never be skipped. Only when nothing fresh is pending may the
         // cursor jump past stale rows (so old unseen ids aren't re-scanned).
+        //
+        // Task 1097: scope the cursor-advance query to id > $after so it only
+        // scans events the client hasn't seen yet.  This is both more efficient
+        // than the original company-wide MAX scan AND correctly advances past any
+        // stale (expired) events that arrived after the client's last cursor.
+        // When no newer event exists the query returns null → $after is used,
+        // which naturally handles both the ($after == 0, empty table) and
+        // ($after > 0, nothing new) cases without a separate branch.
         if ($rows->isNotEmpty()) {
             $lastId = (int) $rows->max('id');
         } else {
             $lastId = (int) (DB::table('pos_caller_events')
-                ->where('company_id', $companyId)->max('id') ?? 0);
+                ->where('company_id', $companyId)
+                ->where('id', '>', $after)
+                ->max('id') ?? $after);
         }
 
         $events = $rows->map(function ($row) use ($companyId) {

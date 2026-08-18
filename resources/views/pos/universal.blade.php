@@ -4200,6 +4200,8 @@ function restaurantPos() {
         kitchenNotes: '',
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
         heldOrders: {!! $jsEnc($heldOrdersJson) !!},
+        _heldEtag: null,     // Task 1097: ETag from last held-orders poll (If-None-Match fast-path)
+        _incomingEtag: null, // Task 1097: ETag from last incoming-orders poll
         // Task 502: Tables page open-order card → boot par isi order ka direct recall.
         bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
@@ -7194,10 +7196,16 @@ function restaurantPos() {
         // within one cycle, AND a new hold on Tab B appears here within one cycle (full
         // server list replaces local list). Only preserves the local copy of a recalled
         // order actively being edited (recalledOrderId) to avoid clobbering work.
+        // Task 1097: If-None-Match ETag fast-path — 304 means nothing changed; skip body.
         async loadHeldOrders() {
             try {
-                const res = await fetch('/pos/restaurant/api/held-orders', { headers: { 'Accept': 'application/json' } });
+                const hdrs = { 'Accept': 'application/json' };
+                if (this._heldEtag) hdrs['If-None-Match'] = this._heldEtag;
+                const res = await fetch('/pos/restaurant/api/held-orders', { headers: hdrs });
+                if (res.status === 304) return;
                 if (!res.ok) return;
+                const etag = res.headers.get('ETag');
+                if (etag) this._heldEtag = etag;
                 const fresh = await res.json();
                 if (!Array.isArray(fresh)) return;
                 // Preserve any recalled order that is actively being edited in the cart
@@ -9368,14 +9376,21 @@ function restaurantPos() {
         },
 
         // ── P7 (F6): INCOMING WAITER ORDERS ───────────────────────────
+        // Task 1097: If-None-Match ETag fast-path — 304 means list unchanged;
+        // still read X-KDS-Alive from the 304 so the KDS flag stays fresh.
         async loadIncoming() {
             if (!this.isRestaurantMode) return;
             try {
-                const res = await fetch('/pos/api/incoming-orders', { headers: { 'Accept': 'application/json' } });
-                if (!res.ok) return;
-                // KDS liveness refresh — keeps the KDS-auto-print suppression honest.
+                const hdrs = { 'Accept': 'application/json' };
+                if (this._incomingEtag) hdrs['If-None-Match'] = this._incomingEtag;
+                const res = await fetch('/pos/api/incoming-orders', { headers: hdrs });
+                // Always capture KDS liveness — it's present on both 200 and 304.
                 const kdsAlive = res.headers.get('X-KDS-Alive');
                 if (kdsAlive !== null) this.kitchenSettings.kds_alive = (kdsAlive === '1');
+                if (res.status === 304) return;
+                if (!res.ok) return;
+                const etag = res.headers.get('ETag');
+                if (etag) this._incomingEtag = etag;
                 this.incomingOrders = await res.json();
                 // ZFC (3 Aug 2026): pehli KAMYAB fetch = baseline — jo orders pehle
                 // se pending the woh boot par chime/"NAYA order" toast na bajayen

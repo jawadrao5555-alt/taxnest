@@ -278,14 +278,16 @@ class PosAccessService
     }
 
     /**
-     * Return / Credit-Note verdict (Task 678, owner voice note: "phir ikhtiyar
-     * deta hoon") — SINGLE source of truth for the Return buttons (bill detail
-     * + transactions list) AND the PosReturnController gate:
+     * Return / Credit-Note verdict — SINGLE source of truth for the Return
+     * buttons (bill detail + transactions list) AND the PosReturnController gate:
      * - Custom Access set (Unlimited/trial) → its explicit 'returns' tick wins,
-     *   both ways (a manager with a set but no tick is blocked too).
-     * - No set + admin/manager → allowed (pre-678 behavior unchanged).
-     * - No set + cashier → BLOCKED (default OFF — the owner grants per staff
-     *   member via the Team page Custom Access tick, never company-wide).
+     *   both ways (a manager/cashier with a set but no tick is blocked).
+     * - No set → allowed for EVERY role, cashiers included (owner rule
+     *   18 Aug 2026: "har company ke cashiers apni sales dekh kar returns
+     *   bhi kar saken" — default ON company-wide; the owner restricts per
+     *   staff member by saving a Custom Access set without the tick).
+     *   Pre-18-Aug behavior (cashier default OFF, Task 678) was reversed
+     *   by the same owner who set it.
      */
     public static function returnsAllowed(?User $user): bool
     {
@@ -297,7 +299,7 @@ class PosAccessService
             return $custom;
         }
 
-        return !$user->isPosCashier();
+        return true;
     }
 
     /** Whether the users.pos_custom_access column exists (PROD drift guard). */

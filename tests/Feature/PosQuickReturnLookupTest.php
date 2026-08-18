@@ -389,14 +389,25 @@ class PosQuickReturnLookupTest extends TestCase
         $this->assertFinds('L-30', $id);
     }
 
-    public function test_cashier_without_returns_tick_403(): void
+    public function test_plain_cashier_allowed_by_default(): void
     {
+        // Owner rule 18 Aug 2026: no Custom Access set → returns default ON
+        // for cashiers too (company-wide).
         $this->actAs('pos_cashier');
-        $this->seedBill(['invoice_number' => 'POS-' . now()->format('Y') . '-00040']);
+        $id = $this->seedBill(['invoice_number' => 'POS-' . now()->format('Y') . '-00040']);
+
+        $this->assertFinds('40', $id);
+    }
+
+    public function test_cashier_with_set_but_no_returns_tick_403(): void
+    {
+        // A saved Custom Access set without the 'returns' tick still blocks.
+        $this->actAs('pos_cashier', ['pos_custom_access' => json_encode(['orders', 'dashboard'])]);
+        $this->seedBill(['invoice_number' => 'POS-' . now()->format('Y') . '-00042']);
 
         try {
-            $this->lookup('40');
-            $this->fail('cashier without the returns tick must be blocked');
+            $this->lookup('42');
+            $this->fail('cashier whose custom set lacks the returns tick must be blocked');
         } catch (HttpException $e) {
             $this->assertSame(403, $e->getStatusCode());
         }

@@ -297,18 +297,16 @@ class PosPraReturnFlowTest extends TestCase
 
     // ── 1. access gates ──────────────────────────────────────────────────────
 
-    public function test_cashier_gets_403(): void
+    public function test_plain_cashier_reaches_return_form(): void
     {
+        // Owner rule 18 Aug 2026: no Custom Access set → returns default ON
+        // for cashiers too. (Blocking now requires a set without the tick —
+        // covered by test_cashier_with_set_but_no_returns_tick_gets_403.)
         $this->actAs('pos_cashier');
         $parent = $this->seedParent();
 
-        try {
-            (new PosReturnController())->returnForm($parent->id);
-            $this->fail('cashier must not reach the return form');
-        } catch (HttpException $e) {
-            $this->assertSame(403, $e->getStatusCode());
-        }
-        $this->assertCount(0, $this->returnRows($parent));
+        $response = (new PosReturnController())->returnForm($parent->id);
+        $this->assertNotNull($response, 'plain cashier must reach the return form by default');
     }
 
     public function test_local_scoped_staff_gets_403_on_pra_parent(): void

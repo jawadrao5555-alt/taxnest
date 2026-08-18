@@ -10,6 +10,16 @@ use Illuminate\Http\Request;
 
 class AdminSystemController extends Controller
 {
+    /**
+     * Test-only injection point.  Set to [threads, maxConn] to inject a fake
+     * MySQL status, or to 'error' to simulate a total DB failure.
+     * Must be null in production (never set outside test code).
+     *
+     * @internal
+     * @var array{0:int,1:int}|'error'|null
+     */
+    public static mixed $testMysqlStatusOverride = null;
+
     public function index()
     {
         $controls = SystemControl::orderBy('key')->get();
@@ -65,37 +75,47 @@ class AdminSystemController extends Controller
         $mysqlThreads = null;
         $mysqlMaxConn = null;
         $mysqlPct     = null;
-        try {
-            $rows = \Illuminate\Support\Facades\DB::select("
-                SELECT 'Threads_connected' AS name, VARIABLE_VALUE AS value
-                  FROM information_schema.GLOBAL_STATUS
-                 WHERE VARIABLE_NAME = 'Threads_connected'
-                UNION ALL
-                SELECT 'max_connections' AS name, VARIABLE_VALUE AS value
-                  FROM information_schema.GLOBAL_VARIABLES
-                 WHERE VARIABLE_NAME = 'max_connections'
-            ");
-            $map = [];
-            foreach ($rows as $row) {
-                $map[$row->name] = (int) $row->value;
+        if (static::$testMysqlStatusOverride === 'error') {
+            // Test-injected failure — leave all three null so the view shows
+            // the "Could not read MySQL status" fallback message.
+        } elseif (is_array(static::$testMysqlStatusOverride)) {
+            [$mysqlThreads, $mysqlMaxConn] = static::$testMysqlStatusOverride;
+            if ($mysqlMaxConn > 0) {
+                $mysqlPct = round($mysqlThreads / $mysqlMaxConn * 100, 1);
             }
-            if (isset($map['Threads_connected'], $map['max_connections']) && $map['max_connections'] > 0) {
-                $mysqlThreads = $map['Threads_connected'];
-                $mysqlMaxConn = $map['max_connections'];
-                $mysqlPct     = round($mysqlThreads / $mysqlMaxConn * 100, 1);
-            }
-        } catch (\Throwable $e) {
-            // Fallback: SHOW STATUS / SHOW VARIABLES (older MariaDB versions).
+        } else {
             try {
-                $t = \Illuminate\Support\Facades\DB::select("SHOW STATUS LIKE 'Threads_connected'");
-                $m = \Illuminate\Support\Facades\DB::select("SHOW VARIABLES LIKE 'max_connections'");
-                if (isset($t[0], $m[0]) && (int) $m[0]->Value > 0) {
-                    $mysqlThreads = (int) $t[0]->Value;
-                    $mysqlMaxConn = (int) $m[0]->Value;
+                $rows = \Illuminate\Support\Facades\DB::select("
+                    SELECT 'Threads_connected' AS name, VARIABLE_VALUE AS value
+                      FROM information_schema.GLOBAL_STATUS
+                     WHERE VARIABLE_NAME = 'Threads_connected'
+                    UNION ALL
+                    SELECT 'max_connections' AS name, VARIABLE_VALUE AS value
+                      FROM information_schema.GLOBAL_VARIABLES
+                     WHERE VARIABLE_NAME = 'max_connections'
+                ");
+                $map = [];
+                foreach ($rows as $row) {
+                    $map[$row->name] = (int) $row->value;
+                }
+                if (isset($map['Threads_connected'], $map['max_connections']) && $map['max_connections'] > 0) {
+                    $mysqlThreads = $map['Threads_connected'];
+                    $mysqlMaxConn = $map['max_connections'];
                     $mysqlPct     = round($mysqlThreads / $mysqlMaxConn * 100, 1);
                 }
-            } catch (\Throwable $e2) {
-                // Unavailable — view will render a "Could not read" state.
+            } catch (\Throwable $e) {
+                // Fallback: SHOW STATUS / SHOW VARIABLES (older MariaDB versions).
+                try {
+                    $t = \Illuminate\Support\Facades\DB::select("SHOW STATUS LIKE 'Threads_connected'");
+                    $m = \Illuminate\Support\Facades\DB::select("SHOW VARIABLES LIKE 'max_connections'");
+                    if (isset($t[0], $m[0]) && (int) $m[0]->Value > 0) {
+                        $mysqlThreads = (int) $t[0]->Value;
+                        $mysqlMaxConn = (int) $m[0]->Value;
+                        $mysqlPct     = round($mysqlThreads / $mysqlMaxConn * 100, 1);
+                    }
+                } catch (\Throwable $e2) {
+                    // Unavailable — view will render a "Could not read" state.
+                }
             }
         }
 

@@ -78,6 +78,15 @@
 
     {{-- Rider khata cards --}}
     @if($riders->count())
+    {{-- Task 1104: shop pin missing → distance hints can't render; one-line
+         nudge to the tracking page (admin/manager only — that page is
+         PosAdminOnly). No nag beyond this. --}}
+    @if($trackingHints && !$hasShopLocation && $isAdminOrManager)
+    <div class="mb-2 text-[11px] text-gray-400 dark:text-gray-500">
+        {{ __('pos.rider_shop_loc_hint') }}
+        <a href="{{ route('pos.riders.tracking') }}" class="font-semibold text-purple-600 dark:text-purple-400 underline">{{ __('pos.rider_shop_loc_hint_link') }}</a>
+    </div>
+    @endif
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         @foreach($riders as $rider)
         @php
@@ -102,6 +111,23 @@
             </div>
             @if($openDel > 0 && $oldestDays >= 1)
             <div class="text-[11px] font-bold text-red-600 dark:text-red-400 mb-1">{{ __('pos.del_oldest_days', ['days' => $oldestDays]) }}</div>
+            @endif
+            {{-- Task 1104: duty / free / distance hints — Unlimited tracking
+                 plans only ($trackingHints); other plans see the plain card. --}}
+            @if($trackingHints)
+            @php $hint = $riderHints[$rider->id] ?? null; @endphp
+            <div class="flex items-center gap-1 flex-wrap mb-1.5">
+                @if($suggestedRiderId !== null && (int) $suggestedRiderId === (int) $rider->id)
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">★ {{ __('pos.rider_suggested_badge') }}</span>
+                @endif
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold {{ ($hint['on_duty'] ?? false) ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400' }}">{{ ($hint['on_duty'] ?? false) ? __('pos.rider_duty_on_chip') : __('pos.rider_duty_off_chip') }}</span>
+                @if($openDel === 0)
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400">{{ __('pos.rider_free_chip') }}</span>
+                @endif
+                @if(($hint['distance_km'] ?? null) !== null)
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ __('pos.rider_km_away', ['km' => number_format($hint['distance_km'], 1)]) }}</span>
+                @endif
+            </div>
             @endif
             @if($rider->phone)<div class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ $rider->phone }}</div>@endif
             @if($owed > 0)
@@ -378,11 +404,15 @@
                                     {{-- Int-cast compare: PDO can return rider_id as a STRING on the
                                          cPanel host — strict === then never matches and the dropdown
                                          falls back to "— no rider —" even though the rider is saved. --}}
-                                    @foreach($riders as $r)
+                                    {{-- Task 1104: $ridersPicker = suggestion-sorted (on-duty →
+                                         free → nearest) on tracking plans; identical name order
+                                         otherwise. Suffix ($riderOptionSuffix) carries the old
+                                         ":count out" label plus duty/free/distance hints. --}}
+                                    @foreach($ridersPicker as $r)
                                     @if($r->is_active || (int) $b->rider_id === (int) $r->id)
                                     {{-- Owner (3 Aug 2026): dropdown mein bhi dikhe kis rider ke
                                          kitne order pehle se bahar hain — barabar batwara aasan. --}}
-                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ ($openDeliveryCounts[$r->id] ?? 0) > 0 ? ' — ' . __('pos.rider_out_pill', ['count' => $openDeliveryCounts[$r->id]]) : '' }}{{ $r->is_active ? '' : __('pos.sfx_inactive_paren') }}</option>
+                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ $riderOptionSuffix[$r->id] ?? '' }}{{ $r->is_active ? '' : __('pos.sfx_inactive_paren') }}</option>
                                     @endif
                                     @endforeach
                                 </select>
@@ -587,9 +617,10 @@
                                 @csrf
                                 <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-purple-500 focus:border-purple-500">
                                     <option value="">{{ __('pos.no_rider_opt') }}</option>
-                                    @foreach($riders as $r)
+                                    {{-- Task 1104: same suggestion order + hint suffix as the main table. --}}
+                                    @foreach($ridersPicker as $r)
                                     @if($r->is_active)
-                                    <option value="{{ $r->id }}">{{ $r->name }}{{ ($openDeliveryCounts[$r->id] ?? 0) > 0 ? ' — ' . __('pos.rider_out_pill', ['count' => $openDeliveryCounts[$r->id]]) : '' }}</option>
+                                    <option value="{{ $r->id }}">{{ $r->name }}{{ $riderOptionSuffix[$r->id] ?? '' }}</option>
                                     @endif
                                     @endforeach
                                 </select>

@@ -4163,6 +4163,15 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'marked_delivered_ok' => 'Marked delivered.',
     'status_update_failed' => 'Status update failed.',
 
+    // Nearest free rider suggestion on the deliveries board (Task 1104, 17 Aug 2026)
+    'rider_duty_on_chip' => 'On duty',
+    'rider_duty_off_chip' => 'Off duty',
+    'rider_free_chip' => 'Free',
+    'rider_km_away' => ':km km away',
+    'rider_suggested_badge' => 'Nearest & free',
+    'rider_shop_loc_hint' => 'Shop location is not set, so rider distances cannot be shown.',
+    'rider_shop_loc_hint_link' => 'Set shop location',
+
     // Biometric Hazri auto-sync (4 Aug 2026)
     'bio_setup_title'        => 'Biometric Device Setup',
     'bio_setup_sub'          => 'Register your attendance devices and map employee PINs to POS users.',

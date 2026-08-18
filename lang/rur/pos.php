@@ -4163,6 +4163,15 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'marked_delivered_ok' => 'Delivered mark ho gaya.',
     'status_update_failed' => 'Status update nahi hua.',
 
+    // Nearest free rider suggestion on the deliveries board (Task 1104, 17 Aug 2026)
+    'rider_duty_on_chip' => 'Duty par',
+    'rider_duty_off_chip' => 'Duty par nahi',
+    'rider_free_chip' => 'Farigh',
+    'rider_km_away' => ':km km door',
+    'rider_suggested_badge' => 'Sab se qareeb, farigh',
+    'rider_shop_loc_hint' => 'Dukan ki location set nahi — is liye rider ka faasla nahi dikh sakta.',
+    'rider_shop_loc_hint_link' => 'Dukan ki location set karein',
+
     // Biometric Hazri auto-sync (4 Aug 2026)
     'bio_setup_title'        => 'Biometric Device Setup',
     'bio_setup_sub'          => 'Apna attendance device register karein aur employee PINs POS users se map karein.',

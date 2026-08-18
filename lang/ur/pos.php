@@ -4163,6 +4163,15 @@ return [
     'marked_delivered_ok' => 'ڈیلیورڈ نشان لگ گیا۔',
     'status_update_failed' => 'اسٹیٹس تبدیل نہیں ہوا۔',
 
+    // Nearest free rider suggestion on the deliveries board (Task 1104, 17 Aug 2026)
+    'rider_duty_on_chip' => 'ڈیوٹی پر',
+    'rider_duty_off_chip' => 'ڈیوٹی پر نہیں',
+    'rider_free_chip' => 'فارغ',
+    'rider_km_away' => ':km کلومیٹر دور',
+    'rider_suggested_badge' => 'سب سے قریب، فارغ',
+    'rider_shop_loc_hint' => 'دکان کی لوکیشن سیٹ نہیں — اس لیے رائیڈر کا فاصلہ نہیں دکھ سکتا۔',
+    'rider_shop_loc_hint_link' => 'دکان کی لوکیشن سیٹ کریں',
+
     // Biometric Hazri auto-sync (4 Aug 2026)
     'bio_setup_title'        => 'بایومیٹرک ڈیوائس سیٹ اَپ',
     'bio_setup_sub'          => 'اپنی حاضری ڈیوائس رجسٹر کریں اور ملازمین کا PIN ہر POS صارف سے ملائیں۔',

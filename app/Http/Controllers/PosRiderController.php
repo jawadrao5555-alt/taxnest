@@ -461,6 +461,90 @@ class PosRiderController extends Controller
                 return (int) floor(abs(now()->diffInHours(\Carbon\Carbon::parse($ts))) / 24);
             });
 
+        // ─── Task 1104: nearest free rider suggestion ──────────────────────
+        // Duty / distance-from-shop hints for the rider cards + assign
+        // dropdowns — rendered ONLY when the rider_tracking_enabled plan gate
+        // passes (Unlimited); every other plan keeps the exact old assign flow.
+        // Distance = haversine on the denormalized pos_riders.last_lat/lng vs
+        // the saved shop pin (companies.shop_lat/lng). hasColumn guards:
+        // cPanel PROD schema-drift convention.
+        $company = Company::find($companyId);
+        $trackingHints = PosFeatureService::planAllows($company, 'riders_enabled')
+            && PosFeatureService::planAllows($company, 'rider_tracking_enabled')
+            && Schema::hasColumn('pos_riders', 'on_duty')
+            && Schema::hasColumn('pos_riders', 'last_lat');
+        $hasShopLocation = false;
+        $riderHints = [];
+        $suggestedRiderId = null;
+        $ridersPicker = $riders;
+        if ($trackingHints) {
+            $shopLat = $shopLng = null;
+            if (Schema::hasColumn('companies', 'shop_lat') && Schema::hasColumn('companies', 'shop_lng')
+                && $company->shop_lat !== null && $company->shop_lng !== null) {
+                $shopLat = (float) $company->shop_lat;
+                $shopLng = (float) $company->shop_lng;
+                $hasShopLocation = true;
+            }
+            foreach ($riders as $r) {
+                $dist = null;
+                // Distance only when the last fix is reasonably FRESH (≤6h) —
+                // an off-duty rider's days-old ping must not claim "0.3 km away".
+                // Carbon 3 signed diffs — abs() (seconds_ago bug class).
+                $fresh = $r->last_located_at
+                    && abs(now()->diffInMinutes($r->last_located_at)) <= 360;
+                if ($hasShopLocation && $fresh && $r->last_lat !== null && $r->last_lng !== null) {
+                    $dist = PosRider::haversineKm($shopLat, $shopLng, (float) $r->last_lat, (float) $r->last_lng);
+                }
+                $riderHints[$r->id] = ['on_duty' => (bool) $r->on_duty, 'distance_km' => $dist];
+            }
+            // Picker order: on-duty first, then fewest open deliveries, then
+            // nearest, then name. Inactive khata-only riders sink to the bottom
+            // (the view still shows them only on the bill they already hold).
+            $rank = function ($r) use ($riderHints, $openDeliveryCounts) {
+                $h = $riderHints[$r->id] ?? ['on_duty' => false, 'distance_km' => null];
+                return [
+                    $r->is_active ? 0 : 1,
+                    $h['on_duty'] ? 0 : 1,
+                    (int) ($openDeliveryCounts[$r->id] ?? 0),
+                    $h['distance_km'] ?? INF,
+                    mb_strtolower((string) $r->name),
+                ];
+            };
+            $ridersPicker = $riders->sort(fn ($a, $b) => $rank($a) <=> $rank($b))->values();
+            // Suggested = best on-duty AND free (no open deliveries) candidate;
+            // the sort already put the nearest of those first. No such rider →
+            // no badge (the human always picks either way).
+            $best = $ridersPicker->first(fn ($r) => $r->is_active
+                && ($riderHints[$r->id]['on_duty'] ?? false)
+                && (int) ($openDeliveryCounts[$r->id] ?? 0) === 0);
+            $suggestedRiderId = $best?->id;
+        }
+
+        // Pre-built <option> suffix per rider — ONE string reused by both assign
+        // dropdowns (main table + old-unassigned section). Non-tracking plans
+        // get exactly the old ":count out" suffix, nothing more.
+        $riderOptionSuffix = [];
+        foreach ($riders as $r) {
+            $bits = [];
+            $h = $trackingHints ? ($riderHints[$r->id] ?? null) : null;
+            if ($h && $suggestedRiderId !== null && (int) $suggestedRiderId === (int) $r->id) {
+                $bits[] = '★ ' . __('pos.rider_suggested_badge');
+            }
+            if ($h) {
+                $bits[] = $h['on_duty'] ? __('pos.rider_duty_on_chip') : __('pos.rider_duty_off_chip');
+            }
+            $openC = (int) ($openDeliveryCounts[$r->id] ?? 0);
+            if ($openC > 0) {
+                $bits[] = __('pos.rider_out_pill', ['count' => $openC]);
+            } elseif ($h) {
+                $bits[] = __('pos.rider_free_chip');
+            }
+            if ($h && $h['distance_km'] !== null) {
+                $bits[] = __('pos.rider_km_away', ['km' => number_format($h['distance_km'], 1)]);
+            }
+            $riderOptionSuffix[$r->id] = count($bits) ? ' — ' . implode(' · ', $bits) : '';
+        }
+
         // Per-rider day summary — derived from the already-loaded $allBills collection
         // (zero extra DB queries). Groups by rider_id and counts by delivery_status bucket.
         // Bills with no rider_id are skipped (unassigned deliveries go into the total only).
@@ -499,7 +583,7 @@ class PosRiderController extends Controller
             }
         }
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers'));
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */

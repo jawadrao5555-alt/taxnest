@@ -46,7 +46,7 @@
                             <div class="px-5 py-2.5 flex items-start justify-between gap-3 flex-wrap">
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2 flex-wrap">
-                                        <span class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $peRow->company->name ?? 'Company #' . $peRow->company_id }}</span>
+                                        <span class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $peRow->company?->name ?? 'Company #' . $peRow->company_id }}</span>
                                         <span class="text-[11px] text-gray-400">{{ $peRow->user->name ?? 'User #' . $peRow->user_id }}</span>
                                         @if($peKey !== false)
                                             <span class="px-2 py-0.5 rounded-full text-[11px] font-bold {{ $peChoiceMeta[$peKey][1] }}">{{ $peChoiceMeta[$peKey][0] }}</span>

@@ -345,4 +345,46 @@ class PraElaanTallyTest extends TestCase
         // Tally block must not appear (no "responses from" summary line).
         $response->assertDontSee('responses from', false);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 7. Soft-deleted company → tally counts unchanged, row shows "Company #N"
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Task 1221: When a responding company is later soft-deleted, the elaan
+     * eager-load (with(['company'])) resolves the relation to null because the
+     * default Eloquent scope excludes soft-deleted rows.  The tally must:
+     *   – still report the correct total (soft-delete doesn't remove the
+     *     feature_suggestion row)
+     *   – still count the soft-deleted company_id as one distinct company
+     *   – fall back to "Company #N" (via the nullsafe ?-> in the view) instead
+     *     of throwing "Attempt to read property 'name' on null"
+     */
+    public function test_soft_deleted_company_shows_fallback_name_in_tally(): void
+    {
+        // Record two elaan responses (different companies, different choices).
+        $this->insertElaanRow($this->userA1Id, $this->companyAId, 'band');
+        $this->insertElaanRow($this->userBId,  $this->companyBId, 'jari');
+
+        // Soft-delete company A — its feature_suggestion row remains.
+        DB::table('companies')
+            ->where('id', $this->companyAId)
+            ->update(['deleted_at' => now()]);
+
+        $response = $this->actingAsAdmin()->get('/admin/feature-suggestions');
+
+        // Page must not throw (PHP 8 null-property access would have been fatal
+        // without the nullsafe ?-> operator in the view).
+        $response->assertStatus(200);
+
+        // Tally counts must be unchanged: 2 responses from 2 companies.
+        $response->assertSee('2 responses from 2 companies', false);
+
+        // The soft-deleted company's row must render the "Company #N" fallback,
+        // not a blank gap or an error page.
+        $response->assertSee('Company #' . $this->companyAId, false);
+
+        // The non-deleted company's real name must still appear normally.
+        $response->assertSee('Company Beta', false);
+    }
 }

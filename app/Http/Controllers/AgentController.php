@@ -231,6 +231,24 @@ class AgentController extends Controller
             $update['agent_update_at'] = $updAt ?: now();
         }
 
+        // Task 1209: clear stale update telemetry once the agent has actually
+        // reached (or passed) the previously stored target version. After a
+        // successful self-update the NEW agent never re-sends the old attempt's
+        // telemetry (only-sent-after-an-attempt rule), so a past failure row
+        // (e.g. the v1.9.0 EPERM temp-dir trap) would otherwise sit in
+        // saas-admin forever looking like the shop is still stuck.
+        if ($updateTelemetryCols
+            && !$request->filled('update_target')
+            && $company->agent_update_target
+            && preg_match('/^v?(\d+)\.(\d+)\.(\d+)/', trim((string) $request->input('version')), $cv)
+            && preg_match('/^v?(\d+)\.(\d+)\.(\d+)/', trim((string) $company->agent_update_target), $tv)
+            && version_compare("{$cv[1]}.{$cv[2]}.{$cv[3]}", "{$tv[1]}.{$tv[2]}.{$tv[3]}", '>=')) {
+            $update['agent_update_target'] = null;
+            $update['agent_update_stage'] = null;
+            $update['agent_update_error'] = null;
+            $update['agent_update_at'] = null;
+        }
+
         $this->telemetryUpdate($company, $update);
 
         // Task 1166: multi-counter registry — agents v1.9.0+ identify their

@@ -265,7 +265,7 @@
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             {{ collect($st->categories ?? [])->isEmpty() ? __('pos.no_categories_assigned') : collect($st->categories)->implode(', ') }}
                             <span class="mx-1">·</span>
-                            {{ __('pos.printer_colon') }} {{ $st->printer_name ?: __('pos.company_kot_printer') }}
+                            {{ __('pos.printer_colon') }} {{ $st->printer_name ?: __('pos.company_kot_printer') }}@if($st->printer_name && ($st->printer_device_uid ?? null) && isset($deviceLabels[$st->printer_device_uid])) — {{ $deviceLabels[$st->printer_device_uid] }}@endif
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -289,11 +289,16 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.printer_desktop_agent') }}</label>
+                            {{-- Task 1194: union picker — any counter's printer, values "uid::name". --}}
+                            @php $stCur = \App\Models\PosAgentDevice::encodePick($st->printer_name, $st->printer_device_uid ?? null); @endphp
                             <select name="printer_name" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
                                 <option value="">{{ __('pos.use_company_kot_printer') }}</option>
-                                @foreach(($printers ?? collect()) as $p)
-                                <option value="{{ $p }}" {{ $st->printer_name === $p ? 'selected' : '' }}>{{ $p }}</option>
+                                @foreach(($printerOptions ?? []) as $opt)
+                                <option value="{{ $opt['value'] }}" {{ $stCur === $opt['value'] ? 'selected' : '' }}>{{ $opt['label'] }}</option>
                                 @endforeach
+                                @if($stCur !== '' && !collect($printerOptions ?? [])->pluck('value')->contains($stCur))
+                                <option value="{{ $stCur }}" selected>{{ $st->printer_name }}</option>
+                                @endif
                             </select>
                         </div>
                     </div>
@@ -340,10 +345,11 @@
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.printer_desktop_agent') }}</label>
+                        {{-- Task 1194: union picker — any counter's printer, values "uid::name". --}}
                         <select name="printer_name" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
                             <option value="">{{ __('pos.use_company_kot_printer') }}</option>
-                            @foreach(($printers ?? collect()) as $p)
-                            <option value="{{ $p }}" {{ old('printer_name') === $p ? 'selected' : '' }}>{{ $p }}</option>
+                            @foreach(($printerOptions ?? []) as $opt)
+                            <option value="{{ $opt['value'] }}" {{ old('printer_name') === $opt['value'] ? 'selected' : '' }}>{{ $opt['label'] }}</option>
                             @endforeach
                         </select>
                     </div>

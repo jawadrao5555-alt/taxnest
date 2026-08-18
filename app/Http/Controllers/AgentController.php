@@ -1087,10 +1087,41 @@ class AgentController extends Controller
                         ->orWhereNull('d.last_seen_at')                    // never seen
                         ->orWhere('d.last_seen_at', '<', $deviceOfflineBefore); // offline
                 })
-                ->get(['j.id', 'j.type']);
+                ->get(['j.id', 'j.type', 'j.target_printer', 'j.device_uid']);
             if ($stranded->isNotEmpty()) {
                 $defaultReceipt = $company->printerSettings()['receipt_printer'] ?? null;
+                // Task 1194 — KOT-family jobs are stamped for the counter that
+                // OWNS the chosen printer, so blind-unstamping is wrong: an
+                // agent whose PC doesn't have that printer would claim the job
+                // and fail (and with several such agents it would bounce).
+                // Retarget only when another ONLINE counter reports the SAME
+                // printer name (LAN/shared printer) — re-stamp to that counter.
+                // Nobody else has it → park as failed so it surfaces on the
+                // recent-failed strip instead of sitting stranded forever.
+                $onlineDevices = collect();
+                try {
+                    $onlineDevices = \App\Models\PosAgentDevice::where('company_id', $company->id)
+                        ->where('last_seen_at', '>=', $deviceOfflineBefore)
+                        ->get();
+                } catch (\Throwable $e) { /* registry hiccup → treat as none online */ }
                 foreach ($stranded as $row) {
+                    if (in_array($row->type, ['kot', 'kot_void'], true)) {
+                        $carrier = $onlineDevices->first(function ($d) use ($row) {
+                            return $d->device_uid !== $row->device_uid
+                                && collect($d->printers ?? [])->pluck('name')->contains($row->target_printer);
+                        });
+                        if ($carrier) {
+                            DB::table('pos_print_jobs')->where('id', $row->id)
+                                ->update(['device_uid' => $carrier->device_uid, 'updated_at' => now()]);
+                        } else {
+                            DB::table('pos_print_jobs')->where('id', $row->id)->update([
+                                'status' => 'failed',
+                                'error' => 'Counter owning printer "' . $row->target_printer . '" is offline and no other online counter reports this printer.',
+                                'updated_at' => now(),
+                            ]);
+                        }
+                        continue;
+                    }
                     $upd = ['device_uid' => null, 'updated_at' => now()];
                     if ($defaultReceipt && in_array($row->type, ['bill', 'proof'], true)) {
                         $upd['target_printer'] = $defaultReceipt;

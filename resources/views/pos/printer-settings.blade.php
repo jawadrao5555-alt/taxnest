@@ -89,7 +89,17 @@
                     ->flip()
                     ->all();
                 $receiptIsTextOnly = $settings['receipt_printer'] && isset($textOnlyNames[$settings['receipt_printer']]);
-                $kotIsTextOnly     = $settings['kot_printer']     && isset($textOnlyNames[$settings['kot_printer']]);
+                // Task 1194: KOT-family dropdowns ride the UNION picker — every
+                // counter's printers, counter-labeled, values "uid::name" (plain
+                // name = legacy). Saved picks compare by their encoded value.
+                $kotOptions = $kotOptions ?? [];
+                $kotOptionValues = collect($kotOptions)->pluck('value')->all();
+                $kotCur = \App\Models\PosAgentDevice::encodePick($settings['kot_printer'], $settings['kot_printer_device'] ?? null);
+                $counterKotCur = \App\Models\PosAgentDevice::encodePick($settings['counter_kot_printer'], $settings['counter_kot_printer_device'] ?? null);
+                $kotSelOpt = collect($kotOptions)->firstWhere('value', $kotCur);
+                $kotIsTextOnly = $kotSelOpt
+                    ? !empty($kotSelOpt['isTextOnly'])
+                    : ($settings['kot_printer'] && isset($textOnlyNames[$settings['kot_printer']]));
             @endphp
             @if(count($settings['available_printers']))
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
@@ -121,9 +131,13 @@
                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ __('pos.kitchen_kot_printer') }}</label>
                         <select name="kot_printer" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             <option value="">{{ __('pos.opt_not_set_popup') }}</option>
-                            @foreach($settings['available_printers'] as $p)
-                            <option value="{{ $p['name'] }}" {{ $settings['kot_printer'] === $p['name'] ? 'selected' : '' }}>{{ $p['displayName'] ?? $p['name'] }}{{ !empty($p['isDefault']) ? ' ' . __('pos.default_paren') : '' }}</option>
+                            @foreach($kotOptions as $opt)
+                            <option value="{{ $opt['value'] }}" {{ $kotCur === $opt['value'] ? 'selected' : '' }}>{{ $opt['label'] }}</option>
                             @endforeach
+                            @if($kotCur !== '' && !in_array($kotCur, $kotOptionValues, true))
+                            {{-- Saved pick missing from the lists (printer renamed / counter deregistered): keep it selected so saving unrelated fields doesn't silently drop it. --}}
+                            <option value="{{ $kotCur }}" selected>{{ $settings['kot_printer'] }}</option>
+                            @endif
                         </select>
                         <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.kot_printer_hint') }}</p>
                         @if($kotIsTextOnly)
@@ -143,9 +157,12 @@
                         </div>
                         <select name="counter_kot_printer" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             <option value="">{{ __('pos.opt_not_set') }}</option>
-                            @foreach($settings['available_printers'] as $p)
-                            <option value="{{ $p['name'] }}" {{ $settings['counter_kot_printer'] === $p['name'] ? 'selected' : '' }}>{{ $p['displayName'] ?? $p['name'] }}{{ !empty($p['isDefault']) ? ' ' . __('pos.default_paren') : '' }}</option>
+                            @foreach($kotOptions as $opt)
+                            <option value="{{ $opt['value'] }}" {{ $counterKotCur === $opt['value'] ? 'selected' : '' }}>{{ $opt['label'] }}</option>
                             @endforeach
+                            @if($counterKotCur !== '' && !in_array($counterKotCur, $kotOptionValues, true))
+                            <option value="{{ $counterKotCur }}" selected>{{ $settings['counter_kot_printer'] }}</option>
+                            @endif
                         </select>
                         <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.counter_kot_hint') }}</p>
                     </div>

@@ -22,6 +22,9 @@ class PosStation extends Model
 
     protected $fillable = [
         'company_id', 'name', 'categories', 'printer_name', 'is_active', 'sort',
+        // Task 1194: owning counter of printer_name (multi-counter shops).
+        // NULL = legacy pick → jobs unstamped, claimable by any agent.
+        'printer_device_uid',
     ];
 
     protected $casts = [

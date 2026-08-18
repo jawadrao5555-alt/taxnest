@@ -489,6 +489,11 @@ class Company extends Model
             // Task 565: print-confirm flag is BAKED into both universal sale
             // screens — a toggle must refresh SW-cached copies (boot fingerprint).
             'print_confirm_ask' => $ps['print_confirm_ask'],
+            // Task 1194: owning-counter of each KOT-family pick is a deliberate
+            // routing choice too. Both ride the normalized shape, so telemetry
+            // rewrites (reportPrinters) can never fake a change here.
+            'kot_printer_device' => $ps['kot_printer_device'],
+            'counter_kot_printer_device' => $ps['counter_kot_printer_device'],
         ];
 
         return md5(json_encode($vals));
@@ -511,6 +516,14 @@ class Company extends Model
             // the tick is ON. Other order types never use it.
             'counter_kot_printer' => $s['counter_kot_printer'] ?? null,
             'counter_kot_enabled' => (bool) ($s['counter_kot_enabled'] ?? false),
+            // Task 1194: owning counter (device_uid) of the KOT-family picks —
+            // union picker lets the admin choose ANY counter's printer, and
+            // enqueue stamps jobs for the owning counter's agent. NULL = legacy
+            // name-only pick → unstamped jobs (pre-1194 behavior). MUST stay in
+            // this normalized shape (POST/telemetry rebuild trap — see
+            // prompt_dismissed_at) or a printers report would silently drop them.
+            'kot_printer_device' => $s['kot_printer_device'] ?? null,
+            'counter_kot_printer_device' => $s['counter_kot_printer_device'] ?? null,
             'available_printers' => is_array($s['available_printers'] ?? null) ? $s['available_printers'] : [],
             'printers_reported_at' => $s['printers_reported_at'] ?? null,
             // Task 565 (customer voice note, Aug 2026): opt-in "Print se pehle

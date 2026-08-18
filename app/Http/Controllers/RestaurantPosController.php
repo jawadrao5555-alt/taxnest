@@ -2029,7 +2029,17 @@ class RestaurantPosController extends Controller
         $categories = \App\Models\PosProduct::where('company_id', $companyId)
             ->whereNotNull('category')->where('category', '!=', '')
             ->distinct()->orderBy('category')->pluck('category');
-        $printers = collect($company->printerSettings()['available_printers'])->pluck('name')->filter()->values();
+        // Task 1194 — union picker: every counter's reported printers, each
+        // labeled with its owning counter (value "uid::name"); single-counter
+        // shops get today's plain company-wide list back.
+        $printerOptions = \App\Models\PosAgentDevice::kotPrinterOptions($company);
+        $deviceLabels = collect();
+        try {
+            if (\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+                $deviceLabels = \App\Models\PosAgentDevice::where('company_id', $companyId)->get()
+                    ->mapWithKeys(fn ($d) => [$d->device_uid => $d->label()]);
+            }
+        } catch (\Throwable $e) { /* registry hiccup — labels are cosmetic */ }
 
         // Task 767: opening this page counts as "notified" — the in-page
         // Task 761 warning takes over from here (it persists while centering
@@ -2042,7 +2052,7 @@ class RestaurantPosController extends Controller
                 ->update(['kot_center_notice_at' => null]);
         }
 
-        return view('pos.restaurant.kitchen-settings', compact('company', 'stations', 'categories', 'printers'));
+        return view('pos.restaurant.kitchen-settings', compact('company', 'stations', 'categories', 'printerOptions', 'deviceLabels'));
     }
 
     /**
@@ -2056,7 +2066,8 @@ class RestaurantPosController extends Controller
             'name' => 'required|string|max:60',
             'categories' => 'nullable|array',
             'categories.*' => 'string|max:100',
-            'printer_name' => 'nullable|string|max:255',
+            // Task 1194: may arrive union-encoded ("uid::name") — wider cap.
+            'printer_name' => 'nullable|string|max:340',
             'is_active' => 'nullable|boolean',
         ]);
 
@@ -2098,22 +2109,29 @@ class RestaurantPosController extends Controller
         // Printer must be one the agent actually reported (or blank = use company
         // KOT printer). Unknown name = loud error, NOT a silent null — otherwise
         // the admin believes a dedicated printer is set when it isn't.
+        // Task 1194: the union picker may submit a device-owned value
+        // ("uid::name") — resolvePick validates it against THAT counter's own
+        // reported list; plain names keep the legacy company-wide check.
         $company = Company::find($companyId);
-        $known = collect($company->printerSettings()['available_printers'])->pluck('name')->all();
-        $printer = trim((string) ($validated['printer_name'] ?? ''));
-        if ($printer !== '' && !in_array($printer, $known, true)) {
+        $raw = trim((string) ($validated['printer_name'] ?? ''));
+        $pick = \App\Models\PosAgentDevice::resolvePick($company, $raw);
+        if ($raw !== '' && !$pick['valid']) {
             abort(redirect()->back()->withErrors([
-                'printer_name' => "Printer \"{$printer}\" is not known to the Desktop Agent. Refresh the agent's printer list or leave blank to use the company KOT printer.",
+                'printer_name' => "Printer \"{$pick['name']}\" is not known to the Desktop Agent. Refresh the agent's printer list or leave blank to use the company KOT printer.",
             ])->withInput());
         }
-        $printer = $printer !== '' ? $printer : null;
 
-        return [
+        $data = [
             'name' => $name,
             'categories' => $categories->all(),
-            'printer_name' => $printer,
+            'printer_name' => $pick['name'],
             'is_active' => $isActive,
         ];
+        // Column-guarded: prod may run this code before migrate --force.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_stations', 'printer_device_uid')) {
+            $data['printer_device_uid'] = $pick['device_uid'];
+        }
+        return $data;
     }
 
     public function storeStation(Request $request)

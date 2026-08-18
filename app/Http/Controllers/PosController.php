@@ -519,8 +519,10 @@ class PosController extends Controller
             $validated = $request->validate([
                 'silent_print_enabled' => 'nullable|boolean',
                 'receipt_printer' => 'nullable|string|max:255',
-                'kot_printer' => 'nullable|string|max:255',
-                'counter_kot_printer' => 'nullable|string|max:255',
+                // Task 1194: KOT-family picks may arrive union-encoded
+                // ("uid::name" — uid ≤64 + '::' + name ≤255), hence the wider cap.
+                'kot_printer' => 'nullable|string|max:340',
+                'counter_kot_printer' => 'nullable|string|max:340',
                 'counter_kot_enabled' => 'nullable|boolean',
                 'print_confirm_ask' => 'nullable|boolean',
             ]);
@@ -530,12 +532,19 @@ class PosController extends Controller
 
             // Only accept printers the agent actually reported (or blank = unset).
             $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
-            $kot = trim((string) ($validated['kot_printer'] ?? ''));
             $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
-            $settings['kot_printer'] = ($kot !== '' && in_array($kot, $known, true)) ? $kot : null;
+            // Task 1194 — KOT-family picks ride the UNION picker: a value may
+            // carry its owning counter ("uid::name", validated against THAT
+            // device's own reported list) or stay a legacy plain name (company-
+            // wide list check, exactly as before). Invalid = silent unset,
+            // same rule the plain names always had.
+            $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
+            $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
+            $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
             // Counter KOT Copy (dine-in only): printer + its own ON/OFF tick.
-            $counterKot = trim((string) ($validated['counter_kot_printer'] ?? ''));
-            $settings['counter_kot_printer'] = ($counterKot !== '' && in_array($counterKot, $known, true)) ? $counterKot : null;
+            $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
+            $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
+            $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
             $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
 
             // Task 1166 — per-counter devices: persist the multi-counter section
@@ -602,7 +611,11 @@ class PosController extends Controller
             }
         }
 
-        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'devices', 'assignableTeam'));
+        // Task 1194 — union KOT-family picker options (every counter's printers,
+        // counter-labeled). Single-counter/legacy shops get today's list back.
+        $kotOptions = \App\Models\PosAgentDevice::kotPrinterOptions($company);
+
+        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'devices', 'assignableTeam', 'kotOptions'));
     }
 
     /**
@@ -941,14 +954,21 @@ class PosController extends Controller
             if ($inFlight) {
                 return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
             }
-            $job = \App\Models\PosPrintJob::create([
+            $attrs = [
                 'company_id' => $companyId,
                 'type' => 'kot',
                 'target_printer' => $settings['kot_printer'],
                 'transaction_id' => (int) $validated['transaction_id'],
                 'status' => 'pending',
                 'created_by' => $user->id,
-            ]);
+            ];
+            // Task 1194: route to the counter that owns the KOT printer (ONLINE
+            // only). Key added only when a stamp resolves — pre-migration prod
+            // (no device_uid column) never sees it in the INSERT.
+            if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['kot_printer_device'] ?? null)) {
+                $attrs['device_uid'] = $stamp;
+            }
+            $job = \App\Models\PosPrintJob::create($attrs);
             return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
@@ -980,7 +1000,7 @@ class PosController extends Controller
             if ($inFlight) {
                 return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
             }
-            $job = \App\Models\PosPrintJob::create([
+            $attrs = [
                 'company_id' => $companyId,
                 'type' => 'kot',
                 'target_printer' => $settings['kot_printer'],
@@ -988,7 +1008,12 @@ class PosController extends Controller
                 'render_query' => 'batch=last',
                 'status' => 'pending',
                 'created_by' => $user->id,
-            ]);
+            ];
+            // Task 1194: owning-counter stamp (online only; see helper docs).
+            if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['kot_printer_device'] ?? null)) {
+                $attrs['device_uid'] = $stamp;
+            }
+            $job = \App\Models\PosPrintJob::create($attrs);
             return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
@@ -1035,7 +1060,7 @@ class PosController extends Controller
                     }
                     return;
                 }
-                \App\Models\PosPrintJob::create([
+                $attrs = [
                     'company_id' => $companyId,
                     'type' => 'kot',
                     'target_printer' => $printer,
@@ -1044,10 +1069,15 @@ class PosController extends Controller
                     'printed_item_ids' => $delta ? $deltaIds : null,
                     'status' => 'pending',
                     'created_by' => $user->id,
-                ]);
+                ];
+                // Task 1194: counter copy routes to ITS owning counter (online only).
+                if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['counter_kot_printer_device'] ?? null)) {
+                    $attrs['device_uid'] = $stamp;
+                }
+                \App\Models\PosPrintJob::create($attrs);
             } catch (\Throwable $e) { /* copy is optional — kitchen print already queued */ }
         };
-        $makeJob = function (?string $printer, ?string $renderQuery) use ($companyId, $order, $user, $delta, $deltaIds) {
+        $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($companyId, $order, $user, $delta, $deltaIds) {
             // In-flight dedupe (client retry + KDS/cashier race, 30 Jul 2026):
             // an identical queued/printing job < 2 min old = same physical ticket
             // already on its way. Delta jobs now carry a BAKED id snapshot, so a
@@ -1073,7 +1103,7 @@ class PosController extends Controller
                 }
                 return $inFlight;
             }
-            return \App\Models\PosPrintJob::create([
+            $attrs = [
                 'company_id' => $companyId,
                 'type' => 'kot',
                 'target_printer' => $printer,
@@ -1082,7 +1112,13 @@ class PosController extends Controller
                 'printed_item_ids' => ($delta && $deltaIds) ? $deltaIds : null,
                 'status' => 'pending',
                 'created_by' => $user->id,
-            ]);
+            ];
+            // Task 1194: owning-counter stamp — only that counter's agent claims
+            // the job. Online-device rule + column guard live in the helper.
+            if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $ownerDeviceUid)) {
+                $attrs['device_uid'] = $stamp;
+            }
+            return \App\Models\PosPrintJob::create($attrs);
         };
 
         // Delta with nothing unprinted = nothing to print anywhere — succeed with
@@ -1098,7 +1134,7 @@ class PosController extends Controller
             if (!$settings['kot_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
-            $job = $makeJob($settings['kot_printer'], $delta ? 'delta=1' : null);
+            $job = $makeJob($settings['kot_printer'], $delta ? 'delta=1' : null, $settings['kot_printer_device'] ?? null);
             $counterCopy();
             return response()->json(['success' => true, 'job_id' => $job->id]);
         }
@@ -1114,7 +1150,7 @@ class PosController extends Controller
             if (!$printer) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
-            $job = $makeJob($printer, 'station=' . $sid . $deltaQ);
+            $job = $makeJob($printer, 'station=' . $sid . $deltaQ, \App\Services\KotPrintService::stationDeviceUid($station, $settings));
             return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
@@ -1139,11 +1175,11 @@ class PosController extends Controller
             if (!$printer) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
-            $plan[] = [$printer, 'station=' . $sid . $deltaQ];
+            $plan[] = [$printer, 'station=' . $sid . $deltaQ, \App\Services\KotPrintService::stationDeviceUid($station, $settings)];
         }
         $jobIds = [];
-        foreach ($plan as [$printer, $rq]) {
-            $jobIds[] = $makeJob($printer, $rq)->id;
+        foreach ($plan as [$printer, $rq, $ownerUid]) {
+            $jobIds[] = $makeJob($printer, $rq, $ownerUid)->id;
         }
         $counterCopy();
         return response()->json(['success' => true, 'job_ids' => $jobIds]);

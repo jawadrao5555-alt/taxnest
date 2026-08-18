@@ -21,6 +21,47 @@ use App\Models\RestaurantOrder;
 class KotPrintService
 {
     /**
+     * Task 1194 — enqueue-time owning-device stamp for KOT-family jobs
+     * (kot / counter copy / station / kot_void). A pick made on the union
+     * printer picker remembers which counter PC owns the printer; stamping
+     * the job with that device_uid means ONLY that counter's agent claims it
+     * (no Windows printer sharing needed).
+     *
+     * Returns the uid ONLY when the routing schema is migrated, the device
+     * row exists for THIS company, and its agent is ONLINE — mirrors the
+     * bill/proof rule: a job stamped for an offline counter would just
+     * strand. Anything short of that → null = unstamped legacy job,
+     * claimable by any agent (pre-1194 behavior, popup fallback preserved).
+     */
+    public static function deviceStampFor(int $companyId, ?string $deviceUid): ?string
+    {
+        if (!$deviceUid || !\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+            return null;
+        }
+        try {
+            $device = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                ->where('device_uid', $deviceUid)
+                ->first();
+            return ($device && $device->isOnline()) ? $device->device_uid : null;
+        } catch (\Throwable $e) {
+            return null; // routing must never break the print fallback chain
+        }
+    }
+
+    /**
+     * Task 1194 — owning device of a STATION job's effective printer: the
+     * station's own pick when it has one, else the company KOT pick's owner.
+     * Must mirror the printer fallback (`printer_name ?: kot_printer`) —
+     * the stamp always belongs to whichever printer actually got the job.
+     */
+    public static function stationDeviceUid(?PosStation $station, array $settings): ?string
+    {
+        return ($station && ($station->printer_name ?? null))
+            ? ($station->printer_device_uid ?? null)
+            : ($settings['kot_printer_device'] ?? null);
+    }
+
+    /**
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
     public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false): array
@@ -46,7 +87,7 @@ class KotPrintService
             if ($delta && empty($deltaIds)) {
                 return ['printed' => true, 'job_ids' => []];
             }
-            $makeJob = function (?string $printer, ?string $renderQuery) use ($company, $order, $userId, $delta, $deltaIds) {
+            $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($company, $order, $userId, $delta, $deltaIds) {
                 // Task 753: in-flight dedupe + merge — mirrors apiCreatePrintJob's
                 // rule so the hold-time server enqueue, the KDS auto-print fire and
                 // the cashier fallback all collapse into ONE physical slip. A
@@ -70,7 +111,7 @@ class KotPrintService
                     }
                     return $inFlight;
                 }
-                return PosPrintJob::create([
+                $attrs = [
                     'company_id' => $company->id,
                     'type' => 'kot',
                     'target_printer' => $printer,
@@ -79,7 +120,13 @@ class KotPrintService
                     'printed_item_ids' => ($delta && $deltaIds) ? $deltaIds : null,
                     'status' => 'pending',
                     'created_by' => $userId,
-                ]);
+                ];
+                // Task 1194: key only added when a stamp resolves — pre-migration
+                // prod (no device_uid column) never sees it in the INSERT.
+                if ($stamp = self::deviceStampFor($company->id, $ownerDeviceUid)) {
+                    $attrs['device_uid'] = $stamp;
+                }
+                return PosPrintJob::create($attrs);
             };
 
             $stations = PosStation::activeFor($company->id);
@@ -92,7 +139,7 @@ class KotPrintService
                     if (!($settings['counter_kot_enabled'] ?? false)) return;
                     $printer = $settings['counter_kot_printer'] ?? null;
                     if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
-                    $makeJob($printer, $delta ? 'delta=1' : null);
+                    $makeJob($printer, $delta ? 'delta=1' : null, $settings['counter_kot_printer_device'] ?? null);
                 } catch (\Throwable $e) { /* copy is optional */ }
             };
 
@@ -101,7 +148,7 @@ class KotPrintService
                 if (!$settings['kot_printer']) {
                     return ['printed' => false, 'reason' => 'no_printer'];
                 }
-                $job = $makeJob($settings['kot_printer'], $delta ? 'delta=1' : null);
+                $job = $makeJob($settings['kot_printer'], $delta ? 'delta=1' : null, $settings['kot_printer_device'] ?? null);
                 $counterCopy();
                 return ['printed' => true, 'job_ids' => [$job->id]];
             }
@@ -121,11 +168,11 @@ class KotPrintService
                 if (!$printer) {
                     return ['printed' => false, 'reason' => 'no_printer'];
                 }
-                $plan[] = [$printer, 'station=' . $sid . $deltaQ];
+                $plan[] = [$printer, 'station=' . $sid . $deltaQ, self::stationDeviceUid($station, $settings)];
             }
             $jobIds = [];
-            foreach ($plan as [$printer, $rq]) {
-                $jobIds[] = $makeJob($printer, $rq)->id;
+            foreach ($plan as [$printer, $rq, $ownerUid]) {
+                $jobIds[] = $makeJob($printer, $rq, $ownerUid)->id;
             }
             $counterCopy();
             return ['printed' => true, 'job_ids' => $jobIds];
@@ -166,8 +213,8 @@ class KotPrintService
                 return ['printed' => false, 'reason' => 'agent_offline'];
             }
 
-            $makeVoidJob = function (?string $printer, array $items) use ($company, $order, $userId) {
-                return PosPrintJob::create([
+            $makeVoidJob = function (?string $printer, array $items, ?string $ownerDeviceUid = null) use ($company, $order, $userId) {
+                $attrs = [
                     'company_id'          => $company->id,
                     'type'                => 'kot_void',
                     'target_printer'      => $printer,
@@ -175,7 +222,13 @@ class KotPrintService
                     'render_query'        => json_encode(array_values($items)),
                     'status'              => 'pending',
                     'created_by'          => $userId,
-                ]);
+                ];
+                // Task 1194: void slips route to the owning counter too — key
+                // only added when a stamp resolves (pre-migration prod safe).
+                if ($stamp = self::deviceStampFor($company->id, $ownerDeviceUid)) {
+                    $attrs['device_uid'] = $stamp;
+                }
+                return PosPrintJob::create($attrs);
             };
 
             // Counter copy (dine-in only, same policy as normal KOT copies) always
@@ -185,7 +238,7 @@ class KotPrintService
                     if (!($settings['counter_kot_enabled'] ?? false)) return;
                     $printer = $settings['counter_kot_printer'] ?? null;
                     if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
-                    $makeVoidJob($printer, $voidItems);
+                    $makeVoidJob($printer, $voidItems, $settings['counter_kot_printer_device'] ?? null);
                 } catch (\Throwable $e) { /* copy is optional */ }
             };
 
@@ -195,7 +248,7 @@ class KotPrintService
                 if (!$settings['kot_printer']) {
                     return ['printed' => false, 'reason' => 'no_printer'];
                 }
-                $job = $makeVoidJob($settings['kot_printer'], $voidItems);
+                $job = $makeVoidJob($settings['kot_printer'], $voidItems, $settings['kot_printer_device'] ?? null);
                 $counterCopy();
                 return ['printed' => true, 'job_ids' => [$job->id]];
             }
@@ -227,7 +280,7 @@ class KotPrintService
                 if (!$printer) {
                     return ['printed' => false, 'reason' => 'no_printer'];
                 }
-                $jobIds[] = $makeVoidJob($printer, $items)->id;
+                $jobIds[] = $makeVoidJob($printer, $items, self::stationDeviceUid($station, $settings))->id;
             }
             $counterCopy();
             return ['printed' => true, 'job_ids' => $jobIds];

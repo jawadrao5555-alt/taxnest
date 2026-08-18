@@ -195,7 +195,14 @@ class PosAuth
             // staff = ASAL local cashier (session mein yaad). Heartbeat USI ki
             // open row par jaye — kabhi PRA counterpart ki row par nahi (woh
             // doosre PC par apni asli hazri row rakhta hai).
-            $hazriUserId = (int) (session('pos_identity_original_id') ?: $user->id);
+            // Task 1157: pos_hazri_user_id (set at real login, never at a switch
+            // login) is the authoritative owner of this station's hazri row.
+            // It is FIRST priority so that forward-after-reverse (local→PRA after
+            // a PRA→local reverse switch) cannot override it via
+            // pos_identity_original_id = local->id (local has no hazri row).
+            // pos_identity_original_id stays as a legacy fallback for sessions
+            // created before this key was introduced.
+            $hazriUserId = (int) (session('pos_hazri_user_id') ?: session('pos_identity_original_id') ?: $user->id);
             $beatKey = 'pos_hazri_beat_' . $hazriUserId;
             if (!cache()->has($beatKey)) {
                 cache()->put($beatKey, 1, 300);

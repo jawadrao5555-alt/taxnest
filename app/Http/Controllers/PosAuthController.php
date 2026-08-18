@@ -306,7 +306,14 @@ class PosAuthController extends Controller
                 // asal (original) local cashier hi ja raha hai — USI ki rows
                 // band karo. Current PRA counterpart ki rows ko haath na lagao:
                 // woh doosre PC par apne asli login se kaam kar raha ho sakta hai.
-                $hazriUserId = (int) (session('pos_identity_original_id') ?: $u->id);
+                // Task 1157: pos_hazri_user_id (set at real login, never at a
+                // switch login) is the authoritative owner of this station's
+                // hazri row — first priority. pos_identity_original_id stays as
+                // a legacy fallback for sessions created before this key was
+                // introduced. This order also fixes forward-after-reverse: when
+                // local→PRA switch sets pos_identity_original_id = local->id,
+                // pos_hazri_user_id = pra->id (real login) still wins.
+                $hazriUserId = (int) (session('pos_hazri_user_id') ?: session('pos_identity_original_id') ?: $u->id);
                 \Illuminate\Support\Facades\DB::table('pos_user_sessions')
                     ->where('user_id', $hazriUserId)
                     ->whereNull('logout_at')

@@ -577,6 +577,107 @@ class PosManagerLocalCheckIdentitySwitchTest extends TestCase
             'duty time must be the real elapsed window, not counted through the cutoff');
     }
 
+    /**
+     * Task 1157 — REVERSE switch hazri lifecycle.
+     *
+     * A PRA-side cashier logs in on a local-check station and immediately
+     * reverse-switches (PRA → local) via identitySwitch(). The hazri row
+     * belongs to the PRA user (the real login). After the switch the
+     * authenticated user is the LOCAL cashier but pos_identity_original_id is
+     * NOT set (reverse branch design). Verify:
+     *   1. Heartbeat stamps the PRA user's open row (physically-present staff).
+     *   2. Logout closes the PRA user's row, NOT the local cashier's.
+     *   3. Forward-after-reverse (local → PRA again) leaves exactly one open
+     *      hazri row at the end.
+     */
+    public function test_hazri_lifecycle_reverse_switch_heartbeat_logout(): void
+    {
+        $cid = $this->makeCompany();
+        $pra = $this->makeUser($cid, ['pos_billing_scope' => 'pra']);
+        $local = $this->makeUser($cid, ['pos_billing_scope' => 'local', 'pos_counterpart_user_id' => $pra->id]);
+        app()->instance('currentCompanyId', $cid);
+
+        // The local cashier is NOT present on this station; no hazri row for them.
+        // (Simulate another station's context by NOT calling login for local.)
+
+        // 1. REAL login on this station — the PRA-side user logs in physically.
+        //    Login listener writes the PRA hazri row + sets pos_hazri_user_id.
+        Auth::guard('pos')->login($pra);
+        $praRow = DB::table('pos_user_sessions')->where('user_id', $pra->id)->first();
+        $this->assertNotNull($praRow, 'real PRA login must create the attendance row');
+        $this->assertNull($praRow->logout_at);
+        // Backdate so elapsed duty is measurable.
+        DB::table('pos_user_sessions')->where('id', $praRow->id)
+            ->update(['login_at' => now()->subMinutes(30)]);
+
+        // Confirm pos_hazri_user_id was stamped at login.
+        $this->assertSame($pra->id, (int) session('pos_hazri_user_id'),
+            'real login must record the hazri owner in pos_hazri_user_id');
+
+        // 2. REVERSE switch: PRA user → local cashier.
+        //    No new hazri row, pos_identity_original_id is NOT set by this branch.
+        $resp = (new PosController())->identitySwitch(Request::create('/pos/api/identity-switch', 'POST'));
+        $this->assertTrue($resp->getData(true)['switched']);
+        $this->assertSame('local', $resp->getData(true)['direction']);
+        $this->assertSame($local->id, Auth::guard('pos')->id(), 'guard must now be the local cashier');
+        $this->assertNull(session('pos_identity_original_id'),
+            'reverse branch must NOT set pos_identity_original_id');
+        $this->assertSame(0, DB::table('pos_user_sessions')->where('user_id', $local->id)->count(),
+            'reverse switch must never create a hazri row for the local cashier');
+        $this->assertSame(1, DB::table('pos_user_sessions')->where('user_id', $pra->id)->count(),
+            'PRA hazri row must remain exactly one');
+
+        // 3. Heartbeat WHILE REVERSE-SWITCHED (real middleware) —
+        //    must stamp the PRA user's open row (physically-present staff),
+        //    NOT attempt to write a non-existent local cashier row.
+        $stale = now()->subMinutes(20);
+        DB::table('pos_user_sessions')->where('id', $praRow->id)
+            ->update(['last_activity_at' => $stale]);
+        cache()->flush(); // clear the 5-min heartbeat throttle
+        $mwReq = Request::create('/pos/dashboard', 'GET');
+        $mwReq->setLaravelSession(app('session.store'));
+        $mwResp = (new \App\Http\Middleware\PosAuth())->handle($mwReq, fn ($r) => response('ok'));
+        $this->assertSame(200, $mwResp->getStatusCode());
+
+        $praBeat = DB::table('pos_user_sessions')->where('id', $praRow->id)->value('last_activity_at');
+        $this->assertTrue(\Carbon\Carbon::parse($praBeat)->gt(now()->subMinute()),
+            'heartbeat after reverse switch must stamp the PRA (physically-present) cashier row');
+        $this->assertSame(0, DB::table('pos_user_sessions')->where('user_id', $local->id)->count(),
+            'heartbeat must NOT create a stray row for the local cashier');
+
+        // 4. Forward-after-reverse: local → PRA again (one more switch press).
+        //    Auth is currently local; local has pos_counterpart_user_id = pra->id,
+        //    so this is a FORWARD switch back to PRA.
+        $resp2 = (new PosController())->identitySwitch(Request::create('/pos/api/identity-switch', 'POST'));
+        $this->assertTrue($resp2->getData(true)['switched']);
+        $this->assertSame($pra->id, Auth::guard('pos')->id(), 'after forward-after-reverse guard = PRA');
+        // Exactly one open hazri row total — the original PRA login row.
+        $openRows = DB::table('pos_user_sessions')->whereNull('logout_at')->count();
+        $this->assertSame(1, $openRows, 'forward-after-reverse must leave exactly one open hazri row');
+        $this->assertSame($pra->id, (int) DB::table('pos_user_sessions')->whereNull('logout_at')->value('user_id'),
+            'the single open row must still belong to the PRA cashier');
+
+        // 5. Logout from the forward-after-reverse state — closes PRA's row.
+        cache()->flush();
+        $outReq = Request::create('/pos/logout', 'POST');
+        $outReq->setLaravelSession(app('session.store'));
+        (new \App\Http\Controllers\PosAuthController())->logout($outReq);
+
+        $praRowAfter = DB::table('pos_user_sessions')->where('id', $praRow->id)->first();
+        $this->assertNotNull($praRowAfter->logout_at,
+            'logout after forward-after-reverse must close the PRA (real) cashier row');
+        $this->assertSame(0, DB::table('pos_user_sessions')->where('user_id', $local->id)->count(),
+            'no stray local cashier rows must ever appear');
+
+        // 6. Duty hours ≈ 30 min (real elapsed), never inflated.
+        $duty = \App\Support\PosHazriDutyHours::fromSessions(
+            collect([DB::table('pos_user_sessions')->where('id', $praRow->id)->first()]),
+            now()->endOfDay()
+        );
+        $this->assertEqualsWithDelta(30, $duty->minutes, 2,
+            'duty time must reflect real elapsed window of the PRA cashier');
+    }
+
     // ── 3. Counterpart link save — owner-only (Team edit row) ────────────────
 
     private function updatePayload(User $cashier, array $overrides = []): array

@@ -130,6 +130,17 @@ class AppServiceProvider extends ServiceProvider
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
+                    // Task 1157: record WHICH user's hazri row belongs to this
+                    // station so heartbeat + logout can follow the right row even
+                    // after a REVERSE identity-switch (PRA → local) where
+                    // pos_identity_original_id is never set. Real-login sets this
+                    // once; identity-switch logins skip the entire block so the
+                    // key is always the physically-present cashier's id.
+                    try {
+                        session(['pos_hazri_user_id' => $event->user->id]);
+                    } catch (\Throwable) {
+                        // Session may not be started in CLI/queue context — ignore.
+                    }
                 }
             } catch (\Throwable $e) {
                 // Table not migrated yet — never block a login.

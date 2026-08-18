@@ -4646,6 +4646,7 @@ return [
     'return_not_allowed_not_completed' => 'صرف مکمل بل واپس ہو سکتا ہے۔',
     'return_not_allowed_provisional' => 'عارضی / لوکل بل واپس نہیں ہو سکتا۔ پہلے بل فائنل کریں۔',
     'return_not_allowed_day_closed' => 'اس بل کا دن بند ہو چکا ہے — حساب طے ہو گیا، اب یہ بل واپس نہیں ہو سکتا۔',
+    'return_locked_no_permission' => 'واپسی / کریڈٹ نوٹ آپ کے اکاؤنٹ میں فعال نہیں — ایڈمن سے کہیں کہ ٹیم → کسٹم رسائی میں فعال کریں۔',
     'fbr_return_window_expired' => 'واپسی کی مدت ختم — ایف بی آر بل صرف :days دن کے اندر واپس ہو سکتا ہے۔',
     'return_over_qty' => ':item کی واپسی مقدار باقی مقدار (:qty) سے زیادہ ہے۔',
     'return_no_items' => 'واپسی کے لیے کم از کم ایک آئٹم چنیں۔',

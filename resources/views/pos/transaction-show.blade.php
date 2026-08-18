@@ -30,6 +30,17 @@
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
             && \App\Http\Controllers\PosReturnController::returnableReason($transaction) === null
             && $__remainingQty > 0;
+        // Task 1154: compute the disabled reason for the two silent suppression
+        // cases (no permission / day-closed) so we can show a muted hint
+        // instead of silently hiding the button.
+        $__returnBlockReason = null;
+        if (!$canReturnHere && !$isReturnBill && $__remainingQty > 0) {
+            if (!\App\Services\PosAccessService::returnsAllowed(auth('pos')->user())) {
+                $__returnBlockReason = 'no_permission';
+            } elseif (\App\Http\Controllers\PosReturnController::returnableReason($transaction) === 'day_closed') {
+                $__returnBlockReason = 'day_closed';
+            }
+        }
         $returnRows = $isReturnBill || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
             ? collect() : $transaction->returns()->withoutGlobalScope('hide_archived')->get();
         // Explicit parent lookup — live has strict lazy loading, so never
@@ -76,6 +87,28 @@
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
                 {{ __('pos.return_refund') }}
             </a>
+            @elseif($__returnBlockReason === 'no_permission')
+            {{-- Task 1154: cashier lacks Custom Access tick — show disabled hint with reason --}}
+            <span class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 text-sm font-semibold rounded-lg cursor-not-allowed select-none" title="{{ __('pos.return_locked_no_permission') }}">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                {{ __('pos.return_refund') }}
+            </span>
+            @elseif($__returnBlockReason === 'day_closed')
+            {{-- Task 1154: day is closed — show disabled hint with reason --}}
+            <span class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 text-sm font-semibold rounded-lg cursor-not-allowed select-none" title="{{ __('pos.return_not_allowed_day_closed') }}">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                {{ __('pos.return_refund') }}
+            </span>
+            @endif
+            @if($__returnBlockReason)
+            {{-- Task 1154: one-line muted reason below the button row --}}
+            <p class="w-full text-xs text-gray-400 dark:text-gray-500 mt-1 sm:mt-0 sm:self-end">
+                @if($__returnBlockReason === 'no_permission')
+                    🔒 {{ __('pos.return_locked_no_permission') }}
+                @elseif($__returnBlockReason === 'day_closed')
+                    🔒 {{ __('pos.return_not_allowed_day_closed') }}
+                @endif
+            </p>
             @endif
             @if(!$transaction->pra_invoice_number)
             <a href="{{ route('pos.transaction.edit', $transaction->id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition">

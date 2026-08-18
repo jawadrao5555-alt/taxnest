@@ -87,22 +87,22 @@
         // Day-close return lock (owner rule 14 Aug 2026): a closed business
         // day is settled — its bills lose the Return button. One query for
         // the page's dates; per-row lookup below mirrors returnableReason.
+        // Task 1154: computed for ALL roles (not just $__canReturn) so we can
+        // show the day-closed disabled hint to cashiers who also lack permission.
         $__closedDates = [];
-        if ($__canReturn) {
-            try {
-                $__pageDates = collect($transactions->items())
-                    ->map(fn ($t) => $t->business_date ?: optional($t->created_at)->format('Y-m-d'))
-                    ->filter()->unique()->values();
-                if ($__pageDates->isNotEmpty()) {
-                    $__closedDates = \App\Models\PosDayCloseReport::where('company_id', app('currentCompanyId'))
-                        ->whereIn('report_date', $__pageDates)
-                        ->pluck('report_date')
-                        ->map(fn ($d) => $d instanceof \Carbon\CarbonInterface ? $d->format('Y-m-d') : substr((string) $d, 0, 10))
-                        ->all();
-                }
-            } catch (\Throwable $__e) {
-                $__closedDates = [];
+        try {
+            $__pageDates = collect($transactions->items())
+                ->map(fn ($t) => $t->business_date ?: optional($t->created_at)->format('Y-m-d'))
+                ->filter()->unique()->values();
+            if ($__pageDates->isNotEmpty()) {
+                $__closedDates = \App\Models\PosDayCloseReport::where('company_id', app('currentCompanyId'))
+                    ->whereIn('report_date', $__pageDates)
+                    ->pluck('report_date')
+                    ->map(fn ($d) => $d instanceof \Carbon\CarbonInterface ? $d->format('Y-m-d') : substr((string) $d, 0, 10))
+                    ->all();
             }
+        } catch (\Throwable $__e) {
+            $__closedDates = [];
         }
     @endphp
 
@@ -301,6 +301,18 @@
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
                                     {{ __('pos.return_action') }}
                                 </a>
+                                @elseif(!$rowIsReturn && $__rowRemaining > 0 && $__rowDayClosed)
+                                {{-- Task 1154: day-closed disabled hint — visible to all roles --}}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-400 border border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 cursor-not-allowed whitespace-nowrap" title="{{ __('pos.return_locked_day_closed') }}">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    {{ __('pos.return_action') }}
+                                </span>
+                                @elseif(!$rowIsReturn && $__rowRemaining > 0 && !$__canReturn)
+                                {{-- Task 1154: no-permission disabled hint — cashier without Custom Access tick --}}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-400 border border-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:border-gray-700 cursor-not-allowed whitespace-nowrap" title="{{ __('pos.return_locked_no_permission') }}">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    {{ __('pos.return_action') }}
+                                </span>
                                 @endif
                                 {{-- LOCAL tab (owner rule Jul 2026 update): every local bill
                                      (provisional L-series OR reporting-OFF final) gets a per-bill

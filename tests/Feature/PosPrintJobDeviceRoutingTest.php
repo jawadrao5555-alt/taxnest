@@ -546,4 +546,82 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertSame('dev-c1', $job->device_uid, 'a fresh stamped job stays with its counter');
         $this->assertSame('pending', $job->status);
     }
+
+    // ── 5. Setup-form printer save (Task 1187) ─────────────────────────────
+
+    private function setSilentPrinting(bool $on): void
+    {
+        $company = Company::find($this->companyId);
+        $settings = $company->printerSettings();
+        $settings['silent_print_enabled'] = $on;
+        $company->update(['pos_printer_settings' => $settings]);
+    }
+
+    public function test_unchanged_printer_resave_never_reactivates_silent_off_shop(): void
+    {
+        // Owner deliberately turned silent printing OFF; the counter already
+        // has this exact printer saved from an earlier explicit pick.
+        $this->setSilentPrinting(false);
+        $this->seedDevice('dev-c1'); // receipt_printer = Counter-dev-c1
+
+        // Setup form reopened → Save clicked with the SAME printer still selected.
+        $res = $this->agentPost('/api/agent/device-printer', [
+            'receipt_printer' => 'Counter-dev-c1',
+            'explicit'        => true, // even a buggy/old client posting explicit=true
+            'device_uid'      => 'dev-c1',
+        ])->assertOk();
+
+        $this->assertFalse($res->json('silent_print_enabled'),
+            'unchanged re-save must never flip a deliberately-OFF shop back on');
+        $this->assertFalse(Company::find($this->companyId)->printerSettings()['silent_print_enabled']);
+    }
+
+    public function test_fresh_explicit_printer_pick_activates_silent_printing(): void
+    {
+        $this->setSilentPrinting(false);
+        $this->seedDevice('dev-c1'); // saved: Counter-dev-c1
+
+        // User CHANGES the dropdown to a different real printer → activation.
+        $res = $this->agentPost('/api/agent/device-printer', [
+            'receipt_printer' => 'XP58-New-Thermal',
+            'explicit'        => true,
+            'device_uid'      => 'dev-c1',
+        ])->assertOk();
+
+        $this->assertTrue($res->json('silent_print_enabled'),
+            'a genuinely new explicit pick must enable silent printing in one step');
+        $device = PosAgentDevice::where('device_uid', 'dev-c1')->first();
+        $this->assertSame('XP58-New-Thermal', $device->receipt_printer);
+    }
+
+    public function test_first_ever_explicit_pick_with_no_device_row_activates(): void
+    {
+        // Brand-new counter (no device row yet) — first explicit pick counts.
+        $this->setSilentPrinting(false);
+
+        $res = $this->agentPost('/api/agent/device-printer', [
+            'receipt_printer' => 'Counter-1-XP80',
+            'explicit'        => true,
+            'device_uid'      => 'dev-new',
+        ])->assertOk();
+
+        $this->assertTrue($res->json('silent_print_enabled'));
+        $this->assertSame('Counter-1-XP80',
+            PosAgentDevice::where('device_uid', 'dev-new')->value('receipt_printer'));
+    }
+
+    public function test_non_explicit_save_never_touches_silent_flag(): void
+    {
+        $this->setSilentPrinting(false);
+        $this->seedDevice('dev-c1');
+
+        // v1.9.1 renderer: unchanged dropdown posts explicit=false.
+        $res = $this->agentPost('/api/agent/device-printer', [
+            'receipt_printer' => 'Counter-dev-c1',
+            'explicit'        => false,
+            'device_uid'      => 'dev-c1',
+        ])->assertOk();
+
+        $this->assertFalse($res->json('silent_print_enabled'));
+    }
 }

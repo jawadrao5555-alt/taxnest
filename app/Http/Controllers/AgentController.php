@@ -761,9 +761,21 @@ class AgentController extends Controller
 
         // 1. Update per-device receipt_printer so Printer Settings page reflects
         //    the agent-side pick without any admin action.
+        // Remember the device's previously-saved printer BEFORE the upsert —
+        // an unchanged re-save (same printer posted again, e.g. the setup form
+        // reopened and Saved without touching the dropdown) must never count
+        // as a fresh explicit pick for a deliberately-OFF shop (see step 2).
+        $priorDevicePrinter = null;
         if (self::deviceRoutingReady()) {
             $uid = $this->requestDeviceUid($request);
             if ($uid) {
+                try {
+                    $priorDevicePrinter = \App\Models\PosAgentDevice::where('company_id', $company->id)
+                        ->where('device_uid', $uid)
+                        ->value('receipt_printer');
+                } catch (\Throwable $e) {
+                    // Registry hiccup — fall through with null (legacy behavior).
+                }
                 try {
                     \App\Models\PosAgentDevice::updateOrCreate(
                         ['company_id' => $company->id, 'device_uid' => $uid],
@@ -787,6 +799,19 @@ class AgentController extends Controller
         //    "Silent print OFF by default" shops get printing in one step from
         //    the agent setup form — no separate panel visit required.
         $silentNowEnabled = $company->printerSettings()['silent_print_enabled'];
+
+        // Unchanged re-save guard: the shop is silent-OFF and this device posted
+        // the exact printer it already had saved — that is a Save-button reflex,
+        // not a fresh deliberate pick. Never reactivate an OFF shop from it.
+        // (A genuinely new/changed real-printer pick still activates below.)
+        if ($explicit && !$silentNowEnabled
+            && $priorDevicePrinter !== null && trim((string) $priorDevicePrinter) === $printer) {
+            $explicit = false;
+            Log::info('Agent: unchanged printer re-save ignored (shop silent-OFF)', [
+                'company_id'      => $company->id,
+                'receipt_printer' => $printer,
+            ]);
+        }
 
         if ($explicit) {
             $settings = $company->printerSettings();

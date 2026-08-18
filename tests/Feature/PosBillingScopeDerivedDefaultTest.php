@@ -787,15 +787,22 @@ class PosBillingScopeDerivedDefaultTest extends TestCase
         $cashier = $this->makeUser($cid); // derived 'pra'
         $other   = $this->makeUser($cid);
 
-        $ownLocal   = $this->makeTxn($cid, ['invoice_number' => 'L-DC-OWN-1', 'created_by' => $cashier->id]);
-        $otherLocal = $this->makeTxn($cid, ['invoice_number' => 'L-DC-OTHER-2', 'created_by' => $other->id]);
-        $ownPra     = $this->makePraTxn($cid, ['invoice_number' => 'POS-DC-OWN-3', 'created_by' => $cashier->id]);
+        // Use PosBusinessDay::current() — NOT now()->toDateString() — so the
+        // seeded rows land on the SAME business day the day-close endpoint
+        // selects (00:00–05:59 counts as yesterday; a calendar-date fixture
+        // fails whenever the suite runs in that window).
+        $today = \App\Services\PosBusinessDay::current($cid);
+
+        $ownLocal   = $this->makeTxn($cid, ['invoice_number' => 'L-DC-OWN-1', 'created_by' => $cashier->id, 'business_date' => $today]);
+        $otherLocal = $this->makeTxn($cid, ['invoice_number' => 'L-DC-OTHER-2', 'created_by' => $other->id, 'business_date' => $today]);
+        $ownPra     = $this->makePraTxn($cid, ['invoice_number' => 'POS-DC-OWN-3', 'created_by' => $cashier->id, 'business_date' => $today]);
         // Own local RETURN row — must survive the return-detail audit filter.
         $ownReturn  = $this->makeTxn($cid, [
             'invoice_number'   => 'RET-DC-OWN-4',
             'created_by'       => $cashier->id,
             'transaction_type' => 'return',
             'total_amount'     => 20,
+            'business_date'    => $today,
         ]);
 
         $resp = $this->actingAs($cashier->fresh(), 'pos')->get('/pos/day-close');

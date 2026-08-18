@@ -332,14 +332,21 @@
     }
   }
 
+  // Printer selection saved in config when the form loaded. "Explicit pick"
+  // means the user CHANGED the dropdown to a real printer — re-saving the
+  // form with the already-saved printer must never re-activate silent
+  // printing on a shop where the admin deliberately turned it OFF.
+  let savedPrinter = '';
+
   async function loadConfig() {
     const cfg = await window.agentAPI.getConfig();
     $('serverUrl').value = cfg.serverUrl || '';
     $('companyId').value = cfg.companyId || '';
     $('apiKey').value = cfg.apiKey || '';
     $('pcName').value = cfg.pcName || '';
+    savedPrinter = cfg.receiptPrinter || '';
     // Load printers and pre-select the saved choice (if any).
-    await loadPrinters(cfg.receiptPrinter || '');
+    await loadPrinters(savedPrinter);
   }
 
   function renderStatus(s) {
@@ -412,10 +419,13 @@
 
   $('saveBtn').addEventListener('click', async () => {
     const printerVal = $('printerSelect').value;
-    // "Explicit real pick" = user selected a non-blank, non-virtual printer.
-    // Blank = no change (never wipe server setting).
+    // "Explicit real pick" = user CHANGED the dropdown to a non-blank,
+    // non-virtual printer. Blank = no change (never wipe server setting).
     // Virtual = software printer (PDF/XPS/OneNote) = no auto-enable.
-    const printerExplicit = printerVal !== '' && !isVirtualPrinter(printerVal);
+    // Unchanged (same as loaded config) = plain re-save, no auto-enable —
+    // a deliberately-OFF shop must never be re-activated by a Save click.
+    const printerExplicit = printerVal !== '' && !isVirtualPrinter(printerVal)
+      && printerVal !== savedPrinter;
 
     const cfg = {
       serverUrl: $('serverUrl').value.trim().replace(/\/+$/, ''),
@@ -437,6 +447,9 @@
     tr.style.color = '#c4b5fd';
     tr.textContent = 'Saving…';
     const res = await window.agentAPI.saveConfig(cfg);
+    // The just-saved printer is now the baseline — a second Save click without
+    // touching the dropdown must not count as another explicit pick.
+    if (printerVal !== '') savedPrinter = printerVal;
     tr.style.color = '#10b981';
     if (res && res.printerActivated) {
       tr.textContent = '✅ Config save ho gaya — ' + printerVal + ' par silent printing chalu ho gayi! 🖨️';

@@ -19,7 +19,7 @@ const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer'
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260818-2';
+const BUILD_TIMESTAMP = '20260819-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -126,8 +126,21 @@ async function handleAgentUpdate(info) {
       try { tray.setToolTip(`TaxNest PRA Sync Agent — updating to v${info.version}…`); } catch (e) {}
     }
 
-    const workDir = path.join(os.tmpdir(), 'taxnest-agent-update');
-    fs.rmSync(workDir, { recursive: true, force: true });
+    // UNIQUE per-attempt workDir (v1.9.1). The old fixed name was a trap: the
+    // apply-update.cmd relaunched the new exe with CWD *inside* the workDir, so
+    // the running agent locked that directory and every later update died at
+    // rmSync with EPERM until the PC rebooted (ZFC sat on 1.6.2 for weeks this
+    // way). A unique name never needs to delete a possibly-CWD-locked dir.
+    const workDir = path.join(os.tmpdir(), `taxnest-agent-update-${Date.now()}`);
+    // Best-effort sweep of stale update dirs (old fixed-name one included).
+    // A dir that is some process's CWD refuses deletion — skip it silently;
+    // it becomes deletable after the next reboot.
+    try {
+      for (const entry of fs.readdirSync(os.tmpdir())) {
+        if (!/^taxnest-agent-update(-\d+)?$/.test(entry)) continue;
+        try { fs.rmSync(path.join(os.tmpdir(), entry), { recursive: true, force: true }); } catch (e) {}
+      }
+    } catch (e) {}
     fs.mkdirSync(workDir, { recursive: true });
     const zipPath = path.join(workDir, 'update.zip');
     const extractDir = path.join(workDir, 'extracted');
@@ -226,6 +239,10 @@ async function handleAgentUpdate(info) {
       `robocopy "${backupDir}" "${destDir}" /E /R:5 /W:2 >nul`,
       ':launch',
       `if not exist "${exePath}" robocopy "${backupDir}" "${destDir}" /E /R:5 /W:2 >nul`,
+      // Leave the temp workDir BEFORE launching: `start` inherits this CWD, and
+      // an agent whose CWD sits inside the update dir locks it forever (the
+      // EPERM-on-next-update trap this v1.9.1 exists to fix).
+      `cd /d "${destDir}"`,
       `start "" "${exePath}"`,
       'exit',
     ].join('\r\n');
@@ -596,6 +613,11 @@ if (!gotInstanceLock) {
     // Agent windows keep the agent identity; the POS window overrides its own
     // AppUserModelID in pos-window.js so NestPOS groups separately on the taskbar.
     try { app.setAppUserModelId('com.taxnest.pra-agent'); } catch (e) {}
+
+    // Belt & braces for the CWD-lock trap: whatever directory we were launched
+    // from (an older updater script used to start us inside its temp workDir),
+    // move to the install dir so this process never holds a temp dir hostage.
+    try { process.chdir(path.dirname(process.execPath)); } catch (e) {}
 
     // Offline Mode telemetry: every heartbeat reports whether NestPOS Desktop
     // Offline Mode is ON and when the sale-screen snapshot was last captured,

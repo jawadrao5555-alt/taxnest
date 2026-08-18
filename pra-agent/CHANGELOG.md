@@ -1,5 +1,13 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.9.1 (2026-08-19)
+**Setup-form Save hardening — unchanged re-save never re-activates silent printing**
+
+- The setup form now remembers which printer was already saved when it opened. Clicking **Save without changing the dropdown** posts `explicit=false` — so a shop whose owner deliberately turned silent printing OFF can never be flipped back ON by a routine config re-save. Only a genuinely NEW/changed real-printer pick activates printing.
+- Server side enforces the same rule independently (defense in depth for v1.9.0 agents already in the field): an explicit save that posts the exact printer the device already has saved, while the shop is silent-OFF, is treated as a no-op.
+- **Self-update CWD-lock fix**: the updater script used to relaunch the new agent from *inside* its temp update folder, so the running agent locked that folder and every LATER update failed with EPERM until the PC rebooted (this is why some shops silently stayed on old versions for weeks). Fixed three ways: unique per-attempt work folder (never needs to delete a locked one), the updater script now `cd`s to the install dir before relaunching, and the agent moves itself to its install dir on startup. Already-stuck old agents heal on their next PC/agent restart.
+- No other changes — v1.9.0 features (per-counter routing, PC Name, printer picker) unchanged.
+
 ## v1.9.0 (2026-08-18)
 **Per-counter printer routing + PC Name + setup-form printer picker — har cashier ka apna printer (Task 1166 + 1182 + 1187)**
 

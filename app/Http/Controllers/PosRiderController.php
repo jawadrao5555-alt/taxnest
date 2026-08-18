@@ -172,7 +172,7 @@ class PosRiderController extends Controller
         $pushConfigured = \App\Services\RiderPushService::isConfigured();
         if ($pushConfigured && !\Illuminate\Support\Facades\Cache::has('fcm_key_logged')) {
             // Log once per 24 h so the owner can confirm in laravel.log after uploading the key.
-            \Illuminate\Support\Facades\Log::info('RiderPushService: Firebase credential is present — push is configured (credential verified at credential load, not send).');
+            \Illuminate\Support\Facades\Log::info('RiderPushService: Firebase credential is present — instant push is ACTIVE.');
             \Illuminate\Support\Facades\Cache::put('fcm_key_logged', true, now()->addHours(24));
         }
 

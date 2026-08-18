@@ -79,8 +79,9 @@
 
     @php
         // Task 678: Return action on eligible rows — single permission verdict
-        // (owner/manager always; cashier only via the Custom Access tick) +
-        // schema guard. Rows shown are already inside the viewer's stream/tab.
+        // (default ON for every role since 18 Aug 2026; a Custom Access set
+        // without the tick blocks) + schema guard. Rows shown are already
+        // inside the viewer's stream/tab.
         $__canReturn = \App\Services\PosAccessService::returnsAllowed(auth('pos')->user())
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
         // Day-close return lock (owner rule 14 Aug 2026): a closed business

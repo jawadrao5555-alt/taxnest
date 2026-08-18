@@ -65,7 +65,11 @@ class PosRiderController extends Controller
 
     private function billingScope(): string
     {
-        return auth('pos')->user()?->posBillingScope() ?? 'both';
+        // Task 1186: EXPLICIT scope only — delivery tracking stays
+        // stream-agnostic for derived-default staff (a reporting-ON cashier's
+        // delivery provisionals live in the local stream; the derived 'pra'
+        // scope hiding them here would break assign/settle mid-delivery).
+        return auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
     }
 
     /** Constrain a pos_transactions query to the current user's stream. */

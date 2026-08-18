@@ -1705,6 +1705,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'billing_scope_perm_on' => 'Admins ko ijazat hai — band karne ke liye dabayen',
     'billing_scope_perm_off' => 'Sirf owner — admins ko ijazat dene ke liye dabayen',
     'billing_scope_perm_saved' => 'Billing Scope ki ijazat update ho gayi.',
+    // Task 1186: derived default — har cashier ko by default apni stream dikhti hai.
+    'billing_scope_auto' => 'Auto — apni stream (reporting ke mutabiq)',
+    'billing_scope_auto_pra' => 'Auto — PRA (reporting status ke mutabiq)',
+    'billing_scope_auto_local' => 'Auto — Local (reporting status ke mutabiq)',
+    'billing_scope_badge_auto_pra' => 'Auto: PRA',
+    'billing_scope_badge_auto_local' => 'Auto: Local',
+    'billing_scope_auto_hint' => 'Auto (cashier ka default): cashier ko sirf apni stream dikhti hai — reporting ON = PRA sales, OFF = Local sales. Apne banaye bill hamesha dikhte hain. Band karne ke liye "Dono" chunein.',
     'number_style_title' => 'Bill Number Style',
     'number_style_scope' => '(receipt par numaya bara number)',
     'number_style_intro' => 'Har billing stream ke liye chunein ke receipt par numaya number kya chhape — chalti serial ya roz ka token jo subah 6 baje dobara 1 se shuru hota hai. Serial hamesha bill par bator hawala mojood rehti hai.',

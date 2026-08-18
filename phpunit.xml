@@ -18,6 +18,9 @@
         </include>
     </source>
     <php>
+        <!-- Full suite peaks ~256M; the default CLI limit (128M) aborts the run
+             mid-suite with repeated "Allowed memory size exhausted" errors. -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

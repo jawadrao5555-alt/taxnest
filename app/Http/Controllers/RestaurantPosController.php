@@ -1211,7 +1211,9 @@ class RestaurantPosController extends Controller
         // ── Billing Scope (owner request 07 Aug 2026) — mirrors storeInvoice ──
         // PRA stream = pra_status 'pending' at birth; local stream = provisionals
         // AND reporting-OFF finals. Guards direct POSTs; UI hides the buttons.
-        $billingScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        // Task 1186: EXPLICIT scope only — the derived default (visibility)
+        // must never block a sale-time write (hold/pay/provisional).
+        $billingScope = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
         if ($billingScope === 'pra' && $initialPraStatus !== 'pending') {
             return response()->json(['success' => false, 'message' => __('pos.billing_scope_pra_only')], 403);
         }

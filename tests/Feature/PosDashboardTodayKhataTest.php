@@ -346,10 +346,28 @@ class PosDashboardTodayKhataTest extends TestCase
         $companyId = $this->makeCompany();
         $this->seedKhataDay($companyId);
 
-        $khata = $this->dashboardKhata($companyId, $this->makeUser($companyId, 'pos_cashier'));
+        // Task 1186: NULL scope now DERIVES from reporting status — explicit
+        // 'both' is the owner's OFF switch that keeps the old unrestricted view.
+        $khata = $this->dashboardKhata($companyId, $this->makeUser($companyId, 'pos_cashier', 'both'));
 
         $this->assertNotNull($khata['pra']);
         $this->assertNull($khata['local'], 'local figures are admin/manager-only for both-scope users');
+    }
+
+    /**
+     * Task 1186: an UNSET cashier derives their scope from reporting status —
+     * reporting OFF (company default here) → 'local' stream: local figures
+     * appear, PRA figures hidden (same as an explicit local lock).
+     */
+    public function test_unset_cashier_reporting_off_derives_local_bucket(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->seedKhataDay($companyId);
+
+        $khata = $this->dashboardKhata($companyId, $this->makeUser($companyId, 'pos_cashier'));
+
+        $this->assertNull($khata['pra'], 'derived-local cashier must never receive PRA figures');
+        $this->assertNotNull($khata['local'], 'derived-local cashier gets the local ledger');
     }
 
     /**

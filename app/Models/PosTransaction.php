@@ -239,6 +239,28 @@ class PosTransaction extends Model
     }
 
     /**
+     * Row guard against a USER (Task 1186): effective scope + own-bill
+     * exemption. On the DERIVED default scope a row the viewer created
+     * themselves is ALWAYS allowed — receipt popup/reprint right after a
+     * sale and returning apna hi banaya bill must never block (e.g. a
+     * reporting-ON cashier's own F10 provisional lives in the local stream).
+     * Explicit scopes (owner-locked) keep the strict predicate.
+     */
+    public function allowedForBillingScopeOf($user): bool
+    {
+        if (!$user) {
+            return true;
+        }
+        if ($this->allowedForBillingScope($user->posBillingScope())) {
+            return true;
+        }
+
+        return $user->posBillingScopeIsDerived()
+            && $this->created_by !== null
+            && (int) $this->created_by === (int) $user->id;
+    }
+
+    /**
      * "Local" bill for display/tag purposes = no PRA fiscal trail at all:
      * deliberate provisionals (invoice_mode='local') OR reporting-OFF finals
      * (pra_status NULL + no fiscal number). Anything with a non-NULL pra_status

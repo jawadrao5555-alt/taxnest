@@ -85,12 +85,16 @@
             @if($scopeManageAllowed)
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.billing_scope_label') }}</label>
+                {{-- Task 1186: "Auto" (default) = NULL column — cashier ki effective
+                     stream us ki reporting status se derive hoti hai; server 'auto'
+                     ko ignore kar ke column unset chhorta hai. --}}
                 <select name="pos_billing_scope" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <option value="auto" selected>{{ __('pos.billing_scope_auto') }}</option>
                     <option value="both">{{ __('pos.billing_scope_both') }}</option>
                     <option value="local">{{ __('pos.billing_scope_local') }}</option>
                     <option value="pra">{{ __('pos.billing_scope_pra') }}</option>
                 </select>
-                <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.billing_scope_hint_role') }}</p>
+                <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.billing_scope_hint_role') }} {{ __('pos.billing_scope_auto_hint') }}</p>
             </div>
             @endif
             <div class="sm:col-span-2">
@@ -195,11 +199,20 @@
                             @else
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ __('pos.role_cashier') }}</span>
                             @endif
-                            {{-- Billing Scope badge (07 Aug 2026): owner (ya allowed admin) ko hi dikhta hai --}}
-                            @if($scopeManageAllowed && in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true) && $member->posBillingScope() !== 'both')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide mt-1 {{ $member->posBillingScope() === 'local' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' }}" title="{{ __('pos.billing_scope_label') }}">
-                                {{ $member->posBillingScope() === 'local' ? __('pos.billing_scope_badge_local') : __('pos.billing_scope_badge_pra') }}
-                            </span>
+                            {{-- Billing Scope badge (07 Aug 2026): owner (ya allowed admin) ko hi dikhta hai.
+                                 Task 1186: explicit lock = purane sky/emerald badges; DERIVED default
+                                 (unset cashier) = "Auto" badge jo effective stream dikhata hai. --}}
+                            @if($scopeManageAllowed && in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true))
+                                @php $mExplicitScope = $member->posBillingScopeExplicit(); @endphp
+                                @if($mExplicitScope !== 'both')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide mt-1 {{ $mExplicitScope === 'local' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' }}" title="{{ __('pos.billing_scope_label') }}">
+                                    {{ $mExplicitScope === 'local' ? __('pos.billing_scope_badge_local') : __('pos.billing_scope_badge_pra') }}
+                                </span>
+                                @elseif($member->posBillingScopeIsDerived())
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide mt-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" title="{{ __('pos.billing_scope_auto_hint') }}">
+                                    {{ $member->posBillingScope($company) === 'local' ? __('pos.billing_scope_badge_auto_local') : __('pos.billing_scope_badge_auto_pra') }}
+                                </span>
+                                @endif
                             @endif
                         </td>
                         <td class="px-4 py-3" data-label="{{ __('pos.status_label') }}">
@@ -257,20 +270,34 @@
                                         <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="{{ __('pos.ph_new_password_optional') }}" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                         {{-- Billing Scope (07 Aug 2026): cashier + manager only; owner (ya allowed admin) hi dekh sakta hai --}}
                                         @if($scopeManageAllowed && in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true))
+                                        @php
+                                            // Task 1186: dropdown selection = RAW column state, not the
+                                            // effective scope. Cashier gets the extra "Auto" option
+                                            // (derived default — label shows the current effective
+                                            // stream); "Dono (Both)" is the owner's OFF switch.
+                                            $mScopeIsCashier = $member->pos_role === 'pos_cashier';
+                                            $mScopeRaw = in_array($member->pos_billing_scope, ['both', 'local', 'pra'], true)
+                                                ? $member->pos_billing_scope
+                                                : ($mScopeIsCashier ? 'auto' : 'both');
+                                        @endphp
                                         <select form="edit-{{ $member->id }}" name="pos_billing_scope" title="{{ __('pos.billing_scope_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
-                                            <option value="both" {{ $member->posBillingScope() === 'both' ? 'selected' : '' }}>{{ __('pos.billing_scope_both') }}</option>
-                                            <option value="local" {{ $member->posBillingScope() === 'local' ? 'selected' : '' }}>{{ __('pos.billing_scope_local') }}</option>
-                                            <option value="pra" {{ $member->posBillingScope() === 'pra' ? 'selected' : '' }}>{{ __('pos.billing_scope_pra') }}</option>
+                                            @if($mScopeIsCashier)
+                                            <option value="auto" {{ $mScopeRaw === 'auto' ? 'selected' : '' }}>{{ $member->praReportingEnabled($company) ? __('pos.billing_scope_auto_pra') : __('pos.billing_scope_auto_local') }}</option>
+                                            @endif
+                                            <option value="both" {{ $mScopeRaw === 'both' ? 'selected' : '' }}>{{ __('pos.billing_scope_both') }}</option>
+                                            <option value="local" {{ $mScopeRaw === 'local' ? 'selected' : '' }}>{{ __('pos.billing_scope_local') }}</option>
+                                            <option value="pra" {{ $mScopeRaw === 'pra' ? 'selected' : '' }}>{{ __('pos.billing_scope_pra') }}</option>
                                         </select>
                                         @endif
                                         {{-- Task 705: PRA counterpart (khufia identity switch target) —
                                              LOCAL-scoped cashier only; owner-only visibility (scope rule).
                                              Options = same-company ACTIVE cashiers that can bill PRA. --}}
-                                        @if($counterpartColReady && $scopeManageAllowed && $member->pos_role === 'pos_cashier' && $member->posBillingScope() === 'local')
+                                        {{-- Task 1186: counterpart link = EXPLICIT-lock feature (Task 705) — derived default par nahi khulta. --}}
+                                        @if($counterpartColReady && $scopeManageAllowed && $member->pos_role === 'pos_cashier' && $member->posBillingScopeExplicit() === 'local')
                                         <select form="edit-{{ $member->id }}" name="pos_counterpart_user_id" title="{{ __('pos.pra_counterpart_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                             <option value="">{{ __('pos.pra_counterpart_none') }}</option>
                                             @foreach($team as $cpOption)
-                                                @if($cpOption->pos_role === 'pos_cashier' && $cpOption->id !== $member->id && $cpOption->is_active && $cpOption->posBillingScope() !== 'local')
+                                                @if($cpOption->pos_role === 'pos_cashier' && $cpOption->id !== $member->id && $cpOption->is_active && $cpOption->posBillingScopeExplicit() !== 'local')
                                                 <option value="{{ $cpOption->id }}" {{ (int) ($member->pos_counterpart_user_id ?? 0) === $cpOption->id ? 'selected' : '' }}>{{ __('pos.pra_counterpart_label') }}: {{ $cpOption->name }}</option>
                                                 @endif
                                             @endforeach

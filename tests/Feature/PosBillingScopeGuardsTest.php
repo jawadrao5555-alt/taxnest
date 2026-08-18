@@ -482,11 +482,13 @@ class PosBillingScopeGuardsTest extends TestCase
             'pra-scoped user must not be 403-blocked on a PRA bill');
     }
 
-    /** Both-scoped (default) user can access bills of either stream. */
+    /** Explicit both-scoped user can access bills of either stream.
+     *  Task 1186: NULL scope now DERIVES from reporting status — explicit
+     *  'both' is the owner's OFF switch that keeps the unrestricted view. */
     public function test_both_scoped_user_can_access_any_bill(): void
     {
         $cid      = $this->makeCompany();
-        $user     = $this->makeUser($cid); // pos_billing_scope=null → 'both'
+        $user     = $this->makeUser($cid, ['pos_billing_scope' => 'both']);
         $localId  = $this->makeTxn($cid);
         $praId    = $this->makePraTxn($cid);
 
@@ -620,7 +622,8 @@ class PosBillingScopeGuardsTest extends TestCase
     {
         $cid  = $this->makeCompany();
         [$localId, $praId] = $this->seedTodayBills($cid);
-        $user = $this->makeUser($cid); // 'both'
+        // Task 1186: explicit 'both' (NULL now derives from reporting status)
+        $user = $this->makeUser($cid, ['pos_billing_scope' => 'both']);
 
         $response = $this->actingAs($user, 'pos')
             ->getJson('/pos/api/todays-bills')
@@ -667,7 +670,8 @@ class PosBillingScopeGuardsTest extends TestCase
     {
         $cid  = $this->makeCompany();
         $this->makePraTxn($cid, ['pra_status' => 'offline', 'pra_invoice_number' => null]);
-        $user = $this->makeUser($cid); // 'both'
+        // Task 1186: explicit 'both' (NULL now derives from reporting status)
+        $user = $this->makeUser($cid, ['pos_billing_scope' => 'both']);
 
         $response = $this->actingAs($user, 'pos')
             ->getJson('/pos/api/failed-bills')

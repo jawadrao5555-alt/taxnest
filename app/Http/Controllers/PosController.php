@@ -2492,7 +2492,9 @@ class PosController extends Controller
         // at birth (pra_status='pending'); local stream = provisionals AND
         // reporting-OFF finals. UI hides the buttons; this guards direct POSTs
         // and offline replays.
-        $billingScope = $posUser->posBillingScope();
+        // Task 1186: EXPLICIT scope only — the derived default (visibility)
+        // must never block a sale-time write (F9/F10 provisional, promote).
+        $billingScope = $posUser->posBillingScopeExplicit();
         if ($billingScope === 'pra' && $initialPraStatus !== 'pending') {
             $scopeMsg = __('pos.billing_scope_pra_only');
             if ($request->expectsJson()) {
@@ -3434,8 +3436,9 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        // Billing Scope (07 Aug 2026): local-scoped staff never touch the PRA pipeline.
-        if (auth('pos')->user()?->posBillingScope() === 'local') {
+        // Billing Scope (07 Aug 2026): local-scoped staff never touch the PRA
+        // pipeline. Task 1186: EXPLICIT scope only — retry is a write path.
+        if (auth('pos')->user()?->posBillingScopeExplicit() === 'local') {
             return back()->with('error', __('pos.billing_scope_local_only'));
         }
 
@@ -3680,7 +3683,8 @@ class PosController extends Controller
 
         // Billing Scope (07 Aug 2026): local-scoped staff cannot push anything
         // into the PRA pipeline — mirrors retryPra / apiRetryFailed.
-        if ((auth('pos')->user()?->posBillingScope() ?? 'both') === 'local') {
+        // Task 1186: EXPLICIT scope only — bulk retry is a write path.
+        if ((auth('pos')->user()?->posBillingScopeExplicit() ?? 'both') === 'local') {
             return back()->with('error', __('pos.billing_scope_local_only'));
         }
 
@@ -3771,7 +3775,10 @@ class PosController extends Controller
         // Billing Scope (07 Aug 2026): pra-scoped staff never see local/provisional
         // bills — the provisional half of this list is emptied for them. The FINAL
         // delivery-bill half below stays (delivery tracking is stream-agnostic).
-        $scopeHidesProvisionals = (auth('pos')->user()?->posBillingScope() ?? 'both') === 'pra'
+        // Task 1186: EXPLICIT scope only — this list feeds the F10 provisional
+        // modal; a derived-'pra' (reporting-ON) cashier's own provisionals must
+        // keep appearing here or the F10 workflow breaks.
+        $scopeHidesProvisionals = (auth('pos')->user()?->posBillingScopeExplicit() ?? 'both') === 'pra'
             // Task 705: manager default PRA-only — provisional list hidden too.
             || (auth('pos')->user()?->posHidesLocalStream() ?? false);
         $bills = $scopeHidesProvisionals ? collect() : PosTransaction::where('company_id', $companyId)
@@ -3795,10 +3802,14 @@ class PosController extends Controller
         $finalBills = collect();
         $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
         // Task 807: stream-scope for final delivery bills — mirrors
-        // PosRiderController::applyStreamScope. local-scoped staff see ONLY
+        // PosRiderController::applyStreamScope (EXPLICIT scope, Task 1186:
+        // delivery tracking stays stream-agnostic for derived-default staff —
+        // hiding a derived-'pra' cashier's own delivery provisionals/finals
+        // here would break the delivery workflow).
+        // local-scoped staff see ONLY
         // local finals; pra-scoped staff see ONLY PRA finals; 'both'
         // (owner/admin/pos_delivery) sees everything unchanged.
-        $finalBillScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        $finalBillScope = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
         if ($hasRiderCols && $hasDelStatus) {
             $finalBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
@@ -3982,7 +3993,9 @@ class PosController extends Controller
             // Task 797: local-scoped staff cannot assign riders to PRA finals —
             // the assign POST already 403s them server-side; this removes the
             // false UI affordance (dropdown appears but always errors).
-            && (auth('pos')->user()?->posBillingScope() ?? 'both') !== 'local';
+            // Task 1186: EXPLICIT scope — a derived-'local' (reporting-OFF)
+            // cashier keeps the rider dropdown for their own local finals.
+            && (auth('pos')->user()?->posBillingScopeExplicit() ?? 'both') !== 'local';
         $assignRiders = [];
         if ($canAssignRider && $hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
             // Task 1132/1138: ship last_battery_pct (+ on_duty) so the popup
@@ -4074,6 +4087,12 @@ class PosController extends Controller
                     $tbScope = 'pra';
                 }
                 PosTransaction::applyBillingScopeFilter($q, $tbScope);
+                // Task 1186 own-bill exemption (derived default only): the
+                // cashier's own bills — e.g. a reporting-ON cashier's F10
+                // provisionals — always appear in their Reprint list.
+                if ($tbUser && $tbUser->posBillingScopeIsDerived()) {
+                    $q->orWhere('created_by', $tbUser->id);
+                }
             })
             ->orderBy('id', 'desc')
             ->limit(300)
@@ -4374,7 +4393,10 @@ class PosController extends Controller
         // Billing Scope (07 Aug 2026): send_to_pra promote = PRA pipeline entry
         // (blocked for local-scoped staff); LOCAL FINAL = local-stream action
         // (blocked for pra-scoped staff — they never touch local bills).
-        $promoScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        // Task 1186: EXPLICIT scope only — promote is a write path; the derived
+        // default must never 403 a reporting-ON cashier promoting their own
+        // provisional (or a reporting-OFF cashier's LOCAL FINAL).
+        $promoScope = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
         if ($request->boolean('send_to_pra', true) && $promoScope === 'local') {
             return response()->json(['success' => false, 'message' => __('pos.billing_scope_local_only')], 403);
         }
@@ -4624,8 +4646,9 @@ class PosController extends Controller
             ], 422);
         }
 
-        // Billing Scope (07 Aug 2026): local-scoped staff never touch the PRA pipeline.
-        if (auth('pos')->user()?->posBillingScope() === 'local') {
+        // Billing Scope (07 Aug 2026): local-scoped staff never touch the PRA
+        // pipeline. Task 1186: EXPLICIT scope only — retry is a write path.
+        if (auth('pos')->user()?->posBillingScopeExplicit() === 'local') {
             return response()->json(['success' => false, 'message' => __('pos.billing_scope_local_only')], 403);
         }
 
@@ -4809,7 +4832,9 @@ class PosController extends Controller
         if (!$user->isPosCashier()) {
             return $noop; // unlinked/ineligible = silent no-op (task rule)
         }
-        if ($user->posBillingScope() === 'local') {
+        // Task 1186: khufia switch is an EXPLICIT-lock feature (Task 705) —
+        // the derived default must never activate/deactivate it.
+        if ($user->posBillingScopeExplicit() === 'local') {
             if (!(int) ($user->pos_counterpart_user_id ?? 0)) {
                 return $noop;
             }
@@ -4818,7 +4843,7 @@ class PosController extends Controller
                 ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
                 ->where('is_active', true)
                 ->first();
-            if (!$target || $target->posBillingScope() === 'local') {
+            if (!$target || $target->posBillingScopeExplicit() === 'local') {
                 return $noop;
             }
             session(['pos_identity_original_id' => $user->id]);
@@ -4839,7 +4864,7 @@ class PosController extends Controller
             ->where('pos_role', 'pos_cashier')
             ->where('is_active', true)
             ->get()
-            ->filter(fn ($u) => $u->posBillingScope() === 'local')
+            ->filter(fn ($u) => $u->posBillingScopeExplicit() === 'local')
             ->values();
         if ($locals->count() !== 1) {
             return $noop;
@@ -4901,7 +4926,9 @@ class PosController extends Controller
                 ->withSum('items as items_returned_total', 'returned_quantity');
         }
 
-        $this->applyReportFilters($query, $tab);
+        // Task 1186: derived-scope viewers get their own cross-stream rows
+        // unioned into their forced tab (own-bill exemption on the list).
+        $this->applyReportFilters($query, $tab, null, $user);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -4963,8 +4990,9 @@ class PosController extends Controller
     private function billingScopeAllowsRow(PosTransaction $txn): bool
     {
         // Single predicate (Task 647): exempt bills are visible to EVERY scope.
-        $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
-        return $txn->allowedForBillingScope($scope);
+        // Task 1186: effective scope + own-bill exemption (derived default only)
+        // — a viewer's own bill is always readable/printable.
+        return $txn->allowedForBillingScopeOf(auth('pos')->user());
     }
 
     public function transactionShow($id)
@@ -5258,8 +5286,35 @@ class PosController extends Controller
         return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
     }
 
-    private function applyReportFilters($query, $tab, $cashierFilter = null)
+    private function applyReportFilters($query, $tab, $cashierFilter = null, $forUser = null)
     {
+        // Task 1186 own-bill union: when the viewer is on the DERIVED default
+        // scope, their own cross-stream rows join their forced tab
+        // ((stream) OR created_by = viewer) so an own F10 provisional never
+        // vanishes from Transactions/Reports — it stays findable, reprintable
+        // and returnable. Explicit (owner-locked) scopes stay strict, and the
+        // TAX reports never pass $forUser (legal PRA figures stay stream-pure).
+        // method_exists guard: analytics callers may pass a lightweight stub
+        // user (tests / internal builders) — treat it as non-derived.
+        if ($forUser && in_array($tab, ['pra', 'local'], true)
+            && method_exists($forUser, 'posBillingScopeIsDerived')
+            && $forUser->posBillingScopeIsDerived()) {
+            if ($tab === 'local') {
+                // Mirror applyStreamTab's local-tab archive bypass — must run on
+                // the OUTER query (global scopes ignore nested-closure calls).
+                $query->withoutGlobalScope('hide_archived');
+            }
+            $query->where(function ($outer) use ($tab, $forUser) {
+                $outer->where(fn ($s) => PosTransaction::applyStreamTab($s, $tab))
+                    ->orWhere('created_by', $forUser->id);
+            });
+
+            if ($cashierFilter && $cashierFilter !== 'all') {
+                $query->where('created_by', $cashierFilter);
+            }
+
+            return $query;
+        }
         // Two FULLY ISOLATED report sets (owner rule Jul 2026) — split by whether the
         // bill was actually REPORTED to PRA (fiscal), not just by invoice_mode:
         //   tab='pra'   → bills in the PRA pipeline: pra_status NOT NULL (pending /
@@ -5351,8 +5406,11 @@ class PosController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'pos_role']);
 
-        $modeFilter = function ($q) use ($tab, $cashierFilter) {
-            $this->applyReportFilters($q, $tab, $cashierFilter);
+        $modeFilter = function ($q) use ($tab, $cashierFilter, $user) {
+            // Task 1186: derived viewers see their own cross-stream rows too
+            // (cashier reports are already forced to created_by = self, so the
+            // union means "ALL apni sales", both streams).
+            $this->applyReportFilters($q, $tab, $cashierFilter, $user);
         };
 
         // Return / credit-note netting (Task 570): revenue figures are SIGNED
@@ -5382,7 +5440,7 @@ class PosController extends Controller
             ->groupBy('payment_method')
             ->get();
 
-        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter, $typeReady) {
+        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter, $typeReady, $user) {
             $q->where('company_id', $companyId)->where('status', 'completed')->where('business_date', '>=', now()->startOfMonth()->toDateString());
             // Top-seller ranking stays GROSS sales — return rows (RET- lines)
             // are excluded rather than netted so rankings don't go negative.
@@ -5391,7 +5449,7 @@ class PosController extends Controller
                     $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 });
             }
-            $this->applyReportFilters($q, $tab, $cashierFilter);
+            $this->applyReportFilters($q, $tab, $cashierFilter, $user);
         })
             ->selectRaw("item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue")
             ->groupBy('item_name')
@@ -5513,7 +5571,8 @@ class PosController extends Controller
             ->when($hasRange,
                 fn ($q) => $q->whereBetween('business_date', [$rangeFrom->toDateString(), $rangeTo->toDateString()]),
                 fn ($q) => $q->where('business_date', '>=', now()->subDays(30)->toDateString()))
-            ->tap(fn ($q) => $this->applyReportFilters($q, $tab))
+            // Task 1186: derived viewers export their own cross-stream rows too.
+            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, null, $user))
             ->when($cashierFilter && $cashierFilter !== 'all', fn($q) => $q->where('created_by', $cashierFilter))
             ->with('creator')
             ->orderBy('created_at', 'desc')
@@ -6469,7 +6528,9 @@ class PosController extends Controller
 
         // Billing Scope (07 Aug 2026): a scope-locked manager's stream is fixed
         // by the admin — flipping the reporting toggle would sidestep the lock.
-        if ($togglingUser->posBillingScope() !== 'both') {
+        // Task 1186: EXPLICIT scope only — the derived default rides ON the
+        // reporting flag, so it must never lock the toggle itself.
+        if ($togglingUser->posBillingScopeExplicit() !== 'both') {
             return response()->json([
                 'success' => false,
                 'enabled' => (bool) $effectiveNow,
@@ -7084,7 +7145,9 @@ class PosController extends Controller
             $newUserData['username'] = $request->input('username') ?: null;
         }
         // Billing Scope (07 Aug 2026): cashier/manager accounts can be locked to
-        // one stream at creation. NULL/both = no lock (default, legacy behaviour).
+        // one stream at creation. Task 1186: 'auto' (= NULL column) is the new
+        // cashier default — the effective scope derives from reporting status.
+        // Explicit 'both' is the owner's OFF switch (unrestricted, purana view).
         // Owner-only rule (07 Aug 2026): sirf owner (ya owner ka allow kiya hua
         // admin) hi scope set kar sakta hai — baqi sab ka input silently ignore.
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope')
@@ -7193,7 +7256,10 @@ class PosController extends Controller
         // is welded to its scope — flipping it the other way would brick billing
         // (the sale-path scope guard rejects the resulting stream). Change the
         // scope from the edit row instead.
-        $cashierScope = $cashier->posBillingScope();
+        // Task 1186: EXPLICIT scope only — a derived-default cashier's visible
+        // stream FOLLOWS this flip (that's the consistency), so the weld must
+        // never 403 an unset-scope cashier.
+        $cashierScope = $cashier->posBillingScopeExplicit();
         if (($cashierScope === 'pra' && !$enable) || ($cashierScope === 'local' && $enable)) {
             return back()->with('error', __('pos.billing_scope_pra_locked'));
         }
@@ -7302,11 +7368,17 @@ class PosController extends Controller
         // pattern): update() on a non-$fillable column silently drops.
         // Owner-only rule (07 Aug 2026): sirf owner (ya owner ka allow kiya hua
         // admin) hi scope badal sakta hai — baqi sab ka input silently ignore.
+        // Task 1186: 'auto' = wapas derived default (NULL column) — cashier ki
+        // effective stream reporting status se khud derive hoti hai. Explicit
+        // 'both' = owner ka OFF switch (unrestricted, purana view).
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope')
             && (auth('pos')->user()?->canManageBillingScope() ?? false)
             && in_array($cashier->pos_role, ['pos_cashier', 'pos_manager'], true)
-            && in_array($request->input('pos_billing_scope'), ['both', 'local', 'pra'], true)) {
+            && in_array($request->input('pos_billing_scope'), ['auto', 'both', 'local', 'pra'], true)) {
             $newScope = $request->input('pos_billing_scope');
+            if ($newScope === 'auto') {
+                $newScope = null; // NULL = derived default (cashier); manager NULL = 'both'
+            }
             $oldScope = $cashier->pos_billing_scope;
             $cashier->pos_billing_scope = $newScope;
             // Scope ↔ reporting alignment: 'pra' lock forces reporting ON,
@@ -7351,7 +7423,7 @@ class PosController extends Controller
                     ->where('id', (int) $cpInput)
                     ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
                     ->first();
-                if ($cpTarget && $cpTarget->posBillingScope() !== 'local') {
+                if ($cpTarget && $cpTarget->posBillingScopeExplicit() !== 'local') {
                     $newCp = (int) $cpTarget->id;
                 }
             }
@@ -9802,15 +9874,22 @@ class PosController extends Controller
         // Billing Scope (07 Aug 2026): LOCAL-scoped staff see the LOCAL stream's
         // figures instead — mirrors the dashboard scope flip.
         $dayCloseScope = $dayCloseUser?->posBillingScope() ?? 'both';
+        // Task 1186 own-bill union: a DERIVED-scope viewer's own cross-stream
+        // bills join the day-close set — their drawer cash must reconcile even
+        // when e.g. a reporting-ON cashier took F10 provisionals today.
+        $dayCloseDerived = (bool) ($dayCloseUser?->posBillingScopeIsDerived() ?? false);
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('business_date', $date)
-            ->where(function ($q) use ($dayCloseScope) {
+            ->where(function ($q) use ($dayCloseScope, $dayCloseDerived, $dayCloseUser) {
                 if ($dayCloseScope === 'local') {
                     $q->where('invoice_mode', 'local')->orWhere(function ($s) {
                         $s->whereNull('pra_status')->whereNull('pra_invoice_number');
                     });
                 } else {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                }
+                if ($dayCloseDerived) {
+                    $q->orWhere('created_by', $dayCloseUser->id);
                 }
             })
             ->with('creator')
@@ -9870,8 +9949,10 @@ class PosController extends Controller
                     ->where('transaction_type', 'return')
                     ->with('creator')
                     ->orderBy('created_at')
+                    // Task 1186: user-aware guard — derived viewers keep their
+                    // own cross-stream returns in the audit list.
                     ->get()
-                    ->filter(fn ($t) => $t->allowedForBillingScope($dayCloseScope))
+                    ->filter(fn ($t) => $t->allowedForBillingScopeOf($dayCloseUser))
                     ->values()
                 : collect();
             // Parent invoice numbers resolved in one query — parents can be from
@@ -10575,7 +10656,8 @@ class PosController extends Controller
                     $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 });
             })
-            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
+            // Task 1186: derived viewers' own cross-stream rows join the analytics.
+            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user))
             ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
             ->get(array_merge(
                 ['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method'],
@@ -10801,7 +10883,7 @@ class PosController extends Controller
         $prevTo = $from->copy()->subDay()->endOfDay();
         $prevRow = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
+            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user))
             ->whereBetween('business_date', [$prevFrom->toDateString(), $prevTo->toDateString()])
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
             ->first();
@@ -10820,7 +10902,7 @@ class PosController extends Controller
                 ->where('status', 'completed')
                 ->where('transaction_type', 'return')
                 ->where('is_wastage', true)
-                ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
+                ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter, $user))
                 ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
                 ->get(['id', 'total_amount']);
             // Top wasted items (Task 597): item-wise ranking so the owner sees

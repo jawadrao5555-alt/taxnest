@@ -109,6 +109,7 @@ class PosPendingBillsTileTest extends TestCase
             $table->string('status');
             $table->string('invoice_mode')->nullable();
             $table->string('pra_status')->nullable();
+            $table->string('pra_invoice_number')->nullable(); // Task 1186: local-stream predicate reads it (unset cashier now derives 'local')
             $table->boolean('is_archived')->default(false);
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);

@@ -25,8 +25,9 @@
         // Task 678: single permission verdict (returnsAllowed) + per-bill
         // stream lock + remaining returnable quantity — BOTH streams.
         $__remainingQty = $transaction->items->sum(fn ($it) => max(0, (float) $it->quantity - (float) ($it->returned_quantity ?? 0)));
+        // Task 1186: effective scope + own-bill exemption (derived only).
         $canReturnHere = \App\Services\PosAccessService::returnsAllowed(auth('pos')->user())
-            && $transaction->allowedForBillingScope(auth('pos')->user()?->posBillingScope() ?? 'both')
+            && $transaction->allowedForBillingScopeOf(auth('pos')->user())
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
             && \App\Http\Controllers\PosReturnController::returnableReason($transaction) === null
             && $__remainingQty > 0;

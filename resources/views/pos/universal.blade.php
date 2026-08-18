@@ -79,7 +79,10 @@
     // Billing Scope (07 Aug 2026): stream lock for this account — 'both' (default),
     // 'local' (offline billing only) or 'pra' (PRA billing only). Drives which
     // sale-screen entry points render; server guards re-enforce everything.
-    $uBillScope = $__ppUser?->posBillingScope() ?? 'both';
+    // Task 1186: EXPLICIT scope only — the derived default governs visibility,
+    // never the sale-screen write affordances (F9/F10 provisional buttons must
+    // keep rendering for a derived-'pra' reporting-ON cashier).
+    $uBillScope = $__ppUser?->posBillingScopeExplicit() ?? 'both';
     // Delivery Board on the sale screen (Task 431, owner voice note 10 Aug 2026):
     // shopkeeper request — delivery manager ke liye TEESRI alag ID/window na khole.
     // Button shows under the SAME verdict as the nav "Deliveries" link (pos-app

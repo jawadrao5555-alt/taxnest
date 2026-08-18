@@ -1705,6 +1705,13 @@ return [
     'billing_scope_perm_on' => 'منتظمین کو اجازت ہے — بند کرنے کے لیے دبائیں',
     'billing_scope_perm_off' => 'صرف مالک — منتظمین کو اجازت دینے کے لیے دبائیں',
     'billing_scope_perm_saved' => 'بلنگ دائرہ کی اجازت محفوظ ہو گئی۔',
+    // Task 1186: derived default — har cashier ko by default apni stream dikhti hai.
+    'billing_scope_auto' => 'خودکار — اپنا سلسلہ (رپورٹنگ کے مطابق)',
+    'billing_scope_auto_pra' => 'خودکار — پی آر اے (رپورٹنگ حالت کے مطابق)',
+    'billing_scope_auto_local' => 'خودکار — مقامی (رپورٹنگ حالت کے مطابق)',
+    'billing_scope_badge_auto_pra' => 'خودکار: پی آر اے',
+    'billing_scope_badge_auto_local' => 'خودکار: مقامی',
+    'billing_scope_auto_hint' => 'خودکار (کیشیئر کی عام حالت): کیشیئر کو صرف اپنا سلسلہ دکھتا ہے — رپورٹنگ کھلی تو پی آر اے فروخت، بند تو مقامی فروخت۔ اپنے بنائے بل ہمیشہ دکھتے ہیں۔ بند کرنے کے لیے «دونوں» چنیں۔',
     'number_style_title' => 'بل نمبر انداز',
     'number_style_scope' => '(رسید پر نمایاں نمبر)',
     'number_style_intro' => 'ہر بلنگ سلسلے کے لیے چنیں کہ رسید پر نمایاں نمبر کیا چھپے — چلتی سیریل یا روز کا ٹوکن جو صبح چھ بجے دوبارہ ایک سے شروع ہوتا ہے۔ سیریل ہمیشہ بل پر بطور حوالہ موجود رہتی ہے۔',

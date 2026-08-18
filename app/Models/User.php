@@ -62,14 +62,21 @@ class User extends Authenticatable
     }
 
     /**
-     * Billing Scope (owner request 07 Aug 2026): stream lock per staff account.
-     *   'both'  = dono streams (default; NULL/unknown values normalize here)
+     * Billing Scope — EXPLICIT column value (owner request 07 Aug 2026):
+     * stream lock per staff account, exactly as saved on the Team page.
+     *   'both'  = dono streams (NULL/unknown values normalize here)
      *   'local' = sirf offline/local billing — PRA pipeline tak rasai nahi
      *   'pra'   = sirf PRA-reporting billing — local/provisional se door
      * Sirf pos_cashier + pos_manager par lagta hai; owner/admin hamesha 'both'.
      * Missing-column safe (PROD drift): not-yet-migrated DB → 'both'.
+     *
+     * Task 1186: sale-time WRITE guards, F10 provisional availability,
+     * promote/retry blocks and the setCashierPra/togglePra weld-locks MUST
+     * read THIS method — never the derived default below — warna Team page
+     * se reporting flip 403 ho jata aur reporting-ON cashiers ka provisional
+     * (F10) workflow toot jata.
      */
-    public function posBillingScope(): string
+    public function posBillingScopeExplicit(): string
     {
         if (self::$_scopeColumnReady === null) {
             try {
@@ -87,6 +94,53 @@ class User extends Authenticatable
         $scope = $this->getAttributeValue('pos_billing_scope');
         return in_array($scope, ['local', 'pra'], true) ? $scope : 'both';
     }
+
+    /**
+     * Billing Scope — EFFECTIVE scope (Task 1186, owner decision): har cashier
+     * ko BY DEFAULT apni hi stream dikhe. A pos_cashier whose pos_billing_scope
+     * column is UNSET derives the scope from their reporting status:
+     * praReportingEnabled → 'pra' stream, warna 'local' stream. An explicit
+     * saved value ('local'/'pra'/'both') ALWAYS wins — explicit 'both' is the
+     * owner's OFF switch (aaj tak wala unrestricted view). Managers/admins
+     * never derive (Task-705 manager default unchanged).
+     *
+     * VISIBILITY + RETURN surfaces read this (transactions/reports/dashboard/
+     * day-close/todays+failed-bills APIs/read guards/return eligibility);
+     * write/weld guards stay on posBillingScopeExplicit().
+     */
+    public function posBillingScope($company = null): string
+    {
+        $explicit = $this->posBillingScopeExplicit();
+        if ($explicit !== 'both' || !$this->posBillingScopeIsDerived()) {
+            return $explicit;
+        }
+        if ($this->_derivedScopeMemo === null) {
+            $this->_derivedScopeMemo = $this->praReportingEnabled($company) ? 'pra' : 'local';
+        }
+        return $this->_derivedScopeMemo;
+    }
+
+    /**
+     * Task 1186: is this account on the DERIVED default scope (no explicit
+     * column value)? Own-bill exemption applies ONLY in this state — a row
+     * created_by the viewer is always visible/returnable to them. Explicit
+     * scopes (owner ne khud lock kiya) keep their strict behavior.
+     */
+    public function posBillingScopeIsDerived(): bool
+    {
+        if (($this->pos_role ?? null) !== 'pos_cashier') {
+            return false;
+        }
+        if ($this->posBillingScopeExplicit() !== 'both') {
+            return false;
+        }
+        // Explicit stored 'both' = owner's OFF switch — not derived.
+        return $this->getAttributeValue('pos_billing_scope') !== 'both';
+    }
+
+    /** @var string|null — per-instance memo for the derived scope (avoids a
+     *  Company::find per call when the user row inherits the company flag). */
+    private ?string $_derivedScopeMemo = null;
 
     /** @var bool|null — class-level cache for pos_billing_scope column existence.
      *  Stored as a static class property (not a method-level static) so tests

@@ -59,8 +59,10 @@ class PosReturnController extends Controller
      */
     private function assertScopeAllows(PosTransaction $txn): void
     {
-        $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
-        if (!$txn->allowedForBillingScope($scope)) {
+        // Task 1186: effective scope (derived default included) + own-bill
+        // exemption — a derived-scope cashier can always return apna hi
+        // banaya bill, whichever stream it landed in.
+        if (!$txn->allowedForBillingScopeOf(auth('pos')->user())) {
             abort(403, __('pos.return_manager_only'));
         }
     }
@@ -179,8 +181,8 @@ class PosReturnController extends Controller
         }
 
         // Stream lock (Task 678): same per-row predicate as reports/lists.
-        $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
-        if (!$txn->allowedForBillingScope($scope)) {
+        // Task 1186: effective scope + own-bill exemption (derived only).
+        if (!$txn->allowedForBillingScopeOf(auth('pos')->user())) {
             return response()->json(['error' => __('pos.return_manager_only')], 403);
         }
 

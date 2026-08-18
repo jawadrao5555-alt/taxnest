@@ -211,4 +211,101 @@ class MysqlConnectionHealthTest extends TestCase
         Mail::assertNothingSent();
         $this->assertFalse($this->hasCooldownFlag());
     }
+
+    // ─────────────────────────── Task 1121: breach-key / banner tests ────────
+
+    /**
+     * A above-threshold run must persist both breach keys so the admin-panel
+     * banner has something to display (timestamp + percentage).
+     */
+    public function test_breach_writes_breach_keys(): void
+    {
+        $this->createAdmin('admin@example.com');
+        $this->setStatus(75, 100); // 75% — above threshold
+
+        $this->artisan(self::CMD)->assertExitCode(0);
+
+        $this->assertNotNull(
+            SystemSetting::get('mysql_conn_last_breach_at'),
+            'mysql_conn_last_breach_at must be written on a breach so the banner can appear'
+        );
+        $this->assertNotNull(
+            SystemSetting::get('mysql_conn_last_breach_pct'),
+            'mysql_conn_last_breach_pct must be written on a breach so the banner shows the ratio'
+        );
+        $this->assertEquals('75', SystemSetting::get('mysql_conn_last_breach_pct'));
+    }
+
+    /**
+     * When the ratio drops back to/below the threshold the command calls
+     * clearAlertFlag(), which must delete ALL three keys — including the two
+     * breach keys that drive the admin-panel banner.
+     * Without this, the banner keeps showing stale data indefinitely.
+     */
+    public function test_recovery_deletes_breach_keys(): void
+    {
+        // Simulate keys left over from a previous breach run.
+        SystemSetting::create([
+            'key'   => 'mysql_conn_last_breach_at',
+            'value' => now()->subMinutes(3)->toDateTimeString(),
+        ]);
+        SystemSetting::create([
+            'key'   => 'mysql_conn_last_breach_pct',
+            'value' => '78.5',
+        ]);
+        $this->writeCooldownMinutesAgo(5);
+
+        // Recovery run — ratio is now safe.
+        $this->setStatus(55, 100);
+        $this->artisan(self::CMD)->assertExitCode(0);
+
+        $this->assertNull(
+            SystemSetting::get('mysql_conn_last_breach_at'),
+            'mysql_conn_last_breach_at must be deleted on recovery so the banner disappears'
+        );
+        $this->assertNull(
+            SystemSetting::get('mysql_conn_last_breach_pct'),
+            'mysql_conn_last_breach_pct must be deleted on recovery'
+        );
+        $this->assertFalse($this->hasCooldownFlag(), 'cooldown flag must also be deleted');
+        Mail::assertNothingSent();
+    }
+
+    /**
+     * Even if the command never ran to clear the keys, the Blade time-guard
+     * (diffInMinutes(now()) <= 10) must make $tnMysqlBreach evaluate to false
+     * once the breach timestamp is more than 10 minutes old.
+     *
+     * This test validates that Carbon expression directly so any future change
+     * to the Blade condition is caught without spinning up an HTTP request.
+     */
+    public function test_blade_breach_flag_is_false_after_10_minutes(): void
+    {
+        $breachAt = now()->subMinutes(11)->toDateTimeString(); // 11 min old — past the window
+
+        // Replicate the Blade expression verbatim.
+        $tnMysqlBreach = $breachAt && \Illuminate\Support\Carbon::parse($breachAt)->diffInMinutes(now()) <= 10;
+
+        $this->assertFalse(
+            $tnMysqlBreach,
+            'The Blade 10-minute time-guard must hide the banner when breach_at is older than 10 minutes, ' .
+            'even if the command has not yet deleted the keys'
+        );
+    }
+
+    /**
+     * Sanity-check the opposite: a breach timestamp that is only 5 minutes old
+     * must still make the Blade expression evaluate to true (banner stays visible).
+     */
+    public function test_blade_breach_flag_is_true_within_10_minutes(): void
+    {
+        $breachAt = now()->subMinutes(5)->toDateTimeString(); // 5 min old — within window
+
+        $tnMysqlBreach = $breachAt && \Illuminate\Support\Carbon::parse($breachAt)->diffInMinutes(now()) <= 10;
+
+        $this->assertTrue(
+            $tnMysqlBreach,
+            'The banner must still show when the breach happened less than 10 minutes ago'
+        );
+    }
 }

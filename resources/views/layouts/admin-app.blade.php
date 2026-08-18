@@ -504,11 +504,15 @@
                     </div>
                 </div>
                 @endif
-                @php
-                    $tnMysqlBreachAt  = \App\Models\SystemSetting::get('mysql_conn_last_breach_at');
-                    $tnMysqlBreachPct = \App\Models\SystemSetting::get('mysql_conn_last_breach_pct');
-                    $tnMysqlBreach    = $tnMysqlBreachAt && \Illuminate\Support\Carbon::parse($tnMysqlBreachAt)->diffInMinutes(now()) <= 10;
-                @endphp
+                {{-- NOTE: must stay in the inline parenthesized at-php form (like the health
+                     banners above). Using the block form here (with the closing directive)
+                     makes Blade's raw-block regex pair that closing token with the FIRST
+                     inline at-php above (MailHealth banner), swallowing ~100 lines into one
+                     raw PHP block and 500-ing every admin page. This applies even to the
+                     literal token inside a Blade comment — raw blocks are extracted first. --}}
+                @php($tnMysqlBreachAt = \App\Models\SystemSetting::get('mysql_conn_last_breach_at'))
+                @php($tnMysqlBreachPct = \App\Models\SystemSetting::get('mysql_conn_last_breach_pct'))
+                @php($tnMysqlBreach = $tnMysqlBreachAt && \Illuminate\Support\Carbon::parse($tnMysqlBreachAt)->diffInMinutes(now()) <= 10)
                 @if($tnMysqlBreach)
                 <div class="mx-4 mt-4 bg-yellow-900/30 border border-yellow-600 rounded-lg px-4 py-3 text-sm">
                     <div class="flex items-start gap-3">

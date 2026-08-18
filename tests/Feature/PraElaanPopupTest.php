@@ -450,7 +450,103 @@ class PraElaanPopupTest extends TestCase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 6. Two users in same company each get their own row
+    // 6. What's New suppression — no two full-screen overlays at once (Task 1207)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Helper: create the app_updates + app_update_seens tables so the layout's
+     * Schema::hasTable('app_updates') guard passes.  Safe to call twice — each
+     * test runs in a fresh in-memory SQLite DB (setUp drops all tables first).
+     */
+    private function createAppUpdatesTables(): void
+    {
+        Schema::create('app_updates', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+            $table->json('points')->nullable();
+            $table->string('image_path')->nullable();
+            $table->string('audience')->default('all');
+            $table->boolean('is_published')->default(false);
+            $table->boolean('is_featured')->default(false);
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('app_update_seens', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('app_update_id');
+            $table->unsignedBigInteger('user_id');
+            $table->timestamps();
+        });
+    }
+
+    public function test_elaan_hidden_when_whats_new_popup_is_pending(): void
+    {
+        $this->createAppUpdatesTables();
+
+        // Ensure the What's New master switch is on (default, but be explicit).
+        \App\Models\SystemSetting::set('pos_whats_new_enabled', '1', 'test');
+
+        // Insert an unseen published AppUpdate aimed at the POS audience.
+        $updateId = DB::table('app_updates')->insertGetId([
+            'title'        => 'New POS feature',
+            'points'       => json_encode(['Check it out']),
+            'audience'     => 'pos',
+            'is_published' => true,
+            'is_featured'  => false,
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
+
+        // Admin has NOT seen the update → $whatsNewPopup is set in the layout.
+        // The elaan condition $praElaanShow && !$whatsNewPopup must evaluate to
+        // false, so data-pra-elaan-popup must NOT appear.
+        $resp = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::MARKER, false);
+    }
+
+    public function test_elaan_appears_once_whats_new_is_marked_seen(): void
+    {
+        $this->createAppUpdatesTables();
+
+        \App\Models\SystemSetting::set('pos_whats_new_enabled', '1', 'test');
+
+        $updateId = DB::table('app_updates')->insertGetId([
+            'title'        => 'New POS feature',
+            'points'       => json_encode(['Check it out']),
+            'audience'     => 'pos',
+            'is_published' => true,
+            'is_featured'  => false,
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
+
+        // Sanity: elaan is hidden while the update is unseen.
+        $hidden = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+        $hidden->assertStatus(200);
+        $hidden->assertDontSee(self::MARKER, false);
+
+        // Mark the update as seen for this admin → $whatsNewPopup becomes null.
+        DB::table('app_update_seens')->insert([
+            'app_update_id' => $updateId,
+            'user_id'       => $this->adminId,
+            'created_at'    => now(),
+            'updated_at'    => now(),
+        ]);
+
+        // Now the elaan popup should be free to render.
+        $visible = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+        $visible->assertStatus(200);
+        $visible->assertSee(self::MARKER, false);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 7. Two users in same company each get their own row
     // ─────────────────────────────────────────────────────────────────────────
 
     public function test_admin_and_manager_each_get_their_own_row(): void

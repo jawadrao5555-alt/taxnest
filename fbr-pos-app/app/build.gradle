@@ -16,8 +16,8 @@ android {
         applicationId "pk.taxnest.fbrpos"
         minSdk 24
         targetSdk 34
-        versionCode 3
-        versionName "1.0.2"
+        versionCode 4
+        versionName "1.1.0"
     }
 
     buildFeatures {
@@ -56,6 +56,21 @@ android {
 }
 
 dependencies {
-    // Deliberately dependency-free (plain Activity + WebView + framework theme):
-    // smallest possible APK, nothing to keep updated.
+    // Previously deliberately dependency-free. v1.1.0 (Task #1283) adds ONLY
+    // Firebase messaging for instant push (fail-queue alert / day-close
+    // reminder). Notifications are built with the framework
+    // Notification.Builder — no androidx UI deps. The dependency is always on
+    // the classpath; without google-services.json Firebase simply never
+    // initializes and Push.kt catches the resulting exceptions (silent no-op,
+    // same pattern as the PRA shell and the rider app).
+    implementation platform('com.google.firebase:firebase-bom:33.1.2')
+    implementation 'com.google.firebase:firebase-messaging'
+}
+
+// Firebase config activates ONLY when the owner drops in the real
+// app/google-services.json (Firebase console → same project as rider app →
+// Android app pk.taxnest.fbrpos). Conditional apply keeps the build green
+// without it — push stays dormant, everything else works (Task #1283).
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
 }

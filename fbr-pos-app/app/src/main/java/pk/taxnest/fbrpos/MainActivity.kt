@@ -51,6 +51,7 @@ class MainActivity : Activity() {
         const val BASE_HOST = "taxnest.com.pk"
         const val START_URL = "https://taxnest.com.pk/fbr-pos/login"
         const val FILE_PICK_REQUEST = 71
+        const val REQ_NOTIF = 72
     }
 
     private lateinit var web: WebView
@@ -95,6 +96,11 @@ class MainActivity : Activity() {
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                 if (url.startsWith("http")) lastMainFrameUrl = url
+                // FBR push (Task #1283): first-party navigation past the
+                // login page = logged in → register this device's FCM token
+                // (session cookie auth); back on /fbr-pos/login = logged out
+                // → clear it. Silent no-op without google-services.json.
+                Push.onNavigation(this@MainActivity, url)
                 super.onPageStarted(view, url, favicon)
             }
 
@@ -242,6 +248,19 @@ class MainActivity : Activity() {
 
         // Play-Store-jaisa update check (Task 443) — fail-silent, once per launch.
         UpdateCheck.run(this)
+
+        // FBR push (Task #1283): Android 13+ needs a runtime prompt before
+        // notifications can show. Ask once on open — denial is fine (the web
+        // app's own screens keep working; push simply stays silent).
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            try {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF)
+            } catch (e: Exception) {
+                // never block the shell over a permission prompt
+            }
+        }
     }
 
     /** true = handled externally (or blocked); false = let the WebView load it. */

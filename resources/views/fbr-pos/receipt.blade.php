@@ -375,7 +375,39 @@
                     return $f == (int) $f ? (string) (int) $f : rtrim(rtrim(number_format($f, 3, '.', ''), '0'), '.');
                 };
             @endphp
+            @php
+                // 🍔 FBR Deals (Task 1273): stored rows are the COMPONENT items
+                // (item-level FBR compliance), but the CUSTOMER bought "1x Family
+                // Deal @ 999". Group rows sharing a deal_group: print ONE deal
+                // line (net price, same ex-tax convention as every other line —
+                // tax rides in the totals section) + indented qty-only contents.
+                $dealGroupsSeen = [];
+            @endphp
             @foreach($transaction->items as $item)
+            @php $dg = $item->deal_group ?? null; @endphp
+            @if($dg !== null && isset($dealGroupsSeen[$dg]))
+                @continue
+            @endif
+            @if($dg !== null)
+            @php
+                $dealGroupsSeen[$dg] = true;
+                $groupRows = $transaction->items->filter(fn ($r) => ($r->deal_group ?? null) === $dg)->values();
+                $groupNet = $groupRows->sum(fn ($r) => (float) $r->subtotal);
+                $dealQty = max(1, (int) ($item->deal_quantity ?? 1));
+            @endphp
+            <tr>
+                <td class="col-item">{{ $item->deal_name ?? $item->item_name }}<span class="tsch-tag">{{ __('pos.deal_badge') }}</span></td>
+                <td class="col-uom">U</td>
+                <td class="col-qty">{{ $dealQty }}</td>
+                <td class="col-price">{{ number_format($groupNet / $dealQty, 0) }}</td>
+                <td class="col-total">{{ number_format($groupNet, 0) }}</td>
+            </tr>
+            @foreach($groupRows as $comp)
+            <tr>
+                <td class="col-item" colspan="5" style="font-size: 0.9em; color: #000; padding-left: 8px;">&#x21B3; {{ $fmtQty($comp->quantity) }}x {{ $comp->item_name }}</td>
+            </tr>
+            @endforeach
+            @else
             <tr>
                 <td class="col-item">{{ $item->item_name }}@if($item->is_third_schedule)<span class="tsch-tag">3rd Sch</span>@endif</td>
                 <td class="col-uom">{{ $item->uom ?? 'U' }}</td>
@@ -388,6 +420,7 @@
                 <td class="col-item" colspan="4" style="font-size: 0.9em; color: #000; padding-left: 8px; font-weight: bold;">&#x21B3; {{ __('pos.receipt_discount') }}</td>
                 <td class="col-total" style="font-size: 0.9em; color: #000; font-weight: bold;">-{{ number_format($item->item_discount, 0) }}</td>
             </tr>
+            @endif
             @endif
             @endforeach
         </tbody>

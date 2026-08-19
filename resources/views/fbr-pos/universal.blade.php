@@ -715,13 +715,14 @@ window.addEventListener('popstate', function() {
              invisible/stale filter — search deliberately narrows to it. Hidden automatically when
              the company has no categories/services to pick (FBR products currently ship category=null,
              so this stays hidden until categories exist — kept for PRA-port diffability). --}}
-        <div class="relative flex-shrink-0 hidden sm:block" x-show="catOptions().length > 0 || allServices.length > 0" x-cloak>
+        <div class="relative flex-shrink-0 hidden sm:block" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
             <select x-model="activeCategory" title="{{ __('pos.ti_category_fbr') }}"
                     class="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-bold border-2 cursor-pointer max-w-[150px] shadow-sm transition focus:ring-2 focus:ring-blue-500 focus:border-blue-400"
                     :class="activeCategory !== 'all' ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'">
                 <option value="all">{{ __('pos.all_categories') }}</option>
                 <template x-for="c in catOptions()" :key="c"><option :value="c" x-text="c"></option></template>
                 <template x-if="allServices.length > 0"><option value="services">{{ __('pos.services') }}</option></template>
+                <template x-if="allDeals.length > 0"><option value="deals">{{ __('pos.deals_label') }}</option></template>
             </select>
             <svg class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
         </div>
@@ -890,7 +891,9 @@ window.addEventListener('popstate', function() {
              shortcuts unchanged (global keydown handler). Send to Kitchen stays (KOT). --}}
         @if($features->kot ?? false)
         <div class="hidden md:flex items-center gap-1.5">
-            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first_cart : window.TXT.fbr_ti_store_saves_no_payment" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+            {{-- Merged (Task 1273 + Store Printer rename): deals join manual items in the
+                 KOT/Store block; tooltip uses the store-flavored idle key from main. --}}
+            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="hasManualItems() || hasDealItems() ? window.TXT.ti_manual_deals_pay_first : window.TXT.fbr_ti_store_saves_no_payment" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
                 <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.fbr_send_to_store"></span>
                 <kbd class="text-[9px] bg-orange-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">Alt+K</kbd>
@@ -910,7 +913,7 @@ window.addEventListener('popstate', function() {
             <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
                     <button @click="activeCategory = 'all'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
-                        {{ __('pos.all_word') }} <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => isItemVisible(p)).length + allServices.length) + ')'"></span>
+                        {{ __('pos.all_word') }} <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => isItemVisible(p)).length + allServices.length + allDeals.length) + ')'"></span>
                     </button>
                     {{-- Task 1271: grid-edit banner (Roman Urdu — customer-facing) --}}
                     <template x-if="gridEditMode">
@@ -920,6 +923,8 @@ window.addEventListener('popstate', function() {
                     <button @click="activeCategory = '{{ $cat }}'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
                     @endforeach
                     <button @click="activeCategory = 'services'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'services' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ __('pos.services') }}</button>
+                    {{-- 🍔 Deals pill (Task 1273) — only when active deals exist today --}}
+                    <button @click="activeCategory = 'deals'; filterProducts()" x-show="showProducts && allDeals.length > 0" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'deals' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ __('pos.deals_label') }}</button>
                     <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">{{ __('pos.grid_hidden_hint') }}</span>
                 </div>
                 {{-- Task 1271: "Sab Wapas Dikhao" — resets ALL of this user's grid prefs (edit mode only) --}}
@@ -987,7 +992,12 @@ window.addEventListener('popstate', function() {
                                         @endif
                                         <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
                                         <template x-if="item.is_third_schedule"><span class="px-1.5 py-0.5 bg-blue-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">3rd Sch</span></template>
+                                        <template x-if="item.type === 'deal'"><span class="px-1.5 py-0.5 bg-amber-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.deal_badge') }}</span></template>
                                     </div>
+                                    {{-- 🍔 Deal tile subtitle (Task 1273): combo contents at a glance --}}
+                                    <template x-if="item.type === 'deal' && (item.components || []).length > 0">
+                                        <p class="text-[10px] text-amber-600 dark:text-amber-400 truncate leading-tight mt-0.5" x-text="(item.components || []).map(c => c.quantity + 'x ' + c.name).join(', ')"></p>
+                                    </template>
                                 </div>
                                 <span class="price-badge text-sm font-extrabold text-blue-600 dark:text-blue-400 flex-shrink-0" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
                                 <template x-if="getCartQty(item) > 0">
@@ -1185,7 +1195,14 @@ window.addEventListener('popstate', function() {
                                     <template x-if="item._isQuickCreated">
                                         <span class="flex-shrink-0 whitespace-nowrap text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
                                     </template>
+                                    <template x-if="item.item_type === 'deal'">
+                                        <span class="flex-shrink-0 whitespace-nowrap text-[8px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 px-1.5 py-0.5 rounded">{{ __('pos.deal_badge') }}</span>
+                                    </template>
                                 </p>
+                                {{-- 🍔 Deal components subtitle (Task 1273): what's inside the combo --}}
+                                <template x-if="item.item_type === 'deal' && (item.deal_components || []).length > 0">
+                                    <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 truncate" x-text="(item.deal_components || []).map(c => c.quantity + 'x ' + c.name).join(', ')"></p>
+                                </template>
                                 {{-- Inline price editor moved OUT of this narrow column to a full-width
                                      panel below the flex row (Aug 2026 overlap fix) — see below. --}}
                                 <template x-if="quickPriceCartUid !== item.cart_uid">
@@ -1245,8 +1262,9 @@ window.addEventListener('popstate', function() {
                                 <span class="text-[10px] text-gray-400 truncate min-w-0">{{ __('pos.save_esc_hint') }}</span>
                             </div>
                         </template>
-                        {{-- Cart rows v3 (Aug 2026): TAX/Disc/FBR only visible on active row — cart stays clean --}}
-                        <div class="flex items-center gap-1.5 mt-1.5 justify-end" x-show="activeCartIndex === index || item.is_tax_exempt || (item.item_discount_value || 0) > 0 || item.showFbrPanel || item.hs_code">
+                        {{-- Cart rows v3 (Aug 2026): TAX/Disc/FBR only visible on active row — cart stays clean.
+                             Deal lines (Task 1273) hide the whole strip: price/tax are server-enforced. --}}
+                        <div class="flex items-center gap-1.5 mt-1.5 justify-end" x-show="item.item_type !== 'deal' && (activeCartIndex === index || item.is_tax_exempt || (item.item_discount_value || 0) > 0 || item.showFbrPanel || item.hs_code)">
                             <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? window.TXT.ti_tax_exempt_toggle : window.TXT.ti_tax_toggle_hint" x-text="item.is_tax_exempt ? window.TXT.no_tax_t : window.TXT.tax_t"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                             <button @click.stop="item.showFbrPanel = !item.showFbrPanel" title="{{ __('pos.ti_fbr_compliance') }}" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="item.showFbrPanel ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((item.hs_code || (item.uom && item.uom !== 'U')) ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-blue-500')">FBR</button>
@@ -1403,7 +1421,7 @@ window.addEventListener('popstate', function() {
                             {{ __('pos.draft_word') }}
                             <span x-show="activeDraftId" x-cloak class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-sky-500 rounded-full shadow-sm" title="{{ __('pos.draft_active_dot') }}"></span>
                         </button>
-                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="hasManualItems() || hasDealItems() ? window.TXT.ti_manual_deals_pay_first : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -3042,6 +3060,25 @@ $servicesJson = $services->map(function($s) {
         'stockStatus' => null,
     ];
 })->values();
+// 🍔 Deals (Task 1273): server-computed fixed-price combos. price = customer
+// gross; net_price/tax_amount = the store() allocation preview so client
+// totals mirror the server EXACTLY. tax_rate 0 + is_tax_exempt false: deal
+// lines never enter the per-item tax path — tax rides on deal_tax_unit.
+$dealsJson = collect($activeDeals ?? [])->map(function ($d) {
+    return [
+        'id' => (int) $d['id'], 'type' => 'deal', 'name' => $d['name'],
+        'price' => (float) $d['price'],
+        'net_price' => (float) $d['net_price'],
+        'tax_amount' => (float) $d['tax_amount'],
+        'description' => $d['description'] ?? '',
+        'components' => $d['components'] ?? [],
+        'category' => 'Deals', 'show_on_sale' => true, 'cost_price' => 0.0,
+        'is_tax_exempt' => false, 'is_third_schedule' => false, 'tax_rate' => 0,
+        'hs_code' => null, 'uom' => 'U', 'barcode' => null,
+        'is_price_editable' => false, 'hasRecipe' => false, 'image' => null,
+        'stockStatus' => null,
+    ];
+})->values();
 $selectedTableJson = $selectedTable ? ['id' => $selectedTable->id, 'table_number' => $selectedTable->table_number, 'seats' => $selectedTable->seats] : null;
 $customersJson = $customers->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone])->values();
 $kitchenSettings = [
@@ -3070,6 +3107,7 @@ function restaurantPos() {
     return {
         allProducts: {!! $jsEnc($productsJson) !!},
         allServices: {!! $jsEnc($servicesJson) !!},
+        allDeals: {!! $jsEnc($dealsJson) !!},
         allCustomers: {!! $jsEnc($customersJson) !!},
         // Task 100: TRUE when the shop has more customers than the bake cap —
         // allCustomers is only the most-recently-active subset. Server search is
@@ -3089,6 +3127,11 @@ function restaurantPos() {
         // but the restaurant Hold/Send-to-Kitchen endpoints require a real
         // item_id, so we gate those actions while a manual line is in cart.
         hasManualItems() { return (this.cart || []).some(i => i && i.item_type === 'manual'); },
+        // 🍔 Deals (Task 1273) — billing-only (PRA rule): deal lines are blocked
+        // from Hold / KOT / Draft flows (their price window + component snapshot
+        // are only guaranteed at Pay time, and the hold endpoints don't know the
+        // 'deal' item_type).
+        hasDealItems() { return (this.cart || []).some(i => i && i.item_type === 'deal'); },
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
         taxRate: {{ (float) ($taxRate ?? 0) }},
         taxRules: {!! $jsEnc($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate]), '{}') !!},
@@ -3451,7 +3494,11 @@ function restaurantPos() {
         },
         getItemTotal(item) { return Math.max(0, this.r2(this._safeQty(item.quantity) * item.unit_price - this.getItemDiscount(item))); },
         get itemDiscountsTotal() { return this.r2(this.cart.reduce((s, i) => s + this.getItemDiscount(i), 0)); },
-        get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (this._safeQty(i.quantity) * i.unit_price), 0)); },
+        // 🍔 Deal lines (Task 1273): subtotal uses the server-allocated NET per
+        // deal (deal_net_unit) so the ex-tax base — and the percentage-discount
+        // base — mirror store() exactly; the customer-facing line still shows
+        // the gross deal price via getItemTotal.
+        get subtotal() { return this.r2(this.cart.reduce((s, i) => s + (this._safeQty(i.quantity) * (i.item_type === 'deal' ? (parseFloat(i.deal_net_unit) || 0) : i.unit_price)), 0)); },
         get effectiveSubtotal() { return Math.max(0, this.r2(this.subtotal - this.itemDiscountsTotal)); },
         get taxableSubtotal() {
             // FBR: order-level discount does NOT reduce the tax base (mirrors store()).
@@ -3462,7 +3509,11 @@ function restaurantPos() {
         // Order discount is applied AFTER tax (does not shrink the tax base).
         _itemRate(i) { return i.is_tax_exempt ? 0 : ((i.tax_rate === 0 || i.tax_rate) ? parseFloat(i.tax_rate) : 18); },
         get taxAmount() {
-            return this.r2(this.cart.reduce((s, i) => s + this.r2(this.getItemTotal(i) * this._itemRate(i) / 100), 0));
+            // Deal lines (Task 1273): tax = qty × deal_tax_unit (server allocation
+            // preview — component-level rates already applied server-side).
+            return this.r2(this.cart.reduce((s, i) => s + (i.item_type === 'deal'
+                ? this.r2(this._safeQty(i.quantity) * (parseFloat(i.deal_tax_unit) || 0))
+                : this.r2(this.getItemTotal(i) * this._itemRate(i) / 100)), 0));
         },
         // Rs 1 FBR POS service charge — added by store() whenever the bill goes to FBR
         // (fbr mode). Provisional saves + FBR-OFF companies bill in local mode (Rs 0).
@@ -3712,6 +3763,12 @@ function restaurantPos() {
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
         async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
+            // Task 1273 safety net: deals must never enter the offline queue
+            // (both call sites guard first; this catches any future path).
+            if ((payload.items || []).some(i => i && i.deal_id)) {
+                this.showToast(window.TXT.deal_offline_block, 'error');
+                return;
+            }
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
             // reopen the lost-response duplicate window. Fallback only if absent.
@@ -4325,7 +4382,7 @@ function restaurantPos() {
             if (!this.showProducts && !hasSearch) {
                 this.filteredItems = []; this.displayCount = 60; this.updateDisplayItems(); return;
             }
-            let items = [...this.allProducts, ...this.allServices];
+            let items = [...this.allDeals, ...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
             // CATEGORY: the dropdown next to the search box is ALWAYS visible (unlike the pills),
             // so a chosen category is never an invisible/stale filter — search now deliberately
@@ -4333,8 +4390,9 @@ function restaurantPos() {
             // products marked "Hidden from sale screen" (show_on_sale=false) within that scope —
             // the hidden flag ONLY declutters the browsable grid, it must never stop a cashier
             // from finding a saved product by name.
-            if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
+            if (this.activeCategory !== 'all' && this.activeCategory !== 'services' && this.activeCategory !== 'deals') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
             else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+            else if (this.activeCategory === 'deals') { items = this.allDeals.filter(d => parseFloat(d.price) > 0 && d.name && d.name.trim().length > 0); }
             // Task 1271 (PRA port): hidden items stay OUT of the browsable grid via the
             // per-user pref map (isItemVisible — user pref overrides admin show_on_sale in
             // BOTH directions). In GRID EDIT mode, ALL items render (hidden ones dimmed)
@@ -4405,6 +4463,14 @@ function restaurantPos() {
                 existing.quantity++;
                 this.activeCartIndex = this.cart.indexOf(existing);
                 this.animateQty(this.activeCartIndex);
+            } else if (item.type === 'deal') {
+                // 🍔 Deal line (Task 1273): ONE cart row at the server-enforced deal
+                // price. tax_rate 0 + is_tax_exempt false — deal tax rides on
+                // deal_tax_unit (server allocation preview), added in taxAmount.
+                // Cashier can never edit the price (no _isQuickCreated, no editor).
+                const d = this.allDeals.find(x => x.id === item.id) || item;
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: d.id, item_type: 'deal', item_name: d.name, quantity: 1, unit_price: parseFloat(d.price), special_notes: '', is_tax_exempt: false, is_third_schedule: false, hs_code: null, uom: 'U', tax_rate: 0, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false, deal_net_unit: parseFloat(d.net_price ?? d.price) || 0, deal_tax_unit: parseFloat(d.tax_amount ?? 0) || 0, deal_components: d.components || [] });
+                this.activeCartIndex = this.cart.length - 1;
             } else {
                 // FBR: hydrate compliance fields (hs_code / uom / tax_rate / exemption) from
                 // the master catalog record — some callers (Quick Type, Random, grid picks)
@@ -5204,7 +5270,7 @@ function restaurantPos() {
             if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
                 e.preventDefault();
                 if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
-                if (this.cart.length === 0 || this.submitting || this.hasManualItems()) return;
+                if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems()) return;
                 this.sendToKitchen();
                 return;
             }
@@ -6004,6 +6070,12 @@ function restaurantPos() {
                 this.showToast(window.TXT.manual_items_billing_only_hold, 'error');
                 return null;
             }
+            // Deals (Task 1273): billing-only — a held deal could be recalled after
+            // the deal expired / was repriced, so parked carts never carry deal lines.
+            if (this.hasDealItems()) {
+                this.showToast(window.TXT.manual_deals_billing_only_hold, 'error');
+                return null;
+            }
             const now = Date.now();
             if (now - this.lastHoldTime < 2000) return null;
             this.lastHoldTime = now;
@@ -6247,6 +6319,10 @@ function restaurantPos() {
                         // AUTHORITATIVE tax_rate/is_tax_exempt from pos_services server-side
                         // (client values are only a display hint — never trusted for tax).
                         service_id: (c.item_type === 'service' && c.item_id) ? c.item_id : null,
+                        // Deals (Task 1273): the server resolves the deal from the DB and
+                        // expands it into component rows at the SERVER-enforced price —
+                        // the client's unit_price for deal lines is display-only.
+                        deal_id: (c.item_type === 'deal' && c.item_id) ? c.item_id : null,
                         hs_code: c.hs_code || null,
                         uom: c.uom || 'U',
                         tax_rate: this._itemRate(c),
@@ -6306,6 +6382,14 @@ function restaurantPos() {
                         this.showPayModal = false; this.submitting = false;
                         return;
                     }
+                    // Task 1273: deals never bill offline — component stock can't be
+                    // validated, and a sync-time 422 would strand a paid customer.
+                    // Cart stays intact; cashier retries when the net returns.
+                    if (this.cart.some(c => c.item_type === 'deal')) {
+                        this.showToast(window.TXT.deal_offline_block, 'error');
+                        this.showPayModal = false; this.submitting = false;
+                        return;
+                    }
                     if (!this.offlineAllowed) {
                         this.showToast(window.TXT.offline_plan_locked, 'error');
                         this.showPayModal = false; this.submitting = false;
@@ -6332,6 +6416,12 @@ function restaurantPos() {
                     // Task 1271: recalled drafts never queue offline (see above).
                     if (this.activeDraftId) {
                         this.showToast(window.TXT.draft_offline_block, 'error');
+                        this.showPayModal = false; this.submitting = false;
+                        return;
+                    }
+                    // Task 1273: deals never bill offline (see the pre-flight branch).
+                    if (this.cart.some(c => c.item_type === 'deal')) {
+                        this.showToast(window.TXT.deal_offline_block, 'error');
                         this.showPayModal = false; this.submitting = false;
                         return;
                     }
@@ -7312,6 +7402,9 @@ function restaurantPos() {
         },
         async saveDraftCart() {
             if (this.cart.length === 0) { this.showToast(window.TXT.draft_cart_empty, 'error'); return; }
+            // Deals (Task 1273): billing-only — drafts are parked JSON carts that can
+            // be recalled after the deal expired / was repriced. Same rule as Hold.
+            if (this.hasDealItems()) { this.showToast(window.TXT.manual_deals_billing_only_hold, 'error'); return; }
             if (this.draftBusy) return;
             this.draftBusy = true;
             try {

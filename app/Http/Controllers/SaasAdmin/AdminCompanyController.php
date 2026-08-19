@@ -988,6 +988,7 @@ class AdminCompanyController extends Controller
             'fbr_day_close_reports', 'fbr_pos_held_sales',
             'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',
             'fbr_pos_promotions', 'fbr_pos_shifts', 'fbr_pos_terminals',
+            'fbr_pos_deals',
             'push_subscriptions', 'payment_proofs', 'feature_suggestions',
             'madadgar_messages', 'invoice_import_batches', 'invoice_import_mappings', 'invoice_deliveries', 'audit_packs',
             // Consultant console: operational rows die with the company (FK
@@ -1004,6 +1005,14 @@ class AdminCompanyController extends Controller
                 $dealIds = DB::table('pos_deals')->where('company_id', $id)->pluck('id');
                 if ($dealIds->isNotEmpty()) {
                     DB::table('pos_deal_items')->whereIn('deal_id', $dealIds)->delete();
+                }
+            }
+            // Same parent-child purge for the FBR twin (Task 1273).
+            if (\Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')
+                && \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_items')) {
+                $fbrDealIds = DB::table('fbr_pos_deals')->where('company_id', $id)->pluck('id');
+                if ($fbrDealIds->isNotEmpty()) {
+                    DB::table('fbr_pos_deal_items')->whereIn('deal_id', $fbrDealIds)->delete();
                 }
             }
             foreach ($orphanTables as $tbl) {

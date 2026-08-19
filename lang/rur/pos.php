@@ -1920,6 +1920,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'manual' => 'Manual',
     'manual_added' => 'Manual add ho gaya',
     'manual_deals_billing_only_hold' => 'Manual items aur deals sirf billing ke liye hain — pehle pay karein ya hold karne ke liye remove karein.',
+    // FBR Deals (Task 1273) — item-level FBR compliance strings
+    'deal_badge' => 'DEAL',
+    'fbr_deals_item_level_note' => 'FBR note: deal aapki fixed price par bikti hai, lekin FBR invoice mein har shamil item apni tax rate ke saath alag report hota hai — items ka total hamesha deal price ke barabar hota hai.',
+    'deal_conflict_line' => 'Line ":name" ghalat hai — deal line ke saath product ya service nahi ho sakti.',
+    'deal_unavailable_line' => 'Deal ":name" abhi available nahi — cart se remove kar ke dobara koshish karein.',
+    'deal_component_out_of_stock' => '":name" ka stock kaafi nahi (deal ka hissa) — deal quantity kam karein ya pehle stock add karein.',
+    'deal_offline_block' => 'Internet nahi — deal wala bill offline nahi ban sakta (items ka stock check nahi ho sakta). Cart waisa hi mehfooz hai; connection wapas aane par dobara try karein.',
     'manual_item' => 'Manual Item',
     'manual_items_billing_only_hold' => 'Manual items sirf billing ke liye hain — pehle pay karein ya hold karne ke liye remove karein.',
     'manual_pay_failed' => 'Manual pay fail ho gaya: ',

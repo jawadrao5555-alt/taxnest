@@ -1606,6 +1606,12 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/api/drafts/{id}/lock', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'lockDraft'])->name('fbrpos.drafts.lock');
     Route::post('/api/drafts/{id}/unlock', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'unlockDraft'])->name('fbrpos.drafts.unlock');
 
+    // Deals (Task 1273 — fixed-price combos; admin-only + plan-gated in-controller)
+    Route::get('/deals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deals'])->name('fbrpos.deals');
+    Route::post('/deals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storeDeal'])->name('fbrpos.deals.store');
+    Route::put('/deals/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'updateDeal'])->name('fbrpos.deals.update');
+    Route::delete('/deals/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteDeal'])->name('fbrpos.deals.delete');
+
     // Promotions
     Route::get('/promotions', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'promotions'])->name('fbrpos.phase2.promotions');
     Route::post('/promotions', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storePromotion'])->name('fbrpos.phase2.promotions.store');

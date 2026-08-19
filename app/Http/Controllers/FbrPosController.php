@@ -1209,6 +1209,36 @@ class FbrPosController extends Controller
         $services = \App\Models\PosService::where('company_id', $companyId)
             ->where('is_active', true)->orderBy('name')->get();
 
+        // 🍔 Deals (Task 1273 — FBR twin of PRA deals): active fixed-price combos
+        // baked with a SERVER-computed per-unit allocation preview (net/tax) so
+        // client totals mirror the store() allocation exactly. Deals whose
+        // components are missing/inactive are unsellable and never baked.
+        $activeDeals = [];
+        if ($this->fbrPlanAllows('deals_enabled') && \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')) {
+            $dealRows = \App\Models\FbrPosDeal::where('company_id', $companyId)
+                ->where('is_active', true)->with('items')->orderBy('name')->get()
+                ->filter(fn ($d) => $d->isActiveOn());
+            foreach ($dealRows as $dealRow) {
+                $units = $this->fbrAllocateDealUnits($dealRow);
+                if (empty($units)) { continue; }
+                $net = 0.0;
+                foreach ($units as $u) { $net += $u['unit_net']; }
+                $activeDeals[] = [
+                    'id' => (int) $dealRow->id,
+                    'name' => (string) $dealRow->name,
+                    'description' => (string) ($dealRow->description ?? ''),
+                    'price' => round((float) $dealRow->price, 2),
+                    'net_price' => round($net, 2),
+                    'tax_amount' => round((float) $dealRow->price - $net, 2),
+                    'components' => array_map(fn ($u) => [
+                        'product_id' => (int) $u['product']->id,
+                        'name' => (string) $u['product']->name,
+                        'quantity' => (int) $u['component_qty'],
+                    ], $units),
+                ];
+            }
+        }
+
         // OFFLINE-FIRST BOOT (Aug 2026 — PRA port): fingerprint baked into the
         // page so a SW-cached copy of this screen can detect staleness via
         // /fbr-pos/api/boot-check. offlineAllowed = plan gate for NEW offline
@@ -1224,7 +1254,7 @@ class FbrPosController extends Controller
             'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
             'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed',
-            'userGridPrefs'
+            'userGridPrefs', 'activeDeals'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
@@ -1248,17 +1278,24 @@ class FbrPosController extends Controller
             return ($row->cnt ?? 0) . ':' . (string) ($row->mx ?? '');
         };
         $promoAgg = $agg(\App\Models\FbrPosPromotion::where('company_id', $companyId));
+        // Deals are baked into the sale screen (Task 1273) — add/edit/delete
+        // must refresh SW-cached copies. Schema guard covers the deploy-before-
+        // migrate window on PROD.
+        $dealAgg = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')
+            ? $agg(\App\Models\FbrPosDeal::where('company_id', $companyId))
+            : '0:';
         $catalogRev = md5(implode('|', [
             $agg(Product::where('company_id', $companyId)),
             // Services are baked into the sale screen (Task 1272) — a service
             // add/edit must refresh SW-cached copies, same rule as products.
             $agg(\App\Models\PosService::where('company_id', $companyId)),
             $promoAgg,
+            $dealAgg,
             $agg(\App\Models\FbrPosTerminal::where('company_id', $companyId)),
-            // Promotions carry date windows — a day change must refresh the
-            // screen, but ONLY for companies that actually have promos (PRA
+            // Promotions AND deals carry date windows — a day change must refresh
+            // the screen, but ONLY for companies that actually have them (PRA
             // deals lesson: no needless morning reload churn for the rest).
-            str_starts_with($promoAgg, '0:') ? '' : now()->toDateString(),
+            (str_starts_with($promoAgg, '0:') && str_starts_with($dealAgg, '0:')) ? '' : now()->toDateString(),
         ]));
 
         $settingsRev = md5(json_encode([
@@ -1287,6 +1324,91 @@ class FbrPosController extends Controller
             'cat' => $catalogRev,
             'set' => $settingsRev,
         ];
+    }
+
+    /**
+     * 🍔 DEALS ALLOCATION (Task 1273) — FBR IMS reporting is ITEM-LEVEL, so a
+     * fixed-price deal must be stored as real component rows, each carrying its
+     * own FBR tax rate, whose gross amounts sum EXACTLY to the deal price.
+     *
+     * Per-deal-UNIT allocation (drift-free): the deal price P (tax-INCLUSIVE
+     * gross) is split across components in integer paisa, proportional to
+     * (product.default_price × component qty), using sequential-remainder
+     * rounding so Σ unit_gross = P exactly. Per component: tax rate comes from
+     * the product (exempt / Third-Schedule → 0, same rule as store()'s
+     * product lines), unit_net = gross ÷ (1 + r/100), unit_tax = gross − net.
+     * Row values for dealQty D are per-unit × D (2dp × int = exact, no drift).
+     *
+     * Returns [] when any component product is missing or inactive (deal is
+     * unsellable) — callers skip the deal (create bake) or reject the sale.
+     */
+    private function fbrAllocateDealUnits(\App\Models\FbrPosDeal $deal): array
+    {
+        $components = $deal->items;
+        if ($components->isEmpty()) { return []; }
+
+        $productIds = $components->pluck('product_id')->map(fn ($v) => (int) $v)->all();
+        $productMap = Product::where('company_id', $deal->company_id)
+            ->where('is_active', true)
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        $rows = [];
+        $sumW = 0;
+        foreach ($components as $comp) {
+            $product = $productMap->get((int) $comp->product_id);
+            if (!$product) { return []; } // component gone → deal unsellable
+            $qty = max(1, (int) $comp->quantity);
+            // Weight in integer paisa; a zero-priced component gets weight 0
+            // (equal-split fallback below covers the all-zero pathological case).
+            $w = (int) round(((float) ($product->default_price ?? 0)) * 100) * $qty;
+            $rows[] = ['product' => $product, 'component_qty' => $qty, 'w' => max(0, $w)];
+            $sumW += max(0, $w);
+        }
+        if ($sumW <= 0) {
+            // All components priced 0 → equal split.
+            foreach ($rows as &$r0) { $r0['w'] = 1; }
+            unset($r0);
+            $sumW = count($rows);
+        }
+
+        // Sequential-remainder split of P (paisa) — Σ shares = P exactly.
+        $remaining = (int) round(((float) $deal->price) * 100);
+        $remW = $sumW;
+        $units = [];
+        $n = count($rows);
+        foreach ($rows as $i => $r) {
+            if ($i === $n - 1) {
+                $gPaisa = $remaining;
+            } else {
+                $gPaisa = $remW > 0 ? (int) round($remaining * $r['w'] / $remW) : 0;
+                $gPaisa = max(0, min($gPaisa, $remaining));
+            }
+            $remaining -= $gPaisa;
+            $remW -= $r['w'];
+
+            $product = $r['product'];
+            $isThird = (bool) ($product->is_third_schedule ?? false);
+            $isExempt = (($product->tax_type ?? 'standard') === 'exempt') || $isThird;
+            $rate = $isExempt ? 0.0 : (float) ($product->default_tax_rate ?? 18);
+
+            $gross = round($gPaisa / 100, 2);
+            $net = $rate > 0 ? round($gross / (1 + $rate / 100), 2) : $gross;
+            $tax = round($gross - $net, 2);
+
+            $units[] = [
+                'product' => $product,
+                'component_qty' => $r['component_qty'],
+                'unit_gross' => $gross,
+                'unit_net' => $net,
+                'unit_tax' => $tax,
+                'tax_rate' => $rate,
+                'is_tax_exempt' => $isExempt,
+                'is_third_schedule' => $isThird,
+            ];
+        }
+        return $units;
     }
 
     /**
@@ -1335,6 +1457,10 @@ class FbrPosController extends Controller
             // Services (Task 1272): id into pos_services — when present the server
             // resolves the AUTHORITATIVE tax_rate/is_tax_exempt from the DB row.
             'items.*.service_id' => 'nullable|integer|min:1',
+            // Deals (Task 1273): id into fbr_pos_deals — the server resolves the
+            // deal from the DB and expands it into component rows at the
+            // server-enforced price; client price/tax values are never trusted.
+            'items.*.deal_id' => 'nullable|integer|min:1',
             'items.*.item_discount' => 'nullable|numeric|min:0',
             'items.*.value_input' => 'nullable|numeric|min:0.01',
             'customer_name' => 'nullable|string|max:255',
@@ -1558,7 +1684,131 @@ class FbrPosController extends Controller
                         ->get(['product_id', 'avg_purchase_price', 'last_purchase_price'])
                         ->keyBy('product_id');
 
+                // 🍔 Deals (Task 1273): aggregate component stock needs across ALL
+                // deal lines — the block check runs AFTER the loop so two deal
+                // lines sharing a component are counted together.
+                $dealStockNeeds = [];
+                $dealStockNames = [];
+
                 foreach ($request->items as $item) {
+                    // ── 🍔 DEAL LINE (Task 1273): fixed-price combo → REAL component
+                    // rows, each at its own FBR tax rate, gross summing EXACTLY to
+                    // the server-enforced deal price × deal qty. Client price/tax
+                    // values for deal lines are never trusted.
+                    if (!empty($item['deal_id'])) {
+                        // Exactly ONE catalog reference per line (same trust
+                        // boundary as the service/product conflict below).
+                        if (!empty($item['product_id']) || isset($item['service_id'])) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_conflict_line', ['name' => (string) ($item['item_name'] ?? 'Deal')])],
+                            ]);
+                        }
+                        // Operational plan gate — same column as promotions.
+                        if (!$this->fbrPlanAllows('deals_enabled')) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.plan_locked_feature')],
+                            ]);
+                        }
+                        // Deals never ride the OFFLINE queue: component stock can't
+                        // be validated at (offline) sale time, so a queued deal bill
+                        // could fail at sync AFTER the customer left with a receipt.
+                        // The sale screen blocks offline deal checkout up front; this
+                        // is the server-side belt for stale cached clients (rejects
+                        // ONCE with a clear message instead of retrying forever).
+                        if ($request->filled('offline_queued_at')) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_offline_block')],
+                            ]);
+                        }
+                        $dealQtyRaw = (float) $item['quantity'];
+                        if ($dealQtyRaw < 1 || abs($dealQtyRaw - round($dealQtyRaw)) > 0.0001) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => ["Deal quantity must be a whole number ≥ 1 for '{$item['item_name']}'."],
+                            ]);
+                        }
+                        $dealQty = (int) round($dealQtyRaw);
+                        $deal = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')
+                            ? \App\Models\FbrPosDeal::where('company_id', $companyId)
+                                ->where('is_active', true)->with('items')->find((int) $item['deal_id'])
+                            : null;
+                        if (!$deal || !$deal->isActiveOn()) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_unavailable_line', ['name' => (string) ($item['item_name'] ?? 'Deal')])],
+                            ]);
+                        }
+                        $dealUnits = $this->fbrAllocateDealUnits($deal);
+                        if (empty($dealUnits)) {
+                            // A component product was deleted/deactivated mid-sale.
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                            ]);
+                        }
+
+                        // Component cost snapshot (costMap only covers top-level
+                        // request product_ids — deal components need their own read).
+                        $compIds = array_map(fn ($u) => (int) $u['product']->id, $dealUnits);
+                        $compStock = \App\Models\InventoryStock::where('company_id', $companyId)
+                            ->whereNull('branch_id')
+                            ->whereIn('product_id', $compIds)
+                            ->get(['product_id', 'avg_purchase_price', 'last_purchase_price'])
+                            ->keyBy('product_id');
+
+                        // One uuid per deal CART LINE — the receipt groups component
+                        // rows under a single customer-facing deal header.
+                        $dealGroup = (string) \Illuminate\Support\Str::uuid();
+                        $dealColsOk = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'deal_group');
+
+                        foreach ($dealUnits as $u) {
+                            $pid = (int) $u['product']->id;
+                            $rowQty = $u['component_qty'] * $dealQty;
+                            $rowNet = round($u['unit_net'] * $dealQty, 2);
+                            $rowTax = round($u['unit_tax'] * $dealQty, 2);
+
+                            $subtotal += $rowNet;
+                            $totalTax += $rowTax;
+
+                            $dealStockNeeds[$pid] = ($dealStockNeeds[$pid] ?? 0) + $rowQty;
+                            $dealStockNames[$pid] = (string) $u['product']->name;
+
+                            $compRow = [
+                                'item_name' => (string) $u['product']->name,
+                                'hs_code' => $u['product']->hs_code,
+                                'uom' => $u['product']->uom ?: 'U',
+                                'product_id' => $pid,
+                                'quantity' => $rowQty,
+                                // Display-only (FbrService uses stored subtotal/tax):
+                                // per-single-unit gross share of the deal price.
+                                'unit_price' => round($u['component_qty'] > 0 ? $u['unit_gross'] / $u['component_qty'] : $u['unit_gross'], 2),
+                                'cost_price' => (function () use ($pid, $compStock) {
+                                    $s = $compStock->get($pid);
+                                    if (!$s) { return null; }
+                                    $avg = (float) $s->avg_purchase_price;
+                                    $last = (float) $s->last_purchase_price;
+                                    return $avg > 0 ? $avg : ($last > 0 ? $last : null);
+                                })(),
+                                'discount' => 0,
+                                'item_discount' => 0,
+                                'tax_rate' => $u['tax_rate'],
+                                'tax_amount' => $rowTax,
+                                'subtotal' => $rowNet,
+                                'total' => round($rowNet + $rowTax, 2),
+                                'is_tax_exempt' => $u['is_tax_exempt'],
+                            ];
+                            if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'is_third_schedule')) {
+                                $compRow['is_third_schedule'] = $u['is_third_schedule'];
+                            }
+                            if ($dealColsOk) {
+                                $compRow['deal_group'] = $dealGroup;
+                                $compRow['deal_id'] = (int) $deal->id;
+                                $compRow['deal_name'] = (string) $deal->name;
+                                $compRow['deal_quantity'] = $dealQty;
+                                $compRow['deal_unit_price'] = round((float) $deal->price, 2);
+                            }
+                            $itemsData[] = $compRow;
+                        }
+                        continue;
+                    }
+
                     $price = (float) $item['unit_price'];
                     $uom = strtoupper($item['uom'] ?? 'U');
                     $valueInput = isset($item['value_input']) && $item['value_input'] !== ''
@@ -1721,6 +1971,35 @@ class FbrPosController extends Controller
                         $itemDataRow['is_third_schedule'] = $fbrIsThirdSchedule;
                     }
                     $itemsData[] = $itemDataRow;
+                }
+
+                // ── 🍔 DEAL STOCK BLOCK (Task 1273, deliberate deviation from the
+                // never-block retail rule above): a deal PROMISES its components,
+                // so selling one with a missing component breaks the combo. Block
+                // only when stock tracking is ON and a stock row EXISTS with
+                // insufficient quantity — products never stocked don't block.
+                // lockForUpdate + deterministic product_id order: we're inside the
+                // sale DB::transaction, so the row locks are held until commit —
+                // a concurrent sale of the same components waits here, then
+                // rechecks against the POST-deduction quantity (no two sales can
+                // both pass on the same last units). InventoryService::deductStock
+                // later re-locks the same rows in the SAME transaction (no-op).
+                if (!empty($dealStockNeeds) && $company->inventory_enabled) {
+                    $dealStockRows = \App\Models\InventoryStock::where('company_id', $companyId)
+                        ->whereNull('branch_id')
+                        ->whereIn('product_id', array_keys($dealStockNeeds))
+                        ->orderBy('product_id')
+                        ->lockForUpdate()
+                        ->get(['product_id', 'quantity'])
+                        ->keyBy('product_id');
+                    foreach ($dealStockNeeds as $needPid => $needed) {
+                        $srow = $dealStockRows->get($needPid);
+                        if ($srow && (float) $srow->quantity < (float) $needed) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_component_out_of_stock', ['name' => $dealStockNames[$needPid] ?? ('#' . $needPid)])],
+                            ]);
+                        }
+                    }
                 }
 
                 $discountType = $request->discount_type;

@@ -470,6 +470,146 @@ class FbrPosPhase2Controller extends Controller
         return response()->json(['success' => true]);
     }
 
+    // ========================= DEALS (Task 1273) =========================
+    // FBR twin of PRA PosController::deals() — admin-only fixed-price combos.
+    // Same plan column as Promotions ('deals_enabled'); admin gating follows
+    // the FBR in-controller convention (no PosAdminOnly middleware on fbrpos).
+
+    /** Admin-only guard for deal management (owner/manager; cashiers never). */
+    private function dealsAdminGate()
+    {
+        $u = $this->user();
+        if (!$u || !$u->isPosAdmin()) {
+            if (request()->expectsJson()) {
+                abort(403, __('pos.custom_access_denied'));
+            }
+            return redirect()->route('fbrpos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        return null;
+    }
+
+    public function deals()
+    {
+        if ($resp = $this->dealsAdminGate()) return $resp;
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
+        $companyId = $this->companyId();
+        $deals = \App\Models\FbrPosDeal::where('company_id', $companyId)
+            ->with('items')
+            ->orderBy('name')
+            ->get();
+        $products = \App\Models\Product::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'default_price']);
+        // Company-scoped product-name lookup for the list cards (deal items
+        // store only product_id; Product has no global company scope).
+        $productNames = $products->pluck('name', 'id');
+        return view('fbr-pos.deals', compact('deals', 'products', 'productNames'));
+    }
+
+    /**
+     * Shared validation + normalization for storeDeal/updateDeal. Returns
+     * [attrs, components] where components = validated company-scoped
+     * {product_id => quantity} rows (duplicates merged).
+     */
+    private function validateDealRequest(Request $request, int $companyId): array
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:255',
+            'price' => 'required|numeric|min:1|max:10000000',
+            'active_days' => 'nullable|array',
+            'active_days.*' => 'integer|min:1|max:7',
+            'starts_on' => 'nullable|date',
+            'ends_on' => 'nullable|date|after_or_equal:starts_on',
+            'items' => 'required|array|min:1|max:30',
+            'items.*.product_id' => 'required|integer',
+            'items.*.quantity' => 'required|integer|min:1|max:999',
+        ]);
+
+        // Tamper-safe: every component product must belong to THIS company.
+        $productIds = collect($data['items'])->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
+        $ownedIds = \App\Models\Product::where('company_id', $companyId)
+            ->whereIn('id', $productIds)
+            ->pluck('id');
+        if ($ownedIds->count() !== $productIds->count()) {
+            abort(422, 'Invalid product selected for this deal.');
+        }
+
+        // Merge duplicate product rows (same product picked twice → sum qty).
+        $components = [];
+        foreach ($data['items'] as $row) {
+            $pid = (int) $row['product_id'];
+            $components[$pid] = ($components[$pid] ?? 0) + (int) $row['quantity'];
+        }
+
+        $attrs = [
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'price' => round((float) $data['price'], 2),
+            'active_days' => array_values(array_unique(array_map('intval', $data['active_days'] ?? []))),
+            'starts_on' => $data['starts_on'] ?? null,
+            'ends_on' => $data['ends_on'] ?? null,
+        ];
+
+        return [$attrs, $components];
+    }
+
+    public function storeDeal(Request $request)
+    {
+        if ($resp = $this->dealsAdminGate()) return $resp;
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
+        $companyId = $this->companyId();
+        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+
+        DB::transaction(function () use ($companyId, $attrs, $components) {
+            $deal = \App\Models\FbrPosDeal::create(array_merge($attrs, [
+                'company_id' => $companyId,
+                'is_active' => true,
+            ]));
+            foreach ($components as $pid => $qty) {
+                \App\Models\FbrPosDealItem::create(['deal_id' => $deal->id, 'product_id' => $pid, 'quantity' => $qty]);
+            }
+        });
+
+        return back()->with('success', __('pos.deal_added_success'));
+    }
+
+    public function updateDeal(Request $request, $id)
+    {
+        if ($resp = $this->dealsAdminGate()) return $resp;
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
+        $companyId = $this->companyId();
+        $deal = \App\Models\FbrPosDeal::where('company_id', $companyId)->findOrFail($id);
+        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+        $attrs['is_active'] = $request->has('is_active');
+
+        DB::transaction(function () use ($deal, $attrs, $components) {
+            $deal->update($attrs);
+            $deal->items()->delete();
+            foreach ($components as $pid => $qty) {
+                \App\Models\FbrPosDealItem::create(['deal_id' => $deal->id, 'product_id' => $pid, 'quantity' => $qty]);
+            }
+        });
+
+        return back()->with('success', __('pos.deal_updated_success'));
+    }
+
+    public function deleteDeal($id)
+    {
+        if ($resp = $this->dealsAdminGate()) return $resp;
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
+        $companyId = $this->companyId();
+        $deal = \App\Models\FbrPosDeal::where('company_id', $companyId)->findOrFail($id);
+        DB::transaction(function () use ($deal) {
+            $deal->items()->delete();
+            $deal->delete();
+        });
+        // Sold bills keep their own component rows + deal_* snapshot columns —
+        // deleting a deal never touches historical transactions.
+        return back()->with('success', __('pos.deal_deleted'));
+    }
+
     // ========================= PROMOTIONS =========================
 
     public function promotions()

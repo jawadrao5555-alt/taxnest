@@ -450,6 +450,15 @@ window.addEventListener('popstate', function() {
                             </button>
                             <span x-text="fbrEnabled ? 'ON' : 'OFF'" :class="fbrEnabled ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
                             <span x-show="fbrLoading" class="text-[10px] text-blue-500 animate-pulse">…</span>
+                            @if($isFbrCompanyAdmin ?? false)
+                            <span x-cloak x-show="fbrEnabled && !fbrConfigured"
+                                  class="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400"
+                                  title="{{ __('pos.fbr_reporting_setup_incomplete_body') }}"
+                                  aria-label="{{ __('pos.fbr_reporting_setup_incomplete_title') }}">
+                                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                                <span>{{ __('pos.fbr_reporting_setup_incomplete_short') }}</span>
+                            </span>
+                            @endif
                         </div>
                     </div>
 
@@ -534,6 +543,15 @@ window.addEventListener('popstate', function() {
             </button>
             <span x-text="fbrEnabled ? 'ON' : 'OFF'" :class="fbrEnabled ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
             <span x-show="fbrLoading" class="text-[10px] text-blue-500 animate-pulse">…</span>
+             @if($isFbrCompanyAdmin ?? false)
+             <span x-cloak x-show="fbrEnabled && !fbrConfigured"
+                   class="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400"
+                   title="{{ __('pos.fbr_reporting_setup_incomplete_body') }}"
+                   aria-label="{{ __('pos.fbr_reporting_setup_incomplete_title') }}">
+                 <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                 <span>{{ __('pos.fbr_reporting_setup_incomplete_short') }}</span>
+             </span>
+             @endif
         </div>
 
         <div class="w-px h-4 bg-blue-200 dark:bg-blue-800/40"></div>

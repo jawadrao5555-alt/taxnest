@@ -1131,6 +1131,9 @@ class FbrPosController extends Controller
         $company = Company::find($companyId);
         $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
         $fbrReportingEnabled = (bool) $company->fbr_reporting_enabled;
+        // The setup warning is an owner/company-admin concern. Keep the flag
+        // server-side so cashier pages do not even render the notice.
+        $isFbrCompanyAdmin = Auth::guard('fbrpos')->user()?->role === 'company_admin';
 
         // 🧮 Pending Day-Close detection (rush/holiday recovery)
         $pendingDayCloses = $this->getPendingDayCloses($companyId, 10);
@@ -1254,7 +1257,7 @@ class FbrPosController extends Controller
             'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
             'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed',
-            'userGridPrefs', 'activeDeals'
+            'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')

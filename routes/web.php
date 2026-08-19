@@ -1521,6 +1521,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
 
     Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
     Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');
+    // 🏷 Barcode label print page (Task 1272 — PRA port + picker upgrade)
+    Route::get('/products/labels', [FbrPosController::class, 'productLabels'])->name('fbrpos.products.labels');
+    // Bulk ops on SELECTED products — admin-gated in-controller (FBR convention)
+    Route::post('/products/bulk', [FbrPosController::class, 'bulkProductAction'])->name('fbrpos.products.bulk');
     // 📦 Excel export/template + bulk import (FBR mirror of pos.products.template/import).
     // NO plan.limit middleware on import (Task 361): at-cap shops must still be
     // able to run UPDATE-only imports (the middleware 403s the whole request at
@@ -1535,6 +1539,11 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/products/{id}/toggle-sale', [FbrPosController::class, 'toggleProductSale'])->name('fbrpos.products.toggle-sale');
     Route::post('/products/bulk-sale', [FbrPosController::class, 'bulkToggleSale'])->name('fbrpos.products.bulk-sale');
     Route::delete('/products/{id}', [FbrPosController::class, 'destroyProduct'])->name('fbrpos.products.destroy');
+    // 🛠 Services (Task 1272 — PRA port): non-stock service items; admin-gated in-controller
+    Route::get('/services', [FbrPosController::class, 'services'])->name('fbrpos.services');
+    Route::post('/services', [FbrPosController::class, 'storeService'])->name('fbrpos.services.store');
+    Route::put('/services/{id}', [FbrPosController::class, 'updateService'])->name('fbrpos.services.update');
+    Route::delete('/services/{id}', [FbrPosController::class, 'deleteService'])->name('fbrpos.services.delete');
     Route::get('/api/products/search', [FbrPosController::class, 'searchProducts'])->name('fbrpos.api.products.search');
     Route::get('/api/products/barcode', [FbrPosController::class, 'lookupByBarcode'])->name('fbrpos.api.products.barcode');
     // 🔄 Auto-Sync engine — silent 30-sec frontend poller + manual Failed modal

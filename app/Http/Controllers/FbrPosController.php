@@ -1203,6 +1203,12 @@ class FbrPosController extends Controller
                 : $custBase->orderBy('name')->get(['id', 'name', 'phone', 'khata_balance']);
         }
 
+        // 🛠 Services (Task 1272 — PRA port): non-stock service items (repairs
+        // etc.) baked like PRA allServices; they sell as product_id-NULL lines
+        // carrying their own tax_rate/is_tax_exempt (item-level FBR compliance).
+        $services = \App\Models\PosService::where('company_id', $companyId)
+            ->where('is_active', true)->orderBy('name')->get();
+
         // OFFLINE-FIRST BOOT (Aug 2026 — PRA port): fingerprint baked into the
         // page so a SW-cached copy of this screen can detect staleness via
         // /fbr-pos/api/boot-check. offlineAllowed = plan gate for NEW offline
@@ -1211,7 +1217,7 @@ class FbrPosController extends Controller
         $bootFp = $this->fbrBootFingerprint($company, Auth::guard('fbrpos')->user());
 
         return response(view($viewName, compact(
-            'company', 'products', 'fbrReportingEnabled', 'frequentProducts',
+            'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
             'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed'
         )))
@@ -1239,6 +1245,9 @@ class FbrPosController extends Controller
         $promoAgg = $agg(\App\Models\FbrPosPromotion::where('company_id', $companyId));
         $catalogRev = md5(implode('|', [
             $agg(Product::where('company_id', $companyId)),
+            // Services are baked into the sale screen (Task 1272) — a service
+            // add/edit must refresh SW-cached copies, same rule as products.
+            $agg(\App\Models\PosService::where('company_id', $companyId)),
             $promoAgg,
             $agg(\App\Models\FbrPosTerminal::where('company_id', $companyId)),
             // Promotions carry date windows — a day change must refresh the
@@ -1315,6 +1324,9 @@ class FbrPosController extends Controller
             'items.*.uom' => 'nullable|string|in:U,KG,GM,LTR,ML,MTR,SQM,PCS,PKT,DOZ,BOX,SET,BAG,BTL,CTN,ROL,FT,IN,YDS,TIN,CAN,BUN',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.is_tax_exempt' => 'nullable|boolean',
+            // Services (Task 1272): id into pos_services — when present the server
+            // resolves the AUTHORITATIVE tax_rate/is_tax_exempt from the DB row.
+            'items.*.service_id' => 'nullable|integer|min:1',
             'items.*.item_discount' => 'nullable|numeric|min:0',
             'items.*.value_input' => 'nullable|numeric|min:0.01',
             'customer_name' => 'nullable|string|max:255',
@@ -1581,6 +1593,38 @@ class FbrPosController extends Controller
                     // Third Schedule overrides exempt (belt-and-suspenders)
                     if ($fbrIsThirdSchedule) { $isExempt = true; }
                     $taxRate = $isExempt ? 0 : (float) ($item['tax_rate'] ?? $defaultTaxRate);
+
+                    // ─── Services (Task 1272): resolve tax from pos_services (authoritative) ───
+                    // Same DB-wins rule as Third Schedule above: for catalog-backed service
+                    // lines the stored rate/exemption ALWAYS come from the DB row — a 5%
+                    // service must never bill at the 18% default via a stale or crafted
+                    // payload. Company-scoped lookup blocks cross-company ids. A missing,
+                    // deleted, inactive, or foreign service_id REJECTS the sale (422) —
+                    // client tax values are never trusted for service lines. The sale
+                    // screen reloads its baked service list on boot, so a legit cashier
+                    // only hits this if the service was deleted/disabled mid-sale; the
+                    // clear message tells them to remove the line and re-add.
+                    if (isset($item['service_id'])) {
+                        // Exactly ONE catalog reference per line: a crafted payload
+                        // carrying BOTH product_id and service_id would bill a taxable
+                        // product at the service's (lower/zero) rate while still moving
+                        // product stock — hard-reject the conflict at this trust boundary.
+                        if (!empty($item['product_id'])) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.service_product_conflict_line', ['name' => (string) ($item['item_name'] ?? 'Item')])],
+                            ]);
+                        }
+                        $svcRow = \App\Models\PosService::where('company_id', $companyId)
+                            ->where('is_active', true)
+                            ->find((int) $item['service_id']);
+                        if (!$svcRow) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.service_unavailable_line', ['name' => (string) ($item['item_name'] ?? 'Service')])],
+                            ]);
+                        }
+                        $isExempt = (bool) ($svcRow->is_tax_exempt ?? false);
+                        $taxRate = $isExempt ? 0 : (float) ($svcRow->tax_rate ?? $defaultTaxRate);
+                    }
                     $itemDiscount = round((float) ($item['item_discount'] ?? 0), 2);
 
                     // 🎯 TAX-INCLUSIVE MODE — cart-level toggle (e.g. "150 ka rice" should TOTAL 150)
@@ -6685,6 +6729,191 @@ class FbrPosController extends Controller
         $name = $product->name;
         $product->delete();
         return redirect()->route('fbrpos.products')->with('success', __('pos.product_deleted_named', ['name' => $name]));
+    }
+
+    /**
+     * POST /fbr-pos/products/bulk — admin-only bulk ops on SELECTED products
+     * (Task 1272 — FBR mirror of PosController::bulkProductAction; no
+     * category/image on the FBR Product model). FBR tax coupling differs from
+     * PRA: exemption lives on tax_type (not a separate flag), and Third
+     * Schedule forces tax_type='exempt' + rate 0 — same rule as storeProduct.
+     */
+    public function bulkProductAction(Request $request)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
+            abort(403, 'Only admin can bulk-manage products.');
+        }
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'action' => 'required|string|in:activate,deactivate,delete,sale_show,sale_hide,price,price_percent,exempt_on,exempt_off,third_on,third_off',
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'price_value' => 'nullable|numeric|min:0|max:10000000',
+            'percent_value' => 'nullable|numeric|min:-90|max:500',
+        ]);
+
+        $query = Product::where('company_id', $companyId)->whereIn('id', $request->ids);
+        $count = (clone $query)->count();
+
+        switch ($request->action) {
+            case 'activate':
+                $query->update(['is_active' => true]);
+                $msg = __('pos.products_activated_count', ['count' => $count]);
+                break;
+            case 'deactivate':
+                $query->update(['is_active' => false]);
+                $msg = __('pos.products_deactivated_count', ['count' => $count]);
+                break;
+            case 'sale_show':
+                $query->update(['show_on_sale' => true]);
+                $msg = __('pos.products_shown_scope', ['count' => number_format($count), 'scope' => '']);
+                break;
+            case 'sale_hide':
+                $query->update(['show_on_sale' => false]);
+                $msg = __('pos.products_hidden_scope', ['count' => number_format($count), 'scope' => '']);
+                break;
+            case 'price':
+                if ($request->input('price_value') === null || $request->input('price_value') === '') {
+                    return back()->with('error', __('pos.enter_new_price'));
+                }
+                $newPrice = round((float) $request->input('price_value'), 2);
+                $query->update(['default_price' => $newPrice]);
+                $msg = __('pos.products_price_set', ['count' => $count, 'price' => $newPrice]);
+                break;
+            case 'price_percent':
+                // SQL-side so big selections stay one UPDATE (PRA convention).
+                $pct = (float) $request->input('percent_value');
+                if ($request->input('percent_value') === null || $request->input('percent_value') === '' || abs($pct) < 0.001) {
+                    return back()->with('error', __('pos.enter_percent'));
+                }
+                $factor = sprintf('%.6F', 1 + $pct / 100);
+                $query->update(['default_price' => DB::raw("ROUND(GREATEST(default_price * {$factor}, 0), 2)")]);
+                $msg = __('pos.products_price_updated_pct', ['count' => $count, 'pct' => ($pct > 0 ? "+{$pct}%" : "{$pct}%")]);
+                break;
+            case 'exempt_on':
+                // FBR coupling: exempt = tax_type + rate 0 (storeProduct rule).
+                $query->update(['tax_type' => 'exempt', 'default_tax_rate' => 0]);
+                $msg = __('pos.products_tax_exempt_on', ['count' => $count]);
+                break;
+            case 'exempt_off':
+                // Back to standard-rated (18%) — matches storeProduct's taxable
+                // default; per-product custom rates are set on the edit form.
+                $query->update(['tax_type' => 'taxable', 'default_tax_rate' => 18]);
+                $msg = __('pos.products_tax_exempt_off', ['count' => $count]);
+                break;
+            case 'third_on':
+                // Third Schedule ON → tax_type='exempt' + rate 0 (storeProduct
+                // coupling). Schema guard: column may not exist on prod yet.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
+                    $query->update(['is_third_schedule' => true, 'tax_type' => 'exempt', 'default_tax_rate' => 0]);
+                }
+                $msg = __('pos.products_third_on', ['count' => $count]);
+                break;
+            case 'third_off':
+                if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
+                    $query->update(['is_third_schedule' => false]);
+                }
+                $msg = __('pos.products_third_off', ['count' => $count]);
+                break;
+            case 'delete':
+                // FBR products carry no image files — plain delete (same as
+                // destroyProduct; sold lines keep their snapshot columns).
+                $query->delete();
+                $msg = __('pos.products_deleted_count', ['count' => $count]);
+                break;
+            default:
+                $msg = __('pos.no_action_taken');
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * GET /fbr-pos/products/labels — barcode/price label print page (Task 1272,
+     * PRA port + picker upgrade). Bakes the WHOLE catalog so the page itself
+     * offers search / select-all / quick filters / per-product quantity and
+     * thermal-roll + A4 format presets; ?ids= preselects rows (products list
+     * selection). Browser print — silent-print hook waits on the FBR printer
+     * settings task. Not admin-gated (parity with PRA: cashiers print labels).
+     */
+    public function productLabels(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $preselectedIds = array_values(array_filter(array_map('intval', explode(',', (string) $request->query('ids', '')))));
+        $products = Product::where('company_id', $companyId)->orderBy('name')->get();
+        $company = Company::find($companyId);
+        return view('fbr-pos.product-labels', compact('products', 'company', 'preselectedIds'));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🛠 Services (Task 1272 — PRA port): non-stock service items (repairs,
+    // fittings). Shared pos_services table (company-scoped, panel-agnostic);
+    // admin-gated in-controller per FBR convention. Sold as product_id-NULL
+    // lines carrying the service's tax_rate / is_tax_exempt.
+    // ═══════════════════════════════════════════════════════════════════
+
+    public function services()
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage services.');
+        $companyId = app('currentCompanyId');
+        $services = \App\Models\PosService::where('company_id', $companyId)->orderBy('name')->get();
+        return view('fbr-pos.services', compact('services'));
+    }
+
+    public function storeService(Request $request)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage services.');
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+            'description' => 'nullable|string',
+        ]);
+
+        \App\Models\PosService::create([
+            'company_id' => $companyId,
+            'name' => $request->name,
+            'description' => $request->description,
+            'price' => $request->price,
+            'tax_rate' => $request->tax_rate ?? 0,
+            'is_active' => true,
+            'is_tax_exempt' => $request->has('is_tax_exempt'),
+        ]);
+
+        return back()->with('success', __('pos.service_added_success'));
+    }
+
+    public function updateService(Request $request, $id)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage services.');
+        $companyId = app('currentCompanyId');
+        $service = \App\Models\PosService::where('company_id', $companyId)->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'tax_rate' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $service->update([
+            'name' => $request->name,
+            'description' => $request->description,
+            'price' => $request->price,
+            'tax_rate' => $request->tax_rate ?? $service->tax_rate,
+            'is_active' => $request->has('is_active'),
+            'is_tax_exempt' => $request->has('is_tax_exempt'),
+        ]);
+
+        return back()->with('success', __('pos.service_updated_success'));
+    }
+
+    public function deleteService($id)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage services.');
+        $companyId = app('currentCompanyId');
+        \App\Models\PosService::where('company_id', $companyId)->findOrFail($id)->delete();
+        return back()->with('success', __('pos.service_deleted'));
     }
 
     // ═══════════════════════════════════════════════════════════════════

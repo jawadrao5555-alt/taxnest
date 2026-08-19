@@ -353,7 +353,7 @@ class PosThirdScheduleBillingTest extends TestCase
     }
 
     /** Create an FBR catalog product. */
-    private function makeFbrProduct(array $attrs = []): \App\Models\Product
+    protected function makeFbrProduct(array $attrs = []): \App\Models\Product
     {
         return \App\Models\Product::create(array_merge([
             'company_id'        => $this->companyId,
@@ -377,7 +377,7 @@ class PosThirdScheduleBillingTest extends TestCase
     }
 
     /** Invoke FbrPosController::store() with a JSON-accepting request. */
-    private function callFbrStore(array $payload): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+    protected function callFbrStore(array $payload): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $userId = DB::table('users')->insertGetId([
             'name'       => 'FBR Cashier',

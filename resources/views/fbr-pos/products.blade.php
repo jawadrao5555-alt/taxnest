@@ -1,14 +1,27 @@
 <x-fbr-pos-layout>
-<div class="max-w-6xl mx-auto">
+@php
+    // Selection checkboxes + bulk bar are admin-only (endpoint 403s non-admins
+    // anyway — don't render controls a cashier can't use). Labels stay open.
+    $fbrIsAdmin = auth('fbrpos')->user() && auth('fbrpos')->user()->role === 'company_admin';
+@endphp
+<div class="max-w-6xl mx-auto" x-data="fbrProductBulk()">
     @include('fbr-pos.partials.back-link')
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.products_word') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.manage_products_tax_config') }}</p>
         </div>
-        <a href="{{ route('fbrpos.products.create') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
-            {{ __('pos.plus_new_product') }}
-        </a>
+        <div class="flex flex-wrap items-center gap-2">
+            {{-- 🏷 Label print page (Task 1272) — selection-aware: picked rows preselect on the labels page --}}
+            <a :href="labelsUrl()" href="{{ route('fbrpos.products.labels') }}"
+               class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                <span x-text="selected.length > 0 ? @js(__('pos.print')) + ' ' + selected.length : @js(__('pos.print_labels'))">{{ __('pos.print_labels') }}</span>
+            </a>
+            <a href="{{ route('fbrpos.products.create') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+                {{ __('pos.plus_new_product') }}
+            </a>
+        </div>
     </div>
 
     @if(session('success'))
@@ -120,6 +133,25 @@
         </form>
         <span class="text-[11px] text-gray-400">{{ __('pos.hidden_products_hint') }}</span>
     </div>
+
+    {{-- ═══ BULK ACTION BAR (Task 1272 — selected rows; PRA mirror, admin only) ═══ --}}
+    <div x-show="selected.length > 0" x-transition x-cloak
+         class="flex flex-wrap items-center gap-2 mb-4 p-3 rounded-xl bg-blue-600 text-white shadow-lg">
+        <span class="font-bold text-sm" x-text="selected.length + ' ' + @js(__('pos.selected_word'))"></span>
+        <div class="flex-1"></div>
+        <button @click="doBulk('activate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.activate') }}</button>
+        <button @click="doBulk('deactivate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.deactivate') }}</button>
+        <button @click="doBulk('sale_show')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.bulk_show_on_grid') }}</button>
+        <button @click="doBulk('sale_hide')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.bulk_hide_from_grid') }}</button>
+        <button @click="doBulk('price')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.set_price') }}</button>
+        <button @click="doBulk('price_percent')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.price_pct_plus_minus') }}</button>
+        <button @click="doBulk('exempt_on')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.tax_exempt_on') }}</button>
+        <button @click="doBulk('exempt_off')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.tax_exempt_off') }}</button>
+        <button @click="doBulk('third_on')" class="px-3 py-1.5 rounded-lg bg-indigo-500/80 hover:bg-indigo-600/80 text-xs font-semibold">{{ __('pos.third_schedule_on') }}</button>
+        <button @click="doBulk('third_off')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.third_schedule_off') }}</button>
+        <button @click="doBulk('delete')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-xs font-semibold">{{ __('pos.delete') }}</button>
+        <button @click="selected = []" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold">{{ __('pos.clear') }}</button>
+    </div>
     @endif
 
     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -127,6 +159,9 @@
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
             <thead class="bg-gray-50 dark:bg-gray-800">
                 <tr>
+                    @if($fbrIsAdmin)
+                    <th class="px-3 py-3 w-8"><input type="checkbox" @change="toggleAll($event)" :checked="allPageSelected" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"></th>
+                    @endif
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('pos.product_col') }}</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('pos.hs_code_col') }}</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{{ __('pos.tax_type_col') }}</th>
@@ -148,6 +183,9 @@
                     $badge = $taxBadges[$taxType] ?? $taxBadges['taxable'];
                 @endphp
                 <tr class="even:bg-gray-50/50 dark:even:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                    @if($fbrIsAdmin)
+                    <td class="px-3 py-3"><input type="checkbox" value="{{ $product->id }}" x-model.number="selected" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"></td>
+                    @endif
                     <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{{ $product->name }}</td>
                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">{{ $product->hs_code ?: '-' }}</td>
                     <td class="px-4 py-3 whitespace-nowrap">
@@ -192,7 +230,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <td colspan="{{ $fbrIsAdmin ? 8 : 7 }}" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                         {{ __('pos.no_products_yet_short') }} <a href="{{ route('fbrpos.products.create') }}" class="text-blue-600 hover:text-blue-800 font-medium">{{ __('pos.add_your_first_product') }}</a>.
                     </td>
                 </tr>
@@ -205,5 +243,64 @@
     @if($products->hasPages())
     <div class="mt-4">{{ $products->links() }}</div>
     @endif
+
+    <script>
+        // Task 1272 — selection + bulk ops (PRA productCatalog mirror, trimmed
+        // for the server-paginated FBR list; select-all = current page).
+        function fbrProductBulk() {
+            return {
+                selected: [],
+                pageIds: @json($products->pluck('id')->map(fn($i) => (int) $i)->values()),
+                csrf: '{{ csrf_token() }}',
+                bulkUrl: '{{ route('fbrpos.products.bulk') }}',
+                labelsBase: '{{ route('fbrpos.products.labels') }}',
+                labelsUrl() { return this.selected.length > 0 ? this.labelsBase + '?ids=' + this.selected.join(',') : this.labelsBase; },
+                get allPageSelected() {
+                    return this.pageIds.length > 0 && this.pageIds.every(id => this.selected.includes(id));
+                },
+                toggleAll(e) {
+                    if (e.target.checked) { this.selected = [...new Set([...this.selected, ...this.pageIds])]; }
+                    else { this.selected = this.selected.filter(id => !this.pageIds.includes(id)); }
+                },
+                postForm(action, fields) {
+                    const f = document.createElement('form');
+                    f.method = 'POST'; f.action = action;
+                    const add = (n, v) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); };
+                    add('_token', this.csrf);
+                    for (const [k, v] of Object.entries(fields)) {
+                        if (Array.isArray(v)) v.forEach(val => add(k + '[]', val));
+                        else add(k, v);
+                    }
+                    document.body.appendChild(f); f.submit();
+                },
+                doBulk(action) {
+                    if (this.selected.length === 0) return;
+                    const fields = { action: action, ids: this.selected };
+                    if (action === 'delete') { if (!confirm(@js(__('pos.js_confirm_bulk_delete')).replace(':count', this.selected.length))) return; }
+                    if (action === 'price') {
+                        const v = prompt(@js(__('pos.js_prompt_set_price')).replace(':count', this.selected.length), '');
+                        if (v === null) return;
+                        const num = parseFloat(String(v).replace(/[^0-9.]/g, ''));
+                        if (isNaN(num) || num < 0) { alert(@js(__('pos.js_alert_invalid_price'))); return; }
+                        if (!confirm(@js(__('pos.js_confirm_set_price')).replace(':count', this.selected.length).replace(':price', num))) return;
+                        fields.price_value = num;
+                    }
+                    if (action === 'price_percent') {
+                        const v = prompt(@js(__('pos.js_prompt_price_percent')), '');
+                        if (v === null) return;
+                        const num = parseFloat(v);
+                        if (isNaN(num) || num === 0 || num < -90 || num > 500) { alert(@js(__('pos.js_alert_invalid_percent'))); return; }
+                        if (!confirm(@js(__('pos.js_confirm_price_percent')).replace(':count', this.selected.length).replace(':percent', (num > 0 ? '+' : '') + num))) return;
+                        fields.percent_value = num;
+                    }
+                    if (action === 'exempt_on' && !confirm(@js(__('pos.js_confirm_exempt_on')).replace(':count', this.selected.length))) return;
+                    if (action === 'exempt_off' && !confirm(@js(__('pos.js_confirm_exempt_off')).replace(':count', this.selected.length))) return;
+                    if (action === 'third_on' && !confirm(@js(__('pos.js_confirm_third_on')).replace(':count', this.selected.length))) return;
+                    if (action === 'third_off' && !confirm(@js(__('pos.js_confirm_third_off')).replace(':count', this.selected.length))) return;
+                    this.postForm(this.bulkUrl, fields);
+                },
+            };
+        }
+    </script>
 </div>
 </x-fbr-pos-layout>

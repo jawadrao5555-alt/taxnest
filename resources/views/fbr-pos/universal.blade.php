@@ -24,7 +24,10 @@
         'kitchen' => false, 'recipes' => false, 'inventory' => false,
         'kitchen_notes' => false,
     ];
-    $services = collect();
+    // Services (Task 1272): UNPINNED — create() bakes active PosService rows so
+    // service items (repairs etc.) sell here as product_id-NULL lines carrying
+    // their own tax_rate/is_tax_exempt. The ?? keeps stray renders 500-free.
+    $services = $services ?? collect();
     $categories = collect();
     $tables = collect();
     $selectedTable = null;
@@ -2920,7 +2923,27 @@ $productsJson = $products->map(function($p) {
         'stockStatus' => null,
     ];
 })->values();
-$servicesJson = collect(); // FBR POS has no services module
+// Services (Task 1272 — PRA port + FBR per-item tax fields): no hs_code/barcode,
+// UoM 'U'; tax comes from the service's own tax_rate / is_tax_exempt so the
+// store() payload stays item-level compliant (product_id NULL lines).
+$servicesJson = $services->map(function($s) {
+    return [
+        'id' => $s->id, 'type' => 'service', 'name' => $s->name,
+        'price' => (float) ($s->price ?? 0), 'category' => 'Services',
+        'show_on_sale' => true,
+        'cost_price' => 0.0,
+        'is_tax_exempt' => (bool) ($s->is_tax_exempt ?? false),
+        'is_third_schedule' => false,
+        'tax_rate' => (float) ($s->tax_rate ?? 0),
+        'hs_code' => null,
+        'uom' => 'U',
+        'barcode' => null,
+        'is_price_editable' => true,
+        'hasRecipe' => false,
+        'image' => null,
+        'stockStatus' => null,
+    ];
+})->values();
 $selectedTableJson = $selectedTable ? ['id' => $selectedTable->id, 'table_number' => $selectedTable->table_number, 'seats' => $selectedTable->seats] : null;
 $customersJson = $customers->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone])->values();
 $kitchenSettings = [
@@ -4181,12 +4204,16 @@ function restaurantPos() {
                 this.activeCartIndex = this.cart.indexOf(existing);
                 this.animateQty(this.activeCartIndex);
             } else {
-                // FBR: hydrate compliance fields (hs_code / uom / tax_rate) from the master
-                // product record — some callers pass minimal {id,type,name,price} objects.
-                const src = (item.type === 'product' && item.id) ? this.allProducts.find(p => p.id === item.id) : null;
+                // FBR: hydrate compliance fields (hs_code / uom / tax_rate / exemption) from
+                // the master catalog record — some callers (Quick Type, Random, grid picks)
+                // pass minimal {id,type,name,price} objects. Services hydrate from allServices
+                // (Task 1272): a 5% service must NEVER fall back to the 18% product default.
+                const src = (item.type === 'product' && item.id) ? this.allProducts.find(p => p.id === item.id)
+                    : ((item.type === 'service' && item.id) ? this.allServices.find(s => s.id === item.id) : null);
+                const srcExempt = (item.is_tax_exempt !== undefined && item.is_tax_exempt !== null) ? !!item.is_tax_exempt : !!(src && src.is_tax_exempt);
                 const rate = (item.tax_rate === 0 || item.tax_rate) ? parseFloat(item.tax_rate)
                     : ((src && (src.tax_rate === 0 || src.tax_rate)) ? parseFloat(src.tax_rate) : 18);
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: (item.is_third_schedule) ? 0 : rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (srcExempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: (item.is_third_schedule || srcExempt) ? 0 : rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
                 this.activeCartIndex = this.cart.length - 1;
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
@@ -5933,7 +5960,15 @@ function restaurantPos() {
             // Retail POS (non-restaurant) companies: restaurant hold endpoint
             // returns 403. Route ALL payments through processPaymentManual
             // which posts directly to pos.invoice.store (universal endpoint).
-            if (!this.isRestaurantMode || this.hasManualItems()) {
+            // ── FBR DIVERGENCE (Task 1272) ── ALWAYS bill via processPaymentManual
+            // (fbrpos.store). The PRA restaurant hold/pay endpoints below are
+            // guard-blocked for fbrpos sessions (PosAuth 302s to /pos/login), so
+            // this branch must short-circuit even when isRestaurantMode=true
+            // (KOT companies since the Aug 2026 kot unpin). FBR KOT printing runs
+            // off the TRANSACTION via runAutoPrintChain — never restaurant orders.
+            // The PRA branch below is kept for port-diffability only (dead code).
+            const FBR_ALWAYS_MANUAL = true;
+            if (FBR_ALWAYS_MANUAL || !this.isRestaurantMode || this.hasManualItems()) {
                 return await this.processPaymentManual(method, provisional, skipReceipt);
             }
 
@@ -5989,6 +6024,10 @@ function restaurantPos() {
                         quantity: c.quantity,
                         unit_price: c.unit_price,
                         product_id: (c.item_type === 'product' && c.item_id) ? c.item_id : null,
+                        // Services (Task 1272): ride the service id so store() resolves the
+                        // AUTHORITATIVE tax_rate/is_tax_exempt from pos_services server-side
+                        // (client values are only a display hint — never trusted for tax).
+                        service_id: (c.item_type === 'service' && c.item_id) ? c.item_id : null,
                         hs_code: c.hs_code || null,
                         uom: c.uom || 'U',
                         tax_rate: this._itemRate(c),

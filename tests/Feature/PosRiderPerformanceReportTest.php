@@ -88,6 +88,19 @@ class PosRiderPerformanceReportTest extends TestCase
         return $method->invoke($controller, self::COMPANY, $from, $to);
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function rank(array $rows): array
+    {
+        $controller = app(PosRiderTrackingController::class);
+        $method = new \ReflectionMethod($controller, 'rankReportRows');
+        $method->setAccessible(true);
+
+        return $method->invoke($controller, $rows);
+    }
+
     private function day(string $date): Carbon
     {
         return Carbon::createFromFormat('Y-m-d', $date, config('app.timezone'))->startOfDay();
@@ -186,5 +199,28 @@ class PosRiderPerformanceReportTest extends TestCase
         $this->assertSame(5, $stats[$rider]['delivered']);
         $this->assertSame(20, $stats[$rider]['avg_minutes'],
             'Only the 30- and 10-minute stamped spans should be averaged.');
+    }
+
+    public function test_ranking_prioritizes_deliveries_average_time_then_kilometres(): void
+    {
+        $rows = [
+            ['rider' => 'fewer-but-fast', 'delivered' => 4, 'avg_minutes' => 5, 'km' => 99.0],
+            ['rider' => 'most-deliveries', 'delivered' => 5, 'avg_minutes' => 60, 'km' => 1.0],
+            ['rider' => 'slower-average', 'delivered' => 5, 'avg_minutes' => 30, 'km' => 50.0],
+            ['rider' => 'faster-average', 'delivered' => 5, 'avg_minutes' => 20, 'km' => 1.0],
+            ['rider' => 'more-kilometres', 'delivered' => 5, 'avg_minutes' => 20, 'km' => 12.0],
+            ['rider' => 'no-average', 'delivered' => 5, 'avg_minutes' => null, 'km' => 100.0],
+        ];
+
+        $ranked = $this->rank($rows);
+
+        $this->assertSame([
+            'more-kilometres',
+            'faster-average',
+            'slower-average',
+            'most-deliveries',
+            'no-average',
+            'fewer-but-fast',
+        ], array_column($ranked, 'rider'));
     }
 }

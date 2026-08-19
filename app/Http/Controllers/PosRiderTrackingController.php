@@ -1167,17 +1167,7 @@ class PosRiderTrackingController extends Controller
             ];
         }
 
-        // Ranking: most deliveries first, then fastest average, then most km.
-        usort($rows, function ($a, $b) {
-            if ($a['delivered'] !== $b['delivered']) {
-                return $b['delivered'] <=> $a['delivered'];
-            }
-            $avg = ($a['avg_minutes'] ?? PHP_INT_MAX) <=> ($b['avg_minutes'] ?? PHP_INT_MAX);
-            if ($avg !== 0) {
-                return $avg;
-            }
-            return $b['km'] <=> $a['km'];
-        });
+        $rows = $this->rankReportRows($rows);
 
         return view('pos.rider-report', [
             'locked' => false,
@@ -1190,6 +1180,45 @@ class PosRiderTrackingController extends Controller
             'hasDeliveryStamps' => Schema::hasColumn('pos_transactions', 'rider_assigned_at')
                 && Schema::hasColumn('pos_transactions', 'delivered_at'),
         ]);
+    }
+
+    /**
+     * Rank report rows by the owner's definition of best rider:
+     * delivered bills, valid average delivery time, faster average, then km.
+     *
+     * A missing average is not a very large average — it is an unavailable
+     * measurement. Keep that rider below one with a real average when their
+     * delivery counts match.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function rankReportRows(array $rows): array
+    {
+        usort($rows, function (array $a, array $b): int {
+            $delivered = ((int) ($b['delivered'] ?? 0))
+                <=> ((int) ($a['delivered'] ?? 0));
+            if ($delivered !== 0) {
+                return $delivered;
+            }
+
+            $aHasAverage = ($a['avg_minutes'] ?? null) !== null;
+            $bHasAverage = ($b['avg_minutes'] ?? null) !== null;
+            if ($aHasAverage !== $bHasAverage) {
+                return $bHasAverage <=> $aHasAverage;
+            }
+
+            if ($aHasAverage) {
+                $average = ((float) $a['avg_minutes']) <=> ((float) $b['avg_minutes']);
+                if ($average !== 0) {
+                    return $average;
+                }
+            }
+
+            return ((float) ($b['km'] ?? 0)) <=> ((float) ($a['km'] ?? 0));
+        });
+
+        return $rows;
     }
 
     /**

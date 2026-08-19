@@ -19,28 +19,8 @@
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                         <span>Download ALL ZIP</span>
                     </a>
-                    {{-- WHT-on-PDF toggle (session-based, all PDF templates respect this) --}}
-                    <div x-data="{ on: {{ session('pdf_show_wht', false) ? 'true' : 'false' }}, saving: false }"
-                         class="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                        <span class="text-[11px] font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">WHT on PDF</span>
-                        <button type="button"
-                                @click="
-                                    saving = true;
-                                    let fd = new FormData();
-                                    fd.append('_token', document.querySelector('meta[name=csrf-token]')?.content || '');
-                                    fd.append('on', on ? '0' : '1');
-                                    fetch('{{ route('invoices.toggle-wht-pdf') }}', { method: 'POST', headers: {'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}, body: fd })
-                                        .then(r => r.json())
-                                        .then(d => { on = !!d.pdf_show_wht; saving = false; })
-                                        .catch(() => { saving = false; alert('Toggle failed'); });
-                                "
-                                :class="on ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'"
-                                class="relative inline-flex h-5 w-10 items-center rounded-full transition focus:outline-none disabled:opacity-50"
-                                :disabled="saving">
-                            <span :class="on ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-4 w-4 transform rounded-full bg-white transition shadow"></span>
-                        </button>
-                        <span x-text="on ? 'ON' : 'OFF'" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'" class="text-[10px] font-bold w-8"></span>
-                    </div>
+                    {{-- WHT on PDF is now per-invoice: the row renders automatically
+                         whenever the invoice has a WHT amount applied (session toggle removed). --}}
                     <a href="{{ route('invoices.import-history') }}"
                        class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:border-blue-300 dark:hover:border-blue-700 transition"
                        title="See past bulk imports and re-download error reports">

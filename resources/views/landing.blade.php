@@ -504,24 +504,28 @@
                         </div>
                         <h4 class="text-3xl font-serif text-[#052730] mb-4">FBR POS</h4>
                         <p class="text-gray-600 mb-6 leading-relaxed">
-                            A robust retail billing system wired directly to the FBR for real-time submission. Handle high-volume checkouts with an installable PWA designed for uninterrupted operations.
+                            A complete retail &amp; restaurant billing system wired directly to the FBR — cloud submission or fiscal-device local mode. Everything a real shop runs daily, on the same terminal that stays compliant.
                         </p>
                         <ul class="space-y-3 mb-8">
                             <li class="flex items-start">
                                 <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Direct FBR POS submission architecture</span>
+                                <span class="text-gray-700 text-sm">Direct FBR submission — cloud API or fiscal-device local mode</span>
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Installable PWA for desktop-like performance</span>
+                                <span class="text-gray-700 text-sm">Restaurant tools — KOT, kitchen display, dine-in tables &amp; QR menu</span>
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Keyboard-first interface with multi-branch management</span>
+                                <span class="text-gray-700 text-sm">Inventory &amp; stock, product Excel import/export, deals &amp; promotions</span>
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-blue mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Returns, customer loyalty, promotions &amp; day-close reports</span>
+                                <span class="text-gray-700 text-sm">Offline billing with auto-sync, khata, loyalty &amp; delivery riders</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="accent-blue mr-3 text-lg leading-none">•</span>
+                                <span class="text-gray-700 text-sm">Analytics, Z-reports &amp; shifts, multi-branch, Android mobile app</span>
                             </li>
                         </ul>
                         <div class="flex gap-4">
@@ -628,9 +632,9 @@
                         </tr>
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Standout features</td>
-                            <td class="p-5">HS code intelligence, bulk Excel import, AI invoice parsing</td>
-                            <td class="p-5">Restaurant suite, delivery riders, khata, Urdu interface, desktop &amp; mobile apps</td>
-                            <td class="p-5">Returns &amp; loyalty, promotions, day-close reports, offline billing</td>
+                            <td class="p-5">HS code intelligence, AI invoice parsing, buyer delivery via WhatsApp &amp; email, consultant console</td>
+                            <td class="p-5">Restaurant suite, delivery riders with live tracking, khata, Urdu interface, desktop &amp; mobile apps</td>
+                            <td class="p-5">Restaurant KOT &amp; kitchen display, inventory, offline billing, khata &amp; loyalty, delivery riders</td>
                         </tr>
                         <tr>
                             <td class="p-5"></td>

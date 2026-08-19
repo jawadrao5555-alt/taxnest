@@ -464,9 +464,9 @@
                     <p class="text-sm text-gray-500">Every invoice is checked against FBR tax schedules before it is submitted.</p>
                 </div>
                 <div class="reveal-on-scroll md:pl-12" style="transition-delay: 100ms;">
-                    <p class="text-[3.5rem] font-serif font-bold text-[#0A4D5C] leading-none mb-2">4-Step</p>
+                    <p class="text-[3.5rem] font-serif font-bold text-[#0A4D5C] leading-none mb-2">3-Step</p>
                     <p class="text-sm font-semibold text-gray-900 uppercase tracking-widest mb-1">Invoice Lifecycle</p>
-                    <p class="text-sm text-gray-500">A simplified draft-to-locked flow your staff learns in one afternoon.</p>
+                    <p class="text-sm text-gray-500">Draft, verify, locked — a simple flow your staff learns in one afternoon.</p>
                 </div>
                 <div class="reveal-on-scroll md:pl-12" style="transition-delay: 200ms;">
                     <p class="text-[3.5rem] font-serif font-bold text-[#0A4D5C] leading-none mb-2">24/7</p>
@@ -533,7 +533,7 @@
                     </div>
                     <div>
                         <h4 class="text-2xl font-serif text-[#052730] mb-3">Bulk Excel Import</h4>
-                        <p class="text-gray-600 leading-relaxed mb-4">Already keeping your sales in spreadsheets? Upload an Excel file and TaxNest turns entire batches of rows into draft invoices in one go — each row mapped, validated against FBR rules, and queued for review. No more retyping hundreds of invoices by hand at month end.</p>
+                        <p class="text-gray-600 leading-relaxed mb-4">Already keeping your sales in spreadsheets? Upload an Excel file and TaxNest turns entire batches of rows into draft invoices in one go — each row mapped, validated against FBR rules, and queued for review. Rows that fail get AI-suggested fixes you can apply in one click (Premium). No more retyping hundreds of invoices by hand at month end.</p>
                     </div>
                 </div>
 
@@ -547,6 +547,45 @@
                     <div>
                         <h4 class="text-2xl font-serif text-[#052730] mb-3">AI Invoice Parsing</h4>
                         <p class="text-gray-600 leading-relaxed mb-4">Paste rough invoice text — a WhatsApp order, a scanned bill, plain notes — and the AI reads it for you: buyer, items, quantities, rates and amounts land in a structured draft ready for your review. You confirm the fields; the system handles the data entry.</p>
+                    </div>
+                </div>
+
+                <div class="w-full h-px bg-gray-200"></div>
+
+                <!-- Point 06 -->
+                <div class="flex flex-col md:flex-row gap-8 reveal-on-scroll items-start">
+                    <div class="w-16 flex-shrink-0 pt-1">
+                        <span class="font-serif text-4xl text-[#0A4D5C] opacity-30 font-bold">06</span>
+                    </div>
+                    <div>
+                        <h4 class="text-2xl font-serif text-[#052730] mb-3">Deliver &amp; Brand Your Invoices</h4>
+                        <p class="text-gray-600 leading-relaxed mb-4">Send any invoice straight to the buyer over WhatsApp or email, or hand them a secure share link they can open on any phone. Need a month's worth of PDFs for the accountant? Download them all as a ZIP in one click. On the Premium plan, white-label the PDFs with your own logo and colors so every invoice carries your brand, not ours.</p>
+                    </div>
+                </div>
+
+                <div class="w-full h-px bg-gray-200"></div>
+
+                <!-- Point 07 -->
+                <div class="flex flex-col md:flex-row gap-8 reveal-on-scroll items-start">
+                    <div class="w-16 flex-shrink-0 pt-1">
+                        <span class="font-serif text-4xl text-[#0A4D5C] opacity-30 font-bold">07</span>
+                    </div>
+                    <div>
+                        <h4 class="text-2xl font-serif text-[#052730] mb-3">Withholding Tax, Handled</h4>
+                        <p class="text-gray-600 leading-relaxed mb-4">Track withholding tax on your invoices without a side spreadsheet: toggle WHT on the PDF, correct entries while drafts are still open, and pull dedicated WHT reports and PDFs when filing time comes. Locked invoices stay locked — corrections leave a clean trail.</p>
+                    </div>
+                </div>
+
+                <div class="w-full h-px bg-gray-200"></div>
+
+                <!-- Point 08 -->
+                <div class="flex flex-col md:flex-row gap-8 reveal-on-scroll items-start">
+                    <div class="w-16 flex-shrink-0 pt-1">
+                        <span class="font-serif text-4xl text-[#0A4D5C] opacity-30 font-bold">08</span>
+                    </div>
+                    <div>
+                        <h4 class="text-2xl font-serif text-[#052730] mb-3">Consultant Console &amp; API</h4>
+                        <p class="text-gray-600 leading-relaxed mb-4">Tax consultants get a dedicated console: link client companies, watch each one's filing health from a single dashboard, and earn referral commissions on clients you bring in. Building your own software? The Premium plan includes a REST API to push invoices into TaxNest programmatically with a secure API key.</p>
                     </div>
                 </div>
             </div>

@@ -334,7 +334,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">3</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Offline resilience</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Internet outages shouldn't stop your register. Bills print offline and synchronize automatically with the PRA the moment your connection returns.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Internet outages shouldn't stop your register. Bills print offline and synchronize automatically with the PRA the moment your connection returns — and the NestPOS Desktop app keeps the whole sale screen working with silent thermal printing even when the connection is down.</p>
                 </div>
 
                 <!-- Feature 4 -->
@@ -347,7 +347,7 @@
                 <!-- Feature 5 -->
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">5</div>
-                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Delivery riders &amp; khata <span class="align-middle ml-2 inline-block px-2 py-0.5 bg-[#0F6171]/10 text-[#0A4D5C] font-mono text-[10px] font-bold uppercase tracking-widest">Pro +</span></h3>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Delivery riders <span class="align-middle ml-2 inline-block px-2 py-0.5 bg-[#0F6171]/10 text-[#0A4D5C] font-mono text-[10px] font-bold uppercase tracking-widest">Pro +</span></h3>
                     <p class="text-gray-600 text-lg leading-relaxed relative z-10">Assign every delivery to a rider, track the cash each rider owes, settle bills the moment they return — and a live pending-bills tile on the dashboard so nothing is forgotten at closing time.</p>
                 </div>
 
@@ -355,14 +355,14 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">6</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">The manager's cockpit</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri), cancelled-orders and waste reports, analytics dashboards with PDF export, and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Unlimited plan), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
                 </div>
 
                 <!-- Feature 7 -->
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">7</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Deals &amp; combo pricing <span class="align-middle ml-2 inline-block px-2 py-0.5 bg-[#0F6171]/10 text-[#0A4D5C] font-mono text-[10px] font-bold uppercase tracking-widest">Business +</span></h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Build combo deals once and the price is enforced by the server on every bill — cashiers can't fat-finger a discount. Deal stock draws down from the real products behind it.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Build combo deals once and the price is enforced by the server on every bill — cashiers can't fat-finger a discount. Deal stock draws down from the real products behind it, and recipe-based menu items deduct ingredient stock automatically.</p>
                 </div>
 
                 <!-- Feature 8 -->
@@ -397,7 +397,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">12</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Counter essentials</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Order tokens printed on receipt and KOT so orders never get mixed up, product Excel import/export for bulk catalogs (Business plan onwards), tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Order tokens printed on receipt and KOT so orders never get mixed up, customer khata and loyalty points, product Excel import/export for bulk catalogs (Business plan onwards), caller-ID customer lookup on the Unlimited plan, tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
                 </div>
             </div>
         </div>
@@ -418,7 +418,7 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16">
                 <h2 class="text-4xl font-serif text-[#052730] mb-6">Simple pricing.</h2>
-                <p class="text-gray-600 font-light text-lg">One edition, full PRA compliance — pick the plan that fits your shop.</p>
+                <p class="text-gray-600 font-light text-lg">Full PRA compliance in every plan — pick the size that fits your shop.</p>
             </div>
 
             <div class="grid grid-cols-1 gap-8 max-w-2xl mx-auto">

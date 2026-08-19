@@ -114,7 +114,7 @@
                 // set the thermal receipt reads (business-profile Print Settings).
                 $rd = $company->displayPrefs('fbrpos');
             @endphp
-            <h1>{{ $company->name }}</h1>
+            @if($rd['show_business_name'])<h1>{{ $company->name }}</h1>@endif
             @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
             @if($rd['show_mobile'] && $company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
             @if($rd['show_email'] && $company->email)<p>{{ $company->email }}</p>@endif
@@ -232,10 +232,14 @@
                 <div class="val">-PKR {{ number_format($transaction->discount_amount, 2) }}</div>
             </div>
             @endif
+            {{-- Task 1263: customer-copy tax display toggle — amounts submitted
+                 to FBR are never affected (mirrors the PRA show_tax rule). --}}
+            @if($rd['show_tax'] ?? true)
             <div class="total-row">
                 <div class="lbl">{{ __('pos.receipt_tax') }} ({{ number_format($transaction->tax_rate, 0) }}%)</div>
                 <div class="val">PKR {{ number_format($transaction->tax_amount, 2) }}</div>
             </div>
+            @endif
             @if($transaction->fbr_service_charge > 0)
             <div class="total-row">
                 <div class="lbl">{{ __('pos.dcp_fbr_pos_fee_sro') }}</div>
@@ -356,7 +360,9 @@
 
         <div class="footer">
             @if($rd['show_footer'])
-            <p>{{ __('pos.receipt_thank_purchase') }}</p>
+            {{-- Task 1263: custom footer text (receipt-settings) replaces the
+                 default thank-you line, PRA-style; footer note stays additive. --}}
+            <p>{{ !empty($rd['footer_text']) ? $rd['footer_text'] : __('pos.receipt_thank_purchase') }}</p>
             @if(!empty($company->receipt_footer_note))
             <p style="font-style: italic;">{{ $company->receipt_footer_note }}</p>
             @endif
@@ -364,7 +370,9 @@
             @if($company->fbr_pos_id)
             <p style="font-weight:bold; color:#1e3a5f;">{{ __('pos.rcpt_fbr_integrated') }}</p>
             @endif
+            @if($rd['show_developed_by'])
             <div class="brand">{{ __('pos.dcp_powered_taxnest_fbr') }}</div>
+            @endif
             {{-- Owner (6 Aug 2026): print-time timestamp hataya — Date info mein hai. --}}
         </div>
     </div>

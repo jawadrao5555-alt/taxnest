@@ -1410,6 +1410,77 @@ class AgentController extends Controller
             ])->render())->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
+        // ═══ Task 1263 — FBR POS silent printing (same agent, fiscal_device shops) ═══
+        // FBR bill receipt: ONE template handles both paper widths (branches on
+        // company print_paper_size internally). No fbrPlanGate here — the agent
+        // route carries no web session; the job was already gated at enqueue.
+        if ($job->type === 'fbr_bill') {
+            $transaction = \App\Models\FbrPosTransaction::where('company_id', $company->id)
+                ->with(['items', 'creator'])
+                ->find($job->transaction_id);
+            if (!$transaction) {
+                return response()->json(['error' => 'Transaction not found'], 404);
+            }
+            $this->setPrintLocale($transaction->creator?->language, $job, $company);
+            return response(view('fbr-pos.receipt', compact('transaction', 'company'))->render())
+                ->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
+        // FBR KOT: restaurant_order_id carries an FbrPosHeldSale id (pre-pay
+        // Send-to-Kitchen ticket — FBR holds are JSON carts, no RestaurantOrder
+        // rows); transaction_id = post-pay reprint. Mirrors kotTicket/kotReprint.
+        if ($job->type === 'fbr_kot') {
+            $this->setPrintLocale(null, $job, $company);
+            if ($job->restaurant_order_id) {
+                $held = \App\Models\FbrPosHeldSale::where('company_id', $company->id)
+                    ->find($job->restaurant_order_id);
+                if (!$held) {
+                    return response('', 204); // hold recalled/billed — nothing to print
+                }
+                $cartData  = $held->cart_data ?? [];
+                $items     = is_array($cartData['items'] ?? null) ? $cartData['items'] : [];
+                $tokenNo   = isset($held->token_no)   ? (int)  $held->token_no   : (isset($cartData['token_no'])   ? (int)  $cartData['token_no']   : null);
+                $orderCode = isset($held->order_code) ? (string) $held->order_code : (isset($cartData['order_code']) ? (string) $cartData['order_code'] : null);
+                $customerName = $held->customer_name ?? ($cartData['customer_name'] ?? null);
+                $kitchenNotes = $cartData['kitchen_notes'] ?? null;
+                $now = now();
+                $autoPrint = false; // agent prints natively — no window.print() script needed
+                return response(view('fbr-pos.kitchen-ticket', compact(
+                    'company', 'held', 'items', 'tokenNo', 'orderCode',
+                    'customerName', 'kitchenNotes', 'now', 'autoPrint'
+                ))->render())->header('Content-Type', 'text/html; charset=UTF-8');
+            }
+            $transaction = \App\Models\FbrPosTransaction::where('company_id', $company->id)
+                ->with(['items', 'creator'])
+                ->find($job->transaction_id);
+            if (!$transaction) {
+                return response()->json(['error' => 'Transaction not found'], 404);
+            }
+            $this->setPrintLocale($transaction->creator?->language, $job, $company);
+            $tokenNo   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'token_no')
+                ? ($transaction->token_no ? (int) $transaction->token_no : null)
+                : null;
+            $orderCode = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_code')
+                ? ($transaction->order_code ?: null)
+                : null;
+            $items = $transaction->items->map(function ($it) {
+                return [
+                    'item_name'     => $it->item_name,
+                    'quantity'      => (float) $it->quantity,
+                    'special_notes' => null,
+                ];
+            })->all();
+            $customerName = $transaction->customer_name;
+            $kitchenNotes = null;
+            $now = $transaction->created_at ?? now();
+            $held = null; // not a held sale — template branches on this
+            $autoPrint = false;
+            return response(view('fbr-pos.kitchen-ticket', compact(
+                'company', 'held', 'items', 'tokenNo', 'orderCode',
+                'customerName', 'kitchenNotes', 'now', 'autoPrint'
+            ))->render())->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
         return response()->json(['error' => 'Unknown job type'], 422);
     }
 

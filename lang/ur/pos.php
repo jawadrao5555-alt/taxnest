@@ -3449,6 +3449,13 @@ return [
     'show_tax_on_local_receipt' => 'لوکل رسید پر ٹیکس دکھائیں',
     'show_tax_on_pra_receipt' => 'PRA رسید پر ٹیکس دکھائیں',
     'show_tax_pra_hint' => 'سب ٹوٹل + سیلز ٹیکس لائنز پرنٹ کریں۔ بند کرنے پر کسٹمر کاپی میں صرف کل ٹوٹل نظر آئے گا۔ ٹیکس ہمیشہ مکمل طور پر PRA کو جمع ہوتا ہے؛ تفصیلات QR اسکین (Sahulat ایپ) پر نظر آتی ہیں۔',
+    // Task 1263: FBR Customize parity + receipt settings expansion.
+    'sec_sale_billing' => 'سیل اسکرین اور بلنگ',
+    'sec_sale_billing_sub' => 'کوئیک ٹائپ، کیش پرامپٹ، رسید پاپ اپ، KOT اور انوینٹری سوئچز',
+    'kot_reprint_toggle_title' => 'KOT دوبارہ پرنٹ بٹن',
+    'kot_reprint_toggle_sub' => 'بلنگ کے بعد رسید پاپ اپ پر KOT دوبارہ پرنٹ کا بٹن دکھائیں',
+    'show_tax_on_fbr_receipt' => 'FBR رسید پر ٹیکس دکھائیں',
+    'show_tax_fbr_hint' => 'سب ٹوٹل + سیلز ٹیکس لائنز پرنٹ کریں۔ بند کرنے پر کسٹمر کاپی میں صرف کل ٹوٹل نظر آئے گا۔ ٹیکس ہمیشہ مکمل طور پر FBR کو جمع ہوتا ہے؛ تفصیلات QR اسکین (Tax Asaan ایپ) پر نظر آتی ہیں۔',
     'show_word' => 'دکھائیں',
     'showing_my_sales' => 'دکھایا جا رہا ہے: میری سیلز',
     'showing_name' => 'دکھایا جا رہا ہے: :name',

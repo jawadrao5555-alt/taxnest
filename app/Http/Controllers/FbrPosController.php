@@ -2820,6 +2820,13 @@ class FbrPosController extends Controller
                 'rp_print_confirm_present' => 'nullable|in:1',
                 'rp_show_verify_line' => 'nullable|in:1',
                 'rp_verify_present'   => 'nullable|in:1',
+                // Task 1263: PRA-parity display prefs on the FBR receipt-settings page.
+                'rp_fbr_display_present' => 'nullable|in:1',
+                'rp_footer_text'         => 'nullable|string|max:150',
+                'rp_pos_style_present'   => 'nullable|in:1',
+                'rp_printer_size'        => 'nullable|in:80mm,58mm,a4',
+                'rp_align_center'        => 'nullable|in:0,1',
+                'rp_left_margin_mm'      => 'nullable|integer|min:0|max:30',
             ]);
 
             $prefs = $company->invoice_display_prefs ?? [];
@@ -2854,7 +2861,64 @@ class FbrPosController extends Controller
                 $prefs['fbrpos'] = $fbrSet;
             }
 
+            // Task 1263: PRA-parity receipt display prefs — stored in the 'fbrpos'
+            // set (merge-preserve show_verify_line + the business-profile keys,
+            // which also writes some of these; last save from either page wins,
+            // same convention as PRA Settings vs receipt-settings paper size).
+            // Gated on rp_fbr_display_present so a stale cached form that
+            // predates these checkboxes can never silently flip them all OFF.
+            if ($request->has('rp_fbr_display_present')) {
+                $fbrSet = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
+                $fbrSet['show_address']       = $request->has('rp_show_address');
+                $fbrSet['show_ntn']           = $request->has('rp_show_ntn');
+                $fbrSet['show_email']         = $request->has('rp_show_email');
+                $fbrSet['show_mobile']        = $request->has('rp_show_mobile');
+                $fbrSet['show_cashier']       = $request->has('rp_show_cashier');
+                $fbrSet['show_footer']        = $request->has('rp_show_footer');
+                $fbrSet['show_business_name'] = $request->has('rp_show_business_name');
+                $fbrSet['show_developed_by']  = $request->has('rp_show_developed_by');
+                // Customer-copy tax display only — amounts submitted to FBR are
+                // never affected (mirrors the PRA pos_receipt_show_tax rule).
+                $fbrSet['show_tax']           = $request->has('rp_show_tax');
+                $fbrSet['footer_text']        = trim((string) $request->input('rp_footer_text', '')) ?: null;
+                $prefs['fbrpos'] = $fbrSet;
+            }
+
+            // Task 1263: show_logo master switch — pos_style is shared with PRA
+            // receipts; $style above is a read-modify-write copy, so untouched
+            // keys (logo_finals_only, show_menu_qr, pdf_paper) survive. Gated on
+            // its own presence marker (mirrors PRA's rp_pos_style_present).
+            if ($request->has('rp_pos_style_present')) {
+                $style = $prefs['pos_style'];
+                $style['show_logo'] = $request->has('rp_show_logo');
+                $prefs['pos_style'] = $style;
+            }
+
             $company->invoice_display_prefs = $prefs;
+
+            // Task 1263: paper size — FBR's own print_paper_size column (also
+            // editable on business-profile; last save wins). NOTE: FBR PDF
+            // downloads (invoice-pdf) are full A4 tax invoices by design — the
+            // PRA-style thermal-PDF toggle doesn't apply here; 'a4' instead
+            // switches the browser receipt itself to A4 layout.
+            if ($request->filled('rp_printer_size')) {
+                $company->print_paper_size = match ($request->input('rp_printer_size')) {
+                    '58mm'  => 'thermal58',
+                    'a4'    => 'a4',
+                    default => 'thermal',
+                };
+            }
+
+            // Task 1263: print position (receipt_* columns, decoupled from KOT).
+            // hasColumn guards = PROD schema-drift parity with business-profile.
+            if ($request->filled('rp_align_center')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')) {
+                $company->receipt_align_center = (bool) ((int) $request->input('rp_align_center'));
+            }
+            if ($request->filled('rp_left_margin_mm')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_left_margin_mm')) {
+                $company->receipt_left_margin_mm = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+            }
 
             // Order Matching style — stored directly on the companies row (shared with PRA).
             // hasColumn guard: silently no-ops on a not-yet-migrated PROD schema.
@@ -3185,6 +3249,445 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_guided_flow_enabled' => $enabled]);
         return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🎛️ Customize parity toggles (Task 1263) — FBR twins of the PRA POS
+    // Customize endpoints. Same columns (shared companies table), same
+    // validation, FBR admin gate (company_admin only; FBR has no manager
+    // tier so posCashierBlocked() has no equivalent here).
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** True (a response) when the pressing user may NOT change settings. */
+    private function fbrSettingGate()
+    {
+        $u = Auth::guard('fbrpos')->user();
+        if (!$u || $u->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_change_setting')], 403);
+        }
+        return null;
+    }
+
+    /** Quick Type Mode toggle — admin-only, OPT-IN (default OFF). */
+    public function updateQuickType(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+        $enabled = $request->boolean('enabled');
+        Company::where('id', app('currentCompanyId'))->update(['pos_quick_type_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /** Receipt popup auto-close timer (seconds; 0 = never, NULL = default 10s). */
+    public function updateReceiptAutoclose(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+        // Prod schema drift guard — never pretend to save into a missing column.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_receipt_autoclose_seconds')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
+        }
+        $secs = (int) $request->input('seconds', 10);
+        if (!in_array($secs, [0, 5, 10, 15, 20, 30], true)) {
+            return response()->json(['success' => false, 'message' => __('pos.invalid_value')], 422);
+        }
+        Company::where('id', app('currentCompanyId'))->update(['pos_receipt_autoclose_seconds' => $secs]);
+        return response()->json(['success' => true, 'seconds' => $secs]);
+    }
+
+    /** Cash Received / change-due box — per-company OPT-IN (default OFF). */
+    public function toggleCashReceived(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cash_received_enabled')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
+        }
+        $enabled = $request->boolean('enabled');
+        Company::where('id', app('currentCompanyId'))->update(['pos_cash_received_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /**
+     * KOT Reprint button toggle — the FBR sale screen already reads
+     * companies.kot_reprint_enabled (default ON); PRA flips it via the
+     * receipt/KOT settings page, FBR gets a dedicated Customize toggle.
+     */
+    public function updateKotReprint(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_reprint_enabled')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
+        }
+        $enabled = $request->boolean('enabled');
+        Company::where('id', app('currentCompanyId'))->update(['kot_reprint_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /** Restock-on-void toggle (only meaningful when inventory is ON). */
+    public function updateRestockToggle(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+        $enabled = $request->boolean('enabled');
+        Company::where('id', app('currentCompanyId'))->update(['pos_restock_on_void' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /**
+     * Inventory master toggle — DUAL-SWITCH rule: the Features-wizard
+     * 'inventory' flag and the inventory_enabled column must always agree
+     * (gates read only the column; the wizard displays the flag).
+     */
+    public function updateInventoryToggle(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+        $enabled = $request->boolean('enabled');
+        $company = Company::find(app('currentCompanyId'));
+        if ($company) {
+            $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
+            $flags['inventory'] = $enabled;
+            $flags = \App\Services\PosFeatureService::normalize($flags);
+            $company->update(['inventory_enabled' => $enabled, 'feature_flags' => $flags]);
+        }
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /** "Cashier bhi Day Close kar sake" — default OFF (admin/manager work). */
+    public function toggleCashierDayclose(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cashier_dayclose')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 503);
+        }
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_cashier_dayclose = $request->boolean('enabled');
+        $company->save();
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->pos_cashier_dayclose,
+            'message' => $company->pos_cashier_dayclose ? __('pos.cashier_dayclose_enabled') : __('pos.cashier_dayclose_disabled'),
+        ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🖨️ Printer Settings + silent print jobs (Task 1263) — FBR twins of
+    // the PRA pages/endpoints. Same shared storage (pos_printer_settings
+    // JSON, PosPrintJob table, PosAgentDevice registry) because FBR shops
+    // run the SAME Desktop Agent under fiscal_device mode.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * FBR Printer Settings page (GET) + save (POST) — admin-only.
+     * DELIBERATE DIFFERENCE from PRA: print_confirm_ask is NOT on this form
+     * (FBR receipt-settings owns it behind the rp_print_confirm_present
+     * marker) — the POST must preserve the existing value, never rewrite it.
+     */
+    public function fbrPrinterSettings(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || $user->role !== 'company_admin') {
+            abort(403, 'Only company admin can change printer settings.');
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        if ($request->isMethod('post')) {
+            $validated = $request->validate([
+                'silent_print_enabled' => 'nullable|boolean',
+                'receipt_printer' => 'nullable|string|max:255',
+                // KOT-family picks may arrive union-encoded ("uid::name").
+                'kot_printer' => 'nullable|string|max:340',
+                'counter_kot_printer' => 'nullable|string|max:340',
+                'counter_kot_enabled' => 'nullable|boolean',
+            ]);
+
+            $settings = $company->printerSettings();
+            $known = collect($settings['available_printers'])->pluck('name')->all();
+
+            // Only accept printers the agent actually reported (or blank = unset).
+            $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
+            $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
+            $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
+            $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
+            $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
+            $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
+            $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
+            $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
+            $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+
+            // Multi-counter section BEFORE the master eligibility check (a shop
+            // configured only with per-counter printers can still enable silent).
+            $this->fbrSavePrinterDeviceSettings($request, $companyId);
+
+            $hasDevicePrinter = false;
+            if (\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+                try {
+                    $hasDevicePrinter = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                        ->whereNotNull('receipt_printer')
+                        ->exists();
+                } catch (\Throwable $e) {
+                    $hasDevicePrinter = false;
+                }
+            }
+            $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
+                && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
+            // print_confirm_ask: PRESERVED as-is (owned by FBR receipt-settings).
+            // Manual save = deliberate choice — never nag with the one-click prompt.
+            $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
+
+            $company->update(['pos_printer_settings' => $settings]);
+
+            return redirect()->route('fbrpos.printer-settings')->with('success', __('pos.printer_settings_saved'));
+        }
+
+        $settings = $company->printerSettings();
+        $agentOnline = $company->agentOnline();
+        $recentFailed = \App\Models\PosPrintJob::where('company_id', $companyId)
+            ->where('status', 'failed')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get();
+
+        $devices = collect();
+        $assignableTeam = collect();
+        if (\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+            $devices = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                ->orderByDesc('last_seen_at')
+                ->get();
+            if ($devices->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')) {
+                // Everyone who can press Print on an FBR bill: admins + cashiers.
+                $assignableTeam = \App\Models\User::where('company_id', $companyId)
+                    ->where(function ($q) {
+                        $q->where('role', 'company_admin')
+                          ->orWhereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier']);
+                    })
+                    ->orderByRaw("CASE WHEN pos_role = 'pos_admin' OR role = 'company_admin' THEN 0 WHEN pos_role = 'pos_manager' THEN 1 ELSE 2 END")
+                    ->orderBy('name')
+                    ->get();
+            }
+        }
+
+        $kotOptions = \App\Models\PosAgentDevice::kotPrinterOptions($company);
+
+        return view('fbr-pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed', 'devices', 'assignableTeam', 'kotOptions'));
+    }
+
+    /**
+     * Multi-counter section of the FBR Printer Settings form (twin of the PRA
+     * helper): device_receipt_printer[uid], device_name[uid], user_device[id].
+     * Every value validated against THIS company's devices and each device's
+     * own reported printer list.
+     */
+    private function fbrSavePrinterDeviceSettings(Request $request, int $companyId): void
+    {
+        if (!\App\Http\Controllers\AgentController::deviceRoutingReady()) {
+            return;
+        }
+        $devices = \App\Models\PosAgentDevice::where('company_id', $companyId)->get()->keyBy('device_uid');
+        if ($devices->isEmpty()) {
+            return;
+        }
+
+        $printerPicks = (array) $request->input('device_receipt_printer', []);
+        $names = (array) $request->input('device_name', []);
+        foreach ($devices as $uid => $device) {
+            $dirty = [];
+            if (array_key_exists($uid, $printerPicks)) {
+                $pick = trim((string) $printerPicks[$uid]);
+                $own = collect($device->printers ?? [])->pluck('name')->all();
+                $dirty['receipt_printer'] = ($pick !== '' && in_array($pick, $own, true)) ? $pick : null;
+            }
+            if (array_key_exists($uid, $names)) {
+                $name = mb_substr(trim((string) $names[$uid]), 0, 60);
+                $dirty['name'] = $name !== '' ? $name : null;
+            }
+            if ($dirty) {
+                $device->update($dirty);
+            }
+        }
+
+        if ($request->has('user_device') && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')) {
+            foreach ((array) $request->input('user_device', []) as $userId => $uid) {
+                if (!is_numeric($userId)) {
+                    continue;
+                }
+                $member = \App\Models\User::where('company_id', $companyId)->find((int) $userId);
+                if (!$member) {
+                    continue;
+                }
+                $uid = trim((string) $uid);
+                $member->pos_device_uid = ($uid !== '' && $devices->has($uid)) ? $uid : null;
+                $member->save();
+            }
+        }
+    }
+
+    /**
+     * Per-counter routing for FBR bill silent prints (twin of the PRA helper):
+     * pressing user assigned to a counter → device row exists → agent on that
+     * PC online → counter has its own receipt printer. Otherwise null =
+     * company-wide printer. Schema-guarded.
+     */
+    private function fbrResolveUserPrintDevice($user, int $companyId): ?array
+    {
+        try {
+            if (!\App\Http\Controllers\AgentController::deviceRoutingReady()
+                || !\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_device_uid')) {
+                return null;
+            }
+            $uid = $user->pos_device_uid ?? null;
+            if (!$uid) {
+                return null;
+            }
+            $device = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                ->where('device_uid', $uid)
+                ->first();
+            if (!$device || !$device->isOnline() || !$device->receipt_printer) {
+                return null;
+            }
+            return ['device_uid' => $device->device_uid, 'printer' => $device->receipt_printer];
+        } catch (\Throwable $e) {
+            return null; // routing must never break the print fallback chain
+        }
+    }
+
+    /**
+     * Session-authed enqueue of a silent FBR print job (bill receipt or KOT).
+     * Types: 'fbr_bill' (transaction_id) and 'fbr_kot' (restaurant_order_id =
+     * FbrPosHeldSale id for pre-pay tickets, OR transaction_id for reprints).
+     * Returns 409 when silent printing cannot happen right now — the sale
+     * screen falls back to the iframe/popup print path on ANY non-2xx.
+     * NO admin gate: cashiers print bills.
+     */
+    public function fbrApiCreatePrintJob(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user) { abort(403); }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        $validated = $request->validate([
+            'type' => 'required|in:fbr_bill,fbr_kot',
+            'transaction_id' => 'required_if:type,fbr_bill|nullable|integer',
+            'restaurant_order_id' => 'nullable|integer',
+        ]);
+
+        $settings = $company->printerSettings();
+        if (!$settings['silent_print_enabled']) {
+            return response()->json(['success' => false, 'reason' => 'disabled'], 409);
+        }
+        if (!$company->agentOnline()) {
+            return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
+        }
+
+        $deviceRoute = $this->fbrResolveUserPrintDevice($user, $companyId);
+
+        // ── BILL: single job on the receipt printer ─────────────────────────
+        if ($validated['type'] === 'fbr_bill') {
+            if (!$deviceRoute && !$settings['receipt_printer']) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
+            $exists = FbrPosTransaction::where('company_id', $companyId)
+                ->where('id', (int) $validated['transaction_id'])
+                ->exists();
+            if (!$exists) {
+                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            // Impatient double-press guard — same bill already queued/printing
+            // (< 2 min, matches the agent's stale-requeue window) = deduped.
+            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'fbr_bill')
+                ->where('transaction_id', (int) $validated['transaction_id'])
+                ->whereIn('status', ['pending', 'printing'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->orderByDesc('id')
+                ->first();
+            if ($inFlight) {
+                return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
+            }
+            $job = \App\Models\PosPrintJob::create([
+                'company_id' => $companyId,
+                'type' => 'fbr_bill',
+                'target_printer' => $deviceRoute['printer'] ?? $settings['receipt_printer'],
+                'device_uid' => $deviceRoute['device_uid'] ?? null,
+                'transaction_id' => (int) $validated['transaction_id'],
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ]);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
+        }
+
+        // ── KOT: needs ONE of the two ids ───────────────────────────────────
+        if (!$request->filled('restaurant_order_id') && !$request->filled('transaction_id')) {
+            return response()->json(['success' => false, 'reason' => 'missing_id'], 422);
+        }
+        if (!$settings['kot_printer']) {
+            return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+        }
+
+        // KOT from a HELD SALE (pre-pay Send-to-Kitchen ticket). The held-sale
+        // id rides the restaurant_order_id column (FBR holds are Phase2 JSON
+        // carts — there is no RestaurantOrder row).
+        if ($request->filled('restaurant_order_id')) {
+            $exists = \App\Models\FbrPosHeldSale::where('company_id', $companyId)
+                ->where('id', (int) $validated['restaurant_order_id'])
+                ->exists();
+            if (!$exists) {
+                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'fbr_kot')
+                ->where('restaurant_order_id', (int) $validated['restaurant_order_id'])
+                ->whereIn('status', ['pending', 'printing'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->orderByDesc('id')->first();
+            if ($inFlight) {
+                return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
+            }
+            $attrs = [
+                'company_id' => $companyId,
+                'type' => 'fbr_kot',
+                'target_printer' => $settings['kot_printer'],
+                'restaurant_order_id' => (int) $validated['restaurant_order_id'],
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ];
+            // Route to the counter that owns the KOT printer (ONLINE only).
+            if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['kot_printer_device'] ?? null)) {
+                $attrs['device_uid'] = $stamp;
+            }
+            $job = \App\Models\PosPrintJob::create($attrs);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
+        }
+
+        // KOT REPRINT from a completed transaction (K key / post-pay button).
+        $exists = FbrPosTransaction::where('company_id', $companyId)
+            ->where('id', (int) $validated['transaction_id'])
+            ->exists();
+        if (!$exists) {
+            return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+        }
+        $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+            ->where('type', 'fbr_kot')
+            ->where('transaction_id', (int) $validated['transaction_id'])
+            ->whereIn('status', ['pending', 'printing'])
+            ->where('created_at', '>=', now()->subMinutes(2))
+            ->orderByDesc('id')->first();
+        if ($inFlight) {
+            return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
+        }
+        $attrs = [
+            'company_id' => $companyId,
+            'type' => 'fbr_kot',
+            'target_printer' => $settings['kot_printer'],
+            'transaction_id' => (int) $validated['transaction_id'],
+            'status' => 'pending',
+            'created_by' => $user->id,
+        ];
+        if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['kot_printer_device'] ?? null)) {
+            $attrs['device_uid'] = $stamp;
+        }
+        $job = \App\Models\PosPrintJob::create($attrs);
+        return response()->json(['success' => true, 'job_id' => $job->id]);
     }
 
     public function verifyPin(Request $request)

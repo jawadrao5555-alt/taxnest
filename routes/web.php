@@ -1422,6 +1422,17 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
     Route::post('/settings/theme', [FbrPosController::class, 'updateTheme'])->name('fbrpos.settings.theme');
     Route::post('/settings/guided-flow', [FbrPosController::class, 'updateGuidedFlow'])->name('fbrpos.settings.guided-flow');
+    // Task 1263 — Customize parity toggles (FBR twins of the PRA endpoints; admin-gated in controller).
+    Route::post('/settings/quick-type', [FbrPosController::class, 'updateQuickType'])->name('fbrpos.settings.quick-type');
+    Route::post('/settings/receipt-autoclose', [FbrPosController::class, 'updateReceiptAutoclose'])->name('fbrpos.settings.receipt-autoclose');
+    Route::post('/settings/cash-received-toggle', [FbrPosController::class, 'toggleCashReceived'])->name('fbrpos.settings.cash-received-toggle');
+    Route::post('/settings/kot-reprint-toggle', [FbrPosController::class, 'updateKotReprint'])->name('fbrpos.settings.kot-reprint-toggle');
+    Route::post('/settings/restock-toggle', [FbrPosController::class, 'updateRestockToggle'])->name('fbrpos.settings.restock-toggle');
+    Route::post('/settings/inventory-toggle', [FbrPosController::class, 'updateInventoryToggle'])->name('fbrpos.settings.inventory-toggle');
+    Route::post('/settings/cashier-dayclose-toggle', [FbrPosController::class, 'toggleCashierDayclose'])->name('fbrpos.settings.cashier-dayclose-toggle');
+    // Task 1263 — Printer Settings page + silent print-job enqueue (Desktop Agent shared with PRA).
+    Route::match(['get', 'post'], '/printer-settings', [FbrPosController::class, 'fbrPrinterSettings'])->name('fbrpos.printer-settings');
+    Route::post('/api/print-jobs', [FbrPosController::class, 'fbrApiCreatePrintJob'])->name('fbrpos.api.print-jobs');
     // Language system (2 Aug 2026): per-user choice + company default. PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script.
     Route::post('/set-language', function (\Illuminate\Http\Request $request) {
         $lang = $request->input('language');

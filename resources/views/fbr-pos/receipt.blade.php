@@ -177,6 +177,45 @@
                 window.location.href = '{{ route('fbrpos.transactions') }}';
             }
         };
+        // ----------------------------------------------------------------
+        // AUTO-PRINT + POSTMESSAGE SIGNAL (Task 1263 — ported from PRA
+        // receipt_80mm). ?auto_print=1 fires window.print() automatically;
+        // ?_signal=<token> inside the parent's hidden print iframe attaches
+        // `afterprint` here and signals the parent via postMessage when the
+        // print dialog actually closes — the parent chains the next print
+        // (e.g. KOT) only AFTER this signal, eliminating the "KOT pops up
+        // before receipt" race.
+        window.addEventListener('load', function() {
+            var urlParams = new URLSearchParams(window.location.search);
+            var frameSignal = urlParams.get('_signal');
+            if (urlParams.get('auto_print') !== '1') return;
+            if (isInIframe && frameSignal) {
+                var signaled = false;
+                var signalParent = function() {
+                    if (signaled) return;
+                    signaled = true;
+                    try { window.parent.postMessage({ type: 'pos_print_done', signal: frameSignal }, '*'); } catch (e) {}
+                };
+                window.addEventListener('afterprint', signalParent, { once: true });
+                // Safety net inside the iframe — if afterprint never fires
+                // (silent printer drivers), signal the parent after a generous
+                // wait so the chain still advances.
+                setTimeout(signalParent, 20000);
+            }
+            // First-print stutter fix: fire print only once fonts/rendering are
+            // settled — cheap Windows thermal drivers truncate jobs rasterized
+            // while the page is still busy. 2.5s failsafe guarantees print
+            // ALWAYS fires (hidden iframes may throttle promises).
+            var tnPrinted = false;
+            var tnFirePrint = function() {
+                if (tnPrinted) return;
+                tnPrinted = true;
+                window.print();
+            };
+            var tnFontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+            tnFontsReady.then(function() { setTimeout(tnFirePrint, 500); });
+            setTimeout(tnFirePrint, 2500);
+        });
     </script>
 
     <div class="receipt-wrap">
@@ -194,13 +233,13 @@
         <div style="text-align:center; margin:0; padding:2mm 0 0; line-height:0;">
             <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
         </div>
-        <h1>{{ $company->name }}</h1>
+        @if($rd['show_business_name'])<h1>{{ $company->name }}</h1>@endif
         @else
         {{-- Side logo: business name left, logo right — compact header --}}
         <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
             <tr>
                 <td style="text-align:left; vertical-align:middle; width:64%; padding:0;">
-                    <h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>
+                    @if($rd['show_business_name'])<h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>@endif
                 </td>
                 <td style="text-align:right; vertical-align:middle; width:36%; padding:0;">
                     <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width:80px; max-height:42px; object-fit:contain;">
@@ -209,10 +248,11 @@
         </table>
         @endif
         @else
-        <h1>{{ $company->name }}</h1>
+        @if($rd['show_business_name'])<h1>{{ $company->name }}</h1>@endif
         @endif
         @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
         @if($rd['show_mobile'] && $company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
+        @if($rd['show_email'] && $company->email)<p>{{ $company->email }}</p>@endif
         @if($rd['show_ntn'] && $company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
     </div>
 
@@ -355,10 +395,14 @@
             <td class="tot-value">-PKR {{ number_format($transaction->discount_amount, 2) }}</td>
         </tr>
         @endif
+        {{-- Task 1263: customer-copy tax display toggle — amounts submitted to
+             FBR are never affected (mirrors the PRA show_tax rule). --}}
+        @if($rd['show_tax'] ?? true)
         <tr>
             <td class="tot-label">{{ __('pos.receipt_tax') }} ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">PKR {{ number_format($transaction->tax_amount, 2) }}</td>
         </tr>
+        @endif
         @if($transaction->fbr_service_charge > 0)
         <tr>
             <td class="tot-label">{{ __('pos.dcp_fbr_pos_fee') }}:</td>
@@ -495,7 +539,9 @@
 
     <div class="footer text-center">
         @if($rd['show_footer'])
-        <p>{{ __('pos.receipt_thank_purchase') }}</p>
+        {{-- Task 1263: custom footer text (receipt-settings) replaces the
+             default thank-you line, PRA-style; footer note stays additive. --}}
+        <p>{{ !empty($rd['footer_text']) ? $rd['footer_text'] : __('pos.receipt_thank_purchase') }}</p>
         @if(!empty($company->receipt_footer_note))
         <p style="font-style: italic; margin-top:2px;">{{ $company->receipt_footer_note }}</p>
         @endif
@@ -503,7 +549,9 @@
         @if($company->fbr_pos_id)
         <p style="font-weight:bold;">{{ __('pos.rcpt_fbr_integrated') }}</p>
         @endif
+        @if($rd['show_developed_by'])
         <p>{{ __('pos.dcp_powered_taxnest_fbr') }}</p>
+        @endif
         {{-- Owner (6 Aug 2026): print-time timestamp hataya — Date upar details
              mein pehle se hai (do jaga date/time confusion khatam). --}}
     </div>

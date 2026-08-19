@@ -11,6 +11,7 @@
                 'items' => [
                     ['label' => __('pos.business_profile'), 'desc' => __('pos.business_profile_card_desc'), 'url' => route('fbrpos.business-profile'), 'tone' => 'blue', 'badge' => __('pos.badge_identity'), 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
                     ['label' => __('pos.receipt_print_style'), 'desc' => __('pos.fbr_receipt_style_card_desc'), 'url' => route('fbrpos.receipt-settings'), 'tone' => 'blue', 'badge' => __('pos.badge_print'), 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
+                    ['label' => __('pos.printer_settings'), 'desc' => __('pos.card_printer_settings_desc'), 'url' => route('fbrpos.printer-settings'), 'tone' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? 'emerald' : 'blue', 'badge' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? __('pos.badge_silent_on') : __('pos.badge_popup'), 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
                     ['label' => __('pos.fbr_settings'), 'desc' => __('pos.fbr_settings_card_desc'), 'url' => route('fbrpos.settings'), 'tone' => $fbrOn ? 'emerald' : 'amber', 'badge' => $fbrOn ? __('pos.fbr_on_badge') : __('pos.fbr_off_badge'), 'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
                     ['label' => __('pos.products_word'), 'desc' => __('pos.products_card_desc'), 'url' => route('fbrpos.products'), 'tone' => 'blue', 'badge' => __('pos.badge_catalog'), 'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
                 ],
@@ -68,7 +69,16 @@
     <div x-data="{
             currentTheme: '{{ $company->pos_theme ?? 'blue' }}',
             currentStyle: '{{ $company->pos_dashboard_style ?? 'default' }}',
-            guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false
+            guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false,
+            quickOn: {{ ($company->pos_quick_type_enabled ?? false) ? 'true' : 'false' }}, savingQuick: false,
+            cashRecvOn: {{ ($company->pos_cash_received_enabled ?? false) ? 'true' : 'false' }}, savingCashRecv: false,
+            autoKotOn: {{ ($company->auto_print_kot ?? false) ? 'true' : 'false' }}, savingAutoKot: false,
+            kotReprintOn: {{ ($company->kot_reprint_enabled ?? true) ? 'true' : 'false' }}, savingKotReprint: false,
+            invOn: {{ ($company->inventory_enabled ?? false) ? 'true' : 'false' }}, savingInv: false,
+            restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false,
+            cashierDcOn: {{ ($company->pos_cashier_dayclose ?? false) ? 'true' : 'false' }}, savingCdc: false,
+            rcSecs: {{ (int) ($company->pos_receipt_autoclose_seconds ?? 10) }}, savingRc: false,
+            setRc(s) { if (this.rcSecs === s || this.savingRc) return; const prev = this.rcSecs; this.rcSecs = s; this.savingRc = true; fetch('/fbr-pos/settings/receipt-autoclose', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({seconds:s})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { this.rcSecs = prev; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ this.rcSecs = prev; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ this.savingRc = false; }); }
          }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
     @include('fbr-pos.partials.back-link')
@@ -167,6 +177,152 @@
                         </button>
                         @endforeach
                     </div>
+                </div>
+            </div>
+        </section>
+
+        {{-- ═══════════ SALE SCREEN & BILLING (Task 1263 — PRA parity toggles) ═══════════ --}}
+        <section>
+            <div class="px-1 mb-3">
+                <h2 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">{{ __('pos.sec_sale_billing') }}</h2>
+                <p class="text-[12px] text-gray-500 dark:text-gray-400">{{ __('pos.sec_sale_billing_sub') }}</p>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-4">
+
+                {{-- Quick Type Mode — OPT-IN (default OFF, mirrors PRA) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.quick_type_mode') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.quick_type_mode_sub') }}</p>
+                    </div>
+                    <button type="button"
+                        @click="quickOn=!quickOn; savingQuick=true; fetch('/fbr-pos/settings/quick-type', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:quickOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { quickOn=!quickOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ quickOn=!quickOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingQuick=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="quickOn ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="quickOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+
+                {{-- Cash Received / Change box in Pay popup --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.cash_received_toggle') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.cash_received_toggle_sub') }}</p>
+                    </div>
+                    <button type="button"
+                        @click="cashRecvOn=!cashRecvOn; savingCashRecv=true; fetch('/fbr-pos/settings/cash-received-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:cashRecvOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { cashRecvOn=!cashRecvOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ cashRecvOn=!cashRecvOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingCashRecv=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="cashRecvOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="cashRecvOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+
+                {{-- Receipt popup auto-close (default 10 sec) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.receipt_popup_autoclose') }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.receipt_popup_autoclose_sub') }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach ([0 => __('pos.never_word'), 5 => __('pos.n_sec', ['n' => 5]), 10 => __('pos.n_sec', ['n' => 10]), 15 => __('pos.n_sec', ['n' => 15]), 30 => __('pos.n_sec', ['n' => 30])] as $s => $label)
+                        <button type="button" @click="setRc({{ $s }})"
+                            class="px-3.5 py-1.5 rounded-full text-xs font-bold border transition"
+                            :class="rcSecs === {{ $s }} ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-400'">
+                            {{ $label }}
+                        </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Cashier can run Day Close (default OFF — admin/manager work) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.cashier_dayclose_title') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.cashier_dayclose_sub') }}</p>
+                    </div>
+                    <button type="button"
+                        @click="cashierDcOn=!cashierDcOn; savingCdc=true; fetch('/fbr-pos/settings/cashier-dayclose-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:cashierDcOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { cashierDcOn=!cashierDcOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ cashierDcOn=!cashierDcOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingCdc=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="cashierDcOn ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="cashierDcOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+
+                @if($company->kitchen_printer_enabled ?? false)
+                {{-- Auto-KOT after payment (existing endpoint, surfaced here too) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.auto_kot') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.ti_auto_kot_hint') }}</p>
+                    </div>
+                    <button type="button"
+                        @click="autoKotOn=!autoKotOn; savingAutoKot=true; fetch('/fbr-pos/api/toggle-auto-kot', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'}}).then(r=>r.json()).then(d=>{ if (d && d.success) { autoKotOn = !!d.enabled; } else { autoKotOn=!autoKotOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ autoKotOn=!autoKotOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingAutoKot=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="autoKotOn ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="autoKotOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+
+                {{-- KOT reprint permission --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.kot_reprint_toggle_title') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.kot_reprint_toggle_sub') }}</p>
+                    </div>
+                    <button type="button"
+                        @click="kotReprintOn=!kotReprintOn; savingKotReprint=true; fetch('/fbr-pos/settings/kot-reprint-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:kotReprintOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { kotReprintOn=!kotReprintOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ kotReprintOn=!kotReprintOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingKotReprint=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="kotReprintOn ? 'bg-rose-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="kotReprintOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+                @endif
+
+                {{-- Inventory tracking on/off (dual-switch synced server-side) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.inventory_tracking') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.inventory_tracking_sub') }}</p>
+                    </div>
+                    <button type="button"
+                        @click="invOn=!invOn; savingInv=true; fetch('/fbr-pos/settings/inventory-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:invOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { invOn=!invOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ invOn=!invOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingInv=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="invOn ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="invOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+
+                {{-- Restock on bill delete / edit (only meaningful with inventory ON) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3" x-show="invOn" x-cloak>
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.restock_on_void') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.restock_on_void_sub') }}</p>
+                    </div>
+                    <button type="button"
+                        @click="restockOn=!restockOn; savingRestock=true; fetch('/fbr-pos/settings/restock-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:restockOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { restockOn=!restockOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ restockOn=!restockOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingRestock=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="restockOn ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="restockOn && 'translate-x-6'"></span>
+                    </button>
                 </div>
             </div>
         </section>

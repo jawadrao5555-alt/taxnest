@@ -19,10 +19,10 @@
             'ntn' => (bool) $rd['show_ntn'],
             'phone' => (bool) $rd['show_mobile'],
             'cashier' => (bool) $rd['show_cashier'],
-            'bizname' => true,
+            'bizname' => (bool) ($rd['show_business_name'] ?? true),
             'footer' => (bool) $rd['show_footer'],
-            'footerText' => '',
-            'tax' => true,
+            'footerText' => (string) ($rd['footer_text'] ?? ''),
+            'tax' => (bool) ($rd['show_tax'] ?? true),
             'logo' => (bool) ($ps['show_logo'] ?? true),
             'logoFinalsOnly' => false,
             'verifyLine' => (bool) ($rd['show_verify_line'] ?? true),
@@ -103,6 +103,120 @@
                 </span>
             </label>
         </div>
+
+        {{-- Task 1263: PRA-parity receipt display prefs — stored in the fbrpos
+             set. rp_fbr_display_present marker: a stale cached form without
+             these checkboxes must never silently flip everything OFF on save.
+             (Some of these are also on Business Profile — last save wins.) --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <input type="hidden" name="rp_fbr_display_present" value="1">
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-3">🧾 {{ __('pos.receipt_content_section') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.receipt_content_sub') }}</span></h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                    <input type="checkbox" name="rp_show_address" value="1" {{ $rd['show_address'] ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_address') }}</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                    <input type="checkbox" name="rp_show_ntn" value="1" {{ $rd['show_ntn'] ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_ntn') }}</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                    <input type="checkbox" name="rp_show_email" value="1" {{ $rd['show_email'] ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_email') }}</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                    <input type="checkbox" name="rp_show_mobile" value="1" {{ $rd['show_mobile'] ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_phone_mobile') }}</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                    <input type="checkbox" name="rp_show_cashier" value="1" {{ $rd['show_cashier'] ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_cashier_details') }}</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                    <input type="checkbox" name="rp_show_business_name" value="1" {{ ($rd['show_business_name'] ?? true) ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_business_name') }}</span>
+                </label>
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                    <input type="checkbox" name="rp_show_developed_by" value="1" {{ ($rd['show_developed_by'] ?? true) ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_developed_by_line') }}</span>
+                </label>
+            </div>
+            <div class="mt-3 p-3 rounded-lg border-2 {{ ($rd['show_tax'] ?? true) ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700' }}">
+                <label class="flex items-start gap-2.5 cursor-pointer">
+                    <input type="checkbox" name="rp_show_tax" value="1" {{ ($rd['show_tax'] ?? true) ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 w-4 h-4">
+                    <span class="flex-1 min-w-0">
+                        <span class="block text-sm font-bold text-gray-900 dark:text-white">🧾 {{ __('pos.show_tax_on_fbr_receipt') }}</span>
+                        <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.show_tax_fbr_hint') }}</span>
+                    </span>
+                </label>
+            </div>
+            <div class="mt-4">
+                <label class="flex items-center gap-2.5 cursor-pointer mb-2">
+                    <input type="checkbox" name="rp_show_footer" value="1" {{ $rd['show_footer'] ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                    <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ __('pos.show_footer_thank_you') }}</span>
+                </label>
+                <input type="text" name="rp_footer_text" value="{{ $rd['footer_text'] }}" maxlength="150" placeholder="{{ __('pos.ph_thank_you_purchase') }}"
+                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-blue-500 focus:ring-blue-500"
+                    autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.leave_blank_default_msg') }}</p>
+            </div>
+        </div>
+
+        {{-- Task 1263: logo master switch — shared pos_style key (same one the
+             thermal receipt already reads). logo_finals_only is ignored on FBR
+             (no local/provisional flow), so no sub-option here. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <input type="hidden" name="rp_pos_style_present" value="1">
+            <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border {{ ($ps['show_logo'] ?? true) ? 'border-blue-400 bg-blue-50/40 dark:bg-blue-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                <input type="checkbox" name="rp_show_logo" value="1" {{ ($ps['show_logo'] ?? true) ? 'checked' : '' }}
+                       class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                <span class="flex-1 min-w-0">
+                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.show_logo_label') }}</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.show_logo_hint') }}</span>
+                </span>
+            </label>
+        </div>
+
+        {{-- Task 1263: paper size — FBR's print_paper_size column (also on
+             Business Profile; last save wins). A4 switches the browser receipt
+             itself to A4 layout; PDF downloads are full A4 invoices by design. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            @php $fbrPaper = $company->print_paper_size ?? 'thermal'; @endphp
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">🖨️ {{ __('pos.receipt_paper_size') }}</label>
+            <select name="rp_printer_size" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="80mm" {{ $fbrPaper === 'thermal' ? 'selected' : '' }}>{{ __('pos.paper_80mm') }}</option>
+                <option value="58mm" {{ $fbrPaper === 'thermal58' ? 'selected' : '' }}>{{ __('pos.paper_58mm') }}</option>
+                <option value="a4" {{ $fbrPaper === 'a4' ? 'selected' : '' }}>{{ __('pos.a4_printer_thermal_style') }}</option>
+            </select>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.paper_size_hint') }}</p>
+        </div>
+
+        {{-- Task 1263: print position — receipt_* columns (decoupled from KOT).
+             hasColumn guard mirrors business-profile (PROD schema-drift parity). --}}
+        @if(\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center'))
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            @php
+                $rpAlignVal = (bool) ($company->receipt_align_center ?? false);
+                $rpMarginVal = (int) ($company->receipt_left_margin_mm ?? 0);
+            @endphp
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">📐 {{ __('pos.print_position') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.applies_receipts_only') }}</span></label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <select name="rp_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="0" {{ !$rpAlignVal ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
+                        <option value="1" {{ $rpAlignVal ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
+                    </select>
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.print_pos_center_warn') }}</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
+                    <input type="number" name="rp_left_margin_mm" min="0" max="30" step="1" value="{{ $rpMarginVal }}"
+                           class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
+                </div>
+            </div>
+        </div>
+        @endif
 
         {{-- Order Matching (Aug 2026) — mirrors PRA receipt-settings placement.
              Applies to receipt AND to KOT (when kitchen_printer_enabled is on). --}}

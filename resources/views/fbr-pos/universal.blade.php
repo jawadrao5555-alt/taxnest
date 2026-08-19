@@ -3203,6 +3203,14 @@ function restaurantPos() {
         // posConfigRev → boot fingerprint mein shamil. Default OFF.
         @php $__fps = $company->printerSettings(); @endphp
         printConfirmAsk: {{ !empty($__fps['print_confirm_ask']) ? 'true' : 'false' }},
+        // Task 1263: silent printing via the shared Desktop Agent (fiscal_device
+        // shops already run it). Baked from the shared pos_printer_settings JSON —
+        // posConfigRev fingerprint covers it, so cached sale screens self-refresh.
+        silentBillPrint: {{ (!empty($__fps['silent_print_enabled']) && !empty($__fps['receipt_printer'])) ? 'true' : 'false' }},
+        silentKotPrint: {{ (!empty($__fps['silent_print_enabled']) && !empty($__fps['kot_printer'])) ? 'true' : 'false' }},
+        // Task 1263: receipt popup auto-close seconds (0 = never). Server column
+        // shared with PRA; hasColumn guard keeps prod alive pre-migration.
+        receiptAutoCloseSecs: {{ \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_receipt_autoclose_seconds') ? (int) ($company->pos_receipt_autoclose_seconds ?? 10) : 10 }},
         showPrintConfirm: false,
         printConfirmChoice: 'yes',
         printConfirmAction: null,
@@ -6221,6 +6229,31 @@ function restaurantPos() {
             frame.src = cacheBustedUrl;
         },
 
+        // ═══ Task 1263: silent print enqueue (twin of PRA trySilentPrint) ═══
+        // POSTs a PosPrintJob to the FBR panel endpoint; one retry on 5xx /
+        // network blips. Resolves the response payload (truthy) on success so
+        // callers can read flags like `deduped`; false keeps the iframe fallback.
+        async trySilentPrint(payload, _retry = true) {
+            try {
+                const res = await fetch('/fbr-pos/api/print-jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                    // One retry on server hiccups (5xx) — a lost print job means a
+                    // bill that never comes out of the printer.
+                    if (_retry && res.status >= 500) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
+                    return false;
+                }
+                const d = await res.json().catch(() => null);
+                return (d && d.success) ? d : false;
+            } catch (e) {
+                if (_retry) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
+                return false;
+            }
+        },
+
         async printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
             // Task 655: fiscal_device grace — bill abhi 'pending' hai to chand
@@ -6229,7 +6262,21 @@ function restaurantPos() {
             await this.fbrPrintGrace();
             const url = '/fbr-pos/transaction/' + this.lastTransactionId + '/receipt?auto_print=1';
             console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
-            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+            // Task 1263: silent-first — enqueue a Desktop Agent print job; the
+            // iframe/popup path stays the fallback when the queue is unreachable.
+            if (this.silentBillPrint) {
+                const ok = await this.trySilentPrint({ type: 'fbr_bill', transaction_id: this.lastTransactionId });
+                if (ok) {
+                    // deduped = this bill is ALREADY on its way to the printer
+                    // (double-press guard) — tell the cashier to wait, no 2nd copy.
+                    if (ok.deduped) this.showToast(window.TXT.receipt_already_printing, 'info');
+                    else this.showToast(window.TXT.receipt_sent_to_printer, 'success');
+                    if (typeof onAfterPrint === 'function') onAfterPrint();
+                } else { fallback(); }
+                return;
+            }
+            fallback();
         },
 
         // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
@@ -6243,7 +6290,18 @@ function restaurantPos() {
                 const id = orderId;
                 if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
                 const url = '/fbr-pos/held/' + id + '/kitchen-ticket?auto_print=1';
-                this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+                const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+                // Task 1263: silent-first via the Desktop Agent, iframe fallback.
+                if (this.silentKotPrint) {
+                    this.trySilentPrint({ type: 'fbr_kot', restaurant_order_id: id }).then(ok => {
+                        if (ok) {
+                            this.showToast(window.TXT.kot_sent_to_printer, 'success');
+                            if (typeof onAfterPrint === 'function') onAfterPrint();
+                        } else { fallback(); }
+                    });
+                    return;
+                }
+                fallback();
                 return;
             }
             const id = orderId || this.lastOrderId;
@@ -6255,7 +6313,19 @@ function restaurantPos() {
             const url = isFbrReprint
                 ? '/fbr-pos/transaction/' + id + '/kot-reprint?auto_print=1'
                 : '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
-            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+            const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+            // Task 1263: silent-first for the FBR reprint path only (the PRA
+            // restaurant URL is never reached from the FBR sale screen).
+            if (isFbrReprint && this.silentKotPrint) {
+                this.trySilentPrint({ type: 'fbr_kot', transaction_id: id }).then(ok => {
+                    if (ok) {
+                        this.showToast(window.TXT.kot_sent_to_printer, 'success');
+                        if (typeof onAfterPrint === 'function') onAfterPrint();
+                    } else { fallback(); }
+                });
+                return;
+            }
+            fallback();
         },
 
         // Print invoice → KOT in strict order. Used by auto-print on successful pay.
@@ -6828,10 +6898,14 @@ function restaurantPos() {
         // receiptAutoCloseTimer and _receiptAutoCloseSecs both kept for cancel support.
         scheduleReceiptAutoClose() {
             if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
+            // Task 1263: honor the company setting (Customize → Receipt popup
+            // auto-close). 0 = never auto-close; default 10s matches old behavior.
+            const secs = parseInt(this.receiptAutoCloseSecs, 10);
+            if (!secs || secs <= 0) return;
             this.receiptAutoCloseTimer = setTimeout(() => {
                 if (this.showReceipt) { this.startNewAfterPayment(); }
                 this.receiptAutoCloseTimer = null;
-            }, 10000);
+            }, secs * 1000);
         },
 
         cancelReceiptAutoClose() {

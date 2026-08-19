@@ -3449,6 +3449,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'show_tax_on_local_receipt' => 'Local Receipt par Tax dikhayen',
     'show_tax_on_pra_receipt' => 'PRA Receipt par Tax dikhayen',
     'show_tax_pra_hint' => 'Subtotal + Sales-Tax lines print karein. OFF = customer copy par sirf grand TOTAL dikhega. Tax hamesha mukammal taur par PRA ko submit hota hai; details QR scan (Sahulat app) par nazar aati rahengi.',
+    // Task 1263: FBR Customize parity + receipt settings expansion.
+    'sec_sale_billing' => 'Sale Screen aur Billing',
+    'sec_sale_billing_sub' => 'Quick type, cash prompt, receipt popup, KOT aur inventory switches',
+    'kot_reprint_toggle_title' => 'KOT Reprint Button',
+    'kot_reprint_toggle_sub' => 'Billing ke baad receipt popup par Reprint KOT button dikhayen',
+    'show_tax_on_fbr_receipt' => 'FBR Receipt par Tax dikhayen',
+    'show_tax_fbr_hint' => 'Subtotal + Sales-Tax lines print karein. OFF = customer copy par sirf grand TOTAL dikhega. Tax hamesha mukammal taur par FBR ko submit hota hai; details QR scan (Tax Asaan app) par nazar aati rahengi.',
     'show_word' => 'Dikhayen',
     'showing_my_sales' => 'Dikhaya ja raha hai: Meri sales',
     'showing_name' => 'Dikhaya ja raha hai: :name',

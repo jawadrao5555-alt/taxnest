@@ -234,7 +234,7 @@ class InvoiceController extends Controller
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
             'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.price' => 'required|numeric|min:0',
+            'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'items.*.pct_code' => 'nullable|string|max:50',
@@ -250,6 +250,7 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
+            'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {
@@ -510,7 +511,7 @@ class InvoiceController extends Controller
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
             'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.price' => 'required|numeric|min:0',
+            'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'items.*.pct_code' => 'nullable|string|max:50',
@@ -526,6 +527,7 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
+            'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
         $itemsWithTaxRate = collect($request->items)->map(function ($item) {

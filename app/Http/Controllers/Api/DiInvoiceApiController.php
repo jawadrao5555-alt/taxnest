@@ -53,7 +53,7 @@ class DiInvoiceApiController extends Controller
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
             'items.*.quantity' => 'required|numeric|min:0.01',
-            'items.*.price' => 'required|numeric|min:0',
+            'items.*.price' => 'required|numeric|min:0.01',
             'items.*.tax' => 'required|numeric|min:0',
             'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'items.*.pct_code' => 'nullable|string|max:50',
@@ -65,6 +65,8 @@ class DiInvoiceApiController extends Controller
             'items.*.st_withheld_at_source' => 'nullable',
             'items.*.petroleum_levy' => 'nullable|numeric|min:0',
             'items.*.further_tax' => 'nullable|numeric|min:0',
+        ], [
+            'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
         $documentType = (string) $request->input('document_type', 'Sale Invoice');

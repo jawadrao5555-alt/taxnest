@@ -163,6 +163,16 @@ class ScheduleEngine
             $scheduleType = $item['schedule_type'] ?? 'standard';
             $scheduleTypes[] = $scheduleType;
             $taxRate = isset($item['tax_rate']) ? floatval($item['tax_rate']) : null;
+            $valueExcludingSt = round(
+                floatval($item['price'] ?? 0) * floatval($item['quantity'] ?? 1),
+                2
+            );
+
+            // Zero-rated and exempt describe the tax treatment, not a free sale:
+            // FBR rejects every zero-value line with error 0300.
+            if ($valueExcludingSt == 0.0) {
+                $errors[] = "Item #" . ($index + 1) . ": FBR rejects free/bonus lines with a value of Rs 0 (error 0300). Note the free item in the description of a paid line or omit it.";
+            }
 
             if ($taxRate === null) {
                 $taxFromAmount = isset($item['tax'], $item['price'], $item['quantity']) ? floatval($item['tax']) : 0;

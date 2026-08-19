@@ -607,6 +607,18 @@ class FbrService
 
             $saleType = strtolower($item['saleType'] ?? '');
 
+            // Zero-rated and exempt describe the tax treatment, not a free sale:
+            // FBR rejects every zero-value line with error 0300.
+            if (array_key_exists('valueSalesExcludingST', $item)
+                && is_numeric($item['valueSalesExcludingST'])
+                && round($valueExclST, 2) == 0.0
+            ) {
+                $errors[] = [
+                    'code' => '0300',
+                    'message' => "Item #{$sn}: FBR rejects free/bonus lines with valueSalesExcludingST of Rs 0 (error 0300). Note the free item in the description of a paid line or omit it.",
+                ];
+            }
+
             // FBR only accepts a 16% rate for Services (FED in ST Mode) — scenario SN018
             // (confirmed Aug 2026: 13% and 19.5% both rejected in sandbox).
             if (strpos($saleType, 'services (fed in st mode)') !== false && is_numeric($rate) && abs(floatval($rate) - 16) > 0.001) {
@@ -1222,6 +1234,32 @@ class FbrService
                 'status' => 'failed',
                 'failure_type' => 'payload_error',
                 'errors' => $payloadErrors,
+                'response_time_ms' => 0,
+            ];
+        }
+
+        $preSubmissionErrors = $this->validatePayloadPreSubmission($payload, $company);
+        if (!empty($preSubmissionErrors)) {
+            $clearHashOnFailure();
+            $errorMessages = array_map(
+                fn (array $error) => "[{$error['code']}] {$error['message']}",
+                $preSubmissionErrors
+            );
+            $log = FbrLog::create([
+                'invoice_id' => $invoice->id,
+                'request_payload' => json_encode($payload),
+                'status' => 'failed',
+                'response_payload' => json_encode(['errors' => $errorMessages]),
+                'response_time_ms' => 0,
+                'retry_count' => $retryCount,
+            ]);
+            $log->failure_type = 'pre_validation';
+            $log->save();
+
+            return [
+                'status' => 'failed',
+                'failure_type' => 'pre_validation',
+                'errors' => $errorMessages,
                 'response_time_ms' => 0,
             ];
         }

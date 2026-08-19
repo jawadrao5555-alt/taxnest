@@ -753,6 +753,11 @@ class InvoiceController extends Controller
     {
         $companyId = app('currentCompanyId');
         $batchKey = (string) $request->query('batch_key', '');
+        if ($batchKey === '') {
+            // Task 1249: no key = "is anything running for my company?" —
+            // resolve the running lock so a reloaded page can re-attach.
+            $batchKey = (string) (Cache::get(\App\Jobs\BulkSubmitInvoiceJob::runningLockKey($companyId)) ?? '');
+        }
         $batch = $batchKey !== '' ? Cache::get(\App\Jobs\BulkSubmitInvoiceJob::cacheKey($batchKey)) : null;
 
         if (!$batch || (int) ($batch['company_id'] ?? 0) !== (int) $companyId) {
@@ -762,7 +767,7 @@ class InvoiceController extends Controller
         // Results are stored keyed by invoice id (write-once dedupe) — expose a plain list.
         $batch['results'] = array_values($batch['results'] ?? []);
 
-        return response()->json(['status' => 'ok', 'batch' => $batch]);
+        return response()->json(['status' => 'ok', 'batch_key' => $batchKey, 'batch' => $batch]);
     }
 
     public function submit(Request $request, Invoice $invoice)

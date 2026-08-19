@@ -1044,6 +1044,26 @@ function invoiceKeyboardNav() {
         bulkError: '',
         bulkPollTimer: null,
 
+        init() {
+            @if($tab === 'draft')
+            // Task 1249: re-attach to a still-running bulk submit after a reload.
+            fetch('/invoices/bulk-submit-status', {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(d => {
+                if (d.batch_key && d.batch && !this.bulkBatchKey) {
+                    this.bulkBatchKey = d.batch_key;
+                    this.bulkProgress = d.batch;
+                    if (!d.batch.finished) {
+                        this.bulkPollTimer = setTimeout(() => this.pollBulk(), 2500);
+                    }
+                }
+            })
+            .catch(() => {});
+            @endif
+        },
+
         toggleAllDrafts(checked) {
             this.bulkSelected = checked ? [...this.pageDraftIds] : [];
         },

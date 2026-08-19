@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\FeatureSuggestion;
+use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -94,6 +95,33 @@ class PraElaanTallyTest extends TestCase
             $table->string('language')->nullable();
             $table->unsignedBigInteger('default_branch_id')->nullable();
             $table->rememberToken();
+            $table->timestamps();
+        });
+
+        // ── support tables required by POS route middleware ──────────────────
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->boolean('is_head_office')->default(false);
+            $table->boolean('is_active')->default(true);
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('branch_user', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('branch_id');
+            $table->unsignedBigInteger('user_id');
+            $table->timestamps();
+        });
+
+        Schema::create('pos_user_sessions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('user_id');
+            $table->timestamp('login_at')->nullable();
+            $table->timestamp('logout_at')->nullable();
+            $table->timestamp('last_activity_at')->nullable();
             $table->timestamps();
         });
 
@@ -347,7 +375,31 @@ class PraElaanTallyTest extends TestCase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 7. Soft-deleted company → tally counts unchanged, row shows "Company #N"
+    // 7. Drifted schema: respond endpoint still records the answer without source
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function test_elaan_response_is_saved_when_source_column_missing(): void
+    {
+        // Simulate a live schema where the source-column migration was missed.
+        Schema::table('feature_suggestions', function (Blueprint $table) {
+            $table->dropColumn('source');
+        });
+
+        $response = $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->postJson('/pos/pra-elaan/respond', ['choice' => 'band']);
+
+        $response->assertStatus(200)->assertJson(['ok' => true]);
+        $this->assertDatabaseHas('feature_suggestions', [
+            'company_id' => $this->companyAId,
+            'user_id' => $this->userA1Id,
+            'product' => 'pos',
+            'title' => FeatureSuggestion::PRA_ELAAN_CHOICES['band'],
+            'status' => 'pending',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 8. Soft-deleted company → tally counts unchanged, row shows "Company #N"
     // ─────────────────────────────────────────────────────────────────────────
 
     /**

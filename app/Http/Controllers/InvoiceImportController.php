@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AiReaderException;
 use App\Jobs\ProcessInvoiceImportBatchJob;
 use App\Models\Company;
 use App\Models\InvoiceImportBatch;
 use App\Models\InvoiceImportMapping;
+use App\Services\AiImportAssistService;
+use App\Services\AiInvoiceReaderService;
+use App\Services\DiFeatureService;
 use App\Services\InvoiceImportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -282,6 +287,302 @@ class InvoiceImportController extends Controller
         }
 
         return $this->service->errorReportResponse($batch);
+    }
+
+    // ------------------------------------------------------------------
+    // Task 1238: AI assist (suggestions only — the user confirms every
+    // change, and the deterministic validation stays the only gatekeeper)
+    // ------------------------------------------------------------------
+
+    /**
+     * AI column-mapping suggestions for a held (non-template) upload.
+     * Same availability rules as the AI Invoice Reader: ai_reader plan gate,
+     * OpenAI key configured, shared monthly quota.
+     */
+    public function aiMapSuggest(Request $request)
+    {
+        $request->validate([
+            'mapping_token' => 'required|string|size:40|alpha_num',
+            'mapping' => 'nullable|array',
+            'defaults' => 'nullable|array',
+        ]);
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!$company) {
+            return response()->json(['error' => 'Company context missing.'], 403);
+        }
+        if ($gate = $this->aiGateError($company)) {
+            return $gate;
+        }
+
+        $token = (string) $request->input('mapping_token');
+        $dir = $this->holdDir((int) $company->id);
+        $metaPath = $dir . '/' . $token . '.json';
+        $meta = is_file($metaPath) ? json_decode((string) @file_get_contents($metaPath), true) : null;
+        $extension = strtolower((string) ($meta['extension'] ?? ''));
+        $dataPath = $dir . '/' . $token . '.' . $extension;
+        if (!is_array($meta) || !in_array($extension, ['xlsx', 'xls', 'csv', 'txt'], true) || !is_file($dataPath)) {
+            return response()->json(['error' => 'This upload has expired. Please upload the file again.'], 422);
+        }
+
+        $headers = array_map(fn ($h) => (string) $h, (array) ($meta['headers'] ?? []));
+        if (empty($headers)) {
+            return response()->json(['error' => 'No headers found for this upload. Please upload the file again.'], 422);
+        }
+
+        // Current selections: AI only fills what's still unresolved and must
+        // not reuse columns the user already assigned.
+        $currentMapping = collect((array) $request->input('mapping', []))
+            ->map(fn ($v) => is_scalar($v) ? trim((string) $v) : '')->filter()->all();
+        $currentDefaults = collect((array) $request->input('defaults', []))
+            ->map(fn ($v) => is_scalar($v) ? trim((string) $v) : '')->filter()->all();
+
+        $samples = $this->service->sampleRows($dataPath, $extension, AiImportAssistService::MAX_SAMPLE_ROWS);
+
+        try {
+            $result = AiImportAssistService::suggestMapping(
+                $headers,
+                $samples,
+                $company,
+                $currentMapping,
+                $currentDefaults,
+                (string) ($meta['original_filename'] ?? '')
+            );
+        } catch (AiReaderException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json($result + ['quota' => AiInvoiceReaderService::quotaState($company)]);
+    }
+
+    /**
+     * AI fix suggestions for rows that failed validation (capped batch).
+     * Suggestions are stored on the batch so the downloadable error report
+     * can include them as a suggestion column.
+     */
+    public function aiRowFixes(int $batchId)
+    {
+        $batch = $this->findBatch($batchId);
+        if (!$batch) {
+            return response()->json(['error' => 'Import batch not found.'], 404);
+        }
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!$company) {
+            return response()->json(['error' => 'Company context missing.'], 403);
+        }
+        if ($gate = $this->aiGateError($company)) {
+            return $gate;
+        }
+
+        if ($batch->status !== 'validated' || $batch->isPruned()) {
+            return response()->json(['error' => 'AI suggestions are only available on the validation preview, before processing starts.'], 422);
+        }
+
+        $rows = $batch->rowsArray();
+
+        $invalid = [];
+        foreach ($rows as $row) {
+            if (!empty($row['valid'])) {
+                continue;
+            }
+            $invalid[] = [
+                'row' => (int) ($row['row'] ?? 0),
+                'data' => (array) ($row['data'] ?? []),
+                'errors' => (array) ($row['errors'] ?? []),
+            ];
+        }
+        if (empty($invalid)) {
+            return response()->json(['error' => 'There are no failing rows in this batch.'], 422);
+        }
+
+        $capped = array_slice($invalid, 0, AiImportAssistService::MAX_FIX_ROWS);
+
+        // Deterministic context: schedule_type each buyer's PASSING rows use —
+        // the classic "one schedule per buyer" fix.
+        $invalidBuyers = [];
+        foreach ($capped as $entry) {
+            $name = trim((string) ($entry['data']['buyer_name'] ?? ''));
+            if ($name !== '') {
+                $invalidBuyers[mb_strtolower($name)] = $name;
+            }
+        }
+        $buyerHints = [];
+        foreach ($rows as $row) {
+            if (empty($row['valid'])) {
+                continue;
+            }
+            $name = trim((string) ($row['data']['buyer_name'] ?? ''));
+            $schedule = trim((string) ($row['data']['schedule_type'] ?? ''));
+            $key = mb_strtolower($name);
+            if ($name !== '' && $schedule !== '' && isset($invalidBuyers[$key]) && !isset($buyerHints[$name])) {
+                $buyerHints[$name] = $schedule;
+            }
+        }
+
+        try {
+            $suggestions = AiImportAssistService::suggestRowFixes($capped, $buyerHints, $company, (string) $batch->original_filename);
+        } catch (AiReaderException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        // Persist for the error report (merge over earlier calls). Guarded so
+        // a drifted install missing the column still returns the suggestions.
+        if (!empty($suggestions) && Schema::hasColumn('invoice_import_batches', 'ai_suggestions_json')) {
+            $stored = $batch->aiSuggestionsArray();
+            foreach ($suggestions as $s) {
+                $stored[(string) $s['row']] = ['fixes' => $s['fixes'], 'note' => $s['note']];
+            }
+            $batch->update(['ai_suggestions_json' => json_encode($stored)]);
+        }
+
+        return response()->json([
+            'suggestions' => $suggestions,
+            'covered' => count($capped),
+            'invalid_total' => count($invalid),
+            'truncated' => count($invalid) > count($capped),
+            'quota' => AiInvoiceReaderService::quotaState($company),
+        ]);
+    }
+
+    /**
+     * Apply user-CONFIRMED AI suggestions to a batch's rows, then re-run the
+     * exact same deterministic validation over ALL rows. Deterministic step
+     * (no AI call, so no key/quota check), but still part of the AI-assist
+     * flow: it requires the ai_reader plan gate and only values the server
+     * itself stored as suggestions can be applied — this is NOT a general
+     * row-edit API.
+     */
+    public function applyRowFixes(Request $request, int $batchId)
+    {
+        $request->validate([
+            'fixes' => 'required|array|min:1|max:200',
+            'fixes.*.row' => 'required|integer|min:1',
+            'fixes.*.fields' => 'required|array|min:1',
+        ]);
+
+        $batch = $this->findBatch($batchId);
+        if (!$batch) {
+            return response()->json(['error' => 'Import batch not found.'], 404);
+        }
+        if ($batch->status !== 'validated' || $batch->isPruned()) {
+            return response()->json(['error' => 'This batch can no longer be edited.'], 409);
+        }
+
+        $company = Company::find($batch->company_id);
+        if (!$company) {
+            return response()->json(['error' => 'Company context missing.'], 403);
+        }
+        if (!DiFeatureService::planAllows($company, 'ai_reader')) {
+            return response()->json(['error' => 'AI assistance is a Premium plan feature. Please upgrade your plan to use it.'], 403);
+        }
+
+        // Only server-stored suggestion values are applicable: row => field => value.
+        $allowed = [];
+        foreach ($batch->aiSuggestionsArray() as $rowKey => $entry) {
+            foreach ((array) ($entry['fixes'] ?? []) as $fix) {
+                if (is_array($fix) && isset($fix['field'])) {
+                    $allowed[(int) $rowKey][(string) $fix['field']] = (string) ($fix['value'] ?? '');
+                }
+            }
+        }
+        if (empty($allowed)) {
+            return response()->json(['error' => 'No AI suggestions have been generated for this batch yet.'], 422);
+        }
+
+        $fixMap = [];
+        foreach ((array) $request->input('fixes', []) as $fix) {
+            $rowNum = (int) ($fix['row'] ?? 0);
+            foreach ((array) ($fix['fields'] ?? []) as $field => $value) {
+                if (is_scalar($value)
+                    && isset($allowed[$rowNum][$field])
+                    && trim((string) $value) === $allowed[$rowNum][$field]) {
+                    $fixMap[$rowNum][$field] = $allowed[$rowNum][$field];
+                }
+            }
+        }
+        if (empty($fixMap)) {
+            return response()->json(['error' => 'Only AI-suggested values can be applied here. Refresh the suggestions and try again.'], 422);
+        }
+
+        $allFields = array_merge(InvoiceImportService::REQUIRED_COLUMNS, InvoiceImportService::OPTIONAL_COLUMNS);
+
+        $rows = $batch->rowsArray();
+        if (empty($rows)) {
+            return response()->json(['error' => 'This batch has no rows to fix.'], 422);
+        }
+
+        // Patch + strip old validation state; validateRows() re-decides
+        // everything (batch rows are never pre-flagged, so no errors carry over).
+        $applied = 0;
+        $parsed = [];
+        foreach ($rows as $row) {
+            $rowNum = (int) ($row['row'] ?? 0);
+            $data = [];
+            foreach ($allFields as $f) {
+                $data[$f] = (string) ($row['data'][$f] ?? '');
+            }
+            if (isset($fixMap[$rowNum])) {
+                foreach ($fixMap[$rowNum] as $f => $v) {
+                    $data[$f] = $v;
+                }
+                $applied++;
+            }
+            $parsed[] = ['row' => $rowNum, 'data' => $data];
+        }
+        if ($applied === 0) {
+            return response()->json(['error' => 'None of the fixes matched a row in this batch.'], 422);
+        }
+
+        $result = $this->service->validateRows($parsed, $company);
+
+        // Compare-and-swap: the new rows may only land while the batch is
+        // still 'validated'. process() atomically moves validated -> queued,
+        // so this cannot interleave with a processing run — once processing
+        // claimed the batch, this update matches 0 rows and we bail out.
+        $updated = InvoiceImportBatch::whereKey($batch->id)
+            ->where('status', 'validated')
+            ->update([
+                'total_rows' => $result['total'],
+                'valid_rows' => $result['valid_count'],
+                'invalid_rows' => $result['error_count'],
+                'rows_json' => json_encode($result['rows']),
+                'updated_at' => now(),
+            ]);
+        if (!$updated) {
+            return response()->json(['error' => 'This batch has already started processing — the fixes were not applied.'], 409);
+        }
+
+        return response()->json([
+            'batch_id' => $batch->id,
+            'total' => $result['total'],
+            'valid_count' => $result['valid_count'],
+            'error_count' => $result['error_count'],
+            'preview' => array_slice($result['rows'], 0, self::PREVIEW_LIMIT),
+            'preview_limit' => self::PREVIEW_LIMIT,
+            'has_more' => $result['total'] > self::PREVIEW_LIMIT,
+            'error_report_url' => $result['error_count'] > 0 ? '/invoices/import/' . $batch->id . '/error-report' : null,
+            'applied' => $applied,
+        ]);
+    }
+
+    /**
+     * Shared availability rules with the AI Invoice Reader: plan gate →
+     * key configured → monthly quota. Returns a friendly JSON error or null.
+     */
+    private function aiGateError(Company $company)
+    {
+        if (!DiFeatureService::planAllows($company, 'ai_reader')) {
+            return response()->json(['error' => 'AI assistance is a Premium plan feature. Please upgrade your plan to use it.'], 403);
+        }
+        if (!AiImportAssistService::enabled()) {
+            return response()->json(['error' => 'AI service is not configured yet. Please contact support — the manual import flow works as usual.'], 503);
+        }
+        $quota = AiInvoiceReaderService::quotaState($company);
+        if (!$quota['unlimited'] && $quota['remaining'] <= 0) {
+            return response()->json(['error' => 'Monthly AI usage limit reached (' . $quota['used'] . '/' . $quota['quota'] . ', shared with the AI Invoice Reader). It resets on the 1st of next month.'], 429);
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------

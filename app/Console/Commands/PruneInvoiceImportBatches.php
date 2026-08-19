@@ -61,9 +61,13 @@ class PruneInvoiceImportBatches extends Command
 
         $pruned = 0;
         // Chunk by id so a huge backlog can't build one massive UPDATE.
-        $query->orderBy('id')->select('id')->chunkById(200, function ($batches) use (&$pruned, $hasPrunedAt) {
+        $hasAiSuggestions = Schema::hasColumn('invoice_import_batches', 'ai_suggestions_json');
+        $query->orderBy('id')->select('id')->chunkById(200, function ($batches) use (&$pruned, $hasPrunedAt, $hasAiSuggestions) {
             $ids = $batches->pluck('id')->all();
             $update = ['rows_json' => null, 'result_json' => null, 'updated_at' => now()];
+            if ($hasAiSuggestions) {
+                $update['ai_suggestions_json'] = null;
+            }
             if ($hasPrunedAt) {
                 $update['pruned_at'] = now();
             }

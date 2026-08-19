@@ -386,6 +386,19 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');
         Route::get('/invoices/import/{batchId}/error-report', [InvoiceImportController::class, 'errorReport'])->name('invoices.import-error-report');
 
+        // Task 1238: AI assist for the bulk import — mapping suggestions on the
+        // mapping screen, per-row fix suggestions on the validation preview
+        // (both AI, throttled like the AI Reader), and the user-confirmed
+        // apply+revalidate step (deterministic, no AI).
+        Route::post('/invoices/import-ai-map', [InvoiceImportController::class, 'aiMapSuggest'])
+            ->middleware('throttle:6,1')
+            ->name('invoices.import-ai-map');
+        Route::post('/invoices/import/{batchId}/ai-fixes', [InvoiceImportController::class, 'aiRowFixes'])
+            ->middleware('throttle:6,1')
+            ->name('invoices.import-ai-fixes');
+        Route::post('/invoices/import/{batchId}/apply-fixes', [InvoiceImportController::class, 'applyRowFixes'])
+            ->name('invoices.import-apply-fixes');
+
         // Task 142: AI Invoice Reader (Premium gate 'ai_reader') — upload old/supplier
         // invoice (PDF/photo/Excel) -> AI extraction -> review -> save DRAFT only.
         Route::get('/invoices/ai-reader', [AiInvoiceReaderController::class, 'show'])->name('invoices.ai-reader');

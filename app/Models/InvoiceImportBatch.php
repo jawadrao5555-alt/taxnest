@@ -20,6 +20,7 @@ class InvoiceImportBatch extends Model
         'failed_rows',
         'rows_json',
         'result_json',
+        'ai_suggestions_json',
         'error_message',
         'started_at',
         'finished_at',
@@ -60,6 +61,18 @@ class InvoiceImportBatch extends Model
     public function resultArray(): array
     {
         $decoded = json_decode($this->result_json ?? '[]', true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Task 1238: decoded AI fix suggestions, keyed by row number:
+     * { "<row>": { fixes: [{field, value, old}], note } }.
+     * Empty when the user never used AI help (or the column predates the
+     * migration on a drifted install — attribute reads just return null).
+     */
+    public function aiSuggestionsArray(): array
+    {
+        $decoded = json_decode($this->ai_suggestions_json ?? '[]', true);
         return is_array($decoded) ? $decoded : [];
     }
 }

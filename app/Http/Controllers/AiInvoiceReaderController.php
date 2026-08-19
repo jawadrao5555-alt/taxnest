@@ -29,8 +29,12 @@ class AiInvoiceReaderController extends Controller
         $allowed = DiFeatureService::planAllows($company, 'ai_reader');
         $configured = AiInvoiceReaderService::enabled();
         $quota = $allowed ? AiInvoiceReaderService::quotaState($company) : null;
+        // Task 1238: import-assist usage rows share the quota but are not
+        // reader parses — keep this page's recent list exactly as before.
         $recentParses = $allowed
-            ? AiInvoiceParse::where('company_id', $companyId)->orderByDesc('id')->limit(6)->get()
+            ? AiInvoiceParse::where('company_id', $companyId)
+                ->whereNotIn('source_type', ['import_map', 'import_fix'])
+                ->orderByDesc('id')->limit(6)->get()
             : collect();
 
         return view('invoice.ai-reader', compact('company', 'allowed', 'configured', 'quota', 'recentParses'));

@@ -476,6 +476,39 @@ class InvoiceImportService
         return $meta;
     }
 
+    /**
+     * Task 1238: first few non-empty data rows of a held upload, raw and
+     * trimmed — sample context for the AI mapping suggestion (never the
+     * whole file).
+     *
+     * @return array<int, array<int,string>>
+     */
+    public function sampleRows(string $path, string $extension, int $limit = 5): array
+    {
+        try {
+            $grid = in_array(strtolower($extension), ['xlsx', 'xls'], true)
+                ? $this->readGridExcel($path, self::MAX_ROWS)
+                : $this->readGridCsv($path, self::MAX_ROWS);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $samples = [];
+        $count = count($grid);
+        for ($i = 1; $i < $count && count($samples) < $limit; $i++) {
+            $cells = array_map(
+                fn ($v) => mb_substr(trim((string) ($v ?? '')), 0, 60),
+                array_slice((array) $grid[$i], 0, 40)
+            );
+            if (implode('', $cells) === '') {
+                continue;
+            }
+            $samples[] = $cells;
+        }
+
+        return $samples;
+    }
+
     /** Per-cell cleaning shared by the template and mapped parse paths. */
     private function cleanCell(string $col, $value): string
     {
@@ -1260,6 +1293,11 @@ class InvoiceImportService
             }
         }
 
+        // Task 1238: when the user asked for AI help on this batch, the same
+        // hints go into an extra suggestion column so the fixes can also be
+        // made in the original Excel file.
+        $aiSuggestions = $batch->aiSuggestionsArray();
+
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Errors');
@@ -1270,7 +1308,12 @@ class InvoiceImportService
         }
         $errorColIdx = count($columns) + 2;
         $sheet->setCellValue([$errorColIdx, 1], 'errors');
-        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($errorColIdx);
+        $aiColIdx = null;
+        if (!empty($aiSuggestions)) {
+            $aiColIdx = $errorColIdx + 1;
+            $sheet->setCellValue([$aiColIdx, 1], 'ai_suggestion');
+        }
+        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($aiColIdx ?? $errorColIdx);
         $sheet->getStyle('A1:' . $lastCol . '1')->getFont()->setBold(true);
         $sheet->getStyle('A1:' . $lastCol . '1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
@@ -1282,6 +1325,9 @@ class InvoiceImportService
             $sheet->getStyle($letter . ':' . $letter)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_TEXT);
         }
         $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($errorColIdx))->setWidth(80);
+        if ($aiColIdx !== null) {
+            $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($aiColIdx))->setWidth(70);
+        }
 
         $r = 2;
         foreach ($failedRows as $failed) {
@@ -1295,6 +1341,9 @@ class InvoiceImportService
                 }
             }
             $sheet->setCellValue([$errorColIdx, $r], implode(' | ', $failed['errors']));
+            if ($aiColIdx !== null) {
+                $sheet->setCellValueExplicit([$aiColIdx, $r], self::aiSuggestionText($aiSuggestions[(string) $failed['row']] ?? $aiSuggestions[$failed['row']] ?? null), DataType::TYPE_STRING);
+            }
             $r++;
         }
 
@@ -1305,5 +1354,26 @@ class InvoiceImportService
         }, 'invoice_import_errors_batch_' . $batch->id . '.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    /** One-cell plain-language rendering of a stored AI suggestion entry. */
+    private static function aiSuggestionText($entry): string
+    {
+        if (!is_array($entry)) {
+            return '';
+        }
+        $parts = [];
+        foreach ((array) ($entry['fixes'] ?? []) as $fix) {
+            if (is_array($fix) && isset($fix['field'])) {
+                $value = trim((string) ($fix['value'] ?? ''));
+                $parts[] = $fix['field'] . ' -> ' . ($value === '' ? '(blank)' : $value);
+            }
+        }
+        $note = trim((string) ($entry['note'] ?? ''));
+        if ($note !== '') {
+            $parts[] = $note;
+        }
+
+        return implode(' | ', $parts);
     }
 }

@@ -125,6 +125,23 @@
                                             </div>
                                         </div>
 
+                                        @if(!empty($aiReaderAllowed))
+                                        {{-- Task 1238: AI mapping suggestions (opt-in; fills only unresolved fields; user can change everything) --}}
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button @click="suggestAiMapping()" :disabled="aiMapLoading || !aiConfigured" class="inline-flex items-center px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                                                <span x-show="!aiMapLoading">AI Suggest Mapping</span>
+                                                <span x-show="aiMapLoading" x-cloak>Asking AI...</span>
+                                            </button>
+                                            <span x-show="!aiConfigured" class="text-xs text-gray-400 dark:text-gray-500">AI suggestions unavailable — the AI service is not configured yet. Manual mapping works as usual.</span>
+                                            <span x-show="aiMapDone && !aiMapError" x-cloak class="text-xs font-medium text-violet-600 dark:text-violet-400">
+                                                <template x-if="aiMapCount > 0"><span>AI filled <span x-text="aiMapCount"></span> suggestion(s) — marked <span class="px-1 rounded bg-violet-100 text-violet-700 font-bold">AI</span>. Review and change anything before continuing.</span></template>
+                                                <template x-if="aiMapCount === 0"><span>AI had no further suggestions for the remaining fields.</span></template>
+                                            </span>
+                                        </div>
+                                        <p x-show="aiMapError" x-cloak class="text-xs text-red-600 dark:text-red-400" x-text="aiMapError"></p>
+                                        @endif
+
                                         <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                                             <div class="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                                 <div class="col-span-4">TaxNest Field</div>
@@ -135,11 +152,11 @@
                                                 <template x-for="f in mappingFields" :key="f.key">
                                                     <div class="grid grid-cols-12 gap-2 items-center px-3 py-2">
                                                         <div class="col-span-4">
-                                                            <p class="text-xs font-semibold text-gray-800 dark:text-gray-200"><span x-text="f.key"></span><span x-show="f.value_required" class="text-red-500">*</span></p>
+                                                            <p class="text-xs font-semibold text-gray-800 dark:text-gray-200"><span x-text="f.key"></span><span x-show="f.value_required" class="text-red-500">*</span><span x-show="aiPicked[f.key]" x-cloak class="ml-1.5 px-1 py-0.5 rounded text-xs font-bold bg-violet-100 text-violet-700" title="Suggested by AI — change it if it's wrong">AI</span></p>
                                                             <p class="text-xs text-gray-400 dark:text-gray-500" x-text="f.hint"></p>
                                                         </div>
                                                         <div class="col-span-4">
-                                                            <select x-model="mappingSel[f.key]" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
+                                                            <select x-model="mappingSel[f.key]" @change="aiPicked[f.key] = false" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
                                                                 <option value="">— no column —</option>
                                                                 <template x-for="h in fileHeaders" :key="h">
                                                                     <option :value="h" x-text="h"></option>
@@ -148,7 +165,7 @@
                                                         </div>
                                                         <div class="col-span-4">
                                                             <template x-if="!mappingSel[f.key] && f.options">
-                                                                <select x-model="defaultsSel[f.key]" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
+                                                                <select x-model="defaultsSel[f.key]" @change="aiPicked[f.key] = false" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
                                                                     <option value="">— none —</option>
                                                                     <template x-for="o in f.options" :key="o">
                                                                         <option :value="o" x-text="o"></option>
@@ -156,7 +173,7 @@
                                                                 </select>
                                                             </template>
                                                             <template x-if="!mappingSel[f.key] && !f.options">
-                                                                <input type="text" x-model="defaultsSel[f.key]" placeholder="Fixed value for every row" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
+                                                                <input type="text" x-model="defaultsSel[f.key]" @input="aiPicked[f.key] = false" placeholder="Fixed value for every row" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
                                                             </template>
                                                             <p x-show="mappingSel[f.key]" class="text-xs text-gray-400 dark:text-gray-500">Using column &ldquo;<span x-text="mappingSel[f.key]"></span>&rdquo;</p>
                                                         </div>
@@ -210,6 +227,19 @@
 
                                         <div x-show="errorCount > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                                             <p class="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">Rows with errors (will be skipped) — download the error report for the full fix-and-reupload list:</p>
+                                            @if(!empty($aiReaderAllowed))
+                                            {{-- Task 1238: AI fix suggestions for failing rows (opt-in; nothing applies without confirmation) --}}
+                                            <div class="mt-1 mb-2 flex flex-wrap items-center gap-2">
+                                                <button @click="getAiFixes()" :disabled="aiFixLoading || !aiConfigured" class="inline-flex items-center px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                                                    <span x-show="!aiFixLoading">Get AI Fix Suggestions</span>
+                                                    <span x-show="aiFixLoading" x-cloak>Asking AI...</span>
+                                                </button>
+                                                <span x-show="!aiConfigured" class="text-xs text-gray-400 dark:text-gray-500">AI suggestions unavailable — the AI service is not configured yet.</span>
+                                                <span x-show="aiFixNote" x-cloak class="text-xs text-amber-700 dark:text-amber-400" x-text="aiFixNote"></span>
+                                            </div>
+                                            <p x-show="aiFixError" x-cloak class="mb-2 text-xs text-red-700 dark:text-red-300 font-medium" x-text="aiFixError"></p>
+                                            @endif
                                             <ul class="text-xs text-red-600 dark:text-red-400 space-y-0.5 max-h-32 overflow-y-auto">
                                                 <template x-for="row in previewRows.filter(r => !r.valid)" :key="row.row">
                                                     <li>
@@ -219,6 +249,37 @@
                                                 </template>
                                             </ul>
                                         </div>
+
+                                        @if(!empty($aiReaderAllowed))
+                                        <p x-show="aiFixApplied > 0" x-cloak class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Applied <span x-text="aiFixApplied"></span> fix(es) — all rows re-checked with the standard validation; the counts above are updated.</p>
+
+                                        {{-- Task 1238: suggestion panel — tick what to apply; everything re-runs the normal validation --}}
+                                        <div x-show="aiFixes.length > 0" x-cloak class="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-3 space-y-2">
+                                            <p class="text-sm font-semibold text-violet-800 dark:text-violet-300">AI fix suggestions — tick the ones to apply. Nothing changes without your confirmation, and applied rows go through the exact same validation again.</p>
+                                            <div class="max-h-48 overflow-y-auto space-y-2">
+                                                <template x-for="s in aiFixes" :key="s.row">
+                                                    <div class="text-xs">
+                                                        <p class="font-bold text-violet-900 dark:text-violet-200">Row <span x-text="s.row"></span><span x-show="s.note" class="font-normal text-violet-700 dark:text-violet-300" x-text="' — ' + s.note"></span></p>
+                                                        <div class="mt-0.5 space-y-0.5">
+                                                            <template x-for="fx in s.fixes" :key="s.row + '-' + fx.field">
+                                                                <label class="flex items-start gap-2 cursor-pointer">
+                                                                    <input type="checkbox" x-model="fx.apply" class="mt-0.5 rounded border-gray-300 text-violet-600">
+                                                                    <span class="text-gray-700 dark:text-gray-300"><span class="font-mono font-semibold" x-text="fx.field"></span> &rarr; <span class="font-mono" x-text="fx.value === '' ? '(blank)' : fx.value"></span> <span class="text-gray-400" x-text="'(was: ' + (fx.old === '' ? 'blank' : fx.old) + ')'"></span></span>
+                                                                </label>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button @click="applySelectedFixes()" :disabled="applyingFixes || selectedFixCount === 0" class="px-4 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <span x-show="!applyingFixes">Apply <span x-text="selectedFixCount"></span> Fix(es) &amp; Re-check</span>
+                                                    <span x-show="applyingFixes" x-cloak>Re-checking rows...</span>
+                                                </button>
+                                                <button @click="aiFixes = []" class="text-xs text-gray-500 dark:text-gray-400 underline hover:text-gray-700">Dismiss suggestions</button>
+                                            </div>
+                                        </div>
+                                        @endif
 
                                         <p x-show="hasMore" class="text-xs text-gray-500 dark:text-gray-400">Showing the first <span x-text="previewRows.length"></span> of <span x-text="totalRows"></span> rows below — counts above cover the whole file.</p>
 
@@ -1009,6 +1070,21 @@ function bulkImport() {
         presetSavedName: '',
         presetCapWarning: false,
 
+        // Task 1238: AI assist (suggestions only; plan-gated server-side too)
+        aiAllowed: {{ !empty($aiReaderAllowed) ? 'true' : 'false' }},
+        aiConfigured: {{ \App\Services\AiInvoiceReaderService::enabled() ? 'true' : 'false' }},
+        aiMapLoading: false,
+        aiMapError: '',
+        aiMapDone: false,
+        aiMapCount: 0,
+        aiPicked: {},
+        aiFixLoading: false,
+        aiFixError: '',
+        aiFixNote: '',
+        aiFixes: [],
+        applyingFixes: false,
+        aiFixApplied: 0,
+
         openModal() {
             this.showModal = true;
             this.resetUpload();
@@ -1053,6 +1129,17 @@ function bulkImport() {
             this.applyingMapping = false;
             this.presetSavedName = '';
             this.presetCapWarning = false;
+            this.aiMapLoading = false;
+            this.aiMapError = '';
+            this.aiMapDone = false;
+            this.aiMapCount = 0;
+            this.aiPicked = {};
+            this.aiFixLoading = false;
+            this.aiFixError = '';
+            this.aiFixNote = '';
+            this.aiFixes = [];
+            this.applyingFixes = false;
+            this.aiFixApplied = 0;
         },
 
         get progressPercent() {
@@ -1199,6 +1286,145 @@ function bulkImport() {
                 this.mappingError = 'Network error. Please try again.';
             }
             this.applyingMapping = false;
+        },
+
+        // Task 1238: AI mapping suggestions — fills ONLY still-unresolved
+        // fields, marks them with an AI badge, user can change everything.
+        async suggestAiMapping() {
+            if (!this.mappingToken || this.aiMapLoading) return;
+            this.aiMapLoading = true;
+            this.aiMapError = '';
+            this.aiMapDone = false;
+
+            const mapping = {}, defaults = {};
+            for (const f of this.mappingFields) {
+                if (this.mappingSel[f.key]) mapping[f.key] = this.mappingSel[f.key];
+                else if ((this.defaultsSel[f.key] || '').trim()) defaults[f.key] = this.defaultsSel[f.key].trim();
+            }
+
+            try {
+                const response = await fetch('/invoices/import-ai-map', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ mapping_token: this.mappingToken, mapping: mapping, defaults: defaults }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.aiMapError = data.error || data.message || 'Could not get AI suggestions.';
+                } else {
+                    let filled = 0;
+                    const sugMap = data.mapping || {}, sugDefs = data.defaults || {};
+                    for (const f of this.mappingFields) {
+                        const k = f.key;
+                        if (this.mappingSel[k] || (this.defaultsSel[k] || '').trim()) continue; // never overwrite the user
+                        if (sugMap[k] && this.fileHeaders.includes(sugMap[k])) {
+                            this.mappingSel[k] = sugMap[k];
+                            this.aiPicked[k] = true;
+                            filled++;
+                        } else if (sugDefs[k]) {
+                            this.defaultsSel[k] = sugDefs[k];
+                            this.aiPicked[k] = true;
+                            filled++;
+                        }
+                    }
+                    this.aiMapCount = filled;
+                    this.aiMapDone = true;
+                    if (data.note) this.aiMapError = data.note;
+                }
+            } catch (e) {
+                this.aiMapError = 'Network error. Please try again.';
+            }
+            this.aiMapLoading = false;
+        },
+
+        // Task 1238: AI fix suggestions for failing rows (capped server-side).
+        async getAiFixes() {
+            if (!this.batchId || this.aiFixLoading) return;
+            this.aiFixLoading = true;
+            this.aiFixError = '';
+            this.aiFixApplied = 0;
+            try {
+                const response = await fetch('/invoices/import/' + this.batchId + '/ai-fixes', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.aiFixError = data.error || data.message || 'Could not get AI suggestions.';
+                } else {
+                    this.aiFixes = (data.suggestions || []).map(s => ({
+                        row: s.row,
+                        note: s.note || '',
+                        fixes: (s.fixes || []).map(fx => ({ field: fx.field, value: fx.value, old: fx.old || '', apply: true })),
+                    }));
+                    this.aiFixNote = data.truncated
+                        ? ('Suggestions cover the first ' + data.covered + ' of ' + data.invalid_total + ' failing rows — fix and re-upload for the rest, or ask again after applying.')
+                        : '';
+                    if (!this.aiFixes.length) {
+                        this.aiFixError = 'The AI had no confident suggestions for these rows — please fix them in the file and re-upload.';
+                    }
+                }
+            } catch (e) {
+                this.aiFixError = 'Network error. Please try again.';
+            }
+            this.aiFixLoading = false;
+        },
+
+        get selectedFixCount() {
+            return this.aiFixes.reduce((n, s) => n + s.fixes.filter(fx => fx.apply).length, 0);
+        },
+
+        // User-confirmed fixes -> server patches rows and re-runs the SAME
+        // validation over the whole batch, then we refresh the preview.
+        async applySelectedFixes() {
+            if (!this.batchId || this.applyingFixes) return;
+            const fixes = [];
+            for (const s of this.aiFixes) {
+                const fields = {};
+                for (const fx of s.fixes) {
+                    if (fx.apply) fields[fx.field] = fx.value;
+                }
+                if (Object.keys(fields).length) fixes.push({ row: s.row, fields: fields });
+            }
+            if (!fixes.length) return;
+
+            this.applyingFixes = true;
+            this.aiFixError = '';
+            try {
+                const response = await fetch('/invoices/import/' + this.batchId + '/apply-fixes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ fixes: fixes }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.aiFixError = data.error || data.message || 'Could not apply the fixes.';
+                } else {
+                    // Keep only unapplied suggestions; drop everything once clean.
+                    this.aiFixes = this.aiFixes
+                        .map(s => ({ row: s.row, note: s.note, fixes: s.fixes.filter(fx => !fx.apply) }))
+                        .filter(s => s.fixes.length > 0);
+                    const keepNote = this.aiFixNote;
+                    this.showPreview(data);
+                    this.aiFixNote = keepNote;
+                    this.aiFixApplied = data.applied || 0;
+                    if (!data.error_count) this.aiFixes = [];
+                }
+            } catch (e) {
+                this.aiFixError = 'Network error. Please try again.';
+            }
+            this.applyingFixes = false;
         },
 
         async renamePreset(p) {

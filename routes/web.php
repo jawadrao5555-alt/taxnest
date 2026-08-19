@@ -447,6 +447,11 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         // WhatsApp Business API (Phase 2) — server-side invoice send credentials
         Route::get('/company/whatsapp-settings', [CompanySettingsController::class, 'whatsappSettings']);
         Route::put('/company/whatsapp-settings', [CompanySettingsController::class, 'updateWhatsappSettings']);
+        // Task 1231: DI invoice push API — key management + integration docs
+        Route::get('/company/api-access', [\App\Http\Controllers\DiApiKeyController::class, 'index'])->name('company.api-access');
+        Route::post('/company/api-access/generate', [\App\Http\Controllers\DiApiKeyController::class, 'generate'])->name('company.api-access.generate');
+        Route::post('/company/api-access/revoke', [\App\Http\Controllers\DiApiKeyController::class, 'revoke'])->name('company.api-access.revoke');
+        Route::get('/company/api-docs', [\App\Http\Controllers\DiApiKeyController::class, 'docs'])->name('company.api-docs');
         Route::post('/company/test-connection', [CompanySettingsController::class, 'testConnection']);
         Route::post('/company/sandbox-test/{type}', [CompanySettingsController::class, 'sandboxTest']);
 
@@ -1607,6 +1612,16 @@ Route::prefix('api/caller-app/v1')->middleware(['throttle:120,1'])->withoutMiddl
     Route::get('/me', [\App\Http\Controllers\PosCallerIdController::class, 'appMe'])->name('callerapp.me');
     Route::get('/version', [\App\Http\Controllers\PosCallerIdController::class, 'appVersion'])->name('callerapp.version');
     Route::post('/logout', [\App\Http\Controllers\PosCallerIdController::class, 'appLogout'])->name('callerapp.logout');
+});
+
+// ── DI invoice push API (Task 1231) — stateless Bearer-key JSON for third-party
+// DMS/ERP software (SAMS, Intellibiz, EasyDMSFlow, custom distributor systems).
+// Versioned v1; key managed at /company/api-access; CSRF-exempt via
+// bootstrap/app.php ('api/di/*'). Suspended/pending companies rejected by di.api.
+Route::prefix('api/di/v1')->middleware(['di.api', 'throttle:120,1'])->withoutMiddleware($statelessMachine)->group(function () {
+    Route::post('/invoices', [\App\Http\Controllers\Api\DiInvoiceApiController::class, 'store'])
+        ->middleware('throttle:60,1')->name('diapi.invoices.store');
+    Route::get('/invoices/status', [\App\Http\Controllers\Api\DiInvoiceApiController::class, 'status'])->name('diapi.invoices.status');
 });
 
 Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {

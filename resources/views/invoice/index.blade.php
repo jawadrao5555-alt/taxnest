@@ -558,6 +558,9 @@
                                     @else
                                         <span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:text-gray-400 font-medium">INV</span>
                                     @endif
+                                    @if(($invoice->source ?? null) === 'api')
+                                        <span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 font-semibold" title="Pushed via the DI invoice API">API</span>
+                                    @endif
                                 </td>
                                 <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate" title="{{ $invoice->buyer_name }}">{{ $invoice->buyer_name }}</td>
                                 <td class="px-2 py-2 whitespace-nowrap text-[10px] text-gray-500 dark:text-gray-400 font-mono">{{ $invoice->buyer_ntn }}</td>

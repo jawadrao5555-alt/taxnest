@@ -44,6 +44,8 @@ class Invoice extends Model
         'wht_locked',
         'retry_count',
         'last_retry_at',
+        'source',
+        'client_reference',
     ];
 
     protected $casts = [

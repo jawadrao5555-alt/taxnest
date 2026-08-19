@@ -2142,7 +2142,8 @@ class InvoiceController extends Controller
         }
     }
 
-    private function extractTaxRate(array $item, ?string $supplierProvince = null): float
+    /** Public: shared with the DI invoice push API (Task 1231). */
+    public function extractTaxRate(array $item, ?string $supplierProvince = null): float
     {
         if (isset($item['tax_rate']) && is_numeric($item['tax_rate'])) {
             return floatval($item['tax_rate']);
@@ -2156,7 +2157,13 @@ class InvoiceController extends Controller
         return ScheduleEngine::getTaxRate($item['schedule_type'] ?? 'standard', $supplierProvince);
     }
 
-    private function submitToFbrSync(Invoice $invoice, ?string $fbrEnvironment = null): array
+    /**
+     * Public: also invoked by the DI invoice push API (Task 1231) so API
+     * submissions share every panel side effect (FBR log, ledger entry,
+     * integrity hash, compliance recalcs). Caller must have set
+     * is_fbr_processing under lock first.
+     */
+    public function submitToFbrSync(Invoice $invoice, ?string $fbrEnvironment = null): array
     {
         $invoice->load(['company', 'items']);
         $company = $invoice->company;

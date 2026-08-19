@@ -43,6 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/agent/*',
             'api/rider-app/*',
             'api/caller-app/*',
+            'api/di/*',            // DI invoice push API (Task 1231) — stateless Bearer-key JSON
+
             'webhooks/whatsapp/*', // Meta WA Cloud API status callbacks
             'bio-sync/*/iclock/*', // Biometric device ADMS push (no browser session)
             'iclock/*',            // Root ADMS push for domain-only firmware (K50/K40 — SN-identified)
@@ -55,6 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'fbrpos.auth' => \App\Http\Middleware\FbrPosAuth::class,
             'admin.auth' => \App\Http\Middleware\AdminAuth::class,
             'agent.auth' => \App\Http\Middleware\AgentAuth::class,
+            'di.api' => \App\Http\Middleware\DiApiAuth::class,
             'franchise.auth' => \App\Http\Middleware\FranchiseAuth::class,
             'plan.limit' => \App\Http\Middleware\CheckPlanLimit::class,
             'company.approval' => \App\Http\Middleware\CheckCompanyApproval::class,

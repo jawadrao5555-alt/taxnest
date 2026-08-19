@@ -177,6 +177,11 @@
             WhatsApp Settings
         </a>
 
+        <a href="/company/api-access" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('company/api-access*') || request()->is('company/api-docs*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-200' }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+            API Access
+        </a>
+
         </div>
         @endif
         @endif

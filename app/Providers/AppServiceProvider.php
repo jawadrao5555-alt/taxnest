@@ -72,7 +72,11 @@ class AppServiceProvider extends ServiceProvider
 
         if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
             \Illuminate\Support\Facades\URL::forceScheme('https');
-        } elseif (str_starts_with(config('app.url', ''), 'https://')) {
+        // APP_URL is also the public HTTPS preview address in development, while
+        // the PHP built-in server used by artisan serve accepts plain HTTP. Keep
+        // that one preview-server exception narrow: production web processes
+        // retain the HTTPS APP_URL fallback if a proxy omits its proto header.
+        } elseif (self::shouldApplyAppUrlSchemeFallback() && str_starts_with(config('app.url', ''), 'https://')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
 
@@ -162,5 +166,10 @@ class AppServiceProvider extends ServiceProvider
                 ]);
             }
         });
+    }
+
+    public static function shouldApplyAppUrlSchemeFallback(?string $sapi = null): bool
+    {
+        return ($sapi ?? PHP_SAPI) !== 'cli-server';
     }
 }

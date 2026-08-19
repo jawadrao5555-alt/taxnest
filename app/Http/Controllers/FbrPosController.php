@@ -5358,12 +5358,32 @@ class FbrPosController extends Controller
     public function createProduct()
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
-        return view('fbr-pos.product-form');
+        $companyId = app('currentCompanyId');
+        // Supplier block on the form (Task 1261) — same plan gate as the
+        // Stock & Purchase routes (plan.limit:inventory).
+        $inventoryAllowed = $this->fbrInventoryPlanAllowed($companyId);
+        $suppliers = $inventoryAllowed
+            ? \App\Models\Supplier::forCompany($companyId)->active()->orderBy('name')->get(['id', 'name', 'city'])
+            : collect();
+        return view('fbr-pos.product-form', [
+            'suppliers' => $suppliers,
+            'inventoryAllowed' => $inventoryAllowed,
+            // Save-and-continue sticky defaults (one-request flash from store).
+            'sticky' => session('fbr_product_sticky', []),
+        ]);
     }
 
     public function storeProduct(Request $request)
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+
+        // Multi-row entry mode (Task 1261) — same route + plan.limit:products
+        // middleware (guarantees at least one free slot); per-row quota is
+        // enforced inside.
+        if ($request->input('entry_mode') === 'multi') {
+            return $this->storeMultipleProducts($request);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255',
             'default_price' => 'required|numeric|min:0',
@@ -5375,6 +5395,13 @@ class FbrPosController extends Controller
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
             'opening_stock' => 'nullable|numeric|min:0',
             'min_stock_level' => 'nullable|numeric|min:0',
+            // Supplier + purchase cost (Task 1261)
+            'unit_cost' => 'nullable|numeric|min:0',
+            'supplier_id' => 'nullable|integer',
+            'new_supplier_name' => 'nullable|string|max:150',
+            'new_supplier_phone' => 'nullable|string|max:30',
+            'new_supplier_city' => 'nullable|string|max:80',
+            'save_action' => 'nullable|in:stay,list',
         ]);
 
         $taxType = $request->tax_type;
@@ -5382,8 +5409,9 @@ class FbrPosController extends Controller
         $isThirdScheduleFbr = $request->boolean('is_third_schedule');
         if ($isThirdScheduleFbr) { $taxType = 'exempt'; $taxRate = 0; }
 
+        $companyId = app('currentCompanyId');
         $createFbrData = [
-            'company_id' => app('currentCompanyId'),
+            'company_id' => $companyId,
             'name' => $request->name,
             'barcode' => $request->barcode ?: null,
             'sku' => $request->sku ?: null,
@@ -5397,12 +5425,157 @@ class FbrPosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
             $createFbrData['is_third_schedule'] = $isThirdScheduleFbr;
         }
-        $product = Product::create($createFbrData);
 
-        // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
-        $this->applyProductStockFields($request, $product);
+        // Supplier (Task 1261): existing supplier validated BEFORE any write;
+        // quick-added supplier is created inside the same transaction as the
+        // product, so a failure leaves nothing behind.
+        $inventoryAllowed = $this->fbrInventoryPlanAllowed($companyId);
+        $existingSupplier = $this->resolveExistingSupplier($request, $companyId, $inventoryAllowed);
 
-        return redirect()->route('fbrpos.products')->with('success', __('pos.product_created_success'));
+        $supplierId = null;
+        $product = DB::transaction(function () use ($request, $createFbrData, $companyId, $inventoryAllowed, $existingSupplier, &$supplierId) {
+            $product = Product::create($createFbrData);
+            $supplier = $this->quickAddSupplierIfRequested($request, $companyId, $inventoryAllowed) ?? $existingSupplier;
+            $supplierId = $supplier?->id;
+            // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
+            $this->applyProductStockFields($request, $product, $supplier, $inventoryAllowed);
+            return $product;
+        });
+
+        if ($request->input('save_action') === 'list') {
+            return redirect()->route('fbrpos.products')->with('success', __('pos.product_created_success'));
+        }
+
+        // Save-and-continue (Task 1261): stay on the New Product page for
+        // rapid consecutive entry; sticky defaults ride a one-request flash.
+        return redirect()->route('fbrpos.products.create')
+            ->with('success', __('pos.fbr_pf_created_named', ['name' => $product->name]))
+            ->with('fbr_product_sticky', $this->productFormStickyDefaults($request, $supplierId, 'single'));
+    }
+
+    /**
+     * Multi-product entry (Task 1261): one submit creates every row. Shared
+     * defaults (tax mode, UoM, supplier) come from the same form fields as
+     * single mode; per-row name/price/barcode/opening stock/cost. Nothing is
+     * created until every filled row passes validation — error messages name
+     * the failing rows and the blade re-fills all rows from old input.
+     */
+    private function storeMultipleProducts(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'tax_type' => 'required|in:taxable,exempt,custom',
+            'default_tax_rate' => 'nullable|numeric|min:0|max:100',
+            'uom' => 'nullable|string|max:20',
+            'supplier_id' => 'nullable|integer',
+            'new_supplier_name' => 'nullable|string|max:150',
+            'new_supplier_phone' => 'nullable|string|max:30',
+            'new_supplier_city' => 'nullable|string|max:80',
+            'save_action' => 'nullable|in:stay,list',
+            'rows' => 'required|array|min:1|max:50',
+        ]);
+
+        // Row rules keyed by ORIGINAL index (blank rows skipped, never
+        // re-indexed) so error keys always match the row numbers on screen.
+        $rows = $request->input('rows', []);
+        $rules = [];
+        $attributes = [];
+        $filled = [];
+        foreach ($rows as $i => $row) {
+            if (!is_array($row)) continue;
+            $blank = trim((string) ($row['name'] ?? '')) === ''
+                && trim((string) ($row['default_price'] ?? '')) === ''
+                && trim((string) ($row['barcode'] ?? '')) === ''
+                && trim((string) ($row['opening_stock'] ?? '')) === ''
+                && trim((string) ($row['unit_cost'] ?? '')) === '';
+            if ($blank) continue;
+            $filled[$i] = $row;
+            $rules["rows.$i.name"] = 'required|string|max:255';
+            $rules["rows.$i.default_price"] = 'required|numeric|min:0';
+            $rules["rows.$i.barcode"] = 'nullable|string|max:64';
+            $rules["rows.$i.opening_stock"] = 'nullable|numeric|min:0';
+            $rules["rows.$i.unit_cost"] = 'nullable|numeric|min:0';
+            $rowLabel = __('pos.fbr_pf_row_n', ['n' => $i + 1]);
+            $attributes["rows.$i.name"] = $rowLabel . ' — ' . __('pos.product_name_label');
+            $attributes["rows.$i.default_price"] = $rowLabel . ' — ' . __('pos.price_pkr');
+            $attributes["rows.$i.barcode"] = $rowLabel . ' — ' . __('pos.barcode_label');
+            $attributes["rows.$i.opening_stock"] = $rowLabel . ' — ' . __('pos.fbr_pf_opening_stock');
+            $attributes["rows.$i.unit_cost"] = $rowLabel . ' — ' . __('pos.stock_kharid_rate_ph');
+        }
+        if (empty($filled)) {
+            return back()->withInput()->withErrors(['rows' => __('pos.fbr_pf_rows_empty')]);
+        }
+        \Illuminate\Support\Facades\Validator::make($request->all(), $rules, [], $attributes)->validate();
+
+        // Plan quota for EVERY row (the route middleware only guarantees one
+        // free slot). null = unlimited.
+        $remaining = \App\Services\PlanLimitService::remainingProductAllowance($companyId, 'fbr');
+        if ($remaining !== null && count($filled) > $remaining) {
+            return back()->withInput()->withErrors(['rows' => __('pos.fbr_pf_quota_rows', ['n' => $remaining])]);
+        }
+
+        $taxType = $request->tax_type;
+        $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
+        $isThird = $request->boolean('is_third_schedule');
+        if ($isThird) { $taxType = 'exempt'; $taxRate = 0; }
+        $hasThirdCol = \Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule');
+
+        $inventoryAllowed = $this->fbrInventoryPlanAllowed($companyId);
+        $existingSupplier = $this->resolveExistingSupplier($request, $companyId, $inventoryAllowed);
+
+        $supplierId = null;
+        $created = DB::transaction(function () use ($request, $filled, $companyId, $taxType, $taxRate, $isThird, $hasThirdCol, $inventoryAllowed, $existingSupplier, &$supplierId) {
+            $supplier = $this->quickAddSupplierIfRequested($request, $companyId, $inventoryAllowed) ?? $existingSupplier;
+            $supplierId = $supplier?->id;
+
+            $purchaseLines = [];
+            $count = 0;
+            foreach ($filled as $row) {
+                $data = [
+                    'company_id' => $companyId,
+                    'name' => $row['name'],
+                    'barcode' => trim((string) ($row['barcode'] ?? '')) !== '' ? $row['barcode'] : null,
+                    'default_price' => (float) $row['default_price'],
+                    'is_price_editable' => true,
+                    'uom' => $request->uom ?? 'U',
+                    'tax_type' => $taxType,
+                    'default_tax_rate' => $taxRate,
+                ];
+                if ($hasThirdCol) $data['is_third_schedule'] = $isThird;
+                $product = Product::create($data);
+                $count++;
+
+                $opening = (float) ($row['opening_stock'] ?? 0);
+                if ($opening > 0) {
+                    $cost = ($inventoryAllowed && trim((string) ($row['unit_cost'] ?? '')) !== '') ? (float) $row['unit_cost'] : 0.0;
+                    if ($supplier) {
+                        // Collected into ONE received purchase below —
+                        // supplier history shows a single entry for the batch.
+                        $purchaseLines[] = ['product_id' => $product->id, 'quantity' => $opening, 'unit_price' => $cost];
+                    } else {
+                        \App\Services\InventoryService::addStock(
+                            $companyId, $product->id, $opening, $cost,
+                            \App\Models\InventoryMovement::TYPE_OPENING, null,
+                            ['type' => 'product_form', 'id' => $product->id, 'number' => null],
+                            'Opening stock (product form)',
+                            Auth::guard('fbrpos')->id()
+                        );
+                    }
+                }
+            }
+            if (!empty($purchaseLines) && $supplier) {
+                $this->recordProductFormPurchase($companyId, $supplier, $purchaseLines);
+            }
+            return $count;
+        });
+
+        if ($request->input('save_action') === 'list') {
+            return redirect()->route('fbrpos.products')->with('success', __('pos.fbr_pf_created_n', ['n' => $created]));
+        }
+        return redirect()->route('fbrpos.products.create')
+            ->with('success', __('pos.fbr_pf_created_n', ['n' => $created]))
+            ->with('fbr_product_sticky', $this->productFormStickyDefaults($request, $supplierId, 'multi'));
     }
 
     public function editProduct($id)
@@ -5462,10 +5635,13 @@ class FbrPosController extends Controller
     /**
      * Retail Core (Aug 2026): apply the optional stock fields from the product
      * form. min_stock_level always saves (it's just a threshold). opening_stock
-     * adds an OPENING movement — only when a value > 0 is supplied AND the
-     * product has no opening movement yet (never duplicates on edit re-save).
+     * adds stock only when a value > 0 is supplied AND the product has never
+     * been stocked through this form or a purchase (never duplicates on edit
+     * re-save). With a supplier (Task 1261) the stock is recorded as a
+     * RECEIVED purchase — supplier history + avg/last kharid stay correct;
+     * without one it stays the plain OPENING movement it always was.
      */
-    private function applyProductStockFields(Request $request, Product $product): void
+    private function applyProductStockFields(Request $request, Product $product, ?\App\Models\Supplier $supplier = null, bool $inventoryAllowed = false): void
     {
         $companyId = app('currentCompanyId');
 
@@ -5479,28 +5655,167 @@ class FbrPosController extends Controller
 
         $opening = (float) ($request->opening_stock ?? 0);
         if ($opening > 0) {
-            $alreadyHasOpening = \App\Models\InventoryMovement::where('company_id', $companyId)
+            // OPENING or PURCHASE: once first stock came in via either path
+            // (or the Stock page), this form never adds again — the blade
+            // shows the read-only "current stock" box for the same condition.
+            $alreadyStocked = \App\Models\InventoryMovement::where('company_id', $companyId)
                 ->where('product_id', $product->id)
-                ->where('type', \App\Models\InventoryMovement::TYPE_OPENING)
+                ->whereIn('type', [\App\Models\InventoryMovement::TYPE_OPENING, \App\Models\InventoryMovement::TYPE_PURCHASE])
                 ->exists();
-            if (!$alreadyHasOpening) {
+            if (!$alreadyStocked) {
+                $cost = ($inventoryAllowed && $request->filled('unit_cost')) ? (float) $request->unit_cost : 0.0;
                 try {
-                    \App\Services\InventoryService::addStock(
-                        $companyId,
-                        $product->id,
-                        $opening,
-                        0,
-                        \App\Models\InventoryMovement::TYPE_OPENING,
-                        null,
-                        ['type' => 'product_form', 'id' => $product->id, 'number' => null],
-                        'Opening stock (product form)',
-                        Auth::guard('fbrpos')->id()
-                    );
+                    if ($supplier) {
+                        $this->recordProductFormPurchase($companyId, $supplier, [
+                            ['product_id' => $product->id, 'quantity' => $opening, 'unit_price' => $cost],
+                        ]);
+                    } else {
+                        \App\Services\InventoryService::addStock(
+                            $companyId,
+                            $product->id,
+                            $opening,
+                            $cost,
+                            \App\Models\InventoryMovement::TYPE_OPENING,
+                            null,
+                            ['type' => 'product_form', 'id' => $product->id, 'number' => null],
+                            'Opening stock (product form)',
+                            Auth::guard('fbrpos')->id()
+                        );
+                    }
                 } catch (\Throwable $e) {
                     Log::warning('FBR POS opening stock failed', ['product' => $product->id, 'err' => $e->getMessage()]);
                 }
             }
         }
+    }
+
+    /**
+     * Display twin of the plan.limit:inventory middleware (Task 1261): may
+     * this company use supplier/purchase features? Same decision tree as
+     * CheckPlanLimit's 'inventory' branch — internal accounts, active
+     * overrides and no-plan companies pass; paid plans need
+     * inventory_enabled; trial plans evaluate everything.
+     */
+    private function fbrInventoryPlanAllowed(int $companyId): bool
+    {
+        $company = Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return true;
+        }
+        $sub = \App\Services\PlanLimitService::getActiveSubscription($companyId);
+        if (!$sub || !$sub->pricingPlan) {
+            return true;
+        }
+        if ($sub->hasActiveOverride()) {
+            return true;
+        }
+        return (bool) $sub->pricingPlan->inventory_enabled || (bool) $sub->pricingPlan->is_trial;
+    }
+
+    /**
+     * Company-scoped, active-only lookup of the chosen supplier (Task 1261).
+     * Quick-add (new_supplier_name) wins over the dropdown; a supplier_id that
+     * doesn't resolve inside the company is an explicit validation error, not
+     * a silent no-supplier fallback. Plan-gated: fields are ignored entirely
+     * when the plan lacks the inventory feature (the form never showed them).
+     */
+    private function resolveExistingSupplier(Request $request, int $companyId, bool $inventoryAllowed): ?\App\Models\Supplier
+    {
+        if (!$inventoryAllowed || $request->filled('new_supplier_name') || !$request->filled('supplier_id')) {
+            return null;
+        }
+        $supplier = \App\Models\Supplier::forCompany($companyId)->active()->find((int) $request->supplier_id);
+        if (!$supplier) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'supplier_id' => __('pos.fbr_pf_supplier_invalid'),
+            ]);
+        }
+        return $supplier;
+    }
+
+    /** Inline quick-add supplier from the product form (Task 1261). */
+    private function quickAddSupplierIfRequested(Request $request, int $companyId, bool $inventoryAllowed): ?\App\Models\Supplier
+    {
+        if (!$inventoryAllowed || !$request->filled('new_supplier_name')) {
+            return null;
+        }
+        return \App\Models\Supplier::create([
+            'company_id' => $companyId,
+            'name' => $request->new_supplier_name,
+            'phone' => $request->new_supplier_phone,
+            'city' => $request->new_supplier_city,
+            'is_active' => true,
+        ]);
+    }
+
+    /**
+     * Received purchase created from the product form (Task 1261) — same
+     * shape as FbrPosStockController::storePurchase (PUR- number, RECEIVED
+     * status, purchase movements via InventoryService) so supplier history,
+     * the purchases list, purchase void and avg/last kharid all behave as if
+     * the entry was made on the Stock & Purchase page.
+     */
+    private function recordProductFormPurchase(int $companyId, \App\Models\Supplier $supplier, array $lines): \App\Models\PurchaseOrder
+    {
+        return DB::transaction(function () use ($companyId, $supplier, $lines) {
+            $total = 0;
+            foreach ($lines as $l) {
+                $total += round((float) $l['quantity'] * (float) $l['unit_price'], 2);
+            }
+            $po = \App\Models\PurchaseOrder::create([
+                'company_id' => $companyId,
+                'supplier_id' => $supplier->id,
+                'po_number' => 'PUR-' . date('ymd') . '-' . strtoupper(Str::random(4)),
+                'status' => \App\Models\PurchaseOrder::STATUS_RECEIVED,
+                'order_date' => now()->toDateString(),
+                'received_date' => now()->toDateString(),
+                'total_amount' => $total,
+                'notes' => 'Opening stock (new product form)',
+                'created_by' => Auth::guard('fbrpos')->id(),
+            ]);
+            foreach ($lines as $l) {
+                \App\Models\PurchaseOrderItem::create([
+                    'purchase_order_id' => $po->id,
+                    'product_id' => (int) $l['product_id'],
+                    'quantity' => (float) $l['quantity'],
+                    'unit_price' => (float) $l['unit_price'],
+                    'total_price' => round((float) $l['quantity'] * (float) $l['unit_price'], 2),
+                    'received_quantity' => (float) $l['quantity'],
+                ]);
+                \App\Services\InventoryService::addStock(
+                    $companyId,
+                    (int) $l['product_id'],
+                    (float) $l['quantity'],
+                    (float) $l['unit_price'],
+                    \App\Models\InventoryMovement::TYPE_PURCHASE,
+                    null,
+                    ['type' => 'purchase_order', 'id' => $po->id, 'number' => $po->po_number],
+                    null,
+                    Auth::guard('fbrpos')->id()
+                );
+            }
+            return $po;
+        });
+    }
+
+    /**
+     * Sticky defaults for the save-and-continue flow (Task 1261): the next
+     * blank form keeps the tax mode, UoM, price-editable choice, supplier and
+     * entry mode of what was just saved. Checkbox absence is ambiguous in
+     * multi mode (the single-mode field is disabled) — default editable=true
+     * there, matching the create default.
+     */
+    private function productFormStickyDefaults(Request $request, ?int $supplierId, string $mode): array
+    {
+        return [
+            'tax_type' => $request->tax_type,
+            'default_tax_rate' => $request->default_tax_rate,
+            'is_third_schedule' => $request->boolean('is_third_schedule'),
+            'uom' => $request->uom ?? 'U',
+            'is_price_editable' => $request->has('is_price_editable') ? $request->boolean('is_price_editable') : true,
+            'supplier_id' => $supplierId,
+            'entry_mode' => $mode,
+        ];
     }
 
     public function toggleProduct($id)

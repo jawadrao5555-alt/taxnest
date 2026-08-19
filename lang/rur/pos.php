@@ -4464,6 +4464,28 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_purch_load_more' => 'Purani purchases dikhayen',
     'stock_purch_loading' => 'Load ho raha hai...',
 
+    // FBR single-page product add (Task 1261)
+    'fbr_pf_mode_single' => 'Ek Product',
+    'fbr_pf_mode_multi' => 'Kai Products Ek Saath',
+    'fbr_pf_opening_stock' => 'Shuru ka Stock',
+    'fbr_pf_unit_cost_hint' => 'Fi unit kharid qeemat — purchase record mein save hogi aur munafa isi se banega.',
+    'fbr_pf_supplier_heading' => 'Supplier',
+    'fbr_pf_supplier_hint' => 'Supplier chunein to shuru ka stock us se kharidari ke tor par record hoga (supplier history aur kharid rate sahi rahenge). Khali chhorein to sirf opening stock banega.',
+    'fbr_pf_quick_add' => 'Naya Supplier',
+    'fbr_pf_shared_heading' => 'Sanjhi Settings (har row par lagengi)',
+    'fbr_pf_rows_heading' => 'Products ki Rows',
+    'fbr_pf_multi_hint' => 'Neeche tax, UoM aur supplier har row par lagenge.',
+    'fbr_pf_add_row' => '+ Row Barhayen',
+    'fbr_pf_row_n' => 'Row :n',
+    'fbr_pf_rows_empty' => 'Kam az kam ek product row bharein.',
+    'fbr_pf_quota_rows' => 'Aap ke plan mein sirf :n aur product(s) ki gunjaish hai — faltu rows hata dein.',
+    'fbr_pf_supplier_invalid' => 'Chuna gaya supplier nahi mila — page refresh kar ke dobara koshish karein.',
+    'fbr_pf_created_named' => '":name" save ho gaya — agla product add karein.',
+    'fbr_pf_created_n' => ':n products ban gaye.',
+    'fbr_pf_save_next' => 'Save Karein aur Agla Add Karein',
+    'fbr_pf_save_all' => 'Sab Products Banayen',
+    'fbr_pf_save_list' => 'Save Kar ke List Dekhein',
+
     // Munafa (profit) report (Aug 2026)
     'munafa_report' => 'Munafa Report',
     'munafa_sub' => 'Har product ka munafa — farokht mein se khareed lagat nikal kar',

@@ -418,6 +418,11 @@
                     <div class="w-full lg:w-1/2">
                         <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl transition-transform duration-300 hover:-translate-y-1">
                             <img src="{{ asset('images/screenshots/pos-sale.jpg') }}" alt="NestPOS Sale Screen" class="w-full h-auto rounded border border-gray-300 shadow-sm" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIHZpZXdCb3g9IjAgMCA4MDAgNTAwIj48cmVjdCBmaWxsPSIjZjNmMTRiIiB3aWR0aD0iODAwIiBoZWlnaHQ9IjUwMCIvPjx0ZXh0IGZpbGw9IiM5Y2EzYWYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBkeT0iMTAuNSIgZm9udC13ZWlnaHQ9ImJvbGQiIHg9IjUwJSIgeT0iNTAlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5OZXN0UE9TIFNjcmVlbnNob3Q8L3RleHQ+PC9zdmc+'">
+                            <div class="grid grid-cols-3 gap-2 mt-2">
+                                <img src="{{ asset('images/screenshots/pos-tables.jpg') }}?v=1" alt="NestPOS restaurant tables board" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
+                                <img src="{{ asset('images/screenshots/pos-dash.jpg') }}?v=1" alt="NestPOS dashboard with profit and BI" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
+                                <img src="{{ asset('images/screenshots/pos-tx.jpg') }}?v=1" alt="NestPOS transactions list with PRA status" loading="lazy" class="w-full h-auto rounded border border-gray-300 shadow-sm">
+                            </div>
                         </div>
                     </div>
                     <div class="w-full lg:w-1/2 lg:pr-10">

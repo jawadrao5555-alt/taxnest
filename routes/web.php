@@ -1200,6 +1200,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/app-updates/feature-toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggleFeature'])->name('admin.app-updates.feature-toggle');
     Route::post('/app-updates/{id}/update', [\App\Http\Controllers\AppUpdateController::class, 'update'])->name('admin.app-updates.update');
     Route::post('/app-updates/{id}/toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggle'])->name('admin.app-updates.toggle');
+    Route::post('/app-updates/{id}/reannounce', [\App\Http\Controllers\AppUpdateController::class, 'reannounce'])->name('admin.app-updates.reannounce');
     Route::delete('/app-updates/{id}/delete', [\App\Http\Controllers\AppUpdateController::class, 'destroy'])->name('admin.app-updates.destroy');
 
     // Tutorial videos visibility control (owner request 3 Aug 2026)

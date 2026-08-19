@@ -122,12 +122,21 @@
                                             <button type="button"
                                                 onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience), @json((bool) ($upd->is_featured ?? false)), @json($upd->type))'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
-                                            <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline">
+                                            @php $updExpired = $upd->created_at->lt(now()->subDays(\App\Models\AppUpdate::LIVE_DAYS)); @endphp
+                                            <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline"
+                                                @if(!$upd->is_published && $updExpired) onsubmit="return confirm('Yeh update {{ \App\Models\AppUpdate::LIVE_DAYS }} din se purana hai — publish karne se DOBARA ELAAN hoga: 7-din ka clock restart hoga aur sab POS users ko popup + bell dobara dikhega. Jaari rakhein?');" @endif>
                                                 @csrf
                                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium {{ $upd->is_published ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200' }}">
-                                                    {{ $upd->is_published ? 'Unpublish' : 'Publish' }}
+                                                    {{ $upd->is_published ? 'Unpublish' : ($updExpired ? 'Publish (dobara elaan)' : 'Publish') }}
                                                 </button>
                                             </form>
+                                            @if($upd->is_published && $updExpired)
+                                                {{-- Task 1295: expired-but-published rows need a dedicated re-announce (toggle would just unpublish) --}}
+                                                <form method="POST" action="/admin/app-updates/{{ $upd->id }}/reannounce" class="inline" onsubmit="return confirm('Dobara elaan karein? 7-din ka clock restart hoga aur sab POS users ko popup + bell dobara dikhega (pehle wale dismiss reset ho jayenge).');">
+                                                    @csrf
+                                                    <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 hover:bg-emerald-200">Dobara Elaan Karein</button>
+                                                </form>
+                                            @endif
                                             <form method="POST" action="/admin/app-updates/{{ $upd->id }}/delete" class="inline" onsubmit="return confirm('Delete this update permanently?');">
                                                 @csrf
                                                 @method('DELETE')

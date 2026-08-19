@@ -133,9 +133,47 @@ class AppUpdateController extends Controller
     public function toggle($id)
     {
         $appUpdate = AppUpdate::findOrFail($id);
-        $appUpdate->update(['is_published' => !$appUpdate->is_published]);
+        $publishing = !$appUpdate->is_published;
+
+        // Task 1295: publishing a row whose 7-day live window has already
+        // expired would be silently invisible on POS (liveWindow filters it
+        // out). Treat that publish as a RE-ANNOUNCE: restart the clock and
+        // clear seen rows so the popup + bell fire again for everyone.
+        if ($publishing && $appUpdate->created_at->lt(now()->subDays(AppUpdate::LIVE_DAYS))) {
+            $this->restartLiveWindow($appUpdate);
+
+            return redirect('/admin/app-updates')->with('success', 'Update dobara elaan ho gaya — 7-din ka clock restart, POS users ko popup + bell phir dikhega.');
+        }
+
+        $appUpdate->update(['is_published' => $publishing]);
 
         return redirect('/admin/app-updates')->with('success', 'Update ' . ($appUpdate->is_published ? 'published' : 'unpublished') . '.');
+    }
+
+    /**
+     * Task 1295: "Dobara Elaan Karein" — re-announce an already-published row
+     * whose 7-day window expired (the toggle only covers hidden rows).
+     */
+    public function reannounce($id)
+    {
+        $appUpdate = AppUpdate::findOrFail($id);
+        $this->restartLiveWindow($appUpdate);
+
+        return redirect('/admin/app-updates')->with('success', 'Update dobara elaan ho gaya — 7-din ka clock restart, POS users ko popup + bell phir dikhega.');
+    }
+
+    /**
+     * Restart the POS live window: bump created_at to now (liveWindow reads
+     * created_at) and wipe seen rows so the one-time popup fires again even
+     * for users who dismissed it the first time. created_at is not fillable,
+     * so set it directly and save.
+     */
+    private function restartLiveWindow(AppUpdate $appUpdate): void
+    {
+        $appUpdate->is_published = true;
+        $appUpdate->created_at = now();
+        $appUpdate->save();
+        AppUpdateSeen::where('app_update_id', $appUpdate->id)->delete();
     }
 
     public function destroy($id)

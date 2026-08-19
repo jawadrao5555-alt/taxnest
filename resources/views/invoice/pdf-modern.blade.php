@@ -434,15 +434,20 @@
                             <td class="tv" style="color: #f97316;">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                         </tr>
                         @endif
-                        @if(session('pdf_show_wht', false) && ($wht_rate ?? 0) > 0)
+                        @php
+                            $pdfWhtAmount = round(floatval($wht_amount ?? 0), 2);
+                            $pdfWhtRate = floatval($wht_rate ?? 0);
+                            $pdfWhtRateLabel = $pdfWhtRate > 0 ? ' (' . rtrim(rtrim(number_format($pdfWhtRate, 4, '.', ''), '0'), '.') . '%)' : '';
+                        @endphp
+                        @if($pdfWhtAmount > 0)
                         <tr>
-                            <td class="tl">WHT ({{ $wht_rate }}%)</td>
-                            <td class="tv">PKR {{ number_format($wht_amount ?? 0, 2) }}</td>
+                            <td class="tl">WHT / Advance Tax{{ $pdfWhtRateLabel }}</td>
+                            <td class="tv">PKR {{ number_format($pdfWhtAmount, 2) }}</td>
                         </tr>
                         @endif
                         <tr class="grand">
                             <td class="tl">TOTAL</td>
-                            <td class="tv">PKR {{ number_format(session('pdf_show_wht', false) && ($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
+                            <td class="tv">PKR {{ number_format($pdfWhtAmount > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

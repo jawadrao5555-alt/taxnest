@@ -378,16 +378,23 @@
                             <td class="t-value">PKR {{ number_format($totalFurtherTax, 2) }}</td>
                         </tr>
                         @endif
-                        {{-- WHT row disabled on PDF per user request --}}
-                        @if(session('pdf_show_wht', false) && ($wht_rate ?? 0) > 0)
+                        {{-- WHT / advance income tax: shown only when this invoice actually
+                             has a WHT amount applied (per-invoice data, not a session toggle).
+                             Invoices without WHT keep the clean PDF with no empty WHT row. --}}
+                        @php
+                            $pdfWhtAmount = round(floatval($wht_amount ?? 0), 2);
+                            $pdfWhtRate = floatval($wht_rate ?? 0);
+                            $pdfWhtRateLabel = $pdfWhtRate > 0 ? ' (' . rtrim(rtrim(number_format($pdfWhtRate, 4, '.', ''), '0'), '.') . '%)' : '';
+                        @endphp
+                        @if($pdfWhtAmount > 0)
                         <tr>
-                            <td class="t-label">WHT ({{ $wht_rate }}%)</td>
-                            <td class="t-value">PKR {{ number_format($wht_amount ?? 0, 2) }}</td>
+                            <td class="t-label">WHT / Advance Tax{{ $pdfWhtRateLabel }}</td>
+                            <td class="t-value">PKR {{ number_format($pdfWhtAmount, 2) }}</td>
                         </tr>
                         @endif
                         <tr class="total-row">
                             <td class="t-label">TOTAL</td>
-                            <td class="t-value">PKR {{ number_format(session('pdf_show_wht', false) && ($wht_rate ?? 0) > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
+                            <td class="t-value">PKR {{ number_format($pdfWhtAmount > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>

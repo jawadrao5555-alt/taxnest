@@ -2282,7 +2282,7 @@ class InvoiceController extends Controller
             $fbrService = new FbrService();
 
             $payload = $fbrService->buildPayload($invoice);
-            $preErrors = $fbrService->validatePayloadPreSubmission($payload);
+            $preErrors = $fbrService->validatePayloadPreSubmission($payload, $company);
             if (!empty($preErrors)) {
                 $executionMs = round((microtime(true) - $startTime) * 1000);
                 $errorMessages = array_map(fn($e) => "[{$e['code']}] {$e['message']}", $preErrors);

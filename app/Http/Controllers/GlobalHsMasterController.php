@@ -235,7 +235,7 @@ class GlobalHsMasterController extends Controller
                 $result['sro_suggestion'] = $sroSuggestion;
             }
 
-            return response()->json(self::stripIntelligenceFields($result));
+            return response()->json(self::stripIntelligenceFields(self::applyFbrUomGuard($result, $hsCode, $company)));
         }
 
         $result = GlobalHsService::resolveForInvoiceItem($hsCode, $standardTaxRate, $companyId);
@@ -254,7 +254,7 @@ class GlobalHsMasterController extends Controller
             $result['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $result['schedule_type'] ?? 'standard');
             $result['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $result['hs_unmapped'] = false;
-            return response()->json(self::stripIntelligenceFields($result));
+            return response()->json(self::stripIntelligenceFields(self::applyFbrUomGuard($result, $hsCode, $company)));
         }
 
         $customerNtn = $request->get('customer_ntn');
@@ -268,7 +268,7 @@ class GlobalHsMasterController extends Controller
             $resolved['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $resolved['schedule_type'] ?? 'standard');
             $resolved['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $resolved['hs_unmapped'] = false;
-            return response()->json(self::stripIntelligenceFields($resolved));
+            return response()->json(self::stripIntelligenceFields(self::applyFbrUomGuard($resolved, $hsCode, $company)));
         }
 
         $scheduleResult = ScheduleEngine::lookupByHsCode($hsCode, $standardTaxRate);
@@ -277,12 +277,37 @@ class GlobalHsMasterController extends Controller
             $scheduleResult['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $scheduleResult['schedule_type'] ?? 'standard');
             $scheduleResult['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $scheduleResult['hs_unmapped'] = false;
-            return response()->json(self::stripIntelligenceFields($scheduleResult));
+            return response()->json(self::stripIntelligenceFields(self::applyFbrUomGuard($scheduleResult, $hsCode, $company)));
         }
 
         self::trackUnmappedHs($normalizedHs, $companyId);
 
         return response()->json(['found' => false, 'hs_unmapped' => true]);
+    }
+
+    /**
+     * FBR restricts which UoM strings are allowed per HS code (error 0099 on mismatch,
+     * e.g. cigarettes HS 2402.2000 only accept KG / Thousand Unit). When the FBR
+     * reference list is known, correct the suggested default_uom to a valid one and
+     * expose the allowed list so the invoice form defaults to a UoM FBR will accept.
+     */
+    private static function applyFbrUomGuard(array $result, string $hsCode, $company): array
+    {
+        try {
+            if (!$company || strlen(preg_replace('/[^0-9]/', '', $hsCode)) < 4) {
+                return $result;
+            }
+            $fbrService = new \App\Services\FbrService();
+            $validUoms = $fbrService->getValidUomsForHsCode($hsCode, $company);
+            if (empty($validUoms)) {
+                return $result;
+            }
+            $result['valid_uoms'] = $validUoms;
+            $result['default_uom'] = $fbrService->resolveUomForHsCode($hsCode, $result['default_uom'] ?? null, $company);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('HS lookup UoM guard skipped: ' . $e->getMessage());
+        }
+        return $result;
     }
 
     private static function trackUnmappedHs(string $hsCode, $companyId): void

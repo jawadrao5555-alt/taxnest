@@ -277,6 +277,7 @@
                                         <option value="Packs">Packs</option>
                                         <option value="Dozens">Dozens</option>
                                         <option value="Tons">Tons</option>
+                                        <option value="Thousand Unit">Thousand Unit</option>
                                         <option value="Others">Others</option>
                                     </select>
                                 </div>

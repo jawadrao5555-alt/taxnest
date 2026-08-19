@@ -594,20 +594,24 @@
             @endif
 
             <div x-data="invoiceKeyboardNav()" @keydown.window="handleKeydown($event)" class="premium-card overflow-hidden">
-                @if($tab === 'draft' && in_array(auth()->user()->role, ['company_admin', 'employee']))
-                {{-- Task 1245: bulk submit selected drafts to FBR --}}
+                @if(in_array($tab, ['draft', 'failed']) && in_array(auth()->user()->role, ['company_admin', 'employee']))
+                {{-- Task 1245: bulk submit selected drafts to FBR. Task 1250: same UI bulk-retries failed invoices. --}}
+                @php
+                    $bulkNoun = $tab === 'failed' ? 'failed invoice' : 'draft';
+                    $bulkTabCount = $tab === 'failed' ? $failedCount : $draftCount;
+                @endphp
                 <div x-show="bulkSelected.length > 0 && !bulkBatchKey" x-cloak class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-900/20">
-                    <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300"><span x-text="bulkSelected.length"></span> draft(s) selected</p>
+                    <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300"><span x-text="bulkSelected.length"></span> {{ $bulkNoun }}(s) selected</p>
                     <button type="button" @click="startBulkSubmit(false)" :disabled="bulkStarting"
                         class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-bold hover:from-emerald-700 hover:to-teal-700 transition disabled:opacity-50">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                        <span x-show="!bulkStarting">Submit selected to FBR</span>
+                        <span x-show="!bulkStarting">{{ $tab === 'failed' ? 'Retry selected' : 'Submit selected to FBR' }}</span>
                         <span x-show="bulkStarting" x-cloak>Starting...</span>
                     </button>
-                    @if($draftCount > 1)
-                    <button type="button" @click="if(confirm('Submit ALL {{ $draftCount }} draft invoices to FBR?')) startBulkSubmit(true)" :disabled="bulkStarting"
+                    @if($bulkTabCount > 1)
+                    <button type="button" @click="if(confirm('{{ $tab === 'failed' ? "Retry ALL {$bulkTabCount} failed invoices?" : "Submit ALL {$bulkTabCount} draft invoices to FBR?" }}')) startBulkSubmit(true)" :disabled="bulkStarting"
                         class="inline-flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/40 transition disabled:opacity-50">
-                        Submit all {{ $draftCount }} drafts
+                        {{ $tab === 'failed' ? "Retry all {$bulkTabCount} failed" : "Submit all {$bulkTabCount} drafts" }}
                     </button>
                     @endif
                     <button type="button" @click="bulkSelected = []" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 underline">Clear selection</button>
@@ -676,12 +680,12 @@
                     <table class="min-w-full premium-table table-cards" id="invoiceTable">
                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80 sticky top-0 z-10">
                             <tr>
-                                @if($tab === 'draft')
+                                @if(in_array($tab, ['draft', 'failed']))
                                 <th class="px-2 py-2 text-center w-8" @click.stop>
                                     <input type="checkbox" @change="toggleAllDrafts($event.target.checked)"
                                         :checked="bulkSelected.length > 0 && bulkSelected.length === pageDraftIds.length"
                                         class="rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                        title="Select all drafts on this page">
+                                        title="Select all {{ $tab === 'failed' ? 'failed invoices' : 'drafts' }} on this page">
                                 </th>
                                 @endif
                                 @if($tab === 'completed')
@@ -752,9 +756,9 @@
                                 data-invoice-url="/invoice/{{ $invoice->id }}"
                                 data-download-url="/invoice/{{ $invoice->id }}/download"
                                 data-wht-locked="{{ $invoice->wht_locked ? '1' : '0' }}">
-                                @if($tab === 'draft')
+                                @if(in_array($tab, ['draft', 'failed']))
                                 <td class="px-2 py-2 text-center" @click.stop>
-                                    @if($invoice->status === 'draft' && !$invoice->fbr_invoice_number && !$invoice->is_fbr_processing)
+                                    @if(in_array($invoice->status, ['draft', 'failed']) && !$invoice->fbr_invoice_number && !$invoice->is_fbr_processing)
                                     <input type="checkbox" value="{{ $invoice->id }}" x-model="bulkSelected"
                                         class="bulk-draft-cb rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
                                     @endif
@@ -1029,9 +1033,9 @@ function invoiceKeyboardNav() {
         bulkSelected: [],
         @php
             $pageDraftIds = [];
-            if ($tab === 'draft') {
+            if (in_array($tab, ['draft', 'failed'])) {
                 foreach ($invoices as $pdInv) {
-                    if ($pdInv->status === 'draft' && !$pdInv->fbr_invoice_number && !$pdInv->is_fbr_processing) {
+                    if (in_array($pdInv->status, ['draft', 'failed']) && !$pdInv->fbr_invoice_number && !$pdInv->is_fbr_processing) {
                         $pageDraftIds[] = (string) $pdInv->id;
                     }
                 }
@@ -1078,8 +1082,8 @@ function invoiceKeyboardNav() {
             this.bulkStarting = true;
             this.bulkError = '';
             const body = selectAll
-                ? { select_all_drafts: true }
-                : { invoice_ids: this.bulkSelected.map(Number) };
+                ? { select_all_drafts: true, status: '{{ $tab === 'failed' ? 'failed' : 'draft' }}' }
+                : { invoice_ids: this.bulkSelected.map(Number), status: '{{ $tab === 'failed' ? 'failed' : 'draft' }}' };
             fetch('/invoices/bulk-submit', {
                 method: 'POST',
                 headers: {

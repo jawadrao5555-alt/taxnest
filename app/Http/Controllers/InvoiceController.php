@@ -690,12 +690,17 @@ class InvoiceController extends Controller
             'invoice_ids' => 'nullable|array|max:1000',
             'invoice_ids.*' => 'integer',
             'select_all_drafts' => 'nullable|boolean',
+            'status' => 'nullable|in:draft,failed',
         ]);
+
+        // Task 1250: the Failed tab reuses this endpoint to bulk-retry failed invoices.
+        $status = $request->input('status', 'draft');
+        $noun = $status === 'failed' ? 'failed' : 'draft';
 
         $selectAll = $request->boolean('select_all_drafts');
         $ids = $request->input('invoice_ids', []);
         if (!$selectAll && empty($ids)) {
-            return response()->json(['status' => 'error', 'message' => 'Select at least one draft invoice.'], 422);
+            return response()->json(['status' => 'error', 'message' => "Select at least one {$noun} invoice."], 422);
         }
 
         $subscription = Subscription::where('company_id', $companyId)
@@ -706,7 +711,7 @@ class InvoiceController extends Controller
         }
 
         $query = Invoice::where('company_id', $companyId)
-            ->where('status', 'draft')
+            ->where('status', $status)
             ->where('is_fbr_processing', false)
             ->whereNull('fbr_invoice_number');
         if (!$selectAll) {
@@ -715,7 +720,7 @@ class InvoiceController extends Controller
         $invoiceIds = $query->orderBy('id')->limit(1000)->pluck('id')->all();
 
         if (empty($invoiceIds)) {
-            return response()->json(['status' => 'error', 'message' => 'No submittable draft invoices in your selection.'], 422);
+            return response()->json(['status' => 'error', 'message' => "No submittable {$noun} invoices in your selection."], 422);
         }
 
         // One bulk run per company at a time — a second click while a batch

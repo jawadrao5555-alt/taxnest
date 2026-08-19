@@ -34,6 +34,18 @@ class InvoiceImportService
     /** Hard cap on data rows per file (competitor benchmark: 9,000/batch). */
     public const MAX_ROWS = 10000;
 
+    /**
+     * Per-request memo caches for validateRow(). Import files repeat the
+     * same handful of HS codes across thousands of rows; without these a
+     * 10k-row batch fires ~2 DB queries PER ROW (HS master lookup + SRO
+     * suggestion), which risks the PHP time limit on shared hosting.
+     * Keys are pure inputs, so within one request the memoized result is
+     * identical to a fresh call — validation outcomes are unchanged.
+     */
+    private array $hsResolveCache = [];
+    private array $sroSuggestCache = [];
+    private array $refExistsCache = [];
+
     /** Upload size cap in KB (matches route validation). */
     public const MAX_FILE_KB = 10240;
 
@@ -866,7 +878,9 @@ class InvoiceImportService
                 $data['hs_code'] = $hsDigits;
                 // companyId deliberately null here: validation must not spam the
                 // unmapped-HS log; creation resolves again with real context.
-                $hsResolved = GlobalHsService::resolveForInvoiceItem($hsDigits, $standardTaxRate, null, null);
+                $hsKey = $hsDigits . '|' . $standardTaxRate;
+                $hsResolved = $this->hsResolveCache[$hsKey]
+                    ??= GlobalHsService::resolveForInvoiceItem($hsDigits, $standardTaxRate, null, null);
                 if (!empty($hsResolved['found'])) {
                     $data['_pct_code'] = $hsResolved['pct_code'] ?? null;
                     $data['_default_uom'] = $hsResolved['default_uom'] ?? null;
@@ -918,14 +932,16 @@ class InvoiceImportService
             if ($ref === '') {
                 $errors[] = "{$docType} rows need reference_invoice_number (the original invoice being adjusted) — FBR rejects notes without it";
             } else {
-                $exists = Invoice::withoutGlobalScopes()
-                    ->where('company_id', $company->id)
-                    ->where(function ($q) use ($ref) {
-                        $q->where('fbr_invoice_number', $ref)
-                          ->orWhere('internal_invoice_number', $ref)
-                          ->orWhere('invoice_number', $ref);
-                    })
-                    ->exists();
+                $refKey = $company->id . '|' . $ref;
+                $exists = $this->refExistsCache[$refKey]
+                    ??= Invoice::withoutGlobalScopes()
+                        ->where('company_id', $company->id)
+                        ->where(function ($q) use ($ref) {
+                            $q->where('fbr_invoice_number', $ref)
+                              ->orWhere('internal_invoice_number', $ref)
+                              ->orWhere('invoice_number', $ref);
+                        })
+                        ->exists();
                 if (!$exists) {
                     $errors[] = "reference_invoice_number '{$ref}' not found in your invoices";
                 }
@@ -942,10 +958,16 @@ class InvoiceImportService
         if ((!empty($rules['requires_sro']) && $sro === '') || (!empty($rules['requires_serial']) && $serial === '')) {
             $suggestion = null;
             if (!empty($data['hs_code'])) {
-                try {
-                    $suggestion = GlobalHsService::suggestSro($data['hs_code'], $scheduleType, $taxRate, $standardTaxRate);
-                } catch (\Throwable $e) {
-                    Log::warning('Import SRO suggestion failed: ' . $e->getMessage());
+                $sroKey = $data['hs_code'] . '|' . $scheduleType . '|' . $taxRate . '|' . $standardTaxRate;
+                if (array_key_exists($sroKey, $this->sroSuggestCache)) {
+                    $suggestion = $this->sroSuggestCache[$sroKey];
+                } else {
+                    try {
+                        $suggestion = GlobalHsService::suggestSro($data['hs_code'], $scheduleType, $taxRate, $standardTaxRate);
+                    } catch (\Throwable $e) {
+                        Log::warning('Import SRO suggestion failed: ' . $e->getMessage());
+                    }
+                    $this->sroSuggestCache[$sroKey] = $suggestion;
                 }
             }
             if ($sro === '' && !empty($suggestion['sro'])) {

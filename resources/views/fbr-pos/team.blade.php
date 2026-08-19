@@ -97,6 +97,19 @@
                                 <option value="pos_cashier" @selected($member->pos_role === 'pos_cashier')>{{ __('pos.role_cashier') }}</option>
                                 <option value="pos_manager" @selected($member->pos_role === 'pos_manager')>{{ __('pos.role_manager') }}</option>
                             </select>
+                            {{-- Task 1271: khufia identity-switch counterpart (PRA Task 705 parity,
+                                 NO billing-scope condition — FBR panel has no scopes). Cashier rows
+                                 only; options = other ACTIVE cashiers of this company. --}}
+                            @if(\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_counterpart_user_id') && $member->pos_role === 'pos_cashier')
+                            <select name="pos_counterpart_user_id" title="{{ __('pos.fbr_counterpart_label') }}" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
+                                <option value="">{{ __('pos.pra_counterpart_none') }}</option>
+                                @foreach($team as $cpOption)
+                                    @if($cpOption->pos_role === 'pos_cashier' && $cpOption->id !== $member->id && $cpOption->is_active)
+                                    <option value="{{ $cpOption->id }}" @selected((int) ($member->pos_counterpart_user_id ?? 0) === $cpOption->id)>{{ __('pos.fbr_counterpart_label') }}: {{ $cpOption->name }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                            @endif
                             @if($branches->isNotEmpty())
                             <select name="default_branch_id" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
                                 <option value="">{{ __('pos.main_branch') }}</option>

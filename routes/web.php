@@ -251,6 +251,10 @@ Route::post('/pos/guest-language', function (\Illuminate\Http\Request $request) 
 
 Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
 
+// Task 1271: FBR twin — PUBLIC tokened bill PDF for WhatsApp share (FBR
+// invoice number + Tax Asaan QR intact; provisional/expired tokens refuse).
+Route::get('/fbr-pos/invoice/share/{token}', [FbrPosController::class, 'publicInvoicePdf'])->name('fbrpos.invoice.share');
+
 // Customer live tracking (Task 1105) — PUBLIC tokenized "aapka rider yahan
 // hai" page + poll. Token = 48-char random tied to ONE bill; both endpoints
 // re-check the company's plan on every call (downgrade kills live links) and
@@ -710,6 +714,13 @@ Route::middleware(['fbrpos.auth'])->get('/fbr-pos/tutorials', [\App\Http\Control
 Route::middleware(['pos.auth'])->prefix('pos/grid-prefs')->group(function () {
     Route::post('/toggle', [\App\Http\Controllers\PosGridPrefController::class, 'toggle'])->name('pos.grid-prefs.toggle')->middleware('throttle:60,1');
     Route::post('/reset', [\App\Http\Controllers\PosGridPrefController::class, 'reset'])->name('pos.grid-prefs.reset')->middleware('throttle:10,1');
+});
+
+// Task 1271: FBR twin of the per-user grid prefs — fbrpos.auth ONLY, NO
+// company.approval (personal display pref; same precedent as the PRA routes).
+Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function () {
+    Route::post('/toggle', [\App\Http\Controllers\FbrPosGridPrefController::class, 'toggle'])->name('fbrpos.grid-prefs.toggle')->middleware('throttle:60,1');
+    Route::post('/reset', [\App\Http\Controllers\FbrPosGridPrefController::class, 'reset'])->name('fbrpos.grid-prefs.reset')->middleware('throttle:10,1');
 });
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
@@ -1434,6 +1445,12 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // Task 1263 — Printer Settings page + silent print-job enqueue (Desktop Agent shared with PRA).
     Route::match(['get', 'post'], '/printer-settings', [FbrPosController::class, 'fbrPrinterSettings'])->name('fbrpos.printer-settings');
     Route::post('/api/print-jobs', [FbrPosController::class, 'fbrApiCreatePrintJob'])->name('fbrpos.api.print-jobs');
+    // Task 1271: WhatsApp Bill share (PRA parity) — Customize toggle, tokened
+    // share-link mint, khufia identity switch, product search-mode pref.
+    Route::post('/settings/whatsapp-bill-toggle', [FbrPosController::class, 'toggleWhatsappBill'])->name('fbrpos.settings.whatsapp-bill-toggle');
+    Route::post('/transaction/{id}/share-link', [FbrPosController::class, 'generateShareLink'])->name('fbrpos.invoice.share-link');
+    Route::post('/api/identity-switch', [FbrPosController::class, 'identitySwitch'])->name('fbrpos.api.identity-switch');
+    Route::post('/products/search-mode', [FbrPosController::class, 'productSearchMode'])->name('fbrpos.products.search-mode');
     // Language system (2 Aug 2026): per-user choice + company default. PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script.
     Route::post('/set-language', function (\Illuminate\Http\Request $request) {
         $lang = $request->input('language');
@@ -1580,6 +1597,14 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/api/held', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'listHeld'])->name('fbrpos.phase2.held.list');
     Route::get('/api/held/{id}/recall', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'recallHeld'])->name('fbrpos.phase2.held.recall');
     Route::delete('/api/held/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteHeld'])->name('fbrpos.phase2.held.delete');
+
+    // Cart drafts (Task 1271 — PRA parity; own JSON table, never FBR serials)
+    Route::post('/api/drafts', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'saveDraft'])->name('fbrpos.drafts.save');
+    Route::get('/api/drafts', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'listDrafts'])->name('fbrpos.drafts.list');
+    Route::get('/api/drafts/{id}/recall', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'recallDraft'])->name('fbrpos.drafts.recall');
+    Route::delete('/api/drafts/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteDraft'])->name('fbrpos.drafts.delete');
+    Route::post('/api/drafts/{id}/lock', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'lockDraft'])->name('fbrpos.drafts.lock');
+    Route::post('/api/drafts/{id}/unlock', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'unlockDraft'])->name('fbrpos.drafts.unlock');
 
     // Promotions
     Route::get('/promotions', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'promotions'])->name('fbrpos.phase2.promotions');

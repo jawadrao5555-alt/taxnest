@@ -119,4 +119,78 @@ class FbrPosTransaction extends Model
     {
         return $this->belongsTo(PosRider::class, 'rider_id');
     }
+
+    /**
+     * Task 1271 — unguessable public reference for the shared bill PDF
+     * (FBR twin of PosTransaction::publicBillToken, Task 777 pattern).
+     * Mints lazily into the existing share_token column; schema-guarded so
+     * PROD drift returns null instead of 500ing a pay response.
+     */
+    public function publicBillToken(): ?string
+    {
+        try {
+            if (!\Schema::hasColumn('fbr_pos_transactions', 'share_token')) {
+                return null;
+            }
+            if (!$this->share_token) {
+                // Direct conditional update = concurrent-mint safe; re-read the
+                // WINNING value afterwards (two cashiers sharing the same bill).
+                self::where('id', $this->id)
+                    ->whereNull('share_token')
+                    ->update(['share_token' => bin2hex(random_bytes(32)), 'share_token_created_at' => now()]);
+                $this->share_token = self::where('id', $this->id)->value('share_token');
+            }
+            return $this->share_token ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Task 1271 — deliberate provisional (FBR finality predicate, mirrors the
+     * pos-provisional triple rule): invoice_mode='local' + fbr_status='local'
+     * = still editable/deletable until promoted, so it must NEVER be shared
+     * with a customer. Reporting-OFF finals (fbr_status NULL) are NOT
+     * provisional.
+     */
+    public function isDeliberateProvisional(): bool
+    {
+        return ($this->invoice_mode ?? null) === 'local'
+            && ($this->fbr_status ?? null) === 'local';
+    }
+
+    /**
+     * Task 1271 — WhatsApp Bill extras for FINAL-bill JSON responses (FBR twin
+     * of PosTransaction::waBillPayload). Both values null when the company
+     * feature is off, the plan lacks it, the bill is a deliberate provisional,
+     * the customer number isn't routable, or the token can't be minted — the
+     * client hides the button on null. Never throws: share extras must not
+     * break a pay response.
+     */
+    public function waBillPayload(?Company $company): array
+    {
+        $out = ['wa_phone' => null, 'share_url' => null];
+        try {
+            if (!$company
+                || !\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+                || !$company->pos_whatsapp_bill_enabled
+                || !\App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled')
+                || $this->isDeliberateProvisional()) {
+                return $out;
+            }
+            $wa = \App\Services\PkPhone::normalize($this->customer_phone);
+            if (!$wa) {
+                return $out;
+            }
+            $token = $this->publicBillToken();
+            if (!$token) {
+                return $out;
+            }
+            $out['wa_phone'] = $wa;
+            $out['share_url'] = url('/fbr-pos/invoice/share/' . $token);
+        } catch (\Throwable $e) {
+            // fall through with nulls
+        }
+        return $out;
+    }
 }

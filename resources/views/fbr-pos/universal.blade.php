@@ -10,8 +10,10 @@
     // (compact grid rows, notes+discount one-row chips, bada total band, one-tap
     // CASH/CARD Alt+1/2) is NOW PORTED here — owner approved via video note.
     // FBR differences kept on purpose: blue chrome (theme engine remaps blue-*),
-    // per-item tax (no cash/card method hint), no gridEditMode / per-user grid
-    // prefs, Fit menu uses fixed-position anchoring (nav overflow clipping).
+    // per-item tax (no cash/card method hint), Fit menu uses fixed-position
+    // anchoring (nav overflow clipping). Task 1271: gridEditMode / per-user grid
+    // prefs, WhatsApp Bill share, cart drafts (fbr_pos_drafts) and search-mode
+    // pref are NOW PORTED here (products-only prefs — FBR has no deals in grid).
     $features = (object) [
         'tables' => false, 'delivery' => false,
         // Order Matching (Aug 2026): unpin kot — gate on kitchen_printer_enabled so
@@ -901,14 +903,33 @@ window.addEventListener('popstate', function() {
             <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
                     <button @click="activeCategory = 'all'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
-                        {{ __('pos.all_word') }} <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length) + ')'"></span>
+                        {{ __('pos.all_word') }} <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => isItemVisible(p)).length + allServices.length) + ')'"></span>
                     </button>
+                    {{-- Task 1271: grid-edit banner (Roman Urdu — customer-facing) --}}
+                    <template x-if="gridEditMode">
+                        <span class="text-[11px] font-semibold text-blue-700 dark:text-blue-300 px-1 whitespace-nowrap">{{ __('pos.tap_item_hide_show') }}</span>
+                    </template>
                     @foreach($categories as $cat)
                     <button @click="activeCategory = '{{ $cat }}'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
                     @endforeach
                     <button @click="activeCategory = 'services'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'services' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ __('pos.services') }}</button>
                     <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">{{ __('pos.grid_hidden_hint') }}</span>
                 </div>
+                {{-- Task 1271: "Sab Wapas Dikhao" — resets ALL of this user's grid prefs (edit mode only) --}}
+                <button type="button" x-show="gridEditMode && hiddenPrefCount > 0" x-cloak @click="resetGridPrefs()" :disabled="gridPrefBusy"
+                        class="flex-shrink-0 px-2.5 py-1.5 rounded-full text-[11px] font-bold border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 transition disabled:opacity-50">
+                    {{ __('pos.show_all_again') }}
+                </button>
+                {{-- Task 1271: PER-USER grid edit chip (PRA port) — ALL roles; each user
+                     hides/shows PRODUCTS on their OWN grid only. Search never affected. --}}
+                <button type="button" @click="gridEditMode = !gridEditMode; filterProducts(); if (!gridEditMode) syncAutoWidecart()"
+                        class="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition"
+                        :class="gridEditMode ? 'bg-blue-600 border-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'"
+                        :title="gridEditMode ? window.TXT.ti_grid_edit_done : window.TXT.ti_grid_edit_start">
+                    <svg x-show="!gridEditMode" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    <svg x-show="gridEditMode" x-cloak class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    <span x-text="gridEditMode ? window.TXT.done_word : window.TXT.grid_arrange" class="whitespace-nowrap"></span>
+                </button>
                 {{-- MASTER products toggle — ab inventory mode mein BHI (owner, 30 Jul 2026):
                      Products OFF sirf grid chhupata hai, search se catalog items add hote rehte
                      hain, is liye billing brick nahi hoti. Wide-cart split isi par chalta hai. --}}
@@ -940,11 +961,12 @@ window.addEventListener('popstate', function() {
                      handleProductClick / gridFocus / stock-out semantics — calcGridCols reads the
                      rendered grid so arrow-key navigation adapts automatically. Class names
                      .prod-card / .price-badge / .cart-qty-badge / .quick-add / .stock-out kept
-                     (CSS + tests rely on them). No gridEditMode (PRA-only per-user grid prefs). --}}
+                     (CSS + tests rely on them). Task 1271: gridEditMode ported (per-user grid prefs). --}}
                 <template x-if="!loading">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
-                            <div :id="'grid-item-' + idx" class="prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-blue-500' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
+                            {{-- Task 1271: gridEditMode (PRA port) — click toggles THIS user's visibility pref; hidden items dim to 40%. --}}
+                            <div :id="'grid-item-' + idx" class="prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-blue-500' : '', gridEditMode ? '' : (item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')), gridEditMode && !isItemVisible(item) ? 'opacity-40' : '']" @click="gridEditMode ? toggleItemVisibility(item) : handleProductClick(item)">
                                 <template x-if="item.image">
                                     <img :src="item.image" :alt="item.name" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" loading="lazy" onerror="this.style.display='none';">
                                 </template>
@@ -964,8 +986,11 @@ window.addEventListener('popstate', function() {
                                 <template x-if="getCartQty(item) > 0">
                                     <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-blue-500 to-blue-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0" x-text="getCartQty(item)"></span>
                                 </template>
-                                <button @click.stop="handleProductClick(item)" class="quick-add w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-sm transition-all flex-shrink-0">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                <button @click.stop="gridEditMode ? toggleItemVisibility(item) : handleProductClick(item)" class="quick-add w-7 h-7 rounded-full text-white flex items-center justify-center shadow-sm transition-all flex-shrink-0" :class="gridEditMode ? (isItemVisible(item) ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-400 hover:bg-gray-500') : 'bg-blue-600 hover:bg-blue-700'">
+                                    <svg x-show="!gridEditMode" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                    {{-- Edit mode: open eye = visible, slashed eye = hidden (this user only) --}}
+                                    <svg x-show="gridEditMode && isItemVisible(item)" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    <svg x-show="gridEditMode && !isItemVisible(item)" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
                                 </button>
                             </div>
                         </template>
@@ -1363,8 +1388,14 @@ window.addEventListener('popstate', function() {
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
                     </div>
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-4 gap-2">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
+                        {{-- Task 1271: Cart drafts — modal has "save current cart" + recall/delete list.
+                             Drafts are JSON rows (fbr_pos_drafts), never held sales / FBR serials. --}}
+                        <button @click="openDrafts()" class="relative py-2 text-xs font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 rounded-xl border border-sky-200 dark:border-sky-800 hover:bg-sky-100 transition flex items-center justify-center gap-0.5">
+                            {{ __('pos.draft_word') }}
+                            <span x-show="activeDraftId" x-cloak class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-sky-500 rounded-full shadow-sm" title="{{ __('pos.draft_active_dot') }}"></span>
+                        </button>
                         <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
@@ -1702,6 +1733,55 @@ window.addEventListener('popstate', function() {
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- Task 1271: CART DRAFTS MODAL — save current cart / recall / delete.     --}}
+    {{-- Locked drafts (another cashier editing, 5-min expiry) show a lock badge --}}
+    {{-- and their Recall button is disabled — server re-checks with a race-safe --}}
+    {{-- conditional-UPDATE claim (423 on loss).                                 --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="showDrafts" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showDrafts = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.drafts_word') }}</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.drafts_hint') }}</p>
+                </div>
+                <button @click="showDrafts = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+                <button @click="saveDraftCart()" :disabled="cart.length === 0 || draftBusy"
+                        class="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                    <span x-text="activeDraftId ? window.TXT.draft_update_btn : window.TXT.draft_save_btn"></span>
+                </button>
+            </div>
+            <div class="max-h-[50vh] overflow-y-auto">
+                <template x-if="drafts.length === 0">
+                    <div class="p-8 text-center text-gray-400"><p class="text-sm">{{ __('pos.no_drafts') }}</p></div>
+                </template>
+                <template x-for="d in drafts" :key="d.id">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-800" :class="activeDraftId === d.id ? 'bg-sky-50 dark:bg-sky-900/15' : ''">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="d.customer_name || window.TXT.walk_in"></p>
+                                <p class="text-xs text-gray-500" x-text="'Rs. ' + Number(d.total_amount).toLocaleString() + ' • ' + d.items_count + window.TXT.sfx_item_s"></p>
+                            </div>
+                            {{-- Locked by another cashier — recall disabled until the lock expires --}}
+                            <span x-show="d.locked" x-cloak class="flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-[10px] font-bold text-red-600 dark:text-red-400 flex-shrink-0">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                <span x-text="d.locked_by_name || ''"></span>
+                            </span>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button @click="recallDraft(d)" :disabled="d.locked || draftBusy" class="flex-1 py-2 text-xs font-bold text-sky-600 border border-sky-300 rounded-xl hover:bg-sky-50 disabled:opacity-30 disabled:cursor-not-allowed transition">{{ __('pos.recall') }}</button>
+                            <button @click="deleteDraft(d.id)" :disabled="d.locked" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition">{{ __('pos.delete') }}</button>
                         </div>
                     </div>
                 </template>
@@ -2740,6 +2820,17 @@ window.addEventListener('popstate', function() {
             {{-- Persistent action bar: Print | KOT | New Sale | Close. Print/KOT fire prints      --}}
             {{-- but popup STAYS OPEN so cashier can verify, reprint, or take other actions.       --}}
             <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+                {{-- Task 1271: WhatsApp Bill (PRA Task 1036 port) — sirf jab bill par
+                     routable customer number + share link ho (warna chhupa; khali wa.me kabhi nahi).
+                     Auto-open popup-block ho to yehi button pulse-highlight fallback ban jata hai. --}}
+                <button x-show="waBillEnabled && lastWaPhone && lastShareUrl && !lastIsOffline" x-cloak
+                    @click="openWaBill()"
+                    class="w-full mb-2 py-3 text-center rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-2"
+                    :class="waHighlight ? 'ring-4 ring-green-300 animate-pulse' : ''"
+                    title="{{ __('pos.ti_wa_bill') }}">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    {{ __('pos.wa_bill_btn') }}
+                </button>
                 <div class="grid grid-cols-4 gap-2">
                     {{-- 1. Print Receipt (P) --}}
                     <button @click="lastIsOffline ? printOfflineReceipt() : printReceipt()" :disabled="!lastTransactionId && !lastIsOffline" class="py-3 text-center rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_print_receipt') }}">
@@ -3086,6 +3177,27 @@ function restaurantPos() {
         // button on transaction-show. Toggle key: P (while pay modal is open).
         saveAsProvisional: false,
         showHeldOrders: false,
+        // ── Task 1271: WhatsApp Bill share (PRA port — FBR PDF + Tax Asaan QR) ──
+        // waBillEnabled bakes the admin toggle AND the plan gate; server re-checks both.
+        waBillEnabled: {{ (!empty($company->pos_whatsapp_bill_enabled) && \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled')) ? 'true' : 'false' }},
+        waBillAutoOpen: {{ !empty($company->pos_whatsapp_bill_auto_open) ? 'true' : 'false' }},
+        waShopName: {!! $jsEnc($company->name ?? '', "''") !!},
+        lastWaPhone: null,
+        lastShareUrl: null,
+        waHighlight: false,
+        // ── Task 1271: per-user grid prefs (PRA port — FBR: PRODUCTS only; services
+        // have no pref row and are always visible). Search is NEVER filtered by prefs.
+        userGridPrefs: {!! $jsEnc((object) ($userGridPrefs ?? []), '{}') !!},
+        gridEditMode: false,
+        gridPrefBusy: false,
+        // ── Task 1271: product search mode (admin pref on FBR products page) ──
+        searchAnyWord: {{ (($company->pos_product_search_mode ?? 'prefix') === 'any_word') ? 'true' : 'false' }},
+        // ── Task 1271: cart drafts (fbr_pos_drafts JSON rows — never FBR serials) ──
+        drafts: [],
+        showDrafts: false,
+        draftBusy: false,
+        activeDraftId: null,
+        draftLockTimer: null,
         // ── FBR REPORTING TOGGLE (root scope so modals/buttons can read it) ───
         // Mirrors $company->fbr_reporting_enabled. Used by Provisional/Failed bill
         // action buttons (:disabled="!fbrEnabled"). Was previously defined only in
@@ -3427,6 +3539,9 @@ function restaurantPos() {
             // Seed the first bill UUID — regenerated on every clearCart() so each
             // new bill gets a fresh key while retries of the SAME bill reuse it.
             this.billUuid = this._newBillUuid();
+            // Task 1271: navigating away with a recalled draft attached → best-
+            // effort lock release (beacon survives the page teardown).
+            window.addEventListener('pagehide', () => this.releaseDraftLockOnExit());
             this.initFit();
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
@@ -3636,6 +3751,7 @@ function restaurantPos() {
             this.lastCashReceived = method === 'cash' ? (parseFloat(this.cashReceived) || 0) : 0;
             this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
             this.lastSaleAt = Date.now();
+            this.setWaBill(null); // Task 1271: offline bill = no server link yet — WA button hidden
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.showToast(window.TXT.offline_bill_saved_will_sync, 'success');
@@ -4000,10 +4116,11 @@ function restaurantPos() {
                     if (this.activeCategory === 'services') all = [...this.allServices];
                     else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
                     else all = [...this.allProducts, ...this.allServices];
-                    // FIRST-LETTER PRIORITY (mirrors PRA universal, 22 Jul 2026): prefix
-                    // matches rank above mid-word matches; scan stops only at 12 prefix hits.
-                    const pref = [], other = [];
-                    for (let i = 0; i < all.length && pref.length < 12; i++) {
+                    // Task 1271: rank-based matching via nameMatchRank (shared with
+                    // filterProducts — the two surfaces must never diverge). anyWord
+                    // honors the admin search-mode pref; prefix hits still sort first.
+                    const ranked = [];
+                    for (let i = 0; i < all.length; i++) {
                         const it = all[i];
                         if (!it.name) continue;
                         // Unpriced PRODUCTS stay visible on inventory-OFF companies: picking
@@ -4011,12 +4128,11 @@ function restaurantPos() {
                         // owner Aug 2026) instead of dropping a Rs.0 row. Unpriced services
                         // and inventory-ON rows stay hidden (old behavior).
                         if (!(parseFloat(it.price) > 0) && ((it.type || 'product') !== 'product' || this.isInventoryEnabled())) continue;
-                        if (it.name.toLowerCase().includes(q)) {
-                            if (it.name.toLowerCase().startsWith(q)) pref.push(it);
-                            else if (other.length < 12) other.push(it);
-                        }
+                        const r = this.nameMatchRank(it.name, q, this.searchAnyWord);
+                        if (r > 0) ranked.push({ it, r });
                     }
-                    const out = [...pref, ...other].slice(0, 12);
+                    ranked.sort((a, b) => b.r - a.r);
+                    const out = ranked.slice(0, 12).map(x => x.it);
                     this.searchSuggestions = out;
                     this.highlightIndex = 0;
                     this.showSearchDropdown = true;
@@ -4120,6 +4236,52 @@ function restaurantPos() {
             this.filterProducts(); this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
 
+        // Task 1271 (PRA port): word-aware search matcher — tokens split on
+        // non-alphanumerics so "cheese(half)" still tokenizes; \u0080-\uffff keeps
+        // Urdu/Unicode chars. BOTH surfaces (dropdown + grid) call nameMatchRank
+        // so they can never diverge.
+        searchTokens(s) {
+            return String(s || '').toLowerCase().split(/[^a-z0-9\u0080-\uffff]+/).filter(Boolean);
+        },
+        // Rank a product name against the typed query. 0 = no match; higher =
+        // better (contiguous/in-order matches sort above scattered-word ones):
+        //   4 = name starts with the raw query (exactly the old startsWith rule)
+        //   3 = tokens match CONSECUTIVE name words in order
+        //   2 = tokens match name words in order with gaps ("cheese half")
+        //   1 = every token matches some word, but out of order
+        // anyWord=false keeps the STRICT PREFIX rule (owner, 24 Jul 2026 — do NOT
+        // loosen): the FIRST token must still match the very START of the name;
+        // only the LATER tokens are free to prefix-match any later word. Single-
+        // word queries therefore behave exactly as before in both modes.
+        nameMatchRank(name, q, anyWord) {
+            const lname = String(name).toLowerCase();
+            if (lname.startsWith(q)) return 4;
+            const tokens = this.searchTokens(q);
+            if (!tokens.length) return 0;
+            if (!anyWord && !lname.startsWith(tokens[0])) return 0;
+            const words = this.searchTokens(lname);
+            for (let s = 0; s + tokens.length <= words.length; s++) {
+                if (tokens.every((t, k) => words[s + k].startsWith(t))) return 3;
+            }
+            let wi = 0, inOrder = true;
+            for (const t of tokens) {
+                while (wi < words.length && !words[wi].startsWith(t)) wi++;
+                if (wi >= words.length) { inOrder = false; break; }
+                wi++;
+            }
+            if (inOrder) return 2;
+            // Scattered: every token prefix-matches a DISTINCT word (longest tokens
+            // claim first) — two tokens must never both count the same word, or
+            // "chicken ch" would drag "Chicken Roll" into the results.
+            const used = new Array(words.length).fill(false);
+            const ok = [...tokens].sort((a, b) => b.length - a.length).every(t => {
+                for (let j = 0; j < words.length; j++) {
+                    if (!used[j] && words[j].startsWith(t)) { used[j] = true; return true; }
+                }
+                return false;
+            });
+            return ok ? 1 : 0;
+        },
         filterProducts() {
             // MASTER "show saved products" toggle — when OFF, the catalog grid is hidden so
             // cashiers bill via manual entry only (type a name → "Create X" quick-add).
@@ -4141,14 +4303,22 @@ function restaurantPos() {
             // from finding a saved product by name.
             if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
             else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
-            // Hidden products stay OUT of the browsable grid (when NOT searching) but remain fully
-            // searchable above — so only drop show_on_sale=false items when there is no search.
-            if (!hasSearch) { items = items.filter(i => i.show_on_sale !== false); }
+            // Task 1271 (PRA port): hidden items stay OUT of the browsable grid via the
+            // per-user pref map (isItemVisible — user pref overrides admin show_on_sale in
+            // BOTH directions). In GRID EDIT mode, ALL items render (hidden ones dimmed)
+            // so the user can re-show them. Search is NEVER filtered by prefs.
+            if (!hasSearch) {
+                if (!this.gridEditMode) items = items.filter(i => this.isItemVisible(i));
+            }
             if (this.searchQuery) {
-                const q = this.searchQuery.toLowerCase();
-                items = items.filter(i => i.name.toLowerCase().includes(q));
-                // FIRST-LETTER PRIORITY (mirrors PRA universal, 22 Jul 2026): prefix matches first.
-                items.sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
+                const q = this.searchQuery.toLowerCase().trim();
+                // Task 1271: shared matcher with the dropdown (nameMatchRank) — the two
+                // surfaces must never diverge. anyWord honors the admin search-mode pref.
+                items = items
+                    .map(i => ({ i, r: this.nameMatchRank(i.name, q, this.searchAnyWord) }))
+                    .filter(x => x.r > 0)
+                    .sort((a, b) => b.r - a.r)
+                    .map(x => x.i);
             }
             this.filteredItems = items;
             this.displayCount = 60;
@@ -5356,7 +5526,20 @@ function restaurantPos() {
         clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); this.billUuid = this._newBillUuid();
             // Order Matching (Aug 2026): reset token/code so a brand-new sale
             // never inherits an identifier from the previous order.
-            this.currentTokenNo = null; this.currentOrderCode = null; this.lastHeldId = null; },
+            this.currentTokenNo = null; this.currentOrderCode = null; this.lastHeldId = null;
+            // Task 1271: discarding a cart that held a recalled draft → detach and
+            // release the edit lock so the counter partner can pick it up now.
+            // (Save/pay paths clear activeDraftId BEFORE calling clearCart, so this
+            // only fires on genuine discards — newSale / voidOrder.)
+            if (this.activeDraftId) {
+                const did = this.activeDraftId;
+                this.activeDraftId = null;
+                this.stopDraftLockRenewal();
+                fetch('/fbr-pos/api/drafts/' + did + '/unlock', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                }).catch(() => {});
+            } },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -5938,6 +6121,9 @@ function restaurantPos() {
             // (checkbox unticked = skip SIRF is bill ki receipt auto-print;
             // KOT/FBR submission/receipt popup untouched).
             const skipReceipt = !this.payPrintReceipt;
+            // Task 1271: WA auto-open tab must be reserved INSIDE this gesture
+            // (provisionals are never WhatsApp-able — no blank-tab flash).
+            if (!provisional) this.reserveWaWindow(this.selectedCustomer?.phone);
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
@@ -6069,10 +6255,24 @@ function restaurantPos() {
                     // regenerated only after clearCart() (confirmed success or void).
                     // Server replay-guard returns the existing bill if UUID matches.
                     offline_uuid: this.billUuid || (this.billUuid = this._newBillUuid()),
+                    // Task 1271: settling a recalled draft — the server re-claims
+                    // and consumes the draft ATOMICALLY (409 draft_conflict if a
+                    // second cashier took it after our lock lapsed).
+                    draft_id: this.activeDraftId || null,
                 };
                 // ── OFFLINE-FIRST: no internet at Pay time → queue locally ──
                 // (plan-gated; the queued bill replays via auto-sync when net returns)
                 if (!navigator.onLine) {
+                    // Task 1271: a recalled draft must NEVER settle offline — the
+                    // server-side one-winner consume can't run, so a queued bill
+                    // could later 409 against a competing settlement AFTER the
+                    // customer already walked away with a receipt. Cart + draft
+                    // stay attached; the cashier retries when the net returns.
+                    if (this.activeDraftId) {
+                        this.showToast(window.TXT.draft_offline_block, 'error');
+                        this.showPayModal = false; this.submitting = false;
+                        return;
+                    }
                     if (!this.offlineAllowed) {
                         this.showToast(window.TXT.offline_plan_locked, 'error');
                         this.showPayModal = false; this.submitting = false;
@@ -6096,6 +6296,12 @@ function restaurantPos() {
                     });
                 } catch (netErr) {
                     // Server unreachable (wifi up, internet down) — same offline path.
+                    // Task 1271: recalled drafts never queue offline (see above).
+                    if (this.activeDraftId) {
+                        this.showToast(window.TXT.draft_offline_block, 'error');
+                        this.showPayModal = false; this.submitting = false;
+                        return;
+                    }
                     if (!this.offlineAllowed) {
                         this.showToast(window.TXT.offline_plan_locked, 'error');
                         this.showPayModal = false; this.submitting = false;
@@ -6110,6 +6316,14 @@ function restaurantPos() {
                 try { rawBody = await res.text(); data = JSON.parse(rawBody); } catch(_) {}
                 if (!res.ok || !data || !data.success) {
                     console.error('[storeInvoice] HTTP', res.status, res.statusText, rawBody.slice(0, 500));
+                    // Task 1271: draft claim lost (409) — another cashier recalled/
+                    // billed this draft. Detach it (cart stays for review) so a
+                    // retry can't double-bill; cashier re-recalls deliberately.
+                    if (data && data.draft_conflict) {
+                        this.activeDraftId = null;
+                        this.stopDraftLockRenewal();
+                        await this.loadDrafts().catch(() => {});
+                    }
                     const msg = (data && (data.message || data.error)) || ('Failed (HTTP ' + res.status + ') — F12 console');
                     this.showToast(msg, 'error');
                     this.submitting = false;
@@ -6132,6 +6346,8 @@ function restaurantPos() {
                 this.lastFbrStatus = data.fbr_status || '';
                 this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                 this.lastSaleAt = Date.now();
+                this.setWaBill(data); // Task 1271: WhatsApp Bill button/auto-open
+                this.consumeActiveDraft(); // recalled draft is now billed — drop the draft row
                 // ── Push to Akhri Bills strip (keep last 5) ──────────────────
                 if (data.transaction_id && data.invoice_number) {
                     this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: savedTotal, method }].concat(this.recentBills).slice(0, 5);
@@ -6888,6 +7104,325 @@ function restaurantPos() {
             } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
         },
 
+        // ═══ Task 1271: WhatsApp Bill share (PRA Task 1036 port). Shared PDF is
+        // the FBR invoice PDF (FBR number + Tax Asaan QR) — never PRA branding. ═══
+        setWaBill(data) {
+            this.lastWaPhone = (data && data.wa_phone) || null;
+            this.lastShareUrl = (data && data.share_url) || null;
+            this.waHighlight = false;
+            // Consume the gesture-reserved tab (see reserveWaWindow). Kept on
+            // window (NOT Alpine state) — proxying a Window object is unsafe.
+            clearTimeout(window.__waReserveTimer);
+            const w = (window.__waReservedWin && !window.__waReservedWin.closed) ? window.__waReservedWin : null;
+            window.__waReservedWin = null;
+            if (this.waBillEnabled && this.waBillAutoOpen && this.lastWaPhone && this.lastShareUrl) {
+                if (w) {
+                    // Reserved inside the pay click/Enter gesture — navigating it
+                    // is never popup-blocked, so auto-open reliably works here.
+                    try { w.location = this.waBillLinkFromLast(); return; } catch (e) { try { w.close(); } catch (e2) {} }
+                }
+                // No reserved tab — best-effort open; popup-block par button pulse
+                // fallback (customize sub-label says exactly this).
+                setTimeout(() => this.openWaBill(true), 150);
+            } else if (w) {
+                // Bill turned out not WhatsApp-able (no phone / provisional /
+                // feature off server-side) — never leave a stray blank tab.
+                try { w.close(); } catch (e) {}
+            }
+        },
+        // Auto-open must be BORN inside the cashier's pay click/Enter gesture or
+        // the browser popup-blocks it (a fetch callback is not a gesture): reserve
+        // a blank tab now; setWaBill() navigates it to wa.me when the server
+        // confirms the extras, or closes it otherwise. A watchdog closes it on
+        // pay failure paths that never reach setWaBill.
+        reserveWaWindow(phone) {
+            if (!this.waBillEnabled || !this.waBillAutoOpen) return;
+            if (window.__waReservedWin && !window.__waReservedWin.closed) { try { window.__waReservedWin.close(); } catch (e) {} }
+            window.__waReservedWin = null;
+            const digits = String(phone || '').replace(/\D/g, '');
+            if (digits.length < 10) return; // no routable-looking number → no blank-tab flash
+            try { window.__waReservedWin = window.open('about:blank', '_blank'); } catch (e) { window.__waReservedWin = null; }
+            if (window.__waReservedWin) {
+                clearTimeout(window.__waReserveTimer);
+                window.__waReserveTimer = setTimeout(() => {
+                    if (window.__waReservedWin && !window.__waReservedWin.closed) { try { window.__waReservedWin.close(); } catch (e) {} }
+                    window.__waReservedWin = null;
+                }, 12000);
+            }
+        },
+        waBillMessage(number, total, url) {
+            return '*' + (this.waShopName || '') + '*\n'
+                + window.TXT.invoice_word + ': ' + (number || '') + '\n'
+                + window.TXT.total_word + ': Rs ' + Number(total || 0).toLocaleString() + '\n'
+                + window.TXT.wa_msg_receipt + ': ' + url + '\n'
+                + window.TXT.wa_msg_thanks;
+        },
+        waBillLinkFromLast() {
+            if (!this.lastWaPhone || !this.lastShareUrl) return null;
+            const msg = this.waBillMessage(this.lastFbrNumber || this.lastInvoiceNumber, this.lastTotal, this.lastShareUrl);
+            return 'https://wa.me/' + this.lastWaPhone + '?text=' + encodeURIComponent(msg);
+        },
+        openWaBill(auto = false) {
+            const link = this.waBillLinkFromLast();
+            if (!link) return;
+            const w = window.open(link, '_blank');
+            if (!w) {
+                // Popup blocked (auto-open from a fetch callback usually is) —
+                // highlight the button; the cashier's own click always works.
+                this.waHighlight = true;
+                if (!auto) this.showToast(window.TXT.wa_popup_blocked, 'error');
+                return;
+            }
+            this.waHighlight = false;
+        },
+
+        // ═══ Task 1271: PER-USER grid visibility (PRA Task 1207 port — FBR:
+        // PRODUCTS only; services have no pref rows and stay visible). User pref
+        // OVERRIDES admin show_on_sale in BOTH directions, for THIS user's grid
+        // only. Search is NEVER filtered by these prefs. Keys: "product:12". ═══
+        isItemVisible(i) {
+            const type = i._type || i.type || 'product';
+            if (type !== 'product') return true; // FBR: services always visible
+            const key = 'product:' + i.id;
+            if (this.userGridPrefs[key] !== undefined) return this.userGridPrefs[key] == 1;
+            return i.show_on_sale !== false;
+        },
+        async toggleItemVisibility(i) {
+            const type = i._type || i.type || 'product';
+            if (type !== 'product') return; // pref rows exist for products only
+            const key = 'product:' + i.id;
+            const newVisible = !this.isItemVisible(i);
+            const prev = this.userGridPrefs[key];
+            this.userGridPrefs[key] = newVisible ? 1 : 0; // optimistic
+            try {
+                const res = await fetch('/fbr-pos/grid-prefs/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ item_type: 'product', item_id: i.id, visible: newVisible })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                this.filterProducts();
+                this.syncAutoWidecart();
+            } catch (e) {
+                if (prev === undefined) delete this.userGridPrefs[key]; else this.userGridPrefs[key] = prev;
+                this.showToast(window.TXT.save_failed_try_again, 'error');
+            }
+        },
+        visibleGridCount() {
+            try {
+                return this.allProducts.filter(p => this.isItemVisible(p)).length
+                    + this.allServices.length;
+            } catch (e) { return 1; /* never auto-hide on error */ }
+        },
+        // PRA parity: jab user saare grid items hide kar de to wide-cart layout
+        // KHUD on ho jaye; unhiding restores the grid (auto flag tracked so a
+        // MANUAL toggle press always wins).
+        syncAutoWidecart() {
+            if (this.gridEditMode) return; // editing needs the grid visible
+            const count = this.visibleGridCount();
+            let autoFlag = false;
+            try { autoFlag = localStorage.getItem('fbr_show_products_auto') === '1'; } catch (e) {}
+            if (count === 0 && this.showProducts) {
+                this.showProducts = false;
+                if (this.activeCategory !== 'all') this.activeCategory = 'all';
+                this.filterProducts();
+                try {
+                    localStorage.setItem('fbr_show_products', '0');
+                    localStorage.setItem('fbr_show_products_auto', '1');
+                } catch (e) {}
+            } else if (count > 0 && !this.showProducts && autoFlag) {
+                this.showProducts = true;
+                this.filterProducts();
+                try {
+                    localStorage.setItem('fbr_show_products', '1');
+                    localStorage.removeItem('fbr_show_products_auto');
+                } catch (e) {}
+            }
+        },
+        async resetGridPrefs() {
+            if (this.gridPrefBusy) return;
+            this.gridPrefBusy = true;
+            try {
+                const res = await fetch('/fbr-pos/grid-prefs/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                this.userGridPrefs = {};
+                this.filterProducts();
+                this.syncAutoWidecart();
+                this.showToast(window.TXT.all_items_visible_again, 'success');
+            } catch (e) {
+                this.showToast(window.TXT.reset_failed_try_again, 'error');
+            } finally {
+                this.gridPrefBusy = false;
+            }
+        },
+        get hiddenPrefCount() {
+            return Object.values(this.userGridPrefs).filter(v => v == 0).length;
+        },
+
+        // ═══ Task 1271: CART DRAFTS — fbr_pos_drafts JSON rows (never
+        // FbrPosTransaction rows: those consume FBR serials). Drafts carry the
+        // selected customer reference; recall is lock-guarded (5-min expiry) so
+        // two cashiers can't edit the same draft simultaneously. ═══
+        async openDrafts() {
+            this.showDrafts = true;
+            await this.loadDrafts();
+        },
+        async loadDrafts() {
+            try {
+                const r = await fetch('/fbr-pos/api/drafts', { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                const d = r.ok ? await r.json() : [];
+                this.drafts = Array.isArray(d) ? d : [];
+            } catch (e) { this.drafts = []; }
+        },
+        async saveDraftCart() {
+            if (this.cart.length === 0) { this.showToast(window.TXT.draft_cart_empty, 'error'); return; }
+            if (this.draftBusy) return;
+            this.draftBusy = true;
+            try {
+                const payload = {
+                    draft_id: this.activeDraftId,
+                    cart_data: {
+                        items: this.cart,
+                        total_amount: this.roundedTotal,
+                        order_type: this.orderType,
+                        kitchen_notes: this.kitchenNotes,
+                        discount_type: this.discountType,
+                        discount_value: this.discountValue,
+                        show_discount: this.showDiscount,
+                    },
+                    customer_id: this.selectedCustomer?.id || null,
+                    customer_name: this.selectedCustomer?.name || null,
+                    customer_phone: this.selectedCustomer?.phone || null,
+                };
+                const res = await fetch('/fbr-pos/api/drafts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data || !data.success) {
+                    this.showToast((data && data.message) || window.TXT.draft_save_failed, 'error');
+                    return;
+                }
+                this.activeDraftId = null;
+                this.stopDraftLockRenewal(); // saved = parked (server released the lock)
+                this.clearCart();
+                this.showToast(window.TXT.draft_saved, 'success');
+                await this.loadDrafts();
+            } catch (e) {
+                this.showToast(window.TXT.draft_save_failed, 'error');
+            } finally { this.draftBusy = false; }
+        },
+        async recallDraft(d) {
+            if (this.draftBusy) return;
+            if (this.cart.length > 0 && !confirm(window.TXT.draft_recall_replaces_cart)) return;
+            this.draftBusy = true;
+            try {
+                const res = await fetch('/fbr-pos/api/drafts/' + d.id + '/recall', { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data || !data.success) {
+                    // 423 = locked by another cashier — message carries the holder name.
+                    this.showToast((data && data.message) || window.TXT.draft_not_found, 'error');
+                    await this.loadDrafts();
+                    return;
+                }
+                this.clearCart();
+                const cd = data.cart || {};
+                this.cart = Array.isArray(cd.items) ? cd.items : [];
+                if (cd.order_type) this.orderType = cd.order_type;
+                this.kitchenNotes = cd.kitchen_notes || '';
+                if (cd.discount_type) this.discountType = cd.discount_type;
+                this.discountValue = cd.discount_value || 0;
+                this.showDiscount = !!cd.show_discount;
+                // Customer restore: prefer the LIVE baked row (fresh khata/phone);
+                // fall back to the draft's snapshot so the reference survives even
+                // when the customer left the baked most-recent subset.
+                if (data.customer_id) {
+                    const live = (this.allCustomers || []).find(c => c.id == data.customer_id);
+                    this.selectedCustomer = live || { id: data.customer_id, name: data.customer_name || window.TXT.customer_word, phone: data.customer_phone || '' };
+                    this.customerPhoneQuery = this.selectedCustomer.phone || this.selectedCustomer.name || '';
+                }
+                this.activeDraftId = d.id;
+                this.startDraftLockRenewal(); // hold the edit lock while the cart is open
+                this.showDrafts = false;
+                this.fixCartIndex();
+                this.showToast(window.TXT.draft_recalled, 'success');
+            } catch (e) {
+                this.showToast(window.TXT.draft_not_found, 'error');
+            } finally { this.draftBusy = false; }
+        },
+        async deleteDraft(id, skipConfirm = false) {
+            if (!skipConfirm && !confirm(window.TXT.draft_delete_confirm)) return;
+            try {
+                const res = await fetch('/fbr-pos/api/drafts/' + id, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success === false) {
+                    this.showToast(data.message || window.TXT.draft_not_found, 'error');
+                } else {
+                    this.drafts = this.drafts.filter(x => x.id !== id);
+                    if (this.activeDraftId === id) { this.activeDraftId = null; this.stopDraftLockRenewal(); }
+                }
+            } catch (e) {}
+        },
+        // Billed a recalled draft → remove the draft row silently (its sale is
+        // now a real transaction; leaving it would double-bill on re-recall).
+        consumeActiveDraft() {
+            if (!this.activeDraftId) return;
+            const did = this.activeDraftId;
+            this.activeDraftId = null;
+            this.stopDraftLockRenewal();
+            fetch('/fbr-pos/api/drafts/' + did, {
+                method: 'DELETE',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+            }).catch(() => {});
+        },
+        // ── Task 1271: ACTIVE-RECALL LOCK RENEWAL ────────────────────────────
+        // The server lock expires after 5 minutes; while a recalled draft sits
+        // in the cart we re-assert it every 2 minutes so a second cashier can
+        // never grab the draft mid-edit. A failed renewal (lock stolen after a
+        // laptop-sleep gap, or draft deleted elsewhere) detaches the draft and
+        // warns — the final settlement claim in store() stays the hard gate.
+        startDraftLockRenewal() {
+            this.stopDraftLockRenewal();
+            this.draftLockTimer = setInterval(() => this.renewDraftLock(), 120000);
+        },
+        stopDraftLockRenewal() {
+            if (this.draftLockTimer) { clearInterval(this.draftLockTimer); this.draftLockTimer = null; }
+        },
+        async renewDraftLock() {
+            const did = this.activeDraftId;
+            if (!did) { this.stopDraftLockRenewal(); return; }
+            try {
+                const res = await fetch('/fbr-pos/api/drafts/' + did + '/lock', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                });
+                if (res.status === 423 || res.status === 404) {
+                    // Lock stolen or draft gone — detach so Pay can't double-bill.
+                    if (this.activeDraftId === did) {
+                        this.activeDraftId = null;
+                        this.stopDraftLockRenewal();
+                        this.showToast(window.TXT.draft_lock_lost, 'error');
+                    }
+                }
+            } catch (e) { /* offline blip — keep the timer, next tick retries */ }
+        },
+        // Leaving the sale screen with a recalled draft still attached → best-
+        // effort lock release so the counter partner isn't stuck for 5 minutes.
+        releaseDraftLockOnExit() {
+            const did = this.activeDraftId;
+            if (!did || !navigator.sendBeacon) return;
+            const fd = new FormData();
+            fd.append('_token', '{{ csrf_token() }}');
+            navigator.sendBeacon('/fbr-pos/api/drafts/' + did + '/unlock', fd);
+        },
+
         async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, skipReceipt = false) {
             try {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
@@ -6908,6 +7443,7 @@ function restaurantPos() {
                     this.lastFbrNumber = data.fbr_invoice_number || ''; this.lastFbrStatus = data.fbr_status || '';
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                     this.lastSaleAt = Date.now();
+                    this.setWaBill(data); // Task 1271: WA extras ride payOrder's JSON when routable
                     // ── Push to Akhri Bills strip ────────────────────────────────────────
                     if (data.transaction_id && data.invoice_number) {
                         this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: savedTotal, method }].concat(this.recentBills).slice(0, 5);

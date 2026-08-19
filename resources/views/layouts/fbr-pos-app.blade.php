@@ -1336,6 +1336,60 @@
         </div>
         @endif
         @endif
+        {{-- Task 1271 (PRA Task 705 port): khufia key Ctrl+Alt+Shift+L — deliberately
+             NO visible UI. Cashier only: station identity switch (owner-linked FBR
+             counterpart, fbr_counterpart_user_id). Relative URL (route(...,false)) —
+             absolute https breaks http dev fetches. --}}
+        @php
+            $khufiaFbrUser = auth('fbrpos')->user();
+            $khufiaFbrUrl = $khufiaFbrUser?->isPosCashier()
+                ? route('fbrpos.api.identity-switch', [], false)
+                : null;
+        @endphp
+        @if($khufiaFbrUrl)
+        <script>
+        (function () {
+            var busy = false;
+            document.addEventListener('keydown', function (e) {
+                if (!e.ctrlKey || !e.altKey || !e.shiftKey) return;
+                var isL = (e.code === 'KeyL') || (String(e.key || '').toLowerCase() === 'l');
+                if (!isL || busy) return;
+                e.preventDefault();
+                e.stopPropagation();
+                busy = true;
+                var meta = document.querySelector('meta[name="csrf-token"]');
+                fetch('{{ $khufiaFbrUrl }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': meta ? meta.content : ''
+                    }
+                }).then(function (r) { return r.ok ? r.json() : null; })
+                  .then(function (d) {
+                      // Reload only when something actually changed — the
+                      // silent no-op (unlinked cashier) must stay invisible.
+                      if (d && d.switched === true) {
+                          // Identity switched: drop the offline-first sale-screen
+                          // cache (SALE_CACHE) or the reload would serve the OLD
+                          // cashier's baked page. SW purges only on login/logout
+                          // URLs, so tell it explicitly (message already supported).
+                          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                              try { navigator.serviceWorker.controller.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (err) {}
+                          }
+                          window.location.reload();
+                      } else { busy = false; }
+                  })
+                  .catch(function () { busy = false; });
+            }, true);
+        })();
+        </script>
+        @endif
+        {{-- Task 1271: tiny neutral dot = station identity switched. Inline styles
+             on purpose (no new arbitrary Tailwind classes). --}}
+        @if(session('fbr_identity_original_id'))
+        <div title="" style="position:fixed;bottom:8px;left:8px;z-index:95;width:8px;height:8px;border-radius:9999px;background:#9ca3af;opacity:.65;pointer-events:none;"></div>
+        @endif
         <x-trial-lock-modal />
         <x-subscription-expiry-popup />
         {{-- Task 1275: Madadgar support bubble (AI chat + WhatsApp) — FBR flavor --}}

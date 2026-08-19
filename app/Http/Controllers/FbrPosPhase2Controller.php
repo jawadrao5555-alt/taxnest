@@ -210,6 +210,266 @@ class FbrPosPhase2Controller extends Controller
         return response()->json(['success' => true]);
     }
 
+    // ========================= CART DRAFTS (Task 1271) =========================
+    // PRA sale-screen parity, law-neutral: drafts are JSON carts in their OWN
+    // table (fbr_pos_drafts) — NEVER FbrPosTransaction rows. FBR invoice
+    // numbering is untouched and the submission schedulers can never see a
+    // draft. Unlike held sales (recall = atomic delete-claim), drafts persist
+    // until deleted and carry a user-keyed edit lock (5-min expiry) so two
+    // cashiers can't edit the same draft simultaneously.
+
+    private function draftsReady(): bool
+    {
+        try {
+            return \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_drafts');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public function saveDraft(Request $r)
+    {
+        $r->validate([
+            'draft_id'       => 'nullable|integer',
+            'cart_data'      => 'required|array',
+            'customer_id'    => 'nullable|integer',
+            'customer_name'  => 'nullable|string|max:255',
+            'customer_phone' => 'nullable|string|max:30',
+        ]);
+        if (!$this->draftsReady()) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
+        }
+        $companyId = $this->companyId();
+        $user = $this->user();
+
+        $items = $r->input('cart_data.items', []);
+        $itemsCount = is_array($items) ? count($items) : 0;
+        if ($itemsCount < 1) {
+            return response()->json(['success' => false, 'message' => __('pos.draft_cart_empty')], 422);
+        }
+
+        // Draft keeps the selected customer reference; company-scope the id so
+        // a crafted payload can't attach another shop's customer.
+        $customerId = null;
+        if ($r->filled('customer_id')) {
+            $customerId = PosCustomer::where('company_id', $companyId)
+                ->where('id', (int) $r->input('customer_id'))->value('id');
+        }
+
+        $payload = [
+            'customer_id'    => $customerId,
+            'customer_name'  => $r->input('customer_name'),
+            'customer_phone' => $r->input('customer_phone'),
+            'cart_data'      => $r->input('cart_data'),
+            'total_amount'   => (float) ($r->input('cart_data.total_amount') ?? 0),
+            'items_count'    => $itemsCount,
+            // Saving PARKS the draft (the UI clears the cart and drops
+            // activeDraftId) — release the lock so another cashier can pick
+            // it up immediately instead of waiting out the 5-min expiry.
+            'locked_by_user_id' => null,
+            'lock_time'         => null,
+        ];
+
+        if ($r->filled('draft_id')) {
+            $draftId = (int) $r->input('draft_id');
+            // Race-safe: the UPDATE itself carries the lock predicate — a
+            // competing lock acquired after any read still blocks this write.
+            // Bulk update bypasses Eloquent casts — encode the JSON column.
+            $updated = \App\Models\FbrPosDraft::where('company_id', $companyId)
+                ->where('id', $draftId)
+                ->lockFreeFor((int) $user->id)
+                ->update(array_merge($payload, [
+                    'cart_data'  => json_encode($payload['cart_data']),
+                    'updated_at' => now(),
+                ]));
+            if ($updated) {
+                return response()->json(['success' => true, 'id' => $draftId, 'updated' => true]);
+            }
+            $draft = \App\Models\FbrPosDraft::where('company_id', $companyId)
+                ->with('lockedBy:id,name')->find($draftId);
+            if ($draft) {
+                // 0 affected + row exists: a live FOREIGN lock is a real block;
+                // otherwise the predicate matched but every value was already
+                // identical (same-second double-save) — that's a success.
+                if ($draft->isLockedForUser((int) $user->id)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => __('pos.draft_locked_by_user', ['name' => $draft->lockedBy?->name ?? '—']),
+                    ], 423);
+                }
+                return response()->json(['success' => true, 'id' => $draftId, 'updated' => true]);
+            }
+            // Stale id (deleted elsewhere) → fall through to create.
+        }
+
+        $draft = \App\Models\FbrPosDraft::create(array_merge($payload, [
+            'company_id' => $companyId,
+            'user_id'    => $user->id,
+        ]));
+
+        return response()->json(['success' => true, 'id' => $draft->id]);
+    }
+
+    public function listDrafts()
+    {
+        if (!$this->draftsReady()) {
+            return response()->json([]);
+        }
+        $userId = (int) $this->user()->id;
+        $drafts = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+            ->with('lockedBy:id,name')
+            ->orderByDesc('updated_at')->limit(10)->get()
+            ->map(fn ($d) => [
+                'id'             => $d->id,
+                'customer_id'    => $d->customer_id,
+                'customer_name'  => $d->customer_name,
+                'customer_phone' => $d->customer_phone,
+                'total_amount'   => (float) $d->total_amount,
+                'items_count'    => (int) $d->items_count,
+                'updated_at'     => optional($d->updated_at)->toIso8601String(),
+                'locked'         => $d->isLockedForUser($userId),
+                'locked_by_name' => $d->isLockedForUser($userId) ? ($d->lockedBy?->name ?? '—') : null,
+            ]);
+        return response()->json($drafts);
+    }
+
+    /**
+     * Recall = load the draft cart AND acquire its edit lock. A second cashier
+     * recalling the same draft gets 423 + the holder's name until the lock
+     * expires (5 min) or is released. The row is NOT deleted — the client
+     * deletes it after a successful pay, or re-saves it on changes.
+     */
+    public function recallDraft($id)
+    {
+        if (!$this->draftsReady()) {
+            return response()->json(['success' => false, 'message' => __('pos.draft_not_found')], 404);
+        }
+        $userId = (int) $this->user()->id;
+        $draft = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+            ->with('lockedBy:id,name')->find($id);
+        if (!$draft) {
+            return response()->json(['success' => false, 'message' => __('pos.draft_not_found')], 404);
+        }
+        if ($draft->isLockedForUser($userId)) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.draft_locked_by_user', ['name' => $draft->lockedBy?->name ?? '—']),
+            ], 423);
+        }
+        // Race-safe claim: conditional UPDATE decides the winner when two
+        // cashiers recall simultaneously (mirrors the held-sale delete-claim).
+        $lockCutoff = now()->subMinutes(\App\Models\FbrPosDraft::LOCK_MINUTES);
+        $claimed = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+            ->where('id', $draft->id)
+            ->where(function ($q) use ($userId, $lockCutoff) {
+                $q->whereNull('locked_by_user_id')
+                    ->orWhere('locked_by_user_id', $userId)
+                    ->orWhere('lock_time', '<', $lockCutoff)
+                    ->orWhereNull('lock_time');
+            })
+            ->update(['locked_by_user_id' => $userId, 'lock_time' => now()]);
+        if (!$claimed) {
+            // 0 affected rows ≠ lost claim: MySQL reports 0 when SET values equal
+            // the row (same-second re-recall by the current holder). Ownership
+            // probe decides — only a live FOREIGN lock is a real conflict.
+            $claimed = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+                ->where('id', $draft->id)->freshlyOwnedBy($userId)->exists();
+        }
+        if (!$claimed) {
+            $draft->refresh()->load('lockedBy:id,name');
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.draft_locked_by_user', ['name' => $draft->lockedBy?->name ?? '—']),
+            ], 423);
+        }
+        return response()->json([
+            'success' => true,
+            'id'      => $draft->id,
+            'cart'    => $draft->cart_data,
+            'customer_id'    => $draft->customer_id,
+            'customer_name'  => $draft->customer_name,
+            'customer_phone' => $draft->customer_phone,
+        ]);
+    }
+
+    public function deleteDraft($id)
+    {
+        if (!$this->draftsReady()) {
+            return response()->json(['success' => true]);
+        }
+        $userId = (int) $this->user()->id;
+        // Race-safe: the DELETE itself carries the lock predicate, so a lock
+        // acquired between any read and this statement still wins.
+        $deleted = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+            ->where('id', (int) $id)
+            ->lockFreeFor($userId)
+            ->delete();
+        if (!$deleted) {
+            $draft = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+                ->with('lockedBy:id,name')->find($id);
+            if ($draft) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('pos.draft_locked_by_user', ['name' => $draft->lockedBy?->name ?? '—']),
+                ], 423);
+            }
+            // Already gone — deleting twice is fine.
+        }
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Explicit lock/unlock (PRA lockInvoice/unlockInvoice parity, user-keyed —
+     * the FBR sale screen has no terminal picker). Unlock is a no-op when the
+     * lock belongs to someone else and hasn't expired.
+     */
+    public function lockDraft($id)
+    {
+        if (!$this->draftsReady()) {
+            return response()->json(['success' => false], 503);
+        }
+        $userId = (int) $this->user()->id;
+        // Conditional claim — identical to recall: the UPDATE's predicate
+        // decides the winner when two cashiers lock simultaneously.
+        $claimed = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+            ->where('id', (int) $id)
+            ->lockFreeFor($userId)
+            ->update(['locked_by_user_id' => $userId, 'lock_time' => now()]);
+        if (!$claimed) {
+            // Same-second renewal by the current holder changes nothing → MySQL
+            // says 0 affected. If we hold a fresh lock, the renewal SUCCEEDED.
+            $claimed = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+                ->where('id', (int) $id)->freshlyOwnedBy($userId)->exists();
+        }
+        if (!$claimed) {
+            $draft = \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+                ->with('lockedBy:id,name')->find($id);
+            if (!$draft) {
+                return response()->json(['success' => false, 'message' => __('pos.draft_not_found')], 404);
+            }
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.draft_locked_by_user', ['name' => $draft->lockedBy?->name ?? '—']),
+            ], 423);
+        }
+        return response()->json(['success' => true]);
+    }
+
+    public function unlockDraft($id)
+    {
+        if (!$this->draftsReady()) {
+            return response()->json(['success' => true]);
+        }
+        $userId = (int) $this->user()->id;
+        // Releases only own/expired/absent locks; a live foreign lock keeps
+        // the row untouched (predicate-guarded, no read-then-write window).
+        \App\Models\FbrPosDraft::where('company_id', $this->companyId())
+            ->where('id', (int) $id)
+            ->lockFreeFor($userId)
+            ->update(['locked_by_user_id' => null, 'lock_time' => null]);
+        return response()->json(['success' => true]);
+    }
+
     // ========================= PROMOTIONS =========================
 
     public function promotions()

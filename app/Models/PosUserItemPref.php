@@ -41,4 +41,29 @@ class PosUserItemPref extends Model
             return [];
         }
     }
+
+    /**
+     * Task 1271 — FBR sale-screen prefs map. FBR grid items are Product rows
+     * (NOT PosProduct), so their prefs are stored with item_type='fbrproduct'
+     * (10-char column cap) to keep the id spaces separate. The FBR client JS
+     * still keys items as "product:ID" — remap here.
+     */
+    public static function mapForFbrUser(?int $userId): array
+    {
+        if (!$userId) {
+            return [];
+        }
+        try {
+            if (!Schema::hasTable('pos_user_item_prefs')) {
+                return [];
+            }
+            return static::where('user_id', $userId)
+                ->where('item_type', 'fbrproduct')
+                ->get()
+                ->mapWithKeys(fn ($r) => ['product:' . $r->item_id => $r->visible ? 1 : 0])
+                ->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
 }

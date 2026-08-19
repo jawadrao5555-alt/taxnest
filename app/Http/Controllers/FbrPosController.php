@@ -1216,10 +1216,15 @@ class FbrPosController extends Controller
         $offlineAllowed = $this->fbrPlanAllows('offline_enabled');
         $bootFp = $this->fbrBootFingerprint($company, Auth::guard('fbrpos')->user());
 
+        // Task 1271: per-user grid visibility prefs (PRA parity) — keys are
+        // "product:ID"; user pref overrides admin show_on_sale BOTH directions.
+        $userGridPrefs = \App\Models\PosUserItemPref::mapForFbrUser(Auth::guard('fbrpos')->id());
+
         return response(view($viewName, compact(
             'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
-            'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed'
+            'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed',
+            'userGridPrefs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
@@ -1266,6 +1271,9 @@ class FbrPosController extends Controller
             (bool) $this->fbrPlanAllows('offline_enabled'),
             (bool) $this->fbrPlanAllows('deals_enabled'),
             (bool) $this->fbrPlanAllows('loyalty_enabled'),
+            // Task 1271: per-user grid prefs are BAKED into the screen — a
+            // toggle/reset must refresh the SW-cached copy (PRA twin rule).
+            \App\Models\PosUserItemPref::mapForFbrUser($user->id),
         ]));
 
         $screenPath = resource_path('views/fbr-pos/universal.blade.php');
@@ -1360,6 +1368,9 @@ class FbrPosController extends Controller
             'offline_queued_at' => 'nullable|date',
             'offline_queued_by' => 'nullable|integer',
             'offline_branch_id' => 'nullable|integer',
+            // Task 1271: recalled-draft settlement — the sale claims/consumes the
+            // draft server-side (atomic; prevents two cashiers billing one draft).
+            'draft_id' => 'nullable|integer',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('FBR POS Store: validation failed', [
@@ -1400,11 +1411,26 @@ class FbrPosController extends Controller
                         'fbr_status'       => $existing->fbr_status,
                         'invoice_mode'     => $existing->invoice_mode,
                         'change_due'       => (float) $existing->change_due,
+                        // Task 1271: replay = same bill → same WhatsApp extras.
+                        ...$existing->waBillPayload($company),
                         'message'          => $replayMsg,
                     ]);
                 }
                 return redirect()->route('fbrpos.show', $existing->id)->with('success', $replayMsg);
             }
+        }
+
+        // ── Task 1271: DRAFT SETTLEMENT (one-winner protocol) ────────────────────
+        // A sale settling a recalled draft carries draft_id. The AUTHORITATIVE
+        // claim is a conditional DELETE of the draft row INSIDE the same DB
+        // transaction that creates the sale (see the closure below): the row's
+        // InnoDB lock serializes competing settlements — even two tabs of the
+        // SAME cashier with different offline_uuids — so exactly one wins. A
+        // failed sale rolls the delete back (draft survives, retry works); a
+        // lost claim aborts via FbrDraftConflictException before any fiscal row.
+        $draftId = (int) $request->input('draft_id', 0);
+        if ($draftId > 0 && !\Illuminate\Support\Facades\Schema::hasTable('fbr_pos_drafts')) {
+            $draftId = 0; // not-yet-migrated PROD window — sale proceeds draft-less
         }
 
         $fbrEnabled = (bool) $company->fbr_reporting_enabled;
@@ -1495,7 +1521,25 @@ class FbrPosController extends Controller
         }
 
         try {
-            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists, $offlineQueuedAt, $offlineQueuedBy, $offlineBranchId) {
+            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists, $offlineQueuedAt, $offlineQueuedBy, $offlineBranchId, $draftId) {
+                // ── Task 1271: ATOMIC DRAFT CONSUME = THE CLAIM ──────────────
+                // Conditional DELETE first: DELETE has no affected-rows-on-
+                // unchanged-values gotcha, and the row lock serializes every
+                // competing settlement (same OR different user). 0 rows = the
+                // draft is gone (already billed) or freshly locked by someone
+                // else → abort the WHOLE sale before any serial/fiscal work.
+                // A later failure in this closure rolls the delete back too —
+                // creation and consumption are one transactional protocol.
+                if ($draftId > 0) {
+                    $consumed = \App\Models\FbrPosDraft::where('company_id', $companyId)
+                        ->where('id', $draftId)
+                        ->lockFreeFor((int) (Auth::guard('fbrpos')->id() ?? 0))
+                        ->delete();
+                    if (!$consumed) {
+                        throw new \App\Exceptions\FbrDraftConflictException($draftId);
+                    }
+                }
+
                 $subtotal = 0;
                 $totalTax = 0;
                 $itemsData = [];
@@ -2027,6 +2071,15 @@ class FbrPosController extends Controller
                 return $transaction;
             });
 
+            // Task 1271: WhatsApp Bill extras (FBR twin of the PRA pay JSON extras).
+            // Never throws — nulls when feature off / provisional / no routable phone.
+            $waExtras = ['wa_phone' => null, 'share_url' => null];
+            try {
+                $waExtras = $transaction->waBillPayload($company);
+            } catch (\Throwable $waEx) {
+                Log::warning('FBR waBillPayload failed', ['tx' => $transaction->id ?? null, 'err' => $waEx->getMessage()]);
+            }
+
             if ($invoiceMode === 'local') {
                 if ($request->wantsJson()) {
                     return response()->json([
@@ -2055,6 +2108,8 @@ class FbrPosController extends Controller
                         'invoice_number' => $transaction->invoice_number,
                         'total_amount' => (float) $transaction->total_amount,
                         'change_due' => (float) $transaction->change_due,
+                        'wa_phone' => $waExtras['wa_phone'],
+                        'share_url' => $waExtras['share_url'],
                         'invoice_mode' => 'fbr',
                         'fbr_status' => null,
                         'fbr_invoice_number' => null,
@@ -2078,6 +2133,8 @@ class FbrPosController extends Controller
                         'invoice_number' => $transaction->invoice_number,
                         'total_amount' => (float) $transaction->total_amount,
                         'change_due' => (float) $transaction->change_due,
+                        'wa_phone' => $waExtras['wa_phone'],
+                        'share_url' => $waExtras['share_url'],
                         'invoice_mode' => 'fbr',
                         'fbr_status' => 'pending',
                         'fbr_invoice_number' => null,
@@ -2100,6 +2157,8 @@ class FbrPosController extends Controller
                         'invoice_number' => $transaction->invoice_number,
                         'total_amount' => (float) $transaction->total_amount,
                         'change_due' => (float) $transaction->change_due,
+                        'wa_phone' => $waExtras['wa_phone'],
+                        'share_url' => $waExtras['share_url'],
                         'invoice_mode' => 'fbr',
                         'fbr_status' => 'success',
                         'fbr_invoice_number' => $fbrResult['fbr_invoice_number'] ?? null,
@@ -2132,6 +2191,8 @@ class FbrPosController extends Controller
                         'invoice_number' => $transaction->invoice_number,
                         'total_amount' => (float) $transaction->total_amount,
                         'change_due' => (float) $transaction->change_due,
+                        'wa_phone' => $waExtras['wa_phone'],
+                        'share_url' => $waExtras['share_url'],
                         'invoice_mode' => 'fbr',
                         'fbr_status' => 'pending',
                         'fbr_invoice_number' => null,
@@ -2157,6 +2218,8 @@ class FbrPosController extends Controller
                     'invoice_number' => $transaction->invoice_number,
                     'total_amount' => (float) $transaction->total_amount,
                     'change_due' => (float) $transaction->change_due,
+                    'wa_phone' => $waExtras['wa_phone'],
+                    'share_url' => $waExtras['share_url'],
                     'invoice_mode' => 'fbr',
                     'fbr_status' => 'failed',
                     'fbr_invoice_number' => null,
@@ -2175,6 +2238,25 @@ class FbrPosController extends Controller
             // Re-throw before the generic Exception catch swallows it. (wantsJson requests
             // automatically get a 422 JSON error bag from the framework.)
             throw $ve;
+        } catch (\App\Exceptions\FbrDraftConflictException $dce) {
+            // ── Task 1271: DRAFT SETTLEMENT CLAIM LOST ───────────────────────────────
+            // The in-transaction consume-DELETE claimed 0 rows: the draft was already
+            // billed by a competing settlement (row gone) or another cashier holds a
+            // fresh edit lock. The whole sale rolled back — no serial, no fiscal row.
+            $draftRow = \App\Models\FbrPosDraft::where('company_id', $companyId)
+                ->with('lockedBy:id,name')->find($dce->draftId);
+            $draftMsg = $draftRow
+                ? __('pos.draft_locked_by_user', ['name' => $draftRow->lockedBy?->name ?? '—'])
+                : __('pos.draft_already_billed');
+            Log::info('FBR POS draft settlement claim lost', ['company' => $companyId, 'draft' => $dce->draftId, 'exists' => (bool) $draftRow]);
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'draft_conflict' => true,
+                    'message' => $draftMsg,
+                ], 409);
+            }
+            return back()->with('error', $draftMsg);
         } catch (\Illuminate\Database\QueryException $qe) {
             // ── RACE-LOSER RECOVERY (concurrent identical submits) ──────────────────
             // When two requests carrying the same offline_uuid hit store() at the same
@@ -2210,6 +2292,8 @@ class FbrPosController extends Controller
                             'fbr_status'         => $winner->fbr_status,
                             'invoice_mode'       => $winner->invoice_mode,
                             'change_due'         => (float) $winner->change_due,
+                            // Task 1271: race-loser replay → same WhatsApp extras.
+                            ...$winner->waBillPayload($company),
                             'message'            => $raceMsg,
                         ]);
                     }
@@ -4489,6 +4573,33 @@ class FbrPosController extends Controller
         }
         $member->pos_role = $request->pos_role;
         $member->default_branch_id = $this->fbrResolveBranchId($request, $companyId);
+
+        // Task 1271: identity-switch counterpart link (PRA parity, but NO
+        // billing-scope condition — the FBR panel has no billing scopes).
+        // Cashier rows only, cashier targets only, never self; invalid target
+        // keeps the old link. Role demotion to manager clears the link.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_counterpart_user_id')) {
+            if ($request->pos_role !== 'pos_cashier') {
+                $member->pos_counterpart_user_id = null;
+            } elseif ($request->exists('pos_counterpart_user_id')) {
+                $cpInput = $request->input('pos_counterpart_user_id');
+                $oldCp = $member->pos_counterpart_user_id ? (int) $member->pos_counterpart_user_id : null;
+                $newCp = $oldCp;
+                if ($cpInput === null || $cpInput === '') {
+                    $newCp = null;
+                } elseif ((int) $cpInput !== $member->id) {
+                    $cpTarget = \App\Models\User::where('company_id', $companyId)
+                        ->where('id', (int) $cpInput)
+                        ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
+                        ->first();
+                    if ($cpTarget) {
+                        $newCp = (int) $cpTarget->id;
+                    }
+                }
+                $member->pos_counterpart_user_id = $newCp;
+            }
+        }
+
         if ($request->filled('password')) {
             $member->password = \Illuminate\Support\Facades\Hash::make($request->password);
             if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
@@ -8033,5 +8144,261 @@ class FbrPosController extends Controller
         $product->default_price = $data['price'];
         $product->save();
         return response()->json(['ok' => true, 'price' => (float) $product->default_price]);
+    }
+
+    // ══════════════════════ Task 1271: FBR sale-screen power pack ══════════════════════
+
+    /**
+     * POST /fbr-pos/settings/whatsapp-bill-toggle — Customize FBR POS toggle
+     * (FBR twin of PosController::toggleWhatsappBill). Shares the company
+     * columns pos_whatsapp_bill_enabled / pos_whatsapp_bill_auto_open (a
+     * company is exactly one panel product; both flags already sit in
+     * posConfigRev, so the SW-cached sale screen refreshes on toggle).
+     */
+    public function toggleWhatsappBill(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        // Company-wide setting exposed on the admin Customize page — require
+        // an explicit admin role (posCashierBlocked() alone would wave through
+        // kitchen/waiter/no-role accounts, which must never flip this).
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+            || !\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_auto_open')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
+        }
+        $update = [];
+        if ($request->has('enabled')) {
+            $update['pos_whatsapp_bill_enabled'] = $request->boolean('enabled');
+        }
+        if ($request->has('auto_open')) {
+            $update['pos_whatsapp_bill_auto_open'] = $request->boolean('auto_open');
+        }
+        if (!$update) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 422);
+        }
+        $companyId = app('currentCompanyId');
+        // Plan gate: turning anything ON needs the plan; OFF always allowed.
+        $turningOn = ($update['pos_whatsapp_bill_enabled'] ?? false)
+            || ($update['pos_whatsapp_bill_auto_open'] ?? false);
+        if ($turningOn && !\App\Services\PosFeatureService::planAllows(Company::find($companyId), 'whatsapp_enabled')) {
+            return response()->json(['success' => false, 'message' => __('pos.wa_bill_plan_locked_api')], 403);
+        }
+        Company::where('id', $companyId)->update($update);
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * POST /fbr-pos/transaction/{id}/share-link — mint (or reuse) the public
+     * share token for a FINAL bill. FBR twin of PosController::generateShareLink.
+     * Provisionals (invoice_mode='local' + fbr_status='local') are still
+     * editable — never mint a public token for them.
+     */
+    public function generateShareLink($id)
+    {
+        $companyId = app('currentCompanyId');
+        $transaction = FbrPosTransaction::where('company_id', $companyId)->findOrFail($id);
+
+        $company = Company::find($companyId);
+        $shareOn = (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+                || (bool) ($company?->pos_whatsapp_bill_enabled ?? true))
+            && \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled');
+        if (!$shareOn || $transaction->isDeliberateProvisional()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.wa_share_not_allowed'),
+            ], 422);
+        }
+
+        if (!$transaction->share_token) {
+            $transaction->update([
+                'share_token' => bin2hex(random_bytes(32)),
+                'share_token_created_at' => now(),
+            ]);
+        }
+
+        $shareUrl = url("/fbr-pos/invoice/share/{$transaction->share_token}");
+
+        return response()->json(['url' => $shareUrl, 'token' => $transaction->share_token]);
+    }
+
+    /**
+     * GET /fbr-pos/invoice/share/{token} — PUBLIC tokened bill PDF (no auth).
+     * FBR twin of PosController::publicInvoicePdf. Serves the SAME A4 invoice
+     * PDF the panel's Download button produces — FBR invoice number and the
+     * Tax Asaan verification QR stay intact (compliance rule for this task).
+     * 30-day expiry → 410; provisional → plain 404 response (never the
+     * login-redirecting abort).
+     */
+    public function publicInvoicePdf($token)
+    {
+        if (strlen($token) !== 64 || !ctype_xdigit($token)) {
+            abort(404);
+        }
+
+        $transaction = FbrPosTransaction::where('share_token', $token)
+            ->with(['items', 'creator'])
+            ->firstOrFail();
+
+        if ($transaction->share_token_created_at && $transaction->share_token_created_at < now()->subDays(30)) {
+            abort(410, 'This share link has expired.');
+        }
+
+        // A deliberate provisional is still editable — even a stale token for
+        // one must never render publicly. Promotion clears the local pair, so
+        // the same token starts working once the bill becomes final. Direct
+        // response, NOT abort(404): the global NotFound renderable would 302
+        // an fbr-pos/* path to the panel login — wrong for a customer link.
+        if ($transaction->isDeliberateProvisional()) {
+            return response('This share link is no longer available.', 404);
+        }
+
+        $company = Company::find($transaction->company_id);
+        if (!$company) {
+            abort(404);
+        }
+
+        // Locale 'ur' → mPDF (Arabic OTL shaping); en/rur → DomPDF (same split
+        // as downloadPdf). Public route carries no panel session — the PDF
+        // renders in the company's default language.
+        $locale = in_array($company->default_language ?? 'en', ['en', 'rur', 'ur'], true)
+            ? $company->default_language : 'en';
+        app()->setLocale($locale);
+        if (app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT) {
+            try {
+                return \App\Support\MpdfRenderer::render(
+                    'fbr-pos.invoice-pdf',
+                    compact('transaction', 'company'),
+                    'a4',
+                    "FBR-POS-Invoice-{$transaction->invoice_number}.pdf",
+                    true
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('mPDF render failed for FBR publicInvoicePdf, falling back to DomPDF Roman Urdu: ' . $e->getMessage());
+            }
+        }
+
+        \App\Support\PosLocale::applyPdfSafeLocale();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.invoice-pdf', compact('transaction', 'company'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream("FBR-POS-Invoice-{$transaction->invoice_number}.pdf");
+    }
+
+    /**
+     * POST /fbr-pos/products/search-mode — admin picks how the sale-screen
+     * search matches names (FBR twin of PosController::productSearchMode).
+     * Shared company column pos_product_search_mode (already in posConfigRev).
+     */
+    public function productSearchMode(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || ($user->isPosCashier() ? $user->posCashierBlocked() : !$user->isPosAdmin())) {
+            abort(403, 'Only POS administrators can change the product search mode.');
+        }
+        $request->validate(['mode' => 'required|in:prefix,any_word']);
+        $company = Company::find(app('currentCompanyId'));
+        if ($company && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_product_search_mode')) {
+            $company->pos_product_search_mode = $request->input('mode');
+            $company->save();
+        }
+        return back()->with('success', __('pos.search_mode_saved'));
+    }
+
+    /**
+     * POST /fbr-pos/api/identity-switch — khufia station identity switch
+     * (Ctrl+Alt+Shift+L; FBR twin of PosController::identitySwitch). The FBR
+     * panel has NO billing scopes, so the trust boundary is purely the
+     * owner-set counterpart link: cashier roles only, same company, active.
+     * Forward = my owner-set link target; back = session memory (sanity: the
+     * original must still point at me); reverse = exactly one active cashier
+     * points at me. Anything else is a silent no-op.
+     */
+    public function identitySwitch(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user) {
+            abort(403);
+        }
+        $companyId = app('currentCompanyId');
+        $noop = response()->json(['switched' => false]);
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_counterpart_user_id')) {
+                return $noop;
+            }
+        } catch (\Throwable $e) {
+            return $noop;
+        }
+
+        // ── Switch BACK: original ID remembered in this session ──
+        $originalId = (int) session('fbr_identity_original_id', 0);
+        if ($originalId > 0) {
+            $original = \App\Models\User::where('company_id', $companyId)
+                ->where('id', $originalId)
+                ->where('pos_role', 'pos_cashier')
+                ->where('is_active', true)
+                ->first();
+            // Sanity: the CURRENT user must be the original's linked counterpart —
+            // a stale/crafted session value must never become a free login.
+            if (!$original || (int) ($original->pos_counterpart_user_id ?? 0) !== (int) $user->id) {
+                session()->forget('fbr_identity_original_id');
+
+                return $noop;
+            }
+            $this->fbrIdentitySwitchLogin($original);
+            session()->forget('fbr_identity_original_id');
+
+            return response()->json(['switched' => true, 'direction' => 'back']);
+        }
+
+        if (!$user->isPosCashier()) {
+            return $noop; // unlinked/ineligible = silent no-op
+        }
+
+        // ── Switch FORWARD: cashier with an owner-set link ──
+        if ((int) ($user->pos_counterpart_user_id ?? 0)) {
+            $target = \App\Models\User::where('company_id', $companyId)
+                ->where('id', (int) $user->pos_counterpart_user_id)
+                ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
+                ->where('is_active', true)
+                ->first();
+            if (!$target) {
+                return $noop;
+            }
+            session(['fbr_identity_original_id' => $user->id]);
+            $this->fbrIdentitySwitchLogin($target);
+
+            return response()->json(['switched' => true, 'direction' => 'forward']);
+        }
+
+        // ── Switch REVERSE: the key must work from BOTH sides. A fresh login
+        // on the target-side ID (no session memory) flips to the cashier that
+        // points at it — but ONLY when exactly one active cashier is linked
+        // (two stations sharing one target = ambiguous, silent no-op).
+        $sources = \App\Models\User::where('company_id', $companyId)
+            ->where('pos_counterpart_user_id', $user->id)
+            ->where('pos_role', 'pos_cashier')
+            ->where('is_active', true)
+            ->get();
+        if ($sources->count() !== 1) {
+            return $noop;
+        }
+        $this->fbrIdentitySwitchLogin($sources->first());
+
+        return response()->json(['switched' => true, 'direction' => 'reverse']);
+    }
+
+    /**
+     * Re-login the fbrpos guard as $target WITHOUT side effects — an identity
+     * switch is not a fresh staff arrival (Hazri listener is pos-guard-gated,
+     * but the attribute keeps parity with the PRA flow). Session data (the
+     * original-id memory) survives login()'s session migrate.
+     */
+    private function fbrIdentitySwitchLogin(\App\Models\User $target): void
+    {
+        request()->attributes->set('pos_identity_switch', true);
+        Auth::guard('fbrpos')->login($target);
     }
 }

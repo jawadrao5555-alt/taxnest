@@ -35,6 +35,35 @@
     </div>
     @endif
 
+    {{-- Task 1271: Product search mode (PRA port, owner rule 4 Aug 2026) — admin picks
+         how the sale-screen search matches names: strict name-prefix (24 Jul rule) or
+         any-word. Shared company column pos_product_search_mode; admin-only. --}}
+    @if(auth('fbrpos')->user() && !auth('fbrpos')->user()->isPosCashier() && auth('fbrpos')->user()->isPosAdmin())
+    <div class="mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-4">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.search_mode_title') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.search_mode_hint') }}</p>
+            </div>
+            @php
+                $tnSearchModeCompany = $company ?? \App\Models\Company::find(app('currentCompanyId'));
+                $searchMode = $tnSearchModeCompany->pos_product_search_mode ?? 'prefix';
+            @endphp
+            <form method="POST" action="{{ route('fbrpos.products.search-mode') }}" class="flex flex-col gap-2 shrink-0">
+                @csrf
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input type="radio" name="mode" value="prefix" onchange="this.form.submit()" {{ $searchMode !== 'any_word' ? 'checked' : '' }} class="text-blue-600 focus:ring-blue-500">
+                    <span>{{ __('pos.search_mode_prefix') }}</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input type="radio" name="mode" value="any_word" onchange="this.form.submit()" {{ $searchMode === 'any_word' ? 'checked' : '' }} class="text-blue-600 focus:ring-blue-500">
+                    <span>{{ __('pos.search_mode_any_word') }}</span>
+                </label>
+            </form>
+        </div>
+    </div>
+    @endif
+
     {{-- Plan product usage vs cap (Task 362): visibility for at-cap / over-cap shops (e.g. after a downgrade) --}}
     @if(!empty($productLimitStatus))
         @if($productLimitStatus['over'])

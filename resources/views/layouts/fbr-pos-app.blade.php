@@ -498,6 +498,12 @@
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                         {{ __('pos.products_word') }}
                                     </a>
+                                    {{-- Task 1260: Customers page — every role may view/add (mirrors PRA);
+                                         manage actions are cashier-blocked in the controller. --}}
+                                    <a href="{{ route('fbrpos.customers') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                        {{ __('pos.nav_customers') }}
+                                    </a>
                                     @if (!in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
                                     <a href="{{ route('fbrpos.stock') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
@@ -711,6 +717,11 @@
                         <a href="{{ route('fbrpos.products.create') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.products.create') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             {{ __('pos.nav_add_product') }}
+                        </a>
+                        {{-- Task 1260: Customers page — every role may view/add (mirrors PRA). --}}
+                        <a href="{{ route('fbrpos.customers') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.customers') || request()->routeIs('fbrpos.customers.history') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            {{ __('pos.nav_customers') }}
                         </a>
                         @if (!in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
                         <a href="{{ route('fbrpos.stock') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.stock') ? $sidebarActive : $sidebarInactive }}">

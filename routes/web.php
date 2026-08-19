@@ -1549,6 +1549,23 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/khata/{customer}/ledger', [\App\Http\Controllers\FbrPosKhataController::class, 'ledger'])->name('fbrpos.khata.ledger');
     Route::post('/khata/wasooli', [\App\Http\Controllers\FbrPosKhataController::class, 'wasooli'])->name('fbrpos.khata.wasooli');
 
+    // 👥 Customers page (Task 1260 — FBR twin of /pos/customers; shared
+    // pos_customers table, stats/history from fbr_pos_transactions only).
+    // List + add: every role (mirrors PRA). Manage actions: admin/manager only
+    // — assertNotCashier in the controller returns a true 403 (khata precedent;
+    // there is no FBR admin-only middleware group).
+    Route::get('/customers', [\App\Http\Controllers\FbrPosCustomerController::class, 'index'])->name('fbrpos.customers');
+    Route::post('/customers', [\App\Http\Controllers\FbrPosCustomerController::class, 'store'])->name('fbrpos.customers.store');
+    Route::get('/customers/export', [\App\Http\Controllers\FbrPosCustomerController::class, 'export'])->name('fbrpos.customers.export');
+    Route::get('/customers/template', [\App\Http\Controllers\FbrPosCustomerController::class, 'template'])->name('fbrpos.customers.template');
+    Route::post('/customers/import', [\App\Http\Controllers\FbrPosCustomerController::class, 'import'])->name('fbrpos.customers.import');
+    Route::put('/customers/{id}', [\App\Http\Controllers\FbrPosCustomerController::class, 'update'])->name('fbrpos.customers.update');
+    Route::delete('/customers/{id}', [\App\Http\Controllers\FbrPosCustomerController::class, 'destroy'])->name('fbrpos.customers.delete');
+    Route::post('/customers/{id}/toggle', [\App\Http\Controllers\FbrPosCustomerController::class, 'toggle'])->name('fbrpos.customers.toggle');
+    Route::get('/customers/{id}/history', [\App\Http\Controllers\FbrPosCustomerController::class, 'history'])->name('fbrpos.customers.history');
+    Route::get('/customers/{id}/history/export', [\App\Http\Controllers\FbrPosCustomerController::class, 'historyExport'])->name('fbrpos.customers.history.export');
+    Route::get('/customers/{id}/history/pdf', [\App\Http\Controllers\FbrPosCustomerController::class, 'historyPdf'])->name('fbrpos.customers.history.pdf');
+
     // Stock / Purchase / Suppliers (Aug 2026 — Retail Core)
     Route::get('/stock', [\App\Http\Controllers\FbrPosStockController::class, 'index'])->name('fbrpos.stock');
     Route::get('/stock/purchases', [\App\Http\Controllers\FbrPosStockController::class, 'purchases'])->name('fbrpos.stock.purchases');

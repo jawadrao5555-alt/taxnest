@@ -822,6 +822,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'customer_updated_success' => 'Customer kamyabi se update ho gaya.',
     'customer_word' => 'Customer',
     'customers_exclusive_note' => 'Ye customers sirf NestPOS (PRA) ke liye hain. Digital Invoice aur FBR POS customers apne system mein alag se manage hote hain.',
+    'fbr_customers_exclusive_note' => 'Ye customers aap ke FBR POS ke hain. Sale screen search aur phone lookup mein foran mil jaate hain.',
     'customers_found_of_total' => ':total mein se :found customers milay',
     'customers_total_line' => 'Kul :total customers — 100 fi page',
     'customers_word' => 'Customers',

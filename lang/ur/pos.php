@@ -822,6 +822,7 @@ return [
     'customer_updated_success' => 'کسٹمر کامیابی سے اپڈیٹ ہو گیا۔',
     'customer_word' => 'کسٹمر',
     'customers_exclusive_note' => 'یہ کسٹمرز NestPOS (PRA) کے لیے مخصوص ہیں۔ ڈیجیٹل انوائس اور FBR POS کسٹمرز اپنے سسٹم میں الگ سے مینیج ہوتے ہیں۔',
+    'fbr_customers_exclusive_note' => 'یہ کسٹمرز آپ کے FBR POS کے ہیں۔ سیل اسکرین سرچ اور فون لُک اپ میں فوراً مل جاتے ہیں۔',
     'customers_found_of_total' => ':found کل :total کسٹمرز میں سے ملے',
     'customers_total_line' => ':total کسٹمرز — 100 فی صفحہ',
     'customers_word' => 'کسٹمرز',

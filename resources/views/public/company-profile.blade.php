@@ -12,6 +12,8 @@
         :root { --brand: #0A4D5C; --brand-dark: #073844; --gold: #E7BF3B; }
         body { -webkit-tap-highlight-color: transparent; }
     </style>
+    {{-- QR menu can render in 'ur' (company default locale) — Urdu-script font (Task 1287). --}}
+    @include('partials.urdu-font')
 </head>
 <body class="bg-gray-50 min-h-screen antialiased" style="font-family: 'Figtree', ui-sans-serif, system-ui, sans-serif;">
 

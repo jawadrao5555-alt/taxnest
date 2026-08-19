@@ -33,6 +33,15 @@
     AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>
 
+<IfModule mod_mime.c>
+    # Self-hosted web fonts (Task 1287: Jameel Noori Nastaleeq in /fonts).
+    # Some cPanel Apache builds default woff2 to application/octet-stream —
+    # declare the proper font MIME types explicitly.
+    AddType font/woff2 .woff2
+    AddType font/woff .woff
+    AddType font/ttf .ttf
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

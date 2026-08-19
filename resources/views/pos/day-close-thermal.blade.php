@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
+<html lang="{{ $urduScript ? 'ur' : 'en' }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -31,6 +32,17 @@
         .receipt { width: 100%; max-width: 80mm; margin: 0; padding: 0 2mm; }
         @page { margin: 3mm; size: 80mm auto; }
     }
+
+    @if($urduScript)
+    /* Urdu script mode (Task 1287 — Jameel Noori Nastaleeq "everywhere",
+       incl. Z/X day-close slips). Layout stays LTR (columns/widths untouched);
+       Courier stays as fallback for Latin digits/labels. Line-height 1.9:
+       Nastaleeq stacks far taller than the 1.45 Latin baseline — it clips. */
+    @include('partials.urdu-print-font')
+    html, body { font-family: 'Jameel Noori Nastaleeq', 'Noto Naskh Arabic', 'Urdu Typesetting', 'Courier New', Courier, monospace; }
+    .receipt { line-height: 1.9; }
+    .sec { text-transform: none; letter-spacing: 0; }
+    @endif
 </style>
 </head>
 <body>

@@ -126,7 +126,19 @@ function printHtmlUnlocked(html, deviceName) {
 
     win.webContents.once('did-finish-load', () => {
       // Give layout/fonts/images a moment to settle before rasterizing.
-      setTimeout(() => {
+      // Task 1287: Urdu tickets use the ~5.5 MB Jameel Noori Nastaleeq web
+      // font — on a cold cache a fixed delay would rasterize the fallback
+      // Naskh mid-download. Wait for document.fonts (bounded at 8s inside the
+      // page; the 30s hard timer above still guards the whole job), then keep
+      // the original 500 ms settle. English/Roman tickets resolve instantly —
+      // document.fonts.ready is already settled when no faces are pending.
+      const fontsWait = win.webContents
+        .executeJavaScript(
+          "(function(){try{if(document.fonts&&document.fonts.ready){return Promise.race([document.fonts.ready,new Promise(function(r){setTimeout(r,8000);})]).then(function(){return 'fonts-ok';});}}catch(e){}return 'no-fontface-api';})()",
+          true
+        )
+        .catch(() => 'fonts-wait-error');
+      fontsWait.then(() => setTimeout(() => {
         try {
           win.webContents.print(
             {
@@ -146,7 +158,7 @@ function printHtmlUnlocked(html, deviceName) {
           clearTimeout(timer);
           done(false, `print: ${e.message}`);
         }
-      }, 500);
+      }, 500));
     });
 
     // Temp file + loadFile — a data: URL over ~2 MB fails with ERR_INVALID_URL

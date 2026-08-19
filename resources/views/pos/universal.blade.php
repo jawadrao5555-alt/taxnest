@@ -5351,6 +5351,11 @@ function restaurantPos() {
                 '.r{text-align:right;white-space:nowrap;}.m{color:#000;font-size:11px;}' +
                 '.tot{border-top:2px solid #000;border-bottom:2px solid #000;font-weight:bold;font-size:14px;}' +
                 '.note{border:1px dashed #000;padding:3px;margin-top:6px;text-align:center;font-weight:bold;font-size:11px;}' +
+                // Task 1287: Urdu-script users get JNN on the offline interim slip too —
+                // product/customer names can be Urdu. The font resolves from the SW cache
+                // when offline (fonts are cached on first ur page load); Courier stays the
+                // Latin fallback. Empty string for en/rur (no font fetch).
+                {!! json_encode(app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT ? "@font-face{font-family:'Jameel Noori Nastaleeq';src:url('" . url('fonts/jameel-noori-nastaleeq.woff2') . "?v=1') format('woff2');font-display:swap;}body{font-family:'Jameel Noori Nastaleeq','Courier New',monospace;line-height:1.9;}" : '') !!} +
                 '</style></head><body>' +
                 '<h1>' + esc(@json($company->name ?? 'NestPOS')) + '</h1>' +
                 '<p>' + new Date(r.queued_at).toLocaleString() + '</p>' +
@@ -5365,8 +5370,28 @@ function restaurantPos() {
             document.body.appendChild(fr);
             fr.srcdoc = html;
             fr.onload = () => {
-                try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) {}
-                setTimeout(() => { try { fr.remove(); } catch (e) {} }, 60000);
+                // Task 1287: in Urdu mode the slip's @font-face may still be
+                // downloading at iframe onload — bounded single-fire wait for
+                // JNN before print (8s failsafe, same as the server receipt
+                // templates: a Courier fallback slip beats a lost slip).
+                // en/rur: no @font-face injected → fonts.load resolves at once.
+                let ofrPrinted = false;
+                const ofrGo = () => {
+                    if (ofrPrinted) return;
+                    ofrPrinted = true;
+                    try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) {}
+                    setTimeout(() => { try { fr.remove(); } catch (e) {} }, 60000);
+                };
+                let waited = false;
+                try {
+                    const fd = fr.contentDocument && fr.contentDocument.fonts;
+                    if (fd && fd.load) {
+                        fd.load("16px 'Jameel Noori Nastaleeq'", '\u0627\u0631\u062F\u0648').then(ofrGo, ofrGo);
+                        setTimeout(ofrGo, 8000);
+                        waited = true;
+                    }
+                } catch (e) {}
+                if (!waited) ofrGo();
             };
         },
 

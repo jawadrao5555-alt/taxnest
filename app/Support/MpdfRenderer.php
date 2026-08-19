@@ -14,11 +14,13 @@ use Throwable;
  * which ships its own Arabic/Urdu OTL shaping engine, to produce a properly
  * shaped, RTL Urdu PDF.
  *
- * Font: XB Riyaz — a Naskh-style Arabic/Urdu font bundled with mPDF v8,
- * already registered in mPDF's FontVariables with useOTL=0xFF (full
- * OpenType Layout) and useKashida=75. Naskh reads well at thermal receipt
- * sizes; the alternative bundled font (Lateef/Nastaliq) is too tall/thin
- * for small point sizes on cheap thermal heads.
+ * Font: Jameel Noori Nastaleeq (Task 1287 — owner chose JNN "everywhere",
+ * overriding the earlier Naskh-first decision). Registered as a custom
+ * fontdata entry (resources/fonts/JameelNooriNastaleeq.ttf) with useOTL=0xFF
+ * (full OpenType Layout — JNN's Nastaleeq ligature shaping lives in GSUB).
+ * XB Riyaz — the Naskh-style font bundled with mPDF v8 (FontVariables,
+ * useOTL=0xFF, useKashida=75) — stays registered as the fallback and is the
+ * next family in every template's font stack.
  *
  * Used only when locale === PosLocale::URDU_SCRIPT. en/rur continue to use
  * DomPDF unchanged. If mPDF is missing or throws, the caller catches and
@@ -31,11 +33,15 @@ use Throwable;
 final class MpdfRenderer
 {
     /**
-     * mPDF font key for XB Riyaz. mPDF normalises CSS font-family names to
-     * lowercase with spaces stripped, so CSS `font-family: 'XB Riyaz'`
-     * resolves to the key 'xbriyaz' in its FontVariables registry.
+     * mPDF font keys. mPDF normalises CSS font-family names to lowercase with
+     * spaces stripped, so CSS `font-family: 'Jameel Noori Nastaleeq'` resolves
+     * to the key 'jameelnoorinastaleeq' (custom fontdata below) and
+     * `font-family: 'XB Riyaz'` to 'xbriyaz' (bundled FontVariables entry).
      */
-    private const FONT_KEY = 'xbriyaz';
+    private const FONT_KEY = 'jameelnoorinastaleeq';
+
+    /** TTF filename (inside resources/fonts) for the JNN fontdata entry. */
+    private const JNN_TTF = 'JameelNooriNastaleeq.ttf';
 
     /**
      * Render a Blade view to a PDF response via mPDF.
@@ -112,12 +118,27 @@ final class MpdfRenderer
             mkdir($tempDir, 0775, true);
         }
 
+        // Register Jameel Noori Nastaleeq on top of mPDF's bundled font set
+        // (Task 1287). Defaults are kept so XB Riyaz + DejaVu fallbacks keep
+        // working; JNN needs useOTL=0xFF — its entire Nastaleeq shaping is
+        // GSUB ligatures (mPDF subsets the 10.8MB TTF per document, so PDFs
+        // only embed the glyphs actually used). No useKashida: Nastaleeq
+        // slopes instead of stretching — kashida insertion breaks its joins.
+        $fontDirs    = (new \Mpdf\Config\ConfigVariables())->getDefaults()['fontDir'];
+        $fontData    = (new \Mpdf\Config\FontVariables())->getDefaults()['fontdata'];
+        $fontDirs[]  = resource_path('fonts');
+        $fontData[self::FONT_KEY] = [
+            'R'      => self::JNN_TTF,
+            'useOTL' => 0xFF,
+        ];
+
         $config = [
             'tempDir'      => $tempDir,
-            // XB Riyaz is already registered in mPDF's bundled FontVariables.php
-            // with useOTL=0xFF + useKashida=75 — no custom fontDir/fontData needed.
-            // Setting it as default_font ensures any element without an explicit
-            // font-family (e.g. fallback text) still uses a shaped Arabic font.
+            'fontDir'      => $fontDirs,
+            'fontdata'     => $fontData,
+            // Setting JNN as default_font ensures any element without an
+            // explicit font-family (e.g. fallback text) still uses a shaped
+            // Urdu font.
             'default_font' => self::FONT_KEY,
         ];
 

@@ -7,11 +7,15 @@
     <meta name="robots" content="noindex">
     <title>{{ $transaction->invoice_number }}</title>
     <style>
+        @if($urduScript)
+        {{-- JNN-first since Task 1287 (owner: Nastaleeq everywhere); Naskh stack stays as fallback while the font streams / offline. --}}
+        @include('partials.urdu-print-font')
+        @endif
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: {{ $urduScript ? "'Noto Naskh Arabic', Tahoma, Arial, sans-serif" : "Arial, 'Segoe UI', sans-serif" }};
+            font-family: {{ $urduScript ? "'Jameel Noori Nastaleeq', 'Noto Naskh Arabic', Tahoma, Arial, sans-serif" : "Arial, 'Segoe UI', sans-serif" }};
             background: #f3f4f6; color: #111827; padding: 16px;
-            line-height: {{ $urduScript ? '1.7' : '1.45' }};
+            line-height: {{ $urduScript ? '2' : '1.45' }};
         }
         .card { max-width: 420px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 20px; }
         .biz { text-align: center; font-size: 18px; font-weight: 700; margin-bottom: 2px; }

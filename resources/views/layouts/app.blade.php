@@ -191,6 +191,8 @@
 
             [x-cloak] { display: none !important; }
         </style>
+        {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur'. --}}
+        @include('partials.urdu-font')
     </head>
     <body class="h-screen overflow-hidden font-sans antialiased">
         @include('partials.impersonation-banner')

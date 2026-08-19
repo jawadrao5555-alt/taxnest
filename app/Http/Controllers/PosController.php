@@ -5318,6 +5318,15 @@ class PosController extends Controller
         $height += 250.0;                                          // PRA/provisional badge + 100px QR + caption
         $height += 80.0;                                           // safety tail so nothing clips
 
+        // Task 1287: Urdu-script receipts render Jameel Noori Nastaleeq at
+        // line-height 1.9 (vs 1.6 Naskh baseline this estimate was tuned for)
+        // — every text row runs taller. Only the mPDF path can still see 'ur'
+        // here: DomPDF callers run applyPdfSafeLocale() (ur → rur) BEFORE
+        // calling this, so the multiplier never inflates DomPDF heights.
+        if (app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT) {
+            $height *= 1.25;
+        }
+
         return max(640.0, $height);
     }
 
@@ -12805,13 +12814,15 @@ class PosController extends Controller
             abort(400, $msg);
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
-            'pos.reports-hazri-payroll-pdf',
-            compact('company', 'dateFrom', 'dateTo', 'rangeRows', 'rangeBioRows')
-        )->setPaper('a4', 'portrait');
-
+        // Task 1287: route through renderReportPdf so the 'ur' locale gets a
+        // shaped Nastaleeq mPDF render (DomPDF can't shape Urdu; it stays the
+        // en/rur path and the fallback via applyPdfSafeLocale inside).
         $filename = 'Payroll-Hazri-' . $dateFrom . '-to-' . $dateTo . '.pdf';
-        return $pdf->download($filename);
+        return $this->renderReportPdf(
+            'pos.reports-hazri-payroll-pdf',
+            compact('company', 'dateFrom', 'dateTo', 'rangeRows', 'rangeBioRows'),
+            $filename
+        );
     }
 
     /**

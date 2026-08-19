@@ -48,7 +48,7 @@
     </style>
     @if($pdfUrdu ?? false)
     <style>
-        body { font-family: 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
+        body { font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
         table.data, .info-box, .info-row { direction: rtl; }
         .section-title { text-transform: none; letter-spacing: 0; }
         table.data thead th { text-transform: none; letter-spacing: 0; }

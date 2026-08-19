@@ -163,6 +163,8 @@
         ]
     }
     </script>
+    {{-- Urdu-script font (Task 1287) — inert unless the app locale is ever 'ur'. --}}
+    @include('partials.urdu-font')
 </head>
 <body x-data="{ scrolled: false, mobileMenuOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
     <div id="tn-boot" aria-hidden="true"><span>Nest<b>POS</b></span></div>

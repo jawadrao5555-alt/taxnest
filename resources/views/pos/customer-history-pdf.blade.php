@@ -23,7 +23,7 @@
     </style>
     @if($pdfUrdu ?? false)
     <style>
-        * { font-family: 'XB Riyaz', DejaVu Sans, sans-serif; }
+        * { font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', DejaVu Sans, sans-serif; }
         body { direction: rtl; }
         table.tx, .kpis { direction: rtl; }
         table.tx th { text-transform: none; letter-spacing: 0; }

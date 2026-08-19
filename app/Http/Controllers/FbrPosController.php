@@ -4144,13 +4144,15 @@ class FbrPosController extends Controller
         // PRA's controller never passes it, so the PRA PDF is unchanged.
         $bioLateEnabled = (bool) $bioLateAfter;
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
-            'pos.reports-hazri-payroll-pdf',
-            compact('company', 'dateFrom', 'dateTo', 'rangeRows', 'rangeBioRows', 'bioLateEnabled')
-        )->setPaper('a4', 'portrait');
-
+        // Task 1287: route through renderReportPdf so the 'ur' locale gets a
+        // shaped Nastaleeq mPDF render (DomPDF can't shape Urdu; it stays the
+        // en/rur path and the fallback via applyPdfSafeLocale inside).
         $filename = 'FBR-Payroll-Hazri-' . $dateFrom . '-to-' . $dateTo . '.pdf';
-        return $pdf->download($filename);
+        return $this->renderReportPdf(
+            'pos.reports-hazri-payroll-pdf',
+            compact('company', 'dateFrom', 'dateTo', 'rangeRows', 'rangeBioRows', 'bioLateEnabled'),
+            $filename
+        );
     }
 
     /**

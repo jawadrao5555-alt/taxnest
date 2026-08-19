@@ -21,6 +21,8 @@
         .dark .text-slate-400 { color: #cbd5e1 !important; }
         .dark .text-slate-500 { color: #94a3b8 !important; }
     </style>
+    {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur'. --}}
+    @include('partials.urdu-font')
 </head>
 <body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100" x-data="{ sidebarOpen: false }">
     <div class="flex h-full">

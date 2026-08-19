@@ -62,6 +62,8 @@
         /* Light-mode safety: opacity-50/60 on body text inside content cards reads as faded ghost */
         .premium-card .opacity-50, .stat-card .opacity-50 { opacity: 0.7; }
     </style>
+    {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur'. --}}
+    @include('partials.urdu-font')
 </head>
 <body class="h-full bg-gray-950 text-gray-100 admin-themed" x-data="{ sidebarOpen: false, themeOpen: false }">
     <div class="flex h-full">

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="{{ ($pdfUrdu ?? false) ? 'ur' : 'en' }}" dir="{{ ($pdfUrdu ?? false) ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
     <title>{{ __('pos.payroll_pdf_title') }} — {{ $dateFrom }} to {{ $dateTo }}</title>
@@ -45,6 +45,18 @@
         .footer p { font-size: 9px; color: #374151; }
         .footer .brand { font-size: 10px; font-weight: bold; color: #1e1b4b; margin-top: 3px; }
     </style>
+    @if($pdfUrdu ?? false)
+    <style>
+        /* Urdu script: Jameel Noori Nastaleeq OTL shaping (mPDF default_font, Task 1287; XB Riyaz fallback), RTL layout,
+           no uppercase/letter-spacing which disrupt Arabic contextual joining. Mirrors day-close-pdf's Urdu block. */
+        body { font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
+        table.data, .info-box, .info-row { direction: rtl; }
+        .header h1 { text-transform: none; letter-spacing: 0; }
+        .report-title h2 { text-transform: none; letter-spacing: 0; }
+        .section-title { text-transform: none; letter-spacing: 0; }
+        table.data thead th { text-transform: none; letter-spacing: 0; }
+    </style>
+    @endif
 </head>
 <body>
 

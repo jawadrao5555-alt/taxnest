@@ -284,6 +284,9 @@
             #tn-nav-sale-tools { scrollbar-width: none; -ms-overflow-style: none; align-self: stretch; }
             #tn-nav-sale-tools::-webkit-scrollbar { display: none; }
         </style>
+        {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur';
+             MUST come after the * Inter rule above (same 0 specificity, later wins). --}}
+        @include('partials.urdu-font')
         {{-- PWA service worker (FBR POS scope) --}}
         <script>
             if ('serviceWorker' in navigator) {

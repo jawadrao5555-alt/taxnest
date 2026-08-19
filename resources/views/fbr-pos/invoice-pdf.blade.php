@@ -91,12 +91,13 @@
            bidi algorithm flips each Urdu text run RTL on its own so mixed
            label/number rows still line up. Taller line-height for Urdu glyphs
            (they clip at Latin line heights on narrow leading). */
-        /* 'XB Riyaz' first so mPDF (Urdu PDF path, Task 260) resolves it via
-           its bundled FontVariables entry (key 'xbriyaz', useOTL=0xFF, Naskh).
-           Browsers fall through to Noto Naskh Arabic → Urdu Typesetting → Tahoma. */
+        /* 'Jameel Noori Nastaleeq' first (Task 1287 — owner: JNN everywhere);
+           mPDF resolves it via the custom fontdata key registered in
+           MpdfRenderer (useOTL=0xFF). 'XB Riyaz' (bundled Naskh) stays as
+           fallback. Line-height 1.9 — Nastaleeq stacks taller than Naskh. */
         body {
-            font-family: 'XB Riyaz', 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, sans-serif;
-            line-height: 1.7;
+            font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, sans-serif;
+            line-height: 1.9;
         }
     </style>
     @endif

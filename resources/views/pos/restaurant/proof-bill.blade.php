@@ -69,17 +69,16 @@
         @endif
 
         @if($urduScript)
-        /* Urdu script mode (Task 240): browser + Desktop Agent renders are
-           Chromium — Arabic shaping & bidi work natively. Layout stays LTR
-           (columns/widths untouched, thermal-print-width rules intact);
-           Unicode bidi flips each Urdu text run RTL on its own, so mixed
-           label/number lines still line up. Naskh-first font stack: Nastaliq
-           is too tall/thin for cheap thermal heads at receipt sizes; Tahoma/
-           Arial keep full Arabic coverage as fallback on any Windows PC.
-           Taller line-height — Urdu glyphs clip at Latin line heights.
+        /* Urdu script mode (Task 240; JNN-first since Task 1287 — owner chose
+           Jameel Noori Nastaleeq "everywhere", overriding the Naskh-on-thermal
+           decision). Chromium shapes Arabic natively; layout stays LTR
+           (columns/widths untouched, thermal-print-width rules intact).
+           Line-height 1.9: Nastaleeq stacks taller than Naskh — 1.6 clips.
+           Fallback Naskh stack still covers offline agent renders.
            NOTE: DomPDF PDFs never reach here — PosLocale::applyPdfSafeLocale()
            drops 'ur' → 'rur' before every PDF render (DomPDF can't shape). */
-        body { font-family: 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, 'Segoe UI', sans-serif; line-height: 1.6; }
+        @include('partials.urdu-print-font')
+        body { font-family: 'Jameel Noori Nastaleeq', 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, 'Segoe UI', sans-serif; line-height: 1.9; }
         @endif
     </style>
 </head>
@@ -156,7 +155,24 @@
                         setTimeout(function() { window.close(); }, 300);
                     }, { once: true });
                 }
-                setTimeout(function() { window.print(); }, 200);
+                setTimeout(function() {
+                    // Task 1287: Urdu proof bills render in Jameel Noori Nastaleeq
+                    // (~5.5 MB, cold cache possible) — bounded wait for the face
+                    // before printing; ALWAYS eventually fires (a Naskh fallback
+                    // slip beats a lost slip). No-op outside Urdu mode.
+                    var tnFired = false;
+                    var tnGo = function() { if (!tnFired) { tnFired = true; window.print(); } };
+                    @if($urduScript)
+                    try {
+                        if (document.fonts && document.fonts.load) {
+                            document.fonts.load("16px 'Jameel Noori Nastaleeq'", "\u0627\u0631\u062F\u0648").then(tnGo, tnGo);
+                            setTimeout(tnGo, 8000);
+                            return;
+                        }
+                    } catch (e) {}
+                    @endif
+                    tnGo();
+                }, 200);
             }
         };
     </script>

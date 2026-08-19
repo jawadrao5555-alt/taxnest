@@ -21,6 +21,8 @@
                 50% { transform: translateY(-6px); }
             }
         </style>
+        {{-- Urdu-script UI font (Task 1287) — renders only when locale is 'ur'. --}}
+        @include('partials.urdu-font')
     </head>
     <body class="font-sans text-gray-900 antialiased">
         <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gradient-to-br from-emerald-50 via-white to-sky-50">

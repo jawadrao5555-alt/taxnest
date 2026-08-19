@@ -48,9 +48,9 @@
     </style>
     @if($pdfUrdu ?? false)
     <style>
-        /* Urdu script: XB Riyaz OTL shaping (mPDF default_font), RTL layout,
+        /* Urdu script: Jameel Noori Nastaleeq OTL shaping (mPDF default_font, Task 1287; XB Riyaz fallback), RTL layout,
            no uppercase/letter-spacing which disrupt Arabic contextual joining. */
-        body { font-family: 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
+        body { font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
         table.data, .info-box, .info-row { direction: rtl; }
         .section-title { text-transform: none; letter-spacing: 0; }
         table.data thead th { text-transform: none; letter-spacing: 0; }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
+<html lang="{{ $urduScript ? 'ur' : 'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -77,16 +78,46 @@
             body { padding: 12px; }
             .no-print { margin-bottom: 16px; text-align: center; font-family: Arial, sans-serif; }
         }
+
+        @if($urduScript)
+        /* Urdu script mode (Task 1287 — owner chose Jameel Noori Nastaleeq
+           "everywhere", including KOTs). Chromium shapes Arabic natively;
+           layout stays LTR (columns/widths untouched, thermal-print-width
+           rules intact). Line-height 1.9: Nastaleeq stacks taller than Naskh —
+           1.4 clips descenders. Naskh stack stays as fallback for offline
+           agent renders before the font is cached. Mirrors the PRA
+           kitchen-ticket's Urdu block. */
+        @include('partials.urdu-print-font')
+        body { font-family: 'Jameel Noori Nastaleeq', 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, 'Segoe UI', sans-serif; line-height: 1.9; }
+        @endif
     </style>
     @if($autoPrint ?? false)
     <script>
         window.onload = function() {
-            window.print();
-            if (window.parent && window.parent !== window) {
-                try {
-                    window.parent.postMessage({ type: 'pos_print_done', signal: (new URLSearchParams(window.location.search)).get('_signal') || '' }, '*');
-                } catch(e) {}
-            }
+            var tnFired = false;
+            var tnGo = function() {
+                if (tnFired) return;
+                tnFired = true;
+                window.print();
+                if (window.parent && window.parent !== window) {
+                    try {
+                        window.parent.postMessage({ type: 'pos_print_done', signal: (new URLSearchParams(window.location.search)).get('_signal') || '' }, '*');
+                    } catch(e) {}
+                }
+            };
+            @if($urduScript)
+            // Task 1287: Urdu KOTs render in Jameel Noori Nastaleeq (~5.5 MB,
+            // cold cache possible) — bounded wait for the face before the auto
+            // print; ALWAYS eventually fires (Naskh fallback beats a lost KOT).
+            try {
+                if (document.fonts && document.fonts.load) {
+                    document.fonts.load("16px 'Jameel Noori Nastaleeq'", "\u0627\u0631\u062F\u0648").then(tnGo, tnGo);
+                    setTimeout(tnGo, 8000);
+                    return;
+                }
+            } catch (e) {}
+            @endif
+            tnGo();
         };
         window.onafterprint = function() {
             if (window.opener) { window.close(); }

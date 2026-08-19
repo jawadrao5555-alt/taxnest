@@ -28,7 +28,7 @@ class PosAuthController extends Controller
             }
             // POS UNIFICATION: every POS user (restaurant or retail) bills on the
             // single universal sale screen; restaurant behavior is driven by features.
-            return redirect('/pos/invoice/create');
+            return $this->redirectToSaleScreen();
         }
         return view('pos.auth.login');
     }
@@ -156,7 +156,7 @@ class PosAuthController extends Controller
                     return redirect('/pos/deliveries');
                 }
 
-                return redirect('/pos/invoice/create');
+                return $this->redirectToSaleScreen();
             }
             // Wrong panel → fall through to generic failure (no info leak)
         }
@@ -292,6 +292,17 @@ class PosAuthController extends Controller
         // Always attaches a subscription row, even if the trial plan seed is
         // missing (plan-less row still carries trial_ends_at).
         \App\Services\TrialSubscriptionService::ensureTrial($companyId, $productType);
+    }
+
+    /**
+     * Keep the sale-screen redirect relative. The development preview reaches
+     * Laravel through a local HTTP bridge while production forces HTTPS URLs;
+     * an absolute forced-HTTPS redirect would otherwise send the browser to
+     * TLS on the local PHP server port after a successful login.
+     */
+    private function redirectToSaleScreen(): \Illuminate\Http\RedirectResponse
+    {
+        return redirect()->away('/pos/invoice/create');
     }
 
     public function logout(Request $request)

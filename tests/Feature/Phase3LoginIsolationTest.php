@@ -6,6 +6,7 @@ use Tests\TestCase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Database\Schema\Blueprint;
 
 /**
@@ -141,6 +142,20 @@ class Phase3LoginIsolationTest extends TestCase
             'name' => 'POS User', 'email' => 'pos@taxnest.test',
             'password' => Hash::make('POS@12345'),
             'company_id' => $posId, 'role' => 'company_admin', 'pos_role' => 'pos_admin', 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // ── Restaurant POS practice user ──
+        // This mirrors the retained local restaurant fixture: a restaurant is
+        // still a POS-panel company and must use the normal POS login route.
+        $restaurantId = DB::table('companies')->insertGetId([
+            'name' => 'Practice Restaurant', 'product_type' => 'pos', 'restaurant_mode' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('users')->insert([
+            'name' => 'Practice Restaurant Admin', 'email' => 'restaurant@taxnest.test',
+            'password' => Hash::make('Restaurant@12345'),
+            'company_id' => $restaurantId, 'role' => 'company_admin', 'pos_role' => 'pos_admin', 'is_active' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -336,6 +351,31 @@ class Phase3LoginIsolationTest extends TestCase
         $this->assertTrue(auth('pos')->check());
         $this->assertFalse(auth('web')->check());
         $this->assertFalse(auth('admin')->check());
+    }
+
+    /** A restaurant-mode POS admin follows the same isolated POS login route. */
+    public function test_practice_restaurant_admin_can_login_on_pos_panel(): void
+    {
+        // The live app forces HTTPS URLs, but the development preview's local
+        // bridge speaks HTTP. The login redirect must remain path-relative so
+        // it does not become https://127.0.0.1:5000/... after authentication.
+        URL::forceScheme('https');
+        try {
+            $response = $this->post('/pos/login', [
+                'login' => 'restaurant@taxnest.test',
+                'password' => 'Restaurant@12345',
+            ]);
+        } finally {
+            URL::forceScheme(null);
+        }
+
+        $response->assertRedirect('/pos/invoice/create');
+        $this->assertSame('/pos/invoice/create', $response->headers->get('Location'));
+        $this->assertTrue(auth('pos')->check());
+        $this->assertSame('restaurant@taxnest.test', auth('pos')->user()->email);
+        $this->assertFalse(auth('web')->check());
+        $this->assertFalse(auth('admin')->check());
+        $this->assertFalse(auth('fbrpos')->check());
     }
 
     /** Test 6c: FBR user on /fbr-pos/login → PASS → /fbr-pos/create */

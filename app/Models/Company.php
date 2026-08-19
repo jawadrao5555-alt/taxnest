@@ -90,6 +90,7 @@ class Company extends Model
         'use_universal_pos',
         'pos_ui_density',
         'pos_theme',
+        'pos_bio_late_after', // Biometric hazri: HH:MM late-arrival threshold (NULL = off)
         'default_language', // PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script — company-wide default
         'pos_dashboard_style',
         'kitchen_printer_enabled',

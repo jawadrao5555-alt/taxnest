@@ -8,6 +8,7 @@ use App\Models\FbrPosLog;
 use App\Models\FbrPosTransaction;
 use App\Models\FbrPosTransactionItem;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\FbrService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -3396,7 +3397,306 @@ class FbrPosController extends Controller
 
         $rows = $this->buildFbrHazriRows($companyId, $date);
 
-        return view('fbr-pos.reports-hazri', compact('company', 'date', 'rows'));
+        // Biometric punches for this business day (FBR port, Aug 2026 —
+        // same shared PosBiometricRows builder the PRA report uses).
+        // Late-arrival marking: first check-in after companies.pos_bio_late_after
+        // (HH:MM, admin-set on the Biometric Setup page; NULL = off).
+        $bioLateAfter = $company->pos_bio_late_after ?: null;
+        $bioPunches = $this->buildFbrBiometricRows($companyId, $date, $bioLateAfter);
+        $hasBioDevices = \Illuminate\Support\Facades\Schema::hasTable('pos_biometric_devices')
+            && \App\Models\PosBiometricDevice::where('company_id', $companyId)->exists();
+
+        // Unmapped-PIN count (last 14 days) — drives the subtle badge on this page.
+        $unmappedPinCount = 0;
+        if ($hasBioDevices && \Illuminate\Support\Facades\Schema::hasTable('pos_biometric_punches')) {
+            try {
+                $unmappedPinCount = \App\Models\PosBiometricPunch::where('company_id', $companyId)
+                    ->whereNull('user_id')
+                    ->whereNotNull('device_pin')
+                    ->where('punched_at', '>=', now()->subDays(14))
+                    ->distinct('device_pin')
+                    ->count('device_pin');
+            } catch (\Throwable $e) {
+                $unmappedPinCount = 0;
+            }
+        }
+
+        // ── Payroll range summary (FBR mirror of PRA Task #280) ──────────
+        $rangeRows    = null;   // array of session-summary stdClass objects, or null = not requested
+        $rangeBioRows = null;   // array of biometric-summary stdClass objects, or null = not requested
+        $dateFrom     = null;
+        $dateTo       = null;
+        $rangeError   = null;
+
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            try {
+                $dateFrom = \Carbon\Carbon::parse($request->get('date_from'))->toDateString();
+                $dateTo   = \Carbon\Carbon::parse($request->get('date_to'))->toDateString();
+            } catch (\Throwable $e) {
+                $rangeError = __('pos.payroll_range_invalid');
+                $dateFrom = $dateTo = null;
+            }
+
+            if ($dateFrom && $dateTo) {
+                try {
+                    [$rangeRows, $rangeBioRows] = $this->buildFbrHazriRangeSummary($companyId, $dateFrom, $dateTo, $bioLateAfter);
+                } catch (\InvalidArgumentException $e) {
+                    $rangeError = $e->getMessage() === 'range_too_long'
+                        ? __('pos.payroll_range_too_long')
+                        : ($e->getMessage() === 'range_future'
+                            ? __('pos.payroll_range_future')
+                            : __('pos.payroll_range_invalid'));
+                    $dateFrom = $dateTo = null;
+                } catch (\Throwable $e) {
+                    \Log::warning('fbr hazri range summary error: ' . $e->getMessage());
+                    $rangeError = __('pos.payroll_range_invalid');
+                    $dateFrom = $dateTo = null;
+                }
+            }
+        }
+
+        $bioLateEnabled = (bool) $bioLateAfter;
+
+        return view('fbr-pos.reports-hazri', compact(
+            'company', 'date', 'rows', 'bioPunches', 'hasBioDevices', 'unmappedPinCount',
+            'rangeRows', 'rangeBioRows', 'dateFrom', 'dateTo', 'rangeError', 'bioLateEnabled'
+        ));
+    }
+
+    /**
+     * Payroll PDF export — FBR mirror of PosController::payrollHazriPdf,
+     * same gates as hazriReport. Reuses the panel-neutral PRA PDF view
+     * (pos.reports-hazri-payroll-pdf) — it only reads company/date/rows.
+     * GET /fbr-pos/reports/hazri/payroll-pdf?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+     */
+    public function payrollHazriPdf(Request $request)
+    {
+        if ($resp = $this->fbrPlanGate('hazri_enabled')) {
+            return $resp;
+        }
+        $companyId = app('currentCompanyId');
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            abort(403);
+        }
+        $company = Company::find($companyId);
+
+        $dateFrom = $request->get('date_from');
+        $dateTo   = $request->get('date_to');
+
+        try {
+            $dateFrom = $dateFrom ? \Carbon\Carbon::parse($dateFrom)->toDateString() : null;
+            $dateTo   = $dateTo   ? \Carbon\Carbon::parse($dateTo)->toDateString()   : null;
+        } catch (\Throwable $e) {
+            abort(400, __('pos.payroll_range_invalid'));
+        }
+
+        if (!$dateFrom || !$dateTo) {
+            abort(400, 'Date range required.');
+        }
+
+        $bioLateAfter = $company->pos_bio_late_after ?: null;
+
+        try {
+            [$rangeRows, $rangeBioRows] = $this->buildFbrHazriRangeSummary($companyId, $dateFrom, $dateTo, $bioLateAfter);
+        } catch (\InvalidArgumentException $e) {
+            $msg = $e->getMessage() === 'range_too_long'
+                ? __('pos.payroll_range_too_long')
+                : ($e->getMessage() === 'range_future'
+                    ? __('pos.payroll_range_future')
+                    : __('pos.payroll_range_invalid'));
+            abort(400, $msg);
+        }
+
+        // bioLateEnabled gates the Late-Days column in the shared PDF blade —
+        // PRA's controller never passes it, so the PRA PDF is unchanged.
+        $bioLateEnabled = (bool) $bioLateAfter;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'pos.reports-hazri-payroll-pdf',
+            compact('company', 'dateFrom', 'dateTo', 'rangeRows', 'rangeBioRows', 'bioLateEnabled')
+        )->setPaper('a4', 'portrait');
+
+        $filename = 'FBR-Payroll-Hazri-' . $dateFrom . '-to-' . $dateTo . '.pdf';
+        return $pdf->download($filename);
+    }
+
+    /**
+     * ── Payroll range summary (FBR mirror of PRA buildHazriRangeSummary) ──
+     * Per-staff aggregated duty hours across a date range: ONE bulk query per
+     * table (sessions, bills, biometric punches), grouped by business-day
+     * bucket (6 AM boundary) in PHP. Bills come from fbr_pos_transactions —
+     * business_date when the column exists, created_at 6AM-window fallback
+     * (hasBizDate convention used across this controller).
+     *
+     * Returns [sessionSummary[], biometricSummary[]]
+     * Throws \InvalidArgumentException('range_too_long' | 'range_future') on bad input.
+     */
+    private function buildFbrHazriRangeSummary(int $companyId, string $from, string $to, ?string $lateAfter = null): array
+    {
+        $start = \Carbon\Carbon::parse($from);
+        $end   = \Carbon\Carbon::parse($to);
+
+        if ($end->lt($start)) {
+            throw new \InvalidArgumentException('range_future');
+        }
+        if ($start->diffInDays($end) > 62) {
+            throw new \InvalidArgumentException('range_too_long');
+        }
+
+        // Bulk window: $from 06:00 → ($to + 1 day) 06:00
+        $rangeStart = \Carbon\Carbon::parse($from, config('app.timezone'))->setTime(6, 0);
+        $rangeEnd   = \Carbon\Carbon::parse($to,   config('app.timezone'))->setTime(6, 0)->addDay();
+
+        // ── 1. Fetch all sessions, bills, and biometric punches in one pass ──
+        $allSessions = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('pos_user_sessions')) {
+            $allSessions = \App\Models\PosUserSession::where('company_id', $companyId)
+                ->where('login_at', '>=', $rangeStart)
+                ->where('login_at', '<', $rangeEnd)
+                ->orderBy('login_at')
+                ->get();
+        }
+
+        // Bills: per-user totals only (the summary sums across the range, so
+        // no per-day granularity is needed — one grouped query either way).
+        $billQuery = FbrPosTransaction::where('company_id', $companyId);
+        if ($this->hasBizDate()) {
+            $billQuery->whereBetween('business_date', [$from, $to]);
+        } else {
+            $billQuery->where('created_at', '>=', $rangeStart)->where('created_at', '<', $rangeEnd);
+        }
+        $allBills = $billQuery
+            ->selectRaw('created_by, COUNT(*) as bill_count, SUM(total_amount) as revenue')
+            ->groupBy('created_by')
+            ->get();
+
+        $allPunches = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('pos_biometric_punches')) {
+            $allPunches = \App\Models\PosBiometricPunch::where('company_id', $companyId)
+                ->where('punched_at', '>=', $rangeStart)
+                ->where('punched_at', '<', $rangeEnd)
+                ->orderBy('punched_at')
+                ->get();
+        }
+
+        // ── 2. Pre-fetch all users in a single query ─────────────────────────
+        $allUserIds = $allSessions->pluck('user_id')
+            ->merge($allBills->pluck('created_by'))
+            ->merge($allPunches->pluck('user_id')->filter())
+            ->unique()->filter()->values();
+        $users = $allUserIds->isNotEmpty()
+            ? User::where('company_id', $companyId)->whereIn('id', $allUserIds)->get()->keyBy('id')
+            : collect();
+
+        // ── 3. Bucket sessions by business date (subHours(6) maps 6AM–6AM → date) ──
+        $sessionsByDay = [];    // ['YYYY-MM-DD' => ['user_id' => [sessions…]]]
+        foreach ($allSessions as $s) {
+            $biz = \Carbon\Carbon::parse($s->login_at, config('app.timezone'))->subHours(6)->toDateString();
+            $sessionsByDay[$biz][$s->user_id][] = $s;
+        }
+
+        // ── 4. Per-staff session totals ───────────────────────────────────────
+        $sessionTotals = [];  // user_id => stdClass aggregate
+
+        foreach ($sessionsByDay as $bizDate => $byUser) {
+            $cutoff = \Carbon\Carbon::parse($bizDate, config('app.timezone'))->setTime(6, 0)->addDay();
+            foreach ($byUser as $uid => $sList) {
+                $duty = \App\Support\PosHazriDutyHours::fromSessions(collect($sList), $cutoff);
+                if (!isset($sessionTotals[$uid])) {
+                    $u = $users->get($uid);
+                    $sessionTotals[$uid] = (object)[
+                        'user_id'       => $uid,
+                        'name'          => $u?->name ?? ('#'.$uid),
+                        'pos_role'      => $u ? ($u->pos_role ?: ($u->role === 'company_admin' ? 'pos_admin' : null)) : null,
+                        'days_present'  => 0,
+                        'total_minutes' => 0,
+                        'any_open'      => false,
+                        'total_bills'   => 0,
+                        'total_revenue' => 0.0,
+                    ];
+                }
+                $sessionTotals[$uid]->days_present++;
+                $sessionTotals[$uid]->total_minutes += $duty->minutes;
+                if ($duty->open) { $sessionTotals[$uid]->any_open = true; }
+            }
+        }
+
+        // Merge bill totals (already grouped per user, just copy in)
+        foreach ($allBills as $b) {
+            $uid = $b->created_by;
+            if (isset($sessionTotals[$uid])) {
+                $sessionTotals[$uid]->total_bills   += (int)   $b->bill_count;
+                $sessionTotals[$uid]->total_revenue += (float) $b->revenue;
+            }
+        }
+
+        usort($sessionTotals, fn($a, $b) => strcmp($a->name, $b->name));
+
+        // ── 5. Bucket biometric punches by business date ─────────────────────
+        $punchesByDay = [];   // ['YYYY-MM-DD' => ['u_N' | 'pin_X' => [punches…]]]
+        foreach ($allPunches as $p) {
+            $biz = \Carbon\Carbon::parse($p->punched_at, config('app.timezone'))->subHours(6)->toDateString();
+            $key = $p->user_id ? 'u_'.$p->user_id : 'pin_'.($p->device_pin ?? 'unknown');
+            $punchesByDay[$biz][$key][] = $p;
+        }
+
+        // ── 6. Per-staff biometric totals ─────────────────────────────────────
+        $bioTotals = [];  // key => stdClass aggregate
+
+        $lateValid = $lateAfter && preg_match('/^\d{1,2}:\d{2}$/', $lateAfter);
+
+        foreach ($punchesByDay as $bizDate => $byKey) {
+            $cutoff = \Carbon\Carbon::parse($bizDate, config('app.timezone'))->setTime(6, 0)->addDay();
+            // Late threshold: wall-clock inside THIS business-day window
+            // (06:00 bizDate → 05:59 next day). A pre-06:00 threshold (night
+            // shift, e.g. 03:00) belongs to the NEXT calendar day — same
+            // rollover as PosBiometricRows, or every punch would count late.
+            $lateThreshold = null;
+            if ($lateValid) {
+                $lateThreshold = \Carbon\Carbon::parse($bizDate . ' ' . $lateAfter, config('app.timezone'));
+                if ($lateThreshold->lt($cutoff->copy()->subDay())) {
+                    $lateThreshold->addDay();
+                }
+            }
+            foreach ($byKey as $key => $pList) {
+                $duty = \App\Support\PosHazriDutyHours::fromPunches($pList, $cutoff);
+                if (!isset($bioTotals[$key])) {
+                    $first = $pList[0];
+                    $u = $first->user_id ? $users->get($first->user_id) : null;
+                    $bioTotals[$key] = (object)[
+                        'user_id'       => $first->user_id,
+                        'device_pin'    => $first->device_pin,
+                        'name'          => $u?->name,
+                        'days_present'  => 0,
+                        'total_minutes' => 0,
+                        'any_open'      => false,
+                        'late_days'     => 0,
+                    ];
+                }
+                $bioTotals[$key]->days_present++;
+                $bioTotals[$key]->total_minutes += $duty->minutes;
+                if ($duty->open) { $bioTotals[$key]->any_open = true; }
+                // Late day = FIRST check-in of this business day after the
+                // threshold. Judged only from check-in punches — an open duty
+                // (missing checkout) keeps its separate amber * convention.
+                if ($lateThreshold) {
+                    $firstIn = collect($pList)
+                        ->filter(fn ($p) => $p->punch_type === 'check_in')
+                        ->min('punched_at');
+                    if ($firstIn && \Carbon\Carbon::parse($firstIn, config('app.timezone'))->gt($lateThreshold)) {
+                        $bioTotals[$key]->late_days++;
+                    }
+                }
+            }
+        }
+
+        usort($bioTotals, fn($a, $b) => strcmp(
+            $a->name ?? ($a->device_pin ?? ''),
+            $b->name ?? ($b->device_pin ?? '')
+        ));
+
+        return [array_values($sessionTotals), array_values($bioTotals)];
     }
 
     /**
@@ -3437,9 +3737,9 @@ class FbrPosController extends Controller
      * check-out, punch counts and duty hours. Returns [] when the table is
      * missing or on any error.
      */
-    private function buildFbrBiometricRows(int $companyId, string $date): array
+    private function buildFbrBiometricRows(int $companyId, string $date, ?string $lateAfter = null): array
     {
-        return \App\Support\PosBiometricRows::build($companyId, $date);
+        return \App\Support\PosBiometricRows::build($companyId, $date, $lateAfter);
     }
 
     /**

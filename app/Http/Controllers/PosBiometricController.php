@@ -260,6 +260,38 @@ class PosBiometricController extends Controller
         return response("OK\r\n", 200)->header('Content-Type', 'text/plain');
     }
 
+    // ─── Panel binding hooks (FBR port, Aug 2026) ─────────────────────────
+    //
+    // The admin setup / mapping / import pages exist on BOTH panels: PRA POS
+    // (/pos/bio-sync, guard 'pos') and FBR POS (/fbr-pos/bio-sync, guard
+    // 'fbrpos' via FbrPosBiometricController). These four hooks are the ONLY
+    // panel-specific surface; the ADMS ingest endpoints above are
+    // panel-agnostic (token/SN-scoped) and MUST NOT consult them.
+
+    /** Auth guard for the admin pages. */
+    protected function panelGuard(): string
+    {
+        return 'pos';
+    }
+
+    /** Route name for a bio-sync page ('setup', 'import', …). */
+    protected function panelRoute(string $suffix): string
+    {
+        return 'pos.bio-sync.' . $suffix;
+    }
+
+    /** View name for a bio page ('biometric-setup' / 'biometric-import'). */
+    protected function panelView(string $view): string
+    {
+        return 'pos.' . $view;
+    }
+
+    /** pos_role values offered in the PIN→staff mapping dropdowns. */
+    protected function mappableRoles(): array
+    {
+        return ['pos_admin', 'pos_manager', 'pos_cashier', 'pos_waiter', 'pos_kitchen', 'pos_delivery', 'pos_rider'];
+    }
+
     // ─── Admin Setup Page ──────────────────────────────────────────────────
 
     /**
@@ -269,7 +301,7 @@ class PosBiometricController extends Controller
     public function setup(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $user = auth('pos')->user();
+        $user = auth($this->panelGuard())->user();
         if (!$user->isPosAdmin()) {
             abort(403);
         }
@@ -288,7 +320,7 @@ class PosBiometricController extends Controller
             });
 
         $posUsers = User::where('company_id', $companyId)
-            ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier', 'pos_waiter', 'pos_kitchen', 'pos_delivery', 'pos_rider'])
+            ->whereIn('pos_role', $this->mappableRoles())
             ->orWhere(function ($q) use ($companyId) {
                 $q->where('company_id', $companyId)->where('role', 'company_admin');
             })
@@ -314,16 +346,42 @@ class PosBiometricController extends Controller
                 ->get();
         }
 
-        return view('pos.biometric-setup', compact('company', 'devices', 'posUsers', 'unmappedPins'));
+        return view($this->panelView('biometric-setup'), compact('company', 'devices', 'posUsers', 'unmappedPins'));
     }
 
     /**
      * POST /pos/bio-sync/device — register a new device.
      */
+    /**
+     * Save the late-arrival threshold (companies.pos_bio_late_after).
+     * Empty value = feature off. Registered on the FBR panel (Task #1274);
+     * panel-agnostic via the guard/route hooks.
+     */
+    public function saveLateTime(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'late_after' => ['nullable', 'regex:/^([01]?\d|2[0-3]):[0-5]\d$/'],
+        ]);
+
+        $company = \App\Models\Company::find($companyId);
+        $company->pos_bio_late_after = !empty($validated['late_after'])
+            ? $validated['late_after']
+            : null;
+        $company->save();
+
+        return redirect()->route($this->panelRoute('setup'))
+            ->with('success', __('pos.bio_late_saved'));
+    }
+
     public function storeDevice(Request $request)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -340,7 +398,7 @@ class PosBiometricController extends Controller
             'is_active'  => true,
         ]);
 
-        return redirect()->route('pos.bio-sync.setup')
+        return redirect()->route($this->panelRoute('setup'))
             ->with('success', __('pos.bio_device_added'));
     }
 
@@ -350,7 +408,7 @@ class PosBiometricController extends Controller
     public function toggleDevice(Request $request, int $id)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -361,7 +419,7 @@ class PosBiometricController extends Controller
         $device->is_active = !$device->is_active;
         $device->save();
 
-        return redirect()->route('pos.bio-sync.setup')
+        return redirect()->route($this->panelRoute('setup'))
             ->with('success', $device->is_active ? __('pos.bio_device_enabled') : __('pos.bio_device_disabled'));
     }
 
@@ -371,7 +429,7 @@ class PosBiometricController extends Controller
     public function destroyDevice(Request $request, int $id)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -383,7 +441,7 @@ class PosBiometricController extends Controller
         PosBiometricUserMap::where('device_id', $device->id)->delete();
         $device->delete();
 
-        return redirect()->route('pos.bio-sync.setup')
+        return redirect()->route($this->panelRoute('setup'))
             ->with('success', __('pos.bio_device_deleted'));
     }
 
@@ -393,7 +451,7 @@ class PosBiometricController extends Controller
     public function saveMapping(Request $request, int $id)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -481,7 +539,7 @@ class PosBiometricController extends Controller
             Log::warning("bio alert update failed after saveMapping: {$e->getMessage()}");
         }
 
-        return redirect()->route('pos.bio-sync.setup')
+        return redirect()->route($this->panelRoute('setup'))
             ->with('success', __('pos.bio_mapping_saved'));
     }
 
@@ -494,7 +552,7 @@ class PosBiometricController extends Controller
     public function quickMapPin(Request $request)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -552,7 +610,7 @@ class PosBiometricController extends Controller
             Log::warning("bio alert update failed after quickMapPin: {$e->getMessage()}");
         }
 
-        return redirect()->route('pos.bio-sync.setup')
+        return redirect()->route($this->panelRoute('setup'))
             ->with('success', __('pos.bio_quick_map_saved'));
     }
 
@@ -567,7 +625,7 @@ class PosBiometricController extends Controller
     public function dismissPinAlert(Request $request)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -597,7 +655,7 @@ class PosBiometricController extends Controller
     public function showImport(Request $request)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -610,7 +668,7 @@ class PosBiometricController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'pos_role', 'role']);
 
-        return view('pos.biometric-import', compact('company', 'devices', 'posUsers'));
+        return view($this->panelView('biometric-import'), compact('company', 'devices', 'posUsers'));
     }
 
     /**
@@ -626,7 +684,7 @@ class PosBiometricController extends Controller
     public function processImport(Request $request)
     {
         $companyId = app('currentCompanyId');
-        if (!auth('pos')->user()->isPosAdmin()) {
+        if (!auth($this->panelGuard())->user()->isPosAdmin()) {
             abort(403);
         }
 
@@ -754,7 +812,7 @@ class PosBiometricController extends Controller
             }
         }
 
-        return redirect()->route('pos.bio-sync.setup')
+        return redirect()->route($this->panelRoute('setup'))
             ->with('success', __('pos.bio_import_done', ['saved' => $saved, 'skipped' => $skipped]));
     }
 

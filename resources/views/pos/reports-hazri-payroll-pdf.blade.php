@@ -138,13 +138,19 @@
             <tr>
                 <th>{{ __('pos.th_staff') }}</th>
                 <th class="c">{{ __('pos.th_days_present') }}</th>
+                {{-- Late Days: only when the calling controller enables the
+                     late-arrival feature (FBR, Task #1274). PRA passes no
+                     $bioLateEnabled, so its PDF is byte-identical. --}}
+                @if(!empty($bioLateEnabled))
+                <th class="c">{{ __('pos.bio_late_days') }}</th>
+                @endif
                 <th class="c">{{ __('pos.th_total_duty') }}</th>
             </tr>
         </thead>
         <tbody>
-            @php $bioTotalMin = 0; @endphp
+            @php $bioTotalMin = 0; $bioTotalLate = 0; @endphp
             @foreach($rangeBioRows as $b)
-            @php $bioTotalMin += $b->total_minutes; @endphp
+            @php $bioTotalMin += $b->total_minutes; $bioTotalLate += ($b->late_days ?? 0); @endphp
             <tr>
                 <td>
                     @if($b->name)
@@ -154,6 +160,11 @@
                     @endif
                 </td>
                 <td class="c">{{ $b->days_present }}</td>
+                @if(!empty($bioLateEnabled))
+                <td class="c" style="{{ ($b->late_days ?? 0) > 0 ? 'color:#dc2626; font-weight:bold;' : 'color:#9ca3af;' }}">
+                    {{ ($b->late_days ?? 0) > 0 ? $b->late_days : '—' }}
+                </td>
+                @endif
                 <td class="duty">
                     {{ \App\Support\PosHazriDutyHours::format($b->total_minutes) }}<span class="open-star">{{ $b->any_open ? '*' : '' }}</span>
                 </td>
@@ -164,6 +175,9 @@
             <tr>
                 <td><strong>Total</strong></td>
                 <td class="c">—</td>
+                @if(!empty($bioLateEnabled))
+                <td class="c" style="{{ $bioTotalLate > 0 ? 'color:#dc2626; font-weight:bold;' : '' }}">{{ $bioTotalLate ?: '—' }}</td>
+                @endif
                 <td class="duty">{{ \App\Support\PosHazriDutyHours::format($bioTotalMin) }}</td>
             </tr>
         </tfoot>

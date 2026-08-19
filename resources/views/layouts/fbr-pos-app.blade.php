@@ -36,6 +36,23 @@
             }
         }
     } catch (\Throwable $e) { /* keep FBR POS pages alive */ }
+    // Unmapped biometric PIN alerts — admin/manager only (FBR port, Aug 2026).
+    // Same gating as the PRA pos-app layout: Schema::hasTable guard + try/catch
+    // so prod schema drift never breaks the layout; pending companies and
+    // confined roles excluded via isPosAdmin().
+    $bioAlerts = collect();
+    try {
+        $bioAllowed = $fbrUser && $fbrUser->isPosAdmin();
+        $bioPending = ($fbrCompany->status ?? null) === 'pending';
+        if ($bioAllowed && !$bioPending
+            && \Illuminate\Support\Facades\Schema::hasTable('pos_bio_pin_alerts')) {
+            $bioAlerts = \App\Models\PosUnmappedPinAlert::where('company_id', app('currentCompanyId'))
+                ->whereNull('dismissed_at')
+                ->whereNull('mapped_at')
+                ->orderBy('first_seen_at')
+                ->get(['id', 'device_pin', 'first_seen_at']);
+        }
+    } catch (\Throwable $e) { $bioAlerts = collect(); }
     // Strict plan-feature binding (Aug 2026): hide nav for features the plan
     // lacks — server-side fbrPlanGate() 403s them too. planAllows handles
     // trial-unlock / override / internal bypass / expired-lock centrally.
@@ -852,6 +869,9 @@
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg" style="min-width: 0;">
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
+                <x-bio-unmapped-pin-banner :alerts="$bioAlerts"
+                    :dismiss-route="route('fbrpos.bio-sync.dismiss-pin-alert')"
+                    :setup-route="route('fbrpos.bio-sync.setup')" />
                 @if(session('success'))
                     <div class="max-w-7xl mx-auto mb-4 px-4 sm:px-6 pt-4">
                         <div class="bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-4 py-3 rounded-lg font-semibold shadow-sm">

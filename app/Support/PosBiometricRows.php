@@ -14,7 +14,16 @@ namespace App\Support;
  */
 class PosBiometricRows
 {
-    public static function build(int $companyId, string $date): array
+    /**
+     * @param string|null $lateAfter  Optional 'HH:MM' late-arrival threshold
+     *                                (companies.pos_bio_late_after). When given,
+     *                                each row also carries `late_minutes`: 0 =
+     *                                on time, >0 = minutes late (first check-in
+     *                                after the threshold on this business day),
+     *                                null = no check-in punch to judge from.
+     *                                Callers that pass nothing are unchanged.
+     */
+    public static function build(int $companyId, string $date, ?string $lateAfter = null): array
     {
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('pos_biometric_punches')) {
@@ -22,6 +31,18 @@ class PosBiometricRows
             }
             $start = \Carbon\Carbon::parse($date, config('app.timezone'))->setTime(6, 0);
             $end   = $start->copy()->addDay();
+
+            // Late-arrival threshold: wall-clock time inside THIS business-day
+            // window (06:00 on $date → 05:59 next day). A pre-06:00 threshold
+            // (night shift, e.g. 03:00) falls on the NEXT calendar day — without
+            // the rollover it would sit before the window and mark everyone late.
+            $lateThreshold = null;
+            if ($lateAfter && preg_match('/^\d{1,2}:\d{2}$/', $lateAfter)) {
+                $lateThreshold = \Carbon\Carbon::parse($date . ' ' . $lateAfter, config('app.timezone'));
+                if ($lateThreshold->lt($start)) {
+                    $lateThreshold->addDay();
+                }
+            }
 
             $punches = \App\Models\PosBiometricPunch::where('company_id', $companyId)
                 ->where('punched_at', '>=', $start)
@@ -63,6 +84,17 @@ class PosBiometricRows
 
                 $duty = \App\Support\PosHazriDutyHours::fromPunches($ps, $end);
 
+                // Late marking judges the FIRST CHECK-IN only — an open duty
+                // (missing checkout) is a different state and keeps its own
+                // amber * convention. No check-in at all → null (unknowable).
+                $lateMinutes = null;
+                if ($lateThreshold && $firstIn) {
+                    $in = \Carbon\Carbon::parse($firstIn, config('app.timezone'));
+                    $lateMinutes = $in->gt($lateThreshold)
+                        ? (int) round($lateThreshold->diffInMinutes($in))
+                        : 0;
+                }
+
                 $rows[] = (object) [
                     'user_id'      => $g['user_id'],
                     'name'         => $user?->name,
@@ -75,6 +107,7 @@ class PosBiometricRows
                     'sources'      => $sources,
                     'duty_minutes' => $duty->minutes,
                     'duty_open'    => $duty->open,
+                    'late_minutes' => $lateMinutes,
                 ];
             }
 

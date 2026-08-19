@@ -1454,6 +1454,22 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/reports', [FbrPosController::class, 'reports'])->name('fbrpos.reports');
     // Staff Hazri — FBR mirror (Task #560) — ADMIN/MANAGER-ONLY (403 in controller).
     Route::get('/reports/hazri', [FbrPosController::class, 'hazriReport'])->name('fbrpos.reports.hazri');
+    // Payroll PDF export — FBR mirror of pos.reports.hazri.payroll-pdf (same gates).
+    Route::get('/reports/hazri/payroll-pdf', [FbrPosController::class, 'payrollHazriPdf'])->name('fbrpos.reports.hazri.payroll-pdf');
+    // Biometric device setup + Excel import — FBR mirror of the PRA bio-sync
+    // pages (admin only, 403 in controller). The public ADMS ingest endpoints
+    // stay SHARED (token/SN-scoped, panel-agnostic) — see /bio-sync above.
+    Route::get('/bio-sync', [\App\Http\Controllers\FbrPosBiometricController::class, 'setup'])->name('fbrpos.bio-sync.setup');
+    Route::post('/bio-sync/device', [\App\Http\Controllers\FbrPosBiometricController::class, 'storeDevice'])->name('fbrpos.bio-sync.store-device');
+    Route::post('/bio-sync/late-time', [\App\Http\Controllers\FbrPosBiometricController::class, 'saveLateTime'])->name('fbrpos.bio-sync.save-late');
+    Route::post('/bio-sync/device/{id}/toggle', [\App\Http\Controllers\FbrPosBiometricController::class, 'toggleDevice'])->name('fbrpos.bio-sync.toggle-device');
+    Route::delete('/bio-sync/device/{id}', [\App\Http\Controllers\FbrPosBiometricController::class, 'destroyDevice'])->name('fbrpos.bio-sync.destroy-device');
+    Route::post('/bio-sync/device/{id}/map', [\App\Http\Controllers\FbrPosBiometricController::class, 'saveMapping'])->name('fbrpos.bio-sync.save-mapping');
+    Route::get('/bio-sync/import', [\App\Http\Controllers\FbrPosBiometricController::class, 'showImport'])->name('fbrpos.bio-sync.import');
+    Route::post('/bio-sync/import', [\App\Http\Controllers\FbrPosBiometricController::class, 'processImport'])->name('fbrpos.bio-sync.process-import');
+    Route::post('/bio-sync/quick-map', [\App\Http\Controllers\FbrPosBiometricController::class, 'quickMapPin'])->name('fbrpos.bio-sync.quick-map');
+    // Unmapped PIN panel-banner dismiss — admin-only, normal fbrpos web middleware (CSRF).
+    Route::post('/bio-sync/pin-alert/dismiss', [\App\Http\Controllers\FbrPosBiometricController::class, 'dismissPinAlert'])->name('fbrpos.bio-sync.dismiss-pin-alert');
     Route::get('/reports/export-csv', [FbrPosController::class, 'exportReportCsv'])->name('fbrpos.reports.export-csv');
 
     // 👥 Team management (FBR twin of /pos/team) — admin-only in controller.

@@ -1,4 +1,10 @@
-@props(['alerts' => collect()])
+@props([
+    'alerts' => collect(),
+    // Panel-aware routes (FBR port, Aug 2026): the FBR layout passes its own
+    // fbrpos.bio-sync.* routes; defaults keep the PRA layout unchanged.
+    'dismissRoute' => null,
+    'setupRoute' => null,
+])
 
 {{--
     Unmapped biometric PIN alert banner (Task #277, Aug 2026).
@@ -14,7 +20,11 @@
 --}}
 
 @if($alerts->isNotEmpty())
-@php $alertCount = $alerts->count(); @endphp
+@php
+    $alertCount = $alerts->count();
+    $dismissRoute = $dismissRoute ?? route('pos.bio-sync.dismiss-pin-alert');
+    $setupRoute   = $setupRoute   ?? route('pos.bio-sync.setup');
+@endphp
 <div class="bg-orange-50 dark:bg-orange-900/30 border-b border-orange-200 dark:border-orange-700">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-start gap-x-4 gap-y-1.5">
 
@@ -39,7 +49,7 @@
                             PIN {{ $alert->device_pin }}
                         </span>
                         {{-- Per-PIN dismiss form (CSRF-protected, admin only) --}}
-                        <form method="POST" action="{{ route('pos.bio-sync.dismiss-pin-alert') }}" class="inline">
+                        <form method="POST" action="{{ $dismissRoute }}" class="inline">
                             @csrf
                             <input type="hidden" name="device_pin" value="{{ $alert->device_pin }}">
                             <button type="submit"
@@ -55,7 +65,7 @@
                 @endforeach
 
                 {{-- Map Now link --}}
-                <a href="{{ route('pos.bio-sync.setup') }}"
+                <a href="{{ $setupRoute }}"
                    class="text-[12px] font-semibold text-orange-700 dark:text-orange-300 underline underline-offset-2 hover:text-orange-900 dark:hover:text-orange-100 whitespace-nowrap">
                     {{ __('pos.bio_map_now') }} →
                 </a>
@@ -66,7 +76,7 @@
                 <span class="text-[12px] text-orange-700 dark:text-orange-300">
                     {{ __('pos.bio_alert_panel_sub', ['count' => $alertCount]) }}
                 </span>
-                <a href="{{ route('pos.bio-sync.setup') }}"
+                <a href="{{ $setupRoute }}"
                    class="text-[12px] font-semibold text-orange-700 dark:text-orange-300 underline underline-offset-2 hover:text-orange-900 dark:hover:text-orange-100 whitespace-nowrap">
                     {{ __('pos.bio_map_now') }} →
                 </a>

@@ -515,6 +515,29 @@ class AdminLiveActivityTest extends TestCase
         $this->assertStringContainsString('PRA 1', $html);
     }
 
+    /**
+     * The table is capped at 50 rows, but the Abhi online summary must include
+     * every live shop, including the ones that sort beyond the visible rows.
+     */
+    public function test_online_summary_count_includes_live_shops_beyond_display_cap(): void
+    {
+        foreach (range(1, 52) as $number) {
+            $companyId = $this->makePraCompany("Busy Shop {$number}");
+            $this->heartbeat($companyId, now()->subMinutes(2));
+        }
+
+        $html = $this->actingAsSuperAdmin()
+            ->get('/admin/live-activity')
+            ->assertStatus(200)
+            ->getContent();
+
+        $this->assertStringContainsString(
+            'PRA 52 &middot; FBR 0',
+            $html,
+            'Abhi online must include live shops beyond the 50 displayed rows'
+        );
+    }
+
     // ────────────────────────────────────────────────────────────────────────
     // Resilience: missing optional tables
     // ────────────────────────────────────────────────────────────────────────

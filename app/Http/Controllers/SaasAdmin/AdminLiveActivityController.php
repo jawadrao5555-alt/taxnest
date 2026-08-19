@@ -170,10 +170,11 @@ class AdminLiveActivityController extends Controller
             ->sortByDesc(fn ($r) => [$r->online ? 1 : 0, $r->total, $r->bill_count])
             ->values();
         $total = $rows->count();
+        $online = $rows->where('online', true)->count();
         $rows = $rows->take(50);
 
         $summary = [
-            'online' => $rows->where('online', true)->count(),
+            'online' => $online,
             'bills' => (int) $agg->sum('bill_count'),
             'total' => (float) $agg->sum('total'),
             'active_shops' => $agg->count(),

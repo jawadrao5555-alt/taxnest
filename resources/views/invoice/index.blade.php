@@ -761,6 +761,8 @@
                                     @if(in_array($invoice->status, ['draft', 'failed']) && !$invoice->fbr_invoice_number && !$invoice->is_fbr_processing)
                                     <input type="checkbox" value="{{ $invoice->id }}" x-model="bulkSelected"
                                         class="bulk-draft-cb rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                                    @elseif(in_array($invoice->status, ['draft', 'failed']) && $invoice->fbr_invoice_number)
+                                    <span class="text-gray-400 cursor-help" title="Already has FBR number {{ $invoice->fbr_invoice_number }} — cannot be resubmitted">&#8212;</span>
                                     @endif
                                 </td>
                                 @endif

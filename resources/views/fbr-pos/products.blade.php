@@ -13,7 +13,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
             {{-- 🏷 Label print page (Task 1272) — selection-aware: picked rows preselect on the labels page --}}
-            <a :href="labelsUrl()" href="{{ route('fbrpos.products.labels') }}"
+            <a x-show="!allMatching" :href="labelsUrl()" href="{{ route('fbrpos.products.labels') }}"
                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 <span x-text="selected.length > 0 ? @js(__('pos.print')) + ' ' + selected.length : @js(__('pos.print_labels'))">{{ __('pos.print_labels') }}</span>
@@ -163,10 +163,27 @@
         <span class="text-[11px] text-gray-400">{{ __('pos.hidden_products_hint') }}</span>
     </div>
 
-    {{-- ═══ BULK ACTION BAR (Task 1272 — selected rows; PRA mirror, admin only) ═══ --}}
-    <div x-show="selected.length > 0" x-transition x-cloak
+    {{-- Gmail-style escalation: header selection starts with this page, then
+         intentionally expands to the whole current server-side search. --}}
+    <div x-show="showSelectAllMatching" x-transition x-cloak
+         class="flex flex-wrap items-center justify-between gap-3 mb-4 px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-800 dark:text-blue-200">
+        <span x-text="pageIds.length + ' ' + @js(__('pos.selected_word'))"></span>
+        <button type="button" @click="selectAllMatching()"
+                class="font-bold underline underline-offset-2 hover:text-blue-950 dark:hover:text-white"
+                x-text="selectAllMatchingLabel"></button>
+    </div>
+
+    <div x-show="allMatching" x-transition x-cloak
+         class="flex flex-wrap items-center justify-between gap-3 mb-4 px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-sm text-blue-800 dark:text-blue-200">
+        <span x-text="allMatchingSelectedLabel"></span>
+        <button type="button" @click="clearSelection()"
+                class="font-bold underline underline-offset-2 hover:text-blue-950 dark:hover:text-white">{{ __('pos.clear') }}</button>
+    </div>
+
+    {{-- ═══ BULK ACTION BAR (selected rows or every matching result, admin only) ═══ --}}
+    <div x-show="selectionCount > 0" x-transition x-cloak
          class="flex flex-wrap items-center gap-2 mb-4 p-3 rounded-xl bg-blue-600 text-white shadow-lg">
-        <span class="font-bold text-sm" x-text="selected.length + ' ' + @js(__('pos.selected_word'))"></span>
+        <span class="font-bold text-sm" x-text="selectionCount + ' ' + @js(__('pos.selected_word'))"></span>
         <div class="flex-1"></div>
         <button @click="doBulk('activate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.activate') }}</button>
         <button @click="doBulk('deactivate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.deactivate') }}</button>
@@ -179,7 +196,7 @@
         <button @click="doBulk('third_on')" class="px-3 py-1.5 rounded-lg bg-indigo-500/80 hover:bg-indigo-600/80 text-xs font-semibold">{{ __('pos.third_schedule_on') }}</button>
         <button @click="doBulk('third_off')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.third_schedule_off') }}</button>
         <button @click="doBulk('delete')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-xs font-semibold">{{ __('pos.delete') }}</button>
-        <button @click="selected = []" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold">{{ __('pos.clear') }}</button>
+        <button @click="clearSelection()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold">{{ __('pos.clear') }}</button>
     </div>
     @endif
 
@@ -213,7 +230,7 @@
                 @endphp
                 <tr class="even:bg-gray-50/50 dark:even:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
                     @if($fbrIsAdmin)
-                    <td class="px-3 py-3"><input type="checkbox" value="{{ $product->id }}" x-model.number="selected" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"></td>
+                    <td class="px-3 py-3"><input type="checkbox" value="{{ $product->id }}" x-model.number="selected" @change="allMatching = false" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"></td>
                     @endif
                     <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{{ $product->name }}</td>
                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">{{ $product->hs_code ?: '-' }}</td>
@@ -274,22 +291,44 @@
     @endif
 
     <script>
-        // Task 1272 — selection + bulk ops (PRA productCatalog mirror, trimmed
-        // for the server-paginated FBR list; select-all = current page).
+        // Page selection can be deliberately escalated to every result in the
+        // current server-side search. IDs are never sent for that larger set.
         function fbrProductBulk() {
             return {
                 selected: [],
                 pageIds: @json($products->pluck('id')->map(fn($i) => (int) $i)->values()),
+                allMatching: false,
+                matchingCount: {{ (int) $products->total() }},
+                matchingSearch: @js($search),
                 csrf: '{{ csrf_token() }}',
                 bulkUrl: '{{ route('fbrpos.products.bulk') }}',
                 labelsBase: '{{ route('fbrpos.products.labels') }}',
-                labelsUrl() { return this.selected.length > 0 ? this.labelsBase + '?ids=' + this.selected.join(',') : this.labelsBase; },
+                labelsUrl() { return !this.allMatching && this.selected.length > 0 ? this.labelsBase + '?ids=' + this.selected.join(',') : this.labelsBase; },
+                get selectionCount() { return this.allMatching ? this.matchingCount : this.selected.length; },
+                get showSelectAllMatching() {
+                    return !this.allMatching && this.allPageSelected && this.matchingCount > this.selected.length;
+                },
+                get selectAllMatchingLabel() {
+                    return @js(__('pos.select_all_matching_products')).replace(':count', this.matchingCount);
+                },
+                get allMatchingSelectedLabel() {
+                    return @js(__('pos.all_matching_products_selected')).replace(':count', this.matchingCount);
+                },
                 get allPageSelected() {
                     return this.pageIds.length > 0 && this.pageIds.every(id => this.selected.includes(id));
                 },
                 toggleAll(e) {
+                    this.allMatching = false;
                     if (e.target.checked) { this.selected = [...new Set([...this.selected, ...this.pageIds])]; }
                     else { this.selected = this.selected.filter(id => !this.pageIds.includes(id)); }
+                },
+                selectAllMatching() {
+                    this.selected = [...this.pageIds];
+                    this.allMatching = true;
+                },
+                clearSelection() {
+                    this.selected = [];
+                    this.allMatching = false;
                 },
                 postForm(action, fields) {
                     const f = document.createElement('form');
@@ -303,15 +342,18 @@
                     document.body.appendChild(f); f.submit();
                 },
                 doBulk(action) {
-                    if (this.selected.length === 0) return;
-                    const fields = { action: action, ids: this.selected };
-                    if (action === 'delete') { if (!confirm(@js(__('pos.js_confirm_bulk_delete')).replace(':count', this.selected.length))) return; }
+                    if (this.selectionCount === 0) return;
+                    const count = this.selectionCount;
+                    const fields = this.allMatching
+                        ? { action: action, all_matching: 1, search: this.matchingSearch }
+                        : { action: action, ids: this.selected };
+                    if (action === 'delete') { if (!confirm(@js(__('pos.js_confirm_bulk_delete')).replace(':count', count))) return; }
                     if (action === 'price') {
-                        const v = prompt(@js(__('pos.js_prompt_set_price')).replace(':count', this.selected.length), '');
+                        const v = prompt(@js(__('pos.js_prompt_set_price')).replace(':count', count), '');
                         if (v === null) return;
                         const num = parseFloat(String(v).replace(/[^0-9.]/g, ''));
                         if (isNaN(num) || num < 0) { alert(@js(__('pos.js_alert_invalid_price'))); return; }
-                        if (!confirm(@js(__('pos.js_confirm_set_price')).replace(':count', this.selected.length).replace(':price', num))) return;
+                        if (!confirm(@js(__('pos.js_confirm_set_price')).replace(':count', count).replace(':price', num))) return;
                         fields.price_value = num;
                     }
                     if (action === 'price_percent') {
@@ -319,13 +361,13 @@
                         if (v === null) return;
                         const num = parseFloat(v);
                         if (isNaN(num) || num === 0 || num < -90 || num > 500) { alert(@js(__('pos.js_alert_invalid_percent'))); return; }
-                        if (!confirm(@js(__('pos.js_confirm_price_percent')).replace(':count', this.selected.length).replace(':percent', (num > 0 ? '+' : '') + num))) return;
+                        if (!confirm(@js(__('pos.js_confirm_price_percent')).replace(':count', count).replace(':percent', (num > 0 ? '+' : '') + num))) return;
                         fields.percent_value = num;
                     }
-                    if (action === 'exempt_on' && !confirm(@js(__('pos.js_confirm_exempt_on')).replace(':count', this.selected.length))) return;
-                    if (action === 'exempt_off' && !confirm(@js(__('pos.js_confirm_exempt_off')).replace(':count', this.selected.length))) return;
-                    if (action === 'third_on' && !confirm(@js(__('pos.js_confirm_third_on')).replace(':count', this.selected.length))) return;
-                    if (action === 'third_off' && !confirm(@js(__('pos.js_confirm_third_off')).replace(':count', this.selected.length))) return;
+                    if (action === 'exempt_on' && !confirm(@js(__('pos.js_confirm_exempt_on')).replace(':count', count))) return;
+                    if (action === 'exempt_off' && !confirm(@js(__('pos.js_confirm_exempt_off')).replace(':count', count))) return;
+                    if (action === 'third_on' && !confirm(@js(__('pos.js_confirm_third_on')).replace(':count', count))) return;
+                    if (action === 'third_off' && !confirm(@js(__('pos.js_confirm_third_off')).replace(':count', count))) return;
                     this.postForm(this.bulkUrl, fields);
                 },
             };

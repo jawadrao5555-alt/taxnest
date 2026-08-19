@@ -483,6 +483,71 @@ class FbrPosProductFullEditTest extends TestCase
         $this->assertSame(0, (int) DB::table('products')->find($this->productId)->is_third_schedule);
     }
 
+    /** 7d. All-matching bulk work rebuilds the current search on the server. */
+    public function test_bulk_all_matching_applies_only_to_the_companys_search_results(): void
+    {
+        $matchingOne = (int) DB::table('products')->insertGetId([
+            'company_id' => $this->companyId, 'name' => 'Tea Biscuit Small',
+            'default_price' => 50, 'tax_type' => 'taxable', 'default_tax_rate' => 18,
+            'uom' => 'U', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $matchingTwo = (int) DB::table('products')->insertGetId([
+            'company_id' => $this->companyId, 'name' => 'Tea Biscuit Large',
+            'default_price' => 90, 'tax_type' => 'taxable', 'default_tax_rate' => 18,
+            'uom' => 'U', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $otherCompanyId = (int) DB::table('companies')->insertGetId([
+            'name' => 'Other FBR Shop', 'product_type' => 'fbrpos', 'status' => 'active',
+            'company_status' => 'active', 'fbr_pos_enabled' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $foreignMatch = (int) DB::table('products')->insertGetId([
+            'company_id' => $otherCompanyId, 'name' => 'Tea Biscuit Foreign',
+            'default_price' => 75, 'tax_type' => 'taxable', 'default_tax_rate' => 18,
+            'uom' => 'U', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $res = $this->actingAs($this->admin, 'fbrpos')->post('/fbr-pos/products/bulk', [
+            'action' => 'deactivate',
+            'all_matching' => 1,
+            'search' => 'Tea Biscuit',
+        ]);
+
+        // Locale varies in the test suite; the important contract is that the
+        // flash reports the two server-side search results, not page IDs.
+        $res->assertSessionHas('success', fn ($message) => str_contains((string) $message, '2'));
+        $this->assertSame(0, (int) DB::table('products')->find($matchingOne)->is_active);
+        $this->assertSame(0, (int) DB::table('products')->find($matchingTwo)->is_active);
+        $this->assertSame(1, (int) DB::table('products')->find($this->productId)->is_active);
+        $this->assertSame(1, (int) DB::table('products')->find($foreignMatch)->is_active);
+    }
+
+    /** 7e. The paginated list exposes the browser state for all search matches. */
+    public function test_products_page_renders_all_matching_selection_affordance(): void
+    {
+        for ($i = 1; $i <= 21; $i++) {
+            DB::table('products')->insert([
+                'company_id' => $this->companyId,
+                'name' => sprintf('Rendered Bulk Match %02d', $i),
+                'default_price' => 100,
+                'tax_type' => 'taxable',
+                'default_tax_rate' => 18,
+                'uom' => 'U',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($this->admin, 'fbrpos')
+            ->get('/fbr-pos/products?search=Rendered%20Bulk%20Match')
+            ->assertOk()
+            ->assertSee('fbrProductBulk()')
+            ->assertSee('selectAllMatching()')
+            ->assertSee('all_matching')
+            ->assertSee('matchingCount: 21');
+    }
+
     /** 8. A cashier (non-admin) is blocked from the edit endpoints. */
     public function test_cashier_cannot_edit_products(): void
     {

@@ -6595,6 +6595,23 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $search = $request->get('search', '');
+        $products = $this->fbrProductListQuery($companyId, $search)
+            ->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
+        // Usage-vs-cap banner (Task 362): visibility for shops at/over their
+        // plan's product cap (e.g. after a downgrade). null = unlimited.
+        $productLimitStatus = \App\Services\PlanLimitService::productLimitStatus($companyId, 'fbr');
+        return view('fbr-pos.products', compact('products', 'search', 'productLimitStatus'));
+    }
+
+    /**
+     * The Products list and its "all matching" bulk actions must use the exact
+     * same company-scoped search. Keeping this in one query builder prevents a
+     * search result from meaning one thing on the page and another in bulk work.
+     */
+    private function fbrProductListQuery(int $companyId, ?string $search = null)
+    {
         $query = Product::where('company_id', $companyId);
         if ($search) {
             $like = \App\Helpers\DbCompat::like();
@@ -6603,11 +6620,8 @@ class FbrPosController extends Controller
                   ->orWhere('hs_code', $like, "%{$search}%");
             });
         }
-        $products = $query->orderBy('name')->paginate(20);
-        // Usage-vs-cap banner (Task 362): visibility for shops at/over their
-        // plan's product cap (e.g. after a downgrade). null = unlimited.
-        $productLimitStatus = \App\Services\PlanLimitService::productLimitStatus($companyId, 'fbr');
-        return view('fbr-pos.products', compact('products', 'search', 'productLimitStatus'));
+
+        return $query;
     }
 
     public function createProduct()
@@ -7296,11 +7310,11 @@ class FbrPosController extends Controller
     }
 
     /**
-     * POST /fbr-pos/products/bulk — admin-only bulk ops on SELECTED products
-     * (Task 1272 — FBR mirror of PosController::bulkProductAction; no
-     * category/image on the FBR Product model). FBR tax coupling differs from
-     * PRA: exemption lives on tax_type (not a separate flag), and Third
-     * Schedule forces tax_type='exempt' + rate 0 — same rule as storeProduct.
+     * POST /fbr-pos/products/bulk — admin-only bulk ops on selected products
+     * or every product matching the current name/HS-code search. FBR tax
+     * coupling differs from PRA: exemption lives on tax_type (not a separate
+     * flag), and Third Schedule forces tax_type='exempt' + rate 0 — same rule
+     * as storeProduct.
      */
     public function bulkProductAction(Request $request)
     {
@@ -7308,15 +7322,25 @@ class FbrPosController extends Controller
             abort(403, 'Only admin can bulk-manage products.');
         }
         $companyId = app('currentCompanyId');
-        $request->validate([
+        $allMatching = $request->boolean('all_matching');
+        $rules = [
             'action' => 'required|string|in:activate,deactivate,delete,sale_show,sale_hide,price,price_percent,exempt_on,exempt_off,third_on,third_off',
-            'ids' => 'required|array|min:1',
-            'ids.*' => 'integer',
+            'all_matching' => 'nullable|boolean',
+            'search' => 'nullable|string|max:255',
             'price_value' => 'nullable|numeric|min:0|max:10000000',
             'percent_value' => 'nullable|numeric|min:-90|max:500',
-        ]);
+        ];
+        if ($allMatching) {
+            $rules['ids'] = 'nullable|array';
+        } else {
+            $rules['ids'] = 'required|array|min:1';
+        }
+        $rules['ids.*'] = 'integer';
+        $request->validate($rules);
 
-        $query = Product::where('company_id', $companyId)->whereIn('id', $request->ids);
+        $query = $allMatching
+            ? $this->fbrProductListQuery($companyId, $request->input('search', ''))
+            : Product::where('company_id', $companyId)->whereIn('id', $request->ids);
         $count = (clone $query)->count();
 
         switch ($request->action) {

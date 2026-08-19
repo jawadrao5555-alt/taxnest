@@ -21,6 +21,14 @@ class FeatureSuggestion extends Model
      */
     public const PRA_ELAAN_SOURCE = 'pra_elaan';
 
+    /**
+     * Reserved title prefix (Task 1229): on a drifted schema without the
+     * source column, elaan rows are recognised by this prefix. The normal
+     * suggestion endpoint REJECTS titles starting with it, so the prefix is
+     * a safe discriminator, not user-controllable text.
+     */
+    public const PRA_ELAAN_TITLE_PREFIX = 'PRA elaan:';
+
     public const PRA_ELAAN_CHOICES = [
         'band' => 'PRA elaan: Haan, provisional billing band kar dein',
         'jari' => 'PRA elaan: Nahi, provisional billing chalti rehne dein',

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FeatureSuggestion;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class FeatureSuggestionController extends Controller
@@ -48,6 +49,15 @@ class FeatureSuggestionController extends Controller
             'title.max' => 'Title 150 harf se lamba nahi ho sakta.',
             'details.max' => 'Tafseel 2000 harf se lambi nahi ho sakti.',
         ]);
+
+        // Reserved-title boundary (Task 1229): the "PRA elaan:" prefix is the
+        // durable discriminator for elaan answers on a drifted schema (no
+        // source column) — a normal suggestion must never be able to wear it,
+        // or it would be mistaken for the user's elaan answer and suppress
+        // the real one.
+        if (stripos(trim($request->title), FeatureSuggestion::PRA_ELAAN_TITLE_PREFIX) === 0) {
+            return redirect('/pos/suggestions')->with('error', 'Yeh title mehfooz (reserved) hai — barah-e-karam koi aur title likhein.');
+        }
 
         // Spam guard: max 10 suggestions per user per day.
         $todayCount = FeatureSuggestion::where('user_id', $user->id)
@@ -110,14 +120,34 @@ class FeatureSuggestionController extends Controller
                     ]
                 );
             } else {
-                FeatureSuggestion::create([
-                    'company_id' => $user->company_id,
-                    'user_id' => $user->id,
-                    'product' => 'pos',
-                    'title' => FeatureSuggestion::PRA_ELAAN_CHOICES[$choice],
-                    'details' => $mashwara,
-                    'status' => 'pending',
-                ]);
+                // Drifted schema has no source column to dedupe on, so mirror
+                // the ONE-answer-per-user rule by the reserved title prefix
+                // instead: the elaan write path only ever uses the
+                // PRA_ELAAN_CHOICES titles, and store() REJECTS the reserved
+                // "PRA elaan:" prefix, so an existing row with any of those
+                // titles for this user IS their elaan answer. A repeat tap
+                // keeps the first answer (same as firstOrCreate above — no
+                // duplicate, no overwrite). Wrapped in a transaction that
+                // locks the authenticated user's row so two concurrent taps
+                // (double-tap / retry with multiple PHP workers) serialize —
+                // the second one sees the first's insert and skips.
+                DB::transaction(function () use ($user, $choice, $mashwara) {
+                    DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
+
+                    $alreadyAnswered = FeatureSuggestion::where('user_id', $user->id)
+                        ->whereIn('title', array_values(FeatureSuggestion::PRA_ELAAN_CHOICES))
+                        ->exists();
+                    if (!$alreadyAnswered) {
+                        FeatureSuggestion::create([
+                            'company_id' => $user->company_id,
+                            'user_id' => $user->id,
+                            'product' => 'pos',
+                            'title' => FeatureSuggestion::PRA_ELAAN_CHOICES[$choice],
+                            'details' => $mashwara,
+                            'status' => 'pending',
+                        ]);
+                    }
+                });
             }
             $this->praElaanStampSeen($user);
         } catch (\Throwable $e) {

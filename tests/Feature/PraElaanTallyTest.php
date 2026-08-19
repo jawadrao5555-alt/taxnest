@@ -399,6 +399,99 @@ class PraElaanTallyTest extends TestCase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // 8. Drifted schema: repeated taps keep ONE answer per user (Task 1229) —
+    //    dedupe falls back to the elaan-only PRA_ELAAN_CHOICES titles.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function test_repeat_elaan_submits_do_not_duplicate_when_source_column_missing(): void
+    {
+        Schema::table('feature_suggestions', function (Blueprint $table) {
+            $table->dropColumn('source');
+        });
+
+        // A normal (non-elaan) suggestion from the same user must NOT count as
+        // their elaan answer — only the "PRA elaan:"-prefixed titles do.
+        FeatureSuggestion::create([
+            'company_id' => $this->companyAId,
+            'user_id' => $this->userA1Id,
+            'product' => 'pos',
+            'title' => 'Barcode scanner ki speed behtar karein',
+            'status' => 'pending',
+        ]);
+
+        $first = $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->postJson('/pos/pra-elaan/respond', ['choice' => 'band']);
+        $first->assertStatus(200)->assertJson(['ok' => true]);
+
+        // Repeat tap — even with a different choice — must succeed but keep
+        // the FIRST answer (no duplicate, no overwrite), mirroring the
+        // firstOrCreate semantics of the source-aware path.
+        $second = $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->postJson('/pos/pra-elaan/respond', ['choice' => 'jari']);
+        $second->assertStatus(200)->assertJson(['ok' => true]);
+
+        $elaanRows = FeatureSuggestion::where('user_id', $this->userA1Id)
+            ->whereIn('title', array_values(FeatureSuggestion::PRA_ELAAN_CHOICES))
+            ->get();
+        $this->assertCount(1, $elaanRows);
+        $this->assertSame(FeatureSuggestion::PRA_ELAAN_CHOICES['band'], $elaanRows->first()->title);
+
+        // The unrelated normal suggestion is untouched.
+        $this->assertDatabaseHas('feature_suggestions', [
+            'user_id' => $this->userA1Id,
+            'title' => 'Barcode scanner ki speed behtar karein',
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 9. Reserved-title boundary (Task 1229): the normal suggestion endpoint
+    //    must reject "PRA elaan:"-prefixed titles so a user-made suggestion
+    //    can never masquerade as (and suppress) an elaan answer.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function test_normal_suggestion_endpoint_rejects_reserved_elaan_title(): void
+    {
+        $exactChoiceTitle = FeatureSuggestion::PRA_ELAAN_CHOICES['band'];
+
+        $response = $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->post('/pos/suggestions', ['title' => $exactChoiceTitle]);
+        $response->assertRedirect('/pos/suggestions')->assertSessionHas('error');
+        $this->assertDatabaseMissing('feature_suggestions', ['title' => $exactChoiceTitle]);
+
+        // Prefix variants (extra text, different case, leading spaces) are
+        // rejected too.
+        $response = $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->post('/pos/suggestions', ['title' => '  pra ELAAN: mera khayal']);
+        $response->assertRedirect('/pos/suggestions')->assertSessionHas('error');
+        $this->assertDatabaseMissing('feature_suggestions', ['title' => 'pra ELAAN: mera khayal']);
+
+        // A non-reserved title still saves normally.
+        $response = $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->post('/pos/suggestions', ['title' => 'Naya report chahiye']);
+        $response->assertRedirect('/pos/suggestions')->assertSessionHas('success');
+        $this->assertDatabaseHas('feature_suggestions', ['title' => 'Naya report chahiye']);
+    }
+
+    public function test_elaan_answer_still_records_after_reserved_title_rejection(): void
+    {
+        // Even after a user TRIED to post a reserved title (and was rejected),
+        // the real elaan answer records exactly once on the drifted schema.
+        Schema::table('feature_suggestions', function (Blueprint $table) {
+            $table->dropColumn('source');
+        });
+
+        $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->post('/pos/suggestions', ['title' => FeatureSuggestion::PRA_ELAAN_CHOICES['jari']]);
+
+        $response = $this->actingAs(User::find($this->userA1Id), 'pos')
+            ->postJson('/pos/pra-elaan/respond', ['choice' => 'jari']);
+        $response->assertStatus(200)->assertJson(['ok' => true]);
+
+        $this->assertSame(1, FeatureSuggestion::where('user_id', $this->userA1Id)
+            ->where('title', FeatureSuggestion::PRA_ELAAN_CHOICES['jari'])->count());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // 8. Soft-deleted company → tally counts unchanged, row shows "Company #N"
     // ─────────────────────────────────────────────────────────────────────────
 

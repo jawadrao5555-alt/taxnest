@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KOT - {{ $company->name }}</title>
+    {{-- Task 1285: FBR Store branding — this ticket is a STORE SLIP (godown/packing), not a
+         kitchen KOT. Labels use the fbr_* lang keys so they follow the active locale: web
+         renders get it from SetPosLocale, agent renders set it before rendering (AgentController
+         silent-print locale). --}}
+    <title>{{ __('pos.fbr_store_slip_word') }} - {{ $company->name }}</title>
     <style>
         @page { size: 80mm auto; margin: 0; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -92,13 +96,13 @@
 </head>
 <body>
     <div class="no-print">
-        <button onclick="window.print()" style="padding: 8px 24px; background: #ea580c; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">Print KOT</button>
+        <button onclick="window.print()" style="padding: 8px 24px; background: #ea580c; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;">{{ __('pos.fbr_ti_print_store_slip') }}</button>
     </div>
 
     <div class="text-center">
         <div class="shop-name">{{ $company->name }}</div>
         <div class="separator"></div>
-        <div class="section-title">*** KITCHEN ORDER ***</div>
+        <div class="section-title">*** {{ mb_strtoupper(__('pos.fbr_store_slip_word')) }} ***</div>
 
         {{-- Order Matching (Aug 2026): same token/code box as PRA kitchen-ticket --}}
         @php

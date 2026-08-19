@@ -1148,7 +1148,9 @@ class AgentController extends Controller
                         ->get();
                 } catch (\Throwable $e) { /* registry hiccup → treat as none online */ }
                 foreach ($stranded as $row) {
-                    if (in_array($row->type, ['kot', 'kot_void'], true)) {
+                    // Task 1285: fbr_kot (FBR store slips) joins the KOT family —
+                    // same printer-owning-counter semantics as PRA KOTs.
+                    if (in_array($row->type, ['kot', 'kot_void', 'fbr_kot'], true)) {
                         $carrier = $onlineDevices->first(function ($d) use ($row) {
                             return $d->device_uid !== $row->device_uid
                                 && collect($d->printers ?? [])->pluck('name')->contains($row->target_printer);
@@ -1166,7 +1168,10 @@ class AgentController extends Controller
                         continue;
                     }
                     $upd = ['device_uid' => null, 'updated_at' => now()];
-                    if ($defaultReceipt && in_array($row->type, ['bill', 'proof'], true)) {
+                    // Task 1285: fbr_bill retargets to the company default receipt
+                    // printer exactly like PRA bills — the per-device printer may
+                    // not exist on the rescuing PC.
+                    if ($defaultReceipt && in_array($row->type, ['bill', 'proof', 'fbr_bill'], true)) {
                         $upd['target_printer'] = $defaultReceipt;
                     }
                     DB::table('pos_print_jobs')->where('id', $row->id)->update($upd);

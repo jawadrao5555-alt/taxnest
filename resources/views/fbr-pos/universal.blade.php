@@ -14,6 +14,13 @@
     // anchoring (nav overflow clipping). Task 1271: gridEditMode / per-user grid
     // prefs, WhatsApp Bill share, cart drafts (fbr_pos_drafts) and search-mode
     // pref are NOW PORTED here (products-only prefs — FBR has no deals in grid).
+    // STORE terminology (Task 1285): the FBR panel calls the whole KOT family
+    // "Store" — Store Printer / Store Slip / Auto Store Slip — because in a
+    // retail shop the slip goes to the godown/packing STORE, not a kitchen.
+    // Only LABELS diverge (fbr_* lang keys); internal names (kot feature flag,
+    // autoKotEnabled, sendToKitchen, fbr_kot job type, kitchen-ticket view)
+    // stay identical to the PRA source so diffs remain reviewable. PRA keeps
+    // its KOT wording — never point the fbr_* keys at PRA views.
     $features = (object) [
         'tables' => false, 'delivery' => false,
         // Order Matching (Aug 2026): unpin kot — gate on kitchen_printer_enabled so
@@ -179,12 +186,12 @@
 .receipt-modal-enter { animation: receiptSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .success-icon-animate { animation: successPulse 1.5s ease-out 0.3s; }
 
-/* ============================================================
+/* ────────────────────────────────────────────────────────────
    Phase 6 — PREMIUM POLISH LAYER (v13)
    Pure additive CSS. No HTML/JS structural changes.
    Design tokens, refined hover states, tighter rhythm,
    better numerics, consistent button feel, calmer chrome.
-   ============================================================ */
+   ──────────────────────────────────────────────────────────── */
 
 :root {
     --tn-radius:14px;
@@ -462,11 +469,11 @@ window.addEventListener('popstate', function() {
 
                     @if($features->kot ?? false)
                     {{-- Auto-KOT — same handler as the mobile strip (root autoKotEnabled) --}}
-                    <div class="flex items-center justify-between gap-2" title="{{ __('pos.ti_auto_kot_hint') }}" x-data="{ autoKotLoading: false }">
-                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">{{ __('pos.auto_kot_label') }}</span>
+                    <div class="flex items-center justify-between gap-2" title="{{ __('pos.fbr_ti_auto_store_slip_hint') }}" x-data="{ autoKotLoading: false }">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">{{ __('pos.fbr_auto_store_slip_label') }}</span>
                         <div class="flex items-center gap-1.5">
                             <button type="button"
-                                @click="autoKotLoading = true; fetch('{{ route('fbrpos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.auto_kot, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
+                                @click="autoKotLoading = true; fetch('{{ route('fbrpos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.fbr_auto_store_slip, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
                                 :disabled="autoKotLoading"
                                 :class="autoKotEnabled ? 'bg-orange-600' : 'bg-gray-400 dark:bg-gray-600'"
                                 class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
@@ -550,10 +557,10 @@ window.addEventListener('popstate', function() {
 
         {{-- Auto-KOT (Phase 5+) — when ON, the kitchen ticket print dialog also pops
              open right after a successful payment of a held/restaurant order. --}}
-        <div class="flex items-center gap-2" title="{{ __('pos.ti_auto_kot_hint') }}">
-            <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">{{ __('pos.auto_kot_label') }}</span>
+        <div class="flex items-center gap-2" title="{{ __('pos.fbr_ti_auto_store_slip_hint') }}">
+            <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">{{ __('pos.fbr_auto_store_slip_label') }}</span>
             <button type="button"
-                @click="autoKotLoading = true; fetch('{{ route('fbrpos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.auto_kot, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
+                @click="autoKotLoading = true; fetch('{{ route('fbrpos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.fbr_auto_store_slip, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
                 :disabled="autoKotLoading"
                 :class="autoKotEnabled ? 'bg-orange-600' : 'bg-gray-400 dark:bg-gray-600'"
                 class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
@@ -883,9 +890,9 @@ window.addEventListener('popstate', function() {
              shortcuts unchanged (global keydown handler). Send to Kitchen stays (KOT). --}}
         @if($features->kot ?? false)
         <div class="hidden md:flex items-center gap-1.5">
-            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first_cart : window.TXT.ti_kot_saves_no_payment" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first_cart : window.TXT.fbr_ti_store_saves_no_payment" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
-                <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.send_to_kitchen"></span>
+                <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.fbr_send_to_store"></span>
                 <kbd class="text-[9px] bg-orange-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">Alt+K</kbd>
             </button>
         </div>
@@ -1728,8 +1735,8 @@ window.addEventListener('popstate', function() {
                             {{-- Order Matching (Aug 2026): FBR held sales live in fbr_pos_held_sales,
                                  NOT pos_restaurant_orders. Use FBR KOT endpoints — never the PRA
                                  /pos/restaurant/... routes which 404 for all FBR companies. --}}
-                            <a :href="'/fbr-pos/held/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.ti_view_print_kot') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
-                            <button @click="resendKitchen(order)" title="{{ __('pos.ti_resend_kitchen_updated') }}" class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
+                            <a :href="'/fbr-pos/held/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.fbr_ti_view_print_store_slip') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">{{ __('pos.fbr_store_slip_word') }}</a>
+                            <button @click="resendKitchen(order)" title="{{ __('pos.fbr_ti_resend_store') }}" class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
@@ -2839,9 +2846,9 @@ window.addEventListener('popstate', function() {
                     </button>
                     {{-- 2. KOT (K) - shown only when an orderId exists (restaurant flow) + admin allows reprint --}}
                     @if(($company->kot_reprint_enabled ?? true))
-                    <button x-show="lastOrderId" @click="printKitchenTicket()" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_print_kot') }}">
+                    <button x-show="lastOrderId" @click="printKitchenTicket()" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.fbr_ti_print_store_slip') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                        KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
+                        {{ __('pos.fbr_store_slip_word') }} <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
                     {{-- Spacer when KOT hidden so grid stays balanced --}}
                     <div x-show="!lastOrderId"></div>
@@ -6055,11 +6062,12 @@ function restaurantPos() {
             } catch (e) { /* silent — badge just won't show */ }
         },
 
-        // Phase 5 — explicit "Send to Kitchen" action.
-        // Same persistence as Hold, but always prints a KOT (no payment is taken).
+        // Phase 5 — explicit "Send to Store" action (FBR Store branding, Task 1285:
+        // the slip goes to the shop's godown/packing store, not a kitchen).
+        // Same persistence as Hold, but always prints a store slip (no payment is taken).
         async sendToKitchen() {
             if (this.cart.length === 0) return;
-            await this.holdOrder({ forcePrintKot: true, successMessage: 'Order sent to kitchen' });
+            await this.holdOrder({ forcePrintKot: true, successMessage: window.TXT.fbr_sent_to_store || 'Sent to store' });
         },
 
         // Phase 5 — re-send an existing held order's KOT to the kitchen.
@@ -6076,7 +6084,7 @@ function restaurantPos() {
             if (!order || !order.id) return;
             // Re-print the FBR KOT. No POST needed — no print-count tracking on FBR held carts.
             this.printKitchenTicket(order.id, null, /* isFbrHeld */ true);
-            this.showToast(window.TXT.resent_to_kitchen_prefix ? window.TXT.resent_to_kitchen_prefix + '1)' : 'KOT re-sent', 'success');
+            this.showToast(window.TXT.fbr_resent_to_store_prefix ? window.TXT.fbr_resent_to_store_prefix + '1)' : 'Store slip re-sent', 'success');
         },
 
         // ─── SAVE PROVISIONAL DIRECT — fully isolated from Pay modal ─────
@@ -6550,7 +6558,7 @@ function restaurantPos() {
                 if (this.silentKotPrint) {
                     this.trySilentPrint({ type: 'fbr_kot', restaurant_order_id: id }).then(ok => {
                         if (ok) {
-                            this.showToast(window.TXT.kot_sent_to_printer, 'success');
+                            this.showToast(window.TXT.fbr_store_slip_sent_to_printer, 'success');
                             if (typeof onAfterPrint === 'function') onAfterPrint();
                         } else { fallback(); }
                     });
@@ -6574,7 +6582,7 @@ function restaurantPos() {
             if (isFbrReprint && this.silentKotPrint) {
                 this.trySilentPrint({ type: 'fbr_kot', transaction_id: id }).then(ok => {
                     if (ok) {
-                        this.showToast(window.TXT.kot_sent_to_printer, 'success');
+                        this.showToast(window.TXT.fbr_store_slip_sent_to_printer, 'success');
                         if (typeof onAfterPrint === 'function') onAfterPrint();
                     } else { fallback(); }
                 });

@@ -3301,7 +3301,8 @@ class FbrPosController extends Controller
         if (!$company->kitchen_printer_enabled) {
             return response()->json([
                 'success' => false,
-                'message' => __('pos.auto_kot_requires_feature'),
+                // Task 1285: FBR Store branding — never surface "KOT" wording here.
+                'message' => __('pos.fbr_auto_store_slip_requires_feature'),
             ], 422);
         }
 

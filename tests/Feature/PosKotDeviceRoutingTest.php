@@ -604,6 +604,89 @@ class PosKotDeviceRoutingTest extends TestCase
         $this->assertContains($job->status, ['pending', 'printing']);
     }
 
+    // Task 1285 — FBR store slips (type fbr_kot) join the KOT-family rescue:
+    // re-stamp to a capable online counter, else park failed. Never
+    // blind-unstamp (an agent without the printer would claim and fail).
+    public function test_stranded_fbr_store_slip_follows_kot_family_rescue(): void
+    {
+        $this->seedDevice('dev-dead', [
+            'last_seen_at' => now()->subMinutes(10),
+            'printers' => [['name' => 'LAN-Store']],
+        ]);
+        $this->seedDevice('dev-alive', [
+            'printers' => [['name' => 'LAN-Store'], ['name' => 'Counter-dev-alive']],
+        ]);
+        $stuck = DB::table('pos_print_jobs')->insertGetId([
+            'company_id' => $this->companyId,
+            'type' => 'fbr_kot',
+            'target_printer' => 'LAN-Store',
+            'restaurant_order_id' => 1,
+            'device_uid' => 'dev-dead',
+            'status' => 'pending',
+            'attempts' => 0,
+            'created_at' => now()->subMinutes(3),
+            'updated_at' => now()->subMinutes(3),
+        ]);
+
+        $this->agentGet('/api/agent/print-jobs')->assertOk(); // housekeeping fires
+
+        $job = DB::table('pos_print_jobs')->where('id', $stuck)->first();
+        $this->assertSame('dev-alive', $job->device_uid, 'store slip re-stamps to the counter that has the printer');
+        $this->assertSame('pending', $job->status);
+        $this->assertSame('LAN-Store', $job->target_printer);
+    }
+
+    public function test_stranded_fbr_store_slip_with_no_capable_counter_parks_failed(): void
+    {
+        $this->seedDevice('dev-dead', [
+            'last_seen_at' => now()->subMinutes(10),
+            'printers' => [['name' => 'USB-Store']],
+        ]);
+        $this->seedDevice('dev-alive'); // online, but no USB-Store
+        $stuck = DB::table('pos_print_jobs')->insertGetId([
+            'company_id' => $this->companyId,
+            'type' => 'fbr_kot',
+            'target_printer' => 'USB-Store',
+            'restaurant_order_id' => 1,
+            'device_uid' => 'dev-dead',
+            'status' => 'pending',
+            'attempts' => 0,
+            'created_at' => now()->subMinutes(3),
+            'updated_at' => now()->subMinutes(3),
+        ]);
+
+        $res = $this->agentGet('/api/agent/print-jobs')->assertOk();
+
+        $job = DB::table('pos_print_jobs')->where('id', $stuck)->first();
+        $this->assertSame('failed', $job->status, 'no capable counter → park failed, never bounce');
+        $this->assertNotContains($stuck, collect($res->json('jobs'))->pluck('id')->all());
+    }
+
+    // Task 1285 — stranded FBR bills mirror PRA bills: unstamp + retarget to
+    // the company default receipt printer (the per-device printer may not
+    // exist on the rescuing PC).
+    public function test_stranded_fbr_bill_retargets_company_receipt_default(): void
+    {
+        $stuck = DB::table('pos_print_jobs')->insertGetId([
+            'company_id' => $this->companyId,
+            'type' => 'fbr_bill',
+            'target_printer' => 'Counter-dev-dead',
+            'transaction_id' => 1,
+            'device_uid' => 'dev-dead',
+            'status' => 'pending',
+            'attempts' => 0,
+            'created_at' => now()->subMinutes(3),
+            'updated_at' => now()->subMinutes(3),
+        ]);
+
+        $this->agentGet('/api/agent/print-jobs')->assertOk();
+
+        $job = DB::table('pos_print_jobs')->where('id', $stuck)->first();
+        $this->assertNull($job->device_uid);
+        $this->assertSame('Manager-POS80', $job->target_printer);
+        $this->assertContains($job->status, ['pending', 'printing']);
+    }
+
     // ── 5. Fingerprint ─────────────────────────────────────────────────────
 
     public function test_owning_device_change_refreshes_pos_config_rev(): void

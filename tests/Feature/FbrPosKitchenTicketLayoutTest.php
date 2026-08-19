@@ -197,4 +197,57 @@ class FbrPosKitchenTicketLayoutTest extends TestCase
         $this->assertSame(1, substr_count($reprintBody, self::CODE_BOX), 'code-box on reprint exactly once');
         $this->assertSame($heldBody, $reprintBody, 'held & reprint KOT bodies identical');
     }
+
+    // ── 5. Store Slip branding follows the active locale (Task 1285) ─────
+    //
+    // The FBR panel rebrands the KOT family as "Store Slip". The ticket's
+    // title/header/button consume the fbr_* lang keys so they follow the
+    // active locale (web = SetPosLocale, agent = silent-print locale set
+    // before rendering) — never hardcoded English.
+
+    public function test_store_slip_branding_renders_in_english_by_default(): void
+    {
+        $html = view(self::TEMPLATE, $this->ticketVars())->render();
+
+        $this->assertStringContainsString('<title>Store Slip - FBR KOT Layout Co</title>', $html, 'tab title is Store-branded');
+        $this->assertStringContainsString('*** STORE SLIP ***', $html, 'printed header is STORE SLIP');
+        $this->assertStringContainsString('Print Store Slip', $html, 'print button is Store-branded');
+        $this->assertStringNotContainsString('KITCHEN ORDER', $html, 'kitchen wording must not appear on the FBR ticket');
+    }
+
+    public function test_store_slip_branding_renders_in_urdu_locale(): void
+    {
+        $previous = app()->getLocale();
+        try {
+            app()->setLocale('ur');
+            $html = view(self::TEMPLATE, $this->ticketVars())->render();
+        } finally {
+            app()->setLocale($previous);
+        }
+
+        $urduLabel = __('pos.fbr_store_slip_word', [], 'ur');
+        $this->assertStringContainsString('سٹور سلپ', $urduLabel, 'ur lang key is real Urdu script');
+        $this->assertStringContainsString('<title>' . $urduLabel . ' - FBR KOT Layout Co</title>', $html, 'tab title localizes');
+        $this->assertStringContainsString('*** ' . mb_strtoupper($urduLabel) . ' ***', $html, 'printed header localizes');
+        $this->assertStringContainsString(__('pos.fbr_ti_print_store_slip', [], 'ur'), $html, 'print button localizes');
+        $this->assertStringNotContainsString('Store Slip -', $html, 'no English title leaks into the Urdu ticket');
+    }
+
+    /** Minimal variable set both controller paths pass (no om identifiers). */
+    private function ticketVars(): array
+    {
+        return [
+            'company'      => $this->makeCompany('off'),
+            'held'         => new \stdClass(),
+            'items'        => [
+                ['item_name' => 'Zinger Burger', 'quantity' => 1.0, 'special_notes' => null],
+            ],
+            'tokenNo'      => null,
+            'orderCode'    => null,
+            'customerName' => null,
+            'kitchenNotes' => null,
+            'now'          => now(),
+            'autoPrint'    => false,
+        ];
+    }
 }

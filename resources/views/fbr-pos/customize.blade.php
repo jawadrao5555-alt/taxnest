@@ -309,14 +309,14 @@
                 </div>
 
                 @if($company->kitchen_printer_enabled ?? false)
-                {{-- Auto-KOT after payment (existing endpoint, surfaced here too) --}}
+                {{-- Auto Store Slip after payment (existing auto-KOT endpoint, Store-branded for FBR — Task 1285) --}}
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.auto_kot') }}</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.ti_auto_kot_hint') }}</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.fbr_auto_store_slip') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_ti_auto_store_slip_hint') }}</p>
                     </div>
                     <button type="button"
                         @click="autoKotOn=!autoKotOn; savingAutoKot=true; fetch('/fbr-pos/api/toggle-auto-kot', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'}}).then(r=>r.json()).then(d=>{ if (d && d.success) { autoKotOn = !!d.enabled; } else { autoKotOn=!autoKotOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ autoKotOn=!autoKotOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingAutoKot=false; })"
@@ -325,14 +325,14 @@
                     </button>
                 </div>
 
-                {{-- KOT reprint permission --}}
+                {{-- Store-slip reprint permission (kot_reprint_enabled column, Store-branded for FBR) --}}
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.kot_reprint_toggle_title') }}</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.kot_reprint_toggle_sub') }}</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.fbr_store_slip_reprint_toggle_title') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_store_slip_reprint_toggle_sub') }}</p>
                     </div>
                     <button type="button"
                         @click="kotReprintOn=!kotReprintOn; savingKotReprint=true; fetch('/fbr-pos/settings/kot-reprint-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:kotReprintOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { kotReprintOn=!kotReprintOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ kotReprintOn=!kotReprintOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingKotReprint=false; })"

@@ -114,7 +114,7 @@
                         @endif
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ __('pos.kitchen_kot_printer') }}</label>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ __('pos.fbr_store_printer') }}</label>
                         <select name="kot_printer" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="">{{ __('pos.opt_not_set_popup') }}</option>
                             @foreach($kotOptions as $opt)
@@ -125,14 +125,14 @@
                             <option value="{{ $kotCur }}" selected>{{ $settings['kot_printer'] }}</option>
                             @endif
                         </select>
-                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.kot_printer_hint') }}</p>
+                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_store_printer_hint') }}</p>
                         @if($kotIsTextOnly)
                         <div class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">{{ __('pos.printer_text_only_warn') }}</div>
                         @endif
                     </div>
                     <div>
                         <div class="flex items-center justify-between gap-2 mb-1.5">
-                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.counter_kot_copy_printer') }}</label>
+                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.fbr_counter_store_copy_printer') }}</label>
                             <label class="flex items-center gap-1.5 cursor-pointer select-none">
                                 <input type="checkbox" name="counter_kot_enabled" value="1" {{ $settings['counter_kot_enabled'] ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5">
                                 <span class="text-[11px] font-semibold text-gray-600 dark:text-gray-400">{{ __('pos.use_it_toggle') }}</span>
@@ -147,7 +147,7 @@
                             <option value="{{ $counterKotCur }}" selected>{{ $settings['counter_kot_printer'] }}</option>
                             @endif
                         </select>
-                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.counter_kot_hint') }}</p>
+                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_counter_store_copy_hint') }}</p>
                     </div>
                     <div class="flex items-end">
                         <button type="submit" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-sm">{{ __('pos.save_printer_settings') }}</button>
@@ -246,7 +246,7 @@
             <div class="flex items-start justify-between gap-3 p-2.5 rounded-lg border border-red-100 dark:border-red-900/40 bg-red-50/50 dark:bg-red-900/10">
                 <div class="min-w-0">
                     <p class="text-xs font-semibold text-gray-800 dark:text-gray-200">
-                        {{ $job->type === 'fbr_bill' ? __('pos.bill_word_short') : __('pos.kot_word') }} #{{ $job->type === 'fbr_bill' ? $job->transaction_id : ($job->restaurant_order_id ?? $job->transaction_id) }}
+                        {{ $job->type === 'fbr_bill' ? __('pos.bill_word_short') : __('pos.fbr_store_slip_word') }} #{{ $job->type === 'fbr_bill' ? $job->transaction_id : ($job->restaurant_order_id ?? $job->transaction_id) }}
                         <span class="text-gray-400 font-normal">→ {{ $job->target_printer }}</span>
                     </p>
                     <p class="text-[11px] text-red-600 dark:text-red-400 truncate">{{ $job->error }}</p>

@@ -77,17 +77,137 @@ class FbrService
         return $fallback ?: "";
     }
 
-    private function getUomByHsCode(?string $hsCode, ?string $defaultUom = 'U'): string
+    /**
+     * FBR-valid UoM list for an HS code (DI reference API pdi/v2/HS_UOM), cached 7 days.
+     * FBR rejects a submission with error 0099 when an item's uoM string is not in this
+     * list (e.g. HS 2402.2000 cigarettes only allow "KG" / "Thousand Unit").
+     * Returns UoM description strings, or [] when the list is UNKNOWN (no token / API
+     * unreachable) — callers must treat [] as "no restriction known", never "nothing allowed".
+     */
+    public function getValidUomsForHsCode(?string $hsCode, $company): array
     {
-        if (empty($hsCode)) return $this->normalizeUom($defaultUom);
+        if (empty($hsCode) || !$company) return [];
+        $clean = preg_replace('/[^0-9]/', '', $hsCode);
+        if (strlen($clean) < 4) return [];
+        $dotted = strlen($clean) > 4 ? substr($clean, 0, 4) . '.' . substr($clean, 4) : $clean;
+
+        $cacheKey = 'fbr_hs_uom:' . $clean;
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if (is_array($cached)) return $cached;
+
+        // Negative cache: don't hammer the reference API while it's unreachable.
+        if (\Illuminate\Support\Facades\Cache::get('fbr_hs_uom_unavailable')) return [];
+
+        try {
+            $token = $this->resolveDiToken($company);
+            if (empty($token)) return [];
+
+            $response = \Illuminate\Support\Facades\Http::withToken($token)
+                ->acceptJson()
+                ->timeout(12)
+                ->get('https://gw.fbr.gov.pk/pdi/v2/HS_UOM', [
+                    'hs_code' => $dotted,
+                    'annexure_id' => 3,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (is_array($data)) {
+                    $list = [];
+                    foreach ($data as $row) {
+                        $desc = trim((string) ($row['description'] ?? ''));
+                        if ($desc !== '' && !in_array($desc, $list, true)) {
+                            $list[] = $desc;
+                        }
+                    }
+                    if (!empty($list)) {
+                        \Illuminate\Support\Facades\Cache::put($cacheKey, $list, now()->addDays(7));
+                        return $list;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('FBR HS_UOM reference lookup failed', [
+                'hs_code' => $dotted,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        \Illuminate\Support\Facades\Cache::put('fbr_hs_uom_unavailable', 1, now()->addMinutes(10));
+        return [];
+    }
+
+    /**
+     * Case-insensitive match of a UoM against the FBR-valid list; returns FBR's exact
+     * casing (the string FBR expects back) or null when not in the list.
+     */
+    public function matchValidUom(array $validList, ?string $uom): ?string
+    {
+        if ($uom === null || trim($uom) === '') return null;
+        foreach ($validList as $valid) {
+            if (strcasecmp(trim((string) $valid), trim($uom)) === 0) {
+                return (string) $valid;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Preferred UoM when the item's own default is not FBR-valid for the HS code.
+     * Only applied when the preference is itself in FBR's valid list.
+     */
+    private function preferredUomForHsCode(string $hsCode): ?string
+    {
+        $clean = preg_replace('/[^0-9]/', '', $hsCode);
+        $heading = substr($clean, 0, 4);
+        $chapter = intval(substr($clean, 0, 2));
+        if ($heading === '2402') return 'Thousand Unit'; // cigarettes — industry Annexure-A convention
+        if ($chapter === 22 || $chapter === 27) return 'Liter';
+        if ($chapter === 31) return 'KG';
+        return null;
+    }
+
+    /**
+     * Resolve the UoM to send to FBR for an HS code. When the FBR reference list is
+     * available, the item's default is kept only if valid; otherwise it is corrected
+     * to a valid UoM (preferred pick first, else FBR's first allowed). When the list
+     * is unavailable, falls back to the legacy chapter rules.
+     */
+    public function resolveUomForHsCode(?string $hsCode, ?string $defaultUom, $company = null): string
+    {
+        $normalizedDefault = $this->normalizeUom($defaultUom);
+        if (empty($hsCode)) return $normalizedDefault;
+
+        $validList = $company ? $this->getValidUomsForHsCode($hsCode, $company) : [];
+        if (!empty($validList)) {
+            $match = $this->matchValidUom($validList, $normalizedDefault);
+            if ($match !== null) return $match;
+
+            $preferred = $this->preferredUomForHsCode($hsCode);
+            if ($preferred !== null) {
+                $match = $this->matchValidUom($validList, $preferred);
+                if ($match !== null) return $match;
+            }
+
+            return (string) $validList[0];
+        }
+
+        // Reference list unavailable — legacy static fallbacks.
         $clean = str_replace('.', '', $hsCode);
         $chapter = intval(substr($clean, 0, 2));
+        $heading = substr(preg_replace('/[^0-9]/', '', $hsCode), 0, 4);
 
         if ($chapter === 22) return "Liter";
         if ($chapter === 27) return "Liter";
         if ($chapter === 31) return "KG";
+        if ($heading === '2402') return "Thousand Unit"; // cigarettes: FBR 0099 on any count-based UoM
 
-        return $this->normalizeUom($defaultUom);
+        return $normalizedDefault;
+    }
+
+    private function getUomByHsCode(?string $hsCode, ?string $defaultUom = 'U', $company = null): string
+    {
+        return $this->resolveUomForHsCode($hsCode, $defaultUom, $company);
     }
 
     public function buildPayload($invoice): array
@@ -176,7 +296,7 @@ class FbrService
             }
 
             $hsCode = $item->hs_code ?? "";
-            $uomCode = $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U');
+            $uomCode = $this->getUomByHsCode($hsCode, $item->default_uom ?? 'U', $company);
 
             $itemPayload = [
                 "uoM" => $uomCode,
@@ -420,7 +540,7 @@ class FbrService
         return in_array($heading, ['7204', '7213', '7214', '7227', '7228'], true);
     }
 
-    public function validatePayloadPreSubmission(array $payload): array
+    public function validatePayloadPreSubmission(array $payload, $company = null): array
     {
         $errors = [];
 
@@ -511,6 +631,23 @@ class FbrService
             if ($saleType === 'exempt goods' || $saleType === 'exempt') {
                 if (floatval($item['salesTaxApplicable'] ?? 0) != 0) {
                     $errors[] = ['code' => '0018', 'message' => "Item #{$sn}: Exempt goods should have zero sales tax."];
+                }
+            }
+
+            // FBR 0099 pre-check: UoM must be in FBR's allowed list for the HS code.
+            // Only enforced when the list is known (cached/fetchable) — never blocks
+            // when the reference API is unavailable.
+            if ($company && !empty($item['hsCode']) && !empty($item['uoM'])) {
+                try {
+                    $validUoms = $this->getValidUomsForHsCode($item['hsCode'], $company);
+                    if (!empty($validUoms) && $this->matchValidUom($validUoms, (string) $item['uoM']) === null) {
+                        $errors[] = [
+                            'code' => '0099',
+                            'message' => "Item #{$sn}: Unit of measurement '{$item['uoM']}' is not allowed by FBR for HS code {$item['hsCode']}. FBR only accepts: " . implode(', ', $validUoms) . ". Change the item's UoM to one of these and resubmit.",
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('UoM pre-check skipped: ' . $e->getMessage());
                 }
             }
         }

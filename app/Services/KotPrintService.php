@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PosPrintJob;
 use App\Models\PosStation;
 use App\Models\RestaurantOrder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Server-side KOT enqueue for SILENT printing — used by the waiter app
@@ -214,21 +215,45 @@ class KotPrintService
             }
 
             $makeVoidJob = function (?string $printer, array $items, ?string $ownerDeviceUid = null) use ($company, $order, $userId) {
-                $attrs = [
-                    'company_id'          => $company->id,
-                    'type'                => 'kot_void',
-                    'target_printer'      => $printer,
-                    'restaurant_order_id' => $order->id,
-                    'render_query'        => json_encode(array_values($items)),
-                    'status'              => 'pending',
-                    'created_by'          => $userId,
-                ];
-                // Task 1194: void slips route to the owning counter too — key
-                // only added when a stamp resolves (pre-migration prod safe).
-                if ($stamp = self::deviceStampFor($company->id, $ownerDeviceUid)) {
-                    $attrs['device_uid'] = $stamp;
-                }
-                return PosPrintJob::create($attrs);
+                $renderQuery = json_encode(array_values($items));
+
+                // Task 951: lock this order while finding or creating the
+                // station slip. Two simultaneous waiter taps therefore cannot
+                // both observe an empty queue and create duplicate jobs. The
+                // exact payload is part of the identity so a later, different
+                // cancellation for the same station still reaches the kitchen.
+                return DB::transaction(function () use ($company, $order, $userId, $printer, $ownerDeviceUid, $renderQuery) {
+                    RestaurantOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+                    $inFlight = PosPrintJob::where('company_id', $company->id)
+                        ->where('type', 'kot_void')
+                        ->where('restaurant_order_id', $order->id)
+                        ->where('target_printer', $printer)
+                        ->where('render_query', $renderQuery)
+                        ->whereIn('status', ['pending', 'printing'])
+                        ->where('created_at', '>=', now()->subMinutes(2))
+                        ->orderByDesc('id')
+                        ->first();
+                    if ($inFlight) {
+                        return $inFlight;
+                    }
+
+                    $attrs = [
+                        'company_id'          => $company->id,
+                        'type'                => 'kot_void',
+                        'target_printer'      => $printer,
+                        'restaurant_order_id' => $order->id,
+                        'render_query'        => $renderQuery,
+                        'status'              => 'pending',
+                        'created_by'          => $userId,
+                    ];
+                    // Task 1194: void slips route to the owning counter too — key
+                    // only added when a stamp resolves (pre-migration prod safe).
+                    if ($stamp = self::deviceStampFor($company->id, $ownerDeviceUid)) {
+                        $attrs['device_uid'] = $stamp;
+                    }
+                    return PosPrintJob::create($attrs);
+                });
             };
 
             // Counter copy (dine-in only, same policy as normal KOT copies) always

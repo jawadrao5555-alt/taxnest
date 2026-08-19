@@ -235,6 +235,71 @@ class KotVoidStationRoutingTest extends TestCase
     }
 
     /**
+     * A waiter double-tapping cancel must reuse each station's in-flight void
+     * job instead of creating a second physical slip for the kitchen.
+     */
+    public function test_rapid_duplicate_void_enqueue_creates_only_one_job_per_station(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeStations($c->id);
+        $order = $this->makeOrder($c->id);
+
+        $voidItems = [
+            $this->voidItem('product', 101, 'Seekh Kabab', 2.0),
+            $this->voidItem('product', 102, 'Garlic Naan', 1.0),
+        ];
+
+        // SQLite ignores lockForUpdate. This is its deterministic twin of the
+        // MySQL race: the order lock serializes simultaneous taps, so the
+        // second caller observes the first caller's committed station jobs.
+        $first = KotPrintService::enqueueVoid($c, $order, $voidItems, userId: null);
+        $second = KotPrintService::enqueueVoid($c, $order, $voidItems, userId: null);
+
+        $this->assertTrue($first['printed']);
+        $this->assertTrue($second['printed']);
+        $this->assertSame($first['job_ids'], $second['job_ids']);
+        $this->assertCount(2, $second['job_ids'], 'the second enqueue reuses one job per station');
+        $this->assertSame(2, DB::table('pos_print_jobs')
+            ->where('company_id', $c->id)
+            ->where('type', 'kot_void')
+            ->count());
+    }
+
+    /**
+     * A second, different cancellation for the same order and printer must
+     * remain a new kitchen instruction even while the first is pending.
+     */
+    public function test_distinct_void_payloads_for_same_station_create_separate_jobs(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeStations($c->id);
+        $order = $this->makeOrder($c->id);
+
+        DB::table('pos_products')->insert([
+            'id' => 103, 'company_id' => $c->id, 'name' => 'Chicken Tikka', 'category' => 'BBQ',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        KotPrintService::enqueueVoid($c, $order, [
+            $this->voidItem('product', 101, 'Seekh Kabab', 1.0),
+        ], userId: null);
+        KotPrintService::enqueueVoid($c, $order, [
+            $this->voidItem('product', 103, 'Chicken Tikka', 1.0),
+        ], userId: null);
+
+        $jobs = DB::table('pos_print_jobs')
+            ->where('company_id', $c->id)
+            ->where('type', 'kot_void')
+            ->where('target_printer', 'GrillPrinter')
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $jobs);
+        $this->assertSame('Seekh Kabab', $this->decodeVoidPayload($jobs[0])[0]['item_name']);
+        $this->assertSame('Chicken Tikka', $this->decodeVoidPayload($jobs[1])[0]['item_name']);
+    }
+
+    /**
      * When one station has MULTIPLE removed dishes and the other has one,
      * the split must still assign each item to its correct station.
      */

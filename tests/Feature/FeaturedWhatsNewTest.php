@@ -151,6 +151,7 @@ class FeaturedWhatsNewTest extends TestCase
             $table->text('points');
             $table->string('image_path')->nullable();
             $table->string('audience')->default('pos');
+            $table->string('type', 20)->nullable(); // Task 1286: feature|improvement (null = legacy)
             $table->boolean('is_published')->default(true);
             $table->boolean('is_featured')->default(false);
             $table->unsignedBigInteger('created_by')->nullable();

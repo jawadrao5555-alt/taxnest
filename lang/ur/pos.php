@@ -4143,6 +4143,8 @@ return [
     'whats_new_many' => ':count نئی اپ ڈیٹس آ گئی ہیں!',
     'whats_new_one' => 'ایک نئی اپ ڈیٹ آ گئی ہے!',
     'whats_new_scroll_hint' => 'سب کچھ دیکھنے کے لیے نیچے اسکرول کریں',
+    'wn_type_feature' => 'نیا فیچر',
+    'wn_type_improvement' => 'بہتری',
     'whatsapp_word' => 'WhatsApp',
     'which_order_add_q' => 'کس آرڈر میں آئٹم شامل کرنے ہیں؟',
     'which_order_shift_q' => 'کون سا آرڈر شفٹ کرنا ہے؟',

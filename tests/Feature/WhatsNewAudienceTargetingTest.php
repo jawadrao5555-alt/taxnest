@@ -163,6 +163,7 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->text('points');
             $table->string('image_path')->nullable();
             $table->string('audience')->default('pos');
+            $table->string('type', 20)->nullable(); // Task 1286: feature|improvement (null = legacy)
             $table->boolean('is_published')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
@@ -391,5 +392,99 @@ class WhatsNewAudienceTargetingTest extends TestCase
         $resp->assertStatus(200);
         $resp->assertSee(self::T_POS);
         $resp->assertSee(self::T_ALL);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 7. 7-day live window (Task 1286) — published updates auto-disappear
+    //    from the POS side 7 days after publish (read-time filter, no cron).
+    //    Rows are never deleted; only visibility + markSeen are cut off.
+    // ════════════════════════════════════════════════════════════════════
+
+    private function backdate(string $title, int $days): void
+    {
+        DB::table('app_updates')->where('id', $this->updateId($title))
+            ->update(['created_at' => now()->subDays($days)]);
+    }
+
+    public function test_eight_day_old_published_update_vanishes_from_pra_layout(): void
+    {
+        $this->backdate(self::T_POS, 8);
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::T_POS);  // expired — gone from popup AND bell
+        $resp->assertSee(self::T_ALL);      // fresh row still visible
+    }
+
+    public function test_eight_day_old_published_update_vanishes_from_fbr_layout(): void
+    {
+        $this->backdate(self::T_FBR, 8);
+
+        $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::T_FBR);
+        $resp->assertSee(self::T_ALL);
+    }
+
+    public function test_six_day_old_update_still_shows_on_pra_layout(): void
+    {
+        $this->backdate(self::T_POS, 6);
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertSee(self::T_POS); // inside the window — still live
+    }
+
+    public function test_mark_seen_skips_eight_day_old_updates(): void
+    {
+        $this->backdate(self::T_POS, 8);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->post('/pos/whats-new/seen')->assertStatus(200);
+
+        $seen = AppUpdateSeen::where('user_id', $this->posAdminId)->pluck('app_update_id')->all();
+        $this->assertEqualsCanonicalizing(
+            [$this->updateId(self::T_ALL)],
+            $seen,
+            'markSeen must only mark rows inside the 7-day live window'
+        );
+        $this->assertNotContains($this->updateId(self::T_POS), $seen, 'expired row must NOT be marked seen');
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 8. Update type (Task 1286) — legacy rows without a type must default
+    //    to 'improvement' (accessor) and render without badge errors.
+    // ════════════════════════════════════════════════════════════════════
+
+    public function test_legacy_row_without_type_defaults_to_improvement_and_renders(): void
+    {
+        $legacyTitle = 'WNTYPE-LEGACY-73kd9';
+        $id = DB::table('app_updates')->insertGetId([
+            // type intentionally omitted (NULL) — pre-Task-1286 legacy row
+            'title' => $legacyTitle, 'points' => json_encode(['Point one']),
+            'audience' => 'pos', 'is_published' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->assertSame('improvement', AppUpdate::find($id)->type, 'null type must normalize to improvement');
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+        $resp->assertStatus(200);
+        $resp->assertSee($legacyTitle); // badge rendering must not 500 on legacy rows
+    }
+
+    public function test_feature_type_round_trips_and_unknown_normalizes(): void
+    {
+        $upd = AppUpdate::create([
+            'title' => 'WNTYPE-FEATURE-73kda', 'points' => ['Point one'],
+            'audience' => 'pos', 'is_published' => true, 'type' => 'feature',
+        ]);
+        $this->assertSame('feature', $upd->fresh()->type);
+
+        DB::table('app_updates')->where('id', $upd->id)->update(['type' => 'garbage']);
+        $this->assertSame('improvement', $upd->fresh()->type, 'unknown type values must normalize to improvement');
     }
 }

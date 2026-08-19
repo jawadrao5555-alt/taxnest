@@ -95,7 +95,10 @@
         if ($wnAllowed && !$wnPending && !$wnReadonlyImp
             && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
             && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
+            // Task 1286: 7-day live window — updates auto-disappear from the
+            // bell + popup 7 days after publish (read-time filter, no cron).
             $whatsNewList = \App\Models\AppUpdate::whereIn('audience', ['pos', 'all'])->where('is_published', true)
+                ->where('created_at', '>=', now()->subDays(\App\Models\AppUpdate::LIVE_DAYS))
                 ->orderByDesc('created_at')->limit(10)->get();
             if ($whatsNewList->isNotEmpty()) {
                 $whatsNewSeenIds = \App\Models\AppUpdateSeen::where('user_id', $posUserLayout->id)
@@ -668,7 +671,7 @@
                                     @foreach($whatsNewList as $wnu)
                                         <div class="px-4 py-3">
                                             <div class="flex items-center justify-between gap-2">
-                                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $wnu->title }}</p>
+                                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $wnu->title }} <x-wn-type-badge :update="$wnu" /></p>
                                                 @if(!in_array($wnu->id, $whatsNewSeenIds))
                                                     <span class="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">{{ __('pos.new_word') }}</span>
                                                 @endif
@@ -1292,7 +1295,7 @@
                         🎉 {{ __('pos.wn_featured_badge') }}
                     </div>
                     <h2 class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->title }}</h2>
-                    <p class="text-[12px] text-white/75 mt-1.5">{{ $whatsNewFeatured->created_at->format('d M Y') }}</p>
+                    <p class="text-[12px] text-white/75 mt-1.5"><x-wn-type-badge :update="$whatsNewFeatured" :light="true" /> · {{ $whatsNewFeatured->created_at->format('d M Y') }}</p>
                 </div>
                 <div class="px-6 py-5 overflow-y-auto" style="max-height: 52vh;">
                     @if($whatsNewFeatured->image_path ?? null)
@@ -1316,7 +1319,7 @@
                             <p class="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">{{ __('pos.wn_featured_more') }}</p>
                             @foreach($whatsNewPopupList->reject(fn ($u) => $u->id === $whatsNewFeatured->id) as $wnp)
                                 <div class="{{ $loop->first ? '' : 'mt-4 pt-3 border-t border-gray-100 dark:border-gray-800' }}">
-                                    <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-1.5">{{ $wnp->title }} <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
+                                    <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-1.5">{{ $wnp->title }} <x-wn-type-badge :update="$wnp" /> <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
                                     <ul class="space-y-1.5">
                                         @foreach(($wnp->points ?? []) as $wnpt)
                                             <li class="flex items-start gap-2 text-[13px] text-gray-600 dark:text-gray-300">
@@ -1363,7 +1366,7 @@
                     <div class="text-4xl mb-1">🎉</div>
                     <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
                     @if($whatsNewUnseenCount === 1)
-                        <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
+                        <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} <x-wn-type-badge :update="$whatsNewPopup" :light="true" /> · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
                     @else
                         <p class="text-[12px] text-white/80 mt-1">{{ __('pos.whats_new_scroll_hint') }}</p>
                     @endif
@@ -1375,7 +1378,7 @@
                     @foreach($whatsNewPopupList as $wnp)
                     <div class="{{ $loop->first ? '' : 'mt-5 pt-4 border-t border-gray-200 dark:border-gray-700' }}">
                         @if($whatsNewUnseenCount > 1)
-                            <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-2">{{ $wnp->title }} <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-2">{{ $wnp->title }} <x-wn-type-badge :update="$wnp" /> <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
                         @endif
                         @if($wnp->image_path ?? null)
                             <img src="{{ asset('storage/' . $wnp->image_path) }}" alt="{{ __('pos.update_image_alt') }}" loading="lazy"

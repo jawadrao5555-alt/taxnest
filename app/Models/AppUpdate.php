@@ -6,8 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class AppUpdate extends Model
 {
+    /**
+     * POS-side live window (Task 1286): updates auto-disappear from the
+     * POS/FBR POS bell + popup this many days after publish (created_at).
+     * Display-only — rows are never deleted; admin history keeps everything.
+     */
+    public const LIVE_DAYS = 7;
+
     protected $fillable = [
-        'title', 'points', 'image_path', 'audience', 'is_published', 'is_featured', 'created_by',
+        'title', 'points', 'image_path', 'audience', 'type', 'is_published', 'is_featured', 'created_by',
     ];
 
     protected $casts = [
@@ -43,9 +50,28 @@ class AppUpdate extends Model
         $this->attributes['points'] = json_encode(array_values(array_filter((array) $value, fn ($p) => $p !== null && $p !== '')), JSON_UNESCAPED_UNICODE);
     }
 
+    /**
+     * Update type (Task 1286): 'feature' or 'improvement'. Legacy/blank rows
+     * (and a mid-deploy missing column — attribute arrives as null) always
+     * normalize to 'improvement' so badge rendering can never error.
+     */
+    public function getTypeAttribute($value)
+    {
+        return $value === 'feature' ? 'feature' : 'improvement';
+    }
+
     public function scopePublished($query)
     {
         return $query->where('is_published', true);
+    }
+
+    /**
+     * 7-day POS-side visibility window (Task 1286) — read-time filter only,
+     * no cron: older rows simply stop matching. Admin history is unfiltered.
+     */
+    public function scopeLiveWindow($query)
+    {
+        return $query->where('created_at', '>=', now()->subDays(self::LIVE_DAYS));
     }
 
     public function seens()

@@ -4142,6 +4142,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'whats_new_many' => ':count Naye Updates Aye Hain!',
     'whats_new_one' => 'Naya Update Aya Hai!',
     'whats_new_scroll_hint' => 'Neeche scroll kar ke sab dekhein',
+    'wn_type_feature' => 'Naya Feature',
+    'wn_type_improvement' => 'Behtari',
     'whatsapp_word' => 'WhatsApp',
     'which_order_add_q' => 'Items kis order mein jayein?',
     'which_order_shift_q' => 'Kaunsa order shift karein?',

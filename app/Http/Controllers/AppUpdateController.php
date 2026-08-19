@@ -59,6 +59,8 @@ class AppUpdateController extends Controller
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             // Audience (Aug 2026): 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
             'audience' => 'nullable|in:pos,fbr_pos,all',
+            // Type (Task 1286): 'feature' = Naya Feature, 'improvement' = Behtari / Masla Hal.
+            'type' => 'nullable|in:feature,improvement',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -76,7 +78,9 @@ class AppUpdateController extends Controller
             // Featured "bara elaan" (Task 722) — hasColumn guard: prod schema
             // drift convention (row could be "Ran" without the column).
         ] + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')
-            ? ['is_featured' => $request->boolean('is_featured')] : []));
+            ? ['is_featured' => $request->boolean('is_featured')] : [])
+          + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')
+            ? ['type' => $request->input('type') ?: 'improvement'] : []));
 
         return redirect('/admin/app-updates')->with('success', 'Update published. POS users will see it on their next page load.');
     }
@@ -90,6 +94,7 @@ class AppUpdateController extends Controller
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'audience' => 'nullable|in:pos,fbr_pos,all',
+            'type' => 'nullable|in:feature,improvement',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -107,6 +112,9 @@ class AppUpdateController extends Controller
         // Unchecked checkbox = false (edit form always sends the field's state).
         if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')) {
             $data['is_featured'] = $request->boolean('is_featured');
+        }
+        if ($request->filled('type') && \Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')) {
+            $data['type'] = $request->input('type');
         }
 
         if ($request->boolean('remove_image')) {
@@ -197,7 +205,9 @@ class AppUpdateController extends Controller
             return response()->json(['ok' => false], 401);
         }
 
-        $ids = AppUpdate::whereIn('audience', $audiences)->published()->pluck('id');
+        // Task 1286: only rows inside the 7-day live window are marked seen —
+        // mirrors the layout queries (older rows are invisible on POS anyway).
+        $ids = AppUpdate::whereIn('audience', $audiences)->published()->liveWindow()->pluck('id');
         $already = AppUpdateSeen::where('user_id', $user->id)->whereIn('app_update_id', $ids)->pluck('app_update_id')->all();
 
         foreach ($ids as $id) {

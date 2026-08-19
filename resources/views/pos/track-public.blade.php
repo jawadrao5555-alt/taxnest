@@ -59,7 +59,7 @@
         .card .big { font-size: 40px; margin-bottom: 10px; }
         .card h1 { font-size: 17px; margin-bottom: 8px; }
         .card p { font-size: 13px; color: #6b7280; line-height: 1.6; }
-        .stale { display: none; padding: 6px 16px; font-size: 11px; font-weight: 600; color: #92400e; background: #fef3c7; flex-shrink: 0; }
+        .stale, .last-seen { display: none; padding: 6px 16px; font-size: 11px; font-weight: 600; color: #92400e; background: #fef3c7; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -94,6 +94,7 @@
         <span id="st-eta" class="eta"></span>
     </div>
     <div id="stale-note" class="stale">{{ __('pos.rt_pub_stale', [], 'rur') }} ({{ __('pos.rt_pub_stale', [], 'en') }})</div>
+    <div id="last-seen-note" class="last-seen"></div>
     <div id="map"></div>
     <div class="note">{{ __('pos.rt_pub_note', [], 'rur') }} · {{ __('pos.rt_pub_note', [], 'en') }}</div>
     <script>
@@ -122,11 +123,18 @@
         var riderIcon = L.divIcon({ className: '', html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">🛵</div>', iconSize: [26, 26], iconAnchor: [13, 13] });
         var homeIcon  = L.divIcon({ className: '', html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">📍</div>', iconSize: [26, 26], iconAnchor: [13, 24] });
         var riderMarker = null, homeMarker = null, line = null, firstFit = true, stopped = false;
+        var PUBLIC_STALE_AFTER_SECONDS = 5 * 60;
+
+        function lastSeenCaption(secondsAgo) {
+            var minutes = Math.max(1, Math.floor(secondsAgo / 60));
+            return 'Aakhri signal ' + minutes + ' min pehle · Last seen ' + minutes + ' min ago';
+        }
 
         function render(d) {
             var chip = document.getElementById('st-chip');
             var eta = document.getElementById('st-eta');
             var stale = document.getElementById('stale-note');
+            var lastSeen = document.getElementById('last-seen-note');
             var st = d.status || 'preparing';
             chip.textContent = LABELS[st] || st;
             chip.className = 'chip ' + st;
@@ -141,12 +149,20 @@
             }
             if (d.rider) {
                 stale.style.display = 'none';
+                var secondsAgo = Number(d.rider.seconds_ago);
+                var riderIsStale = Number.isFinite(secondsAgo) && secondsAgo >= PUBLIC_STALE_AFTER_SECONDS;
+                lastSeen.style.display = riderIsStale ? 'block' : 'none';
+                lastSeen.textContent = riderIsStale ? lastSeenCaption(secondsAgo) : '';
                 if (!riderMarker) riderMarker = L.marker([d.rider.lat, d.rider.lng], { icon: riderIcon }).addTo(map);
                 else riderMarker.setLatLng([d.rider.lat, d.rider.lng]);
+                riderMarker.setOpacity(riderIsStale ? 0.48 : 1);
                 if (d.customer) {
                     var pts = [[d.rider.lat, d.rider.lng], [d.customer.lat, d.customer.lng]];
-                    if (!line) line = L.polyline(pts, { color: '#0A4D5C', weight: 3, dashArray: '6 8', opacity: .7 }).addTo(map);
-                    else line.setLatLngs(pts);
+                    if (!line) line = L.polyline(pts, { color: '#0A4D5C', weight: 3, dashArray: '6 8', opacity: riderIsStale ? .35 : .7 }).addTo(map);
+                    else {
+                        line.setLatLngs(pts);
+                        line.setStyle({ opacity: riderIsStale ? .35 : .7 });
+                    }
                     if (firstFit) { map.fitBounds(pts, { padding: [40, 40] }); firstFit = false; }
                 } else if (firstFit) {
                     map.setView([d.rider.lat, d.rider.lng], 15); firstFit = false;
@@ -154,6 +170,10 @@
             } else {
                 // No fresh rider fix yet — show the customer pin (or PK center).
                 stale.style.display = (st === 'dispatched' || st === 'assigned') ? 'block' : 'none';
+                lastSeen.style.display = 'none';
+                lastSeen.textContent = '';
+                if (riderMarker) riderMarker.setOpacity(1);
+                if (line) line.setStyle({ opacity: .7 });
                 if (firstFit) {
                     if (d.customer) map.setView([d.customer.lat, d.customer.lng], 15);
                     else map.setView([30.3753, 69.3451], 5);

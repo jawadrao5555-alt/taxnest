@@ -264,6 +264,36 @@ class CustomerTrackingLinkTest extends TestCase
         $this->assertArrayNotHasKey('phone', $d);
     }
 
+    public function test_public_page_marks_a_delayed_rider_fix_with_last_seen_context(): void
+    {
+        $company = $this->makeCompany();
+        $rider = PosRider::create([
+            'company_id' => $company->id, 'name' => 'Bilal', 'on_duty' => true,
+            'last_lat' => 31.5300000, 'last_lng' => 74.3500000,
+            'last_located_at' => now()->subMinutes(20),
+        ]);
+        $bill = $this->makeBill($company, [
+            'rider_id' => $rider->id, 'delivery_status' => 'dispatched',
+            'track_token' => str_repeat('e', 48),
+        ]);
+
+        $data = app(PosRiderTrackingController::class)
+            ->publicTrackData($bill->track_token)->getData(true);
+
+        // Delayed public fixes remain visible until the existing six-hour
+        // cutoff, but their age gives the map enough context not to imply live
+        // movement.
+        $this->assertNotNull($data['rider']);
+        $this->assertGreaterThanOrEqual(20 * 60, $data['rider']['seconds_ago']);
+        $this->assertLessThan(22 * 60, $data['rider']['seconds_ago']);
+
+        $page = app(PosRiderTrackingController::class)->publicTrackPage($bill->track_token);
+        $html = $page->render();
+        $this->assertStringContainsString('id="last-seen-note"', $html);
+        $this->assertStringContainsString('PUBLIC_STALE_AFTER_SECONDS = 5 * 60', $html);
+        $this->assertStringContainsString('riderMarker.setOpacity', $html);
+    }
+
     public function test_public_poll_delivered_bill_is_done_without_rider(): void
     {
         $company = $this->makeCompany();

@@ -594,6 +594,59 @@
             @endif
 
             <div x-data="invoiceKeyboardNav()" @keydown.window="handleKeydown($event)" class="premium-card overflow-hidden">
+                @if($tab === 'draft' && in_array(auth()->user()->role, ['company_admin', 'employee']))
+                {{-- Task 1245: bulk submit selected drafts to FBR --}}
+                <div x-show="bulkSelected.length > 0 && !bulkBatchKey" x-cloak class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-900/20">
+                    <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300"><span x-text="bulkSelected.length"></span> draft(s) selected</p>
+                    <button type="button" @click="startBulkSubmit(false)" :disabled="bulkStarting"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-bold hover:from-emerald-700 hover:to-teal-700 transition disabled:opacity-50">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        <span x-show="!bulkStarting">Submit selected to FBR</span>
+                        <span x-show="bulkStarting" x-cloak>Starting...</span>
+                    </button>
+                    @if($draftCount > 1)
+                    <button type="button" @click="if(confirm('Submit ALL {{ $draftCount }} draft invoices to FBR?')) startBulkSubmit(true)" :disabled="bulkStarting"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/40 transition disabled:opacity-50">
+                        Submit all {{ $draftCount }} drafts
+                    </button>
+                    @endif
+                    <button type="button" @click="bulkSelected = []" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 underline">Clear selection</button>
+                </div>
+                <div x-show="bulkBatchKey" x-cloak class="px-5 py-3.5 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-900/20">
+                    <div class="flex flex-wrap items-center gap-3 mb-2">
+                        <svg x-show="!bulkProgress || !bulkProgress.finished" class="w-4 h-4 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                        <p class="text-sm font-bold text-indigo-900 dark:text-indigo-200">
+                            <span x-show="!bulkProgress || !bulkProgress.finished">Submitting to FBR — <span x-text="bulkProgress ? bulkProgress.done : 0"></span> / <span x-text="bulkProgress ? bulkProgress.total : '…'"></span></span>
+                            <span x-show="bulkProgress && bulkProgress.finished" x-cloak>Bulk submit finished</span>
+                        </p>
+                        <template x-if="bulkProgress">
+                            <p class="text-xs font-semibold">
+                                <span class="text-emerald-700 dark:text-emerald-400" x-text="bulkProgress.success + ' submitted'"></span>
+                                <span class="text-red-600 dark:text-red-400 ml-2" x-show="bulkProgress.failed > 0" x-text="bulkProgress.failed + ' failed'"></span>
+                                <span class="text-amber-600 dark:text-amber-400 ml-2" x-show="bulkProgress.pending > 0" x-text="bulkProgress.pending + ' pending verification'"></span>
+                                <span class="text-gray-500 dark:text-gray-400 ml-2" x-show="bulkProgress.skipped > 0" x-text="bulkProgress.skipped + ' skipped'"></span>
+                            </p>
+                        </template>
+                    </div>
+                    <div class="w-full h-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full overflow-hidden mb-2">
+                        <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-500" :style="'width: ' + (bulkProgress && bulkProgress.total ? Math.round(bulkProgress.done / bulkProgress.total * 100) : 0) + '%'"></div>
+                    </div>
+                    <template x-if="bulkProgress && bulkProgress.finished">
+                        <div>
+                            <div x-show="bulkFailures().length" class="mb-2 max-h-40 overflow-y-auto rounded-lg bg-white/70 dark:bg-gray-900/40 border border-red-200 dark:border-red-800 p-2">
+                                <template x-for="r in bulkFailures()" :key="r.invoice_id">
+                                    <p class="text-[11px] text-red-700 dark:text-red-400 py-0.5">
+                                        <a :href="'/invoice/' + r.invoice_id" class="font-bold underline" x-text="r.invoice_number || ('#' + r.invoice_id)"></a>
+                                        — <span x-text="r.message"></span>
+                                    </p>
+                                </template>
+                            </div>
+                            <button type="button" @click="window.location.reload()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">Refresh list</button>
+                        </div>
+                    </template>
+                    <p x-show="bulkError" x-cloak class="text-xs text-red-600 dark:text-red-400 font-semibold" x-text="bulkError"></p>
+                </div>
+                @endif
                 <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
                     <div class="flex items-center gap-3">
                         <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -623,6 +676,14 @@
                     <table class="min-w-full premium-table table-cards" id="invoiceTable">
                         <thead class="bg-gradient-to-r from-gray-50 to-gray-100/80 dark:from-gray-800 dark:to-gray-800/80 sticky top-0 z-10">
                             <tr>
+                                @if($tab === 'draft')
+                                <th class="px-2 py-2 text-center w-8" @click.stop>
+                                    <input type="checkbox" @change="toggleAllDrafts($event.target.checked)"
+                                        :checked="bulkSelected.length > 0 && bulkSelected.length === pageDraftIds.length"
+                                        class="rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        title="Select all drafts on this page">
+                                </th>
+                                @endif
                                 @if($tab === 'completed')
                                 <th class="px-1 py-2 text-center w-6 text-[10px]">#</th>
                                 @endif
@@ -691,6 +752,14 @@
                                 data-invoice-url="/invoice/{{ $invoice->id }}"
                                 data-download-url="/invoice/{{ $invoice->id }}/download"
                                 data-wht-locked="{{ $invoice->wht_locked ? '1' : '0' }}">
+                                @if($tab === 'draft')
+                                <td class="px-2 py-2 text-center" @click.stop>
+                                    @if($invoice->status === 'draft' && !$invoice->fbr_invoice_number && !$invoice->is_fbr_processing)
+                                    <input type="checkbox" value="{{ $invoice->id }}" x-model="bulkSelected"
+                                        class="bulk-draft-cb rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                                    @endif
+                                </td>
+                                @endif
                                 @if($tab === 'completed')
                                 <td class="px-1 py-2 text-center text-[10px] text-gray-400 font-mono">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $index + 1 }}</td>
                                 @endif
@@ -876,7 +945,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="{{ $tab === 'completed' ? '11' : '10' }}" class="px-6 py-12 text-center">
+                                <td colspan="11" class="px-6 py-12 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                     <p class="mt-2 text-gray-500 dark:text-gray-400">No invoices found</p>
                                     @if(request('search') || request('fbr_status') || request('month') || request('date_from'))
@@ -955,6 +1024,79 @@ function invoiceKeyboardNav() {
     return {
         selectedRow: -1,
         totalRows: {{ $invoices->count() }},
+
+        // ── Task 1245: bulk submit drafts to FBR ──
+        bulkSelected: [],
+        @php
+            $pageDraftIds = [];
+            if ($tab === 'draft') {
+                foreach ($invoices as $pdInv) {
+                    if ($pdInv->status === 'draft' && !$pdInv->fbr_invoice_number && !$pdInv->is_fbr_processing) {
+                        $pageDraftIds[] = (string) $pdInv->id;
+                    }
+                }
+            }
+        @endphp
+        pageDraftIds: {{ json_encode($pageDraftIds) }},
+        bulkBatchKey: null,
+        bulkProgress: null,
+        bulkStarting: false,
+        bulkError: '',
+        bulkPollTimer: null,
+
+        toggleAllDrafts(checked) {
+            this.bulkSelected = checked ? [...this.pageDraftIds] : [];
+        },
+
+        bulkFailures() {
+            if (!this.bulkProgress || !this.bulkProgress.results) return [];
+            return this.bulkProgress.results.filter(r => r.status === 'failed' || r.status === 'skipped' || r.status === 'pending');
+        },
+
+        startBulkSubmit(selectAll) {
+            if (this.bulkStarting || this.bulkBatchKey) return;
+            this.bulkStarting = true;
+            this.bulkError = '';
+            const body = selectAll
+                ? { select_all_drafts: true }
+                : { invoice_ids: this.bulkSelected.map(Number) };
+            fetch('/invoices/bulk-submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || ''
+                },
+                body: JSON.stringify(body)
+            })
+            .then(async r => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }))
+            .then(({ ok, status, data }) => {
+                this.bulkStarting = false;
+                if (data.batch_key && (ok || status === 409)) {
+                    // 409 = a batch is already running; re-attach to it.
+                    this.bulkBatchKey = data.batch_key;
+                    this.pollBulk();
+                } else {
+                    alert(data.message || 'Could not start bulk submit.');
+                }
+            })
+            .catch(() => { this.bulkStarting = false; alert('Network error — please try again.'); });
+        },
+
+        pollBulk() {
+            if (!this.bulkBatchKey) return;
+            fetch('/invoices/bulk-submit-status?batch_key=' + encodeURIComponent(this.bulkBatchKey), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(d => {
+                if (d.batch) this.bulkProgress = d.batch;
+                if (this.bulkProgress && this.bulkProgress.finished) return;
+                this.bulkPollTimer = setTimeout(() => this.pollBulk(), 2500);
+            })
+            .catch(() => { this.bulkPollTimer = setTimeout(() => this.pollBulk(), 5000); });
+        },
 
         handleKeydown(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable) return;

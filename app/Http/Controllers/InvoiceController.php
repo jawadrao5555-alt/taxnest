@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use App\Services\AuditLogService;
 use App\Services\InvoiceNumberingService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -674,6 +675,94 @@ class InvoiceController extends Controller
             DB::rollBack();
             return back()->with('error', 'Failed to update invoice.')->withInput();
         }
+    }
+
+    /**
+     * Task 1245: bulk-submit selected draft invoices to FBR.
+     * Queues one BulkSubmitInvoiceJob per invoice; the list page polls
+     * bulkSubmitStatus() for per-invoice results.
+     */
+    public function bulkSubmit(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'invoice_ids' => 'nullable|array|max:1000',
+            'invoice_ids.*' => 'integer',
+            'select_all_drafts' => 'nullable|boolean',
+        ]);
+
+        $selectAll = $request->boolean('select_all_drafts');
+        $ids = $request->input('invoice_ids', []);
+        if (!$selectAll && empty($ids)) {
+            return response()->json(['status' => 'error', 'message' => 'Select at least one draft invoice.'], 422);
+        }
+
+        $subscription = Subscription::where('company_id', $companyId)
+            ->where('active', true)
+            ->first();
+        if ($subscription && ($subscription->isExpired() || ($subscription->trial_ends_at && $subscription->isTrialExpired()))) {
+            return response()->json(['status' => 'error', 'message' => 'Your subscription has expired. Invoices stay as drafts.'], 422);
+        }
+
+        $query = Invoice::where('company_id', $companyId)
+            ->where('status', 'draft')
+            ->where('is_fbr_processing', false)
+            ->whereNull('fbr_invoice_number');
+        if (!$selectAll) {
+            $query->whereIn('id', $ids);
+        }
+        $invoiceIds = $query->orderBy('id')->limit(1000)->pluck('id')->all();
+
+        if (empty($invoiceIds)) {
+            return response()->json(['status' => 'error', 'message' => 'No submittable draft invoices in your selection.'], 422);
+        }
+
+        // One bulk run per company at a time — a second click while a batch
+        // is running just re-attaches to the running batch.
+        $lockKey = \App\Jobs\BulkSubmitInvoiceJob::runningLockKey($companyId);
+        $batchKey = $companyId . '-' . now()->format('YmdHis') . '-' . substr(md5(uniqid('', true)), 0, 8);
+        if (!Cache::add($lockKey, $batchKey, now()->addMinutes(60))) {
+            $existing = Cache::get($lockKey);
+            return response()->json([
+                'status' => 'already_running',
+                'message' => 'A bulk submit is already in progress.',
+                'batch_key' => $existing,
+            ], 409);
+        }
+
+        \App\Jobs\BulkSubmitInvoiceJob::startBatch($batchKey, $companyId, $invoiceIds);
+        foreach ($invoiceIds as $id) {
+            \App\Jobs\BulkSubmitInvoiceJob::dispatch($id, $batchKey, auth()->id());
+        }
+
+        AuditLogService::log('invoice_bulk_submit_started', 'Invoice', null, null, [
+            'batch_key' => $batchKey,
+            'count' => count($invoiceIds),
+        ]);
+
+        return response()->json([
+            'status' => 'queued',
+            'batch_key' => $batchKey,
+            'total' => count($invoiceIds),
+        ]);
+    }
+
+    /** Task 1245: progress/results of a bulk submit batch (polled by the list). */
+    public function bulkSubmitStatus(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $batchKey = (string) $request->query('batch_key', '');
+        $batch = $batchKey !== '' ? Cache::get(\App\Jobs\BulkSubmitInvoiceJob::cacheKey($batchKey)) : null;
+
+        if (!$batch || (int) ($batch['company_id'] ?? 0) !== (int) $companyId) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        // Results are stored keyed by invoice id (write-once dedupe) — expose a plain list.
+        $batch['results'] = array_values($batch['results'] ?? []);
+
+        return response()->json(['status' => 'ok', 'batch' => $batch]);
     }
 
     public function submit(Request $request, Invoice $invoice)

@@ -178,6 +178,16 @@ class PosWaiterMultiOrderPickerTest extends TestCase
         return json_decode($res->getContent(), true);
     }
 
+    private function tablesResponse(?string $etag = null)
+    {
+        $request = Request::create('/pos/waiter/api/tables', 'GET');
+        if ($etag) {
+            $request->headers->set('If-None-Match', $etag);
+        }
+
+        return app(RestaurantWaiterController::class)->tables($request);
+    }
+
     // ── 1+2: tables API held_orders payload ──────────────────────────────
 
     public function test_tables_api_lists_all_held_orders_and_excludes_non_held(): void
@@ -219,6 +229,29 @@ class PosWaiterMultiOrderPickerTest extends TestCase
         $this->assertCount(1, $t['held_orders']);
         $this->assertSame($o1, $t['held_orders'][0]['id']);
         $this->assertSame($o1, $t['order_id']);
+    }
+
+    public function test_tables_api_returns_304_until_visible_table_data_changes(): void
+    {
+        [$companyId, $tableId] = $this->seedCompanyAndTable();
+        $orderId = $this->makeOrder($companyId, $tableId, 'W-ETAG', 'held', 1);
+
+        $first = $this->tablesResponse();
+        $etag = $first->headers->get('ETag');
+        $this->assertNotEmpty($etag);
+        $this->assertSame(304, $this->tablesResponse($etag)->getStatusCode());
+
+        DB::table('restaurant_order_items')
+            ->where('order_id', $orderId)
+            ->update([
+                'item_name' => 'Updated preview item',
+                'updated_at' => now()->addSecond(),
+            ]);
+
+        $changed = $this->tablesResponse($etag);
+        $this->assertSame(200, $changed->getStatusCode());
+        $this->assertNotSame($etag, $changed->headers->get('ETag'));
+        $this->assertSame('Updated preview item', json_decode($changed->getContent(), true)[0]['held_orders'][0]['items'][0]['name']);
     }
 
     // ── Read-only table preview (ZFC, 6 Aug 2026) ────────────────────────
@@ -403,6 +436,35 @@ const assert = (cond, msg) => { if (!cond) { console.error('FAIL: ' + msg); proc
     app.startShiftFromTable(empty);
     assert(app.appendOrderId === null && app.shiftFor === null && app.appendPickFor === null && app.shiftPickFor === null,
            'tables without a held order must be inert');
+
+    // ── Table poll ETag: cache validator sent; 304 preserves current body ──
+    const liveTables = [{ id: 88, table_number: '9', status: 'available' }];
+    const fetchCalls = [];
+    global.fetch = async (_url, options) => {
+        fetchCalls.push(options);
+        if (fetchCalls.length === 1) {
+            return {
+                status: 200,
+                ok: true,
+                headers: { get: (name) => name === 'ETag' ? '"waiter-etag-1"' : null },
+                json: async () => liveTables,
+            };
+        }
+        return {
+            status: 304,
+            ok: false,
+            headers: { get: () => null },
+            json: async () => { throw new Error('304 response body must not be parsed'); },
+        };
+    };
+
+    await app.reloadTablesQuiet();
+    assert(app._tableEtag === '"waiter-etag-1"', '200 response ETag must be remembered');
+    assert(app.tables === liveTables, '200 response body must update waiter tables');
+
+    await app.reloadTablesQuiet();
+    assert(fetchCalls[1].headers['If-None-Match'] === '"waiter-etag-1"', 'next poll must send If-None-Match');
+    assert(app.tables === liveTables, '304 must preserve the existing table data');
 
     console.log('ALL_OK');
 })().catch((e) => { console.error('FAIL: ' + (e && e.stack || e)); process.exit(1); });

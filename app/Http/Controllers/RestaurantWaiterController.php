@@ -158,10 +158,18 @@ class RestaurantWaiterController extends Controller
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
-    public function tables()
+    public function tables(?Request $request = null)
     {
         $companyId = app('currentCompanyId');
         RestaurantTable::releaseStaleReservations($companyId);
+
+        // Fast-path for the waiter tablet's frequent floor poll. The fingerprint
+        // covers every value exposed below (including preview items), so a 304
+        // never leaves a visible table card stale.
+        $etag = $this->tablesEtag($companyId);
+        if ($request?->header('If-None-Match') === $etag) {
+            return response('', 304)->header('ETag', $etag);
+        }
 
         // Two separate eager-loads:
         //   activeOrders  — all non-completed/cancelled (for active_orders count +
@@ -225,7 +233,64 @@ class RestaurantWaiterController extends Controller
                 ])->all(),
             ]);
 
-        return response()->json($tables);
+        return response()->json($tables)->header('ETag', $etag);
+    }
+
+    /**
+     * Lightweight fingerprint for the waiter table-picker/status feed.
+     *
+     * The full response eagerly loads orders and items. On an unchanged poll,
+     * these scalar queries avoid that work while still including every field the
+     * waiter can see: table/floor details, active/held order data, and item
+     * preview/count data.
+     */
+    private function tablesEtag(int $companyId): string
+    {
+        $tableRows = DB::table('restaurant_tables as tables')
+            ->leftJoin('restaurant_floors as floors', 'floors.id', '=', 'tables.floor_id')
+            ->where('tables.company_id', $companyId)
+            ->where('tables.is_active', true)
+            ->orderBy('tables.id')
+            ->get([
+                'tables.id', 'tables.table_number', 'tables.seats', 'tables.status',
+                'tables.occupied_since', 'tables.updated_at',
+                'floors.name as floor_name', 'floors.updated_at as floor_updated_at',
+            ]);
+
+        $orderRows = DB::table('restaurant_orders')
+            ->where('company_id', $companyId)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereNotNull('table_id')
+            ->orderBy('id')
+            ->get(['id', 'table_id', 'order_number', 'status', 'total_amount', 'updated_at']);
+
+        $itemRows = DB::table('restaurant_order_items')
+            ->whereIn('order_id', function ($query) use ($companyId) {
+                $query->select('id')
+                    ->from('restaurant_orders')
+                    ->where('company_id', $companyId)
+                    ->whereNotIn('status', ['completed', 'cancelled'])
+                    ->whereNotNull('table_id');
+            })
+            ->orderBy('id')
+            ->get(['id', 'order_id', 'item_name', 'quantity', 'updated_at']);
+
+        $payload =
+            $tableRows->map(fn ($row) => implode(':', [
+                $row->id, $row->table_number, $row->seats, $row->status,
+                $row->occupied_since, $row->updated_at, $row->floor_name, $row->floor_updated_at,
+            ]))->join(',')
+            . '|'
+            . $orderRows->map(fn ($row) => implode(':', [
+                $row->id, $row->table_id, $row->order_number, $row->status,
+                $row->total_amount, $row->updated_at,
+            ]))->join(',')
+            . '|'
+            . $itemRows->map(fn ($row) => implode(':', [
+                $row->id, $row->order_id, $row->item_name, $row->quantity, $row->updated_at,
+            ]))->join(',');
+
+        return '"waiter-tables-' . $companyId . '-' . md5($payload) . '"';
     }
 
     /** Waiter's own open (still-held) sent orders — for append + status view. */

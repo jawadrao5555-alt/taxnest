@@ -720,6 +720,7 @@ function waiterApp() {
         showTables: false,
         tables: [],
         tablesLoading: false,
+        _tableEtag: null,
         // Buttons style (Task #340, Aug 2026): home button list vs product grid.
         // true = show the home button list; false = show the product grid.
         // Starts true only in buttons mode (PHP-baked); in other styles never used.
@@ -1021,9 +1022,24 @@ function waiterApp() {
             this.showTables = true;
             this.tablesLoading = true;
             try {
-                const res = await fetch('/pos/waiter/api/tables', { headers: { 'Accept': 'application/json' } });
-                this.tables = res.ok ? await res.json() : [];
-            } catch (e) { this.tables = []; }
+                const headers = { 'Accept': 'application/json' };
+                if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
+                const res = await fetch('/pos/waiter/api/tables', { headers });
+                if (res.status !== 304) {
+                    if (!res.ok) {
+                        this.tables = [];
+                        this._tableEtag = null;
+                    }
+                    else {
+                        const etag = res.headers.get('ETag');
+                        if (etag) this._tableEtag = etag;
+                        this.tables = await res.json();
+                    }
+                }
+            } catch (e) {
+                this.tables = [];
+                this._tableEtag = null;
+            }
             this.tablesLoading = false;
         },
         pickTable(t) {
@@ -1184,8 +1200,14 @@ function waiterApp() {
             this.showMyOrders = false;
             this.shiftTablesLoading = true;
             try {
-                const res = await fetch('/pos/waiter/api/tables', { headers: { 'Accept': 'application/json' } });
-                if (res.ok) this.tables = await res.json();
+                const headers = { 'Accept': 'application/json' };
+                if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
+                const res = await fetch('/pos/waiter/api/tables', { headers });
+                if (res.status !== 304 && res.ok) {
+                    const etag = res.headers.get('ETag');
+                    if (etag) this._tableEtag = etag;
+                    this.tables = await res.json();
+                }
             } catch (e) { /* silent — grid shows "koi khali table nahi" */ }
             this.shiftTablesLoading = false;
         },
@@ -1345,8 +1367,14 @@ function waiterApp() {
         // showTables modal (used by the buttons-style poll and post-send reset).
         async reloadTablesQuiet() {
             try {
-                const res = await fetch('/pos/waiter/api/tables', { headers: { 'Accept': 'application/json' } });
-                if (res.ok) this.tables = await res.json();
+                const headers = { 'Accept': 'application/json' };
+                if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
+                const res = await fetch('/pos/waiter/api/tables', { headers });
+                if (res.status === 304) return;
+                if (!res.ok) return;
+                const etag = res.headers.get('ETag');
+                if (etag) this._tableEtag = etag;
+                this.tables = await res.json();
             } catch (e) { /* network blip — stale data stays until next poll */ }
         },
 

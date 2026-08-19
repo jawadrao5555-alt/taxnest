@@ -11,7 +11,9 @@
     $initMode = $isEdit ? 'single' : (string) old('entry_mode', $sticky['entry_mode'] ?? 'single');
     if (!in_array($initMode, ['single', 'multi'], true)) { $initMode = 'single'; }
 
-    $initTaxType = (string) old('tax_type', $product->tax_type ?? ($sticky['tax_type'] ?? 'taxable'));
+    // Task 1262: Exempt is the default for new products (most entries are
+    // exempt). Edit mode / old-input redisplay / sticky keep their own value.
+    $initTaxType = (string) old('tax_type', $product->tax_type ?? ($sticky['tax_type'] ?? 'exempt'));
     $initTaxRate = old('default_tax_rate', $product->default_tax_rate ?? ($sticky['default_tax_rate'] ?? 18));
     $initTaxRate = $initTaxRate === null || $initTaxRate === '' ? 18 : $initTaxRate;
     $initThird = old('is_third_schedule', $isEdit ? ($product->is_third_schedule ?? false) : ($sticky['is_third_schedule'] ?? false));
@@ -279,22 +281,8 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
             <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-5 pb-3 border-b border-gray-200 dark:border-gray-700">{{ __('pos.tax_configuration') }}</h3>
 
+            {{-- Task 1262: Exempt first — it's the default and the most common choice. --}}
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-                <label class="relative flex cursor-pointer rounded-xl border-2 p-4 transition"
-                    :class="taxType === 'taxable' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'">
-                    <input type="radio" name="tax_type" value="taxable" x-model="taxType" class="sr-only">
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">%</span>
-                            <span class="font-semibold text-gray-900 dark:text-white text-sm">{{ __('pos.taxable_word') }}</span>
-                        </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.standard_gst_applies') }}</p>
-                    </div>
-                    <div class="absolute top-2 right-2" x-show="taxType === 'taxable'">
-                        <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                    </div>
-                </label>
-
                 <label class="relative flex cursor-pointer rounded-xl border-2 p-4 transition"
                     :class="taxType === 'exempt' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'">
                     <input type="radio" name="tax_type" value="exempt" x-model="taxType" class="sr-only">
@@ -307,6 +295,21 @@
                     </div>
                     <div class="absolute top-2 right-2" x-show="taxType === 'exempt'">
                         <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                    </div>
+                </label>
+
+                <label class="relative flex cursor-pointer rounded-xl border-2 p-4 transition"
+                    :class="taxType === 'taxable' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'">
+                    <input type="radio" name="tax_type" value="taxable" x-model="taxType" class="sr-only">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">%</span>
+                            <span class="font-semibold text-gray-900 dark:text-white text-sm">{{ __('pos.taxable_word') }}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.standard_gst_applies') }}</p>
+                    </div>
+                    <div class="absolute top-2 right-2" x-show="taxType === 'taxable'">
+                        <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                     </div>
                 </label>
 

@@ -1541,8 +1541,9 @@ window.addEventListener('popstate', function() {
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.qc_tax_label') }}</label>
                         <select x-model="qcTaxMode" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            <option value="standard">{{ __('pos.qc_tax_standard') }}</option>
+                            {{-- Task 1262: Exempt first + default (matches product form) --}}
                             <option value="exempt">{{ __('pos.tax_exempt_tax_free') }}</option>
+                            <option value="standard">{{ __('pos.qc_tax_standard') }}</option>
                             <option value="custom">{{ __('pos.qc_tax_custom') }}</option>
                         </select>
                     </div>
@@ -4500,7 +4501,7 @@ function restaurantPos() {
         qcSaving: false,
         qcFromScan: false,
         qcExistingId: null,   // set = popup is EDITING an existing unpriced product (update, not create)
-        qcName: '', qcBarcode: '', qcPrice: '', qcUom: 'U', qcTaxMode: 'standard', qcTaxRate: '', qcHsCode: '',
+        qcName: '', qcBarcode: '', qcPrice: '', qcUom: 'U', qcTaxMode: 'exempt', qcTaxRate: '', qcHsCode: '',
         quickPriceCartUid: null,    // cart_uid of row currently in price-edit mode
         quickPriceValue: '',        // bound to the inline price input
         quickCreateProduct() {
@@ -4535,7 +4536,7 @@ function restaurantPos() {
             this.qcFromScan = /^[0-9]{6,}$/.test(typed);
             this.qcName = this.qcFromScan ? '' : typed;
             this.qcBarcode = this.qcFromScan ? typed : '';
-            this.qcPrice = ''; this.qcUom = 'U'; this.qcTaxMode = 'standard'; this.qcTaxRate = ''; this.qcHsCode = '';
+            this.qcPrice = ''; this.qcUom = 'U'; this.qcTaxMode = 'exempt'; this.qcTaxRate = ''; this.qcHsCode = '';
             this.showSearchDropdown = false;
             this.qcModal = true;
             // Focus the missing piece: scanned code needs a NAME first, typed name needs a PRICE.

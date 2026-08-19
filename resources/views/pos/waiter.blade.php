@@ -717,6 +717,10 @@ function waiterApp() {
         priority: false,
         cashierId: '',
         sending: false,
+        // Task 1010: one UUID per new punch. It stays set after a timeout or
+        // network error so the next tap replays the same server-side attempt
+        // instead of creating a twin held order/KOT.
+        holdAttemptUuid: null,
         showTables: false,
         tables: [],
         tablesLoading: false,
@@ -1248,6 +1252,9 @@ function waiterApp() {
                 return;
             }
             this.sending = true;
+            if (!this.appendOrderId && !this.holdAttemptUuid) {
+                this.holdAttemptUuid = this._newHoldUuid();
+            }
             const items = this.cart.map(l => ({
                 name: l.name, quantity: l.quantity, unit_price: l.unit_price,
                 item_id: l.item_id, special_notes: l.special_notes || null,
@@ -1264,6 +1271,7 @@ function waiterApp() {
                 customer_phone: this.customerPhone || null,
                 kitchen_notes: this.kitchenNotes || null,
                 priority: this.priority,
+                hold_uuid: this.holdAttemptUuid,
             };
             try {
                 const res = await fetch(url, {
@@ -1280,6 +1288,7 @@ function waiterApp() {
                     this.customerName = ''; this.customerPhone = ''; this.kitchenNotes = '';
                     this.selectedTable = null;
                     this.priority = false;
+                    this.holdAttemptUuid = null;
                     // SADA MODE: agla order phir dine-in se, fold band — screen
                     // khud "naya order" halat par wapas (cashier ka intikhab
                     // din bhar qaim rehta hai, jaan boojh kar reset NahiN).
@@ -1298,6 +1307,17 @@ function waiterApp() {
                 this.showToast(@js(__('pos.network_error_try_again')), 'error');
             }
             this.sending = false;
+        },
+
+        // Task 1010: crypto UUIDs are preferred; the fallback supports older
+        // Android WebViews used by waiter tablets.
+        _newHoldUuid() {
+            try {
+                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                    return window.crypto.randomUUID();
+                }
+            } catch (e) {}
+            return 'waiter-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
         },
 
         // ── Buttons style helpers (Task #340, Aug 2026) ─────────────────────────

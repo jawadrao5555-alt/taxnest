@@ -12,6 +12,7 @@ use App\Services\PosFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * P7 (F6) — Waiter Tablets.
@@ -342,12 +343,40 @@ class RestaurantWaiterController extends Controller
             // Urgent/Rush (owner, 7 Aug 2026) — same flag the cashier sale
             // screen sets; KDS badge + KOT *** URGENT *** read order->priority.
             'priority' => 'nullable|boolean',
+            // Task 1010: one idempotency key per waiter punch attempt. The
+            // client keeps this across retries after a timeout/lost response.
+            'hold_uuid' => 'nullable|string|max:64',
         ]);
 
         // Task 632 (ZFC "NOTE: waiter", 13 Aug 2026): browser autofill drops the
         // waiter's OWN login identity into note boxes — discard exact matches on
         // EVERY waiter note-persisting path (storeOrder + appendItems).
         $validated = $this->stripIdentityNotes($validated, $user);
+
+        // Task 1010: a waiter punch must be replay-safe just like the cashier
+        // Hold/Send-to-Kitchen path. Keep this company-scoped and schema-guarded
+        // so code can deploy before the already-planned column if necessary.
+        $holdUuid = trim((string) ($validated['hold_uuid'] ?? ''));
+        $hasHoldUuidColumn = Schema::hasColumn('restaurant_orders', 'hold_uuid');
+        if ($holdUuid !== '' && $hasHoldUuidColumn) {
+            $existingOrder = RestaurantOrder::where('company_id', $companyId)
+                ->where('hold_uuid', $holdUuid)
+                ->with(['items', 'table'])
+                ->first();
+            if ($existingOrder) {
+                Log::info('[WAITER] Replayed by hold_uuid — returning existing order', [
+                    'order_id' => $existingOrder->id,
+                    'hold_uuid' => $holdUuid,
+                ]);
+                return response()->json([
+                    'success' => true,
+                    'order_id' => $existingOrder->id,
+                    'order_number' => $existingOrder->order_number,
+                    'kot_printed' => (int) ($existingOrder->kot_print_count ?? 0) > 0,
+                    'message' => "Order {$existingOrder->order_number} already sent.",
+                ]);
+            }
+        }
 
         // Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026). No pick =
         // unassigned order → EVERY cashier's incoming list shows it (incomingOrders
@@ -398,7 +427,8 @@ class RestaurantWaiterController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.dine_in_table_required')], 422);
         }
 
-        $storeOrderResponse = DB::transaction(function () use ($companyId, $validated, $cashier, $orderType, $tableId, $user, $company) {
+        try {
+            $storeOrderResponse = DB::transaction(function () use ($companyId, $validated, $cashier, $orderType, $tableId, $user, $company, $holdUuid, $hasHoldUuidColumn) {
             if ($tableId) {
                 $table = RestaurantTable::where('company_id', $companyId)
                     ->where('id', $tableId)->where('is_active', true)
@@ -428,7 +458,7 @@ class RestaurantWaiterController extends Controller
                 ? \App\Services\OrderTokenService::nextToken($companyId)
                 : null;
 
-            $order = RestaurantOrder::create([
+            $orderData = [
                 'company_id' => $companyId,
                 'order_number' => 'ORD-' . date('ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5)),
                 'token_no' => $waiterTokenNo,
@@ -447,7 +477,11 @@ class RestaurantWaiterController extends Controller
                 'source' => 'waiter',
                 'kot_sent_at' => now(),
                 'kot_print_count' => 0,
-            ]);
+            ];
+            if ($holdUuid !== '' && $hasHoldUuidColumn) {
+                $orderData['hold_uuid'] = $holdUuid;
+            }
+            $order = RestaurantOrder::create($orderData);
 
             foreach ($validated['items'] as $it) {
                 RestaurantOrderItem::create([
@@ -485,7 +519,34 @@ class RestaurantWaiterController extends Controller
                 'kot_printed' => (bool) $kot['printed'],
                 'message' => $msg,
             ]);
-        });
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Task 1010: two taps/retries can both pass the lookup while the
+            // first request is still in flight. The unique hold_uuid index makes
+            // the loser fail safely; return the committed winner instead of
+            // creating a second KOT or exposing a 500 to the waiter.
+            if ($holdUuid !== '' && $hasHoldUuidColumn) {
+                $winner = RestaurantOrder::where('company_id', $companyId)
+                    ->where('hold_uuid', $holdUuid)
+                    ->with(['items', 'table'])
+                    ->first();
+                if ($winner) {
+                    Log::info('[WAITER] Duplicate-key race resolved — returning winner', [
+                        'order_id' => $winner->id,
+                        'hold_uuid' => $holdUuid,
+                    ]);
+                    return response()->json([
+                        'success' => true,
+                        'order_id' => $winner->id,
+                        'order_number' => $winner->order_number,
+                        'kot_printed' => (int) ($winner->kot_print_count ?? 0) > 0,
+                        'message' => "Order {$winner->order_number} already sent.",
+                    ]);
+                }
+            }
+            Log::error('Waiter order unique-key collision (no winner found): ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to send order. Please try again.'], 500);
+        }
 
         // Instant cashier phone push (Task #1142) — queued only AFTER the
         // transaction committed (success responses carry order_id; the 4xx

@@ -119,6 +119,9 @@ class PosWaiterPermissionTogglesTest extends TestCase
             $table->string('source')->default('waiter');
             $table->timestamp('kot_sent_at')->nullable();
             $table->integer('kot_print_count')->nullable();
+            // Task 1010: waiter punch replay key — same production uniqueness
+            // contract as the cashier Hold/Send-to-Kitchen path.
+            $table->string('hold_uuid', 64)->nullable()->unique();
             $table->timestamp('cancelled_at')->nullable();
             $table->unsignedBigInteger('cancelled_by')->nullable();
             $table->timestamps();
@@ -274,6 +277,28 @@ class PosWaiterPermissionTogglesTest extends TestCase
 
         $this->assertSame(200, $res->getStatusCode());
         $this->assertSame(1, DB::table('restaurant_orders')->where('order_type', 'takeaway')->count());
+    }
+
+    public function test_waiter_punch_replays_hold_uuid_without_a_second_order(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeUser($c, 'pos_waiter');
+        $payload = [
+            'items' => $this->items(),
+            'order_type' => 'takeaway',
+            'hold_uuid' => 'waiter-replay-uuid-1010',
+        ];
+
+        $first = json_decode($this->punch($payload)->getContent(), true);
+        $replay = json_decode($this->punch($payload)->getContent(), true);
+
+        $this->assertTrue($first['success']);
+        $this->assertTrue($replay['success']);
+        $this->assertSame($first['order_id'], $replay['order_id']);
+        $this->assertSame(1, DB::table('restaurant_orders')
+            ->where('company_id', $c->id)
+            ->where('hold_uuid', $payload['hold_uuid'])
+            ->count());
     }
 
     public function test_takeaway_off_does_not_block_admin_on_tablet(): void

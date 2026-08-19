@@ -483,6 +483,77 @@ JS;
         }
     }
 
+    public function test_waiter_app_reuses_the_same_hold_uuid_after_a_network_error(): void
+    {
+        $node = trim((string) shell_exec('command -v node'));
+        if ($node === '') {
+            $this->markTestSkipped('node not available');
+        }
+
+        $js = $this->extractWaiterAppJs();
+
+        $harness = <<<'JS'
+global.window = {
+    scrollTo() {},
+    location: { href: 'http://t/pos/waiter' },
+    crypto: { randomUUID: () => 'waiter-punch-uuid-1010' },
+};
+global.document = { hidden: true, addEventListener() {} };
+global.confirm = () => true;
+
+__WAITER_APP__
+
+const assert = (cond, msg) => { if (!cond) { console.error('FAIL: ' + msg); process.exit(1); } };
+
+(async () => {
+    const app = waiterApp();
+    app.cart = [{ item_id: 9, name: 'Tea', quantity: 1, unit_price: 100, special_notes: '' }];
+    app.orderType = 'takeaway';
+    app.showToast = () => {};
+    app.loadMyOrders = async () => {};
+
+    const payloads = [];
+    let calls = 0;
+    global.fetch = async (_url, options) => {
+        payloads.push(JSON.parse(options.body));
+        calls++;
+        if (calls === 1) throw new Error('simulated lost response');
+        return {
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true, order_id: 44, order_number: 'ORD-44' }),
+        };
+    };
+
+    await app.send();
+    assert(app.holdAttemptUuid === 'waiter-punch-uuid-1010',
+        'failed punch must retain its UUID for retry');
+    assert(app.cart.length === 1, 'failed punch must retain the cart for retry');
+
+    await app.send();
+    assert(payloads.length === 2, 'retry must send exactly one additional request');
+    assert(payloads[0].hold_uuid === 'waiter-punch-uuid-1010',
+        'first punch must carry a generated hold_uuid');
+    assert(payloads[1].hold_uuid === payloads[0].hold_uuid,
+        'retry must reuse the original hold_uuid');
+    assert(app.holdAttemptUuid === null, 'successful punch must clear its UUID for the next order');
+    console.log('ALL_OK');
+})().catch((e) => { console.error('FAIL: ' + (e && e.stack || e)); process.exit(1); });
+JS;
+
+        $script = str_replace('__WAITER_APP__', $js, $harness);
+        $tmp = tempnam(sys_get_temp_dir(), 'waiterapp_') . '.js';
+        file_put_contents($tmp, $script);
+        try {
+            exec(escapeshellarg($node) . ' ' . escapeshellarg($tmp) . ' 2>&1', $out, $code);
+            $output = implode("\n", $out);
+            $this->assertSame(0, $code, "node run failed:\n" . $output);
+            $this->assertStringContainsString('ALL_OK', $output);
+        } finally {
+            @unlink($tmp);
+        }
+    }
+
     /**
      * Pull the real waiterApp() script out of waiter.blade.php and replace
      * blade constructs with harmless JS literals so node can execute it.

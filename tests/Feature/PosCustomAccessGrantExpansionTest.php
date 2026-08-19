@@ -51,6 +51,7 @@ class PosCustomAccessGrantExpansionTest extends TestCase
             $table->string('company_status')->default('approved');
             $table->boolean('restaurant_mode')->default(false);
             $table->boolean('pos_setup_completed')->default(true);
+            $table->text('feature_flags')->nullable();
             $table->string('confidential_pin')->nullable();
             $table->string('default_language')->nullable();
             $table->text('invoice_display_prefs')->nullable();
@@ -132,6 +133,7 @@ class PosCustomAccessGrantExpansionTest extends TestCase
             $table->string('product_type')->nullable();
             $table->decimal('price', 12, 2)->default(0);
             $table->text('features')->nullable();
+            $table->boolean('restaurant_enabled')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
@@ -141,6 +143,7 @@ class PosCustomAccessGrantExpansionTest extends TestCase
             'product_type' => 'pos',
             'status' => 'approved',
             'company_status' => 'approved',
+            'feature_flags' => json_encode(['recipes' => true, 'inventory' => true]),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -152,6 +155,7 @@ class PosCustomAccessGrantExpansionTest extends TestCase
             'name' => 'Test Plan',
             'product_type' => 'pos',
             'price' => 0,
+            'restaurant_enabled' => true,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -255,6 +259,55 @@ class PosCustomAccessGrantExpansionTest extends TestCase
 
         $resp = $this->actingAs($manager, 'pos')->get('/pos/services');
         $resp->assertStatus(200);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // (d) RECIPE EXCEL ROUTES: direct links honor the inventory grant
+    // ════════════════════════════════════════════════════════════════════
+
+    public function test_cashier_without_inventory_access_cannot_reach_recipe_page_or_excel_routes(): void
+    {
+        $companyId = $this->buildHttpSchema();
+        // A saved set is important here: it proves the route gate is enforcing
+        // an explicit unticked inventory feature, rather than only relying on
+        // the normal cashier role defaults or hidden navigation.
+        $cashier = $this->makeMember(
+            $companyId,
+            'pos_cashier',
+            ['dashboard', 'reports'],
+            'recipe-cashier@grant.test'
+        );
+
+        foreach ([
+            ['get', '/pos/restaurant/recipes'],
+            ['get', '/pos/restaurant/recipes/template'],
+            ['post', '/pos/restaurant/recipes/import'],
+        ] as [$method, $path]) {
+            $response = $this->actingAs($cashier, 'pos')->{$method}($path);
+            $response->assertRedirect('/pos/dashboard');
+            $response->assertSessionHas('error');
+        }
+    }
+
+    public function test_manager_can_reach_recipe_template_and_import_routes(): void
+    {
+        $companyId = $this->buildHttpSchema();
+        $manager = $this->makeMember($companyId, 'pos_manager', null, 'recipe-manager@grant.test');
+
+        $this->actingAs($manager, 'pos')
+            ->get('/pos/restaurant/recipes/template')
+            ->assertOk()
+            ->assertHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+
+        // No file is intentional: validation is the controller-level proof
+        // that the request passed PosAuth, PosAdminOnly, and feature:recipes.
+        $this->from('/pos/restaurant/recipes')
+            ->actingAs($manager, 'pos')
+            ->post('/pos/restaurant/recipes/import')
+            ->assertSessionHasErrors('excel_file');
     }
 
     // ════════════════════════════════════════════════════════════════════

@@ -61,6 +61,16 @@ class InvoiceImportService
         'reference_invoice_number',
     ];
 
+    /**
+     * Fields whose VALUE must be present on every row. A column-mapping must
+     * supply either a source column or a fixed default for each of these
+     * (the rest may stay blank — validateRow() treats blank as optional/auto).
+     */
+    public const VALUE_REQUIRED_FIELDS = [
+        'buyer_name', 'buyer_address', 'destination_province', 'document_type',
+        'hs_code', 'description', 'quantity', 'price', 'tax',
+    ];
+
     /** Columns that must survive as literal digit/code strings. */
     private const CODE_COLUMNS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'reference_invoice_number'];
 
@@ -95,6 +105,54 @@ class InvoiceImportService
         'City Electronics|85171100|Smart Phone X100',
     ];
 
+    /**
+     * Known DMS-export header aliases per template field, normalized via
+     * normalizeHeaderKey() (lowercase, non-alphanumerics stripped). Covers the
+     * common wording in distributor day-end exports (Voyage, TMX, Salesflo,
+     * Centegy, local DMS); suggestMapping()'s fuzzy pass catches near-misses.
+     * Deliberately conservative — a wrong auto-suggestion is worse than none.
+     */
+    private const FIELD_ALIASES = [
+        'buyer_name' => ['customername', 'customer', 'partyname', 'party', 'clientname', 'buyername', 'buyer', 'shopname', 'outletname', 'outlet', 'retailername', 'retailer', 'dealername', 'dealer', 'accountname', 'customertitle', 'shiptoparty', 'shiptopartyname', 'storename'],
+        'buyer_ntn' => ['ntn', 'ntnno', 'ntnnumber', 'buyerntn', 'customerntn', 'partyntn', 'strn', 'stregno', 'salestaxregno', 'taxregno'],
+        'buyer_cnic' => ['cnic', 'cnicno', 'cnicnumber', 'buyercnic', 'customercnic', 'idcardno', 'nicno'],
+        'buyer_address' => ['address', 'customeraddress', 'partyaddress', 'buyeraddress', 'shiptoaddress', 'deliveryaddress', 'outletaddress', 'shopaddress', 'address1'],
+        'destination_province' => ['province', 'provincename', 'buyerprovince', 'customerprovince', 'destinationprovince', 'state'],
+        'document_type' => ['documenttype', 'doctype', 'invoicetype', 'transactiontype', 'billtype'],
+        'hs_code' => ['hscode', 'hs', 'hsno', 'hscodeno', 'pctcode', 'pct', 'tariffcode'],
+        'description' => ['productname', 'itemname', 'itemdescription', 'productdescription', 'product', 'item', 'skuname', 'materialdescription', 'itemtitle', 'productdetail'],
+        'quantity' => ['qty', 'quantitysold', 'saleqty', 'soldqty', 'salesqty', 'units', 'unitssold', 'pcs', 'noofunits', 'totalqty'],
+        'price' => ['unitprice', 'rate', 'saleprice', 'salerate', 'tradeprice', 'unitrate', 'priceperunit', 'extaxprice', 'basicprice', 'netrate'],
+        'tax' => ['salestax', 'gst', 'gstamount', 'taxamount', 'stamount', 'salestaxamount', 'outputtax', 'gstvalue', 'taxvalue', 'totaltax'],
+        'tax_rate' => ['taxrate', 'gstrate', 'strate', 'taxpercent', 'taxpercentage', 'gstpercent', 'salestaxrate'],
+        'schedule_type' => ['scheduletype', 'taxschedule'],
+        'mrp' => ['mrp', 'retailprice', 'rrp', 'maxretailprice', 'mrpprice'],
+        'sro_schedule_no' => ['sro', 'srono', 'sroscheduleno', 'sronumber', 'sroschedule'],
+        'sro_serial_no' => ['sroserialno', 'sroserial', 'sroitemserial', 'sroitemserialno'],
+        'reference_invoice_number' => ['referenceinvoice', 'refinvoice', 'refinvoiceno', 'referenceinvoiceno', 'originalinvoice', 'originalinvoiceno'],
+    ];
+
+    /** Short per-field hints for the mapping screen (mirrors the template Help sheet). */
+    private const FIELD_HINTS = [
+        'buyer_name' => 'Customer / buyer legal name',
+        'buyer_ntn' => '7-digit NTN or 13-digit registration (optional)',
+        'buyer_cnic' => '13-digit CNIC (optional)',
+        'buyer_address' => 'Buyer address',
+        'destination_province' => 'Buyer province',
+        'document_type' => 'Sale Invoice / Credit Note / Debit Note',
+        'hs_code' => '4-12 digit HS code',
+        'description' => 'Item description / product name',
+        'quantity' => 'Units sold (positive number)',
+        'price' => 'Unit price EXCLUDING sales tax',
+        'tax' => 'Total sales tax AMOUNT for the row (0 for exempt)',
+        'schedule_type' => 'Blank = auto-detected from HS code',
+        'tax_rate' => 'Percent, e.g. 18. Blank = derived from tax amount',
+        'mrp' => 'Retail price — needed for 3rd Schedule items',
+        'sro_schedule_no' => 'SRO / schedule number (auto-filled when known)',
+        'sro_serial_no' => 'SRO item serial number (auto-filled when known)',
+        'reference_invoice_number' => 'Original invoice — Credit/Debit Notes only',
+    ];
+
     // ------------------------------------------------------------------
     // Parsing
     // ------------------------------------------------------------------
@@ -102,9 +160,14 @@ class InvoiceImportService
     /**
      * Parse an uploaded xlsx/xls/csv/txt file into raw template-keyed rows.
      *
-     * @return array{error?: string, rows?: array<int, array{row:int, data:array<string,string>}>}
+     * With $captureHeadersOnMismatch, a file whose headers don't match the
+     * template returns ['needs_mapping' => true, 'headers' => [...]] instead
+     * of the missing-columns error, so the caller can start the column-mapping
+     * flow (DMS day-end exports). Template-matching files are unaffected.
+     *
+     * @return array{error?: string, needs_mapping?: bool, headers?: array<int,string>, rows?: array<int, array{row:int, data:array<string,string>}>}
      */
-    public function parseFile(string $path, string $extension, int $maxRows = self::MAX_ROWS): array
+    public function parseFile(string $path, string $extension, int $maxRows = self::MAX_ROWS, bool $captureHeadersOnMismatch = false): array
     {
         $extension = strtolower($extension);
 
@@ -128,6 +191,18 @@ class InvoiceImportService
         $header = array_map(fn ($h) => strtolower(trim((string) $h)), $grid[0] ?? []);
         $missing = array_diff(self::REQUIRED_COLUMNS, $header);
         if (!empty($missing)) {
+            if ($captureHeadersOnMismatch) {
+                $rawHeaders = [];
+                foreach ($grid[0] ?? [] as $h) {
+                    $h = trim((string) $h);
+                    if ($h !== '' && !in_array($h, $rawHeaders, true)) {
+                        $rawHeaders[] = $h;
+                    }
+                }
+                if (!empty($rawHeaders)) {
+                    return ['needs_mapping' => true, 'headers' => $rawHeaders];
+                }
+            }
             return ['error' => 'Missing required columns: ' . implode(', ', $missing)];
         }
 
@@ -147,21 +222,7 @@ class InvoiceImportService
 
             $data = [];
             foreach ($columnIndexes as $col => $idx) {
-                $value = $raw[$idx] ?? null;
-                if (in_array($col, self::CODE_COLUMNS, true)) {
-                    $data[$col] = (string) (self::cleanCode($value) ?? '');
-                } elseif (in_array($col, self::NUMERIC_COLUMNS, true)) {
-                    $rawStr = trim((string) ($value ?? ''));
-                    if ($rawStr === '') {
-                        $data[$col] = '';
-                    } else {
-                        $cleaned = self::cleanNumber($value);
-                        // Keep the unparseable original so validation can name it.
-                        $data[$col] = $cleaned === null ? $rawStr : $this->numberToString($cleaned);
-                    }
-                } else {
-                    $data[$col] = trim((string) ($value ?? ''));
-                }
+                $data[$col] = $this->cleanCell($col, $raw[$idx] ?? null);
             }
 
             // Skip fully empty rows.
@@ -183,6 +244,254 @@ class InvoiceImportService
         }
 
         return ['rows' => $rows];
+    }
+
+    /**
+     * Parse a DMS export using a user-built column mapping.
+     *
+     * @param array<string,string> $columnMap our field => source column header (as shown in the file)
+     * @param array<string,string> $defaults  our field => fixed value for every row (fields with NO mapped column)
+     * @return array{error?: string, rows?: array<int, array{row:int, data:array<string,string>}>}
+     */
+    public function parseFileWithMapping(string $path, string $extension, array $columnMap, array $defaults = [], int $maxRows = self::MAX_ROWS): array
+    {
+        $extension = strtolower($extension);
+
+        try {
+            $grid = in_array($extension, ['xlsx', 'xls'], true)
+                ? $this->readGridExcel($path, $maxRows)
+                : $this->readGridCsv($path, $maxRows);
+        } catch (\Throwable $e) {
+            Log::warning('Invoice import (mapped) parse failed: ' . $e->getMessage());
+            return ['error' => 'Could not read the file. Please upload a valid .xlsx or CSV file.'];
+        }
+
+        if (count($grid) > $maxRows + 1) {
+            return ['error' => 'This file has more than ' . number_format($maxRows) . ' data rows. Please split it into smaller files (max ' . number_format($maxRows) . ' rows each).'];
+        }
+
+        if (empty($grid)) {
+            return ['error' => 'The file is empty.'];
+        }
+
+        $allFields = array_merge(self::REQUIRED_COLUMNS, self::OPTIONAL_COLUMNS);
+
+        // Normalized header -> column index (first occurrence wins on duplicates).
+        $headerIndex = [];
+        foreach ($grid[0] ?? [] as $idx => $h) {
+            $key = self::normalizeHeaderKey((string) $h);
+            if ($key !== '' && !isset($headerIndex[$key])) {
+                $headerIndex[$key] = $idx;
+            }
+        }
+        if (empty($headerIndex)) {
+            return ['error' => 'The file has no header row.'];
+        }
+
+        // Resolve mapped source columns to indexes (match by name, so a saved
+        // preset keeps working even when the DMS reorders columns).
+        $columnIndexes = [];
+        $notFound = [];
+        foreach ($columnMap as $field => $source) {
+            if (!in_array($field, $allFields, true)) {
+                continue;
+            }
+            $source = trim((string) $source);
+            if ($source === '') {
+                continue;
+            }
+            $key = self::normalizeHeaderKey($source);
+            if ($key === '' || !isset($headerIndex[$key])) {
+                $notFound[$field] = $source;
+                continue;
+            }
+            $columnIndexes[$field] = $headerIndex[$key];
+        }
+        if (!empty($notFound)) {
+            $parts = [];
+            foreach ($notFound as $field => $source) {
+                $parts[] = "'{$source}' (mapped to {$field})";
+            }
+            return ['error' => 'These mapped columns were not found in the file: ' . implode(', ', $parts) . '. Re-check the mapping against this file\'s headers.'];
+        }
+
+        // Fixed defaults only apply to fields WITHOUT a mapped column; they go
+        // through the same code/number cleaning as cell values.
+        $cleanDefaults = [];
+        foreach ($defaults as $field => $value) {
+            if (!in_array($field, $allFields, true) || isset($columnIndexes[$field])) {
+                continue;
+            }
+            $value = trim((string) $value);
+            if ($value === '') {
+                continue;
+            }
+            $cleanDefaults[$field] = $this->cleanCell($field, $value);
+        }
+
+        $missing = [];
+        foreach (self::VALUE_REQUIRED_FIELDS as $field) {
+            if (!isset($columnIndexes[$field]) && !isset($cleanDefaults[$field])) {
+                $missing[] = $field;
+            }
+        }
+        if (!empty($missing)) {
+            return ['error' => 'These required fields have no mapped column and no fixed value: ' . implode(', ', $missing)];
+        }
+
+        $rows = [];
+        $gridCount = count($grid);
+        for ($i = 1; $i < $gridCount; $i++) {
+            $rowNum = $i + 1; // 1-based, matching what the user sees in Excel
+            $raw = $grid[$i];
+
+            $data = [];
+            $hasMappedValue = false;
+            foreach ($columnIndexes as $col => $idx) {
+                $data[$col] = $this->cleanCell($col, $raw[$idx] ?? null);
+                if ($data[$col] !== '') {
+                    $hasMappedValue = true;
+                }
+            }
+
+            // Empty-row skip must look at MAPPED cells only — fixed defaults
+            // would otherwise turn every blank line into a phantom row.
+            if (!$hasMappedValue) {
+                continue;
+            }
+
+            foreach ($cleanDefaults as $col => $value) {
+                $data[$col] = $value;
+            }
+            // Every template key exists so validation/preview see a full row.
+            foreach ($allFields as $col) {
+                if (!array_key_exists($col, $data)) {
+                    $data[$col] = '';
+                }
+            }
+
+            $rows[] = ['row' => $rowNum, 'data' => $data];
+        }
+
+        if (empty($rows)) {
+            return ['error' => 'No data rows found in the file.'];
+        }
+
+        return ['rows' => $rows];
+    }
+
+    /** Header/source-column comparison key: lowercase, non-alphanumerics stripped. */
+    public static function normalizeHeaderKey(string $h): string
+    {
+        return (string) preg_replace('/[^a-z0-9]/', '', strtolower(trim($h)));
+    }
+
+    /**
+     * Auto-suggest a mapping (our field => file header) from alias + fuzzy
+     * matching. Each header is used at most once; required fields get first
+     * pick. Fuzzy pass is conservative (>= 85% similarity).
+     *
+     * @param array<int,string> $headers original header strings from the file
+     * @return array<string,string>
+     */
+    public function suggestMapping(array $headers): array
+    {
+        $normalized = []; // normKey => original header
+        foreach ($headers as $h) {
+            $key = self::normalizeHeaderKey((string) $h);
+            if ($key !== '' && !isset($normalized[$key])) {
+                $normalized[$key] = (string) $h;
+            }
+        }
+
+        $fields = array_merge(self::REQUIRED_COLUMNS, self::OPTIONAL_COLUMNS);
+        $suggestions = [];
+        $used = [];
+
+        // Pass 1: exact field-name or alias match.
+        foreach ($fields as $field) {
+            $candidates = array_merge([self::normalizeHeaderKey($field)], self::FIELD_ALIASES[$field] ?? []);
+            foreach ($candidates as $cand) {
+                if (isset($normalized[$cand]) && !isset($used[$cand])) {
+                    $suggestions[$field] = $normalized[$cand];
+                    $used[$cand] = true;
+                    break;
+                }
+            }
+        }
+
+        // Pass 2: fuzzy match for still-unmapped fields ("Customer Name.", "Qty Sold").
+        foreach ($fields as $field) {
+            if (isset($suggestions[$field])) {
+                continue;
+            }
+            $candidates = array_merge([self::normalizeHeaderKey($field)], self::FIELD_ALIASES[$field] ?? []);
+            $bestKey = null;
+            $bestScore = 0.0;
+            foreach ($normalized as $normKey => $orig) {
+                if (isset($used[$normKey])) {
+                    continue;
+                }
+                foreach ($candidates as $cand) {
+                    similar_text($cand, (string) $normKey, $pct);
+                    if ($pct > $bestScore) {
+                        $bestScore = $pct;
+                        $bestKey = $normKey;
+                    }
+                }
+            }
+            if ($bestKey !== null && $bestScore >= 85.0) {
+                $suggestions[$field] = $normalized[$bestKey];
+                $used[$bestKey] = true;
+            }
+        }
+
+        return $suggestions;
+    }
+
+    /**
+     * Field metadata for the mapping screen: key, whether a value is required
+     * on every row, enum options for fixed-value dropdowns, and a short hint.
+     *
+     * @return array<int, array{key:string, value_required:bool, options?:array, hint:string}>
+     */
+    public function mappingFieldMeta(): array
+    {
+        $meta = [];
+        foreach (array_merge(self::REQUIRED_COLUMNS, self::OPTIONAL_COLUMNS) as $field) {
+            $entry = [
+                'key' => $field,
+                'value_required' => in_array($field, self::VALUE_REQUIRED_FIELDS, true),
+                'hint' => self::FIELD_HINTS[$field] ?? '',
+            ];
+            if ($field === 'destination_province') {
+                $entry['options'] = self::VALID_PROVINCES;
+            } elseif ($field === 'document_type') {
+                $entry['options'] = self::VALID_DOC_TYPES;
+            } elseif ($field === 'schedule_type') {
+                $entry['options'] = self::VALID_SCHEDULE_TYPES;
+            }
+            $meta[] = $entry;
+        }
+        return $meta;
+    }
+
+    /** Per-cell cleaning shared by the template and mapped parse paths. */
+    private function cleanCell(string $col, $value): string
+    {
+        if (in_array($col, self::CODE_COLUMNS, true)) {
+            return (string) (self::cleanCode($value) ?? '');
+        }
+        if (in_array($col, self::NUMERIC_COLUMNS, true)) {
+            $rawStr = trim((string) ($value ?? ''));
+            if ($rawStr === '') {
+                return '';
+            }
+            $cleaned = self::cleanNumber($value);
+            // Keep the unparseable original so validation can name it.
+            return $cleaned === null ? $rawStr : $this->numberToString($cleaned);
+        }
+        return trim((string) ($value ?? ''));
     }
 
     private function readGridExcel(string $path, int $maxRows): array
@@ -637,7 +946,7 @@ class InvoiceImportService
         return $errors;
     }
 
-    private function normalizeProvince(string $raw): ?string
+    public function normalizeProvince(string $raw): ?string
     {
         $needle = strtolower(trim($raw));
         foreach (self::VALID_PROVINCES as $province) {

@@ -616,4 +616,154 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertStringContainsString('Invoice limit reached', $outcome['row_errors'][0]['errors'][0]);
         $this->assertCount(1, Invoice::withoutGlobalScopes()->get());
     }
+
+    // ------------------------------------------------------------------
+    // TASK #1230: DMS-export column mapping
+    // ------------------------------------------------------------------
+
+    public function test_parse_file_captures_headers_on_mismatch_only_when_asked(): void
+    {
+        $header = ['Customer Name', 'Party Address', 'HS Code', 'Product Name', 'Qty', 'Rate', 'GST Amount'];
+        $path = $this->writeXlsx($header, [
+            ['Alpha Store', 'Addr 1', ['explicit_string', '15179090'], 'Oil', 5, 100, 90],
+        ]);
+
+        // Without the flag: same missing-columns error as before.
+        $plain = $this->service->parseFile($path, 'xlsx');
+        $this->assertArrayHasKey('error', $plain);
+        $this->assertStringContainsString('Missing required columns', $plain['error']);
+
+        // With the flag: needs_mapping + the original header strings.
+        $captured = $this->service->parseFile($path, 'xlsx', InvoiceImportService::MAX_ROWS, true);
+        $this->assertTrue($captured['needs_mapping'] ?? false);
+        $this->assertSame($header, $captured['headers']);
+        @unlink($path);
+    }
+
+    public function test_template_matching_file_skips_mapping_even_with_capture_flag(): void
+    {
+        $header = array_merge(InvoiceImportService::REQUIRED_COLUMNS, InvoiceImportService::OPTIONAL_COLUMNS);
+        $row = $this->row();
+        $path = $this->writeXlsx($header, [array_values(array_merge(array_fill_keys($header, ''), $row))]);
+
+        $parsed = $this->service->parseFile($path, 'xlsx', InvoiceImportService::MAX_ROWS, true);
+        $this->assertArrayNotHasKey('needs_mapping', $parsed);
+        $this->assertArrayHasKey('rows', $parsed);
+        $this->assertCount(1, $parsed['rows']);
+        @unlink($path);
+    }
+
+    public function test_suggest_mapping_uses_aliases_and_fuzzy_matching(): void
+    {
+        $headers = [
+            'Customer Name',   // alias -> buyer_name
+            'NTN No',          // alias -> buyer_ntn
+            'Party Address',   // fuzzy -> buyer_address
+            'HS Code',         // exact field name
+            'Product Name',    // alias -> description
+            'Qty',             // alias -> quantity
+            'Rate',            // alias -> price
+            'GST Amount',      // alias -> tax
+            'Route Code',      // DMS noise — must stay unmapped
+        ];
+
+        $suggestions = $this->service->suggestMapping($headers);
+
+        $this->assertSame('Customer Name', $suggestions['buyer_name'] ?? null);
+        $this->assertSame('NTN No', $suggestions['buyer_ntn'] ?? null);
+        $this->assertSame('Party Address', $suggestions['buyer_address'] ?? null);
+        $this->assertSame('HS Code', $suggestions['hs_code'] ?? null);
+        $this->assertSame('Product Name', $suggestions['description'] ?? null);
+        $this->assertSame('Qty', $suggestions['quantity'] ?? null);
+        $this->assertSame('Rate', $suggestions['price'] ?? null);
+        $this->assertSame('GST Amount', $suggestions['tax'] ?? null);
+        $this->assertNotContains('Route Code', $suggestions);
+
+        // Each header can only feed one field.
+        $this->assertSame(count($suggestions), count(array_unique($suggestions)));
+    }
+
+    public function test_parse_file_with_mapping_remaps_defaults_and_keeps_codes_string_safe(): void
+    {
+        $header = ['Customer Name', 'NTN No', 'HS Code', 'Product Name', 'Qty', 'Rate', 'GST Amount'];
+        $path = $this->writeXlsx($header, [
+            ['Alpha Store', 7654321, ['explicit_string', '02023000'], 'Frozen beef', 5, 100, 90],
+            ['', '', '', '', '', '', ''], // fully empty in MAPPED columns → skipped despite defaults
+            ['Beta Mart', 8901234567890, 15179090, 'Cooking Oil', '2', '250.5', '90.18'],
+        ]);
+
+        $mapping = [
+            'buyer_name' => 'Customer Name',
+            'buyer_ntn' => 'ntn no', // case-insensitive source resolution
+            'hs_code' => 'HS Code',
+            'description' => 'Product Name',
+            'quantity' => 'Qty',
+            'price' => 'Rate',
+            'tax' => 'GST Amount',
+        ];
+        $defaults = [
+            'buyer_address' => 'Main Bazaar, Lahore',
+            'destination_province' => 'Punjab',
+            'document_type' => 'Sale Invoice',
+            'buyer_name' => 'MUST BE IGNORED', // default for a MAPPED field is ignored
+        ];
+
+        $parsed = $this->service->parseFileWithMapping($path, 'xlsx', $mapping, $defaults);
+        $this->assertArrayNotHasKey('error', $parsed);
+        $this->assertCount(2, $parsed['rows'], 'blank line must not become a phantom row via defaults');
+
+        $rowA = $parsed['rows'][0]['data'];
+        $this->assertSame('Alpha Store', $rowA['buyer_name']);
+        $this->assertSame('7654321', $rowA['buyer_ntn']);
+        $this->assertSame('02023000', $rowA['hs_code'], 'leading zero must survive the remap');
+        $this->assertSame('Main Bazaar, Lahore', $rowA['buyer_address']);
+        $this->assertSame('Punjab', $rowA['destination_province']);
+        $this->assertSame('Sale Invoice', $rowA['document_type']);
+
+        $rowB = $parsed['rows'][1]['data'];
+        $this->assertSame('8901234567890', $rowB['buyer_ntn'], 'numeric cell must not become 8.9E+12');
+
+        // Every template key is present so validation/preview see full rows.
+        foreach (array_merge(InvoiceImportService::REQUIRED_COLUMNS, InvoiceImportService::OPTIONAL_COLUMNS) as $col) {
+            $this->assertArrayHasKey($col, $rowA);
+        }
+        $this->assertSame('', $rowA['schedule_type'], 'unmapped optional fields stay blank');
+
+        // Remapped rows flow into the normal validation untouched.
+        $result = $this->service->validateRows($parsed['rows'], $this->company);
+        $this->assertSame(2, $result['total']);
+        @unlink($path);
+    }
+
+    public function test_parse_file_with_mapping_requires_column_or_default_for_required_fields(): void
+    {
+        $header = ['Customer Name', 'Qty'];
+        $path = $this->writeXlsx($header, [['Alpha', 5]]);
+
+        $parsed = $this->service->parseFileWithMapping($path, 'xlsx', [
+            'buyer_name' => 'Customer Name',
+            'quantity' => 'Qty',
+        ], []);
+
+        $this->assertArrayHasKey('error', $parsed);
+        $this->assertStringContainsString('no mapped column and no fixed value', $parsed['error']);
+        $this->assertStringContainsString('hs_code', $parsed['error']);
+        @unlink($path);
+    }
+
+    public function test_parse_file_with_mapping_names_missing_source_columns(): void
+    {
+        $header = ['Customer Name', 'Qty'];
+        $path = $this->writeXlsx($header, [['Alpha', 5]]);
+
+        $parsed = $this->service->parseFileWithMapping($path, 'xlsx', [
+            'buyer_name' => 'Customer Name',
+            'quantity' => 'Sold Units', // not in this file — preset from a different export
+        ], []);
+
+        $this->assertArrayHasKey('error', $parsed);
+        $this->assertStringContainsString("'Sold Units'", $parsed['error']);
+        $this->assertStringContainsString('quantity', $parsed['error']);
+        @unlink($path);
+    }
 }

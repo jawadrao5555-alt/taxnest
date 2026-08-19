@@ -97,7 +97,98 @@
                                         </div>
                                     </div>
 
+                                    {{-- Task 1230: DMS-export column mapping — file headers don't match the template --}}
+                                    <div x-show="step === 'mapping'" class="space-y-4">
+                                        <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                                            <p class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">This file's columns don't match the TaxNest template — map them below (one time).</p>
+                                            <p class="text-xs text-amber-700/80 dark:text-amber-400/80">Works with day-end exports from your company's distribution software (Voyage, TMX, Salesflo, etc.). Pick which file column feeds each TaxNest field. Fields your export doesn't have can take a fixed value instead. Save the mapping as a preset and the next upload of this export imports in one click.</p>
+                                            <p class="text-xs text-amber-700 dark:text-amber-400 mt-1 font-medium">File: <span x-text="mappingFilename"></span></p>
+                                        </div>
+
+                                        <div x-show="presets.length > 0" class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                                            <p class="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-2">Saved Mapping Presets</p>
+                                            <div class="space-y-1.5">
+                                                <template x-for="p in presets" :key="p.id">
+                                                    <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                                        <div class="min-w-0 flex items-center gap-2">
+                                                            <span class="font-medium text-gray-800 dark:text-gray-200 truncate" x-text="p.name"></span>
+                                                            <span x-show="p.matches" class="px-1.5 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">MATCHES THIS FILE</span>
+                                                            <span x-show="!p.matches" class="px-1.5 py-0.5 rounded text-xs font-bold bg-gray-100 text-gray-500" :title="'Columns not in this file: ' + (p.missing_columns || []).join(', ')">DIFFERENT COLUMNS</span>
+                                                        </div>
+                                                        <div class="flex items-center gap-1.5">
+                                                            <button x-show="p.matches" @click="applyMapping(p.id)" :disabled="applyingMapping" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50">Apply</button>
+                                                            <button @click="renamePreset(p)" class="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline">Rename</button>
+                                                            <button @click="deletePreset(p)" class="px-2 py-1 text-xs text-red-500 hover:text-red-700 underline">Delete</button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                                            <div class="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                <div class="col-span-4">TaxNest Field</div>
+                                                <div class="col-span-4">Column in Your File</div>
+                                                <div class="col-span-4">Fixed Value (when no column)</div>
+                                            </div>
+                                            <div class="divide-y divide-gray-100 dark:divide-gray-800" style="max-height: 45vh; overflow-y: auto;">
+                                                <template x-for="f in mappingFields" :key="f.key">
+                                                    <div class="grid grid-cols-12 gap-2 items-center px-3 py-2">
+                                                        <div class="col-span-4">
+                                                            <p class="text-xs font-semibold text-gray-800 dark:text-gray-200"><span x-text="f.key"></span><span x-show="f.value_required" class="text-red-500">*</span></p>
+                                                            <p class="text-xs text-gray-400 dark:text-gray-500" x-text="f.hint"></p>
+                                                        </div>
+                                                        <div class="col-span-4">
+                                                            <select x-model="mappingSel[f.key]" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
+                                                                <option value="">— no column —</option>
+                                                                <template x-for="h in fileHeaders" :key="h">
+                                                                    <option :value="h" x-text="h"></option>
+                                                                </template>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-span-4">
+                                                            <template x-if="!mappingSel[f.key] && f.options">
+                                                                <select x-model="defaultsSel[f.key]" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
+                                                                    <option value="">— none —</option>
+                                                                    <template x-for="o in f.options" :key="o">
+                                                                        <option :value="o" x-text="o"></option>
+                                                                    </template>
+                                                                </select>
+                                                            </template>
+                                                            <template x-if="!mappingSel[f.key] && !f.options">
+                                                                <input type="text" x-model="defaultsSel[f.key]" placeholder="Fixed value for every row" class="w-full text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5">
+                                                            </template>
+                                                            <p x-show="mappingSel[f.key]" class="text-xs text-gray-400 dark:text-gray-500">Using column &ldquo;<span x-text="mappingSel[f.key]"></span>&rdquo;</p>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                <input type="checkbox" x-model="savePreset" class="rounded border-gray-300 text-emerald-600">
+                                                <span>Save this mapping as a preset</span>
+                                            </label>
+                                            <input x-show="savePreset" type="text" x-model="presetName" maxlength="100" placeholder="Preset name, e.g. Coca-Cola Voyage export" class="flex-1 text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 py-1.5" style="min-width: 220px;">
+                                        </div>
+
+                                        <div x-show="mappingError" class="bg-red-50 border border-red-200 rounded-lg p-3">
+                                            <p class="text-sm text-red-700" x-text="mappingError"></p>
+                                        </div>
+
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button @click="resetUpload()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition">Upload Different File</button>
+                                            <button @click="applyMapping()" :disabled="applyingMapping" class="px-5 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <span x-show="!applyingMapping">Continue to Preview</span>
+                                                <span x-show="applyingMapping">Mapping rows...</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div x-show="step === 'preview'" class="space-y-4">
+                                        <p x-show="presetSavedName" class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Mapping preset &ldquo;<span x-text="presetSavedName"></span>&rdquo; saved — next time this export imports in one click.</p>
+                                        <p x-show="presetCapWarning" class="text-xs font-medium text-amber-600 dark:text-amber-400">The mapping preset was NOT saved — you already have the maximum number of saved presets. Delete an old preset first. (The import itself continues normally.)</p>
                                         <div class="flex flex-wrap items-center justify-between gap-2">
                                             <div class="flex flex-wrap gap-2">
                                                 <span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 dark:text-gray-300">Total: <span x-text="totalRows"></span></span>
@@ -903,6 +994,21 @@ function bulkImport() {
         createdInvoices: [],
         createdTotal: 0,
 
+        // Task 1230: DMS-export column mapping step
+        mappingToken: null,
+        mappingFilename: '',
+        fileHeaders: [],
+        mappingFields: [],
+        mappingSel: {},
+        defaultsSel: {},
+        presets: [],
+        savePreset: false,
+        presetName: '',
+        mappingError: '',
+        applyingMapping: false,
+        presetSavedName: '',
+        presetCapWarning: false,
+
         openModal() {
             this.showModal = true;
             this.resetUpload();
@@ -934,6 +1040,19 @@ function bulkImport() {
             this.resultMessage = '';
             this.createdInvoices = [];
             this.createdTotal = 0;
+            this.mappingToken = null;
+            this.mappingFilename = '';
+            this.fileHeaders = [];
+            this.mappingFields = [];
+            this.mappingSel = {};
+            this.defaultsSel = {};
+            this.presets = [];
+            this.savePreset = false;
+            this.presetName = '';
+            this.mappingError = '';
+            this.applyingMapping = false;
+            this.presetSavedName = '';
+            this.presetCapWarning = false;
         },
 
         get progressPercent() {
@@ -976,20 +1095,157 @@ function bulkImport() {
                     return;
                 }
 
-                this.batchId = data.batch_id;
-                this.previewRows = data.preview || [];
-                this.hasMore = !!data.has_more;
-                this.totalRows = data.total;
-                this.validCount = data.valid_count;
-                this.errorCount = data.error_count;
-                this.errorReportUrl = data.error_report_url;
-                this.step = 'preview';
+                if (data.needs_mapping) {
+                    this.setupMapping(data);
+                } else {
+                    this.showPreview(data);
+                }
             } catch (e) {
                 this.uploadError = 'Network error. Please try again.';
             }
 
             this.uploading = false;
             event.target.value = '';
+        },
+
+        showPreview(data) {
+            this.batchId = data.batch_id;
+            this.previewRows = data.preview || [];
+            this.hasMore = !!data.has_more;
+            this.totalRows = data.total;
+            this.validCount = data.valid_count;
+            this.errorCount = data.error_count;
+            this.errorReportUrl = data.error_report_url;
+            this.presetSavedName = data.preset_saved || '';
+            this.step = 'preview';
+        },
+
+        setupMapping(data) {
+            this.mappingToken = data.mapping_token;
+            this.mappingFilename = data.original_filename || '';
+            this.fileHeaders = data.headers || [];
+            this.mappingFields = data.fields || [];
+            this.presets = data.presets || [];
+            this.mappingError = '';
+            this.savePreset = false;
+            this.presetName = '';
+            const sel = {}, defs = {};
+            for (const f of this.mappingFields) {
+                sel[f.key] = (data.suggestions && data.suggestions[f.key]) || '';
+                defs[f.key] = '';
+            }
+            // Sensible fixed-value prefills for fields DMS exports rarely carry.
+            if (!sel['document_type']) defs['document_type'] = 'Sale Invoice';
+            if (!sel['destination_province'] && data.company_province) defs['destination_province'] = data.company_province;
+            this.mappingSel = sel;
+            this.defaultsSel = defs;
+            this.step = 'mapping';
+        },
+
+        async applyMapping(presetId = null) {
+            this.mappingError = '';
+
+            if (!presetId) {
+                const missing = this.mappingFields
+                    .filter(f => f.value_required && !this.mappingSel[f.key] && !(this.defaultsSel[f.key] || '').trim())
+                    .map(f => f.key);
+                if (missing.length) {
+                    this.mappingError = 'Give these required fields a column or a fixed value: ' + missing.join(', ');
+                    return;
+                }
+                if (this.savePreset && !this.presetName.trim()) {
+                    this.mappingError = 'Enter a name for the preset (or untick "Save this mapping as a preset").';
+                    return;
+                }
+            }
+
+            const payload = { mapping_token: this.mappingToken };
+            if (presetId) {
+                payload.preset_id = presetId;
+            } else {
+                const mapping = {}, defaults = {};
+                for (const f of this.mappingFields) {
+                    if (this.mappingSel[f.key]) {
+                        mapping[f.key] = this.mappingSel[f.key];
+                    } else if ((this.defaultsSel[f.key] || '').trim()) {
+                        defaults[f.key] = this.defaultsSel[f.key].trim();
+                    }
+                }
+                payload.mapping = mapping;
+                payload.defaults = defaults;
+                if (this.savePreset && this.presetName.trim()) payload.save_preset_name = this.presetName.trim();
+            }
+
+            this.applyingMapping = true;
+            try {
+                const response = await fetch('/invoices/import-apply-mapping', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.mappingError = data.error || data.message || 'Could not apply the mapping.';
+                } else {
+                    // Preset cap hit — import continues, just tell the user.
+                    this.presetCapWarning = !!(payload.save_preset_name && !data.preset_saved);
+                    this.showPreview(data);
+                }
+            } catch (e) {
+                this.mappingError = 'Network error. Please try again.';
+            }
+            this.applyingMapping = false;
+        },
+
+        async renamePreset(p) {
+            const name = prompt('New preset name:', p.name);
+            if (!name || !name.trim() || name.trim() === p.name) return;
+            try {
+                const response = await fetch('/invoices/import-mappings/' + p.id + '/rename', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ name: name.trim() }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.mappingError = data.error || 'Could not rename the preset.';
+                } else {
+                    p.name = data.name;
+                    this.mappingError = '';
+                }
+            } catch (e) {
+                this.mappingError = 'Network error. Please try again.';
+            }
+        },
+
+        async deletePreset(p) {
+            if (!confirm('Delete preset "' + p.name + '"?')) return;
+            try {
+                const response = await fetch('/invoices/import-mappings/' + p.id, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.mappingError = data.error || 'Could not delete the preset.';
+                } else {
+                    this.presets = this.presets.filter(x => x.id !== p.id);
+                    this.mappingError = '';
+                }
+            } catch (e) {
+                this.mappingError = 'Network error. Please try again.';
+            }
         },
 
         async startProcessing() {

@@ -377,6 +377,10 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         // Bulk import v2: .xlsx template + pre-validation + background processing.
         Route::get('/invoices/import-template', [InvoiceImportController::class, 'template'])->name('invoices.import-template');
         Route::post('/invoices/import-upload', [InvoiceImportController::class, 'upload'])->name('invoices.import-upload');
+        // DMS-export column mapping: apply a mapping/preset to a held upload + preset management.
+        Route::post('/invoices/import-apply-mapping', [InvoiceImportController::class, 'applyMapping'])->name('invoices.import-apply-mapping');
+        Route::post('/invoices/import-mappings/{id}/rename', [InvoiceImportController::class, 'renameMapping'])->name('invoices.import-mapping-rename');
+        Route::delete('/invoices/import-mappings/{id}', [InvoiceImportController::class, 'deleteMapping'])->name('invoices.import-mapping-delete');
         Route::post('/invoices/import/{batchId}/process', [InvoiceImportController::class, 'process'])->middleware('plan.limit:invoices')->name('invoices.import-process');
         Route::get('/invoices/import-history', [InvoiceImportController::class, 'history'])->name('invoices.import-history');
         Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');

@@ -5,13 +5,22 @@ namespace App\Http\Controllers;
 use App\Jobs\ProcessInvoiceImportBatchJob;
 use App\Models\Company;
 use App\Models\InvoiceImportBatch;
+use App\Models\InvoiceImportMapping;
 use App\Services\InvoiceImportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * DI bulk invoice import — .xlsx/CSV upload with row-level FBR pre-validation,
  * background draft creation and polled progress.
+ *
+ * Files whose headers don't match the template (DMS day-end exports from
+ * Voyage/TMX/Salesflo/etc.) go through a column-mapping step: the upload is
+ * held on disk, the user maps the export's columns to our fields (or applies
+ * a saved preset), and applyMapping() feeds the remapped rows into the SAME
+ * validate -> preview -> batch pipeline. Template-matching files never see
+ * the mapping step.
  *
  * The legacy CSV endpoints (CsvImportController) stay as a fallback; both
  * paths run the SAME validation via InvoiceImportService.
@@ -19,6 +28,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class InvoiceImportController extends Controller
 {
     private const PREVIEW_LIMIT = 100;
+
+    /** Held DMS uploads awaiting mapping die after this many seconds. */
+    private const HOLD_TTL_SECONDS = 86400;
+
+    /** Cap on saved mapping presets per company. */
+    private const MAX_PRESETS = 30;
 
     public function __construct(private InvoiceImportService $service = new InvoiceImportService())
     {
@@ -46,35 +61,137 @@ class InvoiceImportController extends Controller
             return response()->json(['error' => 'Company context missing.'], 403);
         }
 
-        $parsed = $this->service->parseFile($file->getRealPath(), $extension);
+        $parsed = $this->service->parseFile($file->getRealPath(), $extension, InvoiceImportService::MAX_ROWS, true);
         if (isset($parsed['error'])) {
+            return response()->json(['error' => $parsed['error']], 422);
+        }
+
+        // Headers don't match the template — hold the file and open the
+        // column-mapping step instead of failing with "missing columns".
+        if (!empty($parsed['needs_mapping'])) {
+            return $this->mappingNeededResponse($file, $extension, $company, $parsed['headers']);
+        }
+
+        $result = $this->service->validateRows($parsed['rows'], $company);
+
+        return response()->json($this->buildBatchPayload(
+            $company,
+            substr($file->getClientOriginalName(), 0, 255),
+            $extension,
+            $result
+        ));
+    }
+
+    /**
+     * Apply a column mapping (built on the mapping screen, or a saved preset)
+     * to a held DMS upload, then continue the normal validate/preview flow.
+     */
+    public function applyMapping(Request $request)
+    {
+        $request->validate([
+            'mapping_token' => 'required|string|size:40|alpha_num',
+            'preset_id' => 'nullable|integer',
+            'mapping' => 'nullable|array',
+            'defaults' => 'nullable|array',
+            'save_preset_name' => 'nullable|string|max:100',
+        ]);
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!$company) {
+            return response()->json(['error' => 'Company context missing.'], 403);
+        }
+
+        $token = (string) $request->input('mapping_token');
+        $dir = $this->holdDir((int) $company->id);
+        $metaPath = $dir . '/' . $token . '.json';
+        $meta = is_file($metaPath) ? json_decode((string) @file_get_contents($metaPath), true) : null;
+        $extension = strtolower((string) ($meta['extension'] ?? ''));
+        $dataPath = $dir . '/' . $token . '.' . $extension;
+        if (!is_array($meta) || !in_array($extension, ['xlsx', 'xls', 'csv', 'txt'], true) || !is_file($dataPath)) {
+            return response()->json(['error' => 'This upload has expired. Please upload the file again.'], 422);
+        }
+
+        $mapping = (array) $request->input('mapping', []);
+        $defaults = (array) $request->input('defaults', []);
+        $presetName = trim((string) $request->input('save_preset_name', ''));
+
+        if ($request->filled('preset_id')) {
+            $preset = InvoiceImportMapping::where('company_id', $company->id)->find((int) $request->input('preset_id'));
+            if (!$preset) {
+                return response()->json(['error' => 'Preset not found.'], 404);
+            }
+            $mapping = $preset->mappingArray();
+            $defaults = $preset->defaultsArray();
+            $presetName = ''; // applying an existing preset never re-saves it
+        }
+
+        $mapping = collect($mapping)->map(fn ($v) => is_scalar($v) ? (string) $v : '')->all();
+        $defaults = collect($defaults)->map(fn ($v) => is_scalar($v) ? (string) $v : '')->all();
+
+        $parsed = $this->service->parseFileWithMapping($dataPath, $extension, $mapping, $defaults);
+        if (isset($parsed['error'])) {
+            // Hold is kept so the user can fix the mapping without re-uploading.
             return response()->json(['error' => $parsed['error']], 422);
         }
 
         $result = $this->service->validateRows($parsed['rows'], $company);
 
-        $batch = InvoiceImportBatch::create([
-            'company_id' => $company->id,
-            'user_id' => auth()->id(),
-            'original_filename' => substr($file->getClientOriginalName(), 0, 255),
-            'source_format' => in_array($extension, ['xlsx', 'xls'], true) ? 'xlsx' : 'csv',
-            'status' => 'validated',
-            'total_rows' => $result['total'],
-            'valid_rows' => $result['valid_count'],
-            'invalid_rows' => $result['error_count'],
-            'rows_json' => json_encode($result['rows']),
-        ]);
+        $presetSaved = null;
+        if ($presetName !== '') {
+            $presetSaved = $this->savePreset($company, $presetName, $mapping, $defaults);
+        }
 
-        return response()->json([
-            'batch_id' => $batch->id,
-            'total' => $result['total'],
-            'valid_count' => $result['valid_count'],
-            'error_count' => $result['error_count'],
-            'preview' => array_slice($result['rows'], 0, self::PREVIEW_LIMIT),
-            'preview_limit' => self::PREVIEW_LIMIT,
-            'has_more' => $result['total'] > self::PREVIEW_LIMIT,
-            'error_report_url' => $result['error_count'] > 0 ? '/invoices/import/' . $batch->id . '/error-report' : null,
-        ]);
+        $payload = $this->buildBatchPayload(
+            $company,
+            (string) ($meta['original_filename'] ?? ('mapped-import.' . $extension)),
+            $extension,
+            $result
+        );
+        $payload['preset_saved'] = $presetSaved;
+
+        @unlink($dataPath);
+        @unlink($metaPath);
+
+        return response()->json($payload);
+    }
+
+    public function renameMapping(Request $request, int $id)
+    {
+        $request->validate(['name' => 'required|string|max:100']);
+
+        $preset = InvoiceImportMapping::where('company_id', app('currentCompanyId'))->find($id);
+        if (!$preset) {
+            return response()->json(['error' => 'Preset not found.'], 404);
+        }
+
+        $name = trim((string) $request->input('name'));
+        if ($name === '') {
+            return response()->json(['error' => 'Preset name cannot be empty.'], 422);
+        }
+
+        $duplicate = InvoiceImportMapping::where('company_id', app('currentCompanyId'))
+            ->where('name', $name)
+            ->where('id', '!=', $preset->id)
+            ->exists();
+        if ($duplicate) {
+            return response()->json(['error' => 'A preset with this name already exists.'], 422);
+        }
+
+        $preset->update(['name' => $name]);
+
+        return response()->json(['success' => true, 'id' => $preset->id, 'name' => $name]);
+    }
+
+    public function deleteMapping(int $id)
+    {
+        $preset = InvoiceImportMapping::where('company_id', app('currentCompanyId'))->find($id);
+        if (!$preset) {
+            return response()->json(['error' => 'Preset not found.'], 404);
+        }
+
+        $preset->delete();
+
+        return response()->json(['success' => true]);
     }
 
     public function process(Request $request, int $batchId)
@@ -165,6 +282,131 @@ class InvoiceImportController extends Controller
         }
 
         return $this->service->errorReportResponse($batch);
+    }
+
+    // ------------------------------------------------------------------
+    // Internals
+    // ------------------------------------------------------------------
+
+    /** Create the batch row and build the JSON payload shared by upload() and applyMapping(). */
+    private function buildBatchPayload(Company $company, string $originalFilename, string $extension, array $result): array
+    {
+        $batch = InvoiceImportBatch::create([
+            'company_id' => $company->id,
+            'user_id' => auth()->id(),
+            'original_filename' => substr($originalFilename, 0, 255),
+            'source_format' => in_array($extension, ['xlsx', 'xls'], true) ? 'xlsx' : 'csv',
+            'status' => 'validated',
+            'total_rows' => $result['total'],
+            'valid_rows' => $result['valid_count'],
+            'invalid_rows' => $result['error_count'],
+            'rows_json' => json_encode($result['rows']),
+        ]);
+
+        return [
+            'batch_id' => $batch->id,
+            'total' => $result['total'],
+            'valid_count' => $result['valid_count'],
+            'error_count' => $result['error_count'],
+            'preview' => array_slice($result['rows'], 0, self::PREVIEW_LIMIT),
+            'preview_limit' => self::PREVIEW_LIMIT,
+            'has_more' => $result['total'] > self::PREVIEW_LIMIT,
+            'error_report_url' => $result['error_count'] > 0 ? '/invoices/import/' . $batch->id . '/error-report' : null,
+        ];
+    }
+
+    /** Hold the non-template upload on disk and return the mapping-screen payload. */
+    private function mappingNeededResponse($file, string $extension, Company $company, array $headers)
+    {
+        $dir = $this->holdDir((int) $company->id);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        // Housekeeping: abandoned holds die after the TTL.
+        foreach (glob($dir . '/*') ?: [] as $old) {
+            $mtime = @filemtime($old);
+            if ($mtime !== false && $mtime < time() - self::HOLD_TTL_SECONDS) {
+                @unlink($old);
+            }
+        }
+
+        $token = Str::random(40);
+        if (!@copy($file->getRealPath(), $dir . '/' . $token . '.' . $extension)) {
+            return response()->json(['error' => 'Could not hold the file for mapping. Please try again.'], 500);
+        }
+        @file_put_contents($dir . '/' . $token . '.json', json_encode([
+            'original_filename' => substr($file->getClientOriginalName(), 0, 255),
+            'extension' => $extension,
+            'headers' => $headers,
+            'created_at' => now()->toIso8601String(),
+        ]));
+
+        // Saved presets, flagged by whether every mapped source column exists
+        // in THIS file's headers (matching presets apply in one click).
+        $headerKeys = array_map([InvoiceImportService::class, 'normalizeHeaderKey'], $headers);
+        $presets = InvoiceImportMapping::where('company_id', $company->id)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($p) use ($headerKeys) {
+                $mapping = $p->mappingArray();
+                $missing = [];
+                foreach ($mapping as $field => $source) {
+                    if (!in_array(InvoiceImportService::normalizeHeaderKey((string) $source), $headerKeys, true)) {
+                        $missing[] = (string) $source;
+                    }
+                }
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'matches' => !empty($mapping) && empty($missing),
+                    'missing_columns' => $missing,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'needs_mapping' => true,
+            'mapping_token' => $token,
+            'headers' => $headers,
+            'fields' => $this->service->mappingFieldMeta(),
+            'suggestions' => $this->service->suggestMapping($headers),
+            'presets' => $presets,
+            'company_province' => $this->service->normalizeProvince((string) ($company->province ?? '')) ?? '',
+            'original_filename' => substr($file->getClientOriginalName(), 0, 255),
+        ]);
+    }
+
+    /** Save/update a named preset. Returns the saved name, or null when the cap blocked a new one. */
+    private function savePreset(Company $company, string $name, array $mapping, array $defaults): ?string
+    {
+        $mappingJson = json_encode(array_filter($mapping, fn ($v) => trim((string) $v) !== ''));
+        $defaultsJson = json_encode(array_filter($defaults, fn ($v) => trim((string) $v) !== ''));
+
+        $existing = InvoiceImportMapping::where('company_id', $company->id)->where('name', $name)->first();
+        if ($existing) {
+            $existing->update(['mapping_json' => $mappingJson, 'defaults_json' => $defaultsJson, 'user_id' => auth()->id()]);
+            return $name;
+        }
+
+        if (InvoiceImportMapping::where('company_id', $company->id)->count() >= self::MAX_PRESETS) {
+            return null; // import still proceeds; UI reports the cap
+        }
+
+        InvoiceImportMapping::create([
+            'company_id' => $company->id,
+            'user_id' => auth()->id(),
+            'name' => $name,
+            'mapping_json' => $mappingJson,
+            'defaults_json' => $defaultsJson,
+        ]);
+
+        return $name;
+    }
+
+    private function holdDir(int $companyId): string
+    {
+        return storage_path('app/import-holds/' . $companyId);
     }
 
     private function findBatch(int $batchId): ?InvoiceImportBatch

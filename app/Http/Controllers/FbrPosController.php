@@ -3197,8 +3197,18 @@ class FbrPosController extends Controller
 
         $hasSandboxFallback = !empty($company->fbr_sandbox_token);
         $hasProductionFallback = !empty($company->fbr_production_token);
+        $fbrReportingSetupIncomplete = (bool) $company->fbr_reporting_enabled
+            && !$company->fbrPosIntegrationConfigured();
 
-        return view('fbr-pos.settings', compact('company', 'fbrLogs', 'maskedPosToken', 'maskedAccessCode', 'hasSandboxFallback', 'hasProductionFallback'));
+        return view('fbr-pos.settings', compact(
+            'company',
+            'fbrLogs',
+            'maskedPosToken',
+            'maskedAccessCode',
+            'hasSandboxFallback',
+            'hasProductionFallback',
+            'fbrReportingSetupIncomplete'
+        ));
     }
 
     /**

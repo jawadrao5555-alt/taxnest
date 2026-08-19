@@ -1386,6 +1386,8 @@ return [
     'fbr_reporting_disabled_enable' => 'FBR رپورٹنگ ڈس ایبل ہے — سیٹنگز سے ان ایبل کریں',
     'fbr_reporting_disabled_msg' => 'FBR رپورٹنگ ڈس ایبل',
     'fbr_reporting_enabled_msg' => 'FBR رپورٹنگ ان ایبل',
+    'fbr_reporting_setup_incomplete_title' => 'FBR رپورٹنگ آن ہے مگر سیٹ اپ نامکمل ہے',
+    'fbr_reporting_setup_incomplete_body' => 'بلز FBR تک نہیں جا رہے۔ Direct to FBR کے لیے POSID اور FBR IMS ٹوکن مکمل کریں، یا Fiscal Device موڈ میں Desktop Sync Agent ان ایبل کریں۔',
     'fbr_retry_failed' => 'FBR ریٹرائی ناکام: :error',
     'fbr_retry_failed_errors' => 'FBR ری ٹرائی ناکام: :error',
     'fbr_rule_eod_summary' => 'FBR رول 150R-4(f) — دن کے اختتام کی سمری',

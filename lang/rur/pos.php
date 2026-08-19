@@ -1386,6 +1386,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'fbr_reporting_disabled_enable' => 'FBR reporting disabled hai — settings se enable karein',
     'fbr_reporting_disabled_msg' => 'FBR Reporting disabled hai',
     'fbr_reporting_enabled_msg' => 'FBR Reporting enabled hai',
+    'fbr_reporting_setup_incomplete_title' => 'FBR Reporting ON hai magar setup adhoora hai',
+    'fbr_reporting_setup_incomplete_body' => 'Bills FBR tak nahi ja rahe. Direct to FBR ke liye POSID aur FBR IMS token mukammal karein, ya Fiscal Device mode mein Desktop Sync Agent enable karein.',
     'fbr_retry_failed' => 'FBR retry fail ho gayi: :error',
     'fbr_retry_failed_errors' => 'FBR retry fail ho gayi: :error',
     'fbr_rule_eod_summary' => 'FBR Rule 150R-4(f) — din bhar ki summary (End-of-Day)',

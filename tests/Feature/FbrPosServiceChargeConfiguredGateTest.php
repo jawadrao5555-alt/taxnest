@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\Company;
+use App\Models\User;
 use App\Http\Controllers\FbrPosController;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -375,6 +376,42 @@ class FbrPosServiceChargeConfiguredGateTest extends TestCase
         // Agent disabled → mirrors the submit guard falling through to cloud rules (no token → false)
         $c = $this->makeCompany($base + ['fbr_pos_enabled' => true, 'agent_enabled' => false]);
         $this->assertFalse($c->fbrPosIntegrationConfigured(), 'fiscal device: agent disabled, no token → not configured');
+    }
+
+    public function test_settings_warning_only_shows_when_reporting_is_on_and_setup_is_incomplete(): void
+    {
+        $this->actingAs(User::findOrFail($this->user->id), 'fbrpos');
+        $controller = app(FbrPosController::class);
+
+        // A reachable owner state: Reporting is on, but no POSID/credential exists yet.
+        $this->setCompany([
+            'fbr_reporting_enabled' => true,
+            'fbr_connection_mode' => 'cloud',
+            'fbr_pos_id' => null,
+            'fbr_pos_token' => null,
+            'agent_enabled' => false,
+        ]);
+
+        $incomplete = $controller->fbrSettings(Request::create('/fbr-pos/settings', 'GET'));
+        $this->assertTrue(
+            $incomplete->getData()['fbrReportingSetupIncomplete'],
+            'settings must warn while Reporting is on but no working FBR route exists'
+        );
+
+        // Completing Fiscal Device setup makes the same canonical predicate true,
+        // so the settings warning must disappear without changing the reporting toggle.
+        $this->setCompany([
+            'fbr_pos_enabled' => true,
+            'fbr_connection_mode' => 'fiscal_device',
+            'fbr_pos_id' => '812345',
+            'agent_enabled' => true,
+        ]);
+
+        $configured = $controller->fbrSettings(Request::create('/fbr-pos/settings', 'GET'));
+        $this->assertFalse(
+            $configured->getData()['fbrReportingSetupIncomplete'],
+            'settings must clear the warning as soon as the fiscal-device setup is complete'
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────

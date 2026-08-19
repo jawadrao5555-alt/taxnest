@@ -387,4 +387,32 @@ class PraElaanTallyTest extends TestCase
         // The non-deleted company's real name must still appear normally.
         $response->assertSee('Company Beta', false);
     }
+
+    /**
+     * A regular suggestion is rendered in the main table, outside the elaan
+     * tally block. Its company relation also excludes soft-deleted companies.
+     */
+    public function test_soft_deleted_company_shows_fallback_name_in_main_suggestions_table(): void
+    {
+        DB::table('feature_suggestions')->insert([
+            'user_id'    => $this->userA1Id,
+            'company_id' => $this->companyAId,
+            'product'    => 'pos',
+            'title'      => 'Regular suggestion from a removed company',
+            'status'     => 'pending',
+            'source'     => 'user',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('companies')
+            ->where('id', $this->companyAId)
+            ->update(['deleted_at' => now()]);
+
+        $response = $this->actingAsAdmin()->get('/admin/feature-suggestions');
+
+        $response->assertStatus(200);
+        $response->assertSee('Company #' . $this->companyAId, false);
+        $response->assertSee('Regular suggestion from a removed company', false);
+    }
 }

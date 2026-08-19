@@ -137,7 +137,7 @@
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-900/30 align-top">
                                     <td class="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ $sugg->created_at->format('d M Y') }}<br><span class="text-xs">{{ $sugg->created_at->format('h:i A') }}</span></td>
                                     <td class="px-4 py-3">
-                                        <div class="font-medium text-gray-800 dark:text-gray-100">{{ $sugg->company->name ?? 'Company #' . $sugg->company_id }}</div>
+                                        <div class="font-medium text-gray-800 dark:text-gray-100">{{ $sugg->company?->name ?? 'Company #' . $sugg->company_id }}</div>
                                         <div class="text-xs text-gray-500 dark:text-gray-400">{{ $sugg->user->name ?? 'User #' . $sugg->user_id }}</div>
                                     </td>
                                     <td class="px-4 py-3">

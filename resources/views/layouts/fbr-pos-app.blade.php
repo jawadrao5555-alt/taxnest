@@ -570,6 +570,12 @@
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                                         {{ __('pos.nav_tutorials') }}
                                     </a>
+                                    @if (auth('fbrpos')->user()->isPosAdmin())
+                                    <a href="{{ route('fbrpos.suggestions') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                                        {{ __('pos.feature_suggestion_box') }}
+                                    </a>
+                                    @endif
                                     {{-- Language picker (2 Aug 2026) — per-user Roman Urdu / English / Urdu script --}}
                                     <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.language') }}</p>
                                     <div class="px-4 py-1.5 flex gap-2">
@@ -819,6 +825,12 @@
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                             {{ __('pos.nav_tutorials') }}
                         </a>
+                        @if (auth('fbrpos')->user()->isPosAdmin())
+                        <a href="{{ route('fbrpos.suggestions') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.suggestions') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            {{ __('pos.feature_suggestion_box') }}
+                        </a>
+                        @endif
                         {{-- PWA install — always visible --}}
                         <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.install_app_device')" :item-class="$sidebarBase . ' ' . $sidebarInactive" />
                     </div>
@@ -1303,7 +1315,8 @@
         @endif
         <x-trial-lock-modal />
         <x-subscription-expiry-popup />
-        <x-whatsapp-support />
+        {{-- Task 1275: Madadgar support bubble (AI chat + WhatsApp) — FBR flavor --}}
+        <x-madadgar-support product="fbrpos" />
         <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
     </body>
 </html>

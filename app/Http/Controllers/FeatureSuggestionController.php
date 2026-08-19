@@ -79,6 +79,74 @@ class FeatureSuggestionController extends Controller
         return redirect('/pos/suggestions')->with('success', 'Shukriya! Aap ki tajweez hum tak pohnch gayi hai. Hamari team is par ghor karegi.');
     }
 
+    // ============ FBR POS SIDE (Task 1275) ============
+    // Same rules as the PRA box: admin/manager-only, 10/day cap, reserved-title
+    // guard. Rows land with product='fbrpos' and feed the SAME admin view +
+    // Zyada Demand grouping (computeHotGroups has no product filter on purpose).
+
+    public function fbrIndex()
+    {
+        $user = auth('fbrpos')->user();
+
+        if (!$user || !$user->isPosAdmin()) {
+            return redirect()->route('fbrpos.dashboard');
+        }
+
+        $suggestions = FeatureSuggestion::with('user')
+            ->where('company_id', $user->company_id)
+            ->where('product', 'fbrpos')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        return view('fbr-pos.suggestions', compact('suggestions'));
+    }
+
+    public function fbrStore(Request $request)
+    {
+        $user = auth('fbrpos')->user();
+
+        if (!$user || !$user->isPosAdmin()) {
+            return redirect()->route('fbrpos.dashboard');
+        }
+
+        $request->validate([
+            'title' => 'required|string|max:150',
+            'details' => 'nullable|string|max:2000',
+        ], [
+            'title.required' => 'Tajweez ka title likhna zaroori hai.',
+            'title.max' => 'Title 150 harf se lamba nahi ho sakta.',
+            'details.max' => 'Tafseel 2000 harf se lambi nahi ho sakti.',
+        ]);
+
+        // Reserved-title boundary (Task 1229) — mirrors store(): the elaan
+        // discriminator must never be wearable by a normal suggestion, from
+        // ANY panel (the drifted-schema fallback matches on title alone).
+        if (stripos(trim($request->title), FeatureSuggestion::PRA_ELAAN_TITLE_PREFIX) === 0) {
+            return redirect('/fbr-pos/suggestions')->with('error', 'Yeh title mehfooz (reserved) hai — barah-e-karam koi aur title likhein.');
+        }
+
+        // Spam guard: max 10 suggestions per user per day (product-agnostic —
+        // users are per-panel, so this is effectively the FBR user's own cap).
+        $todayCount = FeatureSuggestion::where('user_id', $user->id)
+            ->whereDate('created_at', now()->toDateString())
+            ->count();
+        if ($todayCount >= 10) {
+            return redirect('/fbr-pos/suggestions')->with('error', 'Aaj ke liye tajaweez ki limit poori ho gayi hai — kal dobara bhej sakte hain.');
+        }
+
+        FeatureSuggestion::create([
+            'company_id' => $user->company_id,
+            'user_id' => $user->id,
+            'product' => 'fbrpos',
+            'title' => trim($request->title),
+            'details' => $request->filled('details') ? trim($request->details) : null,
+            'status' => 'pending',
+        ]);
+
+        return redirect('/fbr-pos/suggestions')->with('success', 'Shukriya! Aap ki tajweez hum tak pohnch gayi hai. Hamari team is par ghor karegi.');
+    }
+
     // ============ PRA ELAAN (Task 1202) ============
 
     /**

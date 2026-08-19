@@ -27,45 +27,45 @@ class MadadgarLocalEngine
 {
     private const CACHE_TTL_DAYS = 30;
 
-    /** Runtime memo (per request). */
-    private static ?array $index = null;
-    private static ?string $kbHash = null;
+    /** Runtime memos (per request), keyed by product ('pos' / 'fbrpos'). */
+    private static array $index = [];
+    private static array $kbHash = [];
 
     // ==================== PUBLIC API ====================
 
     /** md5 of the KB file — cache keys ride on this so KB edits invalidate. */
-    public static function kbHash(): string
+    public static function kbHash(string $product = 'pos'): string
     {
-        if (self::$kbHash === null) {
-            self::$kbHash = md5(self::kbRaw());
+        if (!isset(self::$kbHash[$product])) {
+            self::$kbHash[$product] = md5(self::kbRaw($product));
         }
 
-        return self::$kbHash;
+        return self::$kbHash[$product];
     }
 
     /**
      * Try to answer locally. Returns plain-text Roman Urdu or NULL when not
      * confident (caller decides: OpenAI / polite fallback).
      */
-    public static function answer(string $question): ?string
+    public static function answer(string $question, string $product = 'pos'): ?string
     {
         $tokens = self::questionTokens($question);
         if (empty($tokens)) {
             return null;
         }
 
-        $faq = self::faqAnswer($tokens);
+        $faq = self::faqAnswer($tokens, $product);
         if ($faq !== null) {
             return $faq;
         }
 
-        return self::retrieve($tokens);
+        return self::retrieve($tokens, $product);
     }
 
     /** Cached answer for this question under the CURRENT KB hash, or null. */
-    public static function cachedAnswer(string $question): ?string
+    public static function cachedAnswer(string $question, string $product = 'pos'): ?string
     {
-        $key = self::cacheKey($question);
+        $key = self::cacheKey($question, $product);
         if ($key === null) {
             return null;
         }
@@ -83,7 +83,7 @@ class MadadgarLocalEngine
      * Store a successful plain-text answer. Escalation cards and error replies
      * must NEVER reach this method (caller guarantees).
      */
-    public static function cacheAnswer(string $question, string $text, string $source = 'local'): void
+    public static function cacheAnswer(string $question, string $text, string $source = 'local', string $product = 'pos'): void
     {
         // Hard guard: ONLY deterministic KB-derived local answers may enter the
         // shared cache. OpenAI output can embed per-session/user context and
@@ -91,7 +91,7 @@ class MadadgarLocalEngine
         if ($source !== 'local') {
             return;
         }
-        $key = self::cacheKey($question);
+        $key = self::cacheKey($question, $product);
         if ($key === null || trim($text) === '') {
             return;
         }
@@ -154,7 +154,7 @@ class MadadgarLocalEngine
     // ==================== CACHE KEY ====================
 
     /** Null when the question is unsafe to cache (follow-up / too thin). */
-    private static function cacheKey(string $question): ?string
+    private static function cacheKey(string $question, string $product = 'pos'): ?string
     {
         $q = mb_strtolower(trim($question), 'UTF-8');
         if (mb_strlen($q) < 6) {
@@ -171,7 +171,9 @@ class MadadgarLocalEngine
         }
         sort($tokens);
 
-        return 'madadgar_ans:'.md5(self::kbHash().'|'.implode(' ', $tokens));
+        // Per-product isolation is automatic: kbHash($product) differs per KB
+        // file, so 'pos' and 'fbrpos' answers can never cross-contaminate.
+        return 'madadgar_ans:'.md5(self::kbHash($product).'|'.implode(' ', $tokens));
     }
 
     // ==================== FAQ LAYER ====================
@@ -181,10 +183,10 @@ class MadadgarLocalEngine
      * First pattern fully contained in the question tokens wins, so more
      * specific patterns must come first.
      */
-    private static function faqAnswer(array $tokens): ?string
+    private static function faqAnswer(array $tokens, string $product = 'pos'): ?string
     {
         $set = array_flip($tokens);
-        foreach (self::faqs() as $faq) {
+        foreach (self::faqs($product) as $faq) {
             foreach ($faq['p'] as $pattern) {
                 $ok = true;
                 foreach ($pattern as $t) {
@@ -202,8 +204,12 @@ class MadadgarLocalEngine
         return null;
     }
 
-    private static function faqs(): array
+    private static function faqs(string $product = 'pos'): array
     {
+        if ($product === 'fbrpos') {
+            return self::fbrFaqs();
+        }
+
         return [
             // --- specific before generic ---
             ['p' => [['rider', 'settle'], ['rider', 'cash'], ['rider', 'khata']],
@@ -350,12 +356,64 @@ class MadadgarLocalEngine
         ];
     }
 
+    /** Curated FAQ set for the FBR POS panel (Task 1275) — same shape as faqs(). */
+    private static function fbrFaqs(): array
+    {
+        return [
+            // --- specific before generic ---
+            ['p' => [['fail', 'queue'], ['report', 'nahi'], ['fbr', 'nahi'], ['fail']],
+             'a' => "Jo bills FBR ko report nahi huay wo Fail Queue mein hote hain — /fbr-pos/fail-queue kholein. Har bill ke saamne \"Retry\" hai; sab ek saath bhejne ke liye \"Retry All\" dabayen. CONFIG ERROR wale bills ka matlab FBR settings ka masla hai (ghalat POS ID/token/environment) — pehle /fbr-pos/settings par settings theek kar ke Test Connection karein, phir retry. Internet wapas aane par system khud bhi retry karta hai."],
+
+            ['p' => [['asaan'], ['verify']],
+             'a' => "Har FBR-reported receipt par FBR ka invoice number aur QR code hota hai — customer FBR ki \"Tax Asaan\" app se QR scan kar ke verify kar sakta hai. Verify na ho to /fbr-pos/transactions par check karein ke bill ka FBR status \"Submitted\" hai — pending/failed bill Tax Asaan par nahi milega (fail queue se retry karein). Sandbox ke bills Tax Asaan par kabhi nahi milte — asli verification sirf Production mein hoti hai."],
+
+            ['p' => [['sandbox'], ['production', 'environment'], ['environment']],
+             'a' => "Environment /fbr-pos/settings par set hota hai (sirf admin): SANDBOX testing ke liye hai — bills asli report NAHI hote; PRODUCTION asli reporting hai. Dukan chalani ho to Production chunein aur wohi token dalein jo FBR ne Production ke liye diya hai. Save ke baad \"Test Connection\" se check karein."],
+
+            ['p' => [['pos', 'id'], ['token']],
+             'a' => "POS Registration ID aur Token FBR se milte hain jab aap apna POS FBR ke saath register karte hain — dono /fbr-pos/settings par dalne hote hain (sirf admin). Environment (Sandbox/Production) token ke mutabiq chunein aur \"Test Connection\" se check karein. \"Resource forbidden\" ya token error ka matlab token/environment ka mel nahi hai."],
+
+            ['p' => [['fiscal', 'device'], ['agent']],
+             'a' => "Connection Mode /fbr-pos/settings par hai: \"Cloud API\" purane registered POS IDs ke liye, aur NAYE FBR registrations ke liye \"Fiscal Device / Local Service\" mode zaroori hai — is mein FBR ka local service usi computer par chalta hai jis ke liye Desktop Agent install hota hai (download settings page ke Agent section se). Install ke baad Test Connection se check karein."],
+
+            ['p' => [['dayclose'], ['zreport']],
+             'a' => "Day close /fbr-pos/day-close par hota hai:\n1. Page kholein — din ka khulasa (sales, tax, payments) nazar aayega.\n2. Cash gin kar reconcile karein.\n3. \"Close Day\" dabayen.\nPurani closes isi page par milti hain — PDF aur Thermal print dono. Auto Day-Close (24h) ka option bhi hai. Din band karne se pehle fail queue check kar lein."],
+
+            ['p' => [['provisional'], ['local', 'bill'], ['makefinal']],
+             'a' => "Provisional bill: sale screen par \"Save Provisional\" — bill save hota hai magar FBR ko report NAHI hota. Baad mein provisional list (F10) ya /fbr-pos/transactions se \"Make Final\" (promote) karein — tabhi bill FBR ko jata hai aur receipt par FBR number + QR aata hai."],
+
+            ['p' => [['silent']],
+             'a' => "Silent printing (bina print dialog ke) ke liye Desktop Agent install karein aur printer settings mein \"Silent Printing\" ON kar ke Bill/KOT printers chunein — list Agent se aati hai. Setting badalne ke baad sale screen refresh (F5) karein."],
+
+            ['p' => [['print', 'lagana'], ['print', 'setup'], ['print', 'install'], ['print', 'connect']],
+             'a' => "Printer lagane ka tareeqa:\n1. Printer PC se connect kar ke driver install karein.\n2. Browser ke print dialog mein wohi printer select karein.\n3. /fbr-pos/receipt-settings par paper size (80mm ya 58mm) set karein.\nHar aam thermal printer (USB, network ya Bluetooth) chalta hai. Bina dialog ke seedha print chahiye to Desktop Agent install kar ke Silent Printing ON karein."],
+
+            ['p' => [['password']],
+             'a' => "Password bhool jayein to /fbr-pos/login par \"Forgot Password\" dabayen — email par OTP aata hai, phir naya password set karein. Apna password badalna ho to /fbr-pos/my-profile par Current Password + New Password + Confirm se change hota hai. Team members ke passwords company admin /fbr-pos/team par dekh sakta hai."],
+
+            ['p' => [['login']],
+             'a' => "FBR POS login /fbr-pos/login par hota hai — Email, Phone, Username, CNIC ya NTN se (CNIC/NTN se company ka admin login hota hai). 5 ghalat koshishon par login thori der ke liye lock ho jata hai. Password bhool gaye hon to \"Forgot Password\" se OTP ke zariye reset karein. Kisi aur panel par login karne se \"Invalid credentials\" aayega — sirf /fbr-pos/login use karein."],
+
+            ['p' => [['scanner'], ['barcode']],
+             'a' => "Barcode scanner ke liye alag setup nahi chahiye — koi bhi USB/Bluetooth scanner jo keyboard ki tarah type karta hai seedha chal jata hai. Sale screen ke search box mein scan karein — exact match foran cart mein chala jata hai."],
+
+            ['p' => [['product', 'add'], ['product', 'naya'], ['product', 'banana']],
+             'a' => "Naya product /fbr-pos/products par banta hai — \"Add Product\" se naam, price, barcode/SKU aur tax set karein. Bohat saare products ek saath dalne hon to Excel import istemal karein (/fbr-pos/products/import — pehle template download karein)."],
+
+            ['p' => [['limit'], ['package'], ['expiry']],
+             'a' => "Apna package, mahana bill limit aur expiry /fbr-pos/billing par nazar aati hai. FBR POS mein mahana quota mein provisional bills bhi ginte hain. Upgrade ya renewal ke liye billing page se payment proof upload karein ya TaxNest team se WhatsApp par rabta karein."],
+
+            ['p' => [['offline'], ['internet']],
+             'a' => "Internet chala jaye to bill save ho jata hai aur FBR ko report offline queue mein chala jata hai — net wapas aane par khud submit ho jata hai, double report nahi hota. Jo bills phir bhi reh jayen wo /fbr-pos/fail-queue par milte hain — wahan se Retry All kar dein."],
+        ];
+    }
+
     // ==================== RETRIEVAL ENGINE ====================
 
     /** Confidence-gated retrieval over KB sections/lines. Null = decline. */
-    private static function retrieve(array $qTokens): ?string
+    private static function retrieve(array $qTokens, string $product = 'pos'): ?string
     {
-        $index = self::index();
+        $index = self::index($product);
         if (empty($index['sections'])) {
             return null;
         }
@@ -492,10 +550,10 @@ class MadadgarLocalEngine
 
     // ==================== KB INDEX ====================
 
-    private static function kbRaw(): string
+    private static function kbRaw(string $product = 'pos'): string
     {
         try {
-            $path = resource_path('madadgar/knowledge-pos.md');
+            $path = resource_path($product === 'fbrpos' ? 'madadgar/knowledge-fbrpos.md' : 'madadgar/knowledge-pos.md');
 
             return is_file($path) ? (string) file_get_contents($path) : '';
         } catch (\Throwable $e) {
@@ -503,16 +561,16 @@ class MadadgarLocalEngine
         }
     }
 
-    /** Parse + tokenize the KB once per request. */
-    private static function index(): array
+    /** Parse + tokenize the KB once per request (memoized per product). */
+    private static function index(string $product = 'pos'): array
     {
-        if (self::$index !== null) {
-            return self::$index;
+        if (isset(self::$index[$product])) {
+            return self::$index[$product];
         }
 
         $sections = [];
         $current = null;
-        foreach (preg_split('/\r?\n/', self::kbRaw()) as $raw) {
+        foreach (preg_split('/\r?\n/', self::kbRaw($product)) as $raw) {
             if (preg_match('/^#{2,3}\s+(.*)$/', $raw, $m)) {
                 if ($current !== null && !empty($current['lines'])) {
                     $sections[] = $current;
@@ -562,7 +620,7 @@ class MadadgarLocalEngine
             $idf[$tok] = log(1 + $n / $d);
         }
 
-        return self::$index = ['sections' => $sections, 'idf' => $idf];
+        return self::$index[$product] = ['sections' => $sections, 'idf' => $idf];
     }
 
     // ==================== NORMALIZATION ====================

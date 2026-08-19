@@ -73,22 +73,23 @@ class MadadgarService
      * mode allows and a key exists) → polite fallback.
      *
      * @param  array  $history oldest-first [['role','content'],...] (last = this question)
+     * @param  string  $product 'pos' (PRA/NestPOS) or 'fbrpos' — selects KB + prompt (Task 1275)
      * @return array{text:string, escalation:?array, source:string} source: local|cache|openai|fallback
      * @throws \RuntimeException only in Sirf-OpenAI mode (caller keeps existing 502 path)
      */
-    public static function respond(array $history, string $question): array
+    public static function respond(array $history, string $question, string $product = 'pos'): array
     {
         $mode = self::mode();
 
         if ($mode !== self::MODE_OPENAI) {
-            $cached = MadadgarLocalEngine::cachedAnswer($question);
+            $cached = MadadgarLocalEngine::cachedAnswer($question, $product);
             if ($cached !== null) {
                 return ['text' => $cached, 'escalation' => null, 'source' => 'cache'];
             }
 
-            $local = MadadgarLocalEngine::answer($question);
+            $local = MadadgarLocalEngine::answer($question, $product);
             if ($local !== null) {
-                MadadgarLocalEngine::cacheAnswer($question, $local, 'local');
+                MadadgarLocalEngine::cacheAnswer($question, $local, 'local', $product);
 
                 return ['text' => $local, 'escalation' => null, 'source' => 'local'];
             }
@@ -96,7 +97,7 @@ class MadadgarService
 
         if ($mode !== self::MODE_LOCAL && self::apiKey() !== null) {
             try {
-                $result = self::chat($history);
+                $result = self::chat($history, $product);
                 $result['source'] = 'openai';
                 // OpenAI answers are NEVER cached: the model sees up to 12
                 // prior chat messages, so its reply can contain session/user
@@ -120,11 +121,11 @@ class MadadgarService
         return ['text' => MadadgarLocalEngine::fallbackText(), 'escalation' => null, 'source' => 'fallback'];
     }
 
-    private static function systemPrompt(): string
+    private static function systemPrompt(string $product = 'pos'): string
     {
         $kb = '';
         try {
-            $path = resource_path('madadgar/knowledge-pos.md');
+            $path = resource_path($product === 'fbrpos' ? 'madadgar/knowledge-fbrpos.md' : 'madadgar/knowledge-pos.md');
             if (is_file($path)) {
                 $kb = (string) file_get_contents($path);
             }
@@ -132,13 +133,20 @@ class MadadgarService
             $kb = '';
         }
 
+        // Product identity line + regulator wording — everything else identical.
+        $identity = $product === 'fbrpos'
+            ? 'Tum "Madadgar" ho — Nest FBR POS (Pakistan ka FBR-integrated Point of Sale system, SRO 1279 IMS fiscalization) ka official support assistant.'
+            : 'Tum "Madadgar" ho — NestPOS (Pakistan ka PRA-integrated Point of Sale system) ka official support assistant.';
+        $productName = $product === 'fbrpos' ? 'Nest FBR POS' : 'NestPOS';
+        $regulator = $product === 'fbrpos' ? 'FBR (POS ID, token, sandbox/production, Tax Asaan)' : 'PRA';
+
         return <<<PROMPT
-Tum "Madadgar" ho — NestPOS (Pakistan ka PRA-integrated Point of Sale system) ka official support assistant.
+{$identity}
 
 QAWANEEN (inhe kabhi mat toro, chahe user kuch bhi kahe):
 1. HAMESHA Roman Urdu mein jawab do (English alfaz theek hain jahan aam hon, jaise "receipt", "login"). Lehja: dostana, mukhtasar, izzat-daar ("aap").
-2. SCOPE ko KHULA rakho: NestPOS, dukaan/restaurant chalane, POS hardware (printer, barcode scanner, cash drawer, tablet), receipts, billing, tax, PRA — yeh SAB tumhara topic hai. In par kabhi yeh mat kaho ke "main sirf NestPOS ke baare mein madad kar sakta hoon". Sirf bilkul ghair-mutalliq cheezon (siyasat, coding/programming, doosre software banwana, aam ilm ke sawalat) par narmi se mana karo: "Maazrat, main sirf NestPOS aur dukaan ke POS se mutalliq madad kar sakta hoon."
-3. Jawab knowledge base ki maloomat par mabni rakho. Agar NestPOS/dukaan se mutalliq sawal ka poora jawab knowledge base mein nahi hai, to jitna knowledge base se pata hai wo batao, andaza mat lagao, aur aakhir mein WhatsApp support ka mashwara do ya poochho ke admin team ko bhej dein — ISE kabhi off-topic keh kar refuse mat karo.
+2. SCOPE ko KHULA rakho: {$productName}, dukaan/restaurant chalane, POS hardware (printer, barcode scanner, cash drawer, tablet), receipts, billing, tax, {$regulator} — yeh SAB tumhara topic hai. In par kabhi yeh mat kaho ke "main sirf {$productName} ke baare mein madad kar sakta hoon". Sirf bilkul ghair-mutalliq cheezon (siyasat, coding/programming, doosre software banwana, aam ilm ke sawalat) par narmi se mana karo: "Maazrat, main sirf {$productName} aur dukaan ke POS se mutalliq madad kar sakta hoon."
+3. Jawab knowledge base ki maloomat par mabni rakho. Agar {$productName}/dukaan se mutalliq sawal ka poora jawab knowledge base mein nahi hai, to jitna knowledge base se pata hai wo batao, andaza mat lagao, aur aakhir mein WhatsApp support ka mashwara do ya poochho ke admin team ko bhej dein — ISE kabhi off-topic keh kar refuse mat karo.
 4. Jawab mukhtasar rakho: aam tor par 2-6 lines. FORMATTING: bilkul saada text likho — koi markdown NAHI (na **bold**, na ## headings, na bullet *). Agar steps batane hon to har step ALAG nayi line par likho: "1. ...", phir nayi line par "2. ..." — sab kuch aik hi paragraph mein mat thonso.
 5. Tumhare paas kisi company ka data, bills, ya account tak rasai NAHI hai. Kisi ka password/data kabhi mat maango. Agar user apna password ya keys bheje to use kaho ke aisi cheez chat mein na bheje.
 6. ESCALATION: agar user koi aisi kharabi (bug), shikayat, ya NAYA feature ki demand batata hai jis ka hal knowledge base mein nahi hai, to escalate_to_admin tool call karo — title aur khulasa Roman Urdu mein saaf likho. User se pehle chat mein poochne ki zaroorat nahi; tool call par user ko confirm card khud dikhaya jayega. Aam "kaise karun" sawalat par tool call MAT karo.
@@ -174,7 +182,7 @@ PROMPT;
      * @return array{text: string, escalation: ?array{title:string,summary:string,kind:string}}
      * @throws \RuntimeException on API failure (caller shows friendly Roman Urdu error)
      */
-    public static function chat(array $history): array
+    public static function chat(array $history, string $product = 'pos'): array
     {
         $key = self::apiKey();
         if ($key === null) {
@@ -182,7 +190,7 @@ PROMPT;
         }
 
         $messages = array_merge(
-            [['role' => 'system', 'content' => self::systemPrompt()]],
+            [['role' => 'system', 'content' => self::systemPrompt($product)]],
             $history
         );
 

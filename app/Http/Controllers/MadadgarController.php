@@ -26,9 +26,20 @@ class MadadgarController extends Controller
     private const DAILY_ESCALATION_CAP = 5; // confirmed escalations per user per day
     private const CONTEXT_MESSAGES = 12;    // rows sent to the model per turn
 
+    /**
+     * Panel detection (Task 1275): the same three endpoints serve both the PRA
+     * panel (/pos/madadgar/*, guard 'pos') and the FBR panel
+     * (/fbr-pos/madadgar/*, guard 'fbrpos'). Guard name === product name on
+     * both panels, so one string drives auth, KB choice and escalation product.
+     */
+    private function panelProduct(Request $request): string
+    {
+        return $request->is('fbr-pos/*') ? 'fbrpos' : 'pos';
+    }
+
     public function history(Request $request)
     {
-        $user = auth('pos')->user();
+        $user = auth($this->panelProduct($request))->user();
         $sessionId = $this->sessionId($request);
 
         $messages = MadadgarMessage::where('user_id', $user->id)
@@ -51,7 +62,8 @@ class MadadgarController extends Controller
 
     public function message(Request $request)
     {
-        $user = auth('pos')->user();
+        $product = $this->panelProduct($request);
+        $user = auth($product)->user();
 
         if (!MadadgarService::enabled()) {
             return response()->json(['error' => 'Madadgar abhi dastyab nahi — WhatsApp par rabta karein.'], 503);
@@ -89,7 +101,7 @@ class MadadgarController extends Controller
         $question = trim($request->content);
 
         try {
-            $result = MadadgarService::respond($history, $question);
+            $result = MadadgarService::respond($history, $question, $product);
         } catch (\Throwable $e) {
             // Sirf-OpenAI mode only (hybrid/local degrade internally): failed
             // turn must not eat the daily cap or leave a reply-less row.
@@ -150,7 +162,8 @@ class MadadgarController extends Controller
 
     public function escalate(Request $request)
     {
-        $user = auth('pos')->user();
+        $product = $this->panelProduct($request);
+        $user = auth($product)->user();
 
         if (!MadadgarService::enabled()) {
             return response()->json(['error' => 'Madadgar abhi dastyab nahi — WhatsApp par rabta karein.'], 503);
@@ -176,7 +189,7 @@ class MadadgarController extends Controller
         $suggestion = FeatureSuggestion::create([
             'company_id' => $user->company_id,
             'user_id' => $user->id,
-            'product' => 'pos',
+            'product' => $product,
             'title' => mb_substr(trim($request->title), 0, 150),
             'details' => '['.$kindLabel.'] '.trim((string) $request->summary),
             'status' => 'pending',

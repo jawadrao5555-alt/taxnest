@@ -39,6 +39,34 @@ class PosAppPushController extends Controller
         if (!$user) {
             return response()->json(['ok' => false], 401);
         }
+
+        return $this->storeToken($request, $user);
+    }
+
+    /**
+     * POST /fbr-pos/app/fcm-token — FBR shell twin of register() (Task 1275).
+     * Same table/dedupe/prune; only the required header value and the session
+     * guard differ (users are strictly per-panel, so no product column is
+     * needed on pos_app_devices). NOTE: /fbr-pos/* is NOT in the platform CSRF
+     * exempt list, so the route carries withoutMiddleware(ValidateCsrfToken) —
+     * the X-TaxNest-App header remains the forgery guard, exactly like PRA.
+     */
+    public function registerFbr(Request $request)
+    {
+        if ($request->header('X-TaxNest-App') !== 'fbrpos') {
+            return response()->json(['ok' => false], 403);
+        }
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user) {
+            return response()->json(['ok' => false], 401);
+        }
+
+        return $this->storeToken($request, $user);
+    }
+
+    /** Shared register body — guard-agnostic ($user already resolved). */
+    private function storeToken(Request $request, $user)
+    {
         try {
             if (!Schema::hasTable('pos_app_devices')) {
                 return response()->json(['ok' => true]); // pre-migration: accept quietly

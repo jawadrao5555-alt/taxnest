@@ -673,6 +673,27 @@ Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
     Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('pos.madadgar.escalate')->middleware('throttle:10,1');
 });
 
+// FBR POS twins (Task 1275) — same controllers detect the panel by URL prefix.
+// Push registration: fbrpos.auth ONLY (same rationale as PRA). /fbr-pos/* is
+// NOT in the platform CSRF-exempt list, so ValidateCsrfToken is dropped at
+// route level — the required X-TaxNest-App header stays the forgery guard.
+Route::middleware(['fbrpos.auth'])->post('/fbr-pos/app/fcm-token', [\App\Http\Controllers\PosAppPushController::class, 'registerFbr'])
+    ->middleware('throttle:30,1')
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+    ->name('fbrpos.app.fcm-token');
+// Stateless logout-time clear — token possession IS the auth; clear() is
+// guard-agnostic (deletes by token_hash), so the FBR shell gets its own alias.
+Route::post('/api/fbr-pos-app/fcm-token/clear', [\App\Http\Controllers\PosAppPushController::class, 'clear'])
+    ->middleware('throttle:30,1')->withoutMiddleware($statelessMachine)->name('fbrpos.app.fcm-clear');
+
+// Madadgar for the FBR panel — fbrpos.auth ONLY, NO company.approval (pending
+// companies may chat), ALL roles. Same throttles as the PRA group.
+Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/madadgar')->group(function () {
+    Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('fbrpos.madadgar.history');
+    Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('fbrpos.madadgar.message')->middleware('throttle:20,1');
+    Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('fbrpos.madadgar.escalate')->middleware('throttle:10,1');
+});
+
 // Tutorial videos inside the POS login (owner request, 2 Aug 2026) — pos.auth
 // ONLY, NO company.approval: pending companies may watch and learn while they
 // wait (same precedent as Madadgar). All roles allowed; path is unmapped in
@@ -1374,6 +1395,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('fbrpos.whats-new.seen');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');
+    // Feature suggestion box (Task 1275) — admin/manager-only (in-controller
+    // gate), 10/day cap; rows land product='fbrpos' in the shared admin view.
+    Route::get('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'fbrIndex'])->name('fbrpos.suggestions');
+    Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'fbrStore'])->name('fbrpos.suggestions.store')->middleware('throttle:10,1');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');
     Route::post('/store', [FbrPosController::class, 'store'])->name('fbrpos.store')->middleware('plan.limit:invoices');
     Route::get('/transactions', [FbrPosController::class, 'transactions'])->name('fbrpos.transactions');

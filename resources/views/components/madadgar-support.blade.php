@@ -1,15 +1,45 @@
 {{-- Madadgar unified support bubble (owner request 22 Jul 2026): one floating
      button -> panel with AI chat (all POS roles, incl. cashiers) + WhatsApp.
-     POS (pos-app) layout ONLY — other layouts keep <x-whatsapp-support />.
+     POS (pos-app) + FBR (fbr-pos-app) layouts ONLY — other layouts keep
+     <x-whatsapp-support />. Task 1275: pass product="fbrpos" from the FBR
+     layout — endpoints, theme (blue vs purple), session key and lang keys all
+     branch on it; the PRA rendering stays byte-identical.
      @keydown.stop on root: sale-screen F-key/Escape document listeners must
      never fire while typing in the chat (architect-mandated). --}}
+@props(['product' => 'pos'])
 @php
+    $mIsFbr = ($product ?? 'pos') === 'fbrpos';
+    $mBase = $mIsFbr ? '/fbr-pos/madadgar' : '/pos/madadgar';
+    $mStoreKey = $mIsFbr ? 'tn_madadgar_session_fbr' : 'tn_madadgar_session';
     $mWaNumber = preg_replace('/\D/', '', (string) \App\Models\SystemSetting::get('support_whatsapp_number', ''));
     $mAiEnabled = \App\Services\MadadgarService::enabled();
+    $mc = $mIsFbr ? [
+        'header' => 'bg-blue-700',
+        'avatar' => 'bg-blue-600',
+        'sub' => 'text-blue-200',
+        'close' => 'text-blue-200 hover:bg-blue-600 hover:text-white',
+        'menuBtn' => 'border-blue-200 bg-blue-50 hover:border-blue-400',
+        'primary' => 'bg-blue-600 hover:bg-blue-700',
+        'input' => 'focus:border-blue-500 focus:ring-blue-500',
+        'link' => 'hover:text-blue-600',
+    ] : [
+        'header' => 'bg-purple-700',
+        'avatar' => 'bg-purple-600',
+        'sub' => 'text-purple-200',
+        'close' => 'text-purple-200 hover:bg-purple-600 hover:text-white',
+        'menuBtn' => 'border-purple-200 bg-purple-50 hover:border-purple-400',
+        'primary' => 'bg-purple-600 hover:bg-purple-700',
+        'input' => 'focus:border-purple-500 focus:ring-purple-500',
+        'link' => 'hover:text-purple-600',
+    ];
+    $mUserBubble = ($mIsFbr ? 'bg-blue-600' : 'bg-purple-600').' text-white rounded-2xl rounded-br-md';
+    $mSubChatKey = $mIsFbr ? 'pos.madadgar_sub_chat_fbr' : 'pos.madadgar_sub_chat';
+    $mWaPrefillKey = $mIsFbr ? 'pos.madadgar_wa_prefill_fbr' : 'pos.madadgar_wa_prefill';
+    $mGreetKey = $mIsFbr ? 'pos.madadgar_greeting_fbr' : 'pos.madadgar_greeting';
 @endphp
 
 @if($mAiEnabled || $mWaNumber)
-<div x-data="tnMadadgar({{ $mAiEnabled ? 'true' : 'false' }}, @js($mWaNumber))"
+<div x-data="tnMadadgar({{ $mAiEnabled ? 'true' : 'false' }}, @js($mWaNumber), @js($mBase), @js($mStoreKey))"
      @keydown.stop @keydown.escape.prevent="open = false"
      class="fixed z-[60] bottom-5 left-5"
      style="padding-bottom: env(safe-area-inset-bottom, 0px);">
@@ -20,17 +50,17 @@
          style="width: min(92vw, 360px); max-height: min(75vh, 560px);">
 
         {{-- Header --}}
-        <div class="px-4 py-3 bg-purple-700 flex items-center justify-between">
+        <div class="px-4 py-3 {{ $mc['header'] }} flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
-                <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                <div class="w-8 h-8 rounded-full {{ $mc['avatar'] }} flex items-center justify-center flex-shrink-0">
                     <svg class="w-4.5 h-4.5 text-white" style="width:18px;height:18px" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                 </div>
                 <div class="min-w-0">
                     <div class="text-white font-bold text-sm leading-tight">Madadgar</div>
-                    <div class="text-purple-200 text-xs leading-tight" x-text="view === 'chat' ? @js(__('pos.madadgar_sub_chat')) : @js(__('pos.madadgar_sub_menu'))"></div>
+                    <div class="{{ $mc['sub'] }} text-xs leading-tight" x-text="view === 'chat' ? @js(__($mSubChatKey)) : @js(__('pos.madadgar_sub_menu'))"></div>
                 </div>
             </div>
-            <button @click="open = false" class="p-1.5 rounded-lg text-purple-200 hover:bg-purple-600 hover:text-white transition cursor-pointer" aria-label="{{ __('pos.close') }}">
+            <button @click="open = false" class="p-1.5 rounded-lg {{ $mc['close'] }} transition cursor-pointer" aria-label="{{ __('pos.close') }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
@@ -38,8 +68,8 @@
         {{-- MENU VIEW: two options --}}
         <div x-show="view === 'menu'" class="p-4 space-y-3">
             <template x-if="ai">
-                <button @click="startChat()" class="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 border-purple-200 bg-purple-50 hover:border-purple-400 transition text-left cursor-pointer">
-                    <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                <button @click="startChat()" class="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 {{ $mc['menuBtn'] }} transition text-left cursor-pointer">
+                    <div class="w-10 h-10 rounded-full {{ $mc['avatar'] }} flex items-center justify-center flex-shrink-0">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <div class="min-w-0">
@@ -49,7 +79,7 @@
                 </button>
             </template>
             <template x-if="wa">
-                <a :href="'https://wa.me/' + wa + '?text=' + encodeURIComponent(@js(__('pos.madadgar_wa_prefill')))"
+                <a :href="'https://wa.me/' + wa + '?text=' + encodeURIComponent(@js(__($mWaPrefillKey)))"
                    target="_blank" rel="noopener"
                    class="w-full flex items-center gap-3 p-3.5 rounded-xl border-2 border-green-200 bg-green-50 hover:border-green-400 transition text-left cursor-pointer">
                     <div class="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center flex-shrink-0">
@@ -69,7 +99,7 @@
                 <template x-for="(m, i) in messages" :key="i">
                     <div :class="m.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
                         <div :class="m.role === 'user'
-                                ? 'bg-purple-600 text-white rounded-2xl rounded-br-md'
+                                ? '{{ $mUserBubble }}'
                                 : (m.error ? 'bg-red-50 text-red-700 border border-red-200 rounded-2xl rounded-bl-md' : 'bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md')"
                              class="px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm"
                              style="max-width: 85%;" x-text="m.content"></div>
@@ -83,7 +113,7 @@
                     <div class="text-xs text-gray-600 mt-1 whitespace-pre-wrap" x-text="pending && pending.summary"></div>
                     <div class="flex gap-2 mt-3">
                         <button @click="confirmEscalation()" :disabled="busy"
-                                class="flex-1 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50">{{ __('pos.madadgar_yes_send') }}</button>
+                                class="flex-1 py-2 rounded-lg {{ $mc['primary'] }} text-white text-xs font-bold transition cursor-pointer disabled:opacity-50">{{ __('pos.madadgar_yes_send') }}</button>
                         <button @click="rejectEscalation()" :disabled="busy"
                                 class="flex-1 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold transition cursor-pointer disabled:opacity-50">{{ __('pos.madadgar_no') }}</button>
                     </div>
@@ -99,15 +129,15 @@
                     <input x-ref="minput" x-model="draft" type="text" maxlength="1000"
                            placeholder="{{ __('pos.madadgar_placeholder') }}"
                            autocomplete="off" name="madadgar_q_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                           class="flex-1 rounded-xl border-gray-300 text-sm focus:border-purple-500 focus:ring-purple-500">
+                           class="flex-1 rounded-xl border-gray-300 text-sm {{ $mc['input'] }}">
                     <button type="submit" :disabled="busy || !draft.trim()"
-                            class="w-10 h-10 rounded-xl bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition cursor-pointer disabled:opacity-40 flex-shrink-0" aria-label="{{ __('pos.madadgar_send') }}">
+                            class="w-10 h-10 rounded-xl {{ $mc['primary'] }} text-white flex items-center justify-center transition cursor-pointer disabled:opacity-40 flex-shrink-0" aria-label="{{ __('pos.madadgar_send') }}">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6"/></svg>
                     </button>
                 </form>
                 <div class="flex items-center justify-between mt-1.5 px-1">
-                    <button @click="newChat()" class="text-xs text-gray-400 hover:text-purple-600 transition cursor-pointer">{{ __('pos.madadgar_new_chat') }}</button>
-                    <button @click="view = 'menu'" class="text-xs text-gray-400 hover:text-purple-600 transition cursor-pointer">{{ __('pos.madadgar_back') }}</button>
+                    <button @click="newChat()" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_new_chat') }}</button>
+                    <button @click="view = 'menu'" class="text-xs text-gray-400 {{ $mc['link'] }} transition cursor-pointer">{{ __('pos.madadgar_back') }}</button>
                     <span class="text-xs text-gray-400" x-show="remaining !== null && remaining <= 5" x-text="@js(__('pos.madadgar_remaining_prefix')) + remaining"></span>
                 </div>
             </div>
@@ -116,17 +146,19 @@
 
     {{-- Floating button --}}
     <button @click="toggle()" aria-label="{{ __('pos.madadgar_support_label') }}"
-            class="flex items-center justify-center w-14 h-14 rounded-full shadow-lg bg-purple-600 hover:bg-purple-700 transition-transform hover:scale-105 active:scale-95 cursor-pointer">
+            class="flex items-center justify-center w-14 h-14 rounded-full shadow-lg {{ $mc['primary'] }} transition-transform hover:scale-105 active:scale-95 cursor-pointer">
         <svg x-show="!open" class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         <svg x-show="open" x-cloak class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
     </button>
 </div>
 
 <script>
-function tnMadadgar(aiEnabled, waNumber) {
+function tnMadadgar(aiEnabled, waNumber, base, storeKey) {
     return {
         ai: aiEnabled,
         wa: waNumber || '',
+        base: base || '/pos/madadgar',
+        storeKey: storeKey || 'tn_madadgar_session',
         open: false,
         view: 'menu',
         messages: [],
@@ -139,7 +171,7 @@ function tnMadadgar(aiEnabled, waNumber) {
 
         init() {
             try {
-                this.sid = localStorage.getItem('tn_madadgar_session') || null;
+                this.sid = localStorage.getItem(this.storeKey) || null;
             } catch (e) { this.sid = null; }
             if (!this.sid) this.resetSid();
         },
@@ -148,7 +180,7 @@ function tnMadadgar(aiEnabled, waNumber) {
                 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
                     const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
                 });
-            try { localStorage.setItem('tn_madadgar_session', this.sid); } catch (e) {}
+            try { localStorage.setItem(this.storeKey, this.sid); } catch (e) {}
         },
         toggle() {
             this.open = !this.open;
@@ -160,11 +192,11 @@ function tnMadadgar(aiEnabled, waNumber) {
             this.$nextTick(() => { this.$refs.minput && this.$refs.minput.focus(); this.scrollDown(); });
         },
         greet() {
-            this.messages.push({ role: 'assistant', content: @js(__('pos.madadgar_greeting')) });
+            this.messages.push({ role: 'assistant', content: @js(__($mGreetKey)) });
         },
         loadHistory() {
             this.loaded = true;
-            fetch('/pos/madadgar/history?session_id=' + this.sid, { headers: this.headers(false) })
+            fetch(this.base + '/history?session_id=' + this.sid, { headers: this.headers(false) })
                 .then(r => r.ok ? r.json() : Promise.reject(r))
                 .then(d => {
                     this.remaining = d.remaining;
@@ -185,7 +217,7 @@ function tnMadadgar(aiEnabled, waNumber) {
             this.messages.push({ role: 'user', content: q });
             this.busy = true;
             this.scrollDown();
-            fetch('/pos/madadgar/message', {
+            fetch(this.base + '/message', {
                 method: 'POST',
                 headers: this.headers(true),
                 body: JSON.stringify({ content: q, session_id: this.sid })
@@ -207,7 +239,7 @@ function tnMadadgar(aiEnabled, waNumber) {
             if (!this.pending || this.busy) return;
             this.busy = true;
             const p = this.pending;
-            fetch('/pos/madadgar/escalate', {
+            fetch(this.base + '/escalate', {
                 method: 'POST',
                 headers: this.headers(true),
                 body: JSON.stringify({ title: p.title, summary: p.summary, kind: p.kind, session_id: this.sid })

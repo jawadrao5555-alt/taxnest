@@ -176,6 +176,14 @@ Schedule::command('cloudflare:check-settings')->dailyAt('05:20');
 // in laravel.log); failures raise the LogHealth admin banner and email admins
 // synchronously (Log:: alerts are useless when logging itself is dead).
 Schedule::command('logs:health-check')->dailyAt('07:20');
+// Task 1275 — FBR fail-queue threshold push: 5+ bills stuck unreported →
+// admin/manager phones get "N bills FBR ko report nahi huay". Throttled to
+// one alert per company per 6h inside the command.
+Schedule::command('fbrpos:fail-queue-alerts')->everyThirtyMinutes()->withoutOverlapping();
+// Task 1275 — FBR day-close reminder: shops that traded today but haven't
+// closed by 21:30 get an evening nudge (auto-dayclose companies skipped;
+// once-per-day guard inside the command).
+Schedule::command('fbrpos:dayclose-reminders')->dailyAt('21:30');
 // MySQL connection headroom guard (Task 1107): on 17 Aug 2026 Threads_connected
 // hit 401/400 with no warning. Every 5 minutes: if Threads_connected / max_connections
 // > 70 %, log a warning and email all admins (throttled to once per hour).

@@ -548,7 +548,10 @@ class FbrPosProductFullEditTest extends TestCase
             ->assertSee('matchingCount: 21');
     }
 
-    /** 8. A cashier (non-admin) is blocked from the edit endpoints. */
+    /**
+     * 8. A cashier (non-admin) is blocked from the edit endpoints, including
+     * direct links carrying a product id from another company.
+     */
     public function test_cashier_cannot_edit_products(): void
     {
         $cashierId = DB::table('users')->insertGetId([
@@ -559,11 +562,114 @@ class FbrPosProductFullEditTest extends TestCase
         ]);
         $cashier = \App\Models\User::find($cashierId);
 
+        $initialProduct = DB::table('products')->find($this->productId);
+        DB::table('inventory_stocks')->insert([
+            'company_id' => $this->companyId,
+            'product_id' => $this->productId,
+            'quantity' => 14,
+            'min_stock_level' => 2,
+            'avg_purchase_price' => 90,
+            'last_purchase_price' => 95,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $initialStock = DB::table('inventory_stocks')->where('product_id', $this->productId)->first();
+
+        $otherCompany = (int) DB::table('companies')->insertGetId([
+            'name' => 'Foreign Shop',
+            'product_type' => 'fbrpos',
+            'status' => 'active',
+            'company_status' => 'active',
+            'fbr_pos_enabled' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $foreignProductId = (int) DB::table('products')->insertGetId([
+            'company_id' => $otherCompany,
+            'name' => 'Foreign Product',
+            'default_price' => 75,
+            'tax_type' => 'exempt',
+            'default_tax_rate' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('inventory_stocks')->insert([
+            'company_id' => $otherCompany,
+            'product_id' => $foreignProductId,
+            'quantity' => 8,
+            'min_stock_level' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $initialForeignProduct = DB::table('products')->find($foreignProductId);
+        $initialForeignStock = DB::table('inventory_stocks')->where('product_id', $foreignProductId)->first();
+
         $this->actingAs($cashier, 'fbrpos')
             ->get('/fbr-pos/products/' . $this->productId . '/edit')->assertForbidden();
         $this->actingAs($cashier, 'fbrpos')
-            ->put('/fbr-pos/products/' . $this->productId, $this->fullPayload())->assertForbidden();
+            ->put('/fbr-pos/products/' . $this->productId, $this->fullPayload([
+                'stock_action' => 'add',
+                'add_qty' => 99,
+                'add_unit_cost' => 1,
+                'name' => 'Cashier Must Not Save',
+                'default_price' => 1,
+            ]))->assertForbidden();
+        $this->actingAs($cashier, 'fbrpos')
+            ->get('/fbr-pos/products/' . $foreignProductId . '/edit')->assertForbidden();
+        $this->actingAs($cashier, 'fbrpos')
+            ->put('/fbr-pos/products/' . $foreignProductId, $this->fullPayload([
+                'stock_action' => 'correct',
+                'new_qty' => 0,
+                'name' => 'Foreign Product Must Not Save',
+                'default_price' => 1,
+            ]))->assertForbidden();
 
-        $this->assertSame('Lux Soap', DB::table('products')->find($this->productId)->name);
+        $this->assertEquals($initialProduct, DB::table('products')->find($this->productId));
+        $this->assertEquals($initialStock, DB::table('inventory_stocks')->where('product_id', $this->productId)->first());
+        $this->assertSame(0, DB::table('inventory_movements')->count());
+        $this->assertEquals($initialForeignProduct, DB::table('products')->find($foreignProductId));
+        $this->assertEquals($initialForeignStock, DB::table('inventory_stocks')->where('product_id', $foreignProductId)->first());
+    }
+
+    /**
+     * Company-scoped lookup must hide another company's product from admins.
+     *
+     * The web exception handler turns ModelNotFoundException into a back
+     * redirect for these form routes, so assert the externally visible
+     * redirect while the cashier test above covers the required 403 contract.
+     */
+    public function test_admin_cannot_cross_company_edit_product(): void
+    {
+        $otherCompany = (int) DB::table('companies')->insertGetId([
+            'name' => 'Foreign Shop',
+            'product_type' => 'fbrpos',
+            'status' => 'active',
+            'company_status' => 'active',
+            'fbr_pos_enabled' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $foreignProductId = (int) DB::table('products')->insertGetId([
+            'company_id' => $otherCompany,
+            'name' => 'Foreign Product',
+            'default_price' => 75,
+            'tax_type' => 'exempt',
+            'default_tax_rate' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin, 'fbrpos')
+            ->get('/fbr-pos/products/' . $foreignProductId . '/edit')
+            ->assertRedirect();
+        $this->actingAs($this->admin, 'fbrpos')
+            ->put('/fbr-pos/products/' . $foreignProductId, $this->fullPayload([
+                'name' => 'Cross-company write must fail',
+            ]))->assertRedirect();
+
+        $this->assertSame('Foreign Product', DB::table('products')->find($foreignProductId)->name);
+        $this->assertSame(75.0, (float) DB::table('products')->find($foreignProductId)->default_price);
     }
 }

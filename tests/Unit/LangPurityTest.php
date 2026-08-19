@@ -33,6 +33,8 @@ class LangPurityTest extends TestCase
         'Google','Maps',
         'Direct','Fiscal','Device','Submission','Mode','Hold','Deals','Update','Bill','Bills','Add','Customer','Product','Arrow','keys','More','Large','Order','Developed','Powered','chai','samosa','Preparing','Ready','Cleared','Report','Madadgar','series','Desktop','Agent','Sync','Retry','Edit','Recall','Pay','Delete','Close','Print','Set','default','New','Shortcut','Settings','devices','Printers','Label','free','app','xxxx','pos','products','Needed','Qty',
         'Pro','Max','SSL','zip','Cloud','Code','XXXXXXX','Letter','Registration','Point','Sale','Tax','Rate','Exempt',
+        // FBR product reference-field acronyms (Task 1276 — same class as SRO/STRN):
+        'PCT','MRP',
     ];
 
     /** Common Roman Urdu words that must never appear in the English file. */

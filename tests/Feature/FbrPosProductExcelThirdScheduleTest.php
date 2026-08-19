@@ -50,6 +50,7 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
             $table->decimal('default_price', 12, 2)->default(0);
             $table->decimal('default_tax_rate', 8, 2)->default(0);
             $table->string('tax_type')->default('taxable');
+            $table->decimal('mrp', 12, 2)->nullable(); // Task 1276: required for Third Schedule rows
             $table->boolean('is_third_schedule')->default(false); // The column under test
             $table->boolean('is_active')->default(true);
             $table->boolean('show_on_sale')->default(true);
@@ -131,7 +132,7 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
         Product::create([
             'company_id' => $this->companyId, 'name' => 'Milk Pack 1L', 'default_price' => 320,
             'default_tax_rate' => 0, 'tax_type' => 'exempt', 'is_third_schedule' => true,
-            'barcode' => '8964000112345',
+            'barcode' => '8964000112345', 'mrp' => 340,
         ]);
         Product::create([
             'company_id' => $this->companyId, 'name' => 'Rooh Afza', 'default_price' => 550,
@@ -141,6 +142,7 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
         $rows = $this->xlsxRows($this->exportXlsxBytes());
 
         $this->assertSame('Third Schedule (Yes/No)', $rows[0][8], 'Column I header must be the Third Schedule flag');
+        $this->assertSame('MRP (Retail Price)', $rows[0][9], 'Column J header must be MRP (Task 1276)');
 
         $byName = [];
         foreach (array_slice($rows, 1) as $row) {
@@ -148,15 +150,19 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
         }
         $this->assertSame('Yes', $byName['Milk Pack 1L'][8]);
         $this->assertSame('No', $byName['Rooh Afza'][8]);
+        // MRP exported for the Third Schedule product, blank when unset.
+        $this->assertEquals(340.0, (float) $byName['Milk Pack 1L'][9]);
+        $this->assertSame('', (string) $byName['Rooh Afza'][9]);
         // Barcode must survive as a plain digit STRING (never 8.964E+12).
         $this->assertSame('8964000112345', (string) $byName['Milk Pack 1L'][4]);
     }
 
     public function test_blank_template_has_third_schedule_header(): void
     {
-        // No products → sample template. Header must still carry the column.
+        // No products → sample template. Header must still carry the columns.
         $rows = $this->xlsxRows($this->exportXlsxBytes());
         $this->assertSame('Third Schedule (Yes/No)', $rows[0][8]);
+        $this->assertSame('MRP (Retail Price)', $rows[0][9]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -165,14 +171,15 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
 
     public function test_import_sets_flag_and_forces_exempt_zero_tax(): void
     {
-        $header = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)'];
+        $header = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)', 'MRP (Retail Price)'];
         $this->importRows($header, [
-            // Third Schedule Yes, even with a non-zero tax rate written → flag on, exempt, 0 tax
-            ['Surf 1kg', 350, '3402.2000', 'SRF-1', '', 18, 'KG', 'No', 'Yes'],
-            // Plain taxable product stays untouched by the new column
-            ['Basmati Rice', 400, '1006.3010', 'RIC-1', '', 18, 'KG', 'No', 'No'],
+            // Third Schedule Yes (needs MRP since Task 1276), even with a
+            // non-zero tax rate written → flag on, exempt, 0 tax
+            ['Surf 1kg', 350, '3402.2000', 'SRF-1', '', 18, 'KG', 'No', 'Yes', 370],
+            // Plain taxable product stays untouched by the new columns
+            ['Basmati Rice', 400, '1006.3010', 'RIC-1', '', 18, 'KG', 'No', 'No', ''],
             // Custom-rate product
-            ['Juice Pack', 150, '', 'JCE-1', '', 5, 'U', 'No', 'No'],
+            ['Juice Pack', 150, '', 'JCE-1', '', 5, 'U', 'No', 'No', ''],
         ]);
 
         $surf = Product::where('company_id', $this->companyId)->where('name', 'Surf 1kg')->first();
@@ -180,6 +187,7 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
         $this->assertEquals(1, (int) $surf->is_third_schedule);
         $this->assertSame('exempt', $surf->tax_type, 'Third Schedule must imply tax_type exempt');
         $this->assertEquals(0.0, (float) $surf->default_tax_rate, 'Third Schedule must imply 0 tax');
+        $this->assertEquals(370.0, (float) $surf->mrp, 'MRP column must persist on import');
 
         $rice = Product::where('company_id', $this->companyId)->where('name', 'Basmati Rice')->first();
         $this->assertEquals(0, (int) $rice->is_third_schedule);
@@ -239,7 +247,7 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
     {
         Product::create([
             'company_id' => $this->companyId, 'name' => 'Milk Pack 1L', 'default_price' => 320,
-            'sku' => 'MLK-1', 'barcode' => '8964000112345',
+            'sku' => 'MLK-1', 'barcode' => '8964000112345', 'mrp' => 340,
             'default_tax_rate' => 0, 'tax_type' => 'exempt', 'is_third_schedule' => true,
         ]);
         Product::create([
@@ -264,6 +272,7 @@ class FbrPosProductExcelThirdScheduleTest extends TestCase
         $this->assertEquals(1, (int) $milk->is_third_schedule, 'Round-trip must preserve Yes');
         $this->assertSame('exempt', $milk->tax_type);
         $this->assertEquals(0.0, (float) $milk->default_tax_rate);
+        $this->assertEquals(340.0, (float) $milk->mrp, 'Round-trip must preserve a positive MRP (Task 1276)');
         $this->assertSame('8964000112345', (string) $milk->barcode, 'Barcode must round-trip as a string');
         $this->assertEquals(0, (int) $rooh->is_third_schedule, 'Round-trip must preserve No');
         $this->assertSame('taxable', $rooh->tax_type);

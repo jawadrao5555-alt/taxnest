@@ -6356,6 +6356,7 @@ class FbrPosController extends Controller
             'sku' => 'nullable|string|max:64',
             'tax_type' => 'required|in:taxable,exempt,custom',
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
+            'mrp' => 'nullable|numeric|min:0',
             'opening_stock' => 'nullable|numeric|min:0',
             'min_stock_level' => 'nullable|numeric|min:0',
             // Supplier + purchase cost (Task 1261)
@@ -6372,6 +6373,14 @@ class FbrPosController extends Controller
         $isThirdScheduleFbr = $request->boolean('is_third_schedule');
         if ($isThirdScheduleFbr) { $taxType = 'exempt'; $taxRate = 0; }
 
+        // FBR requires the retail price on Third Schedule items — same invariant
+        // as updateProduct (Task 1276): never create one without a positive MRP.
+        if ($isThirdScheduleFbr && !($request->filled('mrp') && (float) $request->mrp > 0)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'mrp' => __('pos.fbr_pf_mrp_required_third'),
+            ]);
+        }
+
         $companyId = app('currentCompanyId');
         $createFbrData = [
             'company_id' => $companyId,
@@ -6384,6 +6393,7 @@ class FbrPosController extends Controller
             'uom' => $request->uom ?? 'U',
             'tax_type' => $taxType,
             'default_tax_rate' => $taxRate,
+            'mrp' => $request->filled('mrp') ? (float) $request->mrp : null,
         ];
         if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
             $createFbrData['is_third_schedule'] = $isThirdScheduleFbr;
@@ -6439,16 +6449,22 @@ class FbrPosController extends Controller
             'rows' => 'required|array|min:1|max:50',
         ]);
 
+        // Shared Third Schedule checkbox applies to every row — each row then
+        // needs its own MRP (FBR retail-price invariant, Task 1276 review).
+        $isThird = $request->boolean('is_third_schedule');
+
         // Row rules keyed by ORIGINAL index (blank rows skipped, never
         // re-indexed) so error keys always match the row numbers on screen.
         $rows = $request->input('rows', []);
         $rules = [];
         $attributes = [];
+        $messages = [];
         $filled = [];
         foreach ($rows as $i => $row) {
             if (!is_array($row)) continue;
             $blank = trim((string) ($row['name'] ?? '')) === ''
                 && trim((string) ($row['default_price'] ?? '')) === ''
+                && trim((string) ($row['mrp'] ?? '')) === ''
                 && trim((string) ($row['barcode'] ?? '')) === ''
                 && trim((string) ($row['opening_stock'] ?? '')) === ''
                 && trim((string) ($row['unit_cost'] ?? '')) === '';
@@ -6456,20 +6472,26 @@ class FbrPosController extends Controller
             $filled[$i] = $row;
             $rules["rows.$i.name"] = 'required|string|max:255';
             $rules["rows.$i.default_price"] = 'required|numeric|min:0';
+            $rules["rows.$i.mrp"] = $isThird ? 'required|numeric|min:0.01' : 'nullable|numeric|min:0';
             $rules["rows.$i.barcode"] = 'nullable|string|max:64';
             $rules["rows.$i.opening_stock"] = 'nullable|numeric|min:0';
             $rules["rows.$i.unit_cost"] = 'nullable|numeric|min:0';
             $rowLabel = __('pos.fbr_pf_row_n', ['n' => $i + 1]);
             $attributes["rows.$i.name"] = $rowLabel . ' — ' . __('pos.product_name_label');
             $attributes["rows.$i.default_price"] = $rowLabel . ' — ' . __('pos.price_pkr');
+            $attributes["rows.$i.mrp"] = $rowLabel . ' — ' . __('pos.mrp_label');
             $attributes["rows.$i.barcode"] = $rowLabel . ' — ' . __('pos.barcode_label');
             $attributes["rows.$i.opening_stock"] = $rowLabel . ' — ' . __('pos.fbr_pf_opening_stock');
             $attributes["rows.$i.unit_cost"] = $rowLabel . ' — ' . __('pos.stock_kharid_rate_ph');
+            if ($isThird) {
+                $messages["rows.$i.mrp.required"] = $rowLabel . ' — ' . __('pos.fbr_pf_mrp_required_third');
+                $messages["rows.$i.mrp.min"] = $rowLabel . ' — ' . __('pos.fbr_pf_mrp_required_third');
+            }
         }
         if (empty($filled)) {
             return back()->withInput()->withErrors(['rows' => __('pos.fbr_pf_rows_empty')]);
         }
-        \Illuminate\Support\Facades\Validator::make($request->all(), $rules, [], $attributes)->validate();
+        \Illuminate\Support\Facades\Validator::make($request->all(), $rules, $messages, $attributes)->validate();
 
         // Plan quota for EVERY row (the route middleware only guarantees one
         // free slot). null = unlimited.
@@ -6480,7 +6502,6 @@ class FbrPosController extends Controller
 
         $taxType = $request->tax_type;
         $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
-        $isThird = $request->boolean('is_third_schedule');
         if ($isThird) { $taxType = 'exempt'; $taxRate = 0; }
         $hasThirdCol = \Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule');
 
@@ -6504,6 +6525,7 @@ class FbrPosController extends Controller
                     'uom' => $request->uom ?? 'U',
                     'tax_type' => $taxType,
                     'default_tax_rate' => $taxRate,
+                    'mrp' => trim((string) ($row['mrp'] ?? '')) !== '' ? (float) $row['mrp'] : null,
                 ];
                 if ($hasThirdCol) $data['is_third_schedule'] = $isThird;
                 $product = Product::create($data);
@@ -6546,7 +6568,13 @@ class FbrPosController extends Controller
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
         $companyId = app('currentCompanyId');
         $product = Product::where('company_id', $companyId)->findOrFail($id);
-        return view('fbr-pos.product-form', compact('product'));
+        // Full product edit (Task 1276): the stock-adjustment block needs the
+        // same supplier list + inventory plan gate as the create form.
+        $inventoryAllowed = $this->fbrInventoryPlanAllowed($companyId);
+        $suppliers = $inventoryAllowed
+            ? \App\Models\Supplier::forCompany($companyId)->active()->orderBy('name')->get(['id', 'name', 'city'])
+            : collect();
+        return view('fbr-pos.product-form', compact('product', 'suppliers', 'inventoryAllowed'));
     }
 
     public function updateProduct(Request $request, $id)
@@ -6566,12 +6594,44 @@ class FbrPosController extends Controller
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
             'opening_stock' => 'nullable|numeric|min:0',
             'min_stock_level' => 'nullable|numeric|min:0',
+            // Full product edit (Task 1276): remaining model-backed fields.
+            'pct_code' => 'nullable|string|max:50',
+            'sro_reference' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mrp' => 'nullable|numeric|min:0',
+            'schedule_type' => 'nullable|in:standard,reduced,3rd_schedule,exempt,zero_rated',
+            // Stock adjustment on edit (Task 1276).
+            'stock_action' => 'nullable|in:none,add,correct',
+            'add_qty' => 'nullable|required_if:stock_action,add|numeric|min:0.001',
+            'add_unit_cost' => 'nullable|numeric|min:0',
+            'supplier_id' => 'nullable|integer',
+            'new_qty' => 'nullable|required_if:stock_action,correct|numeric|min:0',
+            'qty_reason' => 'nullable|string|max:200',
         ]);
 
         $taxType = $request->tax_type;
         $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
         $isThirdScheduleFbrUpd = $request->boolean('is_third_schedule');
         if ($isThirdScheduleFbrUpd) { $taxType = 'exempt'; $taxRate = 0; }
+
+        // FBR requires the retail price on Third Schedule items — the tax was
+        // already paid by the manufacturer at MRP, so a third-schedule product
+        // without an MRP can't be reported correctly.
+        if ($isThirdScheduleFbrUpd && !($request->filled('mrp') && (float) $request->mrp > 0)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'mrp' => __('pos.fbr_pf_mrp_required_third'),
+            ]);
+        }
+
+        // Reporting/fiscal coupling (Task 1276 review): schedule_type
+        // '3rd_schedule' (MRP-based reporting) may only be saved together with
+        // the fiscal Third Schedule flag — which itself demands a positive MRP
+        // above — so the two columns can never contradict each other.
+        if ($request->input('schedule_type') === '3rd_schedule' && !$isThirdScheduleFbrUpd) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'schedule_type' => __('pos.fbr_sched_third_requires_flag'),
+            ]);
+        }
 
         $updateFbrData = [
             'name' => $request->name,
@@ -6583,16 +6643,117 @@ class FbrPosController extends Controller
             'uom' => $request->uom ?? 'U',
             'tax_type' => $taxType,
             'default_tax_rate' => $taxRate,
+            // Full product edit (Task 1276): FBR reference fields + toggles.
+            'pct_code' => $request->pct_code ?: null,
+            'sro_reference' => $request->sro_reference ?: null,
+            'serial_number' => $request->serial_number ?: null,
+            'mrp' => $request->filled('mrp') ? (float) $request->mrp : null,
+            'schedule_type' => $request->filled('schedule_type') ? $request->schedule_type : null,
+            'show_on_sale' => $request->boolean('show_on_sale'),
+            'is_active' => $request->boolean('is_active'),
         ];
         if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
             $updateFbrData['is_third_schedule'] = $isThirdScheduleFbrUpd;
         }
-        $product->update($updateFbrData);
 
-        // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
-        $this->applyProductStockFields($request, $product);
+        // Stock-adjustment supplier resolved BEFORE any write (review fix): a
+        // forged / inactive / cross-company supplier id must fail the request
+        // while the product row is still untouched.
+        $inventoryAllowedUpd = $this->fbrInventoryPlanAllowed($companyId);
+        $editStockSupplier = null;
+        if ($request->input('stock_action') === 'add' && $inventoryAllowedUpd && $request->filled('supplier_id')) {
+            $editStockSupplier = \App\Models\Supplier::forCompany($companyId)->active()->find((int) $request->supplier_id);
+            if (!$editStockSupplier) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'supplier_id' => __('pos.fbr_pf_supplier_invalid'),
+                ]);
+            }
+        }
+
+        // ONE transaction for the whole edit: field save + min-stock/opening
+        // + stock adjustment commit together or not at all.
+        DB::transaction(function () use ($request, $product, $updateFbrData, $editStockSupplier, $inventoryAllowedUpd) {
+            $product->update($updateFbrData);
+
+            // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
+            $this->applyProductStockFields($request, $product);
+
+            // Stock adjustment on edit (Task 1276): add-stock purchase or
+            // quantity correction — always through InventoryService movements.
+            $this->applyEditStockAdjustment($request, $product, $editStockSupplier, $inventoryAllowedUpd);
+        });
 
         return redirect()->route('fbrpos.products')->with('success', __('pos.product_updated_success'));
+    }
+
+    /**
+     * Stock adjustment from the product edit form (Task 1276).
+     *
+     * add     → new stock in. With a supplier it is recorded as a RECEIVED
+     *           purchase (same shape as the create form / Stock & Purchase
+     *           page: PO + purchase movements, supplier history and avg/last
+     *           kharid stay correct); without one it is a plain purchase
+     *           movement via InventoryService.
+     * correct → the target quantity is booked as an adjustment_in/out
+     *           movement for the DELTA (never a raw column overwrite — same
+     *           rule as the Stock page quick edit), so the audit trail,
+     *           stat tiles and low-stock alerts all follow.
+     */
+    private function applyEditStockAdjustment(Request $request, Product $product, ?\App\Models\Supplier $supplier = null, bool $inventoryAllowed = false): void
+    {
+        $action = $request->input('stock_action');
+        if (!in_array($action, ['add', 'correct'], true)) {
+            return;
+        }
+        $companyId = app('currentCompanyId');
+        $userId = Auth::guard('fbrpos')->id();
+
+        if ($action === 'add') {
+            $qty = round((float) $request->add_qty, 3);
+            if ($qty <= 0) {
+                return;
+            }
+            // Supplier already resolved & validated by the caller BEFORE any
+            // write (review fix) — this method never queries it itself.
+            $cost = ($inventoryAllowed && $request->filled('add_unit_cost')) ? (float) $request->add_unit_cost : 0.0;
+            if ($supplier) {
+                $this->recordProductFormPurchase($companyId, $supplier, [
+                    ['product_id' => $product->id, 'quantity' => $qty, 'unit_price' => $cost],
+                ]);
+            } else {
+                \App\Services\InventoryService::addStock(
+                    $companyId, $product->id, $qty, $cost,
+                    \App\Models\InventoryMovement::TYPE_PURCHASE, null,
+                    ['type' => 'product_form', 'id' => $product->id, 'number' => null],
+                    'Stock added (product edit form)',
+                    $userId
+                );
+            }
+            return;
+        }
+
+        // correct: book the delta as an adjustment movement.
+        $newQty = round((float) $request->new_qty, 3);
+        $reason = trim((string) ($request->qty_reason ?? ''));
+        $note = 'Stock correction (product edit form)' . ($reason !== '' ? ' — ' . $reason : '');
+        DB::transaction(function () use ($companyId, $product, $newQty, $note, $userId) {
+            $stock = \App\Models\InventoryStock::lockForUpdate()->firstOrCreate(
+                ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
+            );
+            $delta = round($newQty - (float) $stock->quantity, 3);
+            if (abs($delta) < 0.0005) {
+                return;
+            }
+            $ref = ['type' => 'product_form', 'id' => $product->id, 'number' => null];
+            if ($delta > 0) {
+                \App\Services\InventoryService::addStock($companyId, $product->id, $delta, 0,
+                    \App\Models\InventoryMovement::TYPE_ADJUSTMENT_IN, null, $ref, $note, $userId);
+            } else {
+                \App\Services\InventoryService::deductStock($companyId, $product->id, abs($delta), 0,
+                    \App\Models\InventoryMovement::TYPE_ADJUSTMENT_OUT, null, $ref, $note, $userId);
+            }
+        });
     }
 
     /**
@@ -6915,10 +7076,25 @@ class FbrPosController extends Controller
             case 'third_on':
                 // Third Schedule ON → tax_type='exempt' + rate 0 (storeProduct
                 // coupling). Schema guard: column may not exist on prod yet.
+                // MRP invariant (Task 1276): only products with a positive MRP
+                // may be flagged — the rest are SKIPPED and reported, never
+                // silently flipped into invalid Third Schedule state.
                 if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
-                    $query->update(['is_third_schedule' => true, 'tax_type' => 'exempt', 'default_tax_rate' => 0]);
+                    $eligible = (clone $query)->whereNotNull('mrp')->where('mrp', '>', 0);
+                    $eligibleCount = (clone $eligible)->count();
+                    $skippedCount = $count - $eligibleCount;
+                    if ($eligibleCount > 0) {
+                        $eligible->update(['is_third_schedule' => true, 'tax_type' => 'exempt', 'default_tax_rate' => 0]);
+                    }
+                    if ($skippedCount > 0) {
+                        $combined = __('pos.products_third_on', ['count' => $eligibleCount])
+                            . ' — ' . __('pos.fbr_bulk_third_skipped_mrp', ['count' => $skippedCount]);
+                        return back()->with($eligibleCount > 0 ? 'success' : 'error', $combined);
+                    }
+                    $msg = __('pos.products_third_on', ['count' => $eligibleCount]);
+                } else {
+                    $msg = __('pos.products_third_on', ['count' => $count]);
                 }
-                $msg = __('pos.products_third_on', ['count' => $count]);
                 break;
             case 'third_off':
                 if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
@@ -7059,15 +7235,17 @@ class FbrPosController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Products');
 
-        // A..I — FBR product columns (no Description/Category on the products table;
+        // A..J — FBR product columns (no Description/Category on the products table;
         // HS Code replaces them; the rest mirrors the PRA set incl. Third Schedule).
-        $headers = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)'];
+        // J = MRP: required on import for Third Schedule rows (Task 1276), so the
+        // export MUST round-trip it or an exported file can't be re-imported.
+        $headers = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)', 'MRP (Retail Price)'];
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:I1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:I1')->getFill()
+        $sheet->getStyle('A1:J1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:J1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('BFDBFE');
-        foreach (['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20] as $col => $w) {
+        foreach (['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20, 'J' => 16] as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
         // SKU + Barcode + HS Code columns forced to TEXT so Excel never converts
@@ -7078,9 +7256,9 @@ class FbrPosController extends Controller
         $rowNum = 2;
         if ($existingProducts->isEmpty()) {
             $samples = [
-                ['Lux Soap 100g', 120, '3401.1100', 'LUX-100', '8964000112345', 18, 'U', 'No', 'Yes'],
-                ['Pepsi 500ml', 120, '2202.1010', 'PEP-500', '8964000154321', 18, 'U', 'No', 'No'],
-                ['Sugar 1kg', 180, '1701.9910', 'SUG-001', '', 0, 'KG', 'Yes', 'No'],
+                ['Lux Soap 100g', 120, '3401.1100', 'LUX-100', '8964000112345', 18, 'U', 'No', 'Yes', 130],
+                ['Pepsi 500ml', 120, '2202.1010', 'PEP-500', '8964000154321', 18, 'U', 'No', 'No', ''],
+                ['Sugar 1kg', 180, '1701.9910', 'SUG-001', '', 0, 'KG', 'Yes', 'No', ''],
             ];
             foreach ($samples as $s) {
                 $this->writeFbrProductRow($sheet, $rowNum++, $s);
@@ -7097,6 +7275,7 @@ class FbrPosController extends Controller
                     $p->uom ?? 'U',
                     ($p->tax_type ?? '') === 'exempt' ? 'Yes' : 'No',
                     !empty($p->is_third_schedule) ? 'Yes' : 'No',
+                    ($p->mrp !== null && (float) $p->mrp > 0) ? (float) $p->mrp : '',
                 ]);
             }
         }
@@ -7115,7 +7294,7 @@ class FbrPosController extends Controller
 
     private function writeFbrProductRow($sheet, int $rowNum, array $vals): void
     {
-        // A..I = Name, Price, HS Code, SKU, Barcode, Tax %, UOM, Tax Exempt, Third Schedule.
+        // A..J = Name, Price, HS Code, SKU, Barcode, Tax %, UOM, Tax Exempt, Third Schedule, MRP.
         // HS Code/SKU/Barcode written as EXPLICIT strings (Excel would otherwise turn
         // 8964000112345 into 8.964E+12 the moment the file is opened).
         $sheet->setCellValue('A' . $rowNum, $vals[0]);
@@ -7127,6 +7306,7 @@ class FbrPosController extends Controller
         $sheet->setCellValue('G' . $rowNum, $vals[6]);
         $sheet->setCellValue('H' . $rowNum, $vals[7] ?? 'No');
         $sheet->setCellValue('I' . $rowNum, $vals[8] ?? 'No');
+        $sheet->setCellValue('J' . $rowNum, $vals[9] ?? '');
     }
 
     public function importProducts(Request $request)
@@ -7200,6 +7380,9 @@ class FbrPosController extends Controller
         $exemptIdx = $this->findFbrColumn($header, ['tax exempt (yes/no)', 'tax exempt', 'exempt (yes/no)', 'exempt', 'tax_exempt', 'is_tax_exempt']);
         // Third Schedule column: round-trip Yes/No; blank = leave flag as-is.
         $thirdIdx = $this->findFbrColumn($header, ['third schedule (yes/no)', 'third schedule', 'third_schedule', 'is_third_schedule', 'third']);
+        // MRP column (Task 1276): Third Schedule rows must carry a retail price —
+        // same invariant as the product forms.
+        $mrpIdx = $this->findFbrColumn($header, ['mrp (retail price)', 'mrp', 'retail price', 'retail_price']);
 
         // 🔒 ATOMIC QUOTA ADMISSION (Task 361 review): the whole catalog read +
         // allowance computation + row writes run in ONE transaction under a
@@ -7312,6 +7495,19 @@ class FbrPosController extends Controller
             // mirrors storeProduct/updateProduct's rule.
             if ($thirdSchedule === true) { $exempt = true; }
 
+            // Third Schedule needs a positive MRP (FBR retail-price invariant,
+            // Task 1276): file value first, else the existing row's MRP.
+            $mrpVal = $mrpIdx !== false ? $this->cleanFbrImportNumber($data[$mrpIdx] ?? '') : null;
+            if ($mrpVal !== null && $mrpVal <= 0) { $mrpVal = null; }
+            if ($thirdSchedule === true) {
+                $effMrp = $mrpVal ?? (float) ($existing->mrp ?? 0);
+                if ($effMrp <= 0) {
+                    $errors[] = "Row {$rowNo}: '{$name}' Third Schedule hai to MRP (retail price) zaroori hai — MRP column mein value dein";
+                    $skipped++;
+                    continue;
+                }
+            }
+
             // tax_type/default_tax_rate resolution (FBR model: taxable=18 / exempt=0 / custom=N):
             //   exempt Yes            → exempt, 0
             //   rate given, no exempt → 18 = taxable, else custom at that rate
@@ -7346,6 +7542,9 @@ class FbrPosController extends Controller
                 if ($hasThirdCol) {
                     $updateData['is_third_schedule'] = $thirdSchedule !== null ? $thirdSchedule : (bool) $existing->is_third_schedule;
                 }
+                if ($mrpVal !== null) {
+                    $updateData['mrp'] = $mrpVal;
+                }
                 $existing->update($updateData);
                 $updated++;
                 $product = $existing;
@@ -7372,6 +7571,9 @@ class FbrPosController extends Controller
                 ];
                 if ($hasThirdCol) {
                     $createData['is_third_schedule'] = $thirdSchedule === true;
+                }
+                if ($mrpVal !== null) {
+                    $createData['mrp'] = $mrpVal;
                 }
                 $product = Product::create($createData);
                 $added++;

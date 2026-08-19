@@ -30,13 +30,14 @@
             $seedRows[] = [
                 'name' => (string) ($oldRow['name'] ?? ''),
                 'default_price' => (string) ($oldRow['default_price'] ?? ''),
+                'mrp' => (string) ($oldRow['mrp'] ?? ''),
                 'barcode' => (string) ($oldRow['barcode'] ?? ''),
                 'opening_stock' => (string) ($oldRow['opening_stock'] ?? ''),
                 'unit_cost' => (string) ($oldRow['unit_cost'] ?? ''),
             ];
         }
         if (empty($seedRows)) {
-            $seedRows[] = ['name' => '', 'default_price' => '', 'barcode' => '', 'opening_stock' => '', 'unit_cost' => ''];
+            $seedRows[] = ['name' => '', 'default_price' => '', 'mrp' => '', 'barcode' => '', 'opening_stock' => '', 'unit_cost' => ''];
         }
     }
     // UTF-8-safe encode (never a bare @json that can die on a malformed byte).
@@ -101,6 +102,7 @@
                 <div class="grid flex-1 grid-cols-12 gap-2 px-2">
                     <div class="col-span-4">{{ __('pos.product_name_label') }} *</div>
                     <div class="col-span-2">{{ __('pos.price_pkr') }} *</div>
+                    <div class="col-span-2" x-show="thirdSchedule" x-cloak>{{ __('pos.mrp_label') }} *</div>
                     <div class="col-span-{{ $inventoryAllowed ? 2 : 4 }}">{{ __('pos.barcode_label') }}</div>
                     <div class="col-span-2">{{ __('pos.fbr_pf_opening_stock') }}</div>
                     @if($inventoryAllowed)
@@ -122,6 +124,12 @@
                             <input type="number" :name="`rows[${i}][default_price]`" x-model="row.default_price" step="0.01" min="0" required :disabled="mode !== 'multi'"
                                    placeholder="{{ __('pos.price_pkr') }} *"
                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        {{-- Per-row MRP — Third Schedule (shared checkbox) demands a retail price per product --}}
+                        <div class="md:col-span-2" x-show="thirdSchedule" x-cloak>
+                            <input type="number" :name="`rows[${i}][mrp]`" x-model="row.mrp" step="0.01" min="0.01" :disabled="mode !== 'multi' || !thirdSchedule"
+                                   placeholder="{{ __('pos.mrp_label') }} *"
+                                   class="w-full rounded-lg border-blue-300 dark:border-blue-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div class="md:col-span-{{ $inventoryAllowed ? 2 : 4 }}">
                             <input type="text" :name="`rows[${i}][barcode]`" x-model="row.barcode" maxlength="64" :disabled="mode !== 'multi'"
@@ -234,31 +242,44 @@
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
                         placeholder="{{ __('pos.ph_sku_example') }}">
                 </div>
+                @if($isEdit)
+                {{-- Full product edit (Task 1276): remaining FBR reference fields --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.pct_code_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
+                    <input type="text" name="pct_code" value="{{ old('pct_code', $product->pct_code ?? '') }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
+                        placeholder="0000.0000">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.sro_reference_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
+                    <input type="text" name="sro_reference" value="{{ old('sro_reference', $product->sro_reference ?? '') }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="SRO 1125(I)/2011">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.serial_number') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
+                    <input type="text" name="serial_number" value="{{ old('serial_number', $product->serial_number ?? '') }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="{{ __('pos.ph_eg_5') }}">
+                </div>
+                @endif
                 @php
-                    // Retail Core (Aug 2026): stock fields — current stock shown on
-                    // edit once the product was first stocked through this form OR
-                    // a purchase (matches the controller's duplicate guard).
+                    // Retail Core (Aug 2026): current stock row — min-stock default
+                    // and the edit-mode stock adjustment card (Task 1276).
                     $stockRow = $isEdit
                         ? \App\Models\InventoryStock::where('company_id', $product->company_id)->where('product_id', $product->id)->whereNull('branch_id')->first()
                         : null;
-                    $hasOpening = $isEdit && \App\Models\InventoryMovement::where('company_id', $product->company_id)
-                        ->where('product_id', $product->id)
-                        ->whereIn('type', [\App\Models\InventoryMovement::TYPE_OPENING, \App\Models\InventoryMovement::TYPE_PURCHASE])
-                        ->exists();
+                    $currentStockQty = $stockRow ? rtrim(rtrim(number_format($stockRow->quantity, 3, '.', ''), '0'), '.') : '0';
                 @endphp
+                @unless($isEdit)
+                {{-- Edit mode handles stock in its own adjustment card (Task 1276) --}}
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_pf_opening_stock') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
-                    @if($hasOpening)
-                        <div class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
-                            Current stock: <strong>{{ $stockRow ? rtrim(rtrim(number_format($stockRow->quantity, 3, '.', ''), '0'), '.') : 0 }} {{ $product->uom ?? 'U' }}</strong>
-                            <span class="text-xs text-gray-400 block">{{ __('pos.stock_receive_from_page_hint') }}</span>
-                        </div>
-                    @else
-                        <input type="number" step="0.001" min="0" name="opening_stock" value="{{ old('opening_stock') }}" :disabled="mode === 'multi'"
-                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="0">
-                    @endif
+                    <input type="number" step="0.001" min="0" name="opening_stock" value="{{ old('opening_stock') }}" :disabled="mode === 'multi'"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0">
                 </div>
+                @endunless
                 @if(!$isEdit && $inventoryAllowed)
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.stock_kharid_rate_ph') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
@@ -275,6 +296,32 @@
                         placeholder="e.g. 10">
                     <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.min_level_alert_hint') }}</p>
                 </div>
+                @if($isEdit)
+                {{-- Show-on-sale + Active toggles (Task 1276) — same columns as the list-page quick toggles --}}
+                <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex items-start gap-2 cursor-pointer p-2.5 rounded-lg border-2 transition"
+                        :class="showOnSale ? 'border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'">
+                        <input type="hidden" name="show_on_sale" value="0">
+                        <input type="checkbox" name="show_on_sale" value="1" x-model="showOnSale"
+                            class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <div>
+                            <span class="text-xs font-bold text-gray-800 dark:text-gray-100">{{ __('pos.show_on_sale_screen') }}</span>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.show_on_sale_screen_hint') }}</p>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-2 cursor-pointer p-2.5 rounded-lg border-2 transition"
+                        :class="isActiveP ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20' : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10'">
+                        <input type="hidden" name="is_active" value="0">
+                        <input type="checkbox" name="is_active" value="1" x-model="isActiveP"
+                            class="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500">
+                        <div>
+                            <span class="text-xs font-bold" :class="isActiveP ? 'text-gray-800 dark:text-gray-100' : 'text-red-700 dark:text-red-300'"
+                                x-text="isActiveP ? @js(__('pos.active_word')) : @js(__('pos.inactive_word'))"></span>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.fbr_pf_active_hint') }}</p>
+                        </div>
+                    </label>
+                </div>
+                @endif
             </div>
         </div>
 
@@ -349,6 +396,45 @@
                 </span>
             </label>
 
+            {{-- MRP / Retail Price (Task 1276) — prominent when Third Schedule is on:
+                 FBR requires the manufacturer's retail price for third-schedule items.
+                 Single mode only: multi mode collects a per-row MRP in the table. --}}
+            <div x-show="mode === 'single'" class="mb-4 p-3 rounded-xl border-2 transition"
+                 :class="thirdSchedule ? 'border-blue-400 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'">
+                <label class="block text-sm font-medium mb-1"
+                       :class="thirdSchedule ? 'text-blue-800 dark:text-blue-200 font-bold' : 'text-gray-700 dark:text-gray-300'">
+                    {{ __('pos.mrp_label') }}
+                    <span x-show="thirdSchedule" class="text-red-500">*</span>
+                    <span x-show="!thirdSchedule" class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span>
+                </label>
+                <input type="number" step="0.01" min="0" name="mrp" value="{{ old('mrp', $isEdit ? $product->mrp : '') }}" :disabled="mode !== 'single'"
+                    class="w-full md:w-64 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0.00">
+                <p x-show="thirdSchedule" class="text-[11px] mt-1 text-blue-700 dark:text-blue-300">{{ __('pos.mrp_third_hint') }}</p>
+                @error('mrp')<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+            </div>
+
+            @if($isEdit)
+            {{-- Schedule Type / Tax Status (Task 1276 review) — model-backed field
+                 shared with Digital Invoicing; optional here, validated server-side. --}}
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {{ __('pos.schedule_type_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span>
+                </label>
+                <select name="schedule_type"
+                        class="w-full md:w-72 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">—</option>
+                    <option value="standard" {{ old('schedule_type', $product->schedule_type) === 'standard' ? 'selected' : '' }}>{{ __('pos.sched_opt_standard') }}</option>
+                    <option value="reduced" {{ old('schedule_type', $product->schedule_type) === 'reduced' ? 'selected' : '' }}>{{ __('pos.sched_opt_reduced') }}</option>
+                    {{-- Only valid together with the fiscal Third Schedule checkbox (server-enforced too) --}}
+                    <option value="3rd_schedule" :disabled="!thirdSchedule" {{ old('schedule_type', $product->schedule_type) === '3rd_schedule' ? 'selected' : '' }}>{{ __('pos.sched_opt_third') }}</option>
+                    <option value="exempt" {{ old('schedule_type', $product->schedule_type) === 'exempt' ? 'selected' : '' }}>{{ __('pos.sched_opt_exempt') }}</option>
+                    <option value="zero_rated" {{ old('schedule_type', $product->schedule_type) === 'zero_rated' ? 'selected' : '' }}>{{ __('pos.sched_opt_zero') }}</option>
+                </select>
+                <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.schedule_type_hint') }}</p>
+            </div>
+            @endif
+
             <div x-show="mode === 'single'" class="p-4 rounded-xl border transition"
                 :class="effectiveRate > 0 ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' : 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'">
                 <div class="grid grid-cols-3 gap-4 text-center">
@@ -407,6 +493,81 @@
         </div>
         @endif
 
+        @if($isEdit)
+        {{-- ═══ STOCK ADJUSTMENT (Task 1276) — add stock as a purchase or correct
+             the quantity via an adjustment movement; never a raw overwrite. ═══ --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">{{ __('pos.fbr_pf_stock_heading') }}</h3>
+                <div class="text-sm text-gray-600 dark:text-gray-300">
+                    {{ __('pos.fbr_pf_stock_current') }}: <strong class="text-gray-900 dark:text-white">{{ $currentStockQty }} {{ $product->uom ?? 'U' }}</strong>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <label class="cursor-pointer px-4 py-2 rounded-lg border-2 text-sm font-bold transition"
+                       :class="stockAction === 'none' ? 'border-gray-500 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'">
+                    <input type="radio" name="stock_action" value="none" x-model="stockAction" class="sr-only">
+                    {{ __('pos.fbr_pf_stock_action_none') }}
+                </label>
+                <label class="cursor-pointer px-4 py-2 rounded-lg border-2 text-sm font-bold transition"
+                       :class="stockAction === 'add' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'">
+                    <input type="radio" name="stock_action" value="add" x-model="stockAction" class="sr-only">
+                    + {{ __('pos.fbr_pf_stock_action_add') }}
+                </label>
+                <label class="cursor-pointer px-4 py-2 rounded-lg border-2 text-sm font-bold transition"
+                       :class="stockAction === 'correct' ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'">
+                    <input type="radio" name="stock_action" value="correct" x-model="stockAction" class="sr-only">
+                    {{ __('pos.fbr_pf_stock_action_correct') }}
+                </label>
+            </div>
+
+            <div x-show="stockAction === 'add'" x-cloak class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_pf_add_qty_label') }} <span class="text-red-500">*</span></label>
+                    <input type="number" step="0.001" min="0.001" name="add_qty" value="{{ old('add_qty') }}" :disabled="stockAction !== 'add'" :required="stockAction === 'add'"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-green-500 focus:border-green-500"
+                        placeholder="0">
+                </div>
+                @if($inventoryAllowed)
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.stock_kharid_rate_ph') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
+                    <input type="number" step="0.01" min="0" name="add_unit_cost" value="{{ old('add_unit_cost') }}" :disabled="stockAction !== 'add'"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-green-500 focus:border-green-500"
+                        placeholder="0.00">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.stock_supplier_optional_lbl') }}</label>
+                    <select name="supplier_id" :disabled="stockAction !== 'add'"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-green-500 focus:border-green-500">
+                        <option value="">{{ __('pos.stock_no_supplier_option') }}</option>
+                        @foreach($suppliers as $s)
+                        <option value="{{ $s->id }}" {{ old('supplier_id') == $s->id ? 'selected' : '' }}>{{ $s->name }}{{ $s->city ? ' (' . $s->city . ')' : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+                <p class="md:col-span-3 text-[11px] text-gray-400 -mt-2">{{ __('pos.fbr_pf_stock_add_hint') }}</p>
+            </div>
+
+            <div x-show="stockAction === 'correct'" x-cloak class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_pf_new_qty_label') }} <span class="text-red-500">*</span></label>
+                    <input type="number" step="0.001" min="0" name="new_qty" value="{{ old('new_qty') }}" :disabled="stockAction !== 'correct'" :required="stockAction === 'correct'"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-amber-500 focus:border-amber-500"
+                        placeholder="{{ $currentStockQty }}">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_pf_qty_reason_lbl') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
+                    <input type="text" name="qty_reason" value="{{ old('qty_reason') }}" maxlength="200" :disabled="stockAction !== 'correct'"
+                        autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-amber-500 focus:border-amber-500"
+                        placeholder="{{ __('pos.fbr_pf_qty_reason_ph') }}">
+                </div>
+                <p class="md:col-span-3 text-[11px] text-gray-400 -mt-2">{{ __('pos.fbr_pf_stock_correct_hint') }}</p>
+            </div>
+        </div>
+        @endif
+
         <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
             <a href="{{ route('fbrpos.products') }}" class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition text-center">{{ __('pos.cancel') }}</a>
             @if($isEdit)
@@ -437,6 +598,10 @@ function fbrProductForm() {
         isPriceEditable: {{ $initPriceEditable ? 'true' : 'false' }},
         thirdSchedule: {{ $initThird ? 'true' : 'false' }},
         supNew: {{ old('new_supplier_name') ? 'true' : 'false' }},
+        // Full product edit (Task 1276)
+        showOnSale: {{ old('show_on_sale', $isEdit ? (($product->show_on_sale ?? true) ? 1 : 0) : 1) ? 'true' : 'false' }},
+        isActiveP: {{ old('is_active', $isEdit ? ($product->is_active ? 1 : 0) : 1) ? 'true' : 'false' }},
+        stockAction: @js((string) old('stock_action', 'none')),
         rows: {!! $seedRowsJson !!},
         errRows: {!! $errRowIdxJson !!},
         rowSeq: 0,
@@ -447,7 +612,7 @@ function fbrProductForm() {
         },
 
         addRow() {
-            this.rows.push({ _k: ++this.rowSeq, name: '', default_price: '', barcode: '', opening_stock: '', unit_cost: '' });
+            this.rows.push({ _k: ++this.rowSeq, name: '', default_price: '', mrp: '', barcode: '', opening_stock: '', unit_cost: '' });
         },
 
         removeRow(i) {

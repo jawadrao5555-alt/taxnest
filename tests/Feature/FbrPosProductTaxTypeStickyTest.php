@@ -82,6 +82,8 @@ class FbrPosProductTaxTypeStickyTest extends TestCase
             $table->string('hs_code')->nullable();
             $table->string('uom')->nullable();
             $table->decimal('default_price', 12, 2)->nullable();
+            $table->decimal('mrp', 12, 2)->nullable(); // Task 1276: storeProduct persists MRP
+            $table->string('schedule_type')->nullable();
             $table->decimal('default_tax_rate', 8, 2)->default(0);
             $table->string('tax_type')->default('taxable');
             $table->boolean('is_third_schedule')->default(false);

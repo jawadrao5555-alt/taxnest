@@ -64,6 +64,39 @@ class FbrPosDayCloseBulkCloseTest extends TestCase
     // TESTS
     // ─────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Legacy close-report rows predate the business-day migration and can have
+     * a NULL business_date. The FBR history list must remain report_date-based.
+     */
+    public function test_history_renders_legacy_report_with_null_business_date(): void
+    {
+        $reportDate = now()->subDays(2)->toDateString();
+
+        DB::table('fbr_day_close_reports')->insert([
+            'company_id' => $this->company->id,
+            'report_date' => $reportDate,
+            'business_date' => null,
+            'report_number' => 'ZRPT-LEGACY-NULL',
+            'total_invoices' => 3,
+            'total_amount' => 1500,
+            'total_tax' => 225,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->posAdmin, 'fbrpos')->get('/fbr-pos/day-close');
+
+        $response->assertOk()
+            ->assertViewHas('previousReports', function ($reports) use ($reportDate) {
+                return $reports->contains(
+                    fn ($report) => $report->report_number === 'ZRPT-LEGACY-NULL'
+                        && $report->report_date->toDateString() === $reportDate
+                );
+            })
+            ->assertSee('ZRPT-LEGACY-NULL')
+            ->assertSee(\Carbon\Carbon::parse($reportDate)->format('d M Y'));
+    }
+
     /** 1 + 5: every stranded prior day closes in one POST; none reappear. */
     public function test_bulk_close_closes_every_pending_day(): void
     {
@@ -443,6 +476,8 @@ class FbrPosDayCloseBulkCloseTest extends TestCase
             $t->id();
             $t->unsignedBigInteger('company_id');
             $t->date('report_date');
+            // Present on upgraded installations; legacy rows may be NULL.
+            $t->date('business_date')->nullable();
             $t->string('report_number')->nullable();
             $t->integer('total_invoices')->default(0);
             $t->integer('fbr_invoices')->default(0);

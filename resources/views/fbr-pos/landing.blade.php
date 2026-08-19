@@ -567,6 +567,51 @@
         </div>
     </section>
 
+    <!-- Real product screenshots -->
+    <section class="py-24 bg-white border-t border-gray-200">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-16 max-w-3xl fade-in-up">
+                <span class="text-xs font-bold tracking-widest uppercase text-[#0A4D5C]">Straight from the terminal</span>
+                <h2 class="text-4xl font-serif text-[#052730] mt-3 mb-6">This is the actual software, <span class="text-[#B8951F]">not a mock-up.</span></h2>
+                <p class="text-xl text-gray-600 leading-relaxed">
+                    The product catalog your manager maintains, the stock page they check every morning, and the analytics your accountant signs off — captured from the running product.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="lg:col-span-2 fade-in-up">
+                    <div class="bg-[#FDFBF7] border border-gray-200 p-3 sm:p-4">
+                        <img src="{{ asset('images/screenshots/fbr-reports.jpg') }}?v=1" alt="FBR POS sales reports and analytics dashboard — revenue, tax, FBR submitted counts and profit estimate" loading="lazy" class="w-full h-auto border border-gray-300 shadow-sm">
+                    </div>
+                    <div class="flex items-baseline justify-between mt-3 px-1">
+                        <div class="text-sm font-bold text-[#052730]">Reports &amp; Analytics</div>
+                        <div class="text-xs text-gray-500">Revenue, tax, FBR submission counts and profit margin in one view.</div>
+                    </div>
+                </div>
+
+                <div class="fade-in-up" style="transition-delay: 100ms;">
+                    <div class="bg-[#FDFBF7] border border-gray-200 p-3 sm:p-4">
+                        <img src="{{ asset('images/screenshots/fbr-products.jpg') }}?v=1" alt="FBR POS products page with tax configuration per product and bulk Excel import" loading="lazy" class="w-full h-auto border border-gray-300 shadow-sm">
+                    </div>
+                    <div class="flex items-baseline justify-between mt-3 px-1 gap-4">
+                        <div class="text-sm font-bold text-[#052730] whitespace-nowrap">Products &amp; Excel Import</div>
+                        <div class="text-xs text-gray-500 text-right">Tax rate per product, bulk import from Excel in minutes.</div>
+                    </div>
+                </div>
+
+                <div class="fade-in-up" style="transition-delay: 200ms;">
+                    <div class="bg-[#FDFBF7] border border-gray-200 p-3 sm:p-4">
+                        <img src="{{ asset('images/screenshots/fbr-stock.jpg') }}?v=1" alt="Stock and purchase page with low-stock alerts, supplier entry and stock list" loading="lazy" class="w-full h-auto border border-gray-300 shadow-sm">
+                    </div>
+                    <div class="flex items-baseline justify-between mt-3 px-1 gap-4">
+                        <div class="text-sm font-bold text-[#052730] whitespace-nowrap">Stock &amp; Purchase</div>
+                        <div class="text-xs text-gray-500 text-right">Low-stock alerts, suppliers and purchase entry beside the counter.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Testimonial -->
     <section class="py-24 bg-[#052730] border-y border-[#0A4D5C]">
         <div class="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8 text-center fade-in-up">

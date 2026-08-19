@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class MadadgarMessage extends Model
 {
     protected $fillable = [
-        'company_id', 'user_id', 'session_id', 'role', 'content', 'escalation_id',
+        'company_id', 'user_id', 'session_id', 'role', 'content', 'escalation_id', 'source',
     ];
 
     public function user()

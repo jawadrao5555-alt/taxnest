@@ -86,13 +86,34 @@ class MadadgarController extends Controller
             ->values()
             ->all();
 
+        $question = trim($request->content);
+
         try {
-            $result = MadadgarService::chat($history);
+            $result = MadadgarService::respond($history, $question);
         } catch (\Throwable $e) {
-            // Failed turn must not eat the daily cap or leave a reply-less row.
+            // Sirf-OpenAI mode only (hybrid/local degrade internally): failed
+            // turn must not eat the daily cap or leave a reply-less row.
             $userRow->delete();
 
             return response()->json(['error' => 'Maazrat, is waqt jawab nahi mil saka — thori der baad koshish karein ya WhatsApp par rabta karein.'], 502);
+        }
+
+        // Fallback turns ("maloom nahi") don't burn the daily cap — the user
+        // row stays for admin visibility of missed questions, but todayCount()
+        // excludes source='fallback' user rows.
+        if ($result['source'] === 'fallback') {
+            $userRow->update(['source' => 'fallback']);
+        }
+
+        // Rule-based escalation for turns OpenAI didn't handle: complaint /
+        // "admin ko batao" wording, or any unanswered (fallback) turn. Card
+        // only — the FeatureSuggestion row is still created EXCLUSIVELY in
+        // escalate() on the user's "Haan".
+        if ($result['source'] !== 'openai' && $result['escalation'] === null) {
+            $result['escalation'] = \App\Services\MadadgarLocalEngine::ruleEscalation(
+                $question,
+                $result['source'] === 'fallback'
+            );
         }
 
         // Escalation-limit pre-check (customer report, 22 Jul 2026): agar aaj ki
@@ -117,6 +138,7 @@ class MadadgarController extends Controller
             'session_id' => $sessionId,
             'role' => 'assistant',
             'content' => $result['text'],
+            'source' => $result['source'],
         ]);
 
         return response()->json([
@@ -208,6 +230,25 @@ class MadadgarController extends Controller
             $keySource = 'env';
         }
 
+        // Answer-source totals (owner: "kharcha bachy" — show the saving).
+        // Assistant rows only; escalation-confirm rows excluded; legacy rows
+        // (pre-source column) were all OpenAI-era.
+        $sourceStats = ['local' => 0, 'cache' => 0, 'openai' => 0, 'fallback' => 0];
+        try {
+            $rows = MadadgarMessage::where('role', 'assistant')
+                ->whereNull('escalation_id')
+                ->selectRaw("COALESCE(source, 'openai') as src, COUNT(*) as c")
+                ->groupBy('src')
+                ->pluck('c', 'src');
+            foreach ($rows as $src => $c) {
+                if (array_key_exists($src, $sourceStats)) {
+                    $sourceStats[$src] = (int) $c;
+                }
+            }
+        } catch (\Throwable $e) {
+            // source column not migrated yet — keep zeros, page must render.
+        }
+
         return view('admin.madadgar-chats', [
             'sessions' => $sessions,
             'companies' => $companies,
@@ -217,6 +258,8 @@ class MadadgarController extends Controller
             'botEnabled' => \App\Models\SystemSetting::get(MadadgarService::SETTING_ENABLED, '1') === '1',
             'keySource' => $keySource,
             'botLive' => MadadgarService::enabled(),
+            'botMode' => MadadgarService::mode(),
+            'sourceStats' => $sourceStats,
         ]);
     }
 
@@ -224,11 +267,13 @@ class MadadgarController extends Controller
     {
         $request->validate([
             'enabled' => 'required|in:0,1',
+            'mode' => 'required|in:hybrid,local,openai',
             'api_key' => 'nullable|string|max:300',
             'clear_key' => 'nullable|in:1',
         ]);
 
         \App\Models\SystemSetting::set(MadadgarService::SETTING_ENABLED, $request->enabled, 'Madadgar AI bot master switch');
+        \App\Models\SystemSetting::set(MadadgarService::SETTING_MODE, $request->mode, 'Madadgar bot mode (hybrid/local/openai)');
 
         if ($request->input('clear_key') === '1') {
             \App\Models\SystemSetting::where('key', MadadgarService::SETTING_KEY_ENC)->delete();
@@ -255,9 +300,14 @@ class MadadgarController extends Controller
 
     private function todayCount(int $userId): int
     {
+        // Fallback turns (bot had no answer) don't count against the cap —
+        // the row is kept only so the admin can see missed questions.
         return MadadgarMessage::where('user_id', $userId)
             ->where('role', 'user')
             ->whereDate('created_at', now()->toDateString())
+            ->where(function ($q) {
+                $q->whereNull('source')->orWhere('source', '!=', 'fallback');
+            })
             ->count();
     }
 }

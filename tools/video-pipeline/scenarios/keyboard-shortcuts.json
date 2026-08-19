@@ -16,7 +16,7 @@
         { "do": "goto", "url": "/pos/login" },
         { "do": "wait", "ms": 700 },
         { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "{{VIDEO_DEMO_PASS}}", "delay": 40 },
         { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
         { "do": "goto", "url": "/pos/invoice/create" },
         { "do": "waitFor", "selector": ".prod-card" },

@@ -83,7 +83,7 @@ Also needs `promo/music72.mp3` (shared 72 s music bed) under `.local/video-studi
 | `CHROMIUM` | Nix-store path | Chromium executable |
 | `DI_BASE_URL` | `http://127.0.0.1:5000` | App URL for recording |
 | `DI_EMAIL` | `didemo@nestpos.pk` | Demo account login |
-| `DI_PASS` | `NestPOS@Demo1` | Demo account password |
+| `DI_PASS` | (from `.local/qa-creds.env` → `VIDEO_DEMO_PASS`) | Demo account password — never hardcoded (public repo) |
 | `ELEVENLABS_API_KEY` | *(required for TTS)* | ElevenLabs API key |
 
 Demo credentials are a dev-only shop (`product_type=di`, subscription=Enterprise).

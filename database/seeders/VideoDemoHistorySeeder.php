@@ -38,7 +38,7 @@ class VideoDemoHistorySeeder extends Seeder
             DB::table('users')->insert([
                 'name' => 'Imran (Cashier)',
                 'email' => $cashierEmail,
-                'password' => Hash::make(VideoDemoShopSeeder::LOGIN_PASSWORD),
+                'password' => Hash::make(VideoDemoShopSeeder::loginPassword()),
                 'company_id' => $companyId,
                 'role' => 'employee',
                 'pos_role' => 'pos_cashier',

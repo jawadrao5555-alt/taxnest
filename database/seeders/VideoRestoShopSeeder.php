@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
  * this committed seeder recreates it idempotently with the exact names the
  * recorded scenarios expect (T-3/T-5 tables, Beef Pulao, Imran Ali, etc).
  *
- * Logins (dev only, all NestPOS@Demo1):
+ * Logins (dev only, password from VIDEO_DEMO_PASS env):
  *   videoresto@nestpos.pk   — pos_admin
  *   videowaiter@nestpos.pk  — pos_waiter
  *   videokitchen@nestpos.pk — pos_kitchen
@@ -24,7 +24,16 @@ class VideoRestoShopSeeder extends Seeder
 {
     public const COMPANY_NAME = 'Lahore Darbar Restaurant';
     public const LOGIN_EMAIL = 'videoresto@nestpos.pk';
-    public const PASSWORD = 'NestPOS@Demo1';
+    /** Dev-only demo password comes from env — repo is public, never hardcode (Aug 2026). */
+    public static function loginPassword(): string
+    {
+        $p = trim((string) env('VIDEO_DEMO_PASS', ''));
+        if ($p === '') {
+            throw new \RuntimeException('VIDEO_DEMO_PASS env var is not set — add it to .env (dev-only) before seeding the video demo shops.');
+        }
+
+        return $p;
+    }
 
     public function run(): void
     {
@@ -89,7 +98,7 @@ class VideoRestoShopSeeder extends Seeder
                 $data = [
                     'name' => $name, 'company_id' => $companyId, 'role' => $role,
                     'pos_role' => $posRole, 'is_active' => true,
-                    'password' => Hash::make(self::PASSWORD), 'updated_at' => now(),
+                    'password' => Hash::make(self::loginPassword()), 'updated_at' => now(),
                 ];
                 $u = DB::table('users')->where('email', $email)->first();
                 if ($u) {

@@ -17,7 +17,7 @@
 //   DI_EMAIL     — demo account email (default: dev-only demo shop)
 //   DI_PASS      — demo account password (default: dev-only demo shop)
 //
-// Demo credentials (didemo@nestpos.pk / NestPOS@Demo1) are a dev-only demo shop;
+// Demo credentials (didemo@nestpos.pk, password via VIDEO_DEMO_PASS/DI_PASS env) are a dev-only demo shop;
 // they are acceptable in source as they grant access to no real customer data.
 // For CI or other environments override with DI_EMAIL / DI_PASS env vars.
 //
@@ -33,7 +33,8 @@ const CHROME   = process.env.CHROMIUM
   || '/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium';
 const BASE     = process.env.DI_BASE_URL || 'http://127.0.0.1:5000';
 const EMAIL    = process.env.DI_EMAIL    || 'didemo@nestpos.pk';
-const PASS     = process.env.DI_PASS     || 'NestPOS@Demo1';
+const PASS     = process.env.DI_PASS || process.env.VIDEO_DEMO_PASS;
+if (!PASS) { console.error('DI_PASS / VIDEO_DEMO_PASS env var missing — source .local/qa-creds.env first.'); process.exit(1); }
 
 const SCRIPT_DIR = __dirname;
 const OUT_BASE   = process.env.DI_OUT_DIR

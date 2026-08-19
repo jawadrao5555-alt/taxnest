@@ -1,6 +1,8 @@
 // Task 1246: capture KDS, FBR stock, FBR reports screenshots (dev).
 const { execSync } = require('child_process');
 const { chromium } = require('playwright-core');
+const DEMO_PASS = process.env.VIDEO_DEMO_PASS;
+if (!DEMO_PASS) { console.error('VIDEO_DEMO_PASS env var missing — source .local/qa-creds.env first.'); process.exit(1); }
 const CHROMIUM = execSync('which chromium').toString().trim();
 const BASE = 'http://127.0.0.1:5000';
 
@@ -43,7 +45,7 @@ async function shoot(ctx, url, out, opts = {}) {
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
 
   // FBR demo shop
-  const fbrCookies = await loginCookies('fbrdemo@nestpos.pk', 'NestPOS@Demo1', '/fbr-pos/login');
+  const fbrCookies = await loginCookies('fbrdemo@nestpos.pk', DEMO_PASS, '/fbr-pos/login');
   const fbrCtx = await browser.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1.5, extraHTTPHeaders: { 'X-Forwarded-Proto': 'https' } });
   await fbrCtx.addCookies(fbrCookies);
   await shoot(fbrCtx, '/fbr-pos/stock', '/tmp/fbr-stock.png');
@@ -52,7 +54,7 @@ async function shoot(ctx, url, out, opts = {}) {
   await fbrCtx.close();
 
   // Restaurant KDS (shared restaurant module)
-  const posCookies = await loginCookies('videoresto@nestpos.pk', 'NestPOS@Demo1', '/pos/login');
+  const posCookies = await loginCookies('videoresto@nestpos.pk', DEMO_PASS, '/pos/login');
   const posCtx = await browser.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1.5, extraHTTPHeaders: { 'X-Forwarded-Proto': 'https' } });
   await posCtx.addCookies(posCookies);
   await shoot(posCtx, '/pos/restaurant/kds', '/tmp/fbr-kds.png', { wait: 2500 });

@@ -9,7 +9,14 @@ const http = require('http');
 
 const scenarioPath = process.argv[2];
 if (!scenarioPath) { console.error('usage: record.cjs <scenario.json>'); process.exit(1); }
-const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
+// Credentials are never stored in scenario JSONs (public repo): the literal
+// placeholder {{VIDEO_DEMO_PASS}} is substituted from the environment here.
+const rawScenario = fs.readFileSync(scenarioPath, 'utf8');
+if (rawScenario.includes('{{VIDEO_DEMO_PASS}}') && !process.env.VIDEO_DEMO_PASS) {
+  console.error('VIDEO_DEMO_PASS env var missing — source .local/qa-creds.env first.');
+  process.exit(1);
+}
+const scenario = JSON.parse(rawScenario.split('{{VIDEO_DEMO_PASS}}').join(process.env.VIDEO_DEMO_PASS || ''));
 const OUT = path.join(__dirname, 'out', scenario.slug);
 fs.mkdirSync(OUT, { recursive: true });
 

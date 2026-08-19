@@ -23,6 +23,20 @@ class MadadgarService
     public const SETTING_ENABLED = 'madadgar_enabled';
     public const SETTING_KEY_ENC = 'madadgar_openai_key_enc';
 
+    /** Bot mode (owner: "kharcha bachy" — local answers first, Aug 2026). */
+    public const SETTING_MODE = 'madadgar_mode';
+    public const MODE_HYBRID = 'hybrid';   // local first, OpenAI fallback (default)
+    public const MODE_LOCAL = 'local';     // never calls OpenAI — zero API cost
+    public const MODE_OPENAI = 'openai';   // original behaviour
+
+    public static function mode(): string
+    {
+        $m = (string) SystemSetting::get(self::SETTING_MODE, self::MODE_HYBRID);
+
+        return in_array($m, [self::MODE_HYBRID, self::MODE_LOCAL, self::MODE_OPENAI], true)
+            ? $m : self::MODE_HYBRID;
+    }
+
     public static function apiKey(): ?string
     {
         $enc = SystemSetting::get(self::SETTING_KEY_ENC);
@@ -41,10 +55,69 @@ class MadadgarService
         return trim($envKey) !== '' ? trim($envKey) : null;
     }
 
-    /** Master switch: admin toggle ON (default) AND a usable API key present. */
+    /**
+     * Master switch. In Hybrid/Sirf-Local modes the bot runs WITHOUT an API
+     * key (local engine + polite fallback); only Sirf-OpenAI mode requires one.
+     */
     public static function enabled(): bool
     {
-        return SystemSetting::get(self::SETTING_ENABLED, '1') === '1' && self::apiKey() !== null;
+        if (SystemSetting::get(self::SETTING_ENABLED, '1') !== '1') {
+            return false;
+        }
+
+        return self::mode() === self::MODE_OPENAI ? self::apiKey() !== null : true;
+    }
+
+    /**
+     * One chat turn, routed by mode: cache → FAQ/local engine → OpenAI (if the
+     * mode allows and a key exists) → polite fallback.
+     *
+     * @param  array  $history oldest-first [['role','content'],...] (last = this question)
+     * @return array{text:string, escalation:?array, source:string} source: local|cache|openai|fallback
+     * @throws \RuntimeException only in Sirf-OpenAI mode (caller keeps existing 502 path)
+     */
+    public static function respond(array $history, string $question): array
+    {
+        $mode = self::mode();
+
+        if ($mode !== self::MODE_OPENAI) {
+            $cached = MadadgarLocalEngine::cachedAnswer($question);
+            if ($cached !== null) {
+                return ['text' => $cached, 'escalation' => null, 'source' => 'cache'];
+            }
+
+            $local = MadadgarLocalEngine::answer($question);
+            if ($local !== null) {
+                MadadgarLocalEngine::cacheAnswer($question, $local, 'local');
+
+                return ['text' => $local, 'escalation' => null, 'source' => 'local'];
+            }
+        }
+
+        if ($mode !== self::MODE_LOCAL && self::apiKey() !== null) {
+            try {
+                $result = self::chat($history);
+                $result['source'] = 'openai';
+                // OpenAI answers are NEVER cached: the model sees up to 12
+                // prior chat messages, so its reply can contain session/user
+                // context — a global cache keyed only on the question would
+                // replay one tenant's context to another (cross-tenant leak).
+                // Only deterministic KB-derived local answers are cacheable.
+
+                return $result;
+            } catch (\Throwable $e) {
+                if ($mode === self::MODE_OPENAI) {
+                    throw $e;
+                }
+                // Hybrid: OpenAI failure degrades to the polite fallback below.
+            }
+        }
+
+        if ($mode === self::MODE_OPENAI) {
+            throw new \RuntimeException('Madadgar API key missing');
+        }
+
+        return ['text' => MadadgarLocalEngine::fallbackText(), 'escalation' => null, 'source' => 'fallback'];
     }
 
     private static function systemPrompt(): string

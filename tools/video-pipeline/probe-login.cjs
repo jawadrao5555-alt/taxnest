@@ -4,6 +4,8 @@ const path = require('path');
 const http = require('http');
 const { execSync } = require('child_process');
 const { chromium } = require('playwright-core');
+const DEMO_PASS = process.env.VIDEO_DEMO_PASS;
+if (!DEMO_PASS) { console.error('VIDEO_DEMO_PASS env var missing — source .local/qa-creds.env first.'); process.exit(1); }
 
 const PROXY_PORT = 5443, UPSTREAM_PORT = 5000;
 async function startTlsProxy() {
@@ -44,7 +46,7 @@ async function startTlsProxy() {
   await page.goto('https://127.0.0.1:5443/pos/login', { waitUntil: 'networkidle' });
   console.log('cookies after GET:', (await ctx.cookies()).map(c => `${c.name} secure=${c.secure} samesite=${c.sameSite}`).join(' ; '));
   await page.fill('#login', 'videodemo@nestpos.pk');
-  await page.fill('#password', 'NestPOS@Demo1');
+  await page.fill('#password', DEMO_PASS);
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle', timeout: 20000 }).catch(e => console.log('nav err', e.message)),
     page.click('button[type=submit]'),

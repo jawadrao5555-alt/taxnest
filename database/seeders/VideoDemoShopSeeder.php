@@ -13,13 +13,22 @@ use Illuminate\Support\Facades\Hash;
  * recordings of tutorial videos. Never contains real customer data.
  * Idempotent: re-running refreshes products/customers to the canonical set.
  *
- * Login (dev only): videodemo@nestpos.pk / NestPOS@Demo1
+ * Login (dev only): videodemo@nestpos.pk / password from VIDEO_DEMO_PASS env
  */
 class VideoDemoShopSeeder extends Seeder
 {
     public const COMPANY_NAME = 'Al-Noor General Store';
     public const LOGIN_EMAIL = 'videodemo@nestpos.pk';
-    public const LOGIN_PASSWORD = 'NestPOS@Demo1';
+    /** Dev-only demo password comes from env — repo is public, never hardcode (Aug 2026). */
+    public static function loginPassword(): string
+    {
+        $p = trim((string) env('VIDEO_DEMO_PASS', ''));
+        if ($p === '') {
+            throw new \RuntimeException('VIDEO_DEMO_PASS env var is not set — add it to .env (dev-only) before seeding the video demo shops.');
+        }
+
+        return $p;
+    }
 
     public function run(): void
     {
@@ -69,7 +78,7 @@ class VideoDemoShopSeeder extends Seeder
             $user = DB::table('users')->where('email', self::LOGIN_EMAIL)->first();
             $userData = [
                 'name' => 'Demo Cashier',
-                'password' => Hash::make(self::LOGIN_PASSWORD),
+                'password' => Hash::make(self::loginPassword()),
                 'company_id' => $companyId,
                 'role' => 'company_admin',
                 'pos_role' => 'pos_admin',

@@ -26,7 +26,7 @@ the browser binary.
 
 1. **Demo shop** — `php artisan db:seed --class=VideoDemoShopSeeder --force`
    (fictional "Al-Noor General Store", login `videodemo@nestpos.pk` /
-   `NestPOS@Demo1`, dev DB only). Never record a real customer company.
+   password = `VIDEO_DEMO_PASS` env var from `.local/qa-creds.env`, dev DB only). Never record a real customer company.
 2. **Scenario** — one JSON per video in `scenarios/` (format below).
 3. **TTS** — per-scene Urdu narration via ElevenLabs
    (`externalApi__elevenlabs` in the agent's CodeExecution sandbox; the API is

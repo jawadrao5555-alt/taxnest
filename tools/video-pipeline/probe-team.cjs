@@ -1,6 +1,8 @@
 // Debug probe: replicate the team add-member flow and dump what happens.
 const { execSync } = require('child_process');
 const { chromium } = require('playwright-core');
+const DEMO_PASS = process.env.VIDEO_DEMO_PASS;
+if (!DEMO_PASS) { console.error('VIDEO_DEMO_PASS env var missing — source .local/qa-creds.env first.'); process.exit(1); }
 const path = require('path'); const fs = require('fs'); const http = require('http');
 async function startTlsProxy() {
   const https = require('https');
@@ -26,7 +28,7 @@ async function startTlsProxy() {
   const page = await ctx.newPage();
   await page.goto('/pos/login');
   await page.fill('#login', 'videodemo@nestpos.pk');
-  await page.fill('#password', 'NestPOS@Demo1');
+  await page.fill('#password', DEMO_PASS);
   await page.click('button[type=submit]');
   await page.waitForSelector('.prod-card', { timeout: 20000 });
   await page.goto('/pos/team');

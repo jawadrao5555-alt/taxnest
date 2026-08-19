@@ -23,23 +23,38 @@
                                 <span class="font-bold text-green-600">LIVE</span>
                             @else
                                 <span class="font-bold text-red-600">OFF</span>
-                                @if($keySource === 'none') (API key missing) @endif
+                                @if($keySource === 'none' && $botMode === 'openai') (API key missing) @endif
                             @endif
+                            — Mode:
+                            <span class="font-bold">
+                                @if($botMode === 'local') Sirf Local
+                                @elseif($botMode === 'openai') Sirf OpenAI
+                                @else Hybrid
+                                @endif
+                            </span>
                             — Key source:
                             @if($keySource === 'admin') Admin panel (encrypted)
                             @elseif($keySource === 'env') Server .env
-                            @else <span class="text-red-600">none</span>
+                            @else <span class="{{ $botMode === 'openai' ? 'text-red-600' : '' }}">none @if($botMode !== 'openai')(local mode ko zaroorat nahi)@endif</span>
                             @endif
                         </p>
                     </div>
                 </div>
-                <form method="POST" action="{{ route('admin.madadgar-settings') }}" class="px-5 py-4 grid gap-3 sm:grid-cols-3 items-end">
+                <form method="POST" action="{{ route('admin.madadgar-settings') }}" class="px-5 py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
                     @csrf
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Bot Enabled</label>
                         <select name="enabled" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                             <option value="1" {{ $botEnabled ? 'selected' : '' }}>ON</option>
                             <option value="0" {{ !$botEnabled ? 'selected' : '' }}>OFF (kill switch)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Bot Mode</label>
+                        <select name="mode" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                            <option value="hybrid" {{ $botMode === 'hybrid' ? 'selected' : '' }}>Hybrid — pehle Local, phir OpenAI (default)</option>
+                            <option value="local" {{ $botMode === 'local' ? 'selected' : '' }}>Sirf Local — zero API cost</option>
+                            <option value="openai" {{ $botMode === 'openai' ? 'selected' : '' }}>Sirf OpenAI</option>
                         </select>
                     </div>
                     <div>
@@ -54,6 +69,36 @@
                         <button type="submit" class="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition cursor-pointer">Save Settings</button>
                     </div>
                 </form>
+            </div>
+
+            {{-- Answer-source totals (kharcha bachat) --}}
+            <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-700">
+                    <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">Jawab Source Totals</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Local aur Cache jawab bilkul free hain — jitne zyada, utni OpenAI ki bachat.</p>
+                </div>
+                <div class="px-5 py-4 grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
+                    <div>
+                        <div class="text-2xl font-bold text-green-600">{{ number_format($sourceStats['local']) }}</div>
+                        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">Local</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-teal-600">{{ number_format($sourceStats['cache']) }}</div>
+                        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">Cache</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-purple-600">{{ number_format($sourceStats['openai']) }}</div>
+                        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">OpenAI</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-gray-400">{{ number_format($sourceStats['fallback']) }}</div>
+                        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">Bina Jawab</div>
+                    </div>
+                    <div class="col-span-2 sm:col-span-1">
+                        <div class="text-2xl font-bold text-emerald-600">{{ number_format($sourceStats['local'] + $sourceStats['cache']) }}</div>
+                        <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5">OpenAI Calls Saved</div>
+                    </div>
+                </div>
             </div>
 
             <div class="grid gap-6 lg:grid-cols-2">
@@ -130,7 +175,18 @@
                                         @endif
                                     </div>
                                 </div>
-                                <div class="text-[10px] text-gray-400 {{ $m->role === 'user' ? 'text-right' : '' }} px-1">{{ $m->created_at->format('d M, h:i A') }}</div>
+                                <div class="text-[10px] text-gray-400 {{ $m->role === 'user' ? 'text-right' : '' }} px-1">
+                                    {{ $m->created_at->format('d M, h:i A') }}
+                                    @if($m->role === 'assistant' && !$m->escalation_id)
+                                        @php $src = $m->source ?: 'openai'; @endphp
+                                        <span class="ml-1 px-1.5 py-0.5 rounded-full font-bold
+                                            {{ $src === 'local' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                                : ($src === 'cache' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
+                                                : ($src === 'fallback' ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                                                : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300')) }}">
+                                            {{ strtoupper($src) }}</span>
+                                    @endif
+                                </div>
                             @endforeach
                         @endif
                     </div>

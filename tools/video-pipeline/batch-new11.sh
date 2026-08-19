@@ -3,6 +3,9 @@
 # Run as a Replit workflow (console) — NEVER as a backgrounded ShellExec.
 # Order matters: resto table videos before kds-kitchen (kds leaves T-3 occupied).
 cd "$(dirname "$0")"
+# Demo login password lives in the untracked creds file (public repo — never hardcode).
+if [ -f ../../.local/qa-creds.env ]; then . ../../.local/qa-creds.env; fi
+export VIDEO_DEMO_PASS
 export CHROMIUM_BIN=/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium
 SLUGS=(
   dashboard-tour

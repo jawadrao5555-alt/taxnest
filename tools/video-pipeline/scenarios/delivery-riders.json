@@ -33,7 +33,7 @@
         {
           "do": "type",
           "selector": "#password",
-          "text": "NestPOS@Demo1",
+          "text": "{{VIDEO_DEMO_PASS}}",
           "delay": 40
         },
         {
@@ -195,7 +195,7 @@
         {
           "do": "type",
           "selector": "#password",
-          "text": "NestPOS@Demo1",
+          "text": "{{VIDEO_DEMO_PASS}}",
           "delay": 45
         },
         {
@@ -258,7 +258,7 @@
         {
           "do": "type",
           "selector": "#password",
-          "text": "NestPOS@Demo1",
+          "text": "{{VIDEO_DEMO_PASS}}",
           "delay": 35
         },
         {

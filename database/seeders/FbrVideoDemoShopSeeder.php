@@ -16,7 +16,16 @@ class FbrVideoDemoShopSeeder extends Seeder
 {
     public const COMPANY_NAME = 'Bismillah Karyana Store';
     public const LOGIN_EMAIL = 'fbrdemo@nestpos.pk';
-    public const LOGIN_PASSWORD = 'NestPOS@Demo1';
+    /** Dev-only demo password comes from env — repo is public, never hardcode (Aug 2026). */
+    public static function loginPassword(): string
+    {
+        $p = trim((string) env('VIDEO_DEMO_PASS', ''));
+        if ($p === '') {
+            throw new \RuntimeException('VIDEO_DEMO_PASS env var is not set — add it to .env (dev-only) before seeding the video demo shops.');
+        }
+
+        return $p;
+    }
 
     public function run(): void
     {
@@ -76,7 +85,7 @@ class FbrVideoDemoShopSeeder extends Seeder
 
             $userData = [
                 'name' => 'Malik Sahab',
-                'password' => Hash::make(self::LOGIN_PASSWORD),
+                'password' => Hash::make(self::loginPassword()),
                 'company_id' => $companyId,
                 'role' => 'company_admin',
                 'pos_role' => null,

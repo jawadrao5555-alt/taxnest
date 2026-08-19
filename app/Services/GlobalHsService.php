@@ -16,7 +16,7 @@ class GlobalHsService
         $master = GlobalHsMaster::where('hs_code', $normalized)->first();
 
         if ($master) {
-            return [
+            return ScheduleEngine::applyThirdScheduleRecommendation([
                 'found' => true,
                 'hs_code' => $master->hs_code,
                 'pct_code' => $master->pct_code,
@@ -31,7 +31,7 @@ class GlobalHsService
                 'risk_weight' => $master->risk_weight,
                 'mapping_status' => $master->mapping_status,
                 'source' => 'global_hs_master',
-            ];
+            ], $normalized);
         }
 
         if ($companyId) {

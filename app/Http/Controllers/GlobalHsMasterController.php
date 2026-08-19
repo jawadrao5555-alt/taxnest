@@ -209,7 +209,6 @@ class GlobalHsMasterController extends Controller
         if ($masterGlobal) {
             $scheduleType = $masterGlobal->schedule_type ?? 'standard';
             $taxRate = $masterGlobal->default_tax_rate ?? $standardTaxRate;
-            $rules = ScheduleEngine::resolveValidationRules($scheduleType, $taxRate, $standardTaxRate);
 
             $result = [
                 'found' => true,
@@ -229,6 +228,9 @@ class GlobalHsMasterController extends Controller
                 'standard_tax_rate' => $standardTaxRate,
                 'hs_unmapped' => false,
             ];
+            $result = ScheduleEngine::applyThirdScheduleRecommendation($result, $hsCode);
+            $scheduleType = $result['schedule_type'];
+            $taxRate = $result['tax_rate'];
 
             $sroSuggestion = GlobalHsService::suggestSro($hsCode, $scheduleType, $taxRate, $standardTaxRate);
             if ($sroSuggestion) {
@@ -268,6 +270,7 @@ class GlobalHsMasterController extends Controller
             $resolved['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $resolved['schedule_type'] ?? 'standard');
             $resolved['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $resolved['hs_unmapped'] = false;
+            $resolved = ScheduleEngine::applyThirdScheduleRecommendation($resolved, $hsCode);
             return response()->json(self::stripIntelligenceFields(self::applyFbrUomGuard($resolved, $hsCode, $company)));
         }
 
@@ -277,6 +280,7 @@ class GlobalHsMasterController extends Controller
             $scheduleResult['st_withheld_applicable'] = self::isStWithheldApplicable($hsCode, $scheduleResult['schedule_type'] ?? 'standard');
             $scheduleResult['petroleum_levy_applicable'] = self::isPetroleumLevyApplicable($hsCode);
             $scheduleResult['hs_unmapped'] = false;
+            $scheduleResult = ScheduleEngine::applyThirdScheduleRecommendation($scheduleResult, $hsCode);
             return response()->json(self::stripIntelligenceFields(self::applyFbrUomGuard($scheduleResult, $hsCode, $company)));
         }
 

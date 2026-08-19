@@ -354,6 +354,16 @@
                                 <p class="text-xs text-indigo-700 dark:text-indigo-300" x-text="item.schedule_hint"></p>
                             </div>
 
+                            <div x-show="item.thirdScheduleRecommended" x-cloak class="mb-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg">
+                                <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">HS 2402.x is a 3rd Schedule item — tax should be 18% of retail/MRP.</p>
+                                <p class="mt-1 text-xs text-amber-700 dark:text-amber-300" x-show="item.schedule_type === '3rd_schedule'">3rd Schedule has been selected. Please enter the retail/MRP below.</p>
+                                <p class="mt-1 text-xs text-amber-700 dark:text-amber-300" x-show="item.schedule_type === 'standard'">This line is using Standard Rate by your choice.</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <button type="button" x-show="item.schedule_type !== '3rd_schedule'" @click="useRecommendedThirdSchedule(index)" class="px-2 py-1 rounded border border-amber-500 text-xs font-semibold text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50">Switch to 3rd Schedule</button>
+                                    <button type="button" x-show="item.schedule_type === '3rd_schedule'" @click="keepStandardRate(index)" class="px-2 py-1 rounded border border-amber-400 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50">Use Standard Rate anyway</button>
+                                </div>
+                            </div>
+
                             <div x-show="item.hsLookupInfo" x-cloak class="mb-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
                                 <p class="text-xs text-blue-700 dark:text-blue-300" x-text="item.hsLookupInfo"></p>
                             </div>
@@ -671,6 +681,9 @@
                     productSearch: '', showDropdown: false, productResults: [],
                     hsLookupInfo: '',
                     hsUnmapped: false,
+                    thirdScheduleRecommended: false,
+                    thirdScheduleTaxRate: 18,
+                    thirdScheduleOverrideAcknowledged: false,
                     taxRecommendation: null,
                     hsSuggestion: null,
                     adminMappings: null,
@@ -791,6 +804,7 @@
                         return item;
                     });
                     this.validateMixedSchedules();
+                    this.items.forEach((item, index) => this.lookupHsCode(index));
                 },
 
                 applyAiHeaderFields(p) {
@@ -841,7 +855,30 @@
 
                 onScheduleChange(index) {
                     let item = this.items[index];
+                    if (item.thirdScheduleRecommended) {
+                        item.thirdScheduleOverrideAcknowledged = item.schedule_type === 'standard';
+                    }
                     item.tax_rate = defaultTaxRates[item.schedule_type] ?? companyStandardRate;
+                    this.applyScheduleRules(item);
+                    this.calcTax(index);
+                    this.validateMixedSchedules();
+                },
+
+                useRecommendedThirdSchedule(index) {
+                    let item = this.items[index];
+                    item.schedule_type = '3rd_schedule';
+                    item.tax_rate = item.thirdScheduleTaxRate || 18;
+                    item.thirdScheduleOverrideAcknowledged = false;
+                    this.applyScheduleRules(item);
+                    this.calcTax(index);
+                    this.validateMixedSchedules();
+                },
+
+                keepStandardRate(index) {
+                    let item = this.items[index];
+                    item.schedule_type = 'standard';
+                    item.tax_rate = companyStandardRate;
+                    item.thirdScheduleOverrideAcknowledged = true;
                     this.applyScheduleRules(item);
                     this.calcTax(index);
                     this.validateMixedSchedules();
@@ -860,18 +897,23 @@
                     }
                 },
 
-                async lookupHsCode(index) {
+                async lookupHsCode(index, forceProductLookup = false) {
                     let item = this.items[index];
                     if (!item.hs_code || item.hs_code.length < 4) return;
-                    if (item.product_id) return;
+                    if (item.product_id && !forceProductLookup) return;
                     try {
                         let res = await fetch('/api/hs-lookup?hs_code=' + encodeURIComponent(item.hs_code));
                         let data = await res.json();
                         item.hsUnmapped = !!data.hs_unmapped;
                         if (data && data.pct_code) {
                             item.pct_code = data.pct_code;
-                            item.schedule_type = data.schedule_type;
-                            item.tax_rate = Math.round(parseFloat(data.tax_rate) || 0);
+                            item.thirdScheduleRecommended = !!data.third_schedule_recommended;
+                            item.thirdScheduleTaxRate = Math.round(parseFloat(data.tax_rate) || 18);
+                            const keepChosenStandard = item.thirdScheduleRecommended && item.thirdScheduleOverrideAcknowledged && item.schedule_type === 'standard';
+                            if (!keepChosenStandard) {
+                                item.schedule_type = data.schedule_type;
+                                item.tax_rate = Math.round(parseFloat(data.tax_rate) || 0);
+                            }
                             if (data.default_uom) item.default_uom = data.default_uom;
                             item.show_st_withheld = !!data.st_withheld_applicable;
                             item.show_petroleum_levy = !!data.petroleum_levy_applicable;
@@ -1038,6 +1080,7 @@
                     item.hsLookupInfo = 'From product: ' + product.name + ' | Schedule: ' + item.schedule_type;
                     this.calcTax(index);
                     this.validateMixedSchedules();
+                    this.lookupHsCode(index, true);
                 },
 
                 mapUom(productUom) {

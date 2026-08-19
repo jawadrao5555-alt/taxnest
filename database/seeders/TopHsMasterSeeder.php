@@ -303,7 +303,7 @@ class TopHsMasterSeeder extends Seeder
             ['hs_code' => '24011000', 'description' => 'Tobacco, not stemmed/stripped', 'schedule_type' => 'standard', 'default_tax_rate' => 18, 'sro_required' => false, 'mrp_required' => false, 'serial_required' => false, 'default_uom' => 'KGS'],
             ['hs_code' => '24012000', 'description' => 'Tobacco, partly stemmed', 'schedule_type' => 'standard', 'default_tax_rate' => 18, 'sro_required' => false, 'mrp_required' => false, 'serial_required' => false, 'default_uom' => 'KGS'],
             ['hs_code' => '24021000', 'description' => 'Cigars and cigarillos', 'schedule_type' => 'standard', 'default_tax_rate' => 18, 'sro_required' => false, 'mrp_required' => true, 'serial_required' => false, 'default_uom' => 'NOS'],
-            ['hs_code' => '24022000', 'description' => 'Cigarettes containing tobacco', 'schedule_type' => 'standard', 'default_tax_rate' => 18, 'sro_required' => false, 'mrp_required' => true, 'serial_required' => false, 'default_uom' => 'NOS'],
+            ['hs_code' => '24022000', 'description' => 'Cigarettes containing tobacco', 'schedule_type' => '3rd_schedule', 'default_tax_rate' => 18, 'sro_required' => false, 'mrp_required' => true, 'serial_required' => false, 'default_uom' => 'NOS'],
 
             // Beverages - Chapter 22
             ['hs_code' => '22011000', 'description' => 'Mineral waters and aerated waters', 'schedule_type' => 'standard', 'default_tax_rate' => 18, 'sro_required' => false, 'mrp_required' => true, 'serial_required' => false, 'default_uom' => 'LTR'],

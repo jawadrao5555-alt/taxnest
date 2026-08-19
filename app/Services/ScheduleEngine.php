@@ -4,6 +4,17 @@ namespace App\Services;
 
 class ScheduleEngine
 {
+    /**
+     * HS prefixes whose tax base is the retail/MRP value under the Third Schedule.
+     *
+     * Keep this list deliberately small and legally reviewed. It is used to protect
+     * entry-time recommendations from older HS-master rows that may still say
+     * "standard".
+     */
+    public const THIRD_SCHEDULE_HS_PREFIXES = [
+        '240220', // Cigarettes containing tobacco; do not include 240210 cigars/cigarillos.
+    ];
+
     public static array $scheduleTypes = [
         'standard' => ['label' => 'Standard Rate', 'tax_rate' => null, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         'reduced' => ['label' => 'Reduced Rate', 'tax_rate' => 10, 'requires_sro' => true, 'requires_serial' => true, 'requires_mrp' => false],
@@ -138,10 +149,15 @@ class ScheduleEngine
     {
         $normalized = preg_replace('/[^0-9]/', '', $hsCode);
 
+        if ($recommendation = self::thirdScheduleRecommendation($normalized)) {
+            return $recommendation;
+        }
+
         if (isset(self::$hsLookupTable[$normalized])) {
             $data = self::$hsLookupTable[$normalized];
             $rules = self::resolveValidationRules($data['schedule_type'], $data['tax_rate'], $standardTaxRate);
             return [
+                'found' => true,
                 'pct_code' => $data['pct_code'],
                 'schedule_type' => $data['schedule_type'],
                 'tax_rate' => $data['tax_rate'],
@@ -152,6 +168,57 @@ class ScheduleEngine
         }
 
         return null;
+    }
+
+    /**
+     * Return the entry-time Third Schedule recommendation for a legally known HS
+     * prefix. This is intentionally a recommendation, not submission validation:
+     * staff may still choose another schedule after seeing the warning.
+     */
+    public static function thirdScheduleRecommendation(string $hsCode): ?array
+    {
+        $normalized = preg_replace('/[^0-9]/', '', $hsCode);
+        $matchesKnownPrefix = false;
+        foreach (self::THIRD_SCHEDULE_HS_PREFIXES as $prefix) {
+            if (str_starts_with($normalized, $prefix)) {
+                $matchesKnownPrefix = true;
+                break;
+            }
+        }
+
+        if (!$matchesKnownPrefix) {
+            return null;
+        }
+
+        return [
+            'found' => true,
+            'pct_code' => self::formatHsCode($normalized),
+            'schedule_type' => '3rd_schedule',
+            'tax_rate' => 18.0,
+            'requires_sro' => false,
+            'requires_serial' => false,
+            'requires_mrp' => true,
+            'third_schedule_recommended' => true,
+            'third_schedule_warning' => 'HS 2402.x is a 3rd Schedule item — tax should be 18% of retail/MRP.',
+        ];
+    }
+
+    /**
+     * Let the known legal heading win over a stale or incomplete master record
+     * while keeping useful metadata such as description and UoM intact.
+     */
+    public static function applyThirdScheduleRecommendation(array $result, string $hsCode): array
+    {
+        $recommendation = self::thirdScheduleRecommendation($hsCode);
+
+        return $recommendation ? array_merge($result, $recommendation) : $result;
+    }
+
+    private static function formatHsCode(string $normalized): string
+    {
+        return strlen($normalized) === 8
+            ? substr($normalized, 0, 4) . '.' . substr($normalized, 4)
+            : $normalized;
     }
 
     public static function validateItems(array $items, float $standardTaxRate = 18.0): array

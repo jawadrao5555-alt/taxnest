@@ -407,6 +407,34 @@ class Company extends Model
     }
 
     /**
+     * Task 1277: TRUE only when this company's FBR POS integration is set up far
+     * enough that a final bill CAN actually be reported. Mirrors EXACTLY what
+     * FbrService::submitFbrPosTransaction requires — never stricter:
+     *  - POS Registration ID (POSID): digits, non-zero. Missing/zero POSID is a
+     *    permanent config_error on submit (buildFbrPosPayload casts the same way).
+     *  - Fiscal Device mode: agentServesFbr() + agent_enabled — the submit guard
+     *    queues the bill 'pending' for the shop-PC Desktop Sync Agent.
+     *  - Cloud mode: a usable dedicated IMS POS token (raw-plausible or
+     *    decryptable). Missing/corrupt token is a config_error on submit — there
+     *    is NO fallback to the DI sandbox/production tokens on the IMS endpoint.
+     * Gates the Rs 1 FBR POS service fee (SRO 1279/21): reporting toggle ON but
+     * setup incomplete must never charge the customer the extra rupee.
+     */
+    public function fbrPosIntegrationConfigured(): bool
+    {
+        $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
+        if ($posId === '' || (int) $posId === 0) {
+            return false;
+        }
+
+        if ($this->agentServesFbr() && $this->agent_enabled) {
+            return true;
+        }
+
+        return app(\App\Services\FbrService::class)->hasUsableFbrPosToken($this);
+    }
+
+    /**
      * POS-CONFIG REVISION (Task 52, Jul 2026): explicit whitelist hash of the
      * company fields that actually shape the sale screen / receipts / POS
      * behaviour. The boot fingerprint ('set' key in PosController::
@@ -501,6 +529,13 @@ class Company extends Model
             'kot_printer_device' => $ps['kot_printer_device'],
             'counter_kot_printer_device' => $ps['counter_kot_printer_device'],
         ];
+
+        // Task 1277: the Rs 1 fee gate flag (fbrConfigured) is BAKED into the FBR
+        // universal sale screen, and it depends on fbr_pos_token USABILITY — a
+        // column deliberately absent from the whitelist above (encrypted blob).
+        // Hash the derived flag itself so saving/fixing a token refreshes cached
+        // offline-first sale screens exactly when the flag actually flips.
+        $vals['fbr_pos_configured'] = $this->fbrPosIntegrationConfigured();
 
         return md5(json_encode($vals));
     }

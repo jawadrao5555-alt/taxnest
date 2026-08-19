@@ -1646,7 +1646,12 @@ class FbrPosController extends Controller
                 // Rs 1 POS service fee applies ONLY to bills actually reported to FBR.
                 // FBR-reporting-OFF finals are 'fbr' mode with NULL status (never
                 // submitted) — no fee. Provisionals (local) — no fee until promoted.
-                $fbrServiceCharge = ($invoiceMode === 'fbr' && $initialFbrStatus !== null) ? 1.00 : 0.00;
+                // Task 1277: reporting ON but integration NOT configured (no POSID /
+                // usable token / agent setup) also gets NO fee — such a bill can never
+                // reach FBR, so the customer must not pay the extra rupee. Offline
+                // replays flow through here too and inherit the same rule.
+                $fbrServiceCharge = ($invoiceMode === 'fbr' && $initialFbrStatus !== null
+                    && $company->fbrPosIntegrationConfigured()) ? 1.00 : 0.00;
 
                 // Phase 2: Promotion discount (cart-level, separate from manual discount)
                 $promotionDiscount = 0;

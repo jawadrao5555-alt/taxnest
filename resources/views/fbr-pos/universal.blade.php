@@ -3069,6 +3069,11 @@ function restaurantPos() {
         // a nested x-data on the toggle strip → caused "fbrEnabled is not defined"
         // Alpine crashes inside the modals which broke the whole page (incl. Pay).
         fbrEnabled: {{ ($company->fbr_reporting_enabled ?? false) ? 'true' : 'false' }},
+        // Task 1277: TRUE only when the FBR integration is actually set up (POSID +
+        // usable token, or fiscal-device agent). Gates the Rs 1 fee client-side so
+        // the payable total the cashier sees matches what the server stores. Joined
+        // to posConfigRev — a settings save refreshes cached offline-first screens.
+        fbrConfigured: {{ $company->fbrPosIntegrationConfigured() ? 'true' : 'false' }},
         fbrLoading: false,
         // ── GUIDED KEYBOARD BILLING FLOW (opt-in, default OFF) ───────────────
         // Mirrors $company->pos_guided_flow_enabled. When false EVERY keyboard
@@ -3311,7 +3316,7 @@ function restaurantPos() {
         },
         // Rs 1 FBR POS service charge — added by store() whenever the bill goes to FBR
         // (fbr mode). Provisional saves + FBR-OFF companies bill in local mode (Rs 0).
-        get fbrServiceCharge() { return (this.fbrEnabled && !this.saveAsProvisional && this.cart.length > 0) ? 1 : 0; },
+        get fbrServiceCharge() { return (this.fbrEnabled && this.fbrConfigured && !this.saveAsProvisional && this.cart.length > 0) ? 1 : 0; },
         get totalAmount() { return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount + this.fbrServiceCharge)); },
         // FBR keeps DECIMALS (no PRA whole-rupee rounding) — store() rounds to 2dp only.
         get roundedTotal() { return this.totalAmount; },

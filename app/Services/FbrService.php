@@ -1836,6 +1836,30 @@ class FbrService
         }
     }
 
+    /**
+     * Task 1277: quiet usability probe for the dedicated IMS POS token — TRUE when
+     * getFbrPosToken() would return a non-empty bearer (plausible RAW token OR a
+     * decryptable Crypt blob). Deliberately NO logging: this runs on every sale
+     * screen render / bill save via Company::fbrPosIntegrationConfigured(), unlike
+     * getFbrPosToken() which warns/errors because it runs at actual submit time.
+     * Keep the acceptance rules in lockstep with getFbrPosToken().
+     */
+    public function hasUsableFbrPosToken($company): bool
+    {
+        $stored = (string) ($company->fbr_pos_token ?? '');
+        if (trim($stored) === '') {
+            return false;
+        }
+        if ($this->looksLikeRawFbrToken($stored)) {
+            return true;
+        }
+        try {
+            return trim(Crypt::decryptString($stored)) !== '';
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     private function getFbrPosUrl($company): string
     {
         // FBR IMS POS Fiscalization endpoints (NOT the DI di_data/v1 API, and NOT the

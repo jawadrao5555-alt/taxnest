@@ -331,10 +331,22 @@ class RestaurantTableController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function tableStatus()
+    public function tableStatus(\Illuminate\Http\Request $request)
     {
         $companyId = app('currentCompanyId');
         RestaurantTable::releaseStaleReservations($companyId);
+
+        // ── Fast-path: If-None-Match ETag (Task 1109) ────────────────────────
+        // Fingerprint covers every state change visible on the Board tile:
+        //   • Table status / lock changes  → tables.updated_at / status changes.
+        //   • New order on a table         → new row in restaurant_orders.
+        //   • Order status change          → restaurant_orders.updated_at.
+        //   • Order removed / cancelled    → different COUNT + id set.
+        // Two lightweight scalar queries replace the full eager-load on a hit.
+        $etag = $this->tableStatusEtag($companyId);
+        if ($request->header('If-None-Match') === $etag) {
+            return response('', 304)->header('ETag', $etag);
+        }
 
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)
@@ -374,6 +386,43 @@ class RestaurantTableController extends Controller
                 ];
             });
 
-        return response()->json($tables);
+        return response()->json($tables)->header('ETag', $etag);
+    }
+
+    /**
+     * Task 1109 — collision-resistant ETag for the table-status poll.
+     *
+     * Covers every state change a Board tile can reflect:
+     *  • Table status / lock flip           → tables row updated_at changes.
+     *  • New order arrives on a table       → new restaurant_orders row.
+     *  • Order status changes (held→ready)  → restaurant_orders updated_at.
+     *  • Order paid / cancelled             → different id set + COUNT.
+     *
+     * Two tiny scalar queries (no relations) replace the full eager-load
+     * when nothing has changed — negligible DB cost on a quiet floor.
+     */
+    private function tableStatusEtag(int $companyId): string
+    {
+        $DB = \Illuminate\Support\Facades\DB::class;
+
+        $tableRows = $DB::table('restaurant_tables')
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get(['id', 'status', 'updated_at', 'locked_by_user_id', 'occupied_since']);
+
+        $orderRows = $DB::table('restaurant_orders')
+            ->where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->whereNotNull('table_id')
+            ->orderBy('id')
+            ->get(['id', 'table_id', 'status', 'updated_at']);
+
+        $payload =
+            $tableRows->map(fn ($r) => $r->id . ':' . $r->status . ':' . $r->updated_at . ':' . $r->locked_by_user_id . ':' . $r->occupied_since)->join(',')
+            . '|'
+            . $orderRows->map(fn ($r) => $r->id . ':' . $r->table_id . ':' . $r->status . ':' . $r->updated_at)->join(',');
+
+        return '"tbl-' . $companyId . '-' . md5($payload) . '"';
     }
 }

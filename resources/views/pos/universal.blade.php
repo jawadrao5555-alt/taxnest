@@ -4288,6 +4288,7 @@ function restaurantPos() {
         heldOrders: {!! $jsEnc($heldOrdersJson) !!},
         _heldEtag: null,     // Task 1097: ETag from last held-orders poll (If-None-Match fast-path)
         _incomingEtag: null, // Task 1097: ETag from last incoming-orders poll
+        _tableEtag: null,    // Task 1109: ETag from last table-status poll (If-None-Match fast-path)
         // Task 502: Tables page open-order card → boot par isi order ka direct recall.
         bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
@@ -7272,10 +7273,18 @@ function restaurantPos() {
             const h = Math.floor(mins / 60), m = mins % 60;
             return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
         },
+        // Task 1109: If-None-Match ETag fast-path — 304 means floor hasn't
+        // changed; skip the body parse and leave tableFloors untouched.
         async loadTableStatus() {
             this.tablesLoading = true;
             try {
-                const res = await fetch('/pos/restaurant/api/table-status', { headers: { 'Accept': 'application/json' } });
+                const hdrs = { 'Accept': 'application/json' };
+                if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
+                const res = await fetch('/pos/restaurant/api/table-status', { headers: hdrs });
+                if (res.status === 304) { this.tablesLoading = false; return; }
+                if (!res.ok) { this.tablesLoading = false; return; }
+                const etag = res.headers.get('ETag');
+                if (etag) this._tableEtag = etag;
                 const list = await res.json();
                 const groups = {};
                 (Array.isArray(list) ? list : []).forEach(t => {

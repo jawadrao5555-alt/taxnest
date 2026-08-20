@@ -8,7 +8,8 @@ use Tests\TestCase;
 
 /**
  * Task #443 — public /api/app-version endpoint powering the Play-Store-style
- * in-app update check inside the Android shells (pos/fbrpos/waiter/rider/di).
+ * in-app update check inside the Android shells (pos/fbrpos/waiter/rider/di,
+ * plus the Caller ID companion app added by Task 1333).
  */
 class AppVersionEndpointTest extends TestCase
 {
@@ -28,6 +29,7 @@ class AppVersionEndpointTest extends TestCase
             'waiter' => ['waiter_app_latest_version', 'downloads/taxnest-waiter.apk'],
             'rider'  => ['rider_app_latest_version', 'downloads/taxnest-rider.apk'],
             'di'     => ['di_app_latest_version', 'downloads/taxnest-di.apk'],
+            'caller' => ['caller_app_latest_version', 'downloads/taxnest-caller.apk'],
         ];
         foreach ($expect as $app => [$key, $path]) {
             SystemSetting::set($key, '9.9.9');

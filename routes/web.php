@@ -432,6 +432,10 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
             ->name('invoices.ai-reader.bulk.status');
         Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/retry', [AiInvoiceReaderController::class, 'bulkRetry'])
             ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.retry');
+        // Shareable review summary of one batch (?format=csv|pdf) — company
+        // scoped, and it never links or embeds the private source photo.
+        Route::get('/invoices/ai-reader/bulk-images/{batchId}/report', [AiInvoiceReaderController::class, 'bulkReport'])
+            ->middleware('throttle:20,1')->name('invoices.ai-reader.bulk.report');
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);

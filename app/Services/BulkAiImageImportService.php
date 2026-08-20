@@ -28,7 +28,23 @@ class BulkAiImageImportService
     public const CHUNK_BYTES = 1024 * 1024;
     public const RETENTION_DAYS = 7;
 
+    /** Same wording the workspace table shows, reused by the shareable report. */
+    public const STATUS_LABELS = [
+        'not_started' => 'Not started',
+        'uploading' => 'Uploading',
+        'queued' => 'Queued',
+        'processing' => 'Reading',
+        'ready' => 'Ready',
+        'needs_review' => 'Needs review',
+        'duplicate' => 'Duplicate',
+        'failed' => 'Failed',
+    ];
+
     private const EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+
+    /** A hand-off summary stays readable only while it stays short. */
+    private const REPORT_MAX_NOTES = 3;
+    private const REPORT_NOTE_CHARS = 160;
 
     public function quotaState(Company $company): array
     {
@@ -416,6 +432,120 @@ class BulkAiImageImportService
             ],
             'annexure_audits' => app(AnnexureProductService::class)->auditTrail($batch, Company::findOrFail($batch->company_id)),
         ];
+    }
+
+    /**
+     * Shareable hand-off summary of a batch: one row per SOURCE photo with the
+     * status, the concise notes a second reviewer needs, and the draft it
+     * produced. Built from stored review data only — the private source photo
+     * (storage path, source uuid, bytes, hash) never leaves the server.
+     */
+    public function reviewReport(BulkAiImageBatch $batch): array
+    {
+        $items = $batch->items()->orderBy('position')->get();
+        $filenames = $items->pluck('original_filename', 'id')->all();
+        $invoiceIds = $items->pluck('invoice_id')->filter()->unique()->values()->all();
+        $drafts = $invoiceIds
+            ? Invoice::where('company_id', $batch->company_id)->whereIn('id', $invoiceIds)->get()->keyBy('id')
+            : collect();
+
+        $counts = ['ready' => 0, 'needs_review' => 0, 'duplicate' => 0, 'failed' => 0, 'pending' => 0];
+        $rows = [];
+        foreach ($items as $item) {
+            $status = (string) $item->status;
+            $counts[array_key_exists($status, $counts) ? $status : 'pending']++;
+            $draft = $item->invoice_id ? $drafts->get($item->invoice_id) : null;
+            $rows[] = [
+                'position' => (int) $item->position,
+                'filename' => (string) $item->original_filename,
+                'status' => $status,
+                'status_label' => self::STATUS_LABELS[$status] ?? $status,
+                'notes' => $this->reportNotes($item, $filenames),
+                'draft_number' => $draft ? (string) $draft->display_invoice_number : '',
+                'processed_at' => $item->processed_at?->format('Y-m-d H:i') ?? '',
+            ];
+        }
+
+        return [
+            'batch' => [
+                'id' => (int) $batch->id,
+                'status' => (string) $batch->status,
+                'status_label' => $batch->status === 'completed' ? 'Completed' : 'In progress',
+                'total' => (int) $batch->total_images,
+                'processed' => $counts['ready'] + $counts['needs_review'] + $counts['duplicate'] + $counts['failed'],
+                'started_at' => $batch->created_at?->format('d M Y, h:i A') ?? '',
+                'finished_at' => $batch->finished_at?->format('d M Y, h:i A') ?? '',
+                'annexure_filename' => (string) ($batch->annexure_filename ?: ''),
+            ],
+            'counts' => $counts,
+            'rows' => $rows,
+        ];
+    }
+
+    public function reviewReportFilename(BulkAiImageBatch $batch, string $extension): string
+    {
+        return 'bulk-ai-review-batch-' . $batch->id . '-' . now()->format('Ymd-His') . '.' . $extension;
+    }
+
+    public function reviewReportCsv(BulkAiImageBatch $batch): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $report = $this->reviewReport($batch);
+
+        return response()->streamDownload(function () use ($report) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel keeps non-Latin filenames readable
+            fputcsv($out, ['#', 'Source file', 'Status', 'Review notes', 'Draft invoice #', 'Processed at']);
+            foreach ($report['rows'] as $row) {
+                fputcsv($out, [
+                    $row['position'],
+                    $this->csvSafe($row['filename']),
+                    $row['status_label'],
+                    $this->csvSafe(implode(' | ', $row['notes'])),
+                    $this->csvSafe($row['draft_number']),
+                    $row['processed_at'],
+                ]);
+            }
+            fclose($out);
+        }, $this->reviewReportFilename($batch, 'csv'), ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Notes are the whole point of the hand-off, so they must stay short:
+     * every stored warning (plus the duplicate/failure reason) trimmed to one
+     * line, de-duplicated, and capped with a "+N more" pointer back to the
+     * workspace.
+     */
+    private function reportNotes(BulkAiImageItem $item, array $filenames): array
+    {
+        $notes = [];
+        if ($item->status === 'duplicate') {
+            $details = $item->detailsArray();
+            $note = (string) ($details['message'] ?? 'This photo repeats another source invoice in this batch.');
+            $original = $filenames[$details['duplicate_of'] ?? 0] ?? null;
+            $notes[] = $original ? rtrim($note, '.') . ' — same as ' . $original . '.' : $note;
+        }
+        foreach (array_merge($item->warningsArray(), array_filter([$item->error])) as $note) {
+            $notes[] = (string) $note;
+        }
+
+        $notes = array_values(array_unique(array_filter(array_map(
+            fn ($note) => trim(mb_substr((string) preg_replace('/\s+/u', ' ', (string) $note), 0, self::REPORT_NOTE_CHARS)),
+            $notes
+        ))));
+        $extra = count($notes) - self::REPORT_MAX_NOTES;
+
+        return $extra > 0
+            ? array_merge(
+                array_slice($notes, 0, self::REPORT_MAX_NOTES),
+                ['+' . $extra . ' more note(s) — open the batch in TaxNest to see all.']
+            )
+            : $notes;
+    }
+
+    /** Source filenames are user-supplied: never let a spreadsheet read one as a formula. */
+    private function csvSafe(string $value): string
+    {
+        return $value !== '' && str_contains("=+-@\t\r", $value[0]) ? "'" . $value : $value;
     }
 
     /**

@@ -258,6 +258,36 @@ class AiInvoiceReaderController extends Controller
         return response()->json($service->statusPayload($batch));
     }
 
+    /**
+     * Task 1330: shareable batch review summary (CSV or printable PDF) so a
+     * distributor can hand failed / duplicate / needs-review source invoices
+     * to another reviewer outside this browser session.
+     *
+     * Scoped exactly like the live status endpoint — the batch lookup is
+     * company-bound, so another company's batch is a 404 — and built from the
+     * stored review data only, never from the private source photo.
+     */
+    public function bulkReport(Request $request, int $batchId, BulkAiImageImportService $service)
+    {
+        $batch = $service->batchForCompany($batchId, (int) app('currentCompanyId'));
+        if (!$batch) {
+            abort(404);
+        }
+
+        if (strtolower((string) $request->query('format')) === 'pdf') {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.ai-reader-bulk-report', [
+                'company' => Company::findOrFail($batch->company_id),
+                'title' => 'Bulk AI Image Import Review',
+                'report' => $service->reviewReport($batch),
+            ]);
+            $pdf->setPaper('a4', 'landscape');
+
+            return $pdf->download($service->reviewReportFilename($batch, 'pdf'));
+        }
+
+        return $service->reviewReportCsv($batch);
+    }
+
     public function bulkRetry(int $batchId, int $itemId, BulkAiImageImportService $service)
     {
         $item = $service->itemForCompany($batchId, $itemId, (int) app('currentCompanyId'));

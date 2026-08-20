@@ -89,10 +89,19 @@
                             </div>
                             <button @click="applyAnnexure()" :disabled="busy" class="mt-4 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50">Confirm mapping &amp; upload photos</button>
                         </div>
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
                             <h2 class="text-sm font-extrabold uppercase tracking-wider text-gray-800 dark:text-gray-100">Batch progress</h2>
-                            <span class="rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200" x-text="(batch.processed || 0) + ' / ' + (batch.total || files.length) + ' processed'"></span>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <template x-if="(batch.processed || 0) > 0">
+                                    <span class="flex items-center gap-2">
+                                        <a :href="reportUrl('csv')" class="rounded-lg border border-gray-200 px-2 py-1 text-[10px] font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Download CSV</a>
+                                        <a :href="reportUrl('pdf')" class="rounded-lg border border-gray-200 px-2 py-1 text-[10px] font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Download PDF</a>
+                                    </span>
+                                </template>
+                                <span class="rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200" x-text="(batch.processed || 0) + ' / ' + (batch.total || files.length) + ' processed'"></span>
+                            </div>
                         </div>
+                        <p x-show="(batch.processed || 0) > 0" class="mt-2 text-[11px] text-gray-400">Share the review summary with another reviewer — it lists each source filename, its status, short notes, and the draft number. The private source photos are never included.</p>
                         <div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"><div class="h-full bg-violet-600 transition-all" :style="'width:' + progress() + '%'"></div></div>
                         <p class="mt-2 text-xs text-gray-500" x-text="busy ? busyLabel : 'Photos are processed separately in the background. You may keep this page open to review live results.'"></p>
 
@@ -278,6 +287,7 @@
                 const selected = [...(this.metadataFields[itemId] || this.metadataKeys)];
                 this.metadataFields[itemId] = checked ? [...new Set([...selected, field])] : selected.filter(key => key !== field);
             },
+            reportUrl(format) { return '/invoices/ai-reader/bulk-images/' + this.batchId + '/report?format=' + format; },
             progress() { return this.batch.total ? Math.round(((this.batch.processed || 0) / this.batch.total) * 100) : 0; },
             label(s) { return ({not_started:'Not started',uploading:'Uploading',queued:'Queued',processing:'Reading',ready:'Ready',needs_review:'Needs review',duplicate:'Duplicate',failed:'Failed'})[s] || s; },
             statusClass(s) { return ({ready:'bg-emerald-100 text-emerald-700',needs_review:'bg-amber-100 text-amber-800',duplicate:'bg-gray-200 text-gray-700',failed:'bg-red-100 text-red-700',processing:'bg-violet-100 text-violet-700',queued:'bg-blue-100 text-blue-700'})[s] || 'bg-gray-100 text-gray-600'; }

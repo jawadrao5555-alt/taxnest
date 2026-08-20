@@ -38,3 +38,4 @@ tools/video-pipeline/out/
 !.env.example
 attached_assets/*.txt
 attached_assets/Pasted-*
+attached_assets/*.json

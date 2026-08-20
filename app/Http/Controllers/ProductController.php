@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ProductController extends Controller
 {
@@ -44,6 +45,9 @@ class ProductController extends Controller
 
         $validationRules = [
             'name' => 'required|string|max:255',
+            'barcode' => 'nullable|string|max:80',
+            'sku' => 'nullable|string|max:80',
+            'aliases_text' => 'nullable|string|max:4000',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
             'default_tax_rate' => 'required|integer|min:0|max:100',
@@ -77,9 +81,11 @@ class ProductController extends Controller
             $taxType = 'custom';
         }
 
-        Product::create([
+        $product = Product::create([
             'company_id' => $companyId,
             'name' => $request->name,
+            'barcode' => $request->barcode,
+            'sku' => $request->sku,
             'hs_code' => $request->hs_code,
             'pct_code' => $request->pct_code,
             'default_tax_rate' => $request->default_tax_rate,
@@ -91,6 +97,7 @@ class ProductController extends Controller
             'mrp' => $request->mrp,
             'default_price' => $request->default_price,
         ]);
+        $this->syncAliases($product, (string) $request->input('aliases_text', ''));
 
         return redirect('/products')->with('success', 'Product created successfully.');
     }
@@ -99,7 +106,11 @@ class ProductController extends Controller
     {
         $companyId = app('currentCompanyId');
         if ($product->company_id !== $companyId) abort(403);
-        return view('products.edit', compact('product'));
+        $aliasesText = '';
+        if (Schema::hasTable('product_aliases')) {
+            $aliasesText = $product->aliases()->where('is_active', true)->orderBy('alias')->pluck('alias')->implode("\n");
+        }
+        return view('products.edit', compact('product', 'aliasesText'));
     }
 
     public function update(Request $request, Product $product)
@@ -113,6 +124,9 @@ class ProductController extends Controller
 
         $validationRules = [
             'name' => 'required|string|max:255',
+            'barcode' => 'nullable|string|max:80',
+            'sku' => 'nullable|string|max:80',
+            'aliases_text' => 'nullable|string|max:4000',
             'hs_code' => 'required|string|max:50',
             'pct_code' => 'nullable|string|max:50',
             'default_tax_rate' => 'required|integer|min:0|max:100',
@@ -144,9 +158,10 @@ class ProductController extends Controller
         }
 
         $product->update(array_merge($request->only([
-            'name', 'hs_code', 'pct_code', 'default_tax_rate',
+            'name', 'barcode', 'sku', 'hs_code', 'pct_code', 'default_tax_rate',
             'uom', 'schedule_type', 'sro_reference', 'serial_number', 'mrp', 'default_price'
         ]), ['tax_type' => $taxType]));
+        $this->syncAliases($product, (string) $request->input('aliases_text', ''));
 
         return redirect('/products')->with('success', 'Product updated successfully.');
     }
@@ -261,5 +276,27 @@ class ProductController extends Controller
             'default_tax_rate' => $product->default_tax_rate,
             'sro_reference' => $product->sro_reference,
         ]);
+    }
+
+    /** Approved aliases are exact supplier/invoice spellings, never AI guesses. */
+    private function syncAliases(Product $product, string $text): void
+    {
+        if (!Schema::hasTable('product_aliases')) {
+            return;
+        }
+        $aliases = collect(preg_split('/\R/u', $text) ?: [])
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique(fn ($value) => mb_strtolower($value))
+            ->take(50)
+            ->values();
+        $product->aliases()->delete();
+        foreach ($aliases as $alias) {
+            $product->aliases()->create([
+                'company_id' => $product->company_id,
+                'alias' => mb_substr($alias, 0, 255),
+                'is_active' => true,
+            ]);
+        }
     }
 }

@@ -122,12 +122,23 @@ class AiInvoiceReaderService
     {
         $quota = self::monthlyQuota($company);
         $used = self::usedThisMonth($company->id);
+        // A batch reserves before uploading. Include that reservation in the
+        // single-reader check as well, otherwise separate browser tabs could
+        // consume credits that have already been promised to source photos.
+        $reserved = 0;
+        if (\Illuminate\Support\Facades\Schema::hasTable('bulk_ai_image_items')) {
+            $reserved = \App\Models\BulkAiImageItem::where('company_id', $company->id)
+                ->where('reservation_status', 'reserved')
+                ->where('created_at', '>=', now()->startOfMonth())
+                ->count();
+        }
 
         return [
             'quota' => $quota,
             'used' => $used,
+            'reserved' => $reserved,
             'unlimited' => $quota === -1,
-            'remaining' => $quota === -1 ? -1 : max(0, $quota - $used),
+            'remaining' => $quota === -1 ? -1 : max(0, $quota - $used - $reserved),
         ];
     }
 
@@ -668,6 +679,8 @@ Schema:
   "items": [                          // every line item, max 30
     {
       "description": string,
+      "barcode": string|null,         // visible barcode / GTIN only when printed
+      "sku": string|null,             // visible seller or supplier SKU only when printed
       "hs_code": string|null,         // ONLY if printed on the document. NEVER guess or invent HS codes.
       "quantity": number,
       "unit_price": number,           // price per unit EXCLUDING sales tax when the document separates tax
@@ -765,11 +778,26 @@ PROMPT;
         }
 
         // ---- Items ----
+        $productColumns = ['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'schedule_type'];
+        foreach (['barcode', 'sku', 'sro_reference', 'serial_number', 'mrp', 'default_price'] as $optionalColumn) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('products', $optionalColumn)) {
+                $productColumns[] = $optionalColumn;
+            }
+        }
         $products = Product::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
             ->where('company_id', $company->id)
             ->where('is_active', true)
             ->limit(500)
-            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'schedule_type']);
+            ->get($productColumns);
+        $aliases = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('product_aliases')) {
+            \App\Models\ProductAlias::where('company_id', $company->id)
+                ->where('is_active', true)
+                ->get(['product_id', 'alias'])
+                ->each(function ($alias) use (&$aliases) {
+                    $aliases[(int) $alias->product_id][] = (string) $alias->alias;
+                });
+        }
 
         $rawItems = is_array($raw['items'] ?? null) ? $raw['items'] : [];
         if (count($rawItems) > self::MAX_ITEMS) {
@@ -801,6 +829,7 @@ PROMPT;
                 $shaky = true;
                 $warnings[] = 'Item ' . $idx . ': quantity unclear — set to 1, please verify.';
             }
+            $priceSuggestion = null;
             if ($price === null || $price < 0) {
                 $price = 0.0;
                 $shaky = true;
@@ -819,7 +848,18 @@ PROMPT;
             $hs = self::cleanHs($itRaw['hs_code'] ?? '');
             $hsSource = $hs !== '' ? 'document' : 'none';
 
-            $product = self::bestProductMatch($desc, $products);
+            $product = self::bestProductMatch($desc, $products, [
+                'barcode' => $itRaw['barcode'] ?? '',
+                'sku' => $itRaw['sku'] ?? '',
+            ], $aliases);
+            $productMatchType = $product?->_match_type ?? null;
+            $productMatchConfidence = $product?->_match_confidence ?? null;
+            if ($product && $productMatchType === 'fuzzy') {
+                $warnings[] = 'Item ' . $idx . ': product match is low-confidence — verify the mapped profile before saving.';
+            }
+            if ($product && $price <= 0 && is_numeric($product->default_price ?? null) && (float) $product->default_price > 0) {
+                $priceSuggestion = round((float) $product->default_price, 2);
+            }
             if ($hs === '' && $product && $product->hs_code) {
                 $hs = self::cleanHs($product->hs_code);
                 if ($hs !== '') {
@@ -834,6 +874,14 @@ PROMPT;
             $sro = '';
             $serial = '';
             $hsFound = false;
+            $profileTaxRate = $product && is_numeric($product->default_tax_rate ?? null)
+                ? (float) $product->default_tax_rate : null;
+            $profileHs = $product ? self::cleanHs($product->hs_code ?? '') : '';
+
+            if ($product && $profileHs !== '' && $hsSource === 'document'
+                && preg_replace('/\D/', '', $profileHs) !== preg_replace('/\D/', '', $hs)) {
+                $warnings[] = 'Item ' . $idx . ': printed HS code differs from the matched product profile — printed value kept; verify mapping.';
+            }
 
             if ($hs !== '') {
                 // companyId = null on purpose: review-time lookups must not spam hs_unmapped_logs
@@ -872,11 +920,21 @@ PROMPT;
                 if ($product->uom) {
                     $uom = self::cleanString($product->uom, 100);
                 }
+                if ($sro === '' && !empty($product->sro_reference)) {
+                    $sro = self::cleanString($product->sro_reference, 100);
+                }
+                if ($serial === '' && !empty($product->serial_number)) {
+                    $serial = self::cleanString($product->serial_number, 100);
+                }
             }
 
             // Tax rate fallbacks: document rate -> derived from tax amount -> schedule default
             $aiRate = self::num($itRaw['tax_rate'] ?? null);
             $aiTax = self::num($itRaw['tax_amount'] ?? null);
+            if ($product && $profileTaxRate !== null && $aiRate !== null
+                && abs($profileTaxRate - $aiRate) > 0.01) {
+                $warnings[] = 'Item ' . $idx . ': document tax rate differs from the product profile — document values kept; verify before submitting.';
+            }
             if ($taxRate === null) {
                 if ($aiRate !== null && $aiRate >= 0 && $aiRate <= 100) {
                     $taxRate = $aiRate;
@@ -927,10 +985,22 @@ PROMPT;
                 'sro_schedule_no' => $sro,
                 'serial_no' => $serial,
                 'mrp' => $mrp,
+                'price_suggestion' => $priceSuggestion,
                 'default_uom' => $uom,
                 'ai_confidence' => $confStr,
                 'hs_source' => $hsSource, // document | product | none
                 'needs_hs' => $needsHs,
+                'product_id' => $product?->id,
+                'product_match_type' => $productMatchType,
+                'product_match_confidence' => $productMatchConfidence,
+                'profile_hs_code' => $profileHs,
+                'profile_pct_code' => $product ? self::cleanString($product->pct_code ?? '', 50) : '',
+                'profile_tax_rate' => $profileTaxRate,
+                'profile_uom' => $product ? self::cleanString($product->uom ?? '', 100) : '',
+                'profile_schedule_type' => $product ? self::cleanString($product->schedule_type ?? '', 50) : '',
+                'profile_sro_reference' => $product ? self::cleanString($product->sro_reference ?? '', 100) : '',
+                'profile_serial_number' => $product ? self::cleanString($product->serial_number ?? '', 100) : '',
+                'profile_mrp' => $product && is_numeric($product->mrp ?? null) ? (float) $product->mrp : null,
             ];
         }
 
@@ -1015,9 +1085,48 @@ PROMPT;
         return array_values(array_unique(array_filter($m[0], fn ($t) => !in_array($t, $stop, true))));
     }
 
-    /** @param \Illuminate\Support\Collection $products */
-    public static function bestProductMatch(string $description, $products): ?object
+    /**
+     * Match only with evidence a distributor can audit. Barcode/SKU and exact
+     * normalized names/approved aliases are decisive; fuzzy names are retained
+     * only above a conservative score and only when there is a clear winner.
+     *
+     * @param \Illuminate\Support\Collection $products
+     * @param array{barcode?:mixed,sku?:mixed} $identifiers
+     * @param array<int,array<int,string>> $aliases product id => approved aliases
+     */
+    public static function bestProductMatch(string $description, $products, array $identifiers = [], array $aliases = []): ?object
     {
+        $barcode = self::normalizeIdentifier((string) ($identifiers['barcode'] ?? ''));
+        $sku = self::normalizeIdentifier((string) ($identifiers['sku'] ?? ''));
+        foreach (['barcode' => $barcode, 'sku' => $sku] as $type => $identifier) {
+            if ($identifier === '') continue;
+            $matches = $products->filter(fn ($p) => $identifier === self::normalizeIdentifier((string) ($p->{$type} ?? '')))->values();
+            if ($matches->count() === 1) {
+                $matches->first()->setAttribute('_match_type', $type);
+                $matches->first()->setAttribute('_match_confidence', 'high');
+                return $matches->first();
+            }
+        }
+
+        $normalizedDescription = self::normalizeProductName($description);
+        $names = $products->filter(fn ($p) => $normalizedDescription !== '' && $normalizedDescription === self::normalizeProductName((string) $p->name))->values();
+        if ($names->count() === 1) {
+            $names->first()->setAttribute('_match_type', 'exact_name');
+            $names->first()->setAttribute('_match_confidence', 'high');
+            return $names->first();
+        }
+        $aliasMatches = $products->filter(function ($p) use ($aliases, $normalizedDescription) {
+            foreach ((array) ($aliases[(int) $p->id] ?? []) as $alias) {
+                if ($normalizedDescription !== '' && $normalizedDescription === self::normalizeProductName((string) $alias)) return true;
+            }
+            return false;
+        })->values();
+        if ($aliasMatches->count() === 1) {
+            $aliasMatches->first()->setAttribute('_match_type', 'approved_alias');
+            $aliasMatches->first()->setAttribute('_match_confidence', 'high');
+            return $aliasMatches->first();
+        }
+
         $descTokens = self::tokenize($description);
         if (empty($descTokens)) {
             return null;
@@ -1026,6 +1135,7 @@ PROMPT;
 
         $best = null;
         $bestScore = 0.0;
+        $runnerUp = 0.0;
         foreach ($products as $p) {
             $name = (string) $p->name;
             $pTokens = self::tokenize($name);
@@ -1044,12 +1154,33 @@ PROMPT;
                 $score += 0.5;
             }
             if ($score > $bestScore) {
+                $runnerUp = $bestScore;
                 $bestScore = $score;
                 $best = $p;
+            } elseif ($score > $runnerUp) {
+                $runnerUp = $score;
             }
         }
 
-        return $bestScore >= 0.75 ? $best : null;
+        // A near tie is an ambiguous mapping, not a permissible guess.
+        if ($bestScore >= 0.85 && ($bestScore - $runnerUp) >= 0.10 && $best) {
+            $best->setAttribute('_match_type', 'fuzzy');
+            $best->setAttribute('_match_confidence', 'low');
+            return $best;
+        }
+
+        return null;
+    }
+
+    private static function normalizeIdentifier(string $value): string
+    {
+        return strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $value));
+    }
+
+    private static function normalizeProductName(string $value): string
+    {
+        $value = mb_strtolower(trim($value));
+        return (string) preg_replace('/[^\p{L}\p{N}]+/u', '', $value);
     }
 
     // ------------------------------------------------------------------

@@ -17,6 +17,11 @@
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white uppercase tracking-wider">Premium</span>
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Upload an old or supplier-format invoice (PDF, photo, or Excel) — AI reads it into a compliant draft you review and save. Nothing is ever submitted to FBR automatically.</p>
+            @if($allowed)
+            <a href="{{ route('invoices.ai-reader.bulk') }}" class="mt-3 inline-flex items-center rounded-xl bg-violet-100 dark:bg-violet-900/40 px-3.5 py-2 text-xs font-bold text-violet-800 dark:text-violet-200 hover:bg-violet-200 dark:hover:bg-violet-900/60 transition">
+                Import many invoice photos separately
+            </a>
+            @endif
         </div>
 
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">

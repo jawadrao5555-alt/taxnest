@@ -43,4 +43,9 @@ class Product extends Model
     {
         return $this->belongsTo(Company::class);
     }
+
+    public function aliases()
+    {
+        return $this->hasMany(ProductAlias::class);
+    }
 }

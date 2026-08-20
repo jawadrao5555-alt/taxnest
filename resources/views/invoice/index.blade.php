@@ -35,6 +35,9 @@
                             <span class="ml-1.5 text-[9px] bg-white/20 rounded px-1.5 py-0.5">PREMIUM</span>
                         @endif
                     </a>
+                    @if(!empty($aiReaderAllowed))
+                    <a href="{{ route('invoices.ai-reader.bulk') }}" class="inline-flex items-center px-3 py-2.5 border border-violet-200 dark:border-violet-800 rounded-xl font-bold text-xs text-violet-700 dark:text-violet-300 uppercase tracking-wider hover:bg-violet-50 dark:hover:bg-violet-950/30 transition" title="Import many invoice photos as separate drafts">Bulk photos</a>
+                    @endif
                     <div x-data="bulkImport()" x-cloak>
                         <button @click="openModal()" class="btn-premium inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-xl font-bold text-xs text-white uppercase tracking-widest hover:from-blue-700 hover:to-blue-800 transition">
                             <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>

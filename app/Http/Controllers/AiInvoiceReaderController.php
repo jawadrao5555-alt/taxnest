@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AiReaderException;
 use App\Models\AiInvoiceParse;
+use App\Models\BulkAiImageBatch;
 use App\Models\Company;
 use App\Services\AiInvoiceReaderService;
+use App\Services\BulkAiImageImportService;
 use App\Services\DiFeatureService;
 use App\Services\PlanLimitService;
 use Illuminate\Http\Request;
@@ -95,5 +97,110 @@ class AiInvoiceReaderController extends Controller
             'items_count' => count($payload['items'] ?? []),
             'warnings' => $payload['warnings'] ?? [],
         ]);
+    }
+
+    public function bulk()
+    {
+        $company = Company::findOrFail(app('currentCompanyId'));
+        $allowed = DiFeatureService::planAllows($company, 'ai_reader');
+        $configured = AiInvoiceReaderService::enabled();
+        $quota = $allowed ? app(BulkAiImageImportService::class)->quotaState($company) : null;
+
+        return view('invoice.ai-reader-bulk', compact('company', 'allowed', 'configured', 'quota'));
+    }
+
+    public function bulkStart(Request $request, BulkAiImageImportService $service)
+    {
+        $company = Company::findOrFail(app('currentCompanyId'));
+        if (!DiFeatureService::planAllows($company, 'ai_reader')) {
+            return response()->json(['error' => 'Bulk AI Image Import is a Premium plan feature.'], 403);
+        }
+        if (!AiInvoiceReaderService::enabled()) {
+            return response()->json(['error' => 'AI service is not configured yet. Please contact support.'], 503);
+        }
+        $limitCheck = PlanLimitService::canCreateInvoice($company->id);
+        if (empty($limitCheck['allowed'])) {
+            return response()->json(['error' => $limitCheck['reason'] ?? 'Invoice limit reached.'], 422);
+        }
+
+        $request->validate([
+            'files' => 'required|array|min:1|max:' . BulkAiImageImportService::MAX_IMAGES,
+            'files.*.name' => 'required|string|max:255',
+            'files.*.size' => 'required|integer|min:1|max:' . BulkAiImageImportService::MAX_IMAGE_BYTES,
+            'files.*.type' => 'nullable|string|max:100',
+        ]);
+        try {
+            $batch = $service->createBatch($company, auth()->id(), $request->input('files'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage(), 'quota' => $service->quotaState($company)], 429);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'batch_id' => $batch->id,
+            'items' => $batch->items()->orderBy('position')->get(['id', 'position', 'original_filename', 'source_uuid']),
+            'quota' => $service->quotaState($company),
+        ]);
+    }
+
+    public function bulkChunk(Request $request, int $batchId, int $itemId, BulkAiImageImportService $service)
+    {
+        $item = $service->itemForCompany($batchId, $itemId, (int) app('currentCompanyId'));
+        if (!$item) {
+            return response()->json(['error' => 'Bulk source photo not found.'], 404);
+        }
+        $request->validate([
+            'chunk' => 'required|file|max:1100',
+            'index' => 'required|integer|min:0',
+            'total_chunks' => 'required|integer|min:1|max:10',
+        ]);
+        try {
+            return response()->json($service->storeChunk(
+                $item,
+                $request->file('chunk'),
+                (int) $request->input('index'),
+                (int) $request->input('total_chunks')
+            ));
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function bulkComplete(int $batchId, int $itemId, BulkAiImageImportService $service)
+    {
+        $item = $service->itemForCompany($batchId, $itemId, (int) app('currentCompanyId'));
+        if (!$item) {
+            return response()->json(['error' => 'Bulk source photo not found.'], 404);
+        }
+        try {
+            return response()->json($service->completeUpload($item));
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function bulkStatus(int $batchId, BulkAiImageImportService $service)
+    {
+        $batch = $service->batchForCompany($batchId, (int) app('currentCompanyId'));
+        if (!$batch) {
+            return response()->json(['error' => 'Bulk AI batch not found.'], 404);
+        }
+        return response()->json($service->statusPayload($batch));
+    }
+
+    public function bulkRetry(int $batchId, int $itemId, BulkAiImageImportService $service)
+    {
+        $item = $service->itemForCompany($batchId, $itemId, (int) app('currentCompanyId'));
+        if (!$item) {
+            return response()->json(['error' => 'Bulk source photo not found.'], 404);
+        }
+        try {
+            $service->retry($item);
+            return response()->json(['ok' => true, 'status' => 'queued']);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
     }
 }

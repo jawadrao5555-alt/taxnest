@@ -409,6 +409,20 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/invoices/ai-reader/parse', [AiInvoiceReaderController::class, 'parse'])
             ->middleware('throttle:6,1')
             ->name('invoices.ai-reader.parse');
+        // One physical photo = one independently queued review draft. Chunks
+        // keep flaky mobile connections from forcing the full batch to restart.
+        Route::get('/invoices/ai-reader/bulk-images', [AiInvoiceReaderController::class, 'bulk'])
+            ->name('invoices.ai-reader.bulk');
+        Route::post('/invoices/ai-reader/bulk-images/start', [AiInvoiceReaderController::class, 'bulkStart'])
+            ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.start');
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/chunk', [AiInvoiceReaderController::class, 'bulkChunk'])
+            ->middleware('throttle:120,1')->name('invoices.ai-reader.bulk.chunk');
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/complete', [AiInvoiceReaderController::class, 'bulkComplete'])
+            ->middleware('throttle:30,1')->name('invoices.ai-reader.bulk.complete');
+        Route::get('/invoices/ai-reader/bulk-images/{batchId}/status', [AiInvoiceReaderController::class, 'bulkStatus'])
+            ->name('invoices.ai-reader.bulk.status');
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/retry', [AiInvoiceReaderController::class, 'bulkRetry'])
+            ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.retry');
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);

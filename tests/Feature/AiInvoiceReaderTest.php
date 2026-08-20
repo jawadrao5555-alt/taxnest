@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Exceptions\AiReaderException;
 use App\Models\AiInvoiceParse;
 use App\Models\Company;
+use App\Models\Product;
 use App\Services\AiInvoiceReaderService;
 use App\Services\DiFeatureService;
 use Illuminate\Database\Schema\Blueprint;
@@ -352,6 +353,54 @@ class AiInvoiceReaderTest extends TestCase
             collect($mapped['warnings'])->contains(fn ($w) => str_contains($w, 'No HS code')),
             'missing-HS warning expected'
         );
+    }
+
+    public function test_product_matcher_uses_identifier_or_approved_alias_and_never_picks_an_ambiguous_identifier(): void
+    {
+        Schema::table('products', function (Blueprint $t) {
+            $t->string('barcode')->nullable();
+            $t->string('sku')->nullable();
+            $t->decimal('default_price', 12, 2)->nullable();
+            $t->string('sro_reference')->nullable();
+            $t->string('serial_number')->nullable();
+            $t->decimal('mrp', 12, 2)->nullable();
+        });
+        Schema::create('product_aliases', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->unsignedBigInteger('product_id');
+            $t->string('alias');
+            $t->boolean('is_active')->default(true);
+            $t->timestamps();
+        });
+        $company = $this->makeCompany('Premium');
+        $firstId = DB::table('products')->insertGetId([
+            'company_id' => $company->id, 'name' => 'Surf Excel 1 KG', 'barcode' => '8901234567890',
+            'sku' => 'SURF-1K', 'hs_code' => '34022000', 'pct_code' => '3402.20',
+            'default_tax_rate' => 18, 'uom' => 'Pack', 'schedule_type' => 'standard',
+            'default_price' => 780, 'is_active' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('product_aliases')->insert([
+            'company_id' => $company->id, 'product_id' => $firstId, 'alias' => 'Surf Ex 1kg',
+            'is_active' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $products = Product::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)->get();
+        $aliases = [$firstId => ['Surf Ex 1kg']];
+
+        $barcode = AiInvoiceReaderService::bestProductMatch('Unclear printed name', $products, ['barcode' => '8901234567890'], $aliases);
+        $this->assertSame($firstId, $barcode->id);
+        $this->assertSame('barcode', $barcode->_match_type);
+        $alias = AiInvoiceReaderService::bestProductMatch('Surf Ex 1kg', $products, [], $aliases);
+        $this->assertSame($firstId, $alias->id);
+        $this->assertSame('approved_alias', $alias->_match_type);
+
+        DB::table('products')->insert([
+            'company_id' => $company->id, 'name' => 'Duplicate barcode product', 'barcode' => '8901234567890',
+            'hs_code' => '34022000', 'default_tax_rate' => 18, 'uom' => 'Pack',
+            'schedule_type' => 'standard', 'is_active' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $ambiguous = AiInvoiceReaderService::bestProductMatch('Unclear printed name', Product::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)->get(), ['barcode' => '8901234567890']);
+        $this->assertNull($ambiguous, 'A duplicate barcode must be flagged, not mapped to an arbitrary product.');
     }
 
     public function test_map_extraction_keeps_printed_mrp_and_blanks_bad_values(): void

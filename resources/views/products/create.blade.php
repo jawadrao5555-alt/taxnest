@@ -29,6 +29,14 @@
                             <input type="text" name="name" value="{{ old('name') }}" required
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Barcode <span class="text-gray-400 text-xs">(Optional)</span></label><input type="text" name="barcode" value="{{ old('barcode') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm"></div>
+                            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SKU <span class="text-gray-400 text-xs">(Optional)</span></label><input type="text" name="sku" value="{{ old('sku') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm"></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Approved supplier / invoice aliases <span class="text-gray-400 text-xs">(one per line)</span></label>
+                            <textarea name="aliases_text" rows="3" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm" placeholder="e.g. Surf Excel 1kg&#10;Surf Ex 1 KG">{{ old('aliases_text') }}</textarea>
+                        </div>
                     </div>
                 </div>
 

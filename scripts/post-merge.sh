@@ -19,18 +19,13 @@ fi
 
 # 1b. Self-heal dev MySQL (recurring: workspace sleep/wake kills mysqld and the
 # whole post-merge dies at the first artisan DB query — "Connection refused
-# 127.0.0.1:9000"). If the port is closed: clear stale socket/lock files (only
-# when no mysqld process exists) and start mysqld with the same defaults-file
-# the "MySQL Staging" workflow uses, then wait for the port.
-mysql_up() { (echo > /dev/tcp/127.0.0.1/9000) 2>/dev/null; }
-if ! mysql_up; then
+# 127.0.0.1:9000"). scripts/dev-mysql-ready.sh is the single readiness probe:
+# --heal clears stale socket/lock files (only when no mysqld process exists) and
+# starts mysqld with the same defaults-file the "MySQL Staging" workflow uses,
+# then waits until the server really accepts connections.
+if ! bash scripts/dev-mysql-ready.sh --quiet; then
   echo "Dev MySQL down — self-healing before migrations..."
-  if ! pgrep -x mysqld >/dev/null 2>&1; then
-    rm -f .local/mysql_run/mysql.sock .local/mysql_run/mysql.sock.lock .local/mysql_run/mysql.pid
-    nohup mysqld --defaults-file="$PWD/.local/mysql_run/my.cnf" >/dev/null 2>&1 &
-  fi
-  for _ in $(seq 1 45); do mysql_up && break; sleep 2; done
-  if mysql_up; then
+  if bash scripts/dev-mysql-ready.sh --wait 90 --heal; then
     echo "Dev MySQL is up (self-healed). NOTE: the 'MySQL Staging' workflow may show"
     echo "as failed/stopped — before restarting it, kill this orphan mysqld first"
     echo "(pkill -x mysqld; rm stale socket/lock files) or the restart will abort"

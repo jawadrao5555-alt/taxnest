@@ -72,7 +72,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE PHP_CLI_SERVER_WORKERS=8 php artisan serve --host=0.0.0.0 --port=5000 --no-reload"
+args = "bash scripts/dev-mysql-ready.sh --wait 15; env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE PHP_CLI_SERVER_WORKERS=8 php artisan serve --host=0.0.0.0 --port=5000 --no-reload"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -95,7 +95,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "mysqld --defaults-file=/home/runner/workspace/.local/mysql_run/my.cnf"
+args = "bash scripts/dev-mysql-serve.sh"
 
 [[workflows.workflow]]
 name = "test"

@@ -74,7 +74,7 @@ Isolated POS (own auth/layouts/models); PRA integration with offline billing + a
 - Live static-asset caching: `.htaccess` caches css/js 30d — ANY loose public asset edit MUST bump its `?v=` in blade refs. → `static-asset-caching.md`
 
 ## External Dependencies
-- **MySQL** — production DB (owner's cPanel); PostgreSQL exists in Replit env but dev uses MySQL staging.
+- **MySQL** — production DB (owner's cPanel); PostgreSQL exists in Replit env but dev uses MySQL staging. Dev startup waits for the DB: "MySQL Staging" runs `scripts/dev-mysql-serve.sh` (stale-lock cleanup + `READY` line) and "Laravel Server" gates `artisan serve` on `bash scripts/dev-mysql-ready.sh --wait 15`. Run that probe (no args) before any browser/curl check — "NOT ready" means the db-down page, not a bug. → `dev-mysql-coldstart.md`
 - **FBR (Pakistan)** — DI + FBR POS tax compliance APIs. **PRA / PRAL IMS API v1.2** — POS fiscal integration (cloud + local fiscal-device).
 - **Laravel Breeze**, **Tailwind CSS**, **Alpine.js**, **Chart.js**. **Unsplash / Picsum** — `ProductImageService` fallback.
 - **cPanel SMTP (noreply@taxnest.com.pk)** — ALL outgoing email; admin SMTP override + MailHealth banner. → memory `mail-noreply-smtp.md`

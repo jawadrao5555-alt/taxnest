@@ -29,6 +29,18 @@ tayyar / day-close):
 4. Build WITHOUT the file = push stays dormant (Push.kt catches the missing
    Firebase init silently); everything else works.
 
+**Status (Aug 2026, v1.1.0 release):** done. `pk.taxnest.pos` is registered in
+the existing `taxnest-rider` Firebase project; the config lives at
+`pos-app/app/google-services.json` (gitignored) with the backup copy on live at
+`~/rider-signing/google-services-pos.json`. The project-wide server credential
+`storage/app/firebase/rider-fcm.json` is in place on live (chmod 600, outside
+the docroot) and verified — the service account exchanges a Google OAuth token
+successfully, so pushes actually send.
+
+Never accept either file through chat attachments: `attached_assets/` is
+committed to the public repo. `attached_assets/*.json` is gitignored for this
+reason.
+
 ---
 
 ## Prerequisites & build
@@ -87,3 +99,21 @@ breaks in-place updates for everything. NEVER commit it (public repo).
 | 1.0.3   | 4           | Fullscreen video (onShowCustomView/onHideCustomView) |
 | 1.0.4   | 5           | Shell polish |
 | 1.1.0   | 6           | **Instant push (FCM)** — naya order → cashiers, order tayyar → waiter, day-close summary → owner/manager; token upload on login / clear on logout; needs the Firebase prerequisite above, builds fine without it |
+
+---
+
+## Rollout status — v1.1.0 (20 Aug 2026): LIVE
+
+- Signed APK (sha256 `7a5d3933…f3d7`, shared `rider` key) hosted as
+  `/downloads/taxnest-pos-1.1.0.apk` **and** promoted over the stable
+  `/downloads/taxnest-pos.apk` (previous stable kept as
+  `taxnest-pos-prev-1.0.3.apk` on live for rollback).
+- `pos_app_latest_version` = `1.1.0` and the What's New elaan row were applied
+  by migration `2026_08_20_130000_rollout_pos_apk_v110.php` (idempotent).
+- Server side verified on live: FCM service-account credential authorises
+  (OAuth 200 + `messages:send` returns INVALID_ARGUMENT for a junk token), and
+  device register/clear works end-to-end for a real POS login.
+- Owner promoted **without** the usual pre-release phone test (his call —
+  "test phir karwa lenge, issue hua to bata dunga"). If a report comes in,
+  rollback = copy `taxnest-pos-prev-1.0.3.apk` back over `taxnest-pos.apk` and
+  set `pos_app_latest_version` back to `1.0.3` in admin → Settings.

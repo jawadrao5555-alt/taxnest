@@ -12,6 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Delivery Riders for FBR POS (port of PosRiderController, Aug 2026).
@@ -89,13 +91,20 @@ class FbrPosRiderController extends Controller
 
         // Admin-viewable passwords (same pattern as PRA pos/team).
         $riderPasswords = [];
-        $riderUsers = User::where('company_id', $companyId)
-            ->where('pos_role', 'pos_rider')
-            ->whereIn('id', $riders->pluck('user_id')->filter())
-            ->get()->keyBy('id');
+        $riderUsers = [];
+        $riderLoginIssues = [];
+        $linkedAccounts = User::whereIn('id', $riders->pluck('user_id')->filter())
+            ->get()
+            ->keyBy('id');
         foreach ($riders as $r) {
-            $u = $r->user_id ? ($riderUsers[$r->user_id] ?? null) : null;
-            if ($u && !empty($u->pos_team_password_enc)) {
+            $status = $r->riderLoginStatus($r->user_id ? ($linkedAccounts[$r->user_id] ?? null) : null);
+            $riderLoginIssues[$r->id] = $status['issue'];
+            if (!$status['user']) {
+                continue;
+            }
+            $u = $status['user'];
+            $riderUsers[$u->id] = $u;
+            if (!empty($u->pos_team_password_enc)) {
                 try {
                     $riderPasswords[$r->id] = Crypt::decryptString($u->pos_team_password_enc);
                 } catch (\Throwable $e) {}
@@ -106,7 +115,7 @@ class FbrPosRiderController extends Controller
             ->with('rider', 'settledBy')
             ->orderByDesc('id')->limit(20)->get();
 
-        return view('fbr-pos.riders', compact('riders', 'khata', 'riderUsers', 'riderPasswords', 'settlements'));
+        return view('fbr-pos.riders', compact('riders', 'khata', 'riderUsers', 'riderLoginIssues', 'riderPasswords', 'settlements'));
     }
 
     public function store(Request $request)
@@ -149,19 +158,30 @@ class FbrPosRiderController extends Controller
         ]);
 
         $isActive = $request->boolean('is_active', $rider->is_active);
-        $rider->update([
-            'name'       => $request->name,
-            'phone'      => $request->phone,
-            'cnic'       => $request->cnic,
-            'vehicle_no' => $request->vehicle_no,
-            'is_active'  => $isActive,
-        ]);
+        DB::transaction(function () use ($request, $companyId, $rider, $isActive) {
+            $lockedRider = PosRider::where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($rider->id);
+            $lockedRider->update([
+                'name'       => $request->name,
+                'phone'      => $request->phone,
+                'cnic'       => $request->cnic,
+                'vehicle_no' => $request->vehicle_no,
+                'is_active'  => $isActive,
+            ]);
 
-        if ($rider->user_id) {
-            User::where('company_id', $companyId)->where('id', $rider->user_id)
-                ->where('pos_role', 'pos_rider')
-                ->update(['is_active' => $isActive]);
-        }
+            $candidate = $lockedRider->user_id
+                ? User::whereKey($lockedRider->user_id)->lockForUpdate()->first()
+                : null;
+            $login = $lockedRider->riderLoginStatus($candidate)['user'];
+            if ($login) {
+                $login->update([
+                    'name' => $lockedRider->name,
+                    'phone' => $lockedRider->phone,
+                    'is_active' => $isActive,
+                ]);
+            }
+        });
 
         return back()->with('success', 'Rider updated.');
     }
@@ -172,41 +192,77 @@ class FbrPosRiderController extends Controller
         $companyId = app('currentCompanyId');
         $rider = PosRider::where('company_id', $companyId)->findOrFail($id);
 
-        $existing = $rider->user_id
-            ? User::where('company_id', $companyId)->where('id', $rider->user_id)->where('pos_role', 'pos_rider')->first()
-            : null;
+        $status = $rider->riderLoginStatus();
+        $existing = $status['user'];
 
         $request->validate([
-            'email'    => $existing ? 'nullable|email' : 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|max:100',
+            'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($existing?->id)],
+            'password' => $existing ? ['nullable', 'string', 'min:6', 'max:100'] : ['required', 'string', 'min:6', 'max:100'],
         ]);
 
-        if ($existing) {
-            $pw = ['password' => bcrypt($request->password)];
-            if (Schema::hasColumn('users', 'pos_team_password_enc')) {
-                $pw['pos_team_password_enc'] = Crypt::encryptString($request->password);
+        $action = DB::transaction(function () use ($request, $companyId, $rider) {
+            $lockedRider = PosRider::where('company_id', $companyId)
+                ->lockForUpdate()
+                ->findOrFail($rider->id);
+            $candidate = $lockedRider->user_id
+                ? User::whereKey($lockedRider->user_id)->lockForUpdate()->first()
+                : null;
+            $lockedStatus = $lockedRider->riderLoginStatus($candidate);
+            $lockedExisting = $lockedStatus['user'];
+
+            if ($lockedExisting) {
+                $data = [
+                    'name' => $lockedRider->name,
+                    'email' => $request->email,
+                    'phone' => $lockedRider->phone,
+                    'is_active' => (bool) $lockedRider->is_active,
+                ];
+                if ($request->filled('password')) {
+                    $data['password'] = bcrypt($request->password);
+                    if (Schema::hasColumn('users', 'pos_team_password_enc')) {
+                        $data['pos_team_password_enc'] = Crypt::encryptString($request->password);
+                    }
+                }
+                $lockedExisting->update($data);
+                if (array_key_exists('login_link_issue', $lockedRider->getAttributes())) {
+                    $lockedRider->update(['login_link_issue' => null]);
+                }
+                return 'updated';
             }
-            $existing->update($pw);
-            return back()->with('success', 'Rider login password reset.');
-        }
 
-        $data = [
-            'name'       => $rider->name,
-            'email'      => $request->email,
-            'phone'      => $rider->phone,
-            'password'   => bcrypt($request->password),
-            'company_id' => $companyId,
-            'role'       => 'employee',
-            'pos_role'   => 'pos_rider',
-            'is_active'  => (bool) $rider->is_active,
-        ];
-        if (Schema::hasColumn('users', 'pos_team_password_enc')) {
-            $data['pos_team_password_enc'] = Crypt::encryptString($request->password);
-        }
-        $user = User::create($data);
-        $rider->update(['user_id' => $user->id]);
+            if (!$request->filled('password')) {
+                throw ValidationException::withMessages([
+                    'password' => __('validation.required', ['attribute' => 'password']),
+                ]);
+            }
+            $data = [
+                'name'       => $lockedRider->name,
+                'email'      => $request->email,
+                'phone'      => $lockedRider->phone,
+                'password'   => bcrypt($request->password),
+                'company_id' => $companyId,
+                'role'       => 'employee',
+                'pos_role'   => 'pos_rider',
+                'is_active'  => (bool) $lockedRider->is_active,
+            ];
+            if (Schema::hasColumn('users', 'pos_team_password_enc')) {
+                $data['pos_team_password_enc'] = Crypt::encryptString($request->password);
+            }
+            $user = User::create($data);
+            $linkData = ['user_id' => $user->id];
+            if (array_key_exists('login_link_issue', $lockedRider->getAttributes())) {
+                $linkData['login_link_issue'] = null;
+            }
+            $lockedRider->update($linkData);
 
-        return back()->with('success', 'Rider login created.');
+            return $lockedStatus['issue'] ? 'repaired' : 'created';
+        });
+
+        return back()->with('success', match ($action) {
+            'updated' => __('pos.rider_login_updated'),
+            'repaired' => __('pos.rider_login_repaired'),
+            default => __('pos.rider_login_created'),
+        });
     }
 
     // ─── Deliveries board (admins + cashiers) ──────────────────────────────

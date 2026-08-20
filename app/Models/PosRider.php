@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 class PosRider extends Model
 {
     protected $fillable = [
-        'company_id', 'name', 'phone', 'cnic', 'vehicle_no', 'is_active', 'user_id',
+        'company_id', 'name', 'phone', 'cnic', 'vehicle_no', 'is_active', 'user_id', 'login_link_issue',
         // Live tracking (Aug 2026)
         'on_duty', 'duty_started_at', 'last_lat', 'last_lng', 'last_located_at', 'app_token',
         // Task #1102: night sweep auto-ended duty stamp
@@ -39,6 +39,45 @@ class PosRider extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Return the confined login only when this row is its safe, exclusive owner.
+     *
+     * A historical or manually changed user_id can point at a deleted account,
+     * another company, another POS role, or the same account as a second rider.
+     * Those links must never be displayed as this rider's identity or mutated by
+     * rider-management actions.
+     *
+     * @return array{user: ?User, issue: ?string}
+     */
+    public function riderLoginStatus(?User $candidate = null): array
+    {
+        if (!$this->user_id) {
+            return [
+                'user' => null,
+                'issue' => $this->getAttributes()['login_link_issue'] ?? null,
+            ];
+        }
+
+        $user = $candidate ?: User::find($this->user_id);
+        if (!$user) {
+            return ['user' => null, 'issue' => 'missing'];
+        }
+        if ((int) $user->id !== (int) $this->user_id) {
+            return ['user' => null, 'issue' => 'missing'];
+        }
+        if ((int) $user->company_id !== (int) $this->company_id) {
+            return ['user' => null, 'issue' => 'cross_company'];
+        }
+        if ($user->pos_role !== 'pos_rider') {
+            return ['user' => null, 'issue' => 'wrong_role'];
+        }
+        if (static::where('user_id', $user->id)->whereKeyNot($this->id)->exists()) {
+            return ['user' => null, 'issue' => 'multiple_riders'];
+        }
+
+        return ['user' => $user, 'issue' => null];
     }
 
     public function settlements()

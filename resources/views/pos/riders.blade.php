@@ -145,6 +145,7 @@
                     @php
                         $k = $khata[$rider->id] ?? null;
                         $loginUser = $rider->user_id ? ($riderUsers[$rider->user_id] ?? null) : null;
+                        $loginIssue = $riderLoginIssues[$rider->id] ?? null;
                     @endphp
                     <tr>
                         <td class="px-4 py-3">
@@ -170,6 +171,9 @@
                                     <span x-show="show" x-cloak class="font-mono">{{ $riderPasswords[$rider->id] }}</span>
                                 </div>
                                 @endif
+                            @elseif($loginIssue)
+                                <div class="text-xs font-semibold text-amber-700 dark:text-amber-400">{{ __('pos.rider_login_needs_repair') }}</div>
+                                <div class="text-[11px] text-amber-600 dark:text-amber-500">{{ __('pos.rider_login_repair_hint') }}</div>
                             @else
                                 <span class="text-[11px] text-gray-400">{{ __('pos.no_login') }}</span>
                             @endif
@@ -185,7 +189,7 @@
                             <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition"
                                     @click="editRider = {{ json_encode(['id' => $rider->id, 'name' => $rider->name, 'phone' => $rider->phone, 'cnic' => $rider->cnic, 'vehicle_no' => $rider->vehicle_no, 'is_active' => (bool) $rider->is_active], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' }}">{{ __('pos.edit') }}</button>
                             <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-                                    @click="loginRider = {{ json_encode(['id' => $rider->id, 'name' => $rider->name, 'has_login' => (bool) $loginUser, 'email' => $loginUser->email ?? ''], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' }}">{{ $loginUser ? __('pos.reset_password') : __('pos.create_login') }}</button>
+                                     @click="loginRider = {{ json_encode(['id' => $rider->id, 'name' => $rider->name, 'has_login' => (bool) $loginUser, 'needs_repair' => (bool) $loginIssue, 'email' => $loginUser->email ?? ''], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' }}">{{ $loginUser ? __('pos.manage_rider_login') : ($loginIssue ? __('pos.repair_rider_login') : __('pos.create_login')) }}</button>
                         </td>
                     </tr>
                     @empty
@@ -322,32 +326,40 @@
         </div>
     </div>
 
-    {{-- Create / reset login modal --}}
+    {{-- Create / manage / repair login modal --}}
     <div x-show="loginRider" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/50" @click="loginRider = null"></div>
         <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1" x-text="loginRider && loginRider.has_login ? {{ Js::from(__('pos.reset_rider_password')) }} : {{ Js::from(__('pos.create_rider_login')) }}"></h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1"
+                x-text="loginRider && loginRider.has_login ? {{ Js::from(__('pos.manage_rider_login')) }} : (loginRider && loginRider.needs_repair ? {{ Js::from(__('pos.repair_rider_login')) }} : {{ Js::from(__('pos.create_rider_login')) }})"></h3>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.rider_login_hint') }}</p>
             <form method="POST" :action="'{{ url('/pos/riders') }}/' + (loginRider ? loginRider.id : '') + '/login'">
                 @csrf
                 <div class="space-y-3">
-                    <template x-if="loginRider && !loginRider.has_login">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.login_email_req') }}</label>
-                            <input type="email" name="email" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
-                        </div>
-                    </template>
-                    <template x-if="loginRider && loginRider.has_login">
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.login_colon') }} <span class="font-mono" x-text="loginRider.email"></span></p>
-                    </template>
+                    <div x-show="loginRider && loginRider.needs_repair" class="rounded-lg bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                        {{ __('pos.rider_login_repair_explanation') }}
+                    </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.password_req') }}</label>
-                        <input type="text" name="password" required minlength="6" maxlength="100" autocomplete="off" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.login_email_req') }}</label>
+                        <input type="email" name="email" required
+                               x-effect="if (loginRider) $el.value = loginRider.email || ''"
+                               autocomplete="off" data-lpignore="true" data-form-type="other"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1"
+                               x-text="loginRider && loginRider.has_login ? {{ Js::from(__('pos.rider_new_password_optional')) }} : {{ Js::from(__('pos.password_req')) }}"></label>
+                        <input type="text" name="password" :required="loginRider && !loginRider.has_login" minlength="6" maxlength="100"
+                               x-effect="if (loginRider) { const riderId = loginRider.id; $el.value = '' }"
+                               autocomplete="off" data-lpignore="true" data-form-type="other"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                        <p x-show="loginRider && loginRider.has_login" class="mt-1 text-[11px] text-gray-400">{{ __('pos.rider_password_unchanged_hint') }}</p>
                     </div>
                 </div>
                 <div class="flex justify-end gap-2 mt-5">
                     <button type="button" class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="loginRider = null">{{ __('pos.cancel') }}</button>
-                    <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition" x-text="loginRider && loginRider.has_login ? {{ Js::from(__('pos.reset_password')) }} : {{ Js::from(__('pos.create_login')) }}"></button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition"
+                            x-text="loginRider && loginRider.has_login ? {{ Js::from(__('pos.save_login_changes')) }} : (loginRider && loginRider.needs_repair ? {{ Js::from(__('pos.repair_rider_login')) }} : {{ Js::from(__('pos.create_login')) }})"></button>
                 </div>
             </form>
         </div>

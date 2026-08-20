@@ -31,6 +31,7 @@ class AdminSettingsController extends Controller
         'fbrpos_app_latest_version',
         'waiter_app_latest_version',
         'rider_app_latest_version',
+        'caller_app_latest_version',
         'ai_reader_model',
         'ai_reader_model_strong',
     ];
@@ -94,6 +95,10 @@ class AdminSettingsController extends Controller
             'fbrpos_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
             'waiter_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
             'rider_app_latest_version'  => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
+            // Caller ID app (Task 1333). Same beta-safe gate as DI/Waiter:
+            // ALSO controls the downloads-page card and the POS → Customize
+            // download button — empty keeps everything hidden.
+            'caller_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
             // AI Reader (invoice photo/PDF OCR) model overrides. Empty primary
             // model = built-in default; empty strong model = auto-retry
             // escalation disabled. Model ids only (letters/digits . _ -).

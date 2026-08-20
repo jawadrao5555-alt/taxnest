@@ -204,6 +204,7 @@ Route::get('/api/app-version', function () {
         'waiter' => ['setting' => 'waiter_app_latest_version', 'apk' => 'downloads/taxnest-waiter.apk'],
         'rider'  => ['setting' => 'rider_app_latest_version',  'apk' => 'downloads/taxnest-rider.apk'],
         'di'     => ['setting' => 'di_app_latest_version',     'apk' => 'downloads/taxnest-di.apk'],
+        'caller' => ['setting' => 'caller_app_latest_version', 'apk' => 'downloads/taxnest-caller.apk'],
     ];
     $app = (string) request()->query('app', '');
     if (!isset($map[$app])) {

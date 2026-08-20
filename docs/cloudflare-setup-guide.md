@@ -57,3 +57,94 @@ Network tab:
 ## Cloudflare limits (free plan) — humari app ke liye theek
 - Upload limit 100 MB per request — payment proofs / attachments is se bohot chhote hain.
 - Koi WebSocket dependency nahi (agent HTTP polling use karta hai).
+
+---
+
+# Error 525 — "SSL handshake failed"
+
+Yeh Cloudflare ka error page hai, hamari app ka nahi. Iska matlab: browser Cloudflare
+tak pohanch gaya, lekin **Cloudflare hamare hosting server se secure connection nahi
+bana saka**. Error page par teen nishaan hote hain — Browser (sabz), Cloudflare (sabz),
+`taxnest.com.pk` Host (**laal**). Laal wala hamesha hosting side hota hai.
+
+**Kabhi bhi is par app ka code debug na karein, aur na hi redeploy karein.**
+
+## Pehla qadam: kya masla ab bhi hai?
+`curl -s -o /dev/null -w "%{http_code}" https://taxnest.com.pk/` — agar 200 aaya to
+waqia khatam ho chuka hai. Error page par likha **UTC waqt** parhein aur +5 kar ke PKT
+banayein: aksar report ghanton baad aati hai (purani browser tab ki photo).
+
+## Tashkhees (diagnosis)
+1. **Origin certificate theek hai?** Server se:
+   `echo | openssl s_client -connect <public-ip>:443 -servername taxnest.com.pk | openssl x509 -noout -dates`
+   Yaad rahe: `127.0.0.1:443` test karne par hosting ka **default** cert (provider ka
+   hostname) aata hai — yeh normal hai, ghabrane ki baat nahi. Hamesha public IP + SNI se test karein.
+2. **Us minute server sach mein down tha?** Access log hi asal gawah hai:
+   `~/access-logs/taxnest.com.pk-ssl_log` (live) aur `~/logs/*-ssl_log-<Mon>-<Year>.gz` (archive).
+   Us minute ke hits ginein — busy waqt mein normal 20–50 hits/minute hote hain. Agar us
+   minute normal traffic tha, to server chal raha tha aur sirf **aik Cloudflare edge**
+   (Pakistan wala) fail hua — yani waqti aur juzvi masla.
+
+## Automatic detection — `site:uptime-watch`
+Har 2 minute scheduler se chalta hai (`routes/console.php`). Har run mein **do** probe:
+- **edge** — public URL Cloudflare ke zariye
+- **origin** — wohi URL, magar DNS origin IP par pin kar ke (Cloudflare bypass)
+
+Nateeja isi jori se classify hota hai:
+
+| edge | origin | Kya matlab |
+|---|---|---|
+| OK | (probe nahi hota) | Sab theek |
+| FAIL | OK | `CLOUDFLARE-ORIGIN-LINK` — 525 family, **hosting** ka masla |
+| FAIL | FAIL | `ORIGIN-DOWN` — hamara server / app |
+
+- Alert **2 lagataar** nakaam checks ke baad (aik blip kabhi email nahi bhejta).
+- Har waqia par **aik** alert email + **aik** recovery email (duration ke saath).
+- Poori history: `storage/logs/uptime-watch.log` (email se azaad record).
+- Origin IP khud `cpanel.<domain>` se resolve hoti hai (yeh record kabhi Cloudflare-proxied
+  nahi hota), is liye hosting IP badle to bhi redeploy ki zaroorat nahi.
+- Manual check: `php artisan site:uptime-watch --force --no-mail`
+
+## Hosting ko ticket (copy-paste)
+525 hone par hosting provider ko yeh bhejein (waqt UTC mein likhein):
+
+> Our domain taxnest.com.pk is behind Cloudflare (SSL mode: Full (strict)).
+> On <DATE> at <TIME> UTC visitors received Cloudflare Error 525 "SSL handshake failed".
+> At that same minute our Apache access log shows the server was serving normal traffic,
+> and our origin certificate (Let's Encrypt, CN=taxnest.com.pk) was valid — so the origin
+> was up and only the Cloudflare-to-origin TLS leg failed.
+>
+> Please:
+> 1. Check the firewall (CSF/lfd) logs for that timestamp for any temporary block or
+>    connection-rate limit against Cloudflare edge IPs.
+> 2. Permanently whitelist ALL Cloudflare IPv4 + IPv6 ranges (https://www.cloudflare.com/ips/)
+>    in CSF, and raise CT_LIMIT / connection-tracking limits for them — a single Cloudflare
+>    edge IP legitimately opens many concurrent connections for a busy site.
+> 3. Confirm whether Apache/LiteSpeed was restarted at that time (AutoSSL renewal, server
+>    maintenance), since in-flight TLS handshakes die during a restart.
+> 4. Tell us if there was any upstream network incident in the datacentre at that time.
+>
+> This is a live POS/invoicing platform used by retail shops, so even a few minutes of
+> handshake failures is disruptive. Thank you.
+
+## Cloudflare Origin Certificate (optional, mazboot hal)
+AutoSSL har ~60 din baad cert renew karta hai aur us lamhe web server restart hota hai —
+yehi 525 ki aik wajah ban sakti hai. Cloudflare ka apna **Origin Certificate** 15 saal
+chalta hai, yani renewal wali wajah hamesha ke liye khatam.
+
+1. Cloudflare dashboard → `taxnest.com.pk` → **SSL/TLS → Origin Server** → *Create Certificate*.
+2. Private key type **RSA (2048)**, hostnames `taxnest.com.pk` aur `*.taxnest.com.pk`,
+   validity **15 years** → Create.
+3. Do box milenge: **Origin Certificate** aur **Private Key**. Private Key sirf **abhi**
+   dikhti hai — dono ko mehfooz jagah copy karein (kabhi git/repo mein na rakhein — repo public hai).
+4. cPanel → **SSL/TLS → Manage SSL sites** → domain `taxnest.com.pk` chunein →
+   Certificate wale box mein Origin Certificate paste karein, Private Key wale box mein key →
+   **Install Certificate**.
+5. SSL/TLS mode **Full (strict)** hi rehne dein (`cloudflare:check-settings` isay roz check karta hai).
+6. Verify: `curl -sI https://taxnest.com.pk/ | head -1` → `HTTP/2 200`, aur
+   `php artisan site:uptime-watch --force --no-mail` → `OK`.
+
+**Zaroori khayal:** Origin Certificate par sirf Cloudflare bharosa karta hai. Iske baad
+domain ka traffic **hamesha** Cloudflare ke zariye (orange cloud ON) hi aana chahiye —
+grey cloud karte hi browser "certificate not trusted" warning dega. Isi liye yeh optional
+hai; sab se ziyada faida wala qadam **firewall whitelist** hai (ticket wala point 2).

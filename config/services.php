@@ -51,6 +51,17 @@ return [
         'zone_id' => env('CLOUDFLARE_ZONE_ID', ''),
     ],
 
+    'uptime_watch' => [
+        // Public URL site:uptime-watch pings THROUGH Cloudflare. Deliberately not
+        // APP_URL: dev/staging point APP_URL at the workspace, and the watchdog
+        // must always measure the real live site.
+        'url' => env('UPTIME_WATCH_URL', 'https://taxnest.com.pk/up'),
+        // Origin IP for the Cloudflare-bypass probe. Left empty it is resolved
+        // from the cPanel hostname (never Cloudflare-proxied), so a hosting IP
+        // change needs no redeploy.
+        'origin_ip' => env('UPTIME_WATCH_ORIGIN_IP', ''),
+    ],
+
     'vapid' => [
         'public'  => env('VAPID_PUBLIC_KEY'),
         'private' => env('VAPID_PRIVATE_KEY'),

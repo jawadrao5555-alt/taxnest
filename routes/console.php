@@ -191,3 +191,10 @@ Schedule::command('fbrpos:dayclose-reminders')->dailyAt('21:30');
 // > 70 %, log a warning and email all admins (throttled to once per hour).
 // Best-effort — any failure is caught inside the command, never bubbles up.
 Schedule::command('app:mysql-conn-health')->everyFiveMinutes()->withoutOverlapping();
+// Uptime watchdog (Aug 2026): a shop hit Cloudflare's "SSL handshake failed"
+// (525) at 03:08 AM and nobody knew until the owner photographed the screen
+// hours later. Every 2 minutes: probe the live URL through Cloudflare AND
+// straight at the origin, so an outage is classified as a Cloudflare↔hosting
+// link failure vs a real origin outage. One alert email per incident + one
+// recovery email; full probe history in storage/logs/uptime-watch.log.
+Schedule::command('site:uptime-watch')->everyTwoMinutes()->withoutOverlapping();

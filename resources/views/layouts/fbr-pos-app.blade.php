@@ -85,21 +85,30 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        {{-- Alpine CDN fallback — only fires if Vite bundle failed (5s grace) --}}
+        {{-- Alpine CDN fallback — arm only AFTER DOMContentLoaded. A blind timer can
+             start Alpine while a large cached sale document is still parsing, before
+             restaurantPos() is defined, which leaves the product grid loading forever. --}}
         <script>
-            setTimeout(function(){
-                if(!window.__alpineStarted){
-                    window.__alpineStarted=true;
-                    var c=document.createElement('script');
-                    c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
-                    document.head.appendChild(c);
-                    c.onload=function(){
-                        var s=document.createElement('script');
-                        s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
-                        document.head.appendChild(s);
-                    };
+            (function(){
+                function tnAlpineFallback(){
+                    setTimeout(function(){
+                        if(!window.Alpine && !window.__alpineStarted && !window.__alpineFallbackLoading){
+                            window.__alpineFallbackLoading=true;
+                            window.__alpineStarted=true;
+                            var c=document.createElement('script');
+                            c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
+                            document.head.appendChild(c);
+                            c.onload=function(){
+                                var s=document.createElement('script');
+                                s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
+                                document.head.appendChild(s);
+                            };
+                        }
+                    }, 500);
                 }
-            }, 5000);
+                if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', tnAlpineFallback); }
+                else { tnAlpineFallback(); }
+            })();
         </script>
         <script src="/vendor/chart.umd.min.js?v=4.4.0" defer></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>

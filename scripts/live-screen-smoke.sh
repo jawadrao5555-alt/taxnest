@@ -156,6 +156,8 @@ fi
 
 say "/pos/invoice/create — print-confirm setting baked into sale screen"
 if fetch "/pos/invoice/create"; then
+  require "/pos/invoice/create" "validated sale-document marker" 'data-tn-sale-document="pra".*data-tn-sale-root'
+  require "/pos/invoice/create" "bounded boot recovery watchdog" 'window\.tnSaleBoot'
   require "/pos/invoice/create" "printConfirmAsk state" 'printConfirmAsk'
   require "/pos/invoice/create" "tablesFirstFlow flag (Task 779)" 'tablesFirstFlow'
 fi

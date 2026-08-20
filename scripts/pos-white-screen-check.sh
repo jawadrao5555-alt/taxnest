@@ -7,9 +7,10 @@
 # no server-side error log). Real incident: /pos/features died from a bare
 # {{ __('...') }} inside <script> (apostrophe in translation broke JS).
 #
-# Two layers:
+# Three layers:
 #   1. STATIC : grep-style scan of ALL Blade views for bare __() echoed
-#               inside <script> blocks without @js()/Js::from() wrapping.
+#               inside <script> blocks without @js()/Js::from() wrapping,
+#               plus Alpine attributes that cannot compile as expressions.
 #   2. RUNTIME: log in as the standing POS test company and fetch the key
 #               POS pages; for each page verify
 #                 - HTTP 200 (not a redirect/500)
@@ -92,6 +93,52 @@ if [ -n "$STATIC_OUT" ]; then
   bad "bare __() echoed inside <script> — wrap with @js(...) or Js::from(...) (an apostrophe in a translation WILL white-screen the page)"
 else
   echo "    OK: no bare __() inside <script> blocks."
+fi
+
+# ------------------------------------------------------------------
+# 1a. STATIC: Alpine evaluates directive attributes as EXPRESSIONS, not script
+#     bodies. A nested @json(__('...')) can be truncated by Blade inside an
+#     HTML attribute, while a leading try/catch is a statement and Alpine's
+#     expression wrapper rejects it. Both only surface at browser startup and
+#     can leave the sale grid behind x-cloak even though inline scripts parse.
+# ------------------------------------------------------------------
+say "Static scan: sale-screen Alpine directive expressions"
+ALPINE_OUT=$(python3 - <<'PYEOF'
+import re, sys
+
+files = [
+    "resources/views/pos/universal.blade.php",
+    "resources/views/fbr-pos/universal.blade.php",
+]
+directive_re = re.compile(
+    r'''(?:\bx-[\w:.-]+|(?<!\w)@[\w:.-]+)\s*=\s*(["'])(.*?)\1''',
+    re.S,
+)
+hits = []
+for path in files:
+    src = open(path, encoding="utf-8", errors="replace").read()
+    for match in directive_re.finditer(src):
+        expression = match.group(2).strip()
+        reason = None
+        if re.search(r"@json\s*\(\s*__\s*\(", expression):
+            reason = "nested @json(__('...'))"
+        elif re.match(r"try\s*\{", expression):
+            reason = "leading try/catch statement"
+        if reason:
+            line = src[:match.start()].count("\n") + 1
+            snippet = " ".join(expression.split())[:140]
+            hits.append(f"{path}:{line}: {reason}: {snippet}")
+
+if hits:
+    print("\n".join(hits))
+    sys.exit(1)
+PYEOF
+)
+if [ -n "$ALPINE_OUT" ]; then
+  echo "$ALPINE_OUT" >&2
+  bad "invalid Alpine directive expression — use window.TXT for labels and call a component method for try/catch persistence"
+else
+  echo "    OK: sale-screen Alpine directive expressions avoid known startup parse traps."
 fi
 
 # ------------------------------------------------------------------

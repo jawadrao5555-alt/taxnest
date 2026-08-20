@@ -2116,6 +2116,7 @@ class PosController extends Controller
             'recallOrderIdForJs', 'canOrderCancel'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('X-TaxNest-Sale-Document', 'pra')
         ->header('Pragma', 'no-cache')
         ->header('Expires', '0');
     }
@@ -2202,6 +2203,26 @@ class PosController extends Controller
         }
         return response()->json(['ok' => true, 'fp' => $this->posBootFingerprint($company, $user)])
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    /**
+     * Records a client-side sale-screen startup failure without accepting any
+     * catalog, customer, or bill data. Support can correlate the authenticated
+     * company/user from the log context when a shop reports a blank screen.
+     */
+    public function bootDiagnostics(Request $request)
+    {
+        $user = auth('pos')->user();
+        Log::warning('POS sale boot diagnostic', [
+            'company_id' => app('currentCompanyId'),
+            'user_id' => $user?->id,
+            'variant' => 'pra',
+            'reason' => substr((string) $request->input('reason', 'unknown'), 0, 80),
+            'message' => substr((string) $request->input('message', ''), 0, 180),
+            'online' => $request->boolean('online'),
+            'controlled' => $request->boolean('controlled'),
+        ]);
+        return response()->json(['ok' => true])->header('Cache-Control', 'no-store');
     }
 
     /**

@@ -1260,6 +1260,7 @@ class FbrPosController extends Controller
             'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('X-TaxNest-Sale-Document', 'fbr')
         ->header('Pragma', 'no-cache')
         ->header('Expires', '0');
     }
@@ -1427,6 +1428,25 @@ class FbrPosController extends Controller
         }
         return response()->json(['ok' => true, 'fp' => $this->fbrBootFingerprint($company, $user)])
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    /**
+     * Support-only startup telemetry for the FBR sale screen. The browser sends
+     * only a bounded error summary; authenticated context identifies the shop.
+     */
+    public function bootDiagnostics(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        Log::warning('FBR POS sale boot diagnostic', [
+            'company_id' => app('currentCompanyId'),
+            'user_id' => $user?->id,
+            'variant' => 'fbr',
+            'reason' => substr((string) $request->input('reason', 'unknown'), 0, 80),
+            'message' => substr((string) $request->input('message', ''), 0, 180),
+            'online' => $request->boolean('online'),
+            'controlled' => $request->boolean('controlled'),
+        ]);
+        return response()->json(['ok' => true])->header('Cache-Control', 'no-store');
     }
 
     public function store(Request $request)

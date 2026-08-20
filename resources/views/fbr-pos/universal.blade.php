@@ -67,6 +67,98 @@
     $showDeliveriesBoardBtn = !empty($_fbrAllFeatures->delivery)
         && \App\Services\PosFeatureService::planAllows($company, 'riders_enabled');
 @endphp
+{{-- Same bounded sale-screen boot guard as PRA. FBR previously had no full-screen
+     recovery at all, so an Alpine startup failure left only the grid spinner. --}}
+<div id="tn-boot-splash" data-tn-sale-boot-splash
+     data-failure-title="{{ __('pos.sale_screen_boot_failed_title') }}"
+     data-failure-hint="{{ __('pos.sale_screen_boot_failed_hint') }}"
+     role="status" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#f9fafb;">
+    <style>@keyframes tnFbrBootSpin { to { transform:rotate(360deg); } } #tn-boot-splash .tn-boot-spinner{width:44px;height:44px;border:4px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:tnFbrBootSpin .8s linear infinite}.dark #tn-boot-splash{background:#111827!important}.dark #tn-boot-splash .tn-boot-title{color:#e5e7eb!important}</style>
+    <div class="tn-boot-spinner"></div>
+    <div id="tn-boot-title" class="tn-boot-title" style="font-weight:800;color:#374151;font-size:15px;">{{ __('pos.nestpos_loading') }}</div>
+    <div id="tn-boot-hint" style="color:#9ca3af;font-size:12px;">{{ __('pos.slow_internet_hint') }}</div>
+    <button id="tn-boot-retry" type="button" hidden style="border:0;border-radius:8px;background:#2563eb;color:#fff;padding:10px 16px;font-weight:700;cursor:pointer;">{{ __('pos.sale_screen_try_again') }}</button>
+</div>
+<script>
+    (function () {
+        var variant = 'fbr', retryKey = 'tn-sale-boot-recovery:' + location.pathname;
+        var splash = document.getElementById('tn-boot-splash');
+        var title = document.getElementById('tn-boot-title');
+        var hint = document.getElementById('tn-boot-hint');
+        var retry = document.getElementById('tn-boot-retry');
+        var state = { ready: false, failed: false, recovering: false };
+        function diagnostic(reason, detail) {
+            var payload = {
+                variant: variant, reason: String(reason || 'unknown').slice(0, 80),
+                message: String(detail || '').slice(0, 180), online: navigator.onLine,
+                controlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+                path: location.pathname
+            };
+            console.error('TaxNest sale boot failed', payload);
+            try { localStorage.setItem('tn_sale_boot_diagnostic', JSON.stringify(payload)); } catch (_) {}
+            try {
+                fetch('{{ route('fbrpos.api.boot-diagnostics', [], false) }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    credentials: 'same-origin', body: JSON.stringify(payload)
+                }).catch(function () {});
+            } catch (_) {}
+        }
+        function freshAttempt() {
+            if (state.recovering) return;
+            state.recovering = true;
+            try { navigator.serviceWorker && navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (_) {}
+            var next = new URL(location.href);
+            next.searchParams.set('__tn_sale_recover', '1');
+            location.replace(next.pathname + '?' + next.searchParams.toString());
+        }
+        function fail(reason, detail) {
+            if (state.ready || state.failed) return;
+            state.failed = true;
+            diagnostic(reason, detail);
+            if (title) title.textContent = splash.getAttribute('data-failure-title');
+            if (hint) hint.textContent = splash.getAttribute('data-failure-hint');
+            if (retry) { retry.hidden = false; retry.onclick = freshAttempt; }
+            try {
+                if (navigator.onLine && !new URL(location.href).searchParams.has('__tn_sale_recover') && !sessionStorage.getItem(retryKey)) {
+                    sessionStorage.setItem(retryKey, '1');
+                    setTimeout(freshAttempt, 700);
+                }
+            } catch (_) {}
+        }
+        window.tnSaleBoot = {
+            validResponse: async function (response) {
+                if (!response || !response.ok || response.redirected || !((response.headers.get('content-type') || '').includes('text/html'))) return false;
+                try {
+                    var html = await response.clone().text();
+                    return html.length > 4096
+                        && html.includes('data-tn-sale-document="fbr"')
+                        && html.includes('data-tn-sale-root')
+                        && html.includes('function restaurantPos()')
+                        && html.includes('window.tnBootFp');
+                } catch (_) { return false; }
+            },
+            ready: function () {
+                if (state.ready) return;
+                state.ready = true;
+                try { sessionStorage.removeItem(retryKey); } catch (_) {}
+                try {
+                    var clean = new URL(location.href);
+                    if (clean.searchParams.delete('__tn_sale_recover')) history.replaceState({}, '', clean.pathname + (clean.search || '') + clean.hash);
+                } catch (_) {}
+                if (splash) splash.remove();
+            },
+            fail: fail
+        };
+        window.addEventListener('error', function (e) {
+            if (!state.ready && (e.error || e.filename)) fail('runtime_error', (e.message || '').slice(0, 180));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+            if (!state.ready) fail('unhandled_rejection', String(e.reason || '').slice(0, 180));
+        });
+        setTimeout(function () { fail('startup_timeout', 'sale component did not become ready within 15 seconds'); }, 15000);
+    })();
+</script>
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
@@ -274,14 +366,12 @@ input:focus:not(:focus-visible) { outline: none; }
 <script type="application/json" id="tn-pos-i18n">{!! json_encode(\App\Support\PosI18n::baked('fbr-pos/universal'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
 <script>window.TXT = (function () { try { return JSON.parse(document.getElementById('tn-pos-i18n').textContent) || {}; } catch (e) { return {}; } })();</script>
 <script>
-// Task 644 (ZFC, Aug 2026): SALE_CACHE re-prime after a browser-data clear —
-// FBR twin of the PRA sale-screen snippet (see pos/universal.blade.php). First
-// visit after a clear = no controlling SW, so SALE_CACHE stayed empty and the
-// SECOND open was still a full network fetch. Ask the fresh SW to fetch+cache
-// this screen once in the background.
+// SALE_CACHE idempotent re-prime. Run after every successful document load:
+// validated entries are a no-op, while an invalid-entry eviction, manual clear,
+// or watchdog cache-bypass recovery gets a guaranteed offline-ready replacement.
 (function () {
     try {
-        if (!('serviceWorker' in navigator) || navigator.serviceWorker.controller) return;
+        if (!('serviceWorker' in navigator)) return;
         window.addEventListener('load', function () {
             navigator.serviceWorker.ready.then(function (reg) {
                 if (reg.active) reg.active.postMessage({ type: 'TN_PRIME_SALE_CACHE', url: '/fbr-pos/create' });
@@ -300,7 +390,7 @@ window.addEventListener('popstate', function() {
 {{-- Screen Fit (Jul 2026, ported from PRA universal): fitStyleStr applies CSS zoom +
      a /zoom-compensated px height so the sale screen renders correctly on ANY display.
      Auto mode picks the zoom from viewport size; manual % saved per device. --}}
-<div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
+<div data-tn-sale-document="fbr" data-tn-sale-root x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
     {{-- ═══════════ NAV SWITCHES (Aug 2026, PRA parity — owner request) ═══════════
          Desktop (md+): FBR Reporting / Auto-Print / Auto-KOT live INSIDE the blue top-nav
          as a "Switches" dropdown — teleported into #tn-nav-sale-tools (fbr-pos-app.blade.php)
@@ -2076,7 +2166,7 @@ window.addEventListener('popstate', function() {
          Sits ABOVE the pending-deliveries modal (inline z-index — no Tailwind rebuild dep). --}}
     <div x-show="riderSettleBill" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" style="z-index: 60;" @click.self="riderSettleBill = null">
         <div class="bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-sm p-5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — <span x-text="riderSettleBill ? (riderSettleBill.rider_name || @json(__('pos.rider_word'))) : ''"></span></h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — <span x-text="riderSettleBill ? (riderSettleBill.rider_name || window.TXT.rider_word) : ''"></span></h3>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-3" x-text="riderSettleBill ? txtRiderSettleScope(riderSettleBill) : ''"></p>
             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.cash_received_now') }}</label>
             <input type="number" id="rider-settle-amount" x-model="riderSettleAmount" min="1" step="0.01" inputmode="decimal"
@@ -2246,7 +2336,7 @@ window.addEventListener('popstate', function() {
                         <div class="flex gap-2 items-stretch">
                             <span class="flex items-center px-2.5 rounded-xl text-[10px] font-bold"
                                   :class="bill.delivery_status === 'delivered' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300'"
-                                  x-text="bill.delivery_status === 'delivered' ? @json(__('pos.delivery_status_delivered')) : (bill.delivery_status === 'dispatched' ? @json(__('pos.delivery_status_dispatched')) : @json(__('pos.delivery_status_assigned')))"></span>
+                                  x-text="bill.delivery_status === 'delivered' ? window.TXT.delivery_status_delivered : (bill.delivery_status === 'dispatched' ? window.TXT.delivery_status_dispatched : window.TXT.delivery_status_assigned)"></span>
                             <template x-if="bill.delivery_status !== 'delivered'">
                                 <button @click="markFinalDelivered(bill)" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
                                     <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
@@ -2316,7 +2406,7 @@ window.addEventListener('popstate', function() {
             </div>
             <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
                 <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
-                    <input type="checkbox" x-model="deliveryPrintReceipt" @change="try{localStorage.setItem('fbrpos_delivery_final_print', deliveryPrintReceipt ? '1' : '0')}catch(e){}" class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <input type="checkbox" x-model="deliveryPrintReceipt" @change="persistDeliveryPrintReceipt()" class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
                     <span>{{ __('pos.delivery_print_receipt') }}</span>
                 </label>
             </div>
@@ -3600,6 +3690,10 @@ function restaurantPos() {
         },
         fitLabel() { return this.screenFit === 'auto' ? 'Fit' : Math.round(this.screenFit * 100) + '%'; },
 
+        persistDeliveryPrintReceipt() {
+            try { localStorage.setItem('fbrpos_delivery_final_print', this.deliveryPrintReceipt ? '1' : '0'); } catch (e) {}
+        },
+
         // Generate a fresh idempotency UUID for a new bill. Falls back to a
         // timestamp+random string on older browsers that lack crypto.randomUUID.
         _newBillUuid() {
@@ -3623,7 +3717,6 @@ function restaurantPos() {
             // Inventory mode must always show the catalog (no manual on-the-fly create).
             try { if (localStorage.getItem('fbr_show_products') === '0') this.showProducts = false; } catch (e) {}
             this.filterProducts();
-            setTimeout(() => { this.loading = false; }, 300);
             this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; if (this.searchQuery.trim().length > 0) this.onSearchInput(); });
             this.calcGridCols();
             window.addEventListener('resize', () => this.calcGridCols());
@@ -3662,6 +3755,12 @@ function restaurantPos() {
             // Desktop shell resume-check hook (PRA parity) — NestPOS Desktop calls
             // this when the window wakes so a days-old cached screen re-verifies.
             try { window.tnDesktopResumeCheck = () => { try { this.bootFpCheck(); } catch (e) {} }; } catch (e) {}
+            // Do not dismiss the watchdog until all synchronous setup above has
+            // completed; deliberate empty/hidden product grids remain valid boots.
+            setTimeout(() => {
+                this.loading = false;
+                try { window.tnSaleBoot?.ready(); } catch (e) {}
+            }, 300);
         },
 
         // ─── AUTO-SYNC ENGINE ──────────────────────────────────────────────
@@ -4030,8 +4129,7 @@ function restaurantPos() {
                             if (!userChanged) {
                                 try {
                                     const resp = await fetch(window.location.pathname, { cache: 'reload', credentials: 'same-origin' });
-                                    const ct = (resp && resp.headers.get('content-type')) || '';
-                                    if (!resp || !resp.ok || resp.redirected || !ct.includes('text/html')) return;
+                                    if (!window.tnSaleBoot || !(await window.tnSaleBoot.validResponse(resp))) return;
                                     if (window.caches) {
                                         try {
                                             // Never hardcode the versioned cache name — find the

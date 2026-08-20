@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260819-153709-dbf19522'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260819-153709-pos-boot-guard'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -9,6 +9,16 @@ const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // /pos/api/boot-check when stale. Purged on ANY logout AND any /login POST
 // (per-user data is baked into the HTML — audit rule, July 2026).
 const SALE_CACHE = `${CACHE_VERSION}-sale`;
+// A cached sale page contains authenticated, per-user boot data. "200 + HTML" is
+// not enough proof that it is a usable sale document: a partially rendered error
+// page, login page, or interrupted response would otherwise be replayed forever
+// by the cache-first navigation path. Keep the markers deliberately structural,
+// not product-data based, so an intentionally empty catalogue remains valid.
+const SALE_DOCUMENT_MARKERS = {
+    '/pos/invoice/create': 'pra',
+    '/fbr-pos/create': 'fbr',
+};
+const SALE_DOCUMENT_HEADER = 'x-taxnest-sale-document';
 // OFFLINE-FIRST TABLES BOARD (Task 819, Aug 2026): dedicated cache for
 // /pos/restaurant/tables — network-first, offline fallback to last snapshot.
 // Tables-first shops navigate here after every KOT/payment;
@@ -40,6 +50,56 @@ const STATIC_ASSETS = [
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Offline</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#059669,#047857);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;color:#fff}.box{text-align:center;background:rgba(255,255,255,.08);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:50px 40px;max-width:420px;box-shadow:0 25px 60px rgba(0,0,0,.3)}.ico{font-size:64px;margin-bottom:20px}h1{font-size:28px;margin-bottom:10px;font-weight:700}.sub{opacity:.85;font-size:15px;margin-bottom:30px;line-height:1.6}.status{background:rgba(0,0,0,.2);padding:16px;border-radius:12px;border-left:4px solid #fbbf24;text-align:left;font-size:14px}.btn{margin-top:24px;display:inline-block;background:#fff;color:#059669;padding:12px 28px;border-radius:10px;font-weight:600;text-decoration:none;border:none;cursor:pointer;font-size:15px}</style></head><body><div class="box"><div class="ico">📡</div><h1>You're Offline</h1><p class="sub">Internet connection nahi hai. Cached pages khol sakte hain — ya net wapas aane par auto-reload hoga.</p><div class="status"><strong>Tip:</strong> Net aate hi yeh page khud refresh ho jayega.</div><button class="btn" onclick="location.reload()">Try Again</button></div><script>window.addEventListener('online',()=>location.reload());setInterval(()=>{if(navigator.onLine)location.reload()},5000)</script></body></html>`;
+const SALE_RECOVERY_HTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TaxNest — Sale Screen Recovery</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f8fafc;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.box{max-width:440px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:34px;box-shadow:0 18px 42px rgba(15,23,42,.11)}h1{font-size:21px;margin:0 0 10px}p{color:#64748b;line-height:1.55;margin:0 0 22px}button{border:0;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;padding:12px 22px;font-size:15px;cursor:pointer}</style></head><body><main class="box"><h1>Sale screen needs a fresh copy</h1><p>The saved screen was incomplete, so it was not opened. Check the internet connection and try again.</p><button onclick="location.reload()">Try again</button></main></body></html>`;
+
+function saleDocumentLooksLikeLogin(response) {
+    try {
+        return response.redirected || /\/(?:pos|fbr-pos)\/login(?:[/?#]|$)/.test(new URL(response.url || '', location.origin).pathname);
+    } catch (_) {
+        return !!response.redirected;
+    }
+}
+
+async function isValidSaleDocument(response, variant) {
+    const contentType = response && response.headers && response.headers.get('content-type') || '';
+    if (!response || !response.ok || response.redirected || !contentType.includes('text/html')) return false;
+    try {
+        const html = await response.clone().text();
+        return html.length > 4096
+            && html.includes(`data-tn-sale-document="${variant}"`)
+            && html.includes('data-tn-sale-root')
+            && html.includes('function restaurantPos()')
+            && html.includes('window.tnBootFp');
+    } catch (_) {
+        return false;
+    }
+}
+
+async function isValidCachedSaleDocument(response, variant) {
+    if (!response || !response.ok || response.redirected) return false;
+    // Current server responses are stamped after Laravel has rendered the full
+    // universal view. Network writes still undergo the body-marker validation
+    // below before cache.put(), so this fast header check is safe and avoids
+    // decoding a multi-megabyte catalogue twice on every cache-first open.
+    if ((response.headers.get(SALE_DOCUMENT_HEADER) || '') === variant) return true;
+    // One-time upgrade path for a cache written by an older worker: accept it
+    // only if the new structural markers are really present.
+    return isValidSaleDocument(response, variant);
+}
+
+async function fetchSaleDocument(request, cache, variant) {
+    const response = await fetch(request);
+    const valid = await isValidSaleDocument(response, variant);
+    if (valid) await cache.put(request, response.clone());
+    return { response, valid };
+}
+
+function saleRecoveryResponse() {
+    return new Response(SALE_RECOVERY_HTML, {
+        status: 503,
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+    });
+}
 
 self.addEventListener('install', e => {
     e.waitUntil(
@@ -90,26 +150,54 @@ self.addEventListener('fetch', e => {
 
     // OFFLINE-FIRST SALE SCREEN: exact match only — query-string variants
     // (?table_id, ?edit_bill, ?updated) stay network-only via skipPatterns.
-    // Cache-first + background revalidate; never cache redirects (login/pending)
-    // or non-HTML. Offline with no cache → offline splash.
-    // Aug 2026: /fbr-pos/create joined (FBR offline billing — PRA port).
-    if (req.mode === 'navigate' && (url.pathname === '/pos/invoice/create' || url.pathname === '/fbr-pos/create') && url.search === '') {
+    // Cache-first + background revalidate, except a browser hard reload which
+    // deliberately prefers a fresh network document. Both cache reads and writes
+    // validate sale-specific boot markers; login/error/partial HTML must never
+    // become the active offline copy. Offline with no valid copy → recovery page.
+    if (req.mode === 'navigate' && SALE_DOCUMENT_MARKERS[url.pathname] && url.search === '') {
         e.respondWith((async () => {
             const c = await caches.open(SALE_CACHE);
-            const cached = await c.match(req);
-            const network = fetch(req).then(res => {
-                const ct = res.headers.get('content-type') || '';
-                if (res.ok && !res.redirected && ct.includes('text/html')) {
-                    c.put(req, res.clone());
+            const variant = SALE_DOCUMENT_MARKERS[url.pathname];
+            let cached = await c.match(req);
+            if (cached && !(await isValidCachedSaleDocument(cached, variant))) {
+                await c.delete(req);
+                cached = undefined;
+            }
+            const network = () => fetchSaleDocument(req, c, variant);
+            // Chrome marks a hard refresh as cache:'reload'. Some terminals send
+            // Cache-Control:no-cache instead, so honor that signal too. A live
+            // document always wins; a broken 5xx/network result safely falls back
+            // to the last validated screen rather than leaving a blank POS.
+            const forceFresh = req.cache === 'reload'
+                || /(?:^|,)\s*no-cache\s*(?:,|$)/i.test(req.headers.get('cache-control') || '');
+            if (forceFresh) {
+                try {
+                    const fresh = await network();
+                    if (saleDocumentLooksLikeLogin(fresh.response)) await c.delete(req);
+                    if (fresh.valid || !cached || saleDocumentLooksLikeLogin(fresh.response)) {
+                        return fresh.valid || saleDocumentLooksLikeLogin(fresh.response)
+                            ? fresh.response : saleRecoveryResponse();
+                    }
+                    return cached;
+                } catch (_) {
+                    return cached || (await caches.match(OFFLINE_PAGE)) || saleRecoveryResponse();
                 }
-                return res;
-            });
+            }
             if (cached) {
-                network.catch(() => {}); // background revalidate — cache updated for next boot
+                network().then(fresh => {
+                    // A background auth redirect means this session is no longer
+                    // usable. Delete the personal document immediately; its own
+                    // boot check will redirect the already-open page to login.
+                    if (saleDocumentLooksLikeLogin(fresh.response)) c.delete(req);
+                }).catch(() => {}); // background revalidate — cache updated for next boot
                 return cached;
             }
-            try { return await network; } catch (err) {
-                return (await caches.match(OFFLINE_PAGE)) || Response.error();
+            try {
+                const fresh = await network();
+                return fresh.valid || saleDocumentLooksLikeLogin(fresh.response)
+                    ? fresh.response : saleRecoveryResponse();
+            } catch (_) {
+                return (await caches.match(OFFLINE_PAGE)) || saleRecoveryResponse();
             }
         })());
         return;
@@ -278,10 +366,11 @@ self.addEventListener('message', e => {
                 const saleUrls = ['/pos/invoice/create', '/fbr-pos/create'];
                 const c = await caches.open(SALE_CACHE);
                 await Promise.all(saleUrls.map(async (u) => {
-                    if (await c.match(u)) return; // already primed
+                    const cached = await c.match(u);
+                    if (cached && await isValidCachedSaleDocument(cached, SALE_DOCUMENT_MARKERS[u])) return;
+                    if (cached) await c.delete(u);
                     const res = await fetch(u, { credentials: 'same-origin' });
-                    const ct = res.headers.get('content-type') || '';
-                    if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(u, res.clone());
+                    if (await isValidSaleDocument(res, SALE_DOCUMENT_MARKERS[u])) await c.put(u, res.clone());
                 }));
             } catch (err) { /* best-effort — normal second-load prime still applies */ }
         })());

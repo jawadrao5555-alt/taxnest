@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "plus" build ke overrides (Task 1345) — SIM + WhatsApp.
+  Baqi sab strings src/main/res/values/strings.xml se aati hain.
+  Yahan sirf wo keys hain jo build ke mutabiq badalti hain.
+-->
+<resources>
+    <string name="build_badge">یہ بلڈ: سِم (عام) کالیں اور واٹس ایپ کالیں — دونوں پکڑتی ہے</string>
+    <string name="build_badge_roman">WhatsApp wali build — SIM + WhatsApp calls dono.</string>
+
+    <string name="perm_on">✔ نوٹیفکیشن کی اجازت مل گئی</string>
+    <string name="perm_off">✖ نوٹیفکیشن کی اجازت نہیں — اس کے بغیر ایپ کالیں نہیں پکڑ سکتی</string>
+    <string name="perm_btn">نوٹیفکیشن کی اجازت دیں</string>
+    <string name="perm_toast">فہرست میں TaxNest Caller ID ڈھونڈ کر آن کریں</string>
+    <string name="status_need_permission">پہلے نوٹیفکیشن کی اجازت دیں — نیچے بٹن دبائیں</string>
+
+    <string name="howto_body">یہ ایپ شاپ کے فون پر آنے والی کالوں (عام کال اور واٹس ایپ کال) کی نوٹیفکیشن پڑھتی ہے اور نمبر POS کو بھیج دیتی ہے — سیل اسکرین پر فوراً پاپ اپ آتا ہے کہ کون سا گاہک کال کر رہا ہے اور اس کی پرانی خریداری کیا ہے۔ ایپ کو کھلا رکھنے کی ضرورت نہیں، بس فون آن رہے۔</string>
+</resources>

@@ -28,7 +28,12 @@ object ApiClient {
                 readTimeout = 20000
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("User-Agent", "TaxNestCaller/" + BuildConfig.VERSION_NAME)
+                // Build kind UA mein — live logs se pata chal jata hai ke shop
+                // ke phone par clean (sim) build hai ya WhatsApp wali (plus).
+                setRequestProperty(
+                    "User-Agent",
+                    "TaxNestCaller/" + BuildConfig.VERSION_NAME + " (" + BuildConfig.BUILD_KIND + ")"
+                )
                 token?.let { setRequestProperty("Authorization", "Bearer $it") }
                 if (body != null) {
                     doOutput = true

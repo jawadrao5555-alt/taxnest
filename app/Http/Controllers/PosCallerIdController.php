@@ -41,7 +41,13 @@ class PosCallerIdController extends Controller
     private const EVENT_RETENTION_HOURS = 48;  // ring rows purged after this
     private const EVENT_FRESH_SECONDS = 120;   // poll never surfaces older rings
     private const DEDUPE_SECONDS = 20;         // same caller re-ring collapse
+    // Task 1345 — DO builds, ek hi package id:
+    //   default ("clean")  = sirf SIM calls, Play Protect ki blocked chaar
+    //                        permissions mein se koi nahi → bina rukawat install
+    //   plus               = SIM + WhatsApp (notification listener), install ke
+    //                        liye Play Protect waqti tor par band karna parta hai
     private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-caller.apk';
+    private const APP_DOWNLOAD_URL_PLUS = 'https://taxnest.com.pk/downloads/taxnest-caller-plus.apk';
     private const DEVICE_CAP = 3;              // paired phones per shop (v2)
     // "Offline" = no ring/API contact for this long. The app has NO periodic
     // heartbeat (contacts only on rings + app-open /me), so keep this lenient
@@ -303,12 +309,24 @@ class PosCallerIdController extends Controller
     }
 
     /** GET /api/caller-app/v1/version — semver update check (SystemSetting-driven). */
-    public function appVersion()
+    public function appVersion(Request $request)
     {
+        // PER-BUILD update check (Task 1345). Har build ka apna version record
+        // aur apna APK — warna plus (WhatsApp wale) phone par clean build ka
+        // update chala jata aur WhatsApp detection chupke se khatam ho jati.
+        //
+        // Legacy phones (v1.0.0) koi ?build nahi bhejte — woh SAB notification
+        // listener wali build hain, is liye param na ho to PLUS.
+        $build = $request->query('build') === 'sim' ? 'sim' : 'plus';
+
         return response()->json([
             'ok' => true,
-            'latest' => (string) SystemSetting::get('caller_app_latest_version', ''),
-            'apk_url' => self::APP_DOWNLOAD_URL,
+            'build' => $build,
+            'latest' => trim((string) SystemSetting::get(
+                $build === 'sim' ? 'caller_app_latest_version' : 'caller_app_plus_latest_version',
+                ''
+            )),
+            'apk_url' => $build === 'sim' ? self::APP_DOWNLOAD_URL : self::APP_DOWNLOAD_URL_PLUS,
         ]);
     }
 

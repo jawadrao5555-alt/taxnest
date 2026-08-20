@@ -27,10 +27,28 @@
     // Caller ID card (Task 1039): same gating pattern as DI/waiter — only visible
     // when BOTH the APK file exists AND caller_app_latest_version is set, so the
     // owner can phone-test the beta before anything is customer-visible.
+    //
+    // Task 1345 — Caller ID ab DO builds mein aati hai:
+    //   taxnest-caller.apk       = default "clean" build, sirf SIM calls. Iski
+    //                              manifest mein Play Protect ki blocked chaar
+    //                              permissions (RECEIVE_SMS, READ_SMS,
+    //                              notification-listener, accessibility) mein se
+    //                              koi nahi — is liye install block nahi hoti.
+    //   taxnest-caller-plus.apk  = SIM + WhatsApp. Notification listener ki wajah
+    //                              se Play Protect install rok deti hai, is liye
+    //                              yeh default card par NAHI — neeche apne alag
+    //                              hisse mein hai, Play Protect band/chaalu karne
+    //                              ke qadam ke sath.
+    // Dono ka gate alag hai (apna version setting + apni file), taake owner har
+    // build alag se phone-test kar ke live kare.
     $callerApkPath = public_path('downloads/taxnest-caller.apk');
     $callerApkVersion = trim((string) \App\Models\SystemSetting::get('caller_app_latest_version', ''));
     $callerApkSize = ($callerApkVersion !== '' && is_file($callerApkPath)) ? $fmtMb(filesize($callerApkPath)) : null;
     $callerApkVisible = $callerApkVersion !== '' && is_file($callerApkPath);
+    $callerPlusApkPath = public_path('downloads/taxnest-caller-plus.apk');
+    $callerPlusApkVersion = trim((string) \App\Models\SystemSetting::get('caller_app_plus_latest_version', ''));
+    $callerPlusApkSize = ($callerPlusApkVersion !== '' && is_file($callerPlusApkPath)) ? $fmtMb(filesize($callerPlusApkPath)) : null;
+    $callerPlusApkVisible = $callerPlusApkVersion !== '' && is_file($callerPlusApkPath);
 @endphp
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
@@ -164,7 +182,12 @@
                     </div>
                     <h3 class="font-serif text-lg text-[#052730] mb-1">TaxNest Caller ID</h3>
                     <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Android 8+ · APK{{ $callerApkSize ? ' · ' . $callerApkSize : '' }}{{ $callerApkVersion ? ' · v' . $callerApkVersion : '' }}</p>
-                    <p class="text-sm text-gray-500 leading-relaxed flex-1">For the shop phone — when a customer calls (normal call or WhatsApp), the POS sale screen instantly shows who is calling with their purchase history, ready to start their bill.</p>
+                    <p class="text-sm text-gray-500 leading-relaxed flex-1">For the shop phone — when a customer rings the shop SIM, the POS sale screen instantly shows who is calling with their purchase history, ready to start their bill. Installs straight from here, no Play Protect warning.</p>
+                    @if($callerPlusApkVisible)
+                    <p class="text-xs text-gray-400 mt-3">SIM calls only. WhatsApp calls bhi chahiyen? <a href="#caller-whatsapp" class="text-sky-700 underline hover:no-underline">Neeche dekhein</a>.</p>
+                    @else
+                    <p class="text-xs text-gray-400 mt-3">Catches normal SIM calls. WhatsApp calls are not detected by this build.</p>
+                    @endif
                     <div class="mt-5">
                         <a href="{{ url('downloads/taxnest-caller.apk') }}" class="block text-center bg-sky-700 hover:bg-sky-800 text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">Download APK</a>
                     </div>
@@ -184,6 +207,50 @@
                     </div>
                 </div>
             </div>
+
+            <!--
+              Caller ID "plus" (SIM + WhatsApp) — Task 1345.
+              Alag hissa, default card ke neeche: is build ki manifest mein
+              notification-listener permission hai, aur Google Play Protect ki
+              "enhanced fraud protection" aisi APK ka website/WhatsApp/file
+              manager se install khud-ba-khud rok deti hai. Is liye yahan Play
+              Protect ko waqti tor par band aur install ke baad dobara chaalu
+              karne ke qadam saaf Roman Urdu mein likhe hain.
+            -->
+            @if($callerApkVisible && $callerPlusApkVisible)
+            <div id="caller-whatsapp" class="mt-8 bg-white rounded-xl border-2 border-sky-200 shadow-sm p-6 scroll-mt-24">
+                <div class="flex items-start gap-3 mb-3">
+                    <div class="w-10 h-10 shrink-0 rounded-lg bg-sky-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M21 12a9 9 0 11-3.6-7.2L21 3v9z"/></svg>
+                    </div>
+                    <div>
+                        <h4 class="font-serif text-lg text-[#052730]">Caller ID — WhatsApp calls bhi chahiyen?</h4>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mt-1">TaxNest Caller ID (plus){{ $callerPlusApkVersion ? ' · v' . $callerPlusApkVersion : '' }} · APK{{ $callerPlusApkSize ? ' · ' . $callerPlusApkSize : '' }}</p>
+                    </div>
+                </div>
+
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    Ooper wali normal Caller ID app shop ki <strong>SIM calls</strong> pakadti hai aur seedhi install ho jati hai. Agar aap ke gaahak <strong>WhatsApp par bhi call</strong> karte hain to yeh alag "plus" app lagayein — yeh SIM aur WhatsApp dono calls pakadti hai.
+                </p>
+                <p class="text-sm text-gray-600 leading-relaxed mt-2">
+                    Farq sirf itna hai: WhatsApp calls parhne ke liye Android ki <strong>notification access</strong> chahiye, aur Google Play Protect aisi app ka website se install <em>khud rok deti hai</em> ("App blocked to protect your device"). App bilkul theek hai — TaxNest ki apni signed app hai — bas install ke waqt Play Protect ka scan 2 minute ke liye band karna parta hai.
+                </p>
+
+                <ol class="list-decimal pl-5 space-y-1.5 text-sm text-gray-600 leading-relaxed mt-4">
+                    <li>Phone par <strong>Play Store</strong> kholein → ooper apni <strong>profile photo</strong> par tap karein → <strong>Play Protect</strong> → ooper dayen <strong>settings (gear)</strong> → <strong>"Scan apps with Play Protect"</strong> ko <strong>OFF</strong> kar dein.</li>
+                    <li>Wapas aa kar neeche wala <strong>WhatsApp wali APK</strong> download karein aur file par tap kar ke <strong>Install</strong> karein. ("Unknown apps" wala sawal aaye to <strong>Allow from this source</strong> chunein.)</li>
+                    <li>Install hote hi <strong>Play Protect dobara ON</strong> kar dein (wohi rasta, switch wapas ON) — phone ki hifazat barqarar rahegi, TaxNest app chalti rahegi.</li>
+                    <li>App kholein, apne admin/manager login se sign in karein, aur pehle screen par <strong>notification access</strong> ki ijazat de dein. Phir <strong>"Test ring"</strong> dabayein — POS sale screen par popup aana chahiye.</li>
+                </ol>
+
+                <div class="mt-5 flex flex-col sm:flex-row gap-3">
+                    <a href="{{ url('downloads/taxnest-caller-plus.apk') }}" class="inline-block text-center bg-sky-700 hover:bg-sky-800 text-white text-sm font-semibold px-5 py-3 rounded-lg transition-colors">WhatsApp wali APK download karein</a>
+                    <span class="text-xs text-gray-500 self-center leading-relaxed">Dono app ka package ek hi hai — jo pehle se lagi ho, nayi uske ooper hi update ho jati hai. Ek waqt mein sirf ek rakhein.</span>
+                </div>
+
+                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-4">Play Protect band karna sirf install ke waqt ka qadam hai. Install ke foran baad usay dobara ON karna na bhoolein.</p>
+            </div>
+            @endif
 
             <!-- Install help -->
             <div class="mt-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">

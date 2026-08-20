@@ -16,13 +16,7 @@
     <!-- Main -->
     <string name="welcome_fmt">%1$s · %2$s</string>
     <string name="status_ok">✔ سب تیار — کال آتے ہی POS اسکرین پر پاپ اپ آئے گا</string>
-    <string name="status_need_permission">پہلے نوٹیفکیشن کی اجازت دیں — نیچے بٹن دبائیں</string>
     <string name="status_feature_off">POS سیٹنگز میں کالر آئی ڈی ابھی بند ہے — پورٹل سے آن کریں</string>
-
-    <string name="notif_on">✔ نوٹیفکیشن کی اجازت مل گئی</string>
-    <string name="notif_off">✖ نوٹیفکیشن کی اجازت نہیں — اس کے بغیر ایپ کالیں نہیں پکڑ سکتی</string>
-    <string name="notif_btn">نوٹیفکیشن کی اجازت دیں</string>
-    <string name="notif_toast">فہرست میں TaxNest Caller ID ڈھونڈ کر آن کریں</string>
 
     <string name="battery_on">✔ بیٹری سیٹنگ ٹھیک ہے — ایپ پیچھے چلتی رہے گی</string>
     <string name="battery_off">✖ بیٹری آپٹیمائزیشن آن ہے — ایپ کبھی کبھی سو سکتی ہے</string>
@@ -41,5 +35,22 @@
     <string name="logout_btn">لاگ آؤٹ</string>
 
     <string name="howto_title">یہ کیسے کام کرتی ہے؟</string>
-    <string name="howto_body">یہ ایپ شاپ کے فون پر آنے والی کالوں (عام کال اور واٹس ایپ کال) کی نوٹیفکیشن پڑھتی ہے اور نمبر POS کو بھیج دیتی ہے — سیل اسکرین پر فوراً پاپ اپ آتا ہے کہ کون سا گاہک کال کر رہا ہے اور اس کی پرانی خریداری کیا ہے۔ ایپ کو کھلا رکھنے کی ضرورت نہیں، بس فون آن رہے۔</string>
+
+    <!--
+      ── Build-specific strings (Task 1345) ──────────────────────────────────
+      Neeche wali values "clean" (sim) build ki hain — yehi default download hai.
+      "plus" build inhe src/plus/res/values/strings.xml se override karti hai
+      (resource merge: flavor > main). Naya build-specific string BOTH jagah
+      likhna zaroori hai warna plus build par clean wala text reh jayega.
+    -->
+    <string name="build_badge">یہ بلڈ: صرف سِم (عام) کالیں پکڑتی ہے — واٹس ایپ کالیں نہیں</string>
+    <string name="build_badge_roman">Clean build — sirf SIM calls. WhatsApp calls ke liye website se \"WhatsApp wali\" APK lein.</string>
+
+    <string name="perm_on">✔ فون اور کال لاگ کی اجازت مل گئی</string>
+    <string name="perm_off">✖ فون اور کال لاگ کی اجازت نہیں — اس کے بغیر ایپ کال کا نمبر نہیں پڑھ سکتی</string>
+    <string name="perm_btn">کال کی اجازت دیں</string>
+    <string name="perm_toast">اجازت دینے کے لیے Permissions میں Phone اور Call logs آن کریں</string>
+    <string name="status_need_permission">پہلے کال کی اجازت دیں — نیچے بٹن دبائیں</string>
+
+    <string name="howto_body">یہ ایپ شاپ کے فون پر آنے والی عام (سِم) کال کا نمبر POS کو بھیج دیتی ہے — سیل اسکرین پر فوراً پاپ اپ آتا ہے کہ کون سا گاہک کال کر رہا ہے اور اس کی پرانی خریداری کیا ہے۔ ایپ کو کھلا رکھنے کی ضرورت نہیں، بس فون آن رہے۔\n\nواٹس ایپ کالیں یہ بلڈ نہیں پکڑتی۔ اگر واٹس ایپ کالیں بھی چاہیئں تو ویب سائٹ کے ڈاؤن لوڈ صفحے سے \"واٹس ایپ والی\" ایپ لیں۔</string>
 </resources>

@@ -69,8 +69,16 @@
                 <input type="text" name="caller_app_latest_version" value="{{ old('caller_app_latest_version', $settings['caller_app_latest_version']) }}"
                        placeholder="e.g. 1.0.0"
                        class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
-                <p class="text-[11px] text-gray-500 mt-1">versionName of the newest released Caller ID APK (TaxNest Caller ID). Also controls the downloads-page Caller ID card and the POS &rarr; Customize download button — <strong class="text-amber-400">leave empty until the APK is phone-tested</strong>; setting it makes both go live automatically. Caller ID itself stays an Unlimited-package feature. Digits and dots only.</p>
+                <p class="text-[11px] text-gray-500 mt-1">versionName of the newest released <strong class="text-gray-300">clean</strong> Caller ID APK (<code>taxnest-caller.apk</code> — SIM calls only, installs without a Play Protect block). Also controls the downloads-page Caller ID card and the POS &rarr; Customize download button — <strong class="text-amber-400">leave empty until the APK is phone-tested</strong>; setting it makes both go live automatically. Caller ID itself stays an Unlimited-package feature. Digits and dots only.</p>
                 @error('caller_app_latest_version') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div class="mt-4">
+                <label class="block text-xs font-medium text-gray-400 mb-1">Latest Caller ID <span class="text-purple-300">WhatsApp (plus)</span> App Version</label>
+                <input type="text" name="caller_app_plus_latest_version" value="{{ old('caller_app_plus_latest_version', $settings['caller_app_plus_latest_version']) }}"
+                       placeholder="e.g. 1.1.0"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                <p class="text-[11px] text-gray-500 mt-1">versionName of the newest released <strong class="text-gray-300">plus</strong> APK (<code>taxnest-caller-plus.apk</code> — SIM + WhatsApp; Play Protect blocks its install until the shop turns the scan off). Separate record on purpose: plus phones check <code>/version?build=plus</code>, so they are never offered the clean APK (that would silently kill their WhatsApp detection). Empty = the &ldquo;WhatsApp calls bhi chahiyen?&rdquo; section on /download and in POS &rarr; Customize stays hidden. Digits and dots only.</p>
+                @error('caller_app_plus_latest_version') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
             </div>
         </div>
 

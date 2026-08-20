@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "clean" (sim) build — DEFAULT download.
+
+  Play Protect ki blocked chaar (RECEIVE_SMS, READ_SMS, notification-listener,
+  accessibility) mein se yahan koi nahi, is liye website se install par koi
+  "App blocked to protect your device" nahi aata.
+
+  READ_PHONE_STATE = RINGING state, READ_CALL_LOG = incoming number
+  (Android 9+ par number is ke baghair khali aata hai). Dono blocked list se
+  bahar hain. WhatsApp calls yeh build detect NAHI karti — uske liye plus build.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+
+    <application>
+        <!-- Manifest-registered: app band ho tab bhi Android jagata hai.
+             PHONE_STATE implicit-broadcast pabandi se mustasna hai. -->
+        <receiver
+            android:name=".PhoneStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

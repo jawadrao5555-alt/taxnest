@@ -1,5 +1,11 @@
 # Caller ID App — Publish & Live QA (20 Aug 2026)
 
+> **Superseded in part by Task 1345** — Play Protect's enhanced fraud protection
+> made this v1.0.0 build uninstallable from the website. Caller ID now ships as
+> two builds (clean = default, plus = SIM + WhatsApp); see
+> `docs/qa/task-1345-caller-id-two-builds-qa.md` and `caller-app/RELEASE.md`.
+> Everything below about the server chain, plan gate and popup still holds.
+
 Released **TaxNest Caller ID v1.0.0** (`pk.taxnest.callerid`, Android 8+, 4.4 MB).
 The APK was already hosted; this task added the admin release control, verified the
 whole chain against live, and switched the download cards on.

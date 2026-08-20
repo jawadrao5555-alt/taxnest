@@ -3,16 +3,22 @@ package pk.taxnest.callerid
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import org.json.JSONObject
-import kotlin.concurrent.thread
 
 /**
- * Dil of the app: Android hamein har notification deta hai; hum SIRF incoming
- * call wali (CATEGORY_CALL) uthate hain — normal dialer ki ring AUR WhatsApp /
- * WhatsApp Business ki call — number/naam nikaal kar server ko POST karte hain.
+ * "plus" build ka dil (SIM + WhatsApp): Android hamein har notification deta
+ * hai; hum SIRF incoming call wali (CATEGORY_CALL) uthate hain — normal dialer
+ * ki ring AUR WhatsApp / WhatsApp Business ki call — number/naam nikaal kar
+ * RingReporter ko de dete hain (payload + 60s dedupe + 401 handling wahin hai,
+ * bilkul "clean" build jaisa).
  *
  * Event-driven hai: koi polling, koi foreground service, koi background loop
  * nahi — battery par asar na-hone-ke-barabar.
+ *
+ * PLAY PROTECT (Task 1345): is service ki BIND_NOTIFICATION_LISTENER_SERVICE
+ * permission Google ki "enhanced fraud protection" ki blocked chaar mein se ek
+ * hai — is liye YEH build sirf "plus" flavor mein hai aur website se install
+ * karne ke liye shop ko Play Protect waqti tor par band karna parta hai. Default
+ * download "clean" (sim) build hai jismein yeh file compile hi nahi hoti.
  *
  * WhatsApp note: unsaved number ki call par title mein number hota hai;
  * saved contact par sirf naam milta hai — dono bhej dete hain, match server
@@ -33,10 +39,6 @@ class CallListenerService : NotificationListenerService() {
             "جاری", "جا رہی", "ختم", "چھوٹی ہوئی",
         )
         private val NUMBER_RE = Regex("[+0-9][0-9 \\-()]{8,}")
-
-        // In-memory dedupe — WhatsApp/dialer ring ke doran notification baar
-        // baar update hoti hai; same caller 60s ke andar dobara na bheje.
-        private val lastSent = HashMap<String, Long>()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -48,7 +50,7 @@ class CallListenerService : NotificationListenerService() {
     }
 
     private fun handle(sbn: StatusBarNotification) {
-        val token = Prefs.token(this) ?: return
+        if (Prefs.token(this) == null) return
         val n = sbn.notification ?: return
         if (n.category != Notification.CATEGORY_CALL) return
 
@@ -65,41 +67,9 @@ class CallListenerService : NotificationListenerService() {
 
         // Number pehle title se, phir text se — jo bhi mile.
         val rawNumber = NUMBER_RE.find(title)?.value ?: NUMBER_RE.find(text)?.value
-        val phone = rawNumber?.replace(Regex("[^+0-9]"), "")?.takeIf { it.length >= 9 }
         // Naam: title jab woh khud number na ho (saved-contact case).
         val name = title.takeIf { it.isNotBlank() && NUMBER_RE.find(it)?.value != it }
 
-        if (phone == null && name.isNullOrBlank()) return
-
-        // 60s dedupe per caller
-        val key = (phone ?: "") + "|" + (name ?: "")
-        val now = System.currentTimeMillis()
-        synchronized(lastSent) {
-            val prev = lastSent[key] ?: 0L
-            if (now - prev < 60_000) return
-            lastSent[key] = now
-            // Map ko chhota rakho
-            if (lastSent.size > 50) {
-                val cutoff = now - 300_000
-                lastSent.entries.removeAll { it.value < cutoff }
-            }
-        }
-
-        val payload = JSONObject()
-            .put("phone", phone ?: JSONObject.NULL)
-            .put("name", name ?: JSONObject.NULL)
-            .put("source", source)
-            .put("at", now)
-
-        thread(name = "caller-ring-post") {
-            val (code, _) = ApiClient.post("/ring", payload, token)
-            if (code == 401) {
-                // Token rotate ho gaya (kisi aur phone se login) — yahan clear,
-                // agli app-open par login screen.
-                Prefs.setToken(this, null)
-            } else if (code in 200..299) {
-                Prefs.setLastSentAt(this, now)
-            }
-        }
+        RingReporter.reportAsync(this, rawNumber, name, source)
     }
 }

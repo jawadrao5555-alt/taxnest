@@ -1,6 +1,5 @@
 package pk.taxnest.callerid
 
-import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -17,19 +16,27 @@ import org.json.JSONObject
 import kotlin.concurrent.thread
 
 /**
- * Status + seedhi Urdu on-boarding:
- *  1) Notification access dein (NotificationListenerService ke bina kuch nahi)
- *  2) Battery exemption (taake Android service ko na maare)
+ * Status + seedhi on-boarding. Build-agnostic (Task 1345): jo permission is
+ * build ko chahiye wohi maangta hai —
+ *   sim ("clean") → Detector = phone + call log runtime permissions
+ *   plus          → Detector = notification access
+ * aur upar saaf likha hota hai ke yeh build kaunsi calls pakadti hai
+ * (build_badge / build_badge_roman har flavor ki apni strings.xml se).
+ *
+ *  1) Apni build wali permission dein (is ke baghair kuch nahi)
+ *  2) Battery exemption (taake Android app ko na maare)
  *  3) Test ring bhejein — sale screen par popup aana chahiye
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var welcomeText: TextView
+    private lateinit var buildBadge: TextView
+    private lateinit var buildBadgeRoman: TextView
     private lateinit var statusText: TextView
-    private lateinit var notifAccessRow: TextView
+    private lateinit var permRow: TextView
     private lateinit var batteryRow: TextView
     private lateinit var lastSentRow: TextView
-    private lateinit var notifBtn: Button
+    private lateinit var permBtn: Button
     private lateinit var batteryBtn: Button
     private lateinit var testBtn: Button
     private lateinit var updateRow: View
@@ -50,21 +57,21 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         welcomeText = findViewById(R.id.welcomeText)
+        buildBadge = findViewById(R.id.buildBadge)
+        buildBadgeRoman = findViewById(R.id.buildBadgeRoman)
         statusText = findViewById(R.id.statusText)
-        notifAccessRow = findViewById(R.id.notifAccessRow)
+        permRow = findViewById(R.id.permRow)
         batteryRow = findViewById(R.id.batteryRow)
         lastSentRow = findViewById(R.id.lastSentRow)
-        notifBtn = findViewById(R.id.notifBtn)
+        permBtn = findViewById(R.id.permBtn)
         batteryBtn = findViewById(R.id.batteryBtn)
         testBtn = findViewById(R.id.testBtn)
         updateRow = findViewById(R.id.updateRow)
 
-        notifBtn.setOnClickListener {
-            try {
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                Toast.makeText(this, getString(R.string.notif_toast), Toast.LENGTH_LONG).show()
-            } catch (_: Exception) {}
-        }
+        buildBadge.text = getString(R.string.build_badge)
+        buildBadgeRoman.text = getString(R.string.build_badge_roman)
+
+        permBtn.setOnClickListener { Detector.request(this) }
 
         batteryBtn.setOnClickListener {
             try {
@@ -120,16 +127,16 @@ class MainActivity : AppCompatActivity() {
         ui.removeCallbacks(stateLoop)
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == Detector.REQUEST_CODE) renderState()
+    }
+
     private fun logoutLocal() {
         Prefs.setToken(this, null)
         startActivity(Intent(this, LoginActivity::class.java))
         finish()
     }
-
-    private fun notifAccessOn(): Boolean = try {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: ""
-        flat.split(":").any { ComponentName.unflattenFromString(it)?.packageName == packageName }
-    } catch (_: Exception) { false }
 
     private fun batteryExempt(): Boolean = try {
         (getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
@@ -138,9 +145,9 @@ class MainActivity : AppCompatActivity() {
     private fun renderState() {
         welcomeText.text = getString(R.string.welcome_fmt, Prefs.userName(this), Prefs.companyName(this))
 
-        val notifOn = notifAccessOn()
-        notifAccessRow.text = if (notifOn) getString(R.string.notif_on) else getString(R.string.notif_off)
-        notifBtn.visibility = if (notifOn) View.GONE else View.VISIBLE
+        val permOn = Detector.granted(this)
+        permRow.text = if (permOn) getString(R.string.perm_on) else getString(R.string.perm_off)
+        permBtn.visibility = if (permOn) View.GONE else View.VISIBLE
 
         val battOn = batteryExempt()
         batteryRow.text = if (battOn) getString(R.string.battery_on) else getString(R.string.battery_off)
@@ -148,7 +155,7 @@ class MainActivity : AppCompatActivity() {
 
         val featureOn = Prefs.featureEnabled(this)
         statusText.text = when {
-            !notifOn -> getString(R.string.status_need_permission)
+            !permOn -> getString(R.string.status_need_permission)
             !featureOn -> getString(R.string.status_feature_off)
             else -> getString(R.string.status_ok)
         }
@@ -177,13 +184,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Update check — HAR BUILD apna. `?build=sim|plus` bhejna zaroori hai warna
+     * plus wale phone ko clean build ka APK mil jata aur WhatsApp detection
+     * chupke se khatam ho jati. Comparison semver-strict hai: server par purana
+     * version ho (ya beta phone aage ho) to jhoota banner nahi aata.
+     */
     private fun checkUpdate() {
         thread {
-            val (code, body) = ApiClient.get("/version", Prefs.token(this))
+            val (code, body) = ApiClient.get("/version?build=" + BuildConfig.BUILD_KIND, Prefs.token(this))
             if (code !in 200..299 || body == null) return@thread
             val latest = body.optString("latest")
             val url = body.optString("apk_url")
-            if (latest.isBlank() || url.isBlank() || latest == BuildConfig.VERSION_NAME) return@thread
+            if (url.isBlank() || !UpdateCheck.isNewer(latest, BuildConfig.VERSION_NAME)) return@thread
             runOnUiThread {
                 updateRow.visibility = View.VISIBLE
                 findViewById<Button>(R.id.updateBtn).setOnClickListener {

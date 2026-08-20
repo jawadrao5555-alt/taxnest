@@ -36,6 +36,4 @@ fbr-pos-app/app/google-services.json
 tools/video-pipeline/out/
 .env.*
 !.env.example
-attached_assets/*.txt
-attached_assets/Pasted-*
-attached_assets/*.json
+attached_assets/

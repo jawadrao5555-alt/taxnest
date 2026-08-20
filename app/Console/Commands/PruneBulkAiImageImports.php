@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\BulkAiImageItem;
+use App\Models\BulkAiImageBatch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
@@ -61,6 +62,33 @@ class PruneBulkAiImageImports extends Command
                     $deleted++;
                 }
             });
+        // Annexure rows are private, batch-scoped review detail just like the
+        // source photo. Keep the audit trail, but remove the temporary product
+        // master and all mapping/sample values once the batch expires.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('bulk_ai_image_batches', 'annexure_rows_json')) {
+            BulkAiImageBatch::whereNotNull('retention_until')
+                ->where('retention_until', '<', now())
+                ->where(function ($query) {
+                    $query->whereNotNull('annexure_rows_json')->orWhereNotNull('annexure_storage_path');
+                })
+                ->orderBy('id')
+                ->chunkById(100, function ($batches) {
+                    foreach ($batches as $batch) {
+                        if ($batch->annexure_storage_path) {
+                            Storage::disk('local')->delete($batch->annexure_storage_path);
+                        }
+                        Storage::disk('local')->deleteDirectory('private/ai-bulk/' . $batch->company_id . '/' . $batch->id . '/annexure');
+                        $batch->update([
+                            'annexure_storage_path' => null,
+                            'annexure_headers_json' => null,
+                            'annexure_samples_json' => null,
+                            'annexure_rows_json' => null,
+                            'annexure_mapping_json' => null,
+                            'annexure_status' => $batch->annexure_status === 'none' ? 'none' : 'pruned',
+                        ]);
+                    }
+                });
+        }
         $this->info("Deleted {$deleted} expired Bulk AI source photo(s); released {$expired} abandoned upload(s).");
         return self::SUCCESS;
     }

@@ -7,6 +7,7 @@ use App\Models\AiInvoiceParse;
 use App\Models\BulkAiImageBatch;
 use App\Models\Company;
 use App\Services\AiInvoiceReaderService;
+use App\Services\AnnexureProductService;
 use App\Services\BulkAiImageImportService;
 use App\Services\DiFeatureService;
 use App\Services\PlanLimitService;
@@ -143,6 +144,73 @@ class AiInvoiceReaderController extends Controller
             'items' => $batch->items()->orderBy('position')->get(['id', 'position', 'original_filename', 'source_uuid']),
             'quota' => $service->quotaState($company),
         ]);
+    }
+
+    public function bulkAnnexureUpload(Request $request, int $batchId, AnnexureProductService $annexure)
+    {
+        $batch = app(BulkAiImageImportService::class)->batchForCompany($batchId, (int) app('currentCompanyId'));
+        if (!$batch) {
+            return response()->json(['error' => 'Bulk AI batch not found.'], 404);
+        }
+        $request->validate([
+            'annexure' => 'required|file|max:5120|mimes:xlsx,xls,csv,txt',
+        ]);
+        try {
+            return response()->json($annexure->upload($batch, $request->file('annexure')));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function bulkAnnexureApply(Request $request, int $batchId, AnnexureProductService $annexure)
+    {
+        $batch = app(BulkAiImageImportService::class)->batchForCompany($batchId, (int) app('currentCompanyId'));
+        if (!$batch) {
+            return response()->json(['error' => 'Bulk AI batch not found.'], 404);
+        }
+        $request->validate(['mapping' => 'required|array']);
+        try {
+            return response()->json($annexure->applyMapping($batch, (array) $request->input('mapping')));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function bulkAnnexureCatalogAction(Request $request, int $batchId, AnnexureProductService $annexure)
+    {
+        $batch = app(BulkAiImageImportService::class)->batchForCompany($batchId, (int) app('currentCompanyId'));
+        if (!$batch) {
+            return response()->json(['error' => 'Bulk AI batch not found.'], 404);
+        }
+        $request->validate([
+            'annexure_row' => 'required|integer|min:1',
+            'action' => 'required|in:create,update',
+            'product_id' => 'nullable|integer',
+            'price_decision' => 'required|in:keep_current,update_catalog,batch_only',
+            'fields' => 'nullable|array',
+            'fields.*' => 'string|in:name,barcode,sku,hs_code,pct_code,uom,default_tax_rate,tax_type,schedule_type,sro_reference,serial_number,mrp',
+        ]);
+        try {
+            return response()->json($annexure->saveCatalogDecision(
+                $batch,
+                Company::findOrFail($batch->company_id),
+                (int) auth()->id(),
+                $request->all()
+            ));
+        } catch (\InvalidArgumentException|\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function bulkAnnexureReverse(Request $request, int $batchId, int $auditId, AnnexureProductService $annexure)
+    {
+        $batch = app(BulkAiImageImportService::class)->batchForCompany($batchId, (int) app('currentCompanyId'));
+        if (!$batch) return response()->json(['error' => 'Bulk AI batch not found.'], 404);
+        try {
+            return response()->json($annexure->reverseCatalogDecision($batch, Company::findOrFail($batch->company_id), (int) auth()->id(), $auditId));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
     }
 
     public function bulkChunk(Request $request, int $batchId, int $itemId, BulkAiImageImportService $service)

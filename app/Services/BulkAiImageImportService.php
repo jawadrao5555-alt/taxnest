@@ -155,6 +155,9 @@ class BulkAiImageImportService
 
     public function completeUpload(BulkAiImageItem $item): array
     {
+        if (($item->batch->annexure_status ?? 'none') === 'mapping_pending') {
+            throw new \InvalidArgumentException('Confirm the Annexure column mapping before uploading invoice photos.');
+        }
         $totalChunks = (int) $item->total_chunks;
         if ($totalChunks < 1) {
             throw new \InvalidArgumentException('No upload chunks were received.');
@@ -266,6 +269,7 @@ class BulkAiImageImportService
             $item->batch()->decrement('reserved_credits');
 
             $payload = (array) $parse->payload_json;
+            $annexureMatches = $this->applyAnnexureReference($item->batch, $payload);
             $rows = $this->rowsFromPayload($payload);
             $validated = (new InvoiceImportService())->validateRows($rows, $company);
             $validationErrors = [];
@@ -291,12 +295,21 @@ class BulkAiImageImportService
 
             $warnings = array_values(array_unique(array_merge(
                 (array) ($payload['warnings'] ?? []),
-                $validationErrors
+                $validationErrors,
+                array_values(array_filter(array_map(
+                    fn ($match) => in_array($match['status'] ?? '', ['missing', 'ambiguous', 'conflict'], true)
+                        ? 'Annexure: ' . ($match['explanation'] ?? 'manual product match review is required.')
+                        : null,
+                    $annexureMatches
+                )))
             )));
             if (!empty($validationErrors) || empty($validated['rows']) || $validated['valid_count'] !== count($validated['rows'])) {
                 $this->finishItem($item, 'needs_review', [
                     'validation_errors' => $validationErrors,
                     'source_document_key' => $sourceKey,
+                    'mapping' => $this->mappingDetails($payload),
+                    'annexure_matches' => $annexureMatches,
+                    'annexure_status' => $item->batch->annexure_status,
                 ], $warnings);
                 return;
             }
@@ -304,6 +317,8 @@ class BulkAiImageImportService
             $details = [
                 'source_document_key' => $sourceKey,
                 'mapping' => $this->mappingDetails($payload),
+                'annexure_matches' => $annexureMatches,
+                'annexure_status' => $item->batch->annexure_status,
                 'validation_errors' => [],
             ];
             // Keep draft creation, immutable source-item linkage, and terminal
@@ -391,7 +406,66 @@ class BulkAiImageImportService
                 'invoice_url' => $i->invoice_id ? '/invoice/' . $i->invoice_id . '/edit' : null,
                 'retryable' => $i->status === 'failed' && $i->source_deleted_at === null,
             ])->values()->all(),
+            'annexure' => [
+                'status' => $batch->annexure_status ?: 'none',
+                'filename' => $batch->annexure_filename,
+                'headers' => $batch->annexureHeadersArray(),
+                'samples' => $batch->annexureSamplesArray(),
+                'mapping' => $batch->annexureMappingArray(),
+                'rows' => array_values(array_filter($batch->annexureRowsArray(), fn ($row) => !empty($row['valid']))),
+            ],
+            'annexure_audits' => app(AnnexureProductService::class)->auditTrail($batch, Company::findOrFail($batch->company_id)),
         ];
+    }
+
+    /**
+     * Applies only missing compliance profile data. The source invoice's
+     * quantity, price, tax, and totals are intentionally not touched.
+     */
+    private function applyAnnexureReference(BulkAiImageBatch $batch, array &$payload): array
+    {
+        $lines = (array) ($payload['items'] ?? []);
+        if (($batch->annexure_status ?? 'none') !== 'ready') {
+            return array_map(fn ($line, $index) => [
+                'line_index' => $index, 'status' => 'not_available', 'match_type' => null,
+                'confidence' => 0, 'explanation' => 'No Annexure was attached to this batch.',
+                'source_row' => null, 'entry' => null,
+            ], $lines, array_keys($lines));
+        }
+        $matches = app(AnnexureProductService::class)->matchLines($lines, $batch->annexureRowsArray());
+        foreach ($matches as $index => $match) {
+            if (($match['status'] ?? '') !== 'matched' || empty($match['entry'])) {
+                continue;
+            }
+            $entry = $match['entry'];
+            $line = &$payload['items'][$index];
+            foreach ([
+                'hs_code' => 'hs_code', 'pct_code' => 'pct_code', 'uom' => 'uom',
+                'default_tax_rate' => 'tax_rate', 'schedule_type' => 'schedule_type',
+                'sro_reference' => 'sro_schedule_no', 'serial_number' => 'serial_no',
+                'mrp' => 'mrp',
+            ] as $from => $to) {
+                if (($line[$to] ?? '') === '' && ($entry[$from] ?? '') !== '') {
+                    $line[$to] = $entry[$from];
+                }
+            }
+            $line['annexure_match'] = [
+                'source_row' => $match['source_row'],
+                'match_type' => $match['match_type'],
+                'confidence' => $match['confidence'],
+            ];
+            $annexurePrice = $entry['default_price'] ?? '';
+            $profilePrice = $line['profile_default_price'] ?? null;
+            if ($line['product_id'] ?? null) {
+                $matches[$index]['price_conflict'] = $annexurePrice !== '' && $profilePrice !== null
+                    && round((float) $annexurePrice, 2) !== round((float) $profilePrice, 2);
+                $matches[$index]['catalog_price'] = $profilePrice;
+                $matches[$index]['annexure_price'] = $annexurePrice === '' ? null : (float) $annexurePrice;
+                $matches[$index]['price_options'] = ['keep_current', 'update_catalog', 'batch_only'];
+            }
+            unset($line);
+        }
+        return $matches;
     }
 
     private function rowsFromPayload(array $payload): array
@@ -456,6 +530,10 @@ class BulkAiImageImportService
             'match_confidence' => $item['product_match_confidence'] ?? null,
             'profile_tax_rate' => $item['profile_tax_rate'] ?? null,
             'profile_hs_code' => $item['profile_hs_code'] ?? null,
+            'profile_default_price' => $item['profile_default_price'] ?? null,
+            'barcode' => $item['barcode'] ?? '',
+            'sku' => $item['sku'] ?? '',
+            'annexure_match' => $item['annexure_match'] ?? null,
         ], (array) ($payload['items'] ?? []));
     }
 

@@ -975,6 +975,8 @@ PROMPT;
 
             $items[] = [
                 'description' => $desc,
+                'barcode' => self::cleanString($itRaw['barcode'] ?? '', 80),
+                'sku' => self::cleanString($itRaw['sku'] ?? '', 80),
                 'hs_code' => $hs,
                 'pct_code' => $pct,
                 'quantity' => $qty,
@@ -996,6 +998,7 @@ PROMPT;
                 'profile_hs_code' => $profileHs,
                 'profile_pct_code' => $product ? self::cleanString($product->pct_code ?? '', 50) : '',
                 'profile_tax_rate' => $profileTaxRate,
+                'profile_default_price' => $product && is_numeric($product->default_price ?? null) ? (float) $product->default_price : null,
                 'profile_uom' => $product ? self::cleanString($product->uom ?? '', 100) : '',
                 'profile_schedule_type' => $product ? self::cleanString($product->schedule_type ?? '', 50) : '',
                 'profile_sro_reference' => $product ? self::cleanString($product->sro_reference ?? '', 100) : '',

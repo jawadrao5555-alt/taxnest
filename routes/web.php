@@ -415,6 +415,14 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
             ->name('invoices.ai-reader.bulk');
         Route::post('/invoices/ai-reader/bulk-images/start', [AiInvoiceReaderController::class, 'bulkStart'])
             ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.start');
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure', [AiInvoiceReaderController::class, 'bulkAnnexureUpload'])
+            ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.annexure');
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure/apply', [AiInvoiceReaderController::class, 'bulkAnnexureApply'])
+            ->name('invoices.ai-reader.bulk.annexure.apply');
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure/catalog', [AiInvoiceReaderController::class, 'bulkAnnexureCatalogAction'])
+            ->name('invoices.ai-reader.bulk.annexure.catalog');
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure/audits/{auditId}/reverse', [AiInvoiceReaderController::class, 'bulkAnnexureReverse'])
+            ->name('invoices.ai-reader.bulk.annexure.reverse');
         Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/chunk', [AiInvoiceReaderController::class, 'bulkChunk'])
             ->middleware('throttle:120,1')->name('invoices.ai-reader.bulk.chunk');
         Route::post('/invoices/ai-reader/bulk-images/{batchId}/items/{itemId}/complete', [AiInvoiceReaderController::class, 'bulkComplete'])

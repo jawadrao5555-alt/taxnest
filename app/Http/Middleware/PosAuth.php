@@ -55,7 +55,7 @@ class PosAuth
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
-                return redirect('/pos/archive');
+                return $this->toPortal('/pos/archive');
             }
         } else {
             // Conversely, non-archive users cannot access archive routes.
@@ -78,7 +78,7 @@ class PosAuth
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
-                return redirect('/pos/local-bills');
+                return $this->toPortal('/pos/local-bills');
             }
         } else {
             if (str_starts_with(ltrim($request->path(), '/'), 'pos/local-bills') && !$user->isPosAdmin()) {
@@ -104,7 +104,7 @@ class PosAuth
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
-                return redirect('/pos/restaurant/kds');
+                return $this->toPortal('/pos/restaurant/kds');
             }
         }
 
@@ -121,7 +121,7 @@ class PosAuth
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
-                return redirect('/pos/rider');
+                return $this->toPortal('/pos/rider');
             }
         }
 
@@ -141,7 +141,7 @@ class PosAuth
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
-                return redirect('/pos/deliveries');
+                return $this->toPortal('/pos/deliveries');
             }
         }
 
@@ -160,7 +160,7 @@ class PosAuth
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
-                return redirect('/pos/waiter');
+                return $this->toPortal('/pos/waiter');
             }
         }
 
@@ -181,7 +181,7 @@ class PosAuth
                 // Dashboard blocked too → land on the sale screen (unmapped path,
                 // always allowed) so the redirect can never loop.
                 $home = in_array('dashboard', $customAccess, true) ? '/pos/dashboard' : '/pos/invoice/create';
-                return redirect($home)->with('error', __('pos.custom_access_denied'));
+                return $this->toPortal($home)->with('error', __('pos.custom_access_denied'));
             }
         }
 
@@ -225,5 +225,19 @@ class PosAuth
         view()->share('currentBranch', $branchId ? \App\Models\Branch::find($branchId) : null);
 
         return $next($request);
+    }
+
+    /**
+     * Send a signed-in staff member back to its own portal with a PATH-RELATIVE
+     * redirect. The development preview reaches Laravel through a local HTTP
+     * bridge while production forces HTTPS URLs; an absolute forced-HTTPS
+     * Location would point the browser at TLS on the local PHP server port and
+     * block a confined role right after a valid sign-in. Relative Location
+     * headers are resolved against the current request by every browser, so
+     * production behaviour is unchanged.
+     */
+    private function toPortal(string $path): \Illuminate\Http\RedirectResponse
+    {
+        return redirect()->away($path);
     }
 }

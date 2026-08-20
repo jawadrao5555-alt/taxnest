@@ -19,16 +19,7 @@ class PosAuthController extends Controller
     public function showLogin()
     {
         if (Auth::guard('pos')->check()) {
-            $user = Auth::guard('pos')->user();
-            if (($user->pos_role ?? null) === 'archive_viewer') {
-                return redirect('/pos/archive');
-            }
-            if (($user->pos_role ?? null) === 'local_viewer') {
-                return redirect('/pos/local-bills');
-            }
-            // POS UNIFICATION: every POS user (restaurant or retail) bills on the
-            // single universal sale screen; restaurant behavior is driven by features.
-            return $this->redirectToSaleScreen();
+            return $this->redirectToPortal(Auth::guard('pos')->user());
         }
         return view('pos.auth.login');
     }
@@ -127,36 +118,10 @@ class PosAuthController extends Controller
                 // (regenerate() keeps session data, so clear explicitly).
                 $request->session()->forget(['pos_local_check', 'pos_identity_original_id']);
 
-                // Archive Viewer → isolated Archive Portal only. Same /pos/login URL,
-                // auto-detected by pos_role. POS admin/cashier never sees this account.
-                if (($user->pos_role ?? null) === 'archive_viewer') {
-                    return redirect('/pos/archive');
-                }
-
-                // Local Bills Viewer → isolated Local Bills Portal only.
-                if (($user->pos_role ?? null) === 'local_viewer') {
-                    return redirect('/pos/local-bills');
-                }
-
-                // Kitchen account (P5, F4) → straight to the Kitchen Display.
-                // PosAuth middleware confines this role to /pos/restaurant/kds*.
-                if (($user->pos_role ?? null) === 'pos_kitchen') {
-                    return redirect('/pos/restaurant/kds');
-                }
-
-                // Waiter account (P7, F6) → straight to the Waiter Tablet.
-                // PosAuth middleware confines this role to /pos/waiter*.
-                if (($user->pos_role ?? null) === 'pos_waiter') {
-                    return redirect('/pos/waiter');
-                }
-
-                // Delivery Manager → straight to the Deliveries board.
-                // PosAuth middleware confines this role to /pos/deliveries*.
-                if (($user->pos_role ?? null) === 'pos_delivery') {
-                    return redirect('/pos/deliveries');
-                }
-
-                return $this->redirectToSaleScreen();
+                // Every POS staff account lands on its own portal — the confined
+                // roles are auto-detected by pos_role on this same /pos/login URL
+                // and PosAuth keeps each one inside its portal from there.
+                return $this->redirectToPortal($user);
             }
             // Wrong panel → fall through to generic failure (no info leak)
         }
@@ -172,7 +137,7 @@ class PosAuthController extends Controller
     public function showRegister()
     {
         if (Auth::guard('pos')->check()) {
-            return redirect('/pos/invoice/create');
+            return $this->redirectToPortal(Auth::guard('pos')->user());
         }
         // Package picker (owner rule Jul 2026): the shop chooses its plan at
         // sign-up; the admin sees it at approval and approves exactly that plan.
@@ -280,7 +245,7 @@ class PosAuthController extends Controller
 
         Auth::guard('pos')->login($user);
 
-        return redirect('/pos/invoice/create');
+        return $this->redirectToPortal($user);
     }
 
     /**
@@ -295,14 +260,43 @@ class PosAuthController extends Controller
     }
 
     /**
-     * Keep the sale-screen redirect relative. The development preview reaches
+     * Post-login home for a POS staff account, by pos_role.
+     *
+     * Every confined role signs in on the same /pos/login URL and is then held
+     * inside its own portal by the PosAuth middleware, so login must land it
+     * exactly there. POS admin/cashier never see those accounts.
+     */
+    private function portalPathFor(?\Illuminate\Contracts\Auth\Authenticatable $user): string
+    {
+        return match ($user->pos_role ?? null) {
+            // Read-only Archive Portal.
+            'archive_viewer' => '/pos/archive',
+            // Read-only Local Bills Portal.
+            'local_viewer'   => '/pos/local-bills',
+            // Kitchen Display (P5, F4).
+            'pos_kitchen'    => '/pos/restaurant/kds',
+            // Rider portal — today's own deliveries only (Jul 2026).
+            'pos_rider'      => '/pos/rider',
+            // Delivery Manager board (owner, 20 Jul 2026).
+            'pos_delivery'   => '/pos/deliveries',
+            // Waiter Tablet (P7, F6).
+            'pos_waiter'     => '/pos/waiter',
+            // POS UNIFICATION: every other POS user (restaurant or retail) bills
+            // on the single universal sale screen; restaurant behavior is driven
+            // by features.
+            default          => '/pos/invoice/create',
+        };
+    }
+
+    /**
+     * Keep every post-login redirect relative. The development preview reaches
      * Laravel through a local HTTP bridge while production forces HTTPS URLs;
      * an absolute forced-HTTPS redirect would otherwise send the browser to
      * TLS on the local PHP server port after a successful login.
      */
-    private function redirectToSaleScreen(): \Illuminate\Http\RedirectResponse
+    private function redirectToPortal(?\Illuminate\Contracts\Auth\Authenticatable $user): \Illuminate\Http\RedirectResponse
     {
-        return redirect()->away('/pos/invoice/create');
+        return redirect()->away($this->portalPathFor($user));
     }
 
     public function logout(Request $request)

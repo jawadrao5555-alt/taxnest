@@ -3,6 +3,11 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
+use App\Http\Middleware\PosAuth;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -22,6 +27,22 @@ use Illuminate\Database\Schema\Blueprint;
  */
 class Phase3LoginIsolationTest extends TestCase
 {
+    /**
+     * Confined POS staff roles → the isolated portal each one owns. Every one
+     * of them signs in on the SAME /pos/login URL and is auto-detected by
+     * pos_role; PosAuth then holds each account inside its portal.
+     */
+    private const CONFINED_POS_PORTALS = [
+        'archive_viewer' => '/pos/archive',
+        'local_viewer'   => '/pos/local-bills',
+        'pos_kitchen'    => '/pos/restaurant/kds',
+        'pos_rider'      => '/pos/rider',
+        'pos_delivery'   => '/pos/deliveries',
+        'pos_waiter'     => '/pos/waiter',
+    ];
+
+    private const CONFINED_POS_PASSWORD = 'Staff@12345';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -144,6 +165,19 @@ class Phase3LoginIsolationTest extends TestCase
             'company_id' => $posId, 'role' => 'company_admin', 'pos_role' => 'pos_admin', 'is_active' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
+
+        // ── Confined POS staff accounts (kitchen, waiter, rider, delivery
+        //    manager, archive viewer, local-bills viewer) ──
+        // Same POS company, same /pos/login URL — each one owns an isolated
+        // portal and must reach it straight after a valid sign-in.
+        foreach (array_keys(self::CONFINED_POS_PORTALS) as $posRole) {
+            DB::table('users')->insert([
+                'name' => 'POS ' . $posRole, 'email' => $posRole . '@taxnest.test',
+                'password' => Hash::make(self::CONFINED_POS_PASSWORD),
+                'company_id' => $posId, 'role' => 'pos_user', 'pos_role' => $posRole, 'is_active' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
 
         // ── Restaurant POS practice user ──
         // This mirrors the retained local restaurant fixture: a restaurant is
@@ -376,6 +410,77 @@ class Phase3LoginIsolationTest extends TestCase
         $this->assertFalse(auth('web')->check());
         $this->assertFalse(auth('admin')->check());
         $this->assertFalse(auth('fbrpos')->check());
+    }
+
+    /**
+     * Every confined POS staff role signs in on the shared /pos/login URL and
+     * must land on its OWN portal with a path-relative redirect. The live app
+     * forces HTTPS URLs, but the development preview's local bridge speaks
+     * HTTP — an absolute Location would send the browser to TLS on the local
+     * PHP server port and block a validly signed-in staff member.
+     */
+    public function test_confined_pos_roles_reach_their_portal_with_a_relative_redirect(): void
+    {
+        foreach (self::CONFINED_POS_PORTALS as $posRole => $portal) {
+            $this->flushSession();
+            $this->app['auth']->forgetGuards();
+
+            URL::forceScheme('https');
+            try {
+                $response = $this->post('/pos/login', [
+                    'login' => $posRole . '@taxnest.test',
+                    'password' => self::CONFINED_POS_PASSWORD,
+                ]);
+            } finally {
+                URL::forceScheme(null);
+            }
+
+            $response->assertRedirect($portal);
+            $this->assertSame(
+                $portal,
+                $response->headers->get('Location'),
+                "[$posRole] must be sent to $portal with a path-relative redirect"
+            );
+            $this->assertTrue(auth('pos')->check(), "[$posRole] must be authenticated on the POS guard");
+            $this->assertSame($posRole . '@taxnest.test', auth('pos')->user()->email);
+            $this->assertFalse(auth('web')->check());
+            $this->assertFalse(auth('admin')->check());
+            $this->assertFalse(auth('fbrpos')->check());
+        }
+    }
+
+    /**
+     * PosAuth keeps each confined role inside its portal. That bounce hits an
+     * ALREADY signed-in staff member, so it has to stay path-relative too —
+     * otherwise the first page the role opens after login is what breaks.
+     * Role confinement itself must not loosen: the bounce still happens.
+     */
+    public function test_pos_auth_confinement_bounce_stays_path_relative(): void
+    {
+        foreach (self::CONFINED_POS_PORTALS as $posRole => $portal) {
+            Auth::guard('pos')->setUser(User::where('email', $posRole . '@taxnest.test')->firstOrFail());
+
+            URL::forceScheme('https');
+            try {
+                $response = (new PosAuth())->handle(
+                    Request::create('https://nestpos.test/pos/dashboard', 'GET'),
+                    fn () => response('NEXT-OK')
+                );
+            } finally {
+                URL::forceScheme(null);
+            }
+
+            $this->assertInstanceOf(
+                RedirectResponse::class,
+                $response,
+                "[$posRole] must stay confined to $portal"
+            );
+            $this->assertSame(
+                $portal,
+                $response->headers->get('Location'),
+                "[$posRole] must be bounced home with a path-relative Location"
+            );
+        }
     }
 
     /** Test 6c: FBR user on /fbr-pos/login → PASS → /fbr-pos/create */

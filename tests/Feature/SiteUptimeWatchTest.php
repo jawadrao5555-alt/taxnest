@@ -113,7 +113,9 @@ class SiteUptimeWatchTest extends TestCase
         $this->assertStringContainsString('CLOUDFLARE-ORIGIN-LINK', (string) $email->getSubject());
         $body = $email->getTextBody();
         $this->assertStringContainsString('HOSTING-side problem', $body);
-        $this->assertStringContainsString('whitelist all Cloudflare IP ranges', $body);
+        // The hosting provider closes a 525 ticket as "nothing found" without the
+        // Ray ID, so the alert must always tell the owner to hand it over.
+        $this->assertStringContainsString('Cloudflare Ray', $body);
 
         // Third failure in the same incident: still exactly one email.
         $this->probeRun();

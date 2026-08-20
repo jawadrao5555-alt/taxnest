@@ -159,6 +159,11 @@ class WatchSiteUptime extends Command
                 'ms' => $this->elapsedMs($started),
                 'error' => null,
                 'tls_ok' => true,
+                // Cloudflare stamps every response — including its own 52x error
+                // pages — with cf-ray. The hosting provider cannot trace a
+                // Cloudflare-side failure in their logs without it, so it is
+                // captured here rather than reconstructed after the fact.
+                'ray' => $response->header('cf-ray') ?: null,
             ];
         } catch (\Throwable $e) {
             return [
@@ -167,6 +172,7 @@ class WatchSiteUptime extends Command
                 'ms' => $this->elapsedMs($started),
                 'error' => $e->getMessage(),
                 'tls_ok' => $verify ? null : true,
+                'ray' => null,
             ];
         }
     }
@@ -311,8 +317,9 @@ class WatchSiteUptime extends Command
                     . "  - the server firewall (CSF/lfd) temporarily blocking a Cloudflare edge IP\n"
                     . "  - a web server restart (AutoSSL renewal / provider maintenance)\n"
                     . "  - a transient network fault between Cloudflare and the datacentre\n\n"
-                    . "Action: send the hosting provider this timestamp and ask them to check the\n"
-                    . "firewall logs and permanently whitelist all Cloudflare IP ranges.",
+                    . "Action: send the hosting provider the UTC timestamp AND the Cloudflare Ray\n"
+                    . "ID printed above — without the Ray ID they cannot trace the failed\n"
+                    . "connection in their logs and the ticket will come back as \"nothing found\".",
                 'ORIGIN-TLS-INVALID' =>
                     "The server is alive, but its SSL certificate is being REJECTED. Cloudflare\n"
                     . "runs in Full (strict) mode, so it refuses the origin and shows visitors\n"
@@ -463,9 +470,10 @@ class WatchSiteUptime extends Command
     {
         $path = storage_path('logs/' . self::LOG_FILE);
         $line = sprintf(
-            "%s | edge=%s | origin=%s | %s\n",
+            "%s | edge=%s%s | origin=%s | %s\n",
             now()->timezone(config('app.timezone'))->format('Y-m-d H:i:s'),
             $this->describe($edge),
+            ($edge['ray'] ?? null) ? ' ray=' . $edge['ray'] : '',
             $origin === null ? '-' : $this->describe($origin),
             $kind
         );

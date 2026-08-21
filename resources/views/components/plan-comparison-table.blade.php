@@ -277,7 +277,11 @@
                                     <span class="tnpc-second" @if(!empty($col['price_note_x'])) x-text="{{ $col['price_note_x'] }}" @endif>{{ $col['price_note'] ?? '' }}</span>
                                 @endif
                                 @if(!empty($col['cta_url']))
-                                    <a class="tnpc-cta" href="{{ $col['cta_url'] }}">{{ $col['cta_label'] ?? $col['name'] }}</a>
+                                    {{-- cta_url_x (Task 1484): surfaces with a billing-cycle
+                                         switch re-point the link at the cycle the visitor is
+                                         actually looking at. The plain href stays the correct
+                                         default for no-JS / pre-boot clicks. --}}
+                                    <a class="tnpc-cta" href="{{ $col['cta_url'] }}" @if(!empty($col['cta_url_x'])) x-bind:href="{{ $col['cta_url_x'] }}" @endif>{{ $col['cta_label'] ?? $col['name'] }}</a>
                                 @endif
                             @else
                                 <span class="tnpc-price">{{ $col['price'] }}</span>

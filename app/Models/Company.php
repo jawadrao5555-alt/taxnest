@@ -53,6 +53,9 @@ class Company extends Model
         // package ki shamil branches se OOPER khareede hue slots.
         'extra_branch_slots',
         'requested_plan_id',
+        // Task 1484: the billing cycle picked alongside that package (DI only —
+        // POS/FBR POS are yearly, so they leave it NULL).
+        'requested_billing_cycle',
         'referred_by_user_id',
         'referral_code_used',
         'registration_no',

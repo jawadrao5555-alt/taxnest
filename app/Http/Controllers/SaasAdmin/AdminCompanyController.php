@@ -799,7 +799,9 @@ class AdminCompanyController extends Controller
         $company->update(['status' => 'approved', 'company_status' => 'active']);
 
         // Owner rule (Jul 2026): approval activates the package the shop picked
-        // at registration — a 1-year subscription of exactly that plan.
+        // before signing up — exactly that plan, charged for the period that
+        // product sells (Task 1484: DI on the cycle the visitor picked,
+        // PRA POS / FBR POS yearly).
         $assigned = \App\Services\SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
 
         AdminAuditLog::log(auth('admin')->id(), 'Company approved', 'Company', $id, [
@@ -811,7 +813,10 @@ class AdminCompanyController extends Controller
 
         $msg = "Company '{$company->name}' has been approved.";
         if ($assigned) {
-            $msg .= " {$assigned->pricingPlan->name} package activated for 1 year (until {$assigned->end_date->format('d M Y')}).";
+            $cycle = Subscription::getCycleLabel($assigned->billing_cycle ?? 'monthly');
+            $msg .= " {$assigned->pricingPlan->name} package activated — {$cycle} billing, Rs "
+                . number_format((float) $assigned->final_price)
+                . " (until {$assigned->end_date->format('d M Y')}).";
         }
         return back()->with('success', $msg);
     }

@@ -148,11 +148,16 @@ class SubscriptionAssignmentService
     }
 
     /**
-     * Owner rule (Jul 2026): a POS shop picks its package at registration
+     * Owner rule (Jul 2026): a shop picks its package before signing up
      * (companies.requested_plan_id); admin approval activates EXACTLY that
-     * plan for 1 year. Called from BOTH admin approve paths
+     * plan. Called from BOTH admin approve paths
      * (SaasAdmin\AdminCompanyController::approve + AdminController::approveCompany)
      * so they can never drift apart.
+     *
+     * Task 1484 — FBR POS and Digital Invoice signups now record a package too,
+     * so the charged period must follow the product, not a hardcoded year:
+     * Digital Invoice on the cycle the visitor picked on the pricing page
+     * (monthly by default), PRA POS and FBR POS yearly as before.
      *
      * No-ops when: no requested plan (legacy registrations), the plan was
      * deleted/trial, or a paid (non-trial) subscription is already active
@@ -180,9 +185,11 @@ class SubscriptionAssignmentService
             return null;
         }
 
-        // assign() deactivates the 3-day trial row and forces the cycle to
-        // annual for POS plans → end_date = +12 months. After that the shop
+        // assign() deactivates the 3-day trial row and prices the plan for this
+        // cycle → end_date = start + the cycle's months. After that the shop
         // must renew (expiry is enforced by PlanLimitService).
-        return self::assign($company->id, $plan->id, 'annual');
+        $cycle = RequestedPackageService::cycleForPlan($plan, $company->requested_billing_cycle ?? null);
+
+        return self::assign($company->id, $plan->id, $cycle);
     }
 }

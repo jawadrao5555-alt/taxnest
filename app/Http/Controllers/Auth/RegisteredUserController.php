@@ -17,26 +17,27 @@ use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 use App\Services\SecurityLogService;
 use App\Services\CredentialLedgerService;
+use App\Services\RequestedPackageService;
 use Illuminate\Validation\ValidationException;
 
 class RegisteredUserController extends Controller
 {
     public function create(): View
     {
-        // Task 1483: the Digital Invoice landing's comparison table sends the
-        // visitor here with ?plan=<package name>, so the page can name the
-        // column they clicked. This form has no package picker — the admin
-        // assigns the plan at approval — so an unknown or missing name simply
-        // shows nothing.
-        $requested = trim((string) request('plan'));
-        $picked = $requested === ''
-            ? null
-            : \App\Models\PricingPlan::where('product_type', 'di')
-                ->where('is_trial', false)
-                ->get()
-                ->first(fn ($plan) => mb_strtolower($plan->name) === mb_strtolower($requested));
+        // Task 1483/1484: the Digital Invoice landing's comparison table sends
+        // the visitor here with ?plan=<package name>&cycle=<billing cycle>, so
+        // the page can name the column they clicked AND the form can carry both
+        // back on submit. store() re-resolves them, so an unknown or missing
+        // name simply shows (and records) nothing; an unknown cycle falls back
+        // to monthly, which is how DI is quoted.
+        $picked = RequestedPackageService::resolvePlan(request('plan'), 'di');
+        $cycle = $picked ? RequestedPackageService::cycleForPlan($picked, request('cycle')) : null;
 
-        return view('auth.register', ['pickedPlanName' => $picked?->name]);
+        return view('auth.register', [
+            'pickedPlanName' => $picked?->name,
+            'pickedCycle' => $cycle,
+            'pickedCycleLabel' => $cycle ? Subscription::getCycleLabel($cycle) : null,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -94,7 +95,17 @@ class RegisteredUserController extends Controller
             }
         }
 
-        $user = DB::transaction(function () use ($request, $referralAttrs) {
+        // Task 1484: the package (and billing cycle) the visitor clicked on the
+        // pricing table, carried here by hidden fields. Re-resolved server-side,
+        // so a tampered, unknown, trial or wrong-product name is ignored rather
+        // than stored — a signup with no package behind it stores nothing at all
+        // — and an unrecognised cycle falls back to monthly.
+        $requestedPackage = RequestedPackageService::companyAttributes(
+            RequestedPackageService::resolvePlan($request->input('requested_plan'), 'di'),
+            $request->input('requested_billing_cycle')
+        );
+
+        $user = DB::transaction(function () use ($request, $referralAttrs, $requestedPackage) {
             $company = Company::create(array_merge([
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
@@ -102,7 +113,7 @@ class RegisteredUserController extends Controller
                 'product_type' => 'di',
                 'company_status' => 'active',
                 'status' => 'pending',
-            ], $referralAttrs));
+            ], $referralAttrs, $requestedPackage));
 
             // Always attaches a trial subscription (even if the trial plan
             // seed row is missing) — no signup may leave a company bare.

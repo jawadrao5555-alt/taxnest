@@ -74,6 +74,14 @@
                     <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}' }">
                         @csrf
 
+                        {{-- Task 1484: carries the clicked package into the signup so
+                             approval activates exactly that one. Only ever holds a
+                             package the server already matched, and register()
+                             re-checks it anyway. --}}
+                        @if(!empty($pickedPlanName))
+                        <input type="hidden" name="requested_plan" value="{{ $pickedPlanName }}">
+                        @endif
+
                         <div class="pt-1 pb-2">
                             <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">{{ __('pos.auth_select_business_type') }}</p>
                         </div>

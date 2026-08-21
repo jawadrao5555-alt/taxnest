@@ -206,7 +206,14 @@ class DiPlanComparisonService
             $col['price_note']   = '';
             $col['price_note_x'] = "cycle === 'monthly' ? '' : 'Billed Rs ' + calcPrice({$sale}).toLocaleString()";
 
-            $col['cta_url']   = route('register', ['plan' => $plan->name], false);
+            // Task 1484: the button carries BOTH the package and the billing
+            // cycle into signup, so the shop is later approved onto exactly
+            // what this column advertised. The server-rendered href holds the
+            // monthly default (correct before Alpine boots / with JS off); the
+            // Alpine binding keeps it in step with the cycle switch above.
+            $signupUrl = route('register', ['plan' => $plan->name], false);
+            $col['cta_url']   = $signupUrl . '&cycle=monthly';
+            $col['cta_url_x'] = "'" . str_replace("'", "\\'", $signupUrl) . "&cycle=' + cycle";
             $col['cta_label'] = 'Choose';
 
             return $col;

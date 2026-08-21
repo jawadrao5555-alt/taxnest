@@ -100,8 +100,9 @@
                             @endif
                             <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->owner_name ?? '' }}</p>
                             {{-- Package picked at registration — what approval will activate for 1 year --}}
-                            @if($company->status === 'pending' && $company->requestedPlan)
-                            <span class="inline-flex items-center mt-1 px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300 text-[10px] font-semibold">{{ $company->requestedPlan->name }} — Rs {{ number_format((float) $company->requestedPlan->sale_price) }}/yr</span>
+                            @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
+                            @if($requestedPackage)
+                            <span class="inline-flex items-center mt-1 px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300 text-[10px] font-semibold">{{ $requestedPackage['badge'] }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>

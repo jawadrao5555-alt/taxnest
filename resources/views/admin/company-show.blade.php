@@ -19,6 +19,15 @@
             @endif
 
             <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 mb-8">
+                {{-- Package picked before signing up — approval activates exactly this
+                     plan, on the period that product sells (Task 1484). --}}
+                @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
+                @if($requestedPackage)
+                <div class="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <p class="text-sm text-indigo-800"><span class="font-semibold">Requested package:</span> {{ $requestedPackage['badge'] }}. {{ $requestedPackage['note'] }}</p>
+                </div>
+                @endif
+
                 @if($company->company_status === 'pending')
                 <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
                     <span class="text-sm text-amber-700 font-medium">This company is pending approval</span>

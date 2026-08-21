@@ -417,10 +417,12 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
         <h3 class="text-sm font-semibold text-white mb-3">Quick Actions</h3>
-        {{-- Package picked at registration — approval activates exactly this plan for 1 year --}}
-        @if($company->status === 'pending' && $company->requestedPlan)
+        {{-- Package picked before signing up — approval activates exactly this
+             plan, on the period that product sells (Task 1484). --}}
+        @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
+        @if($requestedPackage)
         <div class="mb-3 px-3 py-2 rounded-lg bg-indigo-900/20 border border-indigo-800/40">
-            <p class="text-xs text-indigo-300"><span class="font-semibold">Requested package:</span> {{ $company->requestedPlan->name }} — Rs {{ number_format((float) $company->requestedPlan->sale_price) }}/year. Approving will activate this package for 1 full year.</p>
+            <p class="text-xs text-indigo-300"><span class="font-semibold">Requested package:</span> {{ $requestedPackage['badge'] }}. {{ $requestedPackage['note'] }}</p>
         </div>
         @endif
         <div class="flex flex-wrap gap-2">

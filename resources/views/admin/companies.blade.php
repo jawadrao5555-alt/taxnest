@@ -31,9 +31,11 @@
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 cursor-pointer" onclick="window.location='/admin/company/{{ $company->id }}'">
                             <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900">
                                 <a href="/admin/company/{{ $company->id }}">{{ $company->name }}</a>
-                                {{-- Package picked at registration — what approval will activate for 1 year --}}
-                                @if($company->company_status === 'pending' && $company->requestedPlan)
-                                <span class="block mt-1"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">{{ $company->requestedPlan->name }} — Rs {{ number_format((float) $company->requestedPlan->sale_price) }}/yr</span></span>
+                                {{-- Package picked before signing up — what approval will
+                                     activate, on the period that product sells (Task 1484). --}}
+                                @php $requestedPackage = \App\Services\RequestedPackageService::pendingSummary($company); @endphp
+                                @if($requestedPackage)
+                                <span class="block mt-1"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">{{ $requestedPackage['badge'] }}</span></span>
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">{{ $company->ntn }}</td>

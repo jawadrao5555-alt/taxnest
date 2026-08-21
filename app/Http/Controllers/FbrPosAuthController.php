@@ -135,17 +135,11 @@ class FbrPosAuthController extends Controller
             return $this->redirectToPortal();
         }
 
-        // Task 1483: the landing's comparison table sends the shop here with
-        // ?plan=<package name>, so the page can name the column it clicked.
-        // This form has no package picker — the admin still assigns the plan at
-        // approval — so an unknown or missing name just shows nothing.
-        $requested = trim((string) request('plan'));
-        $picked = $requested === ''
-            ? null
-            : \App\Models\PricingPlan::where('product_type', 'fbrpos')
-                ->where('is_trial', false)
-                ->get()
-                ->first(fn ($plan) => mb_strtolower($plan->name) === mb_strtolower($requested));
+        // Task 1483/1484: the landing's comparison table sends the shop here
+        // with ?plan=<package name>, so the page can name the column it clicked
+        // AND the form can carry it back on submit (register() re-resolves it,
+        // so an unknown or missing name simply records nothing).
+        $picked = \App\Services\RequestedPackageService::resolvePlan(request('plan'), 'fbrpos');
 
         return view('fbr-pos.auth.register', ['pickedPlanName' => $picked?->name]);
     }
@@ -186,6 +180,15 @@ class FbrPosAuthController extends Controller
             ? ['kitchen_printer_enabled' => true]
             : [];
 
+        // Task 1484: the package the shop clicked on the landing table, carried
+        // here by a hidden field. Re-resolved server-side, so a tampered,
+        // unknown, trial or wrong-product name is ignored rather than stored —
+        // and a signup with no package behind it stores nothing at all.
+        // FBR POS is licensed by the YEAR, so there is no cycle to remember.
+        $requestedPackage = \App\Services\RequestedPackageService::companyAttributes(
+            \App\Services\RequestedPackageService::resolvePlan($request->input('requested_plan'), 'fbrpos')
+        );
+
         $company = Company::create([
             'name' => $request->company_name,
             'ntn' => $request->company_ntn,
@@ -202,7 +205,7 @@ class FbrPosAuthController extends Controller
             'fbr_pos_enabled' => true,
             'fbr_pos_environment' => 'sandbox',
             'fbr_reporting_enabled' => true,
-        ] + $storeSlipDefault);
+        ] + $storeSlipDefault + $requestedPackage);
 
         $userData = [
             'name' => $request->name,

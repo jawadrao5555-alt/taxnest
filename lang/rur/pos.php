@@ -5181,6 +5181,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_dial_copy' => 'Number copy karein',
     'caller_dial_copied' => 'Number copy ho gaya',
     'caller_called_back' => 'call back kiya',
+    // Task 1397 — bell badge: today's rings nobody has called back or cleared.
+    'caller_pending_calls' => 'call ka jawab abhi baqi hai',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',

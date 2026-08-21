@@ -188,6 +188,47 @@ class PosCallerIdController extends Controller
     }
 
     /**
+     * Task 1397: bell par ka badge — AAJ ki woh rings jin par abhi tak kuch
+     * nahi hua: na call back hui, na list se hatai gai. Rush mein "Haaliya
+     * calls" list wohi cheez hai jo koi nahi kholta, is liye baqi ka number
+     * bell par hi nazar aana chahiye.
+     *
+     * Yeh COUNT hamesha kisi MOJOOD response ke sath jata hai (ring poll,
+     * recent-calls list, clear, call back) — badge ke liye alag request kabhi
+     * nahi, warna har counter par ek aur poll chal parta.
+     *
+     * Ring poll par yeh isi liye afford hota hai ke EVENT_RETENTION_HOURS ka
+     * purge har dukan ki rows 48 ghante par kaat deta hai — company_id index
+     * ke peechay ginne ko dozen bhar rows hoti hain, hazaron nahi. Agar kabhi
+     * retention barhe to yeh count dobara taulna hoga.
+     *
+     * "Aaj" = calendar din (ring_at >= aaj 00:00), app TZ mein. Panel 24
+     * ghante dikhata hai, magar badge se poocha yeh ja raha hai ke AAJ kya
+     * baqi reh gaya — raat 12 baje ginti saaf, kal ka bojh aaj par nahi.
+     *
+     * Schema drift par shart chhoot jati hai (500 nahi hota): cleared_at ya
+     * called_back_at column na ho to us hisse ka filter lagta hi nahi.
+     */
+    private function pendingCallbacks(int $companyId): int
+    {
+        $tableExists = \Illuminate\Support\Facades\Cache::remember(
+            'caller_events_table_exists',
+            300,
+            fn () => Schema::hasTable('pos_caller_events')
+        );
+        if (!$tableExists) {
+            return 0;
+        }
+
+        return (int) DB::table('pos_caller_events')
+            ->where('company_id', $companyId)
+            ->where('ring_at', '>=', Carbon::today())
+            ->when($this->clearSupported(), fn ($q) => $q->whereNull('cleared_at'))
+            ->when($this->calledBackSupported(), fn ($q) => $q->whereNull('called_back_at'))
+            ->count();
+    }
+
+    /**
      * Number the PHONE should dial. displayPhone() is for humans (0300-1234567);
      * the tel: URI wants clean digits — local form for PK numbers (shop ka SIM
      * PK ka hai), plain +international for anything else.
@@ -671,7 +712,9 @@ class PosCallerIdController extends Controller
             ->value('caller_id_enabled');
 
         if (!$enabled) {
-            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
+            // Task 1397: sarahatan sifar — plan/toggle band ho jaye to bell ka
+            // badge apni purani ginti par jama na reh jaye.
+            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0, 'pending' => 0]);
         }
 
         $tableExists = \Illuminate\Support\Facades\Cache::remember(
@@ -680,13 +723,13 @@ class PosCallerIdController extends Controller
             fn () => Schema::hasTable('pos_caller_events')
         );
         if (!$tableExists) {
-            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
+            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0, 'pending' => 0]);
         }
 
         // planLocked needs the full Company model — only load it when the flag is ON.
         $company = Company::find($companyId);
         if (!$company || $this->planLocked($company)) {
-            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0]);
+            return response()->json(['enabled' => false, 'events' => [], 'last_id' => 0, 'pending' => 0]);
         }
 
         $after = (int) $request->query('after', 0);
@@ -738,6 +781,11 @@ class PosCallerIdController extends Controller
             'events' => $events,
             // v2: offline warning — has ANY paired phone contacted us recently?
             'online' => self::anyDeviceOnline($company),
+            // Task 1397: bell ka badge har tick par SERVER se set hota hai, na
+            // ke counter ki apni ginti se. Isi se teen soortein khud theek
+            // rehti hain: doosray counter ne call back kar li, screen aadhi
+            // raat paar kar gai, ya tab kuch der chupi rahi.
+            'pending' => $this->pendingCallbacks($companyId),
         ]);
     }
 
@@ -755,7 +803,9 @@ class PosCallerIdController extends Controller
         if (!$company || !($company->caller_id_enabled ?? false)
             || $this->planLocked($company)
             || !Schema::hasTable('pos_caller_events')) {
-            return response()->json(['enabled' => false, 'calls' => []]);
+            // Task 1397: sarahatan sifar — plan/toggle band ho jaye to bell ka
+            // badge apni purani ginti par jama na reh jaye.
+            return response()->json(['enabled' => false, 'calls' => [], 'pending' => 0]);
         }
 
         $rows = DB::table('pos_caller_events')
@@ -787,6 +837,9 @@ class PosCallerIdController extends Controller
             // Task 1381: kya abhi koi phone call-back request le sakta hai?
             // (POS button phir bhi dikhta hai — nakaami par number + copy.)
             'dial_ready' => $this->dialReadyCount($companyId) > 0,
+            // Task 1397: bell ka badge — AAJ ki kitni calls abhi baqi hain.
+            // Usi response mein, taake badge ke liye doosri request na ho.
+            'pending' => $this->pendingCallbacks($companyId),
         ]);
     }
 
@@ -830,7 +883,12 @@ class PosCallerIdController extends Controller
         }
         $cleared = (int) $query->update(['cleared_at' => now()]);
 
-        return response()->json(['ok' => true, 'cleared' => $cleared]);
+        // Task 1397: badge foran theek — hatai gai call baqi mein nahi ginti.
+        return response()->json([
+            'ok' => true,
+            'cleared' => $cleared,
+            'pending' => $this->pendingCallbacks($companyId),
+        ]);
     }
 
     /**
@@ -889,12 +947,17 @@ class PosCallerIdController extends Controller
                 ->update(['called_back_at' => $calledBackAt]);
         }
 
+        // Task 1397: stamp ke BAAD ginti — call back karte hi bell ka badge
+        // gir jata hai, chahe request phone tak pohanchi ho ya nahi.
+        $pending = $this->pendingCallbacks($companyId);
+
         $fallback = [
             'ok' => true,
             'sent' => false,
             'phone' => $display,
             'dial' => $digits,
             'called_back_at' => $calledBackAt->format('h:i A'),
+            'pending' => $pending,
         ];
 
         if (!$this->dialSupported()) {
@@ -939,6 +1002,7 @@ class PosCallerIdController extends Controller
             'phone' => $display,
             'dial' => $digits,
             'called_back_at' => $calledBackAt->format('h:i A'),
+            'pending' => $pending,
         ]);
     }
 

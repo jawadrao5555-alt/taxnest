@@ -5177,6 +5177,8 @@ return [
     'caller_dial_copy' => 'نمبر کاپی کریں',
     'caller_dial_copied' => 'نمبر کاپی ہو گیا',
     'caller_called_back' => 'واپس کال کی',
+    // Task 1397 — bell badge: today's rings nobody has called back or cleared.
+    'caller_pending_calls' => 'کالوں کا جواب ابھی باقی ہے',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'واٹس ایپ بل',

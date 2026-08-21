@@ -5183,6 +5183,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'caller_dial_copy' => 'Copy number',
     'caller_dial_copied' => 'Number copied',
     'caller_called_back' => 'called back',
+    // Task 1397 — bell badge: today's rings nobody has called back or cleared.
+    'caller_pending_calls' => 'call(s) still to be called back',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',

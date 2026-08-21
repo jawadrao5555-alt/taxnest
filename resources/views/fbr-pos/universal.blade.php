@@ -3209,9 +3209,22 @@ window.addEventListener('popstate', function() {
          client-side localStorage cursor. --}}
     <template x-if="callerIdOn">
         <div class="fixed top-20 right-4 z-50 flex flex-col items-end gap-1.5" x-show="!callerPopup" x-cloak>
-            <button type="button" @click="openCallerLog()" class="relative w-9 h-9 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-md flex items-center justify-center text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-gray-800 transition" title="{{ __('pos.caller_log_title') }}">
+            {{-- Task 1397: hover par poora jumla BUTTON se milta hai — badge
+                 khud 16px ka hai, us par theek se hover nahi hota. Alpine se
+                 pehle static title chalta rehta hai. --}}
+            <button type="button" @click="openCallerLog()" class="relative w-9 h-9 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-md flex items-center justify-center text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-gray-800 transition" title="{{ __('pos.caller_log_title') }}" :title="callerPending > 0 ? (callerPending + ' ' + window.TXT.caller_pending_calls) : window.TXT.caller_log_title">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                <span x-show="callerUnseen > 0" x-cloak class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 bg-red-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="callerUnseen > 9 ? '9+' : callerUnseen"></span>
+                {{-- Task 1397: badge ab AAJ ki BAQI call-backs ginta hai (na call
+                     back hui, na hatai gai) — rush mein list kholay baghair pata
+                     chal jata hai ke kuch reh gaya hai. Sifar = koi badge nahi,
+                     sale screen par mustaqil sajawat nahi. Nayi ring aate hi wohi
+                     badge surkh ho kar dhadakta hai (pehle jaisa "naya" ishara),
+                     dekh lene ke baad amber reh jata hai — kaam abhi baqi hai. --}}
+                <span x-show="callerPending > 0" x-cloak
+                      class="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 text-white text-[9px] rounded-full flex items-center justify-center font-bold"
+                      :class="callerUnseen > 0 ? 'bg-red-600 animate-pulse' : 'bg-amber-500'"
+                      :aria-label="callerPending + ' ' + window.TXT.caller_pending_calls"
+                      x-text="callerPending > 9 ? '9+' : callerPending"></span>
             </button>
             <span x-show="callerQueue.length > 0" x-cloak class="px-2 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-bold shadow animate-pulse" x-text="callerQueue.length + ' ' + window.TXT.caller_queued_calls"></span>
         </div>
@@ -3490,8 +3503,12 @@ function restaurantPos() {
         showCallerLog: false,     // recent-calls (last 24h) panel
         callerLog: [],
         callerLogLoading: false,
-        callerUnseen: 0,          // badge count; cursor in localStorage
+        callerUnseen: 0,          // NEW rings not looked at yet (badge colour)
         callerSeenId: 0,          // max event id the cashier has SEEN (log open)
+        // Task 1397: aaj ki calls jin par abhi kuch nahi hua (na call back, na
+        // clear) — bell ka badge. Server hi sach hai: har caller-recent /
+        // clear / call-back jawab ke sath taza aata hai, alag request nahi.
+        callerPending: 0,
         _callerBeeped: [],        // event ids already beeped (no re-fire)
         _callerWarnedOffline: false,
         callerDialBusy: false,    // double-tap guard on every Call back button
@@ -8186,6 +8203,14 @@ function restaurantPos() {
                             // Unseen badge — new rings count until the log is opened.
                             data.events.forEach(ev => { if ((parseInt(ev.id, 10) || 0) > this.callerSeenId) this.callerUnseen++; });
                         }
+                        // Task 1397: badge ki ginti HAR tick par server se —
+                        // counter apne taur par jama-nafi nahi karta. Warna
+                        // teen soortein ghalat ho jatin: doosray counter ne
+                        // call back kar li, screen aadhi raat paar kar gai
+                        // (ginti nai din se shuru honi chahiye), ya tab kuch
+                        // der chupi rahi aur ring miss ho gai. Yeh usi response
+                        // ka hissa hai jo pehle se aa raha hai — nayi request nahi.
+                        this.applyCallerPending(data.pending);
                         const lid = parseInt(data.last_id, 10) || 0; // live-pdo-string-ints
                         if (lid > this.callerLastId) {
                             this.callerLastId = lid;
@@ -8197,6 +8222,10 @@ function restaurantPos() {
                             this._callerWarnedOffline = true;
                             this.showToast(window.TXT.caller_phone_offline_warn, 'error');
                         }
+                    } else if (data && data.enabled === false) {
+                        // Task 1397: feature beech shift mein band ya plan lock
+                        // ho jaye to badge bhi ghayab — purani ginti chipki na reh jaye.
+                        this.callerPending = 0;
                     }
                 }
             } catch (e) {}
@@ -8316,6 +8345,8 @@ function restaurantPos() {
                         const row = this.callerLog.find(c => (parseInt(c.id, 10) || 0) === evId);
                         if (row) { row.called_back = true; row.called_back_at = data.called_back_at || ''; }
                     }
+                    // Task 1397: bell ka badge usi jawab se — reload ka intezar nahi.
+                    this.applyCallerPending(data.pending);
                     if (data.sent) {
                         this.callerDialFallback = null;
                         this.showToast(window.TXT.caller_dial_sent, 'success');
@@ -8429,6 +8460,9 @@ function restaurantPos() {
                     const maxId = this.callerLog.reduce((mx, c) => Math.max(mx, parseInt(c.id, 10) || 0), this.callerSeenId);
                     this.callerSeenId = Math.max(maxId, this.callerLastId);
                     this.callerUnseen = 0;
+                    // Task 1397: list dekh lene se baqi ka number KAM nahi hota —
+                    // sirf call back ya clear se girta hai. Wahi server ki ginti.
+                    this.applyCallerPending(data && data.pending);
                     try { localStorage.setItem('tn_caller_seen_id', String(this.callerSeenId)); } catch (e) {}
                 })
                 .catch(() => {})
@@ -8441,11 +8475,16 @@ function restaurantPos() {
         clearCallerEvent(ev) {
             const id = ev && (parseInt(ev.id, 10) || 0);
             if (!id) { return; }
+            const wasPending = !(ev && ev.called_back);
             this.callerLog = this.callerLog.filter(c => (parseInt(c.id, 10) || 0) !== id);
             // Wohi ring agar abhi popup/queue mein hai to wahan se bhi jaye.
             this.callerQueue = this.callerQueue.filter(c => (parseInt(c.id, 10) || 0) !== id);
             if (this.callerPopup && (parseInt(this.callerPopup.id, 10) || 0) === id) { this.dismissCallerPopup(); }
             this.callerUnseen = this.callerLog.filter(c => (parseInt(c.id, 10) || 0) > this.callerSeenId).length;
+            // Task 1397: badge foran girta hai (row list se bhi foran ghayab hoti
+            // hai); server ka asli number jawab aate hi is par set ho jata hai —
+            // kal ki row hatai gai ho to wahin theek ho jayega.
+            if (wasPending) { this.callerPending = Math.max(0, this.callerPending - 1); }
             this.postCallerClear({ id: id });
         },
         clearAllCallerEvents() {
@@ -8455,6 +8494,8 @@ function restaurantPos() {
             this.callerQueue = [];
             if (this.callerPopup) { this.dismissCallerPopup(); }
             this.callerUnseen = 0;
+            // "Sab hatayen" shop ki HAR un-cleared ring hata deta hai — baqi sifar.
+            this.callerPending = 0;
             this.postCallerClear({ all: true }, true);
         },
         // Server hi sach hai: clear fail ho to list dobara load kar ke asli
@@ -8468,6 +8509,8 @@ function restaurantPos() {
                 .then(r => r.json())
                 .then(data => {
                     if (data && data.ok) {
+                        // Task 1397: server ki asli ginti — optimistic number theek.
+                        this.applyCallerPending(data.pending);
                         if (toastOnSuccess) { this.showToast(window.TXT.caller_cleared, 'success'); }
                         return;
                     }
@@ -8479,13 +8522,23 @@ function restaurantPos() {
                     this.loadCallerLog();
                 });
         },
+        // Task 1397: server hi baqi-calls ka sach hai. Poora number sirf tab
+        // set hota hai jab jawab mein aaya ho — purana server/jawab (pending
+        // ghayab) badge ko chupke se sifar na kar de.
+        applyCallerPending(value) {
+            const n = parseInt(value, 10);   // live-pdo-string-ints
+            if (!isNaN(n) && n >= 0) { this.callerPending = n; }
+        },
         // Boot-time unseen count (badge survives reloads without waiting for
         // fresh rings) — one cheap fetch, then the poll increments.
+        // Task 1397: wohi ek fetch baqi-calls ka badge bhi bhar deta hai.
         refreshCallerUnseen() {
             fetch('{{ route('fbrpos.api.caller-recent', [], false) }}', { headers: { 'Accept': 'application/json' } })
                 .then(r => r.json())
                 .then(data => {
-                    if (!data || !Array.isArray(data.calls)) return;
+                    if (!data) return;
+                    this.applyCallerPending(data.pending);
+                    if (!Array.isArray(data.calls)) return;
                     this.callerUnseen = data.calls.filter(c => (parseInt(c.id, 10) || 0) > this.callerSeenId).length;
                 })
                 .catch(() => {});

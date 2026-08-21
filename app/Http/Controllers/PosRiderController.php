@@ -36,6 +36,13 @@ class PosRiderController extends Controller
     private function deliveryGate()
     {
         $company = Company::find(app('currentCompanyId'));
+        // A disabled/downgraded Delivery feature must not strand cash already
+        // held by a rider.  The settlement POST is intentionally open, and the
+        // board is the only place where the owner can select those bills and
+        // settle them.  Shops with no open rider cash keep the normal gate.
+        if ($this->hasOpenRiderCash($company?->id)) {
+            return null;
+        }
         // Plan gate (Aug 2026 package matrix): Riders is a Pro+ feature.
         if (!PosFeatureService::planAllows($company, 'riders_enabled')) {
             if (request()->expectsJson()) {
@@ -50,6 +57,39 @@ class PosRiderController extends Controller
                 ->with('error', 'Enable the Delivery feature to use Riders.');
         }
         return null;
+    }
+
+    /**
+     * Whether this company has cash bills still owed by a rider.
+     *
+     * Keep this schema-safe: deliveryGate() also runs during deployments where
+     * the rider migration may not have reached the database yet.
+     */
+    private function hasOpenRiderCash(?int $companyId): bool
+    {
+        if (!$companyId || !Schema::hasTable('pos_transactions')
+            || !Schema::hasColumn('pos_transactions', 'rider_id')
+            || !Schema::hasColumn('pos_transactions', 'rider_settlement_id')
+            || !Schema::hasColumn('pos_transactions', 'payment_method')) {
+            return false;
+        }
+
+        try {
+            return PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->whereNotNull('rider_id')
+                ->where('payment_method', 'cash')
+                ->whereNull('rider_settlement_id')
+                ->where(function ($q) {
+                    $q->whereNull('delivery_status')
+                        ->orWhere('delivery_status', '!=', 'returned');
+                })
+                ->exists();
+        } catch (\Throwable $e) {
+            // A partially migrated schema must retain the existing gate, not
+            // turn a failed probe into accidental feature access.
+            return false;
+        }
     }
 
     private function schemaReady(): bool

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use Tests\TestCase;
 use App\Models\Company;
 use App\Models\User;
+use App\Http\Controllers\PosRiderController;
 use App\Http\Controllers\PosController;
 use App\Services\PosFeatureService;
 use Illuminate\Support\Facades\DB;
@@ -410,6 +411,55 @@ class PosDeliveryBoardModalGuardTest extends TestCase
         $cid2 = $this->makeCompany(deliveryFeature: true, ridersPlan: true);
         $cashier2 = $this->makeUser($cid2, 'pos_cashier', ['reports']);
         $this->assertTrue($this->boardVerdict($cashier2));
+    }
+
+    public function test_feature_off_company_with_open_rider_cash_can_reach_board_gate(): void
+    {
+        $this->buildSchema();
+        $cid = $this->makeCompany(deliveryFeature: false, ridersPlan: false);
+        DB::table('pos_riders')->insert([
+            'company_id' => $cid,
+            'name' => 'Open Cash Rider',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('pos_transactions')->insert([
+            'company_id' => $cid,
+            'business_date' => now()->toDateString(),
+            'status' => 'completed',
+            'order_type' => 'delivery',
+            'payment_method' => 'cash',
+            'total_amount' => 500,
+            'rider_id' => 1,
+            'delivery_status' => 'delivered',
+            'rider_settlement_id' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->app->instance('currentCompanyId', $cid);
+        $this->actingAs($this->makeUser($cid, 'pos_admin'), 'pos');
+        $method = new \ReflectionMethod(PosRiderController::class, 'deliveryGate');
+        $method->setAccessible(true);
+
+        $this->assertNull($method->invoke(app(PosRiderController::class)),
+            'An open rider-cash bill must keep the settlement board reachable after Delivery is switched off.');
+    }
+
+    public function test_feature_off_company_without_open_rider_cash_keeps_gate(): void
+    {
+        $this->buildSchema();
+        $cid = $this->makeCompany(deliveryFeature: false, ridersPlan: true);
+        $this->app->instance('currentCompanyId', $cid);
+        $this->actingAs($this->makeUser($cid, 'pos_admin'), 'pos');
+        $method = new \ReflectionMethod(PosRiderController::class, 'deliveryGate');
+        $method->setAccessible(true);
+
+        $response = $method->invoke(app(PosRiderController::class));
+
+        $this->assertInstanceOf(\Illuminate\Http\RedirectResponse::class, $response);
+        $this->assertSame(route('pos.features'), $response->getTargetUrl());
     }
 
     // ── 4. Boot fingerprint refreshes the baked button ──────────────────────

@@ -232,7 +232,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#7c3aed">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">
@@ -1056,7 +1056,11 @@
             </div>
             @endif
 
-            <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade" style="min-width: 0;">
+            {{-- tn-fab-pad: room at the end of the page so the floating Madadgar
+                 button (fixed bottom-left) stops covering the last card's corner
+                 on phones. Full-height screens (sale, KDS, waiter) opt out — they
+                 never scroll to an end and padding would eat working area. --}}
+            <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade @unless(request()->is('*invoice/create') || request()->is('*kds*') || request()->is('*waiter*') || request()->is('*riders/tracking*')) tn-fab-pad @endunless" style="min-width: 0;">
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts" />

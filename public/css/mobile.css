@@ -777,3 +777,13 @@ pre, code { max-width: 100%; overflow-x: auto; word-break: break-word; }
         padding: 0 !important;
     }
 }
+
+/* ── Madadgar (support) button clearance — phones ─────────────────────
+   The floating help button is fixed at bottom-left. On a phone the page
+   runs full-width, so at the end of a scroll the last card's corner sat
+   UNDERNEATH it. Give scrolling pages room to finish above the button.
+   Full-height screens (sale screen, KDS, waiter) do not carry tn-fab-pad:
+   they never scroll to an end and the padding would eat working area. */
+@media (max-width: 767px) {
+    main.tn-fab-pad { padding-bottom: 5.5rem !important; }
+}

@@ -70,7 +70,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#1e3a5f">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest FBR Pos">
@@ -913,7 +913,9 @@
                 </div>
             </aside>
 
-            <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg" style="min-width: 0;">
+            {{-- tn-fab-pad — see pos-app.blade.php: clearance for the floating
+                 Madadgar button on phones; full-height screens opt out. --}}
+            <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg @unless(request()->is('*invoice/create') || request()->is('*kds*') || request()->is('*waiter*') || request()->is('*riders/tracking*')) tn-fab-pad @endunless" style="min-width: 0;">
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts"

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
     <title>{{ $title ?? 'Admin Panel' }} - TaxNest Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -389,7 +389,7 @@
                 <h1 class="text-sm font-bold admin-accent-text">TaxNest Admin</h1>
             </header>
 
-            <main class="flex-1 overflow-y-auto overflow-x-hidden">
+            <main class="flex-1 overflow-y-auto overflow-x-hidden tn-fab-pad">
                 @if(isset($header))
                 <div class="bg-gray-900 border-b border-gray-800 px-6 py-4 hidden lg:block">
                     {{ $header }}

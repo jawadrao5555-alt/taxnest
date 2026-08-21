@@ -19,6 +19,22 @@
     </div>
     @endif
 
+    {{-- PACKAGE LIMIT vs USAGE (Task 1349) — sirf ACTIVE counters cap ke khilaf
+         ginay jate hain (bilkul create-route ke guard ki tarah). NULL/negative
+         limit = unlimited. --}}
+    <div class="mb-4 flex flex-wrap items-center gap-2 rounded-xl border p-4 {{ ($terminalLimit !== null && $terminalsActive >= $terminalLimit) ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700' : 'bg-gray-50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700' }}">
+        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 7l1 12a1 1 0 001 1h12a1 1 0 001-1l1-12M4 7l1.2-2.4A1 1 0 016.1 4h11.8a1 1 0 01.9.6L20 7M9 11h6"/></svg>
+        <span class="text-sm text-gray-700 dark:text-gray-300">
+            <span class="font-semibold">{{ __('pos.counters_used_label') }}:</span>
+            <span class="font-bold text-gray-900 dark:text-white">{{ $terminalsActive }}</span>
+            <span class="text-gray-400">/</span>
+            <span class="font-bold text-gray-900 dark:text-white">{{ $terminalLimit === null ? __('pos.unlimited_word') : $terminalLimit }}</span>
+        </span>
+        @if($terminalLimit !== null && $terminalsActive >= $terminalLimit)
+        <span class="text-xs font-medium text-amber-700 dark:text-amber-400">{{ __('pos.counter_limit_reached_hint') }}</span>
+        @endif
+    </div>
+
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">{{ __('pos.add_new_terminal') }}</h3>
         <form method="POST" action="{{ route('pos.terminals.store') }}" class="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -57,6 +73,7 @@
                     <th class="px-4 py-3">{{ __('pos.code_label') }}</th>
                     <th class="px-4 py-3 hidden sm:table-cell">{{ __('pos.location_label') }}</th>
                     <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
+                    <th class="px-4 py-3 hidden sm:table-cell">{{ __('pos.counter_today_sale') }}</th>
                     <th class="px-4 py-3 hidden sm:table-cell">{{ __('pos.transactions') }}</th>
                     <th class="px-4 py-3">{{ __('pos.actions_label') }}</th>
                 </tr>
@@ -88,6 +105,16 @@
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.inactive_word') }}</span>
                         @endif
                     </td>
+                    {{-- Aaj ki sale (Task 1349) — business day ke hisaab se, returns netted. --}}
+                    @php($tToday = $todayByTerminal[$terminal->id] ?? null)
+                    <td class="px-4 py-3 hidden sm:table-cell" x-show="!editing" data-label="{{ __('pos.counter_today_sale') }}">
+                        @if($tToday && (int) $tToday->bills > 0)
+                        <span class="font-semibold text-gray-900 dark:text-white">PKR {{ number_format((float) $tToday->sale) }}</span>
+                        <span class="block text-xs text-gray-400">{{ $tToday->bills }} {{ __('pos.th_bills') }}</span>
+                        @else
+                        <span class="text-gray-400">—</span>
+                        @endif
+                    </td>
                     <td class="px-4 py-3 text-gray-600 dark:text-gray-400 hidden sm:table-cell" x-show="!editing" data-label="{{ __('pos.transactions') }}">{{ $terminal->transactions_count ?? $terminal->transactions()->count() }}</td>
                     <td class="px-4 py-3" x-show="!editing" data-label="{{ __('pos.actions_label') }}">
                         <div class="flex gap-2">
@@ -102,7 +129,7 @@
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="6" class="px-4 py-12 text-center text-gray-400">{{ __('pos.no_terminals_configured') }}</td></tr>
+                <tr><td colspan="7" class="px-4 py-12 text-center text-gray-400">{{ __('pos.no_terminals_configured') }}</td></tr>
                 @endforelse
             </tbody>
         </table>

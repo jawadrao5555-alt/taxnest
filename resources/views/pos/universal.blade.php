@@ -784,6 +784,15 @@ window.addEventListener('popstate', function() {
             autoKotLoading: false
          }">
 
+        {{-- COUNTER chip — MOBILE copy (Task 1349): the desktop one lives in the
+             cart-column header, which is hidden below md. --}}
+        <button type="button" x-show="allTerminals.length > 0" x-cloak @click="showTerminalPicker = true"
+                class="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wide mr-auto"
+                :class="terminalId ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-dashed border-gray-300 dark:border-gray-600'">
+            <svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 7l1 12a1 1 0 001 1h12a1 1 0 001-1l1-12M4 7l1.2-2.4A1 1 0 016.1 4h11.8a1 1 0 01.9.6L20 7M9 11h6"/></svg>
+            <span x-text="terminalId ? terminalName() : window.TXT.counter_pick_prompt"></span>
+        </button>
+
         {{-- PRA Reporting — hidden entirely for Standalone-edition companies (no
              government integration): flipping it ON would queue every sale for PRA
              submission that can only fail. togglePra also rejects server-side. --}}
@@ -1392,6 +1401,20 @@ window.addEventListener('popstate', function() {
                     :title="cartMode ? window.TXT.ti_cart_mode_on : window.TXT.ti_enter_cart_mode">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     <span x-text="cartMode ? window.TXT.editing_word : window.TXT.edit"></span>
+                </button>
+                {{-- COUNTER chip (Task 1349) — DEVICE-level counter for this billing
+                     machine. Lives in the cart header on purpose: the top-nav sale-tools
+                     strip is overflow-x-auto and collapses to a few pixels on ~1440px
+                     screens, so a chip there would be unreachable. The cart column is a
+                     fixed-width, always-visible pane. Only rendered when the shop has
+                     actually created counters; unset = billing unchanged. Mobile has its
+                     own copy in the md:hidden toggles strip. --}}
+                <button type="button" x-show="allTerminals.length > 0" x-cloak @click="showTerminalPicker = true"
+                        class="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border flex-shrink-0 transition"
+                        :class="terminalId ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-dashed border-gray-300 dark:border-gray-600 hover:bg-gray-100'"
+                        :title="window.TXT.counter_chip_hint">
+                    <svg class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 7l1 12a1 1 0 001 1h12a1 1 0 001-1l1-12M4 7l1.2-2.4A1 1 0 016.1 4h11.8a1 1 0 01.9.6L20 7M9 11h6"/></svg>
+                    <span class="truncate max-w-[96px] xl:max-w-[140px]" x-text="terminalId ? terminalName() : window.TXT.counter_pick_prompt"></span>
                 </button>
                 <template x-if="priorityOrder"><span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">URGENT</span></template>
                 {{-- Task #643: loaded waiter order ki pehchaan — order number + waiter naam
@@ -2262,6 +2285,40 @@ window.addEventListener('popstate', function() {
                 <button type="button" x-ref="printConfirmNo" @click="resolvePrintConfirm(false)" @focus="printConfirmChoice = 'no'"
                         class="py-3 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition ring-offset-2 dark:ring-offset-gray-900 focus:outline-none"
                         :class="printConfirmChoice === 'no' ? 'ring-2 ring-gray-500 border-gray-400 dark:border-gray-500' : ''">{{ __('pos.print_confirm_no') }}</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ═══ Task 1349: COUNTER (TERMINAL) PICKER ═══
+         Device-level: jo counter yahan chuna jaye wo ISI machine par yaad rehta
+         hai (localStorage) aur har bill ke saath jata hai. "Koi nahin" chunne par
+         billing bilkul pehle jaisi (counter khali) chalti rehti hai. z-index
+         inline — arbitrary Tailwind class = Vite rebuild trap. --}}
+    <div x-show="showTerminalPicker" x-cloak x-transition.opacity @click.self="showTerminalPicker = false"
+         class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style="display:none;z-index:70;">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+            <div class="px-5 pt-5 pb-3">
+                <p class="text-lg font-black text-gray-900 dark:text-white">{{ __('pos.counter_picker_title') }}</p>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.counter_picker_hint') }}</p>
+            </div>
+            <div class="px-4 pb-2 max-h-[50vh] overflow-y-auto space-y-1.5">
+                <template x-for="t in allTerminals" :key="t.id">
+                    <button type="button" @click="setTerminal(t.id)"
+                            class="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-left transition"
+                            :class="terminalId === t.id ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-300 dark:border-indigo-700' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'">
+                        <span class="min-w-0">
+                            <span class="block text-sm font-bold text-gray-900 dark:text-white truncate" x-text="t.name"></span>
+                            <span class="block text-[10px] font-mono text-gray-400 truncate" x-text="t.code"></span>
+                        </span>
+                        <svg x-show="terminalId === t.id" class="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </template>
+            </div>
+            <div class="px-4 pb-4 pt-2 grid grid-cols-2 gap-2 border-t border-gray-100 dark:border-gray-800">
+                <button type="button" @click="setTerminal(null)"
+                        class="py-2.5 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition">{{ __('pos.counter_none_option') }}</button>
+                <button type="button" @click="showTerminalPicker = false"
+                        class="py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition">{{ __('pos.close') }}</button>
             </div>
         </div>
     </div>
@@ -4329,6 +4386,43 @@ function restaurantPos() {
         highlightIndex: 0,
         // Order Sound (Aug 2026): device-level chime pref for incoming waiter orders.
         orderSound: (function () { try { return localStorage.getItem('pos_order_sound') !== '0'; } catch (e) { return true; } })(),
+        // ── Task 1349: COUNTER (terminal) — DEVICE-level choice ─────────────
+        // Baked ACTIVE counters (id/name/code); the picked one is remembered on
+        // THIS machine (localStorage) and rides on EVERY sale — normal bill,
+        // restaurant pay-order and offline-queued bills (it sits inside the
+        // payload object, so the queue carries it automatically). Nothing picked
+        // = counter-less billing exactly as before (never blocks a cashier).
+        // The list is in posBootFingerprint(), so a new counter refreshes cached
+        // (offline-first) copies of this screen.
+        allTerminals: {!! $jsEnc($terminalsForJs ?? [], '[]') !!},
+        terminalId: null,
+        showTerminalPicker: false,
+        terminalName() {
+            const t = (this.allTerminals || []).find(x => x.id === this.terminalId);
+            return t ? t.name : '';
+        },
+        loadTerminalPref() {
+            let saved = null;
+            try { saved = parseInt(localStorage.getItem('pos_terminal_id') || '0', 10) || null; } catch (e) {}
+            // Self-heal: a counter deleted/deactivated since this device picked
+            // it must not keep riding on bills (the server drops it anyway) —
+            // clear the stale pref so the chip asks for a fresh pick.
+            if (saved && !(this.allTerminals || []).some(x => x.id === saved)) {
+                saved = null;
+                try { localStorage.removeItem('pos_terminal_id'); } catch (e) {}
+            }
+            this.terminalId = saved;
+        },
+        setTerminal(id) {
+            const next = parseInt(id, 10) || null;
+            this.terminalId = (next && (this.allTerminals || []).some(x => x.id === next)) ? next : null;
+            try {
+                if (this.terminalId) localStorage.setItem('pos_terminal_id', String(this.terminalId));
+                else localStorage.removeItem('pos_terminal_id');
+            } catch (e) {}
+            this.showTerminalPicker = false;
+            window.tnNotify && window.tnNotify(window.TXT.counter_word, this.terminalId ? this.terminalName() : window.TXT.counter_not_set);
+        },
         // ── Caller ID (Task 1039): incoming-call popup ──────────────────────
         // Baked flag — caller_id_enabled sits in the posConfigRev whitelist so
         // a settings toggle refreshes offline-cached sale screens.
@@ -4996,6 +5090,8 @@ function restaurantPos() {
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
             try { if (localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}
+            // Task 1349: device counter pref (validated against the baked list).
+            this.loadTerminalPref();
             this.syncAutoWidecart(); // all items hidden => auto split layout
             this.filterProducts();
             // Task 753 (Pizza Master): "products ghayab" dead-end guards — baked
@@ -6537,6 +6633,15 @@ function restaurantPos() {
                 if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); this.resolvePrintConfirm(true); return; }
                 if (e.key === 'n' || e.key === 'N') { e.preventDefault(); this.resolvePrintConfirm(false); return; }
                 if (/^F\d+$/.test(e.key) || (e.key && e.key.length === 1) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
+                return;
+            }
+            // Task 1349: COUNTER PICKER khula ho to keyboard usi ka — Esc/Enter
+            // band karein, baqi single keys swallow (guided flow / T,D,N
+            // shortcuts / search ko kuch na jaye). Sirf chip click se khulta hai.
+            if (this.showTerminalPicker) {
+                e.stopPropagation();
+                if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); this.showTerminalPicker = false; return; }
+                if (/^F\d+$/.test(e.key) || (e.key && e.key.length === 1)) { e.preventDefault(); }
                 return;
             }
             // ═══════════════════════════════════════════════════════════════
@@ -9085,6 +9190,12 @@ function restaurantPos() {
                     // carries the SAME uuid → server's replay guard returns the
                     // existing bill instead of creating a duplicate.
                     offline_uuid: this._newOfflineUuid(),
+                    // Task 1349: COUNTER attribution — the device's remembered
+                    // counter. Inside the payload on purpose: an offline-queued
+                    // bill then replays with its ORIGINAL counter. Server
+                    // re-validates (company-scoped + active) and stamps NULL if
+                    // the counter is gone — a sale is never blocked over it.
+                    terminal_id: this.terminalId || null,
                 };
                 // OFFLINE-FIRST (Jul 2026): no internet → queue the bill on this
                 // device (IndexedDB) and keep billing. Sync engine replays it.
@@ -10706,7 +10817,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null }) });
+                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null, terminal_id: this.terminalId || null }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));

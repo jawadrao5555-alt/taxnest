@@ -2114,6 +2114,22 @@ class PosController extends Controller
         // — mapForUser is hasTable + try/catch guarded internally).
         $userGridPrefs = \App\Models\PosUserItemPref::mapForUser(auth('pos')->id());
 
+        // Task 1349: ACTIVE counters (terminals) baked for the sale screen's
+        // device-level counter picker. Deliberately tiny (id/name/code) — this
+        // screen can be served from SALE_CACHE, so the list joins
+        // posBootFingerprint() (a newly added counter must refresh cached copies).
+        $terminalsForJs = \Schema::hasTable('pos_terminals')
+            ? PosTerminal::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->orderBy('terminal_name')
+                ->get(['id', 'terminal_name', 'terminal_code'])
+                ->map(fn ($t) => [
+                    'id' => (int) $t->id,
+                    'name' => (string) $t->terminal_name,
+                    'code' => (string) ($t->terminal_code ?? ''),
+                ])->values()->all()
+            : [];
+
         // OFFLINE-FIRST BOOT (Jul 2026): fingerprint baked into the page so a
         // SW-cached copy of this screen can detect staleness via /pos/api/boot-check.
         $bootFp = $this->posBootFingerprint($company, $user);
@@ -2130,7 +2146,7 @@ class PosController extends Controller
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
             'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated',
-            'recallOrderIdForJs', 'canOrderCancel'
+            'recallOrderIdForJs', 'canOrderCancel', 'terminalsForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('X-TaxNest-Sale-Document', 'pra')
@@ -2191,6 +2207,15 @@ class PosController extends Controller
             // (e.g. Starter→Business now unlocks Kitchen mode) must refresh the
             // offline-cached copy even though feature_flags itself is unchanged.
             (bool) \App\Services\PosFeatureService::restaurantAllowed($company),
+            // Task 1349: the ACTIVE counter list is BAKED into the sale screen
+            // (device counter picker). Adding/renaming/deactivating a counter
+            // must refresh the offline-cached copy, or the old screen keeps
+            // offering a stale list (and a deleted counter stays selectable).
+            // Schema-guarded: minimal test schemas / pre-migration installs may
+            // not have the table at all — a missing table must not 500 the screen.
+            \Schema::hasTable('pos_terminals')
+                ? $agg(PosTerminal::where('company_id', $companyId)->where('is_active', true))
+                : null,
         ]));
 
         $screenPath = resource_path('views/pos/universal.blade.php');
@@ -2423,6 +2448,10 @@ class PosController extends Controller
             // Branch the bill was rung up on (multi-branch shops): snapshot from
             // the offline queue so a later sync books it under the right branch.
             'offline_branch_id' => 'nullable|integer',
+            // Task 1349: counter (terminal) this billing device is set to. Rides
+            // on EVERY sale (online + offline queue) so counter-wise reporting
+            // works; resolved/validated below (invalid = NULL, never a block).
+            'terminal_id' => 'nullable|integer',
             // Task 646: waiter order loaded into the cart — FINAL bills settle
             // it server-side BEFORE the response so the receipt can print the
             // waiter's name on the very first (auto-)print.
@@ -2541,11 +2570,18 @@ class PosController extends Controller
             $taxInclusiveFields['tax_menu_rate'] = $menuRate;
         }
 
-        if ($request->terminal_id) {
-            $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->where('is_active', true)->first();
-            if (!$terminal) {
-                return back()->withInput()->with('error', __('pos.invalid_inactive_terminal'));
-            }
+        // Task 1349: COUNTER (terminal) attribution — the sale screen sends the
+        // device's remembered counter with every bill (online + offline replay).
+        // Resolve company-scoped + active; anything else stamps NULL instead of
+        // failing the sale. A counter deleted/deactivated AFTER a device
+        // remembered it (or after an offline bill was queued) must never block
+        // billing — same silently-drop convention as rider attribution.
+        $terminalId = null;
+        if ($request->filled('terminal_id') && \Schema::hasTable('pos_terminals')) {
+            $terminalId = PosTerminal::where('company_id', $companyId)
+                ->where('id', (int) $request->input('terminal_id'))
+                ->where('is_active', true)
+                ->value('id');
         }
 
         // PROVISIONAL BILL FLOW — when cashier explicitly saves as provisional, the bill is
@@ -2778,7 +2814,7 @@ class PosController extends Controller
 
                 $transaction->update([
                     'invoice_number' => $invoiceNumber,
-                    'terminal_id' => $request->terminal_id,
+                    'terminal_id' => $terminalId,
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
                     'delivery_address' => $request->input('delivery_address') ?: null,
@@ -2822,7 +2858,7 @@ class PosController extends Controller
                     // — the owner's company-wide view binds NULL, and a live bill must
                     // still land on a real branch. Offline replay keeps its own branch.
                     'branch_id' => $offlineBranchId ?: app(\App\Services\BranchContextService::class)->stampBranchId(),
-                    'terminal_id' => $request->terminal_id,
+                    'terminal_id' => $terminalId,
                     'invoice_number' => $invoiceNumber,
                     'invoice_mode' => $invoiceMode,
                     'customer_name' => $request->customer_name,
@@ -7419,7 +7455,43 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $terminals = PosTerminal::where('company_id', $companyId)->orderBy('terminal_name')->get();
-        return view('pos.terminals', compact('terminals'));
+
+        // Task 1349: package limit vs current usage. Platform convention (same
+        // as CheckPlanLimit / PlanLimitService): NULL or negative = UNLIMITED.
+        // Only ACTIVE counters count against the cap, exactly like the guard on
+        // the create route — so a deactivated counter frees a slot.
+        $terminalLimit = null;
+        $subscription = \App\Models\Subscription::where('company_id', $companyId)
+            ->where('active', true)
+            ->with('pricingPlan')
+            ->first();
+        if ($subscription && $subscription->pricingPlan
+            && $subscription->pricingPlan->max_terminals !== null
+            && (int) $subscription->pricingPlan->max_terminals >= 0) {
+            $terminalLimit = (int) $subscription->pricingPlan->max_terminals;
+        }
+        $terminalsActive = $terminals->where('is_active', true)->count();
+
+        // Aaj ki sale per counter — business day (00:00–05:59 pre-close bills
+        // yesterday mein ginay jate hain), returns netted like every other
+        // POS figure. Keyed by terminal_id for the table below.
+        $todayByTerminal = collect();
+        if ($terminals->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'terminal_id')) {
+            $bizToday = \App\Services\PosBusinessDay::current((int) $companyId);
+            $signExpr = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
+                ? "CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END"
+                : '1';
+            $todayByTerminal = PosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->whereNotNull('terminal_id')
+                ->where('business_date', $bizToday)
+                ->groupBy('terminal_id')
+                ->selectRaw("terminal_id, COUNT(*) as bills, COALESCE(SUM(({$signExpr}) * total_amount),0) as sale")
+                ->get()
+                ->keyBy('terminal_id');
+        }
+
+        return view('pos.terminals', compact('terminals', 'terminalLimit', 'terminalsActive', 'todayByTerminal'));
     }
 
     public function storeTerminal(Request $request)
@@ -10745,6 +10817,9 @@ class PosController extends Controller
             ];
         });
 
+        // Task 1349: counter-wise (terminal) breakdown — same signed convention.
+        $terminalBreakdown = $this->buildTerminalBreakdown($transactions, $companyId);
+
         // Task 1197: stored Z-reports hold COMPANY-WIDE figures — an isolated
         // cashier gets no history list (the report views 403 them anyway).
         $previousReports = $dayCloseIso
@@ -10880,7 +10955,7 @@ class PosController extends Controller
         // cash recon, local/rider summaries, Z print links) for isolated cashiers.
         $dcIso = $dayCloseIso;
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso'));
     }
 
     /**
@@ -11413,7 +11488,10 @@ class PosController extends Controller
                 ['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method'],
                 // Schema-guarded: order_type column added Jul 2026; pre-migration PROD
                 // schemas omit it — unconditional selection would throw unknown-column SQL.
-                \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'order_type') ? ['order_type'] : []
+                \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'order_type') ? ['order_type'] : [],
+                // terminal_id (Task 1349) powers the counter-wise split below. Guarded
+                // for the same reason: minimal test schemas omit the column entirely.
+                \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'terminal_id') ? ['terminal_id'] : []
             ));
 
         $ids = $transactions->pluck('id')->all();
@@ -11553,6 +11631,26 @@ class PosController extends Controller
                 'avg' => round($revenue / max(1, $g->count()), 2),
             ];
         })->sortByDesc('revenue')->values();
+
+        // Task 1349: SALES BY COUNTER (terminal) — mirrors the cashier block.
+        // Only bills that actually carry a counter are grouped, so a shop that
+        // never picked one gets an empty list and the section stays hidden.
+        $terminalNames = \Schema::hasTable('pos_terminals')
+            ? PosTerminal::where('company_id', $companyId)->pluck('terminal_name', 'id')
+            : collect();
+        $terminals = $transactions->filter(fn ($t) => !empty($t->terminal_id))
+            ->groupBy('terminal_id')
+            ->map(function ($g) use ($terminalNames) {
+                $tid = $g->first()->terminal_id;
+                $revenue = (float) $g->sum('total_amount');
+                return (object) [
+                    'name' => $terminalNames[$tid] ?? ('#' . $tid),
+                    'count' => $g->count(),
+                    'revenue' => $revenue,
+                    'tax' => (float) $g->sum('tax_amount'),
+                    'avg' => round($revenue / max(1, $g->count()), 2),
+                ];
+            })->sortByDesc('revenue')->values();
 
         // Sales by Waiter (Table-se-Bill, Jul 2026): waiter attribution rides on
         // restaurant_orders (created_by = waiter, pos_transaction_id linked at
@@ -11714,12 +11812,53 @@ class PosController extends Controller
             'daily' => $daily,
             'hourly' => $hourly,
             'cashiers' => $cashiers,
+            'terminals' => $terminals,
             'waiters' => $waiters,
             'top_customers' => $topCustomers,
             'payments' => $payments,
             'is_restaurant' => $isRestaurant,
             'order_types' => $orderTypes,
         ];
+    }
+
+    /**
+     * Task 1349: COUNTER-WISE (terminal) breakdown for the day-close surfaces —
+     * page, PDF, thermal and the X-report. Mirrors $cashierBreakdown exactly:
+     * figures are SIGNED (refunds net revenue/tax) while counts stay sales-only.
+     *
+     * Names come from ONE pluck instead of $t->terminal, so the four callers'
+     * with() lists stay untouched (prod runs strict lazy-loading and would throw
+     * on an un-eager-loaded relation). Returns an EMPTY collection when NOT ONE
+     * bill carries a counter — every view hides the section for shops that
+     * never picked counters, so nothing changes for them.
+     *
+     * @param  \Illuminate\Support\Collection  $transactions
+     * @return \Illuminate\Support\Collection
+     */
+    private function buildTerminalBreakdown($transactions, int $companyId)
+    {
+        if ($transactions->filter(fn ($t) => !empty($t->terminal_id))->isEmpty()) {
+            return collect();
+        }
+
+        $names = \Schema::hasTable('pos_terminals')
+            ? PosTerminal::where('company_id', $companyId)->pluck('terminal_name', 'id')
+            : collect();
+
+        return $transactions
+            ->groupBy(fn ($t) => $t->terminal_id
+                ? ($names[$t->terminal_id] ?? (__('pos.counter_word') . ' #' . $t->terminal_id))
+                : __('pos.counter_not_set'))
+            ->map(function ($group) {
+                $sign = fn ($t) => ($t->transaction_type ?? 'sale') === 'return' ? -1 : 1;
+
+                return (object) [
+                    'count' => $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return')->count(),
+                    'revenue' => $group->sum(fn ($t) => $sign($t) * (float) $t->total_amount),
+                    'tax' => $group->sum(fn ($t) => $sign($t) * (float) $t->tax_amount),
+                ];
+            })
+            ->sortByDesc('revenue');
     }
 
     /**
@@ -12691,6 +12830,9 @@ class PosController extends Controller
             ];
         });
 
+        // Task 1349: counter-wise (terminal) breakdown — same signed convention.
+        $terminalBreakdown = $this->buildTerminalBreakdown($transactions, $companyId);
+
         $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
         // Plan gate: hazri section is Pro+ (views already @if(!empty($hazri))).
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
@@ -12719,7 +12861,7 @@ class PosController extends Controller
 
         return $this->renderReportPdf(
             'pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -12766,6 +12908,9 @@ class PosController extends Controller
             ];
         });
 
+        // Task 1349: counter-wise (terminal) breakdown — same signed convention.
+        $terminalBreakdown = $this->buildTerminalBreakdown($transactions, $companyId);
+
         $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
@@ -12787,7 +12932,7 @@ class PosController extends Controller
         $showLocalStream = (bool) session('pos_local_check')
             || ((\Illuminate\Support\Facades\Auth::guard('pos')->user()?->posBillingScope() ?? 'both') === 'local');
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'));
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'));
     }
 
     /**
@@ -13106,6 +13251,9 @@ class PosController extends Controller
             ];
         });
 
+        // Task 1349: counter-wise (terminal) breakdown — same signed convention.
+        $terminalBreakdown = $this->buildTerminalBreakdown($transactions, $companyId);
+
         $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildHazriRows($companyId, $date)
@@ -13116,7 +13264,7 @@ class PosController extends Controller
         $taxSplit = $this->dayCloseTaxSplit($transactions);
         $isXReport = true;
 
-        return compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'isXReport');
+        return compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'isXReport');
     }
 
     /** X-Report as A4 PDF (Task 660) — read-only, PROVISIONAL watermark. */

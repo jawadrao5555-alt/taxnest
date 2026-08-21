@@ -505,6 +505,32 @@
     </table>
     @endif
 
+    {{-- COUNTER-WISE breakdown (Task 1349) — hidden unless the shop's bills
+         actually carry counters. --}}
+    @if(!empty($terminalBreakdown) && $terminalBreakdown->isNotEmpty())
+    <div class="section-title">{{ __('pos.counter_breakdown') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.counter_word') }}</th>
+                <th class="c">{{ __('pos.dcp_sales') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+                <th class="r">{{ __('pos.dc_th_tax_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($terminalBreakdown as $tName => $tData)
+            <tr>
+                <td>{{ $tName }}</td>
+                <td class="c">{{ $tData->count }}</td>
+                <td class="r">{{ number_format($tData->revenue, 2) }}</td>
+                <td class="r">{{ number_format($tData->tax, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     {{-- ═══ Staff Attendance / Hazri (owner batch, 26 Jul 2026) ═══
          From pos_user_sessions: first login, last logout (or last-seen when
          Logout was never pressed), bills + first/last sale per staff member. --}}

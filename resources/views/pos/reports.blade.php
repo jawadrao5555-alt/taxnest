@@ -353,6 +353,34 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{-- SALES BY COUNTER (Task 1349) — sirf tab jab bills par counter
+                     mojood ho; counter-less shops ke liye kuch nahi badalta. --}}
+                @if($ra->terminals->isNotEmpty())
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mt-6 mb-2">{{ __('pos.sales_by_counter') }}</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm table-cards">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
+                                <th class="pb-2">{{ __('pos.counter_word') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.th_bills') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.th_avg_bill') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($ra->terminals as $t)
+                            <tr class="border-b border-gray-50 dark:border-gray-800">
+                                <td class="py-2.5 font-medium text-gray-900 dark:text-white">{{ $t->name }}</td>
+                                <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ $t->count }}</td>
+                                <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($t->revenue) }}</td>
+                                <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($t->avg) }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @endif
             </div>
             <div>
                 <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.top_customers') }}</h4>

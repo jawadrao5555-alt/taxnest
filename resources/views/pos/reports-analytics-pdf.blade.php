@@ -230,6 +230,33 @@
     </table>
     @endif
 
+    {{-- SALES BY COUNTER (Task 1349) — counters wali shops par hi chhapta hai. --}}
+    @if($analytics->terminals->isNotEmpty())
+    <div class="section-title">{{ __('pos.sales_by_counter') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.counter_word') }}</th>
+                <th class="c">{{ __('pos.dcp_bills') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+                <th class="r">{{ __('pos.dc_th_tax_pkr') }}</th>
+                <th class="r">{{ __('pos.ra_avg_bill_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($analytics->terminals as $t)
+            <tr>
+                <td>{{ $t->name }}</td>
+                <td class="c">{{ $t->count }}</td>
+                <td class="r">{{ number_format($t->revenue, 2) }}</td>
+                <td class="r">{{ number_format($t->tax, 2) }}</td>
+                <td class="r">{{ number_format($t->avg, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     @if($analytics->waiters->isNotEmpty())
     <div class="section-title">{{ __('pos.ra_sales_by_waiter') }}</div>
     <table class="data">

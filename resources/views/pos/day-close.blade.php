@@ -369,6 +369,40 @@
                     </tbody>
                 </table>
             </div>
+
+            {{-- COUNTER-WISE breakdown (Task 1349) — sirf un shops ke liye jinhon
+                 ne counters bana kar sale screen par chune hain; warna chhupa
+                 rehta hai (counter-less shops ke liye page pehle jaisa). --}}
+            @if(!empty($terminalBreakdown) && $terminalBreakdown->isNotEmpty())
+            <div class="mt-6 pt-5 border-t border-gray-100 dark:border-gray-800">
+                <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 7l1 12a1 1 0 001 1h12a1 1 0 001-1l1-12M4 7l1.2-2.4A1 1 0 016.1 4h11.8a1 1 0 01.9.6L20 7M9 11h6"/></svg>
+                    {{ __('pos.counter_breakdown') }}
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.counter_word') }}</th>
+                                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{{ __('pos.th_sales') }}</th>
+                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.kpi_revenue') }}</th>
+                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.receipt_tax') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            @foreach($terminalBreakdown as $tName => $tData)
+                            <tr>
+                                <td class="px-3 py-2 text-sm font-medium text-gray-900 dark:text-white">{{ $tName }}</td>
+                                <td class="px-3 py-2 text-sm text-center text-gray-700 dark:text-gray-300">{{ $tData->count }}</td>
+                                <td class="px-3 py-2 text-sm text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($tData->revenue, 2) }}</td>
+                                <td class="px-3 py-2 text-sm text-right text-purple-600">PKR {{ number_format($tData->tax, 2) }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
         </div>
     </div>
 

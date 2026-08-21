@@ -1068,6 +1068,10 @@ class RestaurantPosController extends Controller
                 // Task 994: per-sale-attempt idempotency key (client reuses it on
                 // every retry of the SAME sale) — mirrors storeInvoice's offline_uuid.
                 'pay_uuid' => 'nullable|string|max:64',
+                // Task 1349: counter (terminal) the billing device is set to —
+                // mirrors storeInvoice so restaurant pay-orders land on the same
+                // counter-wise reports. Invalid ids are dropped, never blocked.
+                'terminal_id' => 'nullable|integer',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('[PAY] Validation failed', ['errors' => $ve->errors(), 'input' => $request->all()]);
@@ -1340,6 +1344,16 @@ class RestaurantPosController extends Controller
             }
             if ($menuRateColumnExists) {
                 $transactionData['tax_menu_rate'] = $menuRate;
+            }
+            // Task 1349: counter attribution on the restaurant pay path too —
+            // the sale screen sends its device counter with the pay request.
+            // Company-scoped + active only; anything else stamps NULL (a stale
+            // remembered counter must never fail a payment).
+            if ($request->filled('terminal_id') && \Illuminate\Support\Facades\Schema::hasTable('pos_terminals')) {
+                $transactionData['terminal_id'] = \App\Models\PosTerminal::where('company_id', $companyId)
+                    ->where('id', (int) $request->input('terminal_id'))
+                    ->where('is_active', true)
+                    ->value('id');
             }
             // Task 994: stamp the retry-idempotency key on the bill — the replay
             // guard above (and the UNIQUE(company_id, offline_uuid) index as the

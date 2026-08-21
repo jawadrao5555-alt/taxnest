@@ -264,6 +264,17 @@
     <div class="hr"></div>
     @endif
 
+    {{-- Counter-wise split (Task 1349) — counters wali shops par hi chhapta hai. --}}
+    @if(!empty($terminalBreakdown) && $terminalBreakdown->isNotEmpty())
+    <div class="sec">{{ __('pos.counter_breakdown') }}</div>
+    <table>
+        @foreach($terminalBreakdown as $tName => $tData)
+        <tr><td>{{ \Illuminate\Support\Str::limit($tName, 18) }}</td><td class="ct">{{ $tData->count }}</td><td class="r">{{ number_format($tData->revenue, 2) }}</td></tr>
+        @endforeach
+    </table>
+    <div class="hr"></div>
+    @endif
+
     {{-- Staff Attendance / Hazri (owner batch, 26 Jul 2026). * = no logout
          pressed — last activity time shown instead. --}}
     @if(!empty($hazri))

@@ -283,6 +283,27 @@ class PosExtraBranchSlotScopeTest extends TestCase
         $this->assertTrue(PlanLimitService::canAddBranch($company)['allowed']);
     }
 
+    /**
+     * (Task 1441) The two halves of the service must AGREE: whatever
+     * applicableSlots() treats as inert (unlimited / no-limit package) is never
+     * billed. Before this fix addonForCycle() still multiplied the stored slots
+     * by 10,000 on an unlimited package, charging the shop for capacity the
+     * package already gave it for free.
+     */
+    public function test_slots_that_widen_nothing_are_also_billed_for_nothing(): void
+    {
+        foreach ([null, -1] as $unlimited) {
+            $company = \App\Models\Company::find($this->makeCompany('pos', $unlimited, 3));
+            $plan = BranchAddonService::activeSubscription($company)?->pricingPlan;
+
+            // Enforcement half: these slots widen no limit.
+            $this->assertSame(0, BranchAddonService::applicableSlots($company));
+            // Pricing half must agree: they are billed for nothing.
+            $this->assertSame(0, BranchAddonService::billableSlots($company, $plan));
+            $this->assertSame(0.0, BranchAddonService::addonForCycle($company, $plan, 'annual'));
+        }
+    }
+
     // ── 6-7. Override precedence + report/enforce agreement ─────────────────
 
     public function test_admin_branch_override_still_wins_over_package_plus_slots(): void

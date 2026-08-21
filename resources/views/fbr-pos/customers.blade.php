@@ -84,6 +84,12 @@
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.city_label') }}</label>
                 <input type="text" name="city" placeholder="{{ __('pos.city_label') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-blue-500">
             </div>
+            {{-- (Khata upgrade Aug 2026) Udhaar hadd — empty means no limit. --}}
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.khata_limit_label') }}</label>
+                <input type="number" name="khata_limit" step="0.01" min="0" placeholder="{{ __('pos.khata_limit_hint') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                <p class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.khata_limit_hint') }}</p>
+            </div>
             <div class="flex items-end">
                 <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition">{{ __('pos.save_customer') }}</button>
             </div>
@@ -184,6 +190,8 @@
                                 <input type="text" name="city" value="{{ $customer->city }}" placeholder="{{ __('pos.city_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="text" name="cnic" value="{{ $customer->cnic }}" placeholder="{{ __('pos.cnic_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <input type="text" name="ntn" value="{{ $customer->ntn }}" placeholder="{{ __('pos.ntn_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
+                                {{-- (Khata upgrade Aug 2026) Udhaar hadd — empty = no limit. --}}
+                                <input type="number" name="khata_limit" step="0.01" min="0" value="{{ $customer->khata_limit !== null ? rtrim(rtrim(number_format((float) $customer->khata_limit, 2, '.', ''), '0'), '.') : '' }}" placeholder="{{ __('pos.khata_limit_label') }}" title="{{ __('pos.khata_limit_hint') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                 <select name="type" required class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
                                     <option value="unregistered" {{ $customer->type === 'unregistered' ? 'selected' : '' }}>{{ __('pos.unregistered') }}</option>
                                     <option value="registered" {{ $customer->type === 'registered' ? 'selected' : '' }}>{{ __('pos.registered') }}</option>

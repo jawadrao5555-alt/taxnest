@@ -133,6 +133,9 @@ class PosBranchStockTest extends TestCase
             $table->string('reference_type', 50)->nullable();
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->string('reference_number')->nullable();
+            // In-transit branch transfers (Task 1434).
+            $table->string('transfer_status', 20)->nullable();
+            $table->decimal('received_quantity', 15, 2)->nullable();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
@@ -461,17 +464,200 @@ class PosBranchStockTest extends TestCase
         ]));
     }
 
-    public function test_transfer_moves_stock_between_branches_without_changing_the_total(): void
+    public function test_transfer_leaves_source_but_holds_stock_in_transit_until_received(): void
     {
+        // In-transit transfers (Task 1434): sending drops the source shelf but
+        // the maal does NOT arrive in the destination stock — it is on the road.
+        // The company total (mirror) stays whole because the in-transit qty is
+        // counted back in.
         $this->seedStock($this->mainBranchId, 60);
         $this->seedStock($this->cityBranchId, 40);
         $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
 
         $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
 
+        $this->assertSame(45.0, $this->qty($this->mainBranchId), 'maal has left the source');
+        $this->assertSame(40.0, $this->qty($this->cityBranchId), 'but has NOT yet arrived at the destination');
+        $this->assertSame(100, $this->mirror(), 'company total stays whole while goods are on the road');
+
+        // Only a TRANSFER_OUT exists, flagged in_transit — no TRANSFER_IN yet.
+        $rows = DB::table('inventory_movements')->where('reference_type', 'branch_transfer')->get();
+        $this->assertSame(1, $rows->where('type', 'transfer_out')->count());
+        $this->assertSame(0, $rows->where('type', 'transfer_in')->count());
+        $this->assertSame('in_transit', $rows->firstWhere('type', 'transfer_out')->transfer_status);
+    }
+
+    public function test_receiving_a_transfer_lands_the_stock_and_keeps_the_total(): void
+    {
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+        $out = DB::table('inventory_movements')->where('type', 'transfer_out')->first();
+
+        (new PosInventoryController())->receiveTransfer(
+            Request::create('/pos/inventory/transfer/' . $out->id . '/receive', 'POST'),
+            (int) $out->id
+        );
+
         $this->assertSame(45.0, $this->qty($this->mainBranchId));
-        $this->assertSame(55.0, $this->qty($this->cityBranchId));
-        $this->assertSame(100, $this->mirror(), 'a transfer never creates or destroys maal');
+        $this->assertSame(55.0, $this->qty($this->cityBranchId), 'now the maal has arrived');
+        $this->assertSame(100, $this->mirror(), 'nothing created or destroyed by a full receive');
+        $this->assertSame('received', DB::table('inventory_movements')->where('id', $out->id)->value('transfer_status'));
+        $this->assertSame(1, DB::table('inventory_movements')->where('type', 'transfer_in')->count());
+    }
+
+    public function test_receiving_a_short_transfer_records_the_shortfall_as_loss(): void
+    {
+        // Kam maal pohancha (Task 1434): only 12 of the 15 sent arrived. The 3
+        // missing never land anywhere, so the company total drops by exactly 3.
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+        $out = DB::table('inventory_movements')->where('type', 'transfer_out')->first();
+
+        (new PosInventoryController())->receiveTransfer(
+            Request::create('/pos/inventory/transfer/' . $out->id . '/receive', 'POST', [
+                'received_quantity' => 12,
+            ]),
+            (int) $out->id
+        );
+
+        $this->assertSame(45.0, $this->qty($this->mainBranchId), 'source already gave up all 15');
+        $this->assertSame(52.0, $this->qty($this->cityBranchId), 'only 12 landed');
+        $this->assertSame(97, $this->mirror(), '3 units lost on the road leave the total');
+        $this->assertSame(12.0, (float) DB::table('inventory_movements')->where('id', $out->id)->value('received_quantity'));
+    }
+
+    public function test_cancelling_an_in_transit_transfer_returns_goods_to_source(): void
+    {
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+        $out = DB::table('inventory_movements')->where('type', 'transfer_out')->first();
+
+        (new PosInventoryController())->cancelTransfer(
+            Request::create('/pos/inventory/transfer/' . $out->id . '/cancel', 'POST'),
+            (int) $out->id
+        );
+
+        $this->assertSame(60.0, $this->qty($this->mainBranchId), 'goods came back');
+        $this->assertSame(40.0, $this->qty($this->cityBranchId), 'destination never touched');
+        $this->assertSame(100, $this->mirror());
+        $this->assertSame('cancelled', DB::table('inventory_movements')->where('id', $out->id)->value('transfer_status'));
+    }
+
+    public function test_a_second_receive_writes_nothing_and_moves_no_stock(): void
+    {
+        // Single-consumption (Task 1434 blocker): two receive POSTs on the same
+        // in-transit row must NOT both credit the destination nor both write a
+        // TRANSFER_IN. The guard flips transfer_status ONCE under lockForUpdate
+        // before touching stock, so the second call is a no-op.
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+        $out = DB::table('inventory_movements')->where('type', 'transfer_out')->first();
+
+        (new PosInventoryController())->receiveTransfer(Request::create('/x', 'POST'), (int) $out->id);
+        (new PosInventoryController())->receiveTransfer(Request::create('/x', 'POST'), (int) $out->id);
+
+        // Real DB SELECTs: destination credited exactly once, mirror whole,
+        // and only ONE TRANSFER_IN row was ever written.
+        $this->assertSame(55.0, $this->qty($this->cityBranchId), 'destination credited exactly once');
+        $this->assertSame(45.0, $this->qty($this->mainBranchId));
+        $this->assertSame(100, $this->mirror(), 'company total not inflated by the second receive');
+        $this->assertSame(1, DB::table('inventory_movements')->where('type', 'transfer_in')->count(), 'no duplicate TRANSFER_IN');
+        $this->assertSame('received', DB::table('inventory_movements')->where('id', $out->id)->value('transfer_status'));
+    }
+
+    public function test_a_cancel_after_receive_is_refused_with_no_stock_movement(): void
+    {
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+        $out = DB::table('inventory_movements')->where('type', 'transfer_out')->first();
+
+        (new PosInventoryController())->receiveTransfer(Request::create('/x', 'POST'), (int) $out->id);
+        // Cancel must NOT return the goods a second time — they already landed.
+        (new PosInventoryController())->cancelTransfer(Request::create('/x', 'POST'), (int) $out->id);
+
+        $this->assertSame(55.0, $this->qty($this->cityBranchId), 'goods stay at the destination');
+        $this->assertSame(45.0, $this->qty($this->mainBranchId), 'nothing returned to source');
+        $this->assertSame(100, $this->mirror());
+        $this->assertSame('received', DB::table('inventory_movements')->where('id', $out->id)->value('transfer_status'), 'a receive is not undone by a late cancel');
+    }
+
+    public function test_a_receive_after_cancel_is_refused_with_no_stock_movement(): void
+    {
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+        $out = DB::table('inventory_movements')->where('type', 'transfer_out')->first();
+
+        (new PosInventoryController())->cancelTransfer(Request::create('/x', 'POST'), (int) $out->id);
+        // Receive must NOT land goods that were already returned to source.
+        (new PosInventoryController())->receiveTransfer(Request::create('/x', 'POST'), (int) $out->id);
+
+        $this->assertSame(60.0, $this->qty($this->mainBranchId), 'goods stayed returned to source');
+        $this->assertSame(40.0, $this->qty($this->cityBranchId), 'destination never credited');
+        $this->assertSame(100, $this->mirror());
+        $this->assertSame(0, DB::table('inventory_movements')->where('type', 'transfer_in')->where('branch_id', $this->cityBranchId)->count(), 'no TRANSFER_IN at destination');
+        $this->assertSame('cancelled', DB::table('inventory_movements')->where('id', $out->id)->value('transfer_status'));
+    }
+
+    public function test_transfer_degrades_to_instant_on_a_db_without_the_in_transit_columns(): void
+    {
+        // Prod-schema-drift safety (Task 1434): the owner's cPanel DB can lack
+        // freshly-added columns. Drop them here to simulate that and prove the
+        // transfer still works instantly instead of 500-ing.
+        Schema::table('inventory_movements', function (Blueprint $t) {
+            $t->dropColumn(['transfer_status', 'received_quantity']);
+        });
+
+        $this->seedStock($this->mainBranchId, 60);
+        $this->seedStock($this->cityBranchId, 40);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        // The page must not crash without the columns.
+        $view = (new PosInventoryController())->transfers(Request::create('/pos/inventory/transfer', 'GET'));
+        $this->assertFalse($view->getData()['columnsReady'], 'page knows the columns are missing');
+        $this->assertTrue($view->getData()['inTransit']->isEmpty(), 'nothing can be in transit without the columns');
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+
+        // Old instant behaviour: the maal lands at the destination immediately,
+        // with the paired OUT + IN ledger rows.
+        $this->assertSame(45.0, $this->qty($this->mainBranchId));
+        $this->assertSame(55.0, $this->qty($this->cityBranchId), 'instant transfer credits the destination now');
+        $this->assertSame(100, $this->mirror());
+        $rows = DB::table('inventory_movements')->where('reference_type', 'branch_transfer')->get();
+        $this->assertSame(1, $rows->where('type', 'transfer_out')->count());
+        $this->assertSame(1, $rows->where('type', 'transfer_in')->count());
+    }
+
+    /** Send then immediately receive — the cost tests care about the arrived state. */
+    private function transferAndReceive(int $from, int $to, float $qty): void
+    {
+        $this->transfer($from, $to, $qty);
+        $out = DB::table('inventory_movements')
+            ->where('type', 'transfer_out')
+            ->where('transfer_status', 'in_transit')
+            ->orderByDesc('id')->first();
+        (new PosInventoryController())->receiveTransfer(
+            Request::create('/pos/inventory/transfer/' . $out->id . '/receive', 'POST'),
+            (int) $out->id
+        );
     }
 
     public function test_transfer_reweights_the_cost_of_a_destination_that_already_has_stock(): void
@@ -483,7 +669,7 @@ class PosBranchStockTest extends TestCase
         $this->seedStock($this->cityBranchId, 10, null, 100);
         $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
 
-        $this->transfer($this->mainBranchId, $this->cityBranchId, 10);
+        $this->transferAndReceive($this->mainBranchId, $this->cityBranchId, 10);
 
         $dest = $this->costRow($this->cityBranchId);
         $this->assertSame(20.0, (float) $dest->quantity);
@@ -497,20 +683,21 @@ class PosBranchStockTest extends TestCase
         $this->seedStock($this->cityBranchId, 10, null, 120);
         $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
 
-        $this->transfer($this->mainBranchId, $this->cityBranchId, 5);
+        $this->transferAndReceive($this->mainBranchId, $this->cityBranchId, 5);
 
         $dest = $this->costRow($this->cityBranchId);
         $this->assertSame(15.0, (float) $dest->quantity, 'the goods still moved');
         $this->assertSame(120.0, (float) $dest->avg_purchase_price, 'known rate survives an unknown one');
     }
 
-    public function test_transfer_writes_a_paired_out_and_in_ledger_row(): void
+    public function test_transfer_writes_a_paired_out_and_in_ledger_row_once_received(): void
     {
         $this->seedStock($this->mainBranchId, 60);
         $this->seedStock($this->cityBranchId, 40);
         $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
 
-        $this->transfer($this->mainBranchId, $this->cityBranchId, 15);
+        // The pair only completes on receive — before that only the OUT exists.
+        $this->transferAndReceive($this->mainBranchId, $this->cityBranchId, 15);
 
         $rows = DB::table('inventory_movements')->where('reference_type', 'branch_transfer')->get();
         $this->assertCount(2, $rows, 'both shops must be able to explain the change');

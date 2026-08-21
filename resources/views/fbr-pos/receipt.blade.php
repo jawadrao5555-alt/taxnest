@@ -409,7 +409,10 @@
             @endforeach
             @else
             <tr>
-                <td class="col-item">{{ $item->item_name }}@if($item->is_third_schedule)<span class="tsch-tag">3rd Sch</span>@endif</td>
+                {{-- (Khata upgrade Aug 2026) Blade won't compile two adjacent
+                     directives (@endif@if with no boundary) — the second stayed a
+                     literal "@if", crashing the view. Compute the tags first. --}}
+                <td class="col-item">{{ $item->item_name }}@if($item->is_third_schedule)<span class="tsch-tag">3rd Sch</span>@endif @if(!empty($item->is_peti_rate))<span class="tsch-tag">{{ __('pos.peti_rate_tag') }}</span>@endif</td>
                 <td class="col-uom">{{ $item->uom ?? 'U' }}</td>
                 <td class="col-qty">{{ $fmtQty($item->quantity) }}</td>
                 <td class="col-price">{{ number_format($item->unit_price, 0) }}</td>
@@ -472,6 +475,30 @@
         </tr>
         @endif
     </table>
+
+    {{-- (Khata upgrade Aug 2026) Udhaar parchi par purana + naya baqaya.
+         CREDIT bills only. Uses the ledger SNAPSHOT for this bill ($khataSnapshot,
+         built in FbrPosController::receipt from the udhaar entry's balance_after)
+         — never the customer's live balance — so a reprint after later bills still
+         shows the truth at this moment. Cash/card bills: $khataSnapshot is null,
+         nothing prints, receipt unchanged. --}}
+    @if(!empty($khataSnapshot))
+    <div class="separator"></div>
+    <table class="totals-table">
+        <tr>
+            <td class="tot-label">{{ __('pos.rcpt_khata_previous') }}:</td>
+            <td class="tot-value">PKR {{ number_format($khataSnapshot['previous'], 2) }}</td>
+        </tr>
+        <tr>
+            <td class="tot-label">{{ __('pos.rcpt_khata_this_bill') }}:</td>
+            <td class="tot-value">PKR {{ number_format($khataSnapshot['bill'], 2) }}</td>
+        </tr>
+        <tr class="grand-total">
+            <td class="tot-label">{{ __('pos.rcpt_khata_total') }}:</td>
+            <td class="tot-value">PKR {{ number_format($khataSnapshot['total'], 2) }}</td>
+        </tr>
+    </table>
+    @endif
 
     <div class="separator"></div>
 

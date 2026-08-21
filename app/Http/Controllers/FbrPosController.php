@@ -1183,6 +1183,22 @@ class FbrPosController extends Controller
                 ->where('is_active', true)->orderByDesc('id')->limit(20)->get()
             : collect();
 
+        // Peti (Wholesale) Rate (Task 1414): server-computed peti rates for the
+        // sale screen. Cost price NEVER reaches the browser — only the finished
+        // customer-facing rate. When the switch is OFF the map is empty, so the
+        // screen behaves exactly as before (no bake, no decision, no UI).
+        // hasColumn-guarded: a live DB that predates the migration degrades to
+        // "feature off" instead of 500ing the sale screen (prod schema drift).
+        $petiRateEnabled = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_peti_rate_enabled')
+            && \Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size')
+            && (bool) ($company->fbr_peti_rate_enabled ?? false);
+        $petiRates = $petiRateEnabled
+            ? \App\Services\FbrPetiRateService::ratesForProducts(
+                $company, $products,
+                \App\Services\BranchStockService::writeBranchId($companyId, null)
+            )
+            : [];
+
         // 🌐 Classic create screen RETIRED (Aug 2026, owner order): the universal
         // screen is the ONLY FBR sale screen — fbr_universal_enabled no longer
         // consulted. fbr-pos/create.blade.php kept on disk as a DEAD file (PRA
@@ -1265,7 +1281,8 @@ class FbrPosController extends Controller
             'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
             'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed',
-            'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin', 'canKotReprint'
+            'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin', 'canKotReprint',
+            'petiRates', 'petiRateEnabled'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('X-TaxNest-Sale-Document', 'fbr')
@@ -1308,6 +1325,17 @@ class FbrPosController extends Controller
             // the screen, but ONLY for companies that actually have them (PRA
             // deals lesson: no needless morning reload churn for the rest).
             (str_starts_with($promoAgg, '0:') && str_starts_with($dealAgg, '0:')) ? '' : now()->toDateString(),
+            // Peti (Wholesale) Rate (Task 1414): the baked peti rate is derived
+            // from avg purchase COST — which changes on every purchase WITHOUT
+            // touching products.updated_at. Fold an InventoryStock aggregate in
+            // so a fresh kharid busts the SW-cached screen (otherwise a cached
+            // screen keeps deriving the peti rate from a stale cost). ONLY for
+            // companies with the switch ON — no cost-write churn for the rest.
+            // hasColumn-guarded so a pre-migration DB degrades to "off", never 500.
+            (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_peti_rate_enabled')
+                && (bool) ($company->fbr_peti_rate_enabled ?? false))
+                ? $agg(\App\Models\InventoryStock::where('company_id', $companyId))
+                : '',
         ]));
 
         $settingsRev = md5(json_encode([
@@ -1490,6 +1518,10 @@ class FbrPosController extends Controller
             'items.*.uom' => 'nullable|string|in:U,KG,GM,LTR,ML,MTR,SQM,PCS,PKT,DOZ,BOX,SET,BAG,BTL,CTN,ROL,FT,IN,YDS,TIN,CAN,BUN',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.is_tax_exempt' => 'nullable|boolean',
+            // Peti (Wholesale) Rate (Task 1414): receipt/report marker only —
+            // the billed unit_price stays authoritative. Stored solely so the
+            // receipt shows the "Peti rate" badge; never re-prices the line.
+            'items.*.is_peti_rate' => 'nullable|boolean',
             // Services (Task 1272): id into pos_services — when present the server
             // resolves the AUTHORITATIVE tax_rate/is_tax_exempt from the DB row.
             'items.*.service_id' => 'nullable|integer|min:1',
@@ -1537,6 +1569,10 @@ class FbrPosController extends Controller
             // Task 1271: recalled-draft settlement — the sale claims/consumes the
             // draft server-side (atomic; prevents two cashiers billing one draft).
             'draft_id' => 'nullable|integer',
+            // (Khata upgrade Aug 2026) explicit owner/manager override of the
+            // per-customer udhaar hadd. A cashier posting this flag is still
+            // hard-blocked below — the flag alone never bypasses the limit.
+            'khata_limit_override' => 'nullable|boolean',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('FBR POS Store: validation failed', [
@@ -1752,6 +1788,17 @@ class FbrPosController extends Controller
                 // screen keeps its old state after a toggle or a downgrade, so the
                 // payload can never be trusted on its own.
                 $storeNotesOn = $this->fbrStoreNotesEnabled($company);
+                // Peti (Wholesale) Rate (Task 1414): resolved ONCE before the
+                // loop — the switch is the single source of truth. OFF ⇒ the
+                // marker is never stored no matter what the payload claims.
+                // hasColumn-guarded so a live DB that predates the migration
+                // degrades to "feature off" instead of 500ing the sale.
+                $petiRateOn = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_peti_rate_enabled')
+                    && \Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size')
+                    && (bool) ($company->fbr_peti_rate_enabled ?? false);
+                // Company margin fraction, resolved once (service handles the
+                // NULL-column / negative default safely).
+                $petiMargin = \App\Services\FbrPetiRateService::marginFraction($company);
 
                 foreach ($request->items as $item) {
                     // ── 🍔 DEAL LINE (Task 1273): fixed-price combo → REAL component
@@ -1897,15 +1944,25 @@ class FbrPosController extends Controller
                     // If product is linked AND is_price_editable=false, force unit_price from DB
                     // and reject any value-mode (Rs) entry. Cashier UI already hides these, but
                     // a crafted request could otherwise bypass and submit arbitrary prices.
+                    //
+                    // Peti (Wholesale) Rate (Task 1414): a fixed-price product IS allowed to
+                    // bill at the SERVER-DERIVED peti rate — that is the whole feature — so the
+                    // reset-to-retail below must not clobber it. $lineProduct is loaded here and
+                    // reused for the peti decision after qty is known (below); $forcedRetail
+                    // records that this is a fixed-price line whose price we would otherwise pin.
+                    $lineProduct = null;
+                    $forcedRetail = false;
                     if (!empty($item['product_id'])) {
-                        $product = \App\Models\Product::where('id', $item['product_id'])
+                        $lineProduct = \App\Models\Product::where('id', $item['product_id'])
                             ->where('company_id', $companyId)
                             ->first();
-                        if ($product && $product->is_price_editable === false) {
+                        if ($lineProduct && $lineProduct->is_price_editable === false) {
                             // NOTE: column is default_price — reading the non-existent
                             // ->price attribute silently returned null → every fixed-price
                             // product line became Rs 0 (total = just the Rs1 FBR charge).
-                            $price = (float) $product->default_price;
+                            // Defer the actual pin until AFTER the peti re-derivation so an
+                            // authorised peti rate on a fixed-price product survives.
+                            $forcedRetail = true;
                             $valueInput = 0; // hard-reject value-mode for fixed-price products
                         }
                     }
@@ -1939,6 +1996,53 @@ class FbrPosController extends Controller
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'items' => "Decimal quantity not allowed for unit-based UoM '{$uom}' on item '{$item['item_name']}'. Use whole numbers only (or switch UoM to KG/LTR for value-mode).",
                         ]);
+                    }
+
+                    // ─── 📦 PETI (WHOLESALE) RATE — server-authoritative (Task 1414) ─────
+                    // The browser only ever suggests a peti price; the SALE INVARIANT is
+                    // enforced here. We RE-DERIVE the peti rate from the bill's own branch
+                    // cost + product retail + company margin (the SAME service, floors and
+                    // caps as the sale-screen bake — never below avg cost, never at/above
+                    // retail, silent when pack size or cost is unknown), then:
+                    //   • is_peti_rate is set ONLY when the price actually billed equals that
+                    //     server rate — the posted marker is never trusted.
+                    //   • a full-carton line whose posted price equals the server rate is
+                    //     AUTHORISED even on a fixed-price product (so $forcedRetail is
+                    //     cancelled — screen and bill agree).
+                    //   • a below-floor / mismatched posted price is simply NOT a peti line;
+                    //     the cashier's legitimate manual rate flows through untouched
+                    //     (fixed-price lines still get pinned to retail just below).
+                    // Cost NEVER leaves the server — only the derived rate is compared.
+                    $petiLine = false;
+                    if ($petiRateOn && $lineProduct) {
+                        $packSize = (int) ($lineProduct->pack_size ?? 0);
+                        if ($packSize > 0 && $qty >= $packSize) {
+                            $stockRow = $costMap->get($item['product_id']);
+                            $avg = $stockRow ? (float) $stockRow->avg_purchase_price : 0.0;
+                            $last = $stockRow ? (float) $stockRow->last_purchase_price : 0.0;
+                            $cost = $avg > 0 ? $avg : ($last > 0 ? $last : null);
+                            $serverPetiRate = \App\Services\FbrPetiRateService::deriveRate(
+                                $cost,
+                                (float) ($lineProduct->default_price ?? 0),
+                                $petiMargin
+                            );
+                            // Accept as a peti line only when the posted price MATCHES the
+                            // server rate to the paisa. A crafted below-floor price fails
+                            // this equality → never marked peti, never billed as peti.
+                            if ($serverPetiRate !== null && abs($price - $serverPetiRate) < 0.005) {
+                                $petiLine = true;
+                                $price = $serverPetiRate;   // authoritative
+                                $forcedRetail = false;      // authorised even if fixed-price
+                            }
+                        }
+                    }
+
+                    // 🔒 FIXED-PRICE PIN (deferred from the enforcement block above): a
+                    // non-editable product that did NOT qualify as a peti line is forced
+                    // back to its catalog retail price — a crafted payload can neither
+                    // discount it nor sneak a fake peti marker past the equality check.
+                    if ($forcedRetail && $lineProduct) {
+                        $price = (float) $lineProduct->default_price;
                     }
 
                     // ─── Third Schedule: resolve from DB FIRST (authoritative) ───────────
@@ -2058,6 +2162,15 @@ class FbrPosController extends Controller
                     if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes')) {
                         $note = $storeNotesOn ? trim((string) ($item['special_notes'] ?? '')) : '';
                         $itemDataRow['special_notes'] = $note === '' ? null : \Illuminate\Support\Str::limit($note, 190, '');
+                    }
+                    // Peti (Wholesale) Rate (Task 1414): persist the marker from the
+                    // SERVER-derived decision ($petiLine) above — never the posted
+                    // flag. $petiLine is only ever true when the price actually
+                    // billed equals the server peti rate (floors/caps enforced), so
+                    // a below-floor or spoofed line can never carry a lying marker.
+                    // hasColumn guards the deploy-before-migrate window on PROD.
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'is_peti_rate')) {
+                        $itemDataRow['is_peti_rate'] = $petiLine;
                     }
                     $itemsData[] = $itemDataRow;
                 }
@@ -2198,6 +2311,17 @@ class FbrPosController extends Controller
                         ]);
                     }
                 }
+
+                // (Khata upgrade Aug 2026) set true only when a manager explicitly
+                // overrides the udhaar hadd — flows into the ledger note for audit.
+                // The udhaar-hadd DECISION is NOT made here: it must read the
+                // customer's balance from the SAME lockForUpdate row that books the
+                // ledger, or two concurrent credit sales each approve against a
+                // stale balance and blow past the limit with no authorised
+                // override. So the check now lives inside the locked ledger block
+                // below (one lock, one decision, one write). See
+                // .agents/memory/fbr-retail-core.md.
+                $khataLimitOverridden = false;
 
                 // Cash received & change
                 $cashReceived = (float) ($request->cash_received ?? 0);
@@ -2398,7 +2522,60 @@ class FbrPosController extends Controller
                         ]);
                     }
                     if ($khataCustomer) {
+                        // ── UDHAAR HADD (credit limit) GUARD (Khata upgrade Aug 2026) ────
+                        // WHY HERE: the decision reads the balance from the LOCKED row
+                        // ($khataCustomer, lockForUpdate above) and the SAME instance
+                        // then writes the ledger + balance — one lock, one decision,
+                        // one write. Doing it earlier (unlocked) let two concurrent
+                        // credit sales both approve against a stale balance and serialise
+                        // only on the increment, exceeding the hadd unauthorised.
+                        // Throwing here rolls back the whole txn (invoice + items
+                        // already created), so a rejected udhaar bill leaves ZERO trace.
+                        //
+                        // Column may be missing on a drifted PROD DB (see
+                        // prod-schema-drift-selfheal.md) → treat as "no limit" and let
+                        // the sale through rather than 500.
+                        $khataLimit = \App\Models\PosCustomer::khataColumnExists('khata_limit')
+                            ? $khataCustomer->khata_limit
+                            : null;
+                        if ($khataLimit !== null) {
+                            $curBal = round((float) $khataCustomer->khata_balance, 2);
+                            $wouldBe = round($curBal + $totalAmount, 2);
+                            if ($wouldBe > round((float) $khataLimit, 2) + 0.001) {
+                                $fbrUser = Auth::guard('fbrpos')->user();
+                                // Override: ONLY a shop owner (company_admin) or pos_manager/
+                                // pos_admin may post khata_limit_override=1 to push past the
+                                // hadd. A pos_cashier (or local_viewer) is HARD-blocked even
+                                // if the flag is sent — the flag alone never bypasses.
+                                $canOverride = ($fbrUser->role ?? '') === 'company_admin'
+                                    || in_array($fbrUser->pos_role ?? '', ['pos_admin', 'pos_manager'], true);
+                                $wantsOverride = $request->boolean('khata_limit_override');
+                                if (!($canOverride && $wantsOverride)) {
+                                    // Hard block — names the limit, current balance and this
+                                    // bill so the manager knows exactly by how much it overshoots.
+                                    throw \Illuminate\Validation\ValidationException::withMessages([
+                                        'payment_method' => __('pos.khata_limit_exceeded', [
+                                            'name' => $khataCustomer->name,
+                                            'limit' => number_format((float) $khataLimit, 0),
+                                            'balance' => number_format($curBal, 0),
+                                            'bill' => number_format($totalAmount, 0),
+                                        ]),
+                                    ]);
+                                }
+                                // Manager override accepted — recorded in the ledger note below.
+                                $khataLimitOverridden = true;
+                            }
+                        }
+
                         $newBalance = round((float) $khataCustomer->khata_balance + $totalAmount, 2);
+                        // (Khata upgrade Aug 2026) audit the hadd override IN the ledger
+                        // note so the owner can later see the limit was consciously bypassed.
+                        $khataNote = "Udhaar bill {$invoiceNumber}";
+                        if ($khataLimitOverridden) {
+                            $khataNote .= ' ' . __('pos.khata_limit_override_note', [
+                                'user' => (string) (Auth::guard('fbrpos')->user()->name ?? '—'),
+                            ]);
+                        }
                         \App\Models\FbrCustomerLedger::create([
                             'company_id' => $companyId,
                             'customer_id' => $khataCustomer->id,
@@ -2406,7 +2583,7 @@ class FbrPosController extends Controller
                             'amount' => $totalAmount,
                             'balance_after' => $newBalance,
                             'transaction_id' => $transaction->id,
-                            'note' => "Udhaar bill {$invoiceNumber}",
+                            'note' => $khataNote,
                             'created_by' => Auth::guard('fbrpos')->id(),
                         ]);
                         $khataCustomer->update(['khata_balance' => $newBalance]);
@@ -3219,6 +3396,38 @@ class FbrPosController extends Controller
                 return back()->with('success', __('pos.fbr_dayclose_policy_saved'));
             }
 
+            // Peti (Wholesale) Rate (Task 1414): the ONE per-company switch + the
+            // single "peti par munafa %" number. Deliberately a lone source of
+            // truth (pos-inventory-dual-switch.md) — no feature_flags mirror; the
+            // sale-screen bake and every gate read the two columns directly.
+            // Gated on its own presence marker so a stale cached form that
+            // predates this card can never silently flip the switch OFF.
+            if ($request->has('peti_rate_update')) {
+                $request->validate([
+                    // 0–100% — a margin above 100 or below 0 makes no business
+                    // sense; the safety clamps (never below cost, never above
+                    // retail) run at derive time regardless.
+                    'peti_margin_pct' => 'nullable|numeric|min:0|max:100',
+                ]);
+                // hasColumn-guarded (prod schema drift): a live DB that predates
+                // the migration must not 500 when the owner saves — only write
+                // the columns that actually exist; missing ones degrade to off.
+                $petiUpdate = [];
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_peti_rate_enabled')) {
+                    $petiUpdate['fbr_peti_rate_enabled'] = $request->boolean('peti_rate_enabled');
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_peti_margin_pct')) {
+                    // Blank margin ⇒ keep the sensible 3% default rather than 0
+                    // (0% would make the peti rate == cost, tripping the clamp).
+                    $petiUpdate['fbr_peti_margin_pct'] = $request->filled('peti_margin_pct')
+                        ? (float) $request->peti_margin_pct : 3.00;
+                }
+                if (!empty($petiUpdate)) {
+                    $company->update($petiUpdate);
+                }
+                return back()->with('success', __('pos.fbr_peti_settings_saved'));
+            }
+
             // Regenerate the Desktop Sync Agent API key. Invalidates the old key,
             // so any agent using the previous key must be reconnected with the new one.
             //
@@ -3301,6 +3510,18 @@ class FbrPosController extends Controller
         $fbrReportingSetupIncomplete = (bool) $company->fbr_reporting_enabled
             && !$company->fbrPosIntegrationConfigured();
 
+        // Peti (Wholesale) Rate (Task 1414): the "reh gaye" list — products that
+        // ALREADY sell in bulk (a past sale line hit a big quantity) but can't
+        // get a peti rate because pack_size OR purchase cost is missing. The
+        // owner only ever fixes these few, not the whole catalog. Computed only
+        // when the switch is on (no query cost for shops not using the feature)
+        // and only when the columns exist (PROD deploy-before-migrate window).
+        $petiGaps = [];
+        if ((bool) ($company->fbr_peti_rate_enabled ?? false)
+            && \Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size')) {
+            $petiGaps = $this->fbrPetiGaps($companyId);
+        }
+
         return view('fbr-pos.settings', compact(
             'company',
             'fbrLogs',
@@ -3308,8 +3529,70 @@ class FbrPosController extends Controller
             'maskedAccessCode',
             'hasSandboxFallback',
             'hasProductionFallback',
-            'fbrReportingSetupIncomplete'
+            'fbrReportingSetupIncomplete',
+            'petiGaps'
         ));
+    }
+
+    /**
+     * Peti (Wholesale) Rate (Task 1414): the "reh gaye" gaps list. Products
+     * that have SOLD in a big quantity on at least one past bill (so they are
+     * real bulk sellers) yet still lack pack_size OR a purchase cost — the two
+     * things the peti rate needs. Returns a small array of
+     * [id, name, missing_pack, missing_cost] rows, capped so the settings card
+     * stays short. Cost values are NEVER returned — only the "missing" boolean.
+     */
+    private function fbrPetiGaps(int $companyId): array
+    {
+        // A line quantity of a dozen or more is our "sells in bulk" signal —
+        // deliberately catalog-agnostic (no per-shop threshold to tune).
+        $bulkThreshold = 12;
+
+        // product_id => max line qty ever sold (only meaningful bulk lines).
+        $bulkProductIds = FbrPosTransactionItem::query()
+            ->whereHas('transaction', fn ($q) => $q->where('company_id', $companyId))
+            ->where('quantity', '>=', $bulkThreshold)
+            ->whereNotNull('product_id')
+            ->distinct()
+            ->pluck('product_id')
+            ->map(fn ($v) => (int) $v)
+            ->all();
+
+        if (empty($bulkProductIds)) {
+            return [];
+        }
+
+        // Which of those have a usable purchase cost on hand.
+        $costed = InventoryStock::where('company_id', $companyId)
+            ->whereIn('product_id', $bulkProductIds)
+            ->where(function ($q) {
+                $q->where('avg_purchase_price', '>', 0)
+                  ->orWhere('last_purchase_price', '>', 0);
+            })
+            ->pluck('product_id')
+            ->map(fn ($v) => (int) $v)
+            ->flip();
+
+        $products = Product::where('company_id', $companyId)
+            ->whereIn('id', $bulkProductIds)
+            ->get(['id', 'name', 'pack_size']);
+
+        $gaps = [];
+        foreach ($products as $p) {
+            $missingPack = ((int) ($p->pack_size ?? 0) <= 0);
+            $missingCost = !isset($costed[(int) $p->id]);
+            // Only a genuine gap — a product with BOTH is already set up.
+            if ($missingPack || $missingCost) {
+                $gaps[] = [
+                    'id' => (int) $p->id,
+                    'name' => $p->name,
+                    'missing_pack' => $missingPack,
+                    'missing_cost' => $missingCost,
+                ];
+                if (count($gaps) >= 30) { break; } // keep the card short
+            }
+        }
+        return $gaps;
     }
 
     /**
@@ -4697,7 +4980,31 @@ class FbrPosController extends Controller
             ->with(['items', 'creator'])
             ->findOrFail($id);
 
-        return view('fbr-pos.receipt', compact('transaction', 'company'));
+        // (Khata upgrade Aug 2026) Udhaar parchi par purana + naya baqaya.
+        // A credit bill's receipt prints "pehle ka baqaya / ye bill / kul baqaya".
+        // We use the LEDGER SNAPSHOT for THIS bill (the udhaar entry's
+        // balance_after; previous = balance_after − amount) — NOT the customer's
+        // live khata_balance — so a reprint after later bills still shows what was
+        // true at the moment of this sale. Cash/card bills get NULL (no snapshot,
+        // receipt looks exactly as before).
+        $khataSnapshot = null;
+        if (strtolower((string) $transaction->payment_method) === 'credit' && $transaction->customer_id) {
+            $udhaarEntry = \App\Models\FbrCustomerLedger::where('company_id', $companyId)
+                ->where('transaction_id', $transaction->id)
+                ->where('entry_type', 'udhaar')
+                ->first();
+            if ($udhaarEntry) {
+                $after = round((float) $udhaarEntry->balance_after, 2);
+                $amt = round((float) $udhaarEntry->amount, 2);
+                $khataSnapshot = [
+                    'previous' => round($after - $amt, 2),
+                    'bill' => $amt,
+                    'total' => $after,
+                ];
+            }
+        }
+
+        return view('fbr-pos.receipt', compact('transaction', 'company', 'khataSnapshot'));
     }
 
     public function reports(Request $request)
@@ -7157,6 +7464,8 @@ class FbrPosController extends Controller
             'mrp' => 'nullable|numeric|min:0',
             'opening_stock' => 'nullable|numeric|min:0',
             'min_stock_level' => 'nullable|numeric|min:0',
+            // Peti (Wholesale) Rate (Task 1414): pieces-per-peti — blank allowed.
+            'pack_size' => 'nullable|integer|min:1',
             // Supplier + purchase cost (Task 1261)
             'unit_cost' => 'nullable|numeric|min:0',
             'supplier_id' => 'nullable|integer',
@@ -7195,6 +7504,10 @@ class FbrPosController extends Controller
         ];
         if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
             $createFbrData['is_third_schedule'] = $isThirdScheduleFbr;
+        }
+        // Peti (Wholesale) Rate (Task 1414): blank stays NULL (not-a-peti).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size')) {
+            $createFbrData['pack_size'] = $request->filled('pack_size') ? (int) $request->pack_size : null;
         }
 
         // Supplier (Task 1261): existing supplier validated BEFORE any write;
@@ -7404,6 +7717,8 @@ class FbrPosController extends Controller
             'sro_reference' => 'nullable|string|max:100',
             'serial_number' => 'nullable|string|max:100',
             'mrp' => 'nullable|numeric|min:0',
+            // Peti (Wholesale) Rate (Task 1414): pieces-per-peti — blank allowed.
+            'pack_size' => 'nullable|integer|min:1',
             'schedule_type' => 'nullable|in:standard,reduced,3rd_schedule,exempt,zero_rated',
             // Stock adjustment on edit (Task 1276).
             'stock_action' => 'nullable|in:none,add,correct',
@@ -7459,6 +7774,10 @@ class FbrPosController extends Controller
         ];
         if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
             $updateFbrData['is_third_schedule'] = $isThirdScheduleFbrUpd;
+        }
+        // Peti (Wholesale) Rate (Task 1414): edit or clear pieces-per-peti.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size')) {
+            $updateFbrData['pack_size'] = $request->filled('pack_size') ? (int) $request->pack_size : null;
         }
 
         // Stock-adjustment supplier resolved BEFORE any write (review fix): a
@@ -8123,13 +8442,14 @@ class FbrPosController extends Controller
         // HS Code replaces them; the rest mirrors the PRA set incl. Third Schedule).
         // J = MRP: required on import for Third Schedule rows (Task 1276), so the
         // export MUST round-trip it or an exported file can't be re-imported.
-        $headers = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)', 'MRP (Retail Price)'];
+        // Column K = Pack Size (Peti) — pieces per carton, Peti Rate (Task 1414).
+        $headers = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)', 'MRP (Retail Price)', 'Pack Size (Peti)'];
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:J1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:J1')->getFill()
+        $sheet->getStyle('A1:K1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:K1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('BFDBFE');
-        foreach (['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20, 'J' => 16] as $col => $w) {
+        foreach (['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20, 'J' => 16, 'K' => 16] as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
         // SKU + Barcode + HS Code columns forced to TEXT so Excel never converts
@@ -8140,9 +8460,9 @@ class FbrPosController extends Controller
         $rowNum = 2;
         if ($existingProducts->isEmpty()) {
             $samples = [
-                ['Lux Soap 100g', 120, '3401.1100', 'LUX-100', '8964000112345', 18, 'U', 'No', 'Yes', 130],
-                ['Pepsi 500ml', 120, '2202.1010', 'PEP-500', '8964000154321', 18, 'U', 'No', 'No', ''],
-                ['Sugar 1kg', 180, '1701.9910', 'SUG-001', '', 0, 'KG', 'Yes', 'No', ''],
+                ['Lux Soap 100g', 120, '3401.1100', 'LUX-100', '8964000112345', 18, 'U', 'No', 'Yes', 130, 48],
+                ['Pepsi 500ml', 120, '2202.1010', 'PEP-500', '8964000154321', 18, 'U', 'No', 'No', '', 24],
+                ['Sugar 1kg', 180, '1701.9910', 'SUG-001', '', 0, 'KG', 'Yes', 'No', '', ''],
             ];
             foreach ($samples as $s) {
                 $this->writeFbrProductRow($sheet, $rowNum++, $s);
@@ -8160,6 +8480,8 @@ class FbrPosController extends Controller
                     ($p->tax_type ?? '') === 'exempt' ? 'Yes' : 'No',
                     !empty($p->is_third_schedule) ? 'Yes' : 'No',
                     ($p->mrp !== null && (float) $p->mrp > 0) ? (float) $p->mrp : '',
+                    // Pack Size (Peti Rate, Task 1414): blank when not a peti product.
+                    ((int) ($p->pack_size ?? 0) > 0) ? (int) $p->pack_size : '',
                 ]);
             }
         }
@@ -8191,6 +8513,8 @@ class FbrPosController extends Controller
         $sheet->setCellValue('H' . $rowNum, $vals[7] ?? 'No');
         $sheet->setCellValue('I' . $rowNum, $vals[8] ?? 'No');
         $sheet->setCellValue('J' . $rowNum, $vals[9] ?? '');
+        // K = Pack Size (Peti Rate, Task 1414) — plain integer or blank.
+        $sheet->setCellValue('K' . $rowNum, $vals[10] ?? '');
     }
 
     public function importProducts(Request $request)
@@ -8267,6 +8591,10 @@ class FbrPosController extends Controller
         // MRP column (Task 1276): Third Schedule rows must carry a retail price —
         // same invariant as the product forms.
         $mrpIdx = $this->findFbrColumn($header, ['mrp (retail price)', 'mrp', 'retail price', 'retail_price']);
+        // Pack Size (Peti Rate, Task 1414): pieces per carton — blank keeps the
+        // product out of the peti feature. Column absent entirely ⇒ never touched.
+        $packIdx = $this->findFbrColumn($header, ['pack size (peti)', 'pack size', 'pack_size', 'peti', 'peti size', 'carton size']);
+        $hasPackCol = \Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size');
 
         // 🔒 ATOMIC QUOTA ADMISSION (Task 361 review): the whole catalog read +
         // allowance computation + row writes run in ONE transaction under a
@@ -8383,6 +8711,24 @@ class FbrPosController extends Controller
             // Task 1276): file value first, else the existing row's MRP.
             $mrpVal = $mrpIdx !== false ? $this->cleanFbrImportNumber($data[$mrpIdx] ?? '') : null;
             if ($mrpVal !== null && $mrpVal <= 0) { $mrpVal = null; }
+
+            // Pack Size (Peti Rate, Task 1414): parse the cell only when the
+            // column is present. Blank ⇒ null (leave as-is on update / not-a-peti
+            // on create); a non-empty non-positive value ⇒ warn and ignore.
+            $packVal = null;         // resolved integer to write, or null to skip write
+            $packProvided = false;   // did this row actually carry a pack cell?
+            if ($packIdx !== false) {
+                $packRaw = trim((string) ($data[$packIdx] ?? ''));
+                if ($packRaw !== '') {
+                    $packNum = $this->cleanFbrImportNumber($packRaw);
+                    if ($packNum !== null && $packNum >= 1) {
+                        $packVal = (int) round($packNum);
+                        $packProvided = true;
+                    } else {
+                        $errors[] = "Row {$rowNo}: '{$name}' ka Pack Size '{$packRaw}' samajh nahi aaya — poora number likhein (masalan 24)";
+                    }
+                }
+            }
             if ($thirdSchedule === true) {
                 $effMrp = $mrpVal ?? (float) ($existing->mrp ?? 0);
                 if ($effMrp <= 0) {
@@ -8429,6 +8775,12 @@ class FbrPosController extends Controller
                 if ($mrpVal !== null) {
                     $updateData['mrp'] = $mrpVal;
                 }
+                // Peti pack size (Task 1414): only overwrite when this row
+                // actually supplied a valid value — a blank cell must not wipe
+                // an existing product's pack size.
+                if ($hasPackCol && $packProvided) {
+                    $updateData['pack_size'] = $packVal;
+                }
                 $existing->update($updateData);
                 $updated++;
                 $product = $existing;
@@ -8458,6 +8810,10 @@ class FbrPosController extends Controller
                 }
                 if ($mrpVal !== null) {
                     $createData['mrp'] = $mrpVal;
+                }
+                // Peti pack size (Task 1414): set on create only when provided.
+                if ($hasPackCol && $packProvided) {
+                    $createData['pack_size'] = $packVal;
                 }
                 $product = Product::create($createData);
                 $added++;

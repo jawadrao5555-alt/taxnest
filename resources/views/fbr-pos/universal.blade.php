@@ -1340,6 +1340,19 @@ window.addEventListener('popstate', function() {
                                         </template>
                                     </p>
                                 </template>
+                                {{-- Peti (Wholesale) Rate (Task 1414): auto-applied line — saaf wajah
+                                     (kitni peti) + bachat, plus one-tap "retail rate par laao".
+                                     Only renders on the exact line the auto-decision flipped. --}}
+                                <template x-if="item.is_peti_rate">
+                                    <div class="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                        <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 px-1.5 py-0.5 rounded"
+                                              x-text="window.TXT.peti_rate_line.replace(':n', Math.floor(_safeQty(item.quantity) / (parseInt(item.peti_pack_size,10) || 1)))"></span>
+                                        <span class="text-[10px] text-emerald-600 dark:text-emerald-400"
+                                              x-show="(parseFloat(item.peti_retail_price) || 0) > (parseFloat(item.unit_price) || 0)"
+                                              x-text="window.TXT.peti_saved.replace(':saved', r2(((parseFloat(item.peti_retail_price)||0) - (parseFloat(item.unit_price)||0)) * _safeQty(item.quantity)).toLocaleString())"></span>
+                                        <button @click.stop="forceRetailRate(index)" class="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-semibold">{{ __('pos.peti_use_retail') }}</button>
+                                    </div>
+                                </template>
                             </div>
                             <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5">
                                 <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
@@ -3321,7 +3334,13 @@ window.addEventListener('popstate', function() {
 // FBR Product model: default_price (NOT price), no category/image columns.
 // Per-item FBR fields (hs_code, uom, tax_rate, exemption, price lock) ride
 // along so the cart can build a compliant store() payload without lookups.
-$productsJson = $products->map(function($p) {
+// Peti (Wholesale) Rate (Task 1414): $petiRates maps product_id => the
+// SERVER-derived customer-facing peti rate (avg cost × margin, clamped). Cost
+// price is NEVER baked — only the finished rate leaves the server. pack_size
+// rides along so the client can decide "quantity >= peti" purely from baked,
+// non-confidential numbers. Products without a rate simply carry peti_rate:null.
+$petiRatesMap = $petiRates ?? [];
+$productsJson = $products->map(function($p) use ($petiRatesMap) {
     return [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
         'price' => (float) ($p->default_price ?? 0), 'category' => null,
@@ -3337,6 +3356,10 @@ $productsJson = $products->map(function($p) {
         'hasRecipe' => false,
         'image' => null,
         'stockStatus' => null,
+        // pack_size = "peti mein kitne piece" (null ⇒ out of the feature);
+        // peti_rate = customer-facing peti rate or null (silent on this line).
+        'pack_size' => ($p->pack_size ?? 0) > 0 ? (int) $p->pack_size : null,
+        'peti_rate' => $petiRatesMap[$p->id] ?? null,
     ];
 })->values();
 // Services (Task 1272 — PRA port + FBR per-item tax fields): no hs_code/barcode,
@@ -3421,6 +3444,10 @@ function restaurantPos() {
         // Use isInventoryEnabled() helper everywhere — never reference this directly.
         inventoryEnabled: {{ ($inventoryEnabled ?? false) ? 'true' : 'false' }},
         isInventoryEnabled() { return this.inventoryEnabled === true; },
+        // Peti (Wholesale) Rate (Task 1414): baked master switch. OFF ⇒ every
+        // peti helper below returns early, so the sale screen behaves exactly
+        // as it did before the feature (no decision, no line marker, no UI).
+        petiRateEnabled: {{ ($petiRateEnabled ?? false) ? 'true' : 'false' }},
         // True when the cart contains at least one synthetic Manual Item line
         // (item_type='manual', item_id=null). Such lines bill cleanly through
         // the standard Pay flow (storeInvoice has lax per-item validation),
@@ -4820,6 +4847,9 @@ function restaurantPos() {
             if (existing) {
                 existing.quantity++;
                 this.activeCartIndex = this.cart.indexOf(existing);
+                // Peti (Task 1414): a repeat-add may push qty over pack_size —
+                // re-decide the rate for the affected row.
+                this.applyPetiRate(this.activeCartIndex);
                 this.animateQty(this.activeCartIndex);
             } else if (item.type === 'deal') {
                 // 🍔 Deal line (Task 1273): ONE cart row at the server-enforced deal
@@ -4839,8 +4869,17 @@ function restaurantPos() {
                 const srcExempt = (item.is_tax_exempt !== undefined && item.is_tax_exempt !== null) ? !!item.is_tax_exempt : !!(src && src.is_tax_exempt);
                 const rate = (item.tax_rate === 0 || item.tax_rate) ? parseFloat(item.tax_rate)
                     : ((src && (src.tax_rate === 0 || src.tax_rate)) ? parseFloat(src.tax_rate) : 18);
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (srcExempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: (item.is_third_schedule || srcExempt) ? 0 : rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
+                // Peti (Task 1414): snapshot the retail unit price + baked
+                // pack_size / peti_rate onto the row so the auto-decision needs
+                // no re-lookup and reverting always lands back on retail.
+                const petiSrc = (item.type === 'product') ? (src || item) : null;
+                const petiPack = petiSrc && (petiSrc.pack_size || 0) > 0 ? parseInt(petiSrc.pack_size, 10) : null;
+                const petiRate = petiSrc && petiSrc.peti_rate != null ? parseFloat(petiSrc.peti_rate) : null;
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (srcExempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: (item.is_third_schedule || srcExempt) ? 0 : rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false, peti_pack_size: petiPack, peti_rate: petiRate, peti_retail_price: parseFloat(item.price), is_peti_rate: false, _petiManual: false });
                 this.activeCartIndex = this.cart.length - 1;
+                // Rare: a grid double-tap or Quick Type "name 24" adds at qty 1
+                // then bumps — but a barcode multi-scan can arrive at qty>1.
+                this.applyPetiRate(this.activeCartIndex);
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
             this.scrollToCartItem(this.activeCartIndex);
@@ -5349,6 +5388,12 @@ function restaurantPos() {
             }
             // Optimistic local update
             item.unit_price = newPrice;
+            // Peti (Task 1414): a hand-typed rate is the cashier's own — pin it
+            // so the auto peti-decision never overrides it, and move the retail
+            // snapshot to this new price so any later revert lands here.
+            item._petiManual = true;
+            item.is_peti_rate = false;
+            item.peti_retail_price = newPrice;
             const productId = item._productId || item.item_id;
             const masterIdx = this.allProducts.findIndex(p => p.id === productId);
             if (masterIdx >= 0) this.allProducts[masterIdx].price = newPrice;
@@ -5398,6 +5443,7 @@ function restaurantPos() {
                 : Math.max(min, Math.round((current + delta) * 100) / 100);
             if (!Number.isFinite(next) || next < min) next = min;
             this.cart[index].quantity = next;
+            this.applyPetiRate(index);
         },
         setQty(index, val) {
             if (!this.cart[index]) return;
@@ -5405,6 +5451,66 @@ function restaurantPos() {
             let v = parseFloat(val);
             if (!Number.isFinite(v) || v < min) v = min;
             this.cart[index].quantity = v;
+            this.applyPetiRate(index);
+        },
+
+        // ══════════════════════════════════════════════════════════════════
+        // Peti (Wholesale) Rate (Task 1414) — the auto-decision.
+        // WHY here (not the server per keystroke): the decision reads only
+        // baked, NON-confidential numbers (pack_size + the finished peti_rate);
+        // cost never reaches the browser. Called after every qty mutation.
+        //
+        // Rule: qty >= pack_size ⇒ line rate = peti_rate; qty < pack_size ⇒
+        // back to the retail snapshot. A line the cashier priced by hand
+        // (_petiManual) is NEVER auto-changed — the manual rate always wins.
+        // A product with no pack_size or no peti_rate is silent (nothing runs).
+        // ══════════════════════════════════════════════════════════════════
+        applyPetiRate(index) {
+            if (!this.petiRateEnabled) return;
+            const it = this.cart[index];
+            if (!it || it.item_type !== 'product') return;
+            // Silent when the product is not a peti candidate (plan: "pack size
+            // ya kharid rate maloom nahi to line normal rehti hai").
+            const pack = parseInt(it.peti_pack_size, 10);
+            const petiRate = (it.peti_rate != null) ? parseFloat(it.peti_rate) : null;
+            if (!Number.isFinite(pack) || pack <= 0 || petiRate == null || !Number.isFinite(petiRate)) return;
+            // Cashier's own hand rate always wins — never auto-flip it.
+            if (it._petiManual) return;
+
+            const qty = this._safeQty(it.quantity);
+            const retail = parseFloat(it.peti_retail_price);
+            if (qty >= pack) {
+                if (!it.is_peti_rate) {
+                    it.is_peti_rate = true;
+                    it.unit_price = petiRate;
+                    // Poori peti par saaf wajah + bachat (per-unit × qty).
+                    const petis = Math.floor(qty / pack);
+                    const saved = (Number.isFinite(retail) && retail > petiRate)
+                        ? this.r2((retail - petiRate) * qty) : 0;
+                    this.showToast(
+                        window.TXT.peti_rate_applied
+                            .replace(':n', petis)
+                            .replace(':saved', saved.toLocaleString()),
+                        'success'
+                    );
+                }
+            } else if (it.is_peti_rate) {
+                // Quantity kam ho gayi — khud retail par laut aao.
+                it.is_peti_rate = false;
+                if (Number.isFinite(retail)) it.unit_price = retail;
+            }
+        },
+
+        // One-tap "retail rate par laao" — cashier forces this line back to
+        // retail; _petiManual pins it so the auto-decision leaves it alone.
+        forceRetailRate(index) {
+            const it = this.cart[index];
+            if (!it) return;
+            const retail = parseFloat(it.peti_retail_price);
+            if (Number.isFinite(retail)) it.unit_price = retail;
+            it.is_peti_rate = false;
+            it._petiManual = true;
+            this.showToast(window.TXT.peti_reverted_retail, 'info');
         },
         removeFromCart(index) {
             if (index < 0 || index >= this.cart.length) return;
@@ -5503,7 +5609,7 @@ function restaurantPos() {
                 if (t && t.dataset._fresh === '1') {
                     e.preventDefault();
                     t.value = e.key;
-                    if (this.cart[index]) this.cart[index].quantity = e.key;
+                    if (this.cart[index]) { this.cart[index].quantity = e.key; this.applyPetiRate(index); }
                     t.dataset._fresh = '0';
                     try { t.setSelectionRange(1, 1); } catch(_){}
                 }
@@ -5518,6 +5624,7 @@ function restaurantPos() {
             if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '');
             t.value = v;
             this.cart[index].quantity = v;
+            this.applyPetiRate(index);
         },
         onQtyBlur(index, e) {
             const t = e.target;
@@ -5527,6 +5634,7 @@ function restaurantPos() {
             let n = parseFloat(this.cart[index].quantity);
             if (!Number.isFinite(n) || n < min) n = min;
             this.cart[index].quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
+            this.applyPetiRate(index);
         },
 
         handleKey(e) {
@@ -6695,6 +6803,11 @@ function restaurantPos() {
                         uom: c.uom || 'U',
                         tax_rate: this._itemRate(c),
                         is_tax_exempt: !!c.is_tax_exempt,
+                        // Peti (Task 1414): display hint only — the receipt/report
+                        // marker. The BILLED unit_price above is authoritative;
+                        // this just records WHY the rate was low. store()
+                        // re-validates it against pack_size + qty server-side.
+                        is_peti_rate: !!c.is_peti_rate,
                         // store() takes ABSOLUTE Rs per-line discount (caps at line gross).
                         item_discount: this.getItemDiscount(c),
                     })),

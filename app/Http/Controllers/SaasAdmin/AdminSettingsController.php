@@ -125,7 +125,62 @@ class AdminSettingsController extends Controller
             'bank' => $data['payment_bank_name'] ?? '',
         ]);
 
+        // Task 1413 — surface a version/APK mismatch HERE, where it is caused,
+        // not silently on shops' phones. Flipping a *_latest_version before (or
+        // without) uploading the matching APK makes every phone download the
+        // old file, install the same version, and get nagged again next launch.
+        // /api/app-version now refuses to advertise a version the hosted file
+        // does not contain; this note tells the admin why their number looks
+        // ignored. Fails open when the APK is not on disk (no note).
+        $mismatch = $this->apkVersionMismatches($data);
+        if ($mismatch !== []) {
+            return back()->with('success', 'Settings saved successfully. NOTE: ' . implode(' ', $mismatch));
+        }
+
         return back()->with('success', 'Settings saved successfully.');
+    }
+
+    /**
+     * Task 1413 — App-version setting => hosted APK, so a mismatch can be named
+     * back to the admin at save time. Same canonical download paths the public
+     * /api/app-version map (routes/web.php) serves.
+     */
+    private const APK_VERSION_MAP = [
+        'pos_app_latest_version'            => ['POS', 'downloads/taxnest-pos.apk'],
+        'fbrpos_app_latest_version'         => ['FBR POS', 'downloads/taxnest-fbr-pos.apk'],
+        'waiter_app_latest_version'         => ['Waiter', 'downloads/taxnest-waiter.apk'],
+        'rider_app_latest_version'          => ['Rider', 'downloads/taxnest-rider.apk'],
+        'di_app_latest_version'             => ['DI', 'downloads/taxnest-di.apk'],
+        'caller_app_latest_version'         => ['Caller ID (clean)', 'downloads/taxnest-caller.apk'],
+        'caller_app_plus_latest_version'    => ['Caller ID (plus)', 'downloads/taxnest-caller-plus.apk'],
+    ];
+
+    /**
+     * For every app-version field the admin just set, compare the value against
+     * the versionName stamped inside the hosted APK. Returns a human note per
+     * app whose file does not carry that version (empty setting or unreadable
+     * file are skipped — the check fails open, matching /api/app-version).
+     *
+     * @param  array<string,mixed>  $data  validated request input
+     * @return string[]
+     */
+    private function apkVersionMismatches(array $data): array
+    {
+        $notes = [];
+        foreach (self::APK_VERSION_MAP as $key => [$name, $apk]) {
+            $want = trim((string) ($data[$key] ?? ''));
+            if ($want === '') {
+                continue;
+            }
+            $hosted = \App\Services\ApkManifestReader::versionName(public_path($apk));
+            if ($hosted === null || $hosted === '') {
+                continue; // file not on disk yet — nothing to compare against
+            }
+            if ($hosted !== $want) {
+                $notes[] = "{$name}: you set {$want} but the hosted APK is {$hosted} — upload the {$want} build, or phones will download the old file.";
+            }
+        }
+        return $notes;
     }
 
     /**

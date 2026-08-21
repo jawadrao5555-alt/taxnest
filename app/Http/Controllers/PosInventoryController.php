@@ -10,6 +10,7 @@ use App\Models\InventoryAdjustment;
 use App\Services\BranchStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PosInventoryController extends Controller
 {
@@ -78,6 +79,30 @@ class PosInventoryController extends Controller
         if ($user && $user->posCashierBlocked()) {
             abort(403, __('pos.access_denied'));
         }
+    }
+
+    /**
+     * True only when the DB actually has the in-transit columns (Task 1434).
+     *
+     * The owner's cPanel PROD schema drifts — a migration can be marked "Ran"
+     * without the column existing (see prod-schema-drift-selfheal). Every
+     * query/write touching transfer_status or received_quantity is gated on
+     * this so the transfer + inventory pages DEGRADE to the old instant-transfer
+     * behaviour instead of 500-ing on a database where the migration has not
+     * landed. Memoized — the schema does not change mid-request.
+     */
+    private ?bool $transferColumnsReady = null;
+    private function transferColumnsReady(): bool
+    {
+        if ($this->transferColumnsReady === null) {
+            try {
+                $this->transferColumnsReady = Schema::hasColumn('inventory_movements', 'transfer_status')
+                    && Schema::hasColumn('inventory_movements', 'received_quantity');
+            } catch (\Throwable $e) {
+                $this->transferColumnsReady = false;
+            }
+        }
+        return $this->transferColumnsReady;
     }
 
     public function dashboard()
@@ -397,17 +422,55 @@ class PosInventoryController extends Controller
             $stockMap[(int) $row->branch_id][(int) $row->product_id] = (float) $row->quantity;
         }
 
+        // Schema-drift safe (Task 1434): on a PROD DB that lacks the in-transit
+        // columns we simply have no in-transit list, and "recent" falls back to
+        // every branch_transfer OUT row — exactly the old instant-transfer page.
+        $columnsReady = $this->transferColumnsReady();
+
+        // In-transit list: "raste mein pare transfers" — visible to BOTH ends.
+        // A transfer is the user's if either the source branch or the
+        // destination (reference_id) is one they may touch, so the sending shop
+        // can cancel it and the receiving shop can confirm it.
+        $inTransit = collect();
+        if ($columnsReady) {
+            $inTransit = InventoryMovement::where('company_id', $companyId)
+                ->where('reference_type', 'branch_transfer')
+                ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
+                ->where('transfer_status', InventoryMovement::TRANSFER_IN_TRANSIT)
+                ->where(function ($q) use ($branchIds) {
+                    $q->whereIn('branch_id', $branchIds)
+                        ->orWhereIn('reference_id', $branchIds);
+                })
+                ->with(['posProduct', 'creator', 'branch'])
+                ->orderByDesc('created_at')
+                ->get();
+        }
+
+        // Branches this user may RECEIVE into — drives which in-transit rows
+        // show a "wasool ho gaya" button vs. a read-only "raste mein" badge.
+        $receivableBranchIds = $branchIds;
+
+        // History: transfers already received or cancelled (the OUT row still
+        // holds the final state), so the old "recent transfers" table keeps
+        // telling the same story once the maal has landed. Without the columns
+        // it is every OUT row, as before.
         $recent = InventoryMovement::where('company_id', $companyId)
             ->where('reference_type', 'branch_transfer')
             ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
-            ->whereIn('branch_id', $branchIds)
+            ->when($columnsReady, fn ($q) => $q->whereIn('transfer_status', [
+                InventoryMovement::TRANSFER_RECEIVED, InventoryMovement::TRANSFER_CANCELLED,
+            ]))
+            ->where(function ($q) use ($branchIds) {
+                $q->whereIn('branch_id', $branchIds)
+                    ->orWhereIn('reference_id', $branchIds);
+            })
             ->with(['posProduct', 'creator', 'branch'])
             ->orderByDesc('created_at')
             ->limit(30)
             ->get();
 
         return view('pos.inventory.transfer', array_merge($branchView, compact(
-            'company', 'products', 'stockMap', 'recent'
+            'company', 'products', 'stockMap', 'recent', 'inTransit', 'receivableBranchIds', 'columnsReady'
         )));
     }
 
@@ -435,9 +498,13 @@ class PosInventoryController extends Controller
 
         $product = PosProduct::where('company_id', $companyId)->findOrFail($request->product_id);
         $qty = round((float) $request->quantity, 3);
+        // On a drifted PROD DB without the in-transit columns, we cannot record
+        // "raste mein" state — degrade to the old instant transfer so the page
+        // still works (see prod-schema-drift-selfheal).
+        $columnsReady = $this->transferColumnsReady();
 
         try {
-            $result = DB::transaction(function () use ($companyId, $product, $from, $to, $qty, $request) {
+            $result = DB::transaction(function () use ($companyId, $product, $from, $to, $qty, $request, $columnsReady) {
                 $source = BranchStockService::stockRow($companyId, (int) $product->id, $from);
 
                 // A transfer can only move goods that exist — unlike a sale
@@ -449,8 +516,6 @@ class PosInventoryController extends Controller
                     ])];
                 }
 
-                $destination = BranchStockService::stockRow($companyId, (int) $product->id, $to);
-
                 $reference = 'TRF-' . now()->format('ymdHis') . '-' . $product->id;
                 $userId = auth('pos')->id();
                 $note = trim(__('pos.transfer_movement_note', [
@@ -458,50 +523,78 @@ class PosInventoryController extends Controller
                     'to' => BranchStockService::branchName($companyId, $to) ?? '—',
                 ]) . ($request->filled('notes') ? ' — ' . $request->notes : ''));
 
+                // In-transit transfers (Task 1434): sending ONLY removes the
+                // maal from the source shelf. The destination's sellable stock
+                // is NOT touched — those units are on the road and the
+                // receiving cashier must not bill against goods that have not
+                // arrived yet. Only when that branch clicks "wasool ho gaya"
+                // (receiveTransfer) does the maal land in its inventory_stocks.
                 $sourceQty = round((float) $source->quantity - $qty, 3);
                 $source->update(['quantity' => $sourceQty]);
 
-                // Cost travels WITH the goods: the destination's average is
-                // re-weighted across what it already held and what just
-                // arrived. Keeping its old rate would mis-value the maal and
-                // every later sale there would snapshot the wrong cost.
-                $destQtyBefore = (float) $destination->quantity;
-                $movedCost = (float) $source->avg_purchase_price;
-                $destQty = round($destQtyBefore + $qty, 3);
-                $destination->update([
-                    'quantity' => $destQty,
-                    'avg_purchase_price' => BranchStockService::blendCost(
-                        $destQtyBefore, (float) $destination->avg_purchase_price, $qty, $movedCost
-                    ),
-                    // These units are the most recent arrival on that shelf.
-                    'last_purchase_price' => $movedCost > 0
-                        ? round($movedCost, 2)
-                        : (float) $destination->last_purchase_price,
-                ]);
+                // The lone TRANSFER_OUT row IS the transfer record: it carries
+                // transfer_status=in_transit and the cost the goods travel with
+                // (unit_price), so the receiving side can re-weight on arrival.
+                // reference_id points at the DESTINATION branch, matching the
+                // existing paired-ledger convention.
+                $outData = [
+                    'company_id' => $companyId,
+                    'product_id' => $product->id,
+                    'branch_id' => $from,
+                    'type' => InventoryMovement::TYPE_TRANSFER_OUT,
+                    'quantity' => $qty,
+                    'unit_price' => (float) $source->avg_purchase_price,
+                    'total_price' => round($qty * (float) $source->avg_purchase_price, 2),
+                    'balance_after' => $sourceQty,
+                    'reference_type' => 'branch_transfer',
+                    'reference_id' => $to,
+                    'reference_number' => $reference,
+                    'notes' => $note,
+                    'created_by' => $userId,
+                ];
+                if ($columnsReady) {
+                    $outData['transfer_status'] = InventoryMovement::TRANSFER_IN_TRANSIT;
+                }
+                InventoryMovement::create($outData);
 
-                foreach ([
-                    [InventoryMovement::TYPE_TRANSFER_OUT, $from, $to, $sourceQty],
-                    [InventoryMovement::TYPE_TRANSFER_IN, $to, $from, $destQty],
-                ] as [$type, $branchId, $otherBranchId, $balance]) {
+                // Legacy fallback: no in-transit columns → keep the pre-Task
+                // behaviour, crediting the destination immediately with a paired
+                // TRANSFER_IN (cost re-weighted on arrival) so the page never
+                // 500s on a database the migration has not reached.
+                if (!$columnsReady) {
+                    $destination = BranchStockService::stockRow($companyId, (int) $product->id, $to);
+                    $destQtyBefore = (float) $destination->quantity;
+                    $movedCost = (float) $source->avg_purchase_price;
+                    $destQty = round($destQtyBefore + $qty, 3);
+                    $destination->update([
+                        'quantity' => $destQty,
+                        'avg_purchase_price' => BranchStockService::blendCost(
+                            $destQtyBefore, (float) $destination->avg_purchase_price, $qty, $movedCost
+                        ),
+                        'last_purchase_price' => $movedCost > 0
+                            ? round($movedCost, 2)
+                            : (float) $destination->last_purchase_price,
+                    ]);
                     InventoryMovement::create([
                         'company_id' => $companyId,
                         'product_id' => $product->id,
-                        'branch_id' => $branchId,
-                        'type' => $type,
+                        'branch_id' => $to,
+                        'type' => InventoryMovement::TYPE_TRANSFER_IN,
                         'quantity' => $qty,
-                        'unit_price' => (float) $source->avg_purchase_price,
-                        'total_price' => round($qty * (float) $source->avg_purchase_price, 2),
-                        'balance_after' => $balance,
+                        'unit_price' => $movedCost,
+                        'total_price' => round($qty * $movedCost, 2),
+                        'balance_after' => $destQty,
                         'reference_type' => 'branch_transfer',
-                        'reference_id' => $otherBranchId,
+                        'reference_id' => $from,
                         'reference_number' => $reference,
                         'notes' => $note,
                         'created_by' => $userId,
                     ]);
                 }
 
-                // Company total is unchanged by a transfer, but the mirror is
-                // resynced anyway so a pre-existing drift heals here too.
+                // The maal left the source shelf but is still the company's:
+                // syncProductMirror now counts in-transit qty, so the company
+                // total (products page) stays whole while it is on the road.
                 BranchStockService::syncProductMirror($companyId, (int) $product->id);
 
                 return ['ok' => true];
@@ -514,11 +607,275 @@ class PosInventoryController extends Controller
             return back()->withInput()->with('error', $result['error']);
         }
 
-        return redirect()->route('pos.inventory.transfers')->with('success', __('pos.transfer_done', [
-            'qty' => rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.'),
-            'product' => $product->name,
-            'from' => BranchStockService::branchName($companyId, $from) ?? '—',
-            'to' => BranchStockService::branchName($companyId, $to) ?? '—',
+        // Different confirmation depending on whether the maal is now on the
+        // road (in-transit) or already landed (legacy fallback).
+        return redirect()->route('pos.inventory.transfers')->with('success', __(
+            $columnsReady ? 'pos.transfer_sent' : 'pos.transfer_done',
+            [
+                'qty' => rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.'),
+                'product' => $product->name,
+                'from' => BranchStockService::branchName($companyId, $from) ?? '—',
+                'to' => BranchStockService::branchName($companyId, $to) ?? '—',
+            ]
+        ));
+    }
+
+    /**
+     * Receive an in-transit transfer (Task 1434) — the destination branch
+     * clicks "wasool ho gaya". ONLY now does the maal land in the receiving
+     * branch's sellable stock. The actual quantity received may be LESS than
+     * what was sent (goods lost or damaged on the road); the shortfall simply
+     * never arrives anywhere, so the company total drops by exactly that gap
+     * and the difference is visible on the ledger.
+     */
+    public function receiveTransfer(Request $request, int $movement)
+    {
+        [$companyId, $company] = $this->ensureInventoryEnabled();
+        $this->assertNotCashier();
+
+        // Without the columns there is no in-transit concept to receive.
+        if (!$this->transferColumnsReady()) {
+            return back()->with('error', __('pos.transfer_not_in_transit'));
+        }
+
+        $request->validate([
+            'received_quantity' => 'nullable|numeric|min:0',
+        ]);
+
+        // Cheap unlocked read ONLY to resolve the branch for the 403/404 gate.
+        // The authoritative state check happens under lockForUpdate below.
+        $out = InventoryMovement::where('company_id', $companyId)
+            ->where('reference_type', 'branch_transfer')
+            ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
+            ->where('id', $movement)
+            ->first();
+
+        if (!$out || !$out->isInTransit()) {
+            return back()->with('error', __('pos.transfer_not_in_transit'));
+        }
+
+        $to = (int) $out->reference_id;   // destination branch (see storeTransfer)
+        $from = (int) $out->branch_id;    // source branch
+
+        // Receiving is the DESTINATION branch's action — only someone who may
+        // touch that branch can pull the maal onto its shelf.
+        if (!BranchStockService::actorCanUse($companyId, $to)) {
+            abort(403, __('pos.access_denied'));
+        }
+
+        $rawReceived = $request->filled('received_quantity')
+            ? round((float) $request->received_quantity, 3)
+            : null;
+
+        try {
+            $result = DB::transaction(function () use ($companyId, $movement, $from, $to, $rawReceived) {
+                // Single-consumption guard (khata ledger discipline): re-fetch
+                // the row LOCKED and re-check its state INSIDE the transaction.
+                // A concurrent receive/cancel that got here first has already
+                // flipped transfer_status, so this one sees a non-transit row
+                // and writes NOTHING — the status is not "last writer wins".
+                $row = InventoryMovement::where('company_id', $companyId)
+                    ->where('reference_type', 'branch_transfer')
+                    ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
+                    ->where('id', $movement)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$row || !$row->isInTransit()) {
+                    return ['stale' => true];
+                }
+
+                $sent = (float) $row->quantity;
+                // Blank = "sab kuch pohanch gaya"; otherwise the real arriving
+                // figure, capped at what was sent (can't receive more than left).
+                $received = $rawReceived === null ? $sent : min($sent, $rawReceived);
+
+                // ONE guarded transition BEFORE any stock is touched: flip the
+                // status conditionally on it still being in_transit. If a racer
+                // slipped between the lock and here (it cannot, but belt-and-
+                // braces), affected=0 aborts with nothing written.
+                $flipped = InventoryMovement::where('id', $row->id)
+                    ->where('transfer_status', InventoryMovement::TRANSFER_IN_TRANSIT)
+                    ->update([
+                        'transfer_status' => InventoryMovement::TRANSFER_RECEIVED,
+                        'received_quantity' => $received,
+                    ]);
+                if ($flipped === 0) {
+                    return ['stale' => true];
+                }
+
+                $destination = BranchStockService::stockRow($companyId, (int) $row->product_id, $to);
+
+                // Cost travels WITH the goods: the destination's average is
+                // re-weighted across what it already held and what just
+                // arrived. Keeping its old rate would mis-value the maal and
+                // every later sale there would snapshot the wrong cost.
+                $destQtyBefore = (float) $destination->quantity;
+                $movedCost = (float) $row->unit_price;
+                $destQty = round($destQtyBefore + $received, 3);
+                $destination->update([
+                    'quantity' => $destQty,
+                    'avg_purchase_price' => BranchStockService::blendCost(
+                        $destQtyBefore, (float) $destination->avg_purchase_price, $received, $movedCost
+                    ),
+                    // These units are the most recent arrival on that shelf.
+                    'last_purchase_price' => $movedCost > 0
+                        ? round($movedCost, 2)
+                        : (float) $destination->last_purchase_price,
+                ]);
+
+                // The paired TRANSFER_IN — both branches can explain the change,
+                // exactly as the old instant-transfer did, just at receive time.
+                $shortfall = round($sent - $received, 3);
+                $note = trim(($row->notes ?? '') . ($shortfall > 0
+                    ? ' — ' . __('pos.transfer_shortfall_note', [
+                        'lost' => rtrim(rtrim(number_format($shortfall, 2, '.', ''), '0'), '.'),
+                    ])
+                    : ''));
+
+                InventoryMovement::create([
+                    'company_id' => $companyId,
+                    'product_id' => $row->product_id,
+                    'branch_id' => $to,
+                    'type' => InventoryMovement::TYPE_TRANSFER_IN,
+                    'quantity' => $received,
+                    'unit_price' => $movedCost,
+                    'total_price' => round($received * $movedCost, 2),
+                    'balance_after' => $destQty,
+                    'reference_type' => 'branch_transfer',
+                    'reference_id' => $from,
+                    'reference_number' => $row->reference_number,
+                    'notes' => $note,
+                    'created_by' => auth('pos')->id(),
+                ]);
+
+                // The in-transit qty for this product is now lower (this one
+                // arrived); resync so the company total reflects the shortfall
+                // (if any) as a genuine loss.
+                BranchStockService::syncProductMirror($companyId, (int) $row->product_id);
+
+                return ['received' => $received];
+            });
+        } catch (\Throwable $e) {
+            return back()->with('error', __('pos.transfer_failed', ['error' => $e->getMessage()]));
+        }
+
+        if (!empty($result['stale'])) {
+            return back()->with('error', __('pos.transfer_not_in_transit'));
+        }
+
+        return redirect()->route('pos.inventory.transfers')->with('success', __('pos.transfer_received_ok', [
+            'qty' => rtrim(rtrim(number_format($result['received'], 2, '.', ''), '0'), '.'),
+            'branch' => BranchStockService::branchName($companyId, $to) ?? '—',
+        ]));
+    }
+
+    /**
+     * Cancel an in-transit transfer (Task 1434) — the goods never left, or the
+     * send was a mistake. The full sent quantity goes BACK to the source shelf
+     * and the transfer is marked cancelled. Only possible while still in
+     * transit: once received, a return is a fresh transfer the other way.
+     */
+    public function cancelTransfer(Request $request, int $movement)
+    {
+        [$companyId, $company] = $this->ensureInventoryEnabled();
+        $this->assertNotCashier();
+
+        // Without the columns there is no in-transit concept to cancel.
+        if (!$this->transferColumnsReady()) {
+            return back()->with('error', __('pos.transfer_not_in_transit'));
+        }
+
+        // Cheap unlocked read ONLY for the 403/404 gate; the authoritative
+        // state check happens under lockForUpdate inside the transaction.
+        $out = InventoryMovement::where('company_id', $companyId)
+            ->where('reference_type', 'branch_transfer')
+            ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
+            ->where('id', $movement)
+            ->first();
+
+        if (!$out || !$out->isInTransit()) {
+            return back()->with('error', __('pos.transfer_not_in_transit'));
+        }
+
+        $from = (int) $out->branch_id;   // goods return whence they came
+        $to = (int) $out->reference_id;
+
+        // Either end's keeper may call it off — the person holding the road
+        // consignment or the shop that sent it. Both must be reachable.
+        if (!BranchStockService::actorCanUse($companyId, $from) && !BranchStockService::actorCanUse($companyId, $to)) {
+            abort(403, __('pos.access_denied'));
+        }
+
+        try {
+            $result = DB::transaction(function () use ($companyId, $movement, $from) {
+                // Single-consumption guard (khata ledger discipline): re-fetch
+                // LOCKED and re-check state INSIDE the transaction. A receive
+                // (or another cancel) that got here first already flipped the
+                // status, so this call writes NOTHING and does not return the
+                // goods a second time.
+                $row = InventoryMovement::where('company_id', $companyId)
+                    ->where('reference_type', 'branch_transfer')
+                    ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
+                    ->where('id', $movement)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$row || !$row->isInTransit()) {
+                    return ['stale' => true];
+                }
+
+                // ONE guarded transition BEFORE any stock is touched.
+                $flipped = InventoryMovement::where('id', $row->id)
+                    ->where('transfer_status', InventoryMovement::TRANSFER_IN_TRANSIT)
+                    ->update([
+                        'transfer_status' => InventoryMovement::TRANSFER_CANCELLED,
+                        'received_quantity' => 0,
+                    ]);
+                if ($flipped === 0) {
+                    return ['stale' => true];
+                }
+
+                $qty = (float) $row->quantity;
+                $source = BranchStockService::stockRow($companyId, (int) $row->product_id, $from);
+                $sourceQty = round((float) $source->quantity + $qty, 3);
+                $source->update(['quantity' => $sourceQty]);
+
+                // A TRANSFER_IN back at the SOURCE closes the loop so its
+                // ledger shows the maal returning, not just vanishing from
+                // transit.
+                InventoryMovement::create([
+                    'company_id' => $companyId,
+                    'product_id' => $row->product_id,
+                    'branch_id' => $from,
+                    'type' => InventoryMovement::TYPE_TRANSFER_IN,
+                    'quantity' => $qty,
+                    'unit_price' => (float) $row->unit_price,
+                    'total_price' => round($qty * (float) $row->unit_price, 2),
+                    'balance_after' => $sourceQty,
+                    'reference_type' => 'branch_transfer',
+                    'reference_id' => $from,
+                    'reference_number' => $row->reference_number,
+                    'notes' => trim(($row->notes ?? '') . ' — ' . __('pos.transfer_cancelled_note')),
+                    'created_by' => auth('pos')->id(),
+                ]);
+
+                // In-transit qty for this product drops back to the source's
+                // real stock; the company total is unchanged (goods returned).
+                BranchStockService::syncProductMirror($companyId, (int) $row->product_id);
+
+                return ['ok' => true];
+            });
+        } catch (\Throwable $e) {
+            return back()->with('error', __('pos.transfer_failed', ['error' => $e->getMessage()]));
+        }
+
+        if (!empty($result['stale'])) {
+            return back()->with('error', __('pos.transfer_not_in_transit'));
+        }
+
+        return redirect()->route('pos.inventory.transfers')->with('success', __('pos.transfer_cancelled_ok', [
+            'branch' => BranchStockService::branchName($companyId, $from) ?? '—',
         ]));
     }
 

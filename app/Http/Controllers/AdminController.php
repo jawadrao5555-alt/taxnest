@@ -969,23 +969,51 @@ class AdminController extends Controller
         $data = $request->validate([
             'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
             'pos_ui_density'    => 'nullable|in:simple,standard,premium',
+            'use_universal_pos' => 'nullable|boolean',
             'feature_flags'     => 'nullable|array',
         ]);
-
-        $flags = [];
-        foreach (\App\Services\PosFeatureService::ALL_FLAGS as $flag) {
-            $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
-        }
 
         $oldFlags = is_array($company->feature_flags) ? $company->feature_flags : [];
         $oldCategory = $company->business_category;
 
-        $company->update([
+        // Stale-form guard (Task 1393 — same shape as the shop-facing pages,
+        // PosController::updateFeatureSettings marker fs_present). The feature
+        // map below is a WHOLESALE rewrite driven by checkbox presence, and this
+        // endpoint writes ANOTHER company's modules under the admin's name — so
+        // an outdated admin tab left open across a deploy (or a replayed POST)
+        // silently switched OFF every module it did not carry. Unchecked
+        // checkboxes send nothing, so "stale form" and "everything unticked"
+        // look identical on the wire; only the hidden marker (fresh render) — or
+        // any of the block's own fields, so scripted/legacy POSTs keep working —
+        // proves the block was really submitted. Otherwise the stored map is
+        // left exactly as it is; wiping is never the safe default.
+        $flagsPresent = $request->has('fs_present') || $request->has('feature_flags');
+
+        $update = [
             'business_category' => $data['business_category'] ?? $company->business_category,
-            'feature_flags'     => $flags,
-            'use_universal_pos' => true,
-            'pos_ui_density'    => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
-        ]);
+        ];
+
+        $flags = $oldFlags;
+        if ($flagsPresent) {
+            $flags = [];
+            foreach (\App\Services\PosFeatureService::ALL_FLAGS as $flag) {
+                $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
+            }
+            $update['feature_flags'] = $flags;
+        }
+
+        // use_universal_pos was force-written true on EVERY save — a bare/stale
+        // POST could flip the company onto the universal sale screen unasked.
+        // Write it only when the request actually carried it; likewise the
+        // density radio (absent on an old form = leave the stored value alone).
+        if ($request->has('use_universal_pos')) {
+            $update['use_universal_pos'] = (bool) ($data['use_universal_pos'] ?? false);
+        }
+        if ($request->filled('pos_ui_density')) {
+            $update['pos_ui_density'] = $data['pos_ui_density'];
+        }
+
+        $company->update($update);
 
         $adminId = auth('admin')->id();
         AuditLogService::log(

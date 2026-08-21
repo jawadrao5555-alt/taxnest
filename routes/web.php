@@ -223,6 +223,10 @@ Route::get('/api/app-version', function () {
         return response()->json(['ok' => false, 'error' => 'unknown app'], 404);
     }
     $latest = trim((string) \App\Models\SystemSetting::get($map[$app]['setting'], ''));
+    // Task 1413 — only advertise a version the HOSTED file actually contains,
+    // so a setting flipped before the upload never nags phones into installing
+    // the same old bytes. Fails open when the APK is not on disk (dev/CI).
+    $latest = \App\Services\ApkManifestReader::advertisedVersion($latest, public_path($map[$app]['apk']));
     return response()->json([
         'ok'     => true,
         'app'    => $app,
@@ -1039,6 +1043,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         // Branch-to-branch stock transfer (Task 1354) — owner/manager only.
         Route::get('/inventory/transfer', [PosInventoryController::class, 'transfers'])->name('pos.inventory.transfers');
         Route::post('/inventory/transfer', [PosInventoryController::class, 'storeTransfer'])->name('pos.inventory.transfer.store');
+        // In-transit transfers (Task 1434): the receiving branch confirms
+        // arrival, or either end cancels while the maal is still on the road.
+        Route::post('/inventory/transfer/{movement}/receive', [PosInventoryController::class, 'receiveTransfer'])->name('pos.inventory.transfer.receive');
+        Route::post('/inventory/transfer/{movement}/cancel', [PosInventoryController::class, 'cancelTransfer'])->name('pos.inventory.transfer.cancel');
         Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
         Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
         Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');
@@ -1751,6 +1759,12 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/khata', [\App\Http\Controllers\FbrPosKhataController::class, 'index'])->name('fbrpos.khata');
     Route::get('/khata/{customer}/ledger', [\App\Http\Controllers\FbrPosKhataController::class, 'ledger'])->name('fbrpos.khata.ledger');
     Route::post('/khata/wasooli', [\App\Http\Controllers\FbrPosKhataController::class, 'wasooli'])->name('fbrpos.khata.wasooli');
+    // (Khata upgrade Aug 2026) manager-only thermal Wasooli ki rasid, keyed on the
+    // wasooli ledger entry. Company-scoped + assertNotCashier inside the controller.
+    Route::get('/khata/wasooli/{entry}/receipt', [\App\Http\Controllers\FbrPosKhataController::class, 'wasooliReceipt'])->name('fbrpos.khata.wasooli.receipt');
+    // (Khata upgrade Aug 2026) record a WhatsApp yaad-dehani send (stamps
+    // khata_last_reminder_at) — manager-only, company-scoped.
+    Route::post('/khata/{customer}/reminder-sent', [\App\Http\Controllers\FbrPosKhataController::class, 'markReminderSent'])->name('fbrpos.khata.reminder-sent');
 
     // 👥 Customers page (Task 1260 — FBR twin of /pos/customers; shared
     // pos_customers table, stats/history from fbr_pos_transactions only).

@@ -25,6 +25,10 @@ class Product extends Model
         'is_active',
         'show_on_sale',
         'is_third_schedule',
+        // Peti (Wholesale) Rate (Task 1414): "peti mein kitne piece" — nullable.
+        // Missing from $fillable ⇒ Eloquent silently drops the write on
+        // create()/update() (the exact trap the plan warns about).
+        'pack_size',
     ];
 
     protected $casts = [
@@ -32,6 +36,8 @@ class Product extends Model
         'is_active' => 'boolean',
         'show_on_sale' => 'boolean',
         'is_third_schedule' => 'boolean',
+        // NULL stays NULL (not-a-peti-product); a real value casts to int.
+        'pack_size' => 'integer',
     ];
 
     protected static function booted()

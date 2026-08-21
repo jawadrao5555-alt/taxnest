@@ -18,6 +18,12 @@ class InventoryMovement extends Model
         'reference_type',
         'reference_id',
         'reference_number',
+        // In-transit branch transfers (Task 1434): state lives on the
+        // TRANSFER_OUT row so both branches read one record. Without these two
+        // in $fillable the mass-assign silently drops them and every transfer
+        // would look instantly-received again.
+        'transfer_status',
+        'received_quantity',
         'notes',
         'created_by',
     ];
@@ -27,6 +33,7 @@ class InventoryMovement extends Model
         'unit_price' => 'float',
         'total_price' => 'float',
         'balance_after' => 'float',
+        'received_quantity' => 'float',
     ];
 
     const TYPE_PURCHASE = 'purchase';
@@ -38,6 +45,13 @@ class InventoryMovement extends Model
     const TYPE_TRANSFER_IN = 'transfer_in';
     const TYPE_TRANSFER_OUT = 'transfer_out';
     const TYPE_OPENING = 'opening';
+
+    // In-transit branch transfers (Task 1434). Only the TRANSFER_OUT row of a
+    // branch_transfer carries one of these; every other movement leaves the
+    // column NULL.
+    const TRANSFER_IN_TRANSIT = 'in_transit';
+    const TRANSFER_RECEIVED = 'received';
+    const TRANSFER_CANCELLED = 'cancelled';
 
     public function company()
     {
@@ -72,5 +86,11 @@ class InventoryMovement extends Model
             self::TYPE_PURCHASE, self::TYPE_ADJUSTMENT_IN,
             self::TYPE_RETURN_IN, self::TYPE_TRANSFER_IN, self::TYPE_OPENING,
         ]);
+    }
+
+    /** A branch transfer whose maal has left the source but not yet arrived. */
+    public function isInTransit()
+    {
+        return $this->transfer_status === self::TRANSFER_IN_TRANSIT;
     }
 }

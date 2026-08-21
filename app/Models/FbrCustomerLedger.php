@@ -32,4 +32,10 @@ class FbrCustomerLedger extends Model
     {
         return $this->belongsTo(FbrPosTransaction::class, 'transaction_id');
     }
+
+    /** (Khata upgrade Aug 2026) who recorded the entry — for the Wasooli ki rasid. */
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

@@ -310,6 +310,64 @@
                 </form>
             </div>
 
+            {{-- 📦 Peti (Wholesale) Rate (Task 1414): the ONE per-company switch +
+                 the single "munafa %". OFF by default. Below the switch is the
+                 "reh gaye" list of bulk-selling products that still need pack
+                 size or cost — the owner only fixes these few. --}}
+            @php $petiOn = (bool) ($company->fbr_peti_rate_enabled ?? false); @endphp
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5"
+                 x-data="{ petiOn: {{ $petiOn ? 'true' : 'false' }} }">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.fbr_peti_title') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.fbr_peti_desc') }}</p>
+                <form method="POST" action="{{ route('fbrpos.settings') }}" class="space-y-4">
+                    @csrf
+                    <input type="hidden" name="peti_rate_update" value="1">
+                    <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition"
+                           :class="petiOn ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-700'">
+                        <input type="checkbox" name="peti_rate_enabled" value="1" x-model="petiOn" class="mt-0.5 text-emerald-600 focus:ring-emerald-500 rounded">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ __('pos.fbr_peti_switch_label') }}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.fbr_peti_switch_hint') }}</span>
+                        </span>
+                    </label>
+                    <div x-show="petiOn" x-cloak>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_peti_margin_label') }}</label>
+                        <input type="number" name="peti_margin_pct" min="0" max="100" step="0.01"
+                               value="{{ old('peti_margin_pct', $company->fbr_peti_margin_pct ?? '3.00') }}"
+                               class="w-32 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.fbr_peti_margin_hint') }}</p>
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">{{ __('pos.save_btn') }}</button>
+                </form>
+
+                @if($petiOn)
+                <div class="mt-5 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.fbr_peti_gaps_title') }}</h4>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.fbr_peti_gaps_desc') }}</p>
+                    @if(empty($petiGaps))
+                        <p class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{{ __('pos.fbr_peti_gaps_empty') }}</p>
+                    @else
+                        <ul class="space-y-2">
+                            @foreach($petiGaps as $gap)
+                            <li class="flex items-center justify-between gap-2 text-sm">
+                                <span class="text-gray-800 dark:text-gray-100 truncate">{{ $gap['name'] }}</span>
+                                <span class="flex items-center gap-2 shrink-0">
+                                    @if($gap['missing_pack'])
+                                        <span class="text-[10px] font-semibold text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 px-1.5 py-0.5 rounded">{{ __('pos.fbr_peti_gaps_missing_pack') }}</span>
+                                    @endif
+                                    @if($gap['missing_cost'])
+                                        <span class="text-[10px] font-semibold text-rose-700 bg-rose-100 dark:bg-rose-900/30 dark:text-rose-300 px-1.5 py-0.5 rounded">{{ __('pos.fbr_peti_gaps_missing_cost') }}</span>
+                                    @endif
+                                    <a href="{{ route('fbrpos.products.edit', $gap['id']) }}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold">{{ __('pos.fbr_peti_gaps_fix') }}</a>
+                                </span>
+                            </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+                @endif
+            </div>
+
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.fbr_registration_details') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.fbr_registration_details_desc') }}</p>

@@ -44,6 +44,15 @@
             <form method="POST" action="/admin/company/{{ $company->id }}/pos-features" class="space-y-5">
                 @csrf
                 @method('PUT')
+                {{-- Stale-form presence marker (Task 1393): proves THIS request
+                     really carried the feature block, so an outdated admin tab
+                     replayed across a deploy can't silently wipe the company's
+                     modules. Mirrors fs_present on the shop wizard. --}}
+                <input type="hidden" name="fs_present" value="1" />
+                {{-- Universal sale screen: rides a hidden input so a fresh save
+                     keeps it ON (its historical force-write) while the controller
+                     no longer flips it blind on a marker-less POST. --}}
+                <input type="hidden" name="use_universal_pos" value="1" />
                 <input type="hidden" name="business_category" :value="selectedPreset" />
 
                 {{-- Industry Preset --}}

@@ -80,12 +80,22 @@ class FbrPosCustomerController extends Controller
             'ntn' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',
             'type' => 'required|in:registered,unregistered',
+            // (Khata upgrade Aug 2026) per-customer udhaar hadd — empty = no limit.
+            'khata_limit' => 'nullable|numeric|min:0|max:99999999',
         ]);
 
-        $customer = PosCustomer::create(array_merge($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']), [
+        $createAttrs = array_merge($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']), [
             'company_id' => $companyId,
             'name' => trim((string) $request->name) !== '' ? trim($request->name) : $request->phone,
-        ]));
+        ]);
+        // (Khata upgrade Aug 2026) Only touch khata_limit when the column really
+        // exists — a drifted PROD DB (prod-schema-drift-selfheal.md) that lags the
+        // migration must still be able to add a customer, just without a limit.
+        // Blank field = no limit (NULL); a concrete number caps the balance.
+        if (PosCustomer::khataColumnExists('khata_limit')) {
+            $createAttrs['khata_limit'] = $request->filled('khata_limit') ? round((float) $request->khata_limit, 2) : null;
+        }
+        $customer = PosCustomer::create($createAttrs);
 
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'customer' => ['id' => $customer->id, 'name' => $customer->name, 'phone' => $customer->phone]]);
@@ -109,9 +119,18 @@ class FbrPosCustomerController extends Controller
             'ntn' => 'nullable|string|max:50',
             'cnic' => 'nullable|string|max:20',
             'type' => 'required|in:registered,unregistered',
+            // (Khata upgrade Aug 2026) per-customer udhaar hadd — empty = no limit.
+            'khata_limit' => 'nullable|numeric|min:0|max:99999999',
         ]);
 
-        $customer->update($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']));
+        $updateAttrs = $request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']);
+        // (Khata upgrade Aug 2026) hasColumn-guarded so a drifted PROD DB that
+        // lags the migration can still edit a customer. Clearing the field removes
+        // the limit; a number sets it.
+        if (PosCustomer::khataColumnExists('khata_limit')) {
+            $updateAttrs['khata_limit'] = $request->filled('khata_limit') ? round((float) $request->khata_limit, 2) : null;
+        }
+        $customer->update($updateAttrs);
         return back()->with('success', __('pos.customer_updated_success'));
     }
 

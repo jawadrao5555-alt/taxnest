@@ -180,8 +180,13 @@
                                                         $ebMonths = \App\Services\BranchAddonService::monthsForCycle($ebPriced['cycle']);
                                                         $ebRow['base'][$ebCycle] = (float) $ebPriced['final_price'];
                                                         $ebRow['addon'][$ebCycle] = [];
+                                                        // (Task 1441) An unlimited-branch package (included null) already
+                                                        // grants every branch free, so its slots bill nothing — the JS box
+                                                        // must not quote slots x 10,000 when the admin switches to it.
                                                         for ($ebS = $ebMin; $ebS <= $ebReview['slots']; $ebS++) {
-                                                            $ebRow['addon'][$ebCycle][$ebS] = \App\Services\BranchAddonService::priceForMonths($ebS, $ebMonths);
+                                                            $ebRow['addon'][$ebCycle][$ebS] = $ebRow['included'] === null
+                                                                ? 0.0
+                                                                : \App\Services\BranchAddonService::priceForMonths($ebS, $ebMonths);
                                                         }
                                                         // 0..N ki lagatar keys warna JS array ban jati hain — object hi rehne dein.
                                                         $ebRow['addon'][$ebCycle] = (object) $ebRow['addon'][$ebCycle];

@@ -622,13 +622,23 @@ class PosCallerIdController extends Controller
         // listener wali build hain, is liye param na ho to PLUS.
         $build = $request->query('build') === 'sim' ? 'sim' : 'plus';
 
+        $latest = trim((string) SystemSetting::get(
+            $build === 'sim' ? 'caller_app_latest_version' : 'caller_app_plus_latest_version',
+            ''
+        ));
+        // Task 1413 — back the advertised version with the HOSTED APK. The
+        // setting alone drives the phone's update banner, so a version flipped
+        // before the upload had every phone downloading the OLD file, installing
+        // the same versionName it already runs, and being prompted again next
+        // launch. Read the file's own versionName; fail open if it is not on
+        // disk (dev/CI, or a build the container never fetched).
+        $apk = $build === 'sim' ? 'downloads/taxnest-caller.apk' : 'downloads/taxnest-caller-plus.apk';
+        $latest = \App\Services\ApkManifestReader::advertisedVersion($latest, public_path($apk));
+
         return response()->json([
             'ok' => true,
             'build' => $build,
-            'latest' => trim((string) SystemSetting::get(
-                $build === 'sim' ? 'caller_app_latest_version' : 'caller_app_plus_latest_version',
-                ''
-            )),
+            'latest' => $latest,
             'apk_url' => $build === 'sim' ? self::APP_DOWNLOAD_URL : self::APP_DOWNLOAD_URL_PLUS,
         ]);
     }

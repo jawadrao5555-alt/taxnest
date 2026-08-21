@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\InventoryMovement;
 use App\Models\InventoryStock;
 use App\Models\PosProduct;
 use Illuminate\Support\Facades\DB;
@@ -411,6 +412,13 @@ class BranchStockService
                 ->where('product_id', $productId)
                 ->sum('quantity');
 
+            // In-transit branch transfers (Task 1434): goods that have LEFT the
+            // source shelf but not yet been received sit in no branch's
+            // inventory_stocks row. Adding them back keeps the company total
+            // (products page + sale-screen loaders) whole while maal is on the
+            // road — otherwise the maal would look like it vanished mid-transit.
+            $sum += self::inTransitQuantity($companyId, $productId);
+
             PosProduct::where('company_id', $companyId)
                 ->where('id', $productId)
                 ->whereNotNull('stock_quantity')
@@ -449,6 +457,33 @@ class BranchStockService
         }
 
         return round((($destQty * $destCost) + ($inQty * $inCost)) / ($destQty + $inQty), 2);
+    }
+
+    /**
+     * Total quantity of $productId currently in transit between this company's
+     * branches (Task 1434) — the sum of every TRANSFER_OUT still flagged
+     * in_transit. Kept branch-agnostic on purpose: it is the "maal raste mein"
+     * figure the company total must include, no matter which two shops it moves
+     * between. Never throws — a missing column on a lean/legacy schema just
+     * yields 0, so a company that predates this feature behaves exactly as
+     * before.
+     */
+    public static function inTransitQuantity(int $companyId, int $productId): float
+    {
+        try {
+            if (!Schema::hasColumn('inventory_movements', 'transfer_status')) {
+                return 0.0;
+            }
+            return (float) DB::table('inventory_movements')
+                ->where('company_id', $companyId)
+                ->where('product_id', $productId)
+                ->where('reference_type', 'branch_transfer')
+                ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
+                ->where('transfer_status', InventoryMovement::TRANSFER_IN_TRANSIT)
+                ->sum('quantity');
+        } catch (\Throwable $e) {
+            return 0.0;
+        }
     }
 
     public static function quantities(int $companyId, ?int $branchId, array $productIds): array

@@ -94,6 +94,24 @@ class PosTransaction extends Model
         // ->archived_at?->format(); without this cast the raw DB string blew up
         // the ONLY page an archive_viewer account can open.
         'archived_at' => 'datetime',
+        // (Task 1339 follow-up) Every hand-added timestamp column gets the SAME
+        // datetime cast that archived_at was missing — otherwise the next screen
+        // or report that does ->format() on a raw DB string dies exactly the way
+        // the archive list did (?-> only guards NULL, never a string). Callers
+        // that go through Carbon::parse() are unaffected (parse() accepts a
+        // Carbon instance too), and every writer already stores now() (a Carbon),
+        // so the JSON/update shape is unchanged.
+        'rider_assigned_at' => 'datetime',
+        'delivered_at' => 'datetime',
+        'returned_at' => 'datetime',
+        'rider_settled_at' => 'datetime',
+        'receipt_printed_at' => 'datetime',
+        'share_token_created_at' => 'datetime',
+        'prepaid_converted_at' => 'datetime',
+        // business_date stays UNCAST ON PURPOSE: reports compare it as a plain
+        // DATE string (= / >= / whereIn on the raw 'Y-m-d' and PosBusinessDay
+        // strings, plus dozens of (string) $b->business_date casts). Turning it
+        // into a Carbon/whereDate value would silently change those comparisons.
     ];
 
     public function company()

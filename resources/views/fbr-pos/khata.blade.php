@@ -9,8 +9,23 @@
         <a href="{{ route('fbrpos.create') }}" class="text-sm text-blue-600 hover:underline">← Sale Screen</a>
     </div>
 
+    {{-- (Khata upgrade Aug 2026) After a wasooli, offer to print the Wasooli ki
+         rasid for the payment just recorded. --}}
+    @if(session('wasooli_receipt_id'))
+    <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 rounded-lg px-4 py-3 text-sm flex items-center justify-between gap-3">
+        <span>{{ session('success') }}</span>
+        <a href="{{ route('fbrpos.khata.wasooli.receipt', session('wasooli_receipt_id')) }}" target="_blank"
+           class="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700">{{ __('pos.wasooli_print_rasid') }}</a>
+    </div>
+    @elseif(session('success'))
+    <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+    <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">{{ session('error') }}</div>
+    @endif
+
     {{-- Stat tiles --}}
-    <div class="grid grid-cols-2 gap-3 mb-6">
+    <div class="grid grid-cols-2 gap-3 mb-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border-l-4 border-red-500">
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Total Udhaar (Baqaya)</p>
             <p class="text-2xl font-extrabold text-red-600 dark:text-red-400 mt-1">Rs {{ number_format($totalOutstanding, 0) }}</p>
@@ -23,12 +38,72 @@
         </div>
     </div>
 
+    {{-- (Khata upgrade Aug 2026) UMAR (aging) buckets — clickable filters.
+         Each bucket = total outstanding whose OLDEST unpaid udhaar falls in that
+         age band (FIFO allocation done server-side). Clicking toggles the row
+         filter. --}}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+        {{-- Static class strings (Tailwind JIT purges interpolated color names —
+             tailwind.config.js has only a tiny teal safelist). --}}
+        @php
+            $ageTiles = [
+                '0_15'   => ['label' => __('pos.khata_age_0_15'),   'border' => 'border-green-500',  'text' => 'text-green-600 dark:text-green-400',  'ring' => 'ring-green-500'],
+                '16_30'  => ['label' => __('pos.khata_age_16_30'),  'border' => 'border-yellow-500', 'text' => 'text-yellow-600 dark:text-yellow-400', 'ring' => 'ring-yellow-500'],
+                '31_60'  => ['label' => __('pos.khata_age_31_60'),  'border' => 'border-orange-500', 'text' => 'text-orange-600 dark:text-orange-400', 'ring' => 'ring-orange-500'],
+                '60_plus'=> ['label' => __('pos.khata_age_60_plus'),'border' => 'border-red-500',    'text' => 'text-red-600 dark:text-red-400',      'ring' => 'ring-red-500'],
+            ];
+        @endphp
+        @foreach($ageTiles as $key => $tile)
+        <button type="button" @click="toggleBucket('{{ $key }}')"
+                :class="bucketFilter === '{{ $key }}' ? 'ring-2 ring-offset-1 {{ $tile['ring'] }}' : ''"
+                class="text-left bg-white dark:bg-gray-800 rounded-lg shadow p-3 border-l-4 {{ $tile['border'] }} hover:shadow-md transition">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">{{ $tile['label'] }}</p>
+            <p class="text-lg font-extrabold {{ $tile['text'] }} mt-0.5">Rs {{ number_format($bucketTotals[$key] ?? 0, 0) }}</p>
+        </button>
+        @endforeach
+    </div>
+
+    {{-- (Khata upgrade Aug 2026) Bulk "Sab ko yaad dehani" panel — every customer
+         with a balance, each with its own WhatsApp send button. wa.me can only
+         open one chat at a time, so this is a manual tick-off list, NOT a fake
+         bulk send. Rows without a routable phone show no dead button. --}}
+    @php $waCustomers = $customers->where('khata_balance', '>', 0)->filter(fn($c) => $c->khata_wa_url); @endphp
+    @if($waCustomers->isNotEmpty())
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden mb-6">
+        <button type="button" @click="showBulk = !showBulk"
+                class="w-full px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between text-left">
+            <span class="font-bold text-gray-900 dark:text-white">📣 {{ __('pos.khata_bulk_reminder_title') }}</span>
+            <span class="text-xs text-gray-400" x-text="showBulk ? '▲' : '▼'"></span>
+        </button>
+        <div x-show="showBulk" x-cloak class="divide-y divide-gray-100 dark:divide-gray-700 max-h-80 overflow-y-auto">
+            @foreach($waCustomers as $c)
+            <div class="flex items-center justify-between gap-3 px-4 py-2.5"
+                 :class="sentReminders.includes({{ $c->id }}) ? 'opacity-50' : ''">
+                <div class="min-w-0">
+                    <p class="font-semibold text-sm text-gray-900 dark:text-white truncate">{{ $c->name }}</p>
+                    <p class="text-xs text-red-600 dark:text-red-400">Rs {{ number_format($c->khata_balance, 0) }}</p>
+                </div>
+                <button type="button" @click="sendReminder({{ $c->id }}, '{{ addslashes($c->khata_wa_url) }}')"
+                        class="shrink-0 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-bold hover:bg-green-700 flex items-center gap-1">
+                    <span x-show="sentReminders.includes({{ $c->id }})">✓</span>
+                    <span x-text="sentReminders.includes({{ $c->id }}) ? '{{ __('pos.khata_reminder_sent_word') }}' : '{{ __('pos.khata_reminder_send_word') }}'"></span>
+                </button>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- Customer list --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
             <h3 class="font-bold text-gray-900 dark:text-white">Khata Customers</h3>
-            <input type="text" x-model="filter" placeholder="Naam / phone search..." autocomplete="off" name="khata_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                   class="border rounded-lg px-3 py-1.5 text-sm w-48 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+            <div class="flex items-center gap-2">
+                <button type="button" x-show="bucketFilter" @click="bucketFilter = ''" x-cloak
+                        class="text-xs text-blue-600 hover:underline">{{ __('pos.khata_clear_filter') }}</button>
+                <input type="text" x-model="filter" placeholder="Naam / phone search..." autocomplete="off" name="khata_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="border rounded-lg px-3 py-1.5 text-sm w-48 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+            </div>
         </div>
 
         @if($customers->isEmpty())
@@ -42,24 +117,52 @@
                 <tr>
                     <th class="px-4 py-2">Customer</th>
                     <th class="px-4 py-2">Phone</th>
+                    <th class="px-4 py-2">{{ __('pos.khata_age_col') }}</th>
                     <th class="px-4 py-2 text-right">Balance</th>
                     <th class="px-4 py-2 text-right">Amal</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($customers as $c)
+                @php
+                    // Static class strings — Tailwind JIT can't see interpolated names.
+                    $badgeClass = match($c->khata_bucket) {
+                        '0_15' => 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                        '16_30' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+                        '31_60' => 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+                        '60_plus' => 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                        default => 'bg-gray-100 text-gray-700',
+                    };
+                @endphp
                 <tr class="border-t dark:border-gray-700"
-                    x-show="filter === '' || '{{ strtolower(addslashes($c->name . ' ' . $c->phone)) }}'.includes(filter.toLowerCase())">
+                    x-show="(filter === '' || '{{ strtolower(addslashes($c->name . ' ' . $c->phone)) }}'.includes(filter.toLowerCase())) && (bucketFilter === '' || bucketFilter === '{{ $c->khata_bucket }}')">
                     <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">{{ $c->name }}</td>
                     <td class="px-4 py-2.5 text-gray-500 dark:text-gray-400">{{ $c->phone ?: '—' }}</td>
+                    <td class="px-4 py-2.5">
+                        @if($c->khata_oldest_days !== null)
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $badgeClass }}">{{ __('pos.khata_days_old', ['n' => $c->khata_oldest_days]) }}</span>
+                        @else
+                        <span class="text-xs text-gray-400">—</span>
+                        @endif
+                    </td>
                     <td class="px-4 py-2.5 text-right font-bold {{ $c->khata_balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
                         Rs {{ number_format($c->khata_balance, 0) }}
                     </td>
                     <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                        {{-- (Khata upgrade Aug 2026) WhatsApp reminder — only when the
+                             phone is routable ($c->khata_wa_url non-null). No dead button. --}}
+                        @if($c->khata_balance > 0 && $c->khata_wa_url)
+                        <button @click="sendReminder({{ $c->id }}, '{{ addslashes($c->khata_wa_url) }}')"
+                                title="{{ $c->khata_last_reminder_days !== null ? __('pos.khata_last_reminder', ['n' => $c->khata_last_reminder_days]) : '' }}"
+                                class="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-bold hover:bg-green-700">WA</button>
+                        @endif
                         <button @click="openWasooli({{ $c->id }}, '{{ addslashes($c->name) }}', {{ (float) $c->khata_balance }})"
                                 class="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-bold hover:bg-green-700">Wasooli</button>
                         <button @click="openLedger({{ $c->id }})"
                                 class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600">Ledger</button>
+                        @if($c->khata_last_reminder_days !== null)
+                        <div class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.khata_last_reminder', ['n' => $c->khata_last_reminder_days]) }}</div>
+                        @endif
                     </td>
                 </tr>
                 @endforeach
@@ -133,6 +236,10 @@
 function khataPage() {
     return {
         filter: '',
+        bucketFilter: '',
+        showBulk: false,
+        // (Khata upgrade Aug 2026) ids ticked off after a reminder was opened.
+        sentReminders: [],
         showWasooli: false,
         wasooliCustomerId: null,
         wasooliName: '',
@@ -141,6 +248,22 @@ function khataPage() {
         ledgerLoading: false,
         ledgerCustomer: {},
         ledgerEntries: [],
+        toggleBucket(b) {
+            this.bucketFilter = this.bucketFilter === b ? '' : b;
+        },
+        // Opens the customer's WhatsApp chat (wa.me can only open ONE at a time),
+        // ticks it off, and records the send server-side so "aakhri yaad dehani"
+        // updates — nobody gets pestered twice a day.
+        sendReminder(id, url) {
+            window.open(url, '_blank');
+            if (!this.sentReminders.includes(id)) this.sentReminders.push(id);
+            try {
+                fetch(`{{ url('/fbr-pos/khata') }}/${id}/reminder-sent`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+            } catch (e) {}
+        },
         openWasooli(id, name, balance) {
             this.wasooliCustomerId = id;
             this.wasooliName = name;

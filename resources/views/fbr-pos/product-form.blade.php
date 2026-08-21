@@ -198,7 +198,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.uom_label') }}</label>
-                    <select name="uom" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <select name="uom" x-model="uomCode" @change="onUomChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         @php
                             $uomList = [
                                 'U' => 'Units',
@@ -229,6 +229,16 @@
                             <option value="{{ $code }}" {{ $currentUom == $code ? 'selected' : '' }}>{{ $code }} — {{ $label }}</option>
                         @endforeach
                     </select>
+                </div>
+                {{-- Peti (Wholesale) Rate (Task 1414): pieces-per-peti. Single mode
+                     only (multi-entry rows share defaults; peti is per-product).
+                     Blank ⇒ this product stays out of the peti feature. --}}
+                <div x-show="mode === 'single'">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_peti_pack_size_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
+                    <input type="number" name="pack_size" min="1" step="1" x-model="packSize" :disabled="mode === 'multi'"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="24">
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.fbr_peti_pack_size_hint') }}</p>
                 </div>
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.barcode_label') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_ean_upc_optional') }}</span></label>
@@ -647,6 +657,17 @@ function fbrProductForm() {
         price: @js((string) old('default_price', $product->default_price ?? 0)),
         isPriceEditable: {{ $initPriceEditable ? 'true' : 'false' }},
         thirdSchedule: {{ $initThird ? 'true' : 'false' }},
+        // Peti (Wholesale) Rate (Task 1414): "peti mein kitne piece". Blank ⇒
+        // product stays out of the feature. uomCode drives the DOZ auto-fill.
+        packSize: @js((string) old('pack_size', $product->pack_size ?? '')),
+        uomCode: @js((string) $currentUom),
+        // UOM 'DOZ' ⇒ prefill 12 (a dozen), but ONLY when the field is empty so
+        // a hand-typed pack size is never clobbered.
+        onUomChange() {
+            if (this.uomCode === 'DOZ' && (this.packSize === '' || this.packSize === null)) {
+                this.packSize = '12';
+            }
+        },
         supNew: {{ old('new_supplier_name') ? 'true' : 'false' }},
         // Full product edit (Task 1276)
         showOnSale: {{ old('show_on_sale', $isEdit ? (($product->show_on_sale ?? true) ? 1 : 0) : 1) ? 'true' : 'false' }},

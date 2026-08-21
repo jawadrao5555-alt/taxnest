@@ -218,7 +218,11 @@ class BranchAddonService
     public static function renewalReview(?Company $company, ?PricingPlan $plan, ?string $cycle, $paid = null): array
     {
         $slots = self::slots($company);
-        $applies = $company !== null && $slots > 0 && self::supportsPlan($plan);
+        // (Task 1441) "applies" tracks whether the add-on line is actually
+        // charged, so it must key off BILLABLE slots — an unlimited package
+        // has stored slots but bills nothing, and the review must say so
+        // (addon_price 0, not a phantom line).
+        $applies = $company !== null && self::billableSlots($company, $plan) > 0;
 
         $cycle = SubscriptionAssignmentService::normalizeCycle($cycle);
         $base = 0.0;
@@ -277,16 +281,42 @@ class BranchAddonService
     }
 
     /**
+     * Slots that may actually be BILLED for a given package.
+     *
+     * (Task 1441) The pricing half must agree with the enforcement half: an
+     * unlimited-branch package (branch_limit null / -1) already grants every
+     * branch for free, so applicableSlots() treats stored slots as inert there.
+     * Charging slots × 10,000 on top of an unlimited plan bills a shop for
+     * capacity it already has — the exact bug this closes. Unlike
+     * applicableSlots(), this deliberately ignores expiry: a renewal quote for
+     * a lapsed package must still price the slots the shop is renewing.
+     *
+     * The stored count is left DORMANT on purpose (never zeroed here): a shop
+     * that later downgrades back to a limited package gets its bought capacity
+     * — and its billing — restored automatically, with no admin cleanup step.
+     */
+    public static function billableSlots(?Company $company, ?PricingPlan $plan): int
+    {
+        if (!self::supportsPlan($plan)) {
+            return 0;
+        }
+
+        $included = $plan->branch_limit;
+        if ($included === null || (int) $included === -1) {
+            return 0;
+        }
+
+        return self::slots($company);
+    }
+
+    /**
      * Renewal / naya subscription banate waqt add-on ka hissa.
-     * Sirf tab jab package add-on support karta ho AUR company ke slots hon.
+     * Sirf tab jab package add-on support karta ho AUR company ke BILLABLE
+     * slots hon (unlimited package par slots inert — dekhein billableSlots()).
      */
     public static function addonForCycle(?Company $company, ?PricingPlan $plan, ?string $cycle): float
     {
-        if (!self::supportsPlan($plan)) {
-            return 0.0;
-        }
-
-        $slots = self::slots($company);
+        $slots = self::billableSlots($company, $plan);
         if ($slots < 1) {
             return 0.0;
         }

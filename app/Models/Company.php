@@ -176,6 +176,9 @@ class Company extends Model
         'force_watermark',
         'fbr_pos_enabled',
         'fbr_reporting_enabled',
+        // Peti (Wholesale) Rate (Task 1414) — single source of truth switch + margin.
+        'fbr_peti_rate_enabled',
+        'fbr_peti_margin_pct',
         'fbr_pos_id',
         'fbr_access_code',
         'fbr_pos_token',
@@ -210,6 +213,9 @@ class Company extends Model
         'pos_tax_inclusive' => 'boolean',
         'fbr_pos_enabled' => 'boolean',
         'fbr_reporting_enabled' => 'boolean',
+        // Peti (Wholesale) Rate (Task 1414) — the ONE per-company switch.
+        'fbr_peti_rate_enabled' => 'boolean',
+        'fbr_peti_margin_pct' => 'decimal:2',
         'agent_enabled' => 'boolean',
         'agent_submits_pra' => 'boolean',
         'agent_last_seen' => 'datetime',
@@ -492,6 +498,11 @@ class Company extends Model
             'pra_pos_id', 'pra_connection_mode', 'agent_enabled', 'agent_submits_pra',
             'fbr_pos_enabled', 'fbr_universal_enabled', 'fbr_reporting_enabled',
             'fbr_pos_id', 'fbr_pos_environment', 'fbr_connection_mode',
+            // Peti (Wholesale) Rate (Task 1414): switch + margin are BAKED into
+            // the sale screen (they drive the auto peti-rate decision). A toggle
+            // or margin change must bust the SW-cached screen's fingerprint, or
+            // an offline/cached screen keeps deciding on the OLD setting.
+            'fbr_peti_rate_enabled', 'fbr_peti_margin_pct',
             // Inventory / restaurant / printing features
             'inventory_enabled', 'pos_restock_on_void', 'restaurant_mode',
             'pos_use_legacy_restaurant', 'kds_enabled', 'pos_kds_auto_print',

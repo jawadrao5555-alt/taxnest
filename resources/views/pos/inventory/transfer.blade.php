@@ -133,6 +133,75 @@
         </form>
 
         <div class="lg:col-span-3 space-y-6">
+            {{--
+                In transit (Task 1434): goods that have left the source but not
+                yet landed in the destination stock. Both branches see the list;
+                the receiving branch confirms arrival (with the real quantity,
+                which may be short), and either end can cancel while on the road.
+                Hidden entirely when the DB lacks the in-transit columns (drifted
+                PROD) — there the transfer is instant, so there is nothing to
+                receive or cancel. See prod-schema-drift-selfheal.
+            --}}
+            @if($columnsReady)
+            <div class="bg-white dark:bg-gray-900 rounded-2xl border border-amber-200 dark:border-amber-800 shadow-lg p-5">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1"/></svg>
+                    {{ __('pos.transfer_in_transit') }}
+                </h3>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.transfer_in_transit_hint') }}</p>
+
+                <div class="space-y-3">
+                    @forelse($inTransit as $m)
+                    @php $canReceive = in_array((int) $m->reference_id, array_map('intval', $receivableBranchIds), true); @endphp
+                    <div class="rounded-xl border border-gray-100 dark:border-gray-700 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="font-semibold text-gray-900 dark:text-white truncate">{{ $m->posProduct->name ?? __('pos.unknown_word') }}</p>
+                                <p class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                                    {{ $branchNames[$m->branch_id] ?? '—' }}
+                                    <span class="mx-1 text-amber-500">&rarr;</span>
+                                    {{ $branchNames[$m->reference_id] ?? '—' }}
+                                </p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {{ __('pos.transfer_sent_qty') }}: <span class="font-bold text-gray-900 dark:text-white">{{ number_format($m->quantity, 0) }}</span>
+                                    · {{ $m->created_at->format('d M Y H:i') }}
+                                </p>
+                            </div>
+                            <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">{{ __('pos.transfer_in_transit_badge') }}</span>
+                        </div>
+
+                        @if($canReceive)
+                        <form method="POST" action="{{ route('pos.inventory.transfer.receive', $m->id) }}"
+                            onsubmit="return confirm('{{ __('pos.transfer_receive_confirm') }}')"
+                            class="mt-3 flex flex-wrap items-end gap-2">
+                            @csrf
+                            <div class="flex-1 min-w-[140px]">
+                                <label class="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.transfer_receive_qty_label') }}</label>
+                                <input type="number" name="received_quantity" step="0.01" min="0" max="{{ $m->quantity }}"
+                                    placeholder="{{ number_format($m->quantity, 0) }}"
+                                    autocomplete="off" data-lpignore="true" data-1p-ignore
+                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-green-500 transition">
+                            </div>
+                            <button type="submit" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition shadow-sm">{{ __('pos.transfer_receive_btn') }}</button>
+                        </form>
+                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.transfer_receive_qty_hint') }}</p>
+                        @endif
+
+                        <div class="mt-2">
+                            <form method="POST" action="{{ route('pos.inventory.transfer.cancel', $m->id) }}"
+                                onsubmit="return confirm('{{ __('pos.transfer_cancel_confirm') }}')">
+                                @csrf
+                                <button type="submit" class="text-[11px] font-semibold text-red-600 hover:text-red-700 transition">{{ __('pos.transfer_cancel_btn') }}</button>
+                            </form>
+                        </div>
+                    </div>
+                    @empty
+                    <p class="py-6 text-center text-sm text-gray-400">{{ __('pos.transfer_none_in_transit') }}</p>
+                    @endforelse
+                </div>
+            </div>
+            @endif
+
             <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5">
                 <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-1">{{ __('pos.transfer_recent') }}</h3>
                 <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.transfer_recent_hint') }}</p>
@@ -144,11 +213,22 @@
                                 <th class="py-2.5 font-semibold">{{ __('pos.product_col') }}</th>
                                 <th class="py-2.5 font-semibold">{{ __('pos.transfer_from') }}</th>
                                 <th class="py-2.5 text-right font-semibold">{{ __('pos.receipt_qty') }}</th>
+                                @if($columnsReady)
+                                <th class="py-2.5 font-semibold">{{ __('pos.transfer_status_col') }}</th>
+                                @endif
                                 <th class="py-2.5 font-semibold hidden sm:table-cell">{{ __('pos.by_col') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
                             @forelse($recent as $m)
+                            @php
+                                // Received rows show the ACTUAL arrived quantity (may be short);
+                                // cancelled rows show what was sent then returned. On a drifted
+                                // DB without the columns these are all instant transfers.
+                                $isCancelled = $columnsReady && $m->transfer_status === \App\Models\InventoryMovement::TRANSFER_CANCELLED;
+                                $shownQty = ($columnsReady && $m->received_quantity !== null && !$isCancelled) ? $m->received_quantity : $m->quantity;
+                                $short = $columnsReady && !$isCancelled && $m->received_quantity !== null && $m->received_quantity < $m->quantity;
+                            @endphp
                             <tr>
                                 <td class="py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{{ $m->created_at->format('d M Y H:i') }}</td>
                                 <td class="py-3 font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? __('pos.unknown_word') }}</td>
@@ -157,12 +237,26 @@
                                     <span class="mx-1 text-purple-400">&rarr;</span>
                                     {{ $branchNames[$m->reference_id] ?? '—' }}
                                 </td>
-                                <td class="py-3 text-right font-bold text-gray-900 dark:text-white">{{ number_format($m->quantity, 0) }}</td>
+                                <td class="py-3 text-right font-bold text-gray-900 dark:text-white">
+                                    {{ number_format($shownQty, 0) }}
+                                    @if($short)
+                                    <span class="block text-[10px] font-normal text-red-500">({{ number_format($m->quantity, 0) }} {{ __('pos.transfer_sent_qty') }})</span>
+                                    @endif
+                                </td>
+                                @if($columnsReady)
+                                <td class="py-3 text-xs">
+                                    @if($isCancelled)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">{{ __('pos.transfer_status_cancelled') }}</span>
+                                    @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">{{ __('pos.transfer_status_received') }}</span>
+                                    @endif
+                                </td>
+                                @endif
                                 <td class="py-3 text-xs text-gray-600 dark:text-gray-400 hidden sm:table-cell">{{ $m->creator->name ?? '—' }}</td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="5" class="py-12 text-center">
+                                <td colspan="{{ $columnsReady ? 6 : 5 }}" class="py-12 text-center">
                                     <p class="text-sm text-gray-400">{{ __('pos.transfer_none_yet') }}</p>
                                 </td>
                             </tr>

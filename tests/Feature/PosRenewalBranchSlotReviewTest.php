@@ -333,6 +333,47 @@ class PosRenewalBranchSlotReviewTest extends TestCase
         $this->assertSame(0.0, $review['addon_price']);
     }
 
+    /**
+     * (Task 1441) An unlimited-branch package already grants every branch, so
+     * the stored slots buy nothing there — the two halves of the service must
+     * agree: applicableSlots() treats them as inert, so the renewal quote must
+     * NOT add slots x 10,000. Before this fix the review still billed 30,000
+     * for capacity the package gave away for free.
+     */
+    public function test_review_never_bills_slots_on_an_unlimited_branch_package(): void
+    {
+        foreach ([null, -1] as $unlimited) {
+            $plan = $this->makePlan('pos', 69999, $unlimited);
+            $shop = $this->makeShop(slots: 3, branches: 4);
+
+            $review = BranchAddonService::renewalReview($shop, $plan, 'annual', 69999);
+
+            $this->assertFalse($review['applies'], 'branch_limit=' . var_export($unlimited, true) . ' must not charge the add-on');
+            $this->assertSame(0.0, $review['addon_price']);
+            $this->assertSame(69999.0, $review['expected_total'], 'expected total = base package only');
+            $this->assertFalse($review['short'], 'paying the base package in full must not read as short');
+        }
+    }
+
+    /**
+     * (Task 1441) The stored slot count stays DORMANT (not zeroed) on an
+     * unlimited package, so a later downgrade to a limited package restores
+     * both the capacity and the billing with no admin cleanup step.
+     */
+    public function test_slots_stay_dormant_on_unlimited_and_bill_again_after_a_downgrade(): void
+    {
+        $unlimited = $this->makePlan('pos', 69999, -1);
+        $limited = $this->makePlan('pos', 24999, 2);
+        $shop = $this->makeShop(slots: 3, branches: 2);
+
+        // Unlimited: nothing billed, but the count is left standing.
+        $this->assertSame(0.0, BranchAddonService::addonForCycle($shop, $unlimited, 'annual'));
+        $this->assertSame(3, (int) $shop->fresh()->extra_branch_slots);
+
+        // Downgrade back to a limited package: the dormant slots bill again.
+        $this->assertSame(30000.0, BranchAddonService::addonForCycle($shop, $limited, 'annual'), '3 dormant slots bill again');
+    }
+
     public function test_review_does_not_apply_to_other_product_lines_or_trials(): void
     {
         $fbrPlan = $this->makePlan('fbrpos', 3000, 2);

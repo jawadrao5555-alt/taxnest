@@ -457,6 +457,27 @@ advertises the old version and **no phone gets an update banner**, because
 Both gates need the **file on disk AND the setting non-empty**, so an empty
 setting hides that build everywhere — that is the beta-safe switch.
 
+**Prove all three numbers agree (Task 1412).** Build, upload and the admin
+setting are three separate manual steps, and the Caller ID 1.4.0 rollout sat
+stuck at 1.1.0 for weeks because one of them was skipped with nothing to flag
+it. After flipping the settings, run the reconcile check — it reads the live
+site over HTTP (no SSH) and the hosted APK itself, so it catches a build that
+never went live, a setting flipped before the upload, or a hosted file that is
+still the old version:
+
+```bash
+php artisan apps:check-release-drift            # all six apps
+php artisan apps:check-release-drift --app=caller --app=caller_plus
+```
+
+For each app it prints `build=` (from `app/build.gradle`) vs `advertised=`
+(the live `/api/app-version` setting) vs `hosted=` (the versionName inside the
+downloaded APK) and **exits non-zero** unless all three match. Note that
+`/api/app-version` and the in-app `/version` endpoint now also refuse to
+advertise a version the hosted file does not contain (Task 1413), so a
+flip-before-upload no longer nags phones into re-installing the same bytes —
+but this command is how you confirm the release is actually finished.
+
 Finally create the What's New elaan (`scripts/elaan-insert.sh`, audience `pos`)
 — `scripts/deploy-live.sh` refuses to deploy without a fresh announcement.
 
@@ -528,7 +549,10 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
    `docs/qa/task-1387-caller-id-languages-qa.md`. The phone model and Android
    version were not captured, so this is an owner-reported QA record rather than
    device-specific evidence.
-8. Flip the two version settings in admin.
+8. Flip the two version settings in admin, then
+   `php artisan apps:check-release-drift --app=caller --app=caller_plus` —
+   build, live site and hosted APK must all show the same versionName (Task
+   1412). Non-zero exit = the release is not finished.
 9. What's New elaan (Roman Urdu, with the reason).
 
 ---

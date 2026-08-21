@@ -549,33 +549,6 @@ class PosBranchIsolationTest extends TestCase
         return $id;
     }
 
-    /** A completed LOCAL (reporting-off) bill — the kind the day-close wash sweeps. */
-    private function makeLocalBill(int $companyId, string $number, float $subtotal, ?int $branchId): int
-    {
-        $tax = round($subtotal * 0.1, 2);
-
-        return (int) DB::table('pos_transactions')->insertGetId([
-            'company_id' => $companyId,
-            'branch_id' => $branchId,
-            'invoice_number' => $number,
-            'transaction_type' => 'sale',
-            'business_date' => PosBusinessDay::current($companyId),
-            'status' => 'completed',
-            // The "local" triple (completed + local + local) — anything else is
-            // a different stream and the wash must leave it alone.
-            'invoice_mode' => 'local',
-            'pra_status' => 'local',
-            'is_archived' => false,
-            'subtotal' => $subtotal,
-            'discount_amount' => 0,
-            'tax_rate' => 10,
-            'tax_amount' => $tax,
-            'total_amount' => $subtotal + $tax,
-            'payment_method' => 'cash',
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
-    }
-
     /**
      * The canonical two-branch shop:
      *   Main Shop  P-MAIN  1000 + 100 tax = 1100
@@ -655,7 +628,12 @@ class PosBranchIsolationTest extends TestCase
         return $id;
     }
 
-    /** A completed LOCAL (never-reported) bill on $branchId — what the Local Bills portal shows. */
+    /**
+     * A completed LOCAL (never-reported) bill on $branchId — the "local" triple
+     * (completed + local + local). This is both what the Local Bills portal
+     * shows and the kind of bill the day-close wash sweeps; keep ONE helper for
+     * the two, or the file stops parsing ("Cannot redeclare …").
+     */
     private function makeLocalBill(int $companyId, string $number, float $subtotal, ?int $branchId): int
     {
         $id = $this->makeBill($companyId, $number, $subtotal, $branchId);

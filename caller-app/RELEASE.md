@@ -3,6 +3,14 @@
 Last updated: Sep 2026 (v1.4.0 — call back from the POS, website builds only,
 Task 1381; v1.3.0 was the English / Roman Urdu / Urdu language switch, Task 1382)
 
+> **Hosted right now: v1.4.0 (versionCode 5), since 21 Aug 2026 (Task 1362).**
+> Both website APKs and both admin version settings are on 1.4.0, so every
+> signed-in phone still on 1.1.0 sees the update banner. That single rollout is
+> what finally carried three releases' worth of code to shops — the 1.2.0
+> **disclosure (consent) screen**, the 1.3.0 language switch and the 1.4.0 call
+> back. Building the code without this step ships nothing: the website keeps
+> serving the old file until someone rebuilds, re-hosts and flips the settings.
+
 > **Play (AAB) ka hissa is file mein NAHI hai.** Play build banane, sign karne,
 > uske key ke faisle aur Console ke saare form: `docs/play/` — khaas tor par
 > `docs/play/signing-and-build.md`. Yeh file website wali dono APKs ka rozana ka
@@ -323,28 +331,51 @@ SCP="-i .local/ssh/cpanel_deploy_key -P 22 -o BatchMode=yes -o StrictHostKeyChec
 H=taxnestc@cpanel.taxnest.com.pk
 
 # keep a versioned copy (the previous build stays as a rollback file), then
-# point the canonical names the download page uses at the new builds
-scp $SCP caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk   $H:public_html/public/downloads/taxnest-caller-1.1.0.apk
-scp $SCP caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk $H:public_html/public/downloads/taxnest-caller-plus-1.1.0.apk
+# point the canonical names the download page uses at the new builds.
+# V = the versionName you just built — never re-use the previous release's name.
+V=1.4.0
+scp $SCP caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk   $H:public_html/public/downloads/taxnest-caller-$V.apk
+scp $SCP caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk $H:public_html/public/downloads/taxnest-caller-plus-$V.apk
 ssh ${SCP/-P/-p} $H "cd public_html/public/downloads \
-  && cp -f taxnest-caller-1.1.0.apk taxnest-caller.apk \
-  && cp -f taxnest-caller-plus-1.1.0.apk taxnest-caller-plus.apk \
+  && cp -f taxnest-caller-$V.apk taxnest-caller.apk \
+  && cp -f taxnest-caller-plus-$V.apk taxnest-caller-plus.apk \
   && chmod 644 taxnest-caller*.apk"
 ```
 
 Rollback = copy `taxnest-caller-<old>.apk` back over the canonical name.
 
-v1.1.0 is already hosted and live (20 Aug 2026): `taxnest-caller.apk` serves the
-clean build, `taxnest-caller-plus.apk` the plus build, versioned copies sit
-beside them and `taxnest-caller-1.0.0.apk` stays as the rollback file.
+**Prove the hosted file, not the local one.** `cp` on the server and a green
+local check say nothing about what the website actually serves, so re-download
+the two canonical URLs and run the same guard over the downloaded bytes:
+
+```bash
+cd /tmp && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller.apk \
+        && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller-plus.apk
+cd /home/runner/workspace && bash scripts/apk-release-check.sh \
+  --expect-version 1.4.0 --expect-code 5 \
+  /tmp/taxnest-caller.apk /tmp/taxnest-caller-plus.apk
+```
+
+md5 the downloads against the build outputs too — equal md5 is the only proof
+the canonical name points at the new build and not at a half-finished upload.
+
+v1.4.0 is hosted and live (21 Aug 2026, Task 1362): `taxnest-caller.apk` serves
+the clean build, `taxnest-caller-plus.apk` the plus build, `taxnest-caller-1.4.0.apk`
+/ `taxnest-caller-plus-1.4.0.apk` are the versioned copies, and the 1.1.0 (and
+clean-only 1.0.0) files stay beside them as rollback.
 
 Then deploy the PHP side and flip the two version settings in
 **SaaS admin → Settings → App versions**:
 
 | setting | value | controls |
 |---|---|---|
-| `caller_app_latest_version` | `1.1.0` | the default /download card + POS → Customize button (clean APK) |
-| `caller_app_plus_latest_version` | `1.1.0` | the "WhatsApp calls bhi chahiyen?" section + plus phones' update prompt |
+| `caller_app_latest_version` | `1.4.0` | the default /download card + POS → Customize button (clean APK) |
+| `caller_app_plus_latest_version` | `1.4.0` | the "WhatsApp calls bhi chahiyen?" section + plus phones' update prompt |
+
+Both must equal the `versionName` you just hosted. A setting left one release
+behind is invisible: the new file is on the server, the download card still
+advertises the old version and **no phone gets an update banner**, because
+`UpdateCheck.isNewer` compares against the setting, not against the APK.
 
 Both gates need the **file on disk AND the setting non-empty**, so an empty
 setting hides that build everywhere — that is the beta-safe switch.
@@ -380,7 +411,9 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 3. Build both website flavors, then `bash scripts/apk-release-check.sh <sim> <plus>`
    (+ the caller-specific `aapt2` extras above). The sim APK must print PASS; the
    plus APK must print PASS WITH 1 KNOWN EXCEPTION and nothing else.
-4. scp both APKs to live `public_html/public/downloads/`.
+4. scp both APKs to live `public_html/public/downloads/` (versioned name +
+   canonical name), then re-run the guard on the **downloaded** canonical URLs
+   and md5-match them against the build outputs.
 5. Deploy PHP (`git push origin HEAD:main`; `.cpanel.yml` auto-deploys).
 6. **Owner phone-tests both builds** — see
    `docs/qa/task-1345-caller-id-two-builds-qa.md`. From 1.3.0 also check the
@@ -413,8 +446,8 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 
 | Version | versionCode | Notes |
 |---------|-------------|-------|
-| 1.4.0 | 5 | **Call back from the POS** (Task 1381) — website builds only. New `CallerApp` + `DialWatchService` (foreground `dataSync`, ~5 s poll of `GET /dial-requests`, interval server-tunable via `poll_ms`) + `DialActivity` (tap → `ACTION_DIAL`, never `CALL_PHONE`) + `DialBootReceiver`, all in `src/web/`. Four new permissions, **none** on Play Protect's blocked list. The poll carries a `notif` flag (notifications enabled + offer channel not muted) — a muted phone stays `dial_seen_at`-fresh but loses `supports_dial`, so POS falls back to the copy-number card instead of a silent "sent", and the app toasts the reason once per launch. `/dial-result` is bound to the device that claimed the row. **`src/play/` untouched — the Play build gets no call back and no new permission.** Server side: `pos_caller_dial_requests` queue + `called_back_at` on ring events. Bump `caller_app_latest_version` **and** `caller_app_plus_latest_version` to `1.4.0` so signed-in website phones self-update — until then a phone on an older build makes POS show the "app purani hai" fallback, which is expected, not a bug. |
+| 1.4.0 | 5 | **Call back from the POS** (Task 1381) — website builds only. New `CallerApp` + `DialWatchService` (foreground `dataSync`, ~5 s poll of `GET /dial-requests`, interval server-tunable via `poll_ms`) + `DialActivity` (tap → `ACTION_DIAL`, never `CALL_PHONE`) + `DialBootReceiver`, all in `src/web/`. Four new permissions, **none** on Play Protect's blocked list. The poll carries a `notif` flag (notifications enabled + offer channel not muted) — a muted phone stays `dial_seen_at`-fresh but loses `supports_dial`, so POS falls back to the copy-number card instead of a silent "sent", and the app toasts the reason once per launch. `/dial-result` is bound to the device that claimed the row. **`src/play/` untouched — the Play build gets no call back and no new permission.** Server side: `pos_caller_dial_requests` queue + `called_back_at` on ring events. Bump `caller_app_latest_version` **and** `caller_app_plus_latest_version` to `1.4.0` so signed-in website phones self-update — until then a phone on an older build makes POS show the "app purani hai" fallback, which is expected, not a bug. **Built, hosted and both settings flipped on 21 Aug 2026 (Task 1362)** — this is the build the website serves today, and it is the first hosted APK to carry the 1.2.0 disclosure screen and the 1.3.0 language switch. |
 | 1.3.0 | 4 | **Language switch** (Task 1382): the whole app is now English / Roman Urdu / Urdu, picked from a compact three-way selector on the login **and** main screens. **A fresh install opens in English** whatever the phone's language is; the choice is saved on the phone and survives app restarts, logout/login and updates. Every user-visible line is translated — login and its errors, status, battery and permission lines with their toasts, the test-ring button and toast, "Last call sent: …", the update prompts and their download toasts, log out, and the whole "how does this work" paragraph — plus the notification-access **disclosure screen** in both notification builds, saying exactly the same five things in all three languages. The two-line build badge became one translated line per build (the old Roman recap lines are gone — the user picks a language now). Detection, permissions and the POS payload are untouched. |
 | 1.0.0 | 1 | Initial release — notification listener only (SIM + WhatsApp). **Uninstallable from the website once Play Protect's enhanced fraud protection rolled out.** |
-| 1.2.0 | 3 | **Third flavor `play`** (Task 1346) for the Google Play Store: no self-update, no `REQUEST_INSTALL_PACKAGES`, no battery permission, `targetSdk 36`, edge-to-edge insets. Both notification builds (`plus` + `play`) gained the **prominent disclosure** screen before notification access. Website APKs unchanged in behaviour — same permissions, same `targetSdk 34`, same self-update. **Hosted website APKs are still the 1.1.0 files**; they only move to 1.2.0 when the owner rebuilds, re-hosts and flips the admin version settings. |
+| 1.2.0 | 3 | **Third flavor `play`** (Task 1346) for the Google Play Store: no self-update, no `REQUEST_INSTALL_PACKAGES`, no battery permission, `targetSdk 36`, edge-to-edge insets. Both notification builds (`plus` + `play`) gained the **prominent disclosure** screen before notification access. Website APKs unchanged in behaviour — same permissions, same `targetSdk 34`, same self-update. This version was **never hosted on its own** — the website stayed on 1.1.0 until the 1.4.0 rollout (Task 1362) carried its disclosure screen to shops. |
 | 1.1.0 | 2 | **Two builds** (Task 1345): `sim` = clean telephony build, installs with no Play Protect block, default download; `plus` = the old SIM + WhatsApp behaviour. Shared `RingReporter` (payload + 60 s dedupe + 401 handling, dedupe moved to SharedPreferences so a fresh receiver process cannot double-post), per-build setup screen + build badge, per-build update check, `device` string now records which build a phone runs. |

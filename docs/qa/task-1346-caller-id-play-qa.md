@@ -118,7 +118,9 @@ AAB phone par seedha install nahi hota. Do raste hain:
 15. [ ] Purani clean (sim) APK wale phone par SIM call → pop-up pehle jaisa
 16. [ ] Purani plus APK wale phone par WhatsApp call → pop-up pehle jaisa
 17. [ ] Website wali build par update banner ka nizaam pehle jaisa chal raha ho
-        (abhi hosted APKs 1.1.0 hi hain, is liye koi naya banner nahi aayega)
+        (jab yeh checklist likhi gayi thi hosted APKs 1.1.0 thay, is liye koi
+        naya banner nahi aata tha; 21 Aug 2026 se website 1.4.0 host karti hai —
+        Task 1362 — is liye purane phone par ab banner aana CHAHIYE)
 
 ### D. Website ke naye safhay (kisi bhi phone/computer par)
 18. [ ] `taxnest.com.pk/privacy` bina login khule aur Caller ID ka hissa saaf ho

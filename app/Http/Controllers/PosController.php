@@ -2305,6 +2305,12 @@ class PosController extends Controller
      * settings change, user/company switch) and reload itself once.
      * Keys are deliberately short: u=user, c=company, s=screen file mtime,
      * cat=catalog revision, set=settings revision.
+     *
+     * Task 1390: EVERY per-user permission verdict the screen bakes in must be
+     * hashed into 'set' — otherwise a cache-first / offline copy (browser or
+     * mobile WebView shell) keeps showing controls the server already refuses.
+     * tests/Feature/PosBakedPermissionFingerprintTest.php discovers the baked
+     * verdicts from this controller and fails if one is missing here.
      */
     private function posBootFingerprint(Company $company, $user): array
     {

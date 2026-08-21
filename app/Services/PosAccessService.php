@@ -27,7 +27,22 @@ use Illuminate\Support\Facades\Schema;
  */
 class PosAccessService
 {
-    /** Feature keys shown as tick-boxes on /pos/team (order = display order). */
+    /**
+     * Feature keys shown as tick-boxes on /pos/team (order = display order).
+     *
+     * ADDING A KEY? It MUST ship with a backfill migration in the same change.
+     * customSet() intersects the stored JSON with this list, so a key added
+     * here is absent from every set a shop saved earlier — a staff member who
+     * could do the job yesterday quietly loses the button today, with no
+     * announcement. The convention is to APPEND the new key to every saved set
+     * (sets stay as permissive as they were; the owner unticks it if he wants
+     * it gone). Pattern to copy:
+     *   database/migrations/2026_09_04_000000_backfill_kot_reprint_custom_access.php
+     *
+     * tests/Feature/PosCustomAccessInvariantsTest.php FAILS until such a
+     * migration exists — or until the key is listed there as a deliberate
+     * "no backfill" exception with the reason written down.
+     */
     public const FEATURES = [
         'dashboard',
         'orders',

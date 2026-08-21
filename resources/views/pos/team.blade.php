@@ -412,6 +412,11 @@
                                                     <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">{{ __('pos.custom_access_enable_label') }}</span>
                                                 </label>
                                                 <div class="grid grid-cols-2 gap-2" :class="!customOn && 'opacity-40 pointer-events-none'">
+                                                    {{-- Adding a tick-box? Add the key to PosAccessService::FEATURES, a
+                                                         pos.feat_<key> label in en/rur/ur, AND a backfill migration that
+                                                         appends the key to already-saved sets — otherwise every shop that
+                                                         saved Custom Access before the deploy silently loses it. The
+                                                         FEATURES docblock has the rule; a test enforces it. --}}
                                                     @foreach(\App\Services\PosAccessService::FEATURES as $featKey)
                                                     <label class="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
                                                         <input type="checkbox" name="features[]" value="{{ $featKey }}"

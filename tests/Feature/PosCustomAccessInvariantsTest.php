@@ -17,7 +17,10 @@ use Tests\TestCase;
  *  (a) lock the sale screen / invoice APIs (billing must always work),
  *  (b) restrict the owner (company_admin / pos_admin),
  *  (c) grant confined roles (waiter/kitchen/rider/delivery/viewers) extra pages,
- *  (d) crash on a corrupt stored payload.
+ *  (d) crash on a corrupt stored payload,
+ *  (e) quietly take a grant AWAY when the feature list grows — a key added to
+ *      PosAccessService::FEATURES must arrive with a backfill migration
+ *      (Task 1391); see the "FEATURES growth guard" section at the bottom.
  *
  * Run with:
  *   APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: \
@@ -383,5 +386,138 @@ class PosCustomAccessInvariantsTest extends TestCase
 
         $resp = $this->actingAs($owner, 'pos')->get('/pos/transactions');
         $resp->assertStatus(200);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // FEATURES growth guard (Task 1391) — a newly added permission must not
+    // silently switch itself OFF for shops that already saved a set
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Feature keys that need NO backfill migration:
+     *  - everything that already existed when this guard was written, plus
+     *  - any later key that is deliberately meant to start UNTICKED on
+     *    existing sets — add it here WITH a one-line reason, so that stays a
+     *    decision somebody made instead of an accident a shop discovers.
+     */
+    private const NO_BACKFILL_REQUIRED = [
+        'dashboard',
+        'orders',
+        'products',
+        'customers',
+        'tables',
+        'kitchen',
+        'deliveries',
+        'riders',
+        'reports',
+        'tax_reports',
+        'day_close',
+        'order_cancel',
+        'returns',
+        'inventory',
+        'customize',
+        'team',
+    ];
+
+    public function test_every_new_feature_key_ships_with_a_working_backfill_migration(): void
+    {
+        $candidates = $this->customAccessMigrationFiles();
+        $unbackfilled = [];
+
+        foreach (array_diff(PosAccessService::FEATURES, self::NO_BACKFILL_REQUIRED) as $feature) {
+            $covered = false;
+            foreach ($candidates as $file) {
+                if ($this->migrationBackfills($file, $feature)) {
+                    $covered = true;
+                    break;
+                }
+            }
+            if (!$covered) {
+                $unbackfilled[] = $feature;
+            }
+        }
+
+        Schema::dropIfExists('users'); // leave no probe table behind
+
+        $this->assertSame([], array_values($unbackfilled), sprintf(
+            "New Custom Access feature key(s) [%s] have no working backfill migration.\n\n"
+            . "PosAccessService::customSet() intersects the stored JSON with FEATURES, so a key added to that list is\n"
+            . "ABSENT from every set a shop saved before the deploy: a staff member who could do the job yesterday\n"
+            . "quietly loses the button today, with no announcement.\n\n"
+            . "Convention — copy database/migrations/2026_09_04_000000_backfill_kot_reprint_custom_access.php and APPEND\n"
+            . "the new key to every non-null users.pos_custom_access set (additive + idempotent; NULL sets stay NULL so\n"
+            . "they keep following the role default, corrupt payloads are left alone). This guard RUNS the migration and\n"
+            . "checks that behaviour, so a migration that merely mentions the key does not satisfy it.\n\n"
+            . "Deliberately want the key to start unticked on existing sets? Add it to\n"
+            . "PosCustomAccessInvariantsTest::NO_BACKFILL_REQUIRED with a one-line reason.\n\n"
+            . 'Migrations checked: %s',
+            implode(', ', $unbackfilled),
+            $candidates ? implode(', ', array_map('basename', $candidates)) : '(none touch pos_custom_access)'
+        ));
+    }
+
+    public function test_backfill_exemption_list_stays_in_sync_with_the_feature_list(): void
+    {
+        $this->assertSame(
+            [],
+            array_values(array_diff(self::NO_BACKFILL_REQUIRED, PosAccessService::FEATURES)),
+            'PosCustomAccessInvariantsTest::NO_BACKFILL_REQUIRED still lists keys that PosAccessService::FEATURES no '
+            . 'longer has — drop them so the exemption list keeps describing the real tick-box set.'
+        );
+    }
+
+    /** Migration files that touch users.pos_custom_access (backfill candidates). */
+    private function customAccessMigrationFiles(): array
+    {
+        return array_values(array_filter(
+            glob(database_path('migrations/*.php')) ?: [],
+            fn ($file) => str_contains((string) file_get_contents($file), 'pos_custom_access')
+        ));
+    }
+
+    /**
+     * TRUE when running $file against a table of already-saved sets appends
+     * $feature to them. Behaviour, not text: an unrelated migration (or one
+     * that only names the key) simply returns false.
+     */
+    private function migrationBackfills(string $file, string $feature): bool
+    {
+        // Migration files are required at most once per process (a named-class
+        // migration would fatal on a second require); up() is idempotent.
+        static $loaded = [];
+        $migration = $loaded[$file] ??= require $file;
+        if (!is_object($migration) || !method_exists($migration, 'up')) {
+            return false;
+        }
+
+        Schema::dropIfExists('users');
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->text('pos_custom_access')->nullable();
+        });
+        DB::table('users')->insert([
+            ['id' => 1, 'pos_custom_access' => json_encode(['reports', 'orders'])], // saved set
+            ['id' => 2, 'pos_custom_access' => null],                               // no set = role default
+            ['id' => 3, 'pos_custom_access' => json_encode([$feature, 'reports'])], // already ticked
+            ['id' => 4, 'pos_custom_access' => 'not-json{'],                        // corrupt payload
+        ]);
+
+        try {
+            $migration->up();
+        } catch (\Throwable $e) {
+            return false; // unrelated migration (wants other tables/columns)
+        }
+
+        $stored = fn (int $id) => DB::table('users')->where('id', $id)->value('pos_custom_access');
+        $existing = json_decode((string) $stored(1), true);
+        $already = json_decode((string) $stored(3), true);
+
+        return is_array($existing)
+            && in_array($feature, $existing, true)                  // appended...
+            && array_diff(['reports', 'orders'], $existing) === []  // ...without dropping the old grants
+            && $stored(2) === null                                  // no set stays "role default"
+            && is_array($already)
+            && count(array_keys($already, $feature, true)) === 1    // idempotent — no duplicate key
+            && $stored(4) === 'not-json{';                          // corrupt payload left alone
     }
 }

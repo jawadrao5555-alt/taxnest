@@ -57,8 +57,18 @@ Output APK: `fbr-pos-app/app/build/outputs/apk/release/app-release.apk`
 ## Release checklist
 
 1. Bump `versionCode`/`versionName` in `fbr-pos-app/app/build.gradle`.
-2. Build signed APK; `apksigner verify --print-certs` must show the shared key
-   (CN=TaxNest Rider).
+2. Build the signed APK, then verify it before hosting — one command, no SDK
+   needed:
+   ```bash
+   bash scripts/apk-release-check.sh fbr-pos-app/app/build/outputs/apk/release/app-release.apk
+   ```
+   Must print **PASS**: no Play Protect blocked permission in the manifest
+   (`RECEIVE_SMS`, `READ_SMS`, `BIND_NOTIFICATION_LISTENER_SERVICE`,
+   `BIND_ACCESSIBILITY_SERVICE` — any one of them silently makes the APK
+   impossible to install from the website, the Caller ID v1.0.0 incident),
+   signature = the shared key (`CN=TaxNest Rider`), and the version matching
+   `fbr-pos-app/app/build.gradle` (a stale APK re-uses its `versionCode` and
+   never updates a phone in place).
 3. Host as a versioned BETA first:
    `scp … public_html/public/downloads/taxnest-fbr-pos-<ver>.apk`
    **NEVER GitHub Releases** (desktop agents self-update from releases/latest).

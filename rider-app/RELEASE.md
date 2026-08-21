@@ -94,10 +94,21 @@ rider-app/app/build/outputs/apk/release/app-release.apk
 
 4. **Build the APK** (see above).
 
-5. **Verify signing** — APK must be signed with the shared keystore
-   (`.local/rider-signing/rider-release.p12`, alias `rider`).
-   Losing this key = riders must uninstall + reinstall forever.
-   Backup lives on live at `~/rider-signing/` (outside public_html).
+5. **Verify the APK before it is hosted** — one command, no SDK needed:
+   ```bash
+   bash scripts/apk-release-check.sh rider-app/app/build/outputs/apk/release/app-release.apk
+   ```
+   It must print **PASS**. It fails on any of Play Protect's four blocked
+   permissions (`RECEIVE_SMS`, `READ_SMS`, `BIND_NOTIFICATION_LISTENER_SERVICE`,
+   `BIND_ACCESSIBILITY_SERVICE`) — one of those in the manifest makes the APK
+   **impossible to install from the website** (the Caller ID v1.0.0 incident,
+   found only when the owner tried it on his own phone) — on a signature that is
+   not the shared keystore (`.local/rider-signing/rider-release.p12`, alias
+   `rider`), and on a version that does not match `app/build.gradle` (a stale
+   APK re-uses its `versionCode`, so phones never update in place).
+
+   Losing that key = riders must uninstall + reinstall forever. Backup lives on
+   live at `~/rider-signing/` (outside public_html).
    **NEVER commit the keystore — repo is public.**
 
 6. **Deploy to live** (owner runs on their cPanel machine):

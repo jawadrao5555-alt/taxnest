@@ -72,7 +72,19 @@ breaks in-place updates for everything. NEVER commit it (public repo).
    `versionCode` N+1 (never reuse), `versionName "X.Y.Z"`.
 2. **Server side deployed** — push to origin (`.cpanel.yml` auto-deploys),
    `ea-php84 artisan migrate --force` on live, verify the live commit.
-3. **Build the signed APK** (above) and verify the signature is the shared key.
+3. **Build the signed APK** (above), then verify it before it leaves the box —
+   one command, no SDK needed:
+   ```bash
+   bash scripts/apk-release-check.sh pos-app/app/build/outputs/apk/release/app-release.apk
+   ```
+   Must print **PASS**: no Play Protect blocked permission in the manifest
+   (`RECEIVE_SMS`, `READ_SMS`, `BIND_NOTIFICATION_LISTENER_SERVICE`,
+   `BIND_ACCESSIBILITY_SERVICE` — any one of them silently makes the APK
+   impossible to install from the website, the Caller ID v1.0.0 incident),
+   signature = the shared `rider` key, and the version matching
+   `pos-app/app/build.gradle` (a stale APK re-uses its `versionCode` and never
+   updates a phone in place). The shell must never hit the Caller ID listener
+   exception — if it does, a feature added a blocked permission.
 4. **Host as a versioned BETA first**:
    `scp … taxnestc@cpanel.taxnest.com.pk:public_html/public/downloads/taxnest-pos-<ver>.apk`
    **NEVER GitHub Releases** — desktop agents self-update from

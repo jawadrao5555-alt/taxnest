@@ -239,41 +239,61 @@ caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk    → taxnest-
 caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk  → taxnest-caller-plus.apk
 ```
 
-### Verify before hosting (60 seconds, do not skip)
+### Verify before hosting (one command, do not skip)
+
+```bash
+bash scripts/apk-release-check.sh \
+  caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk \
+  caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk
+```
+
+This is the guard v1.0.0 did not have. Per APK it FAILS loudly on:
+
+1. **any of Play Protect's four blocked permissions** anywhere in the manifest —
+   `<uses-permission>` *and* `android:permission` on a service, which is how the
+   notification listener is declared;
+2. **a signature that is not the shared rider key** (`CN=TaxNest Rider`) — a
+   wrong key means no in-place update, every phone would have to uninstall;
+3. **a version that does not match `caller-app/app/build.gradle`** — a stale APK
+   built before the bump re-uses its `versionCode`, and a re-used `versionCode`
+   never updates a phone.
+
+It prints package + `versionName`/`versionCode` for each file and needs only
+`python3` (manifest and signing block are parsed directly — no Android SDK, so
+it also works before the SDK is re-downloaded after a container reset).
+
+**The plus build is the one allowed carrier of the listener**, so the script
+reports it as a named EXCEPTION — *"PASS WITH 1 KNOWN EXCEPTION"*, never a
+silent pass — and still FAILS if that same file is named `taxnest-caller.apk`,
+which is exactly the v1.0.0 incident. The clean `sim` build must come back with
+a plain PASS. `--strict` turns the exception into a failure; `--expect-version` /
+`--expect-code` assert the version you meant to ship.
+
+Caller-specific extras — these need the SDK's `aapt2` and the script does
+**not** cover them:
 
 ```bash
 BT=/home/runner/android-sdk/build-tools/36.0.0
 SIM=caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk
 PLUS=caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk
 
-# 1. The clean build must contain NONE of the four blocked permissions.
-$BT/aapt2 dump xmltree --file AndroidManifest.xml $SIM \
-  | grep -iE "RECEIVE_SMS|READ_SMS|BIND_NOTIFICATION_LISTENER|BIND_ACCESSIBILITY" \
-  && echo "STOP — blocked permission leaked into the clean build" || echo "clean OK"
-
-# 2. Clean build has the telephony receiver; plus build has the listener.
+# a. Clean build has the telephony receiver; plus build has the listener.
 $BT/aapt2 dump permissions $SIM     # READ_PHONE_STATE + READ_CALL_LOG expected
 $BT/aapt2 dump permissions $PLUS    # neither of those expected
 
-# 3. Both signed with the shared rider key, same package + version.
-$BT/apksigner verify --print-certs $SIM  | grep "certificate DN"   # CN=TaxNest Rider
-$BT/apksigner verify --print-certs $PLUS | grep "certificate DN"
-$BT/aapt2 dump badging $SIM  | head -1
-$BT/aapt2 dump badging $PLUS | head -1   # both: versionCode='5' versionName='1.4.0'
-
-# 3b. Language switch (Task 1382): each build's badge must exist in all three
-#     locales, and each build must show its OWN badge.
+# b. Language switch (Task 1382): each build's badge must exist in all three
+#    locales, and each build must show its OWN badge.
 $BT/aapt2 dump resources $SIM  | grep -A3 "string/build_badge"   # SIM-only wording
 $BT/aapt2 dump resources $PLUS | grep -A3 "string/build_badge"   # WhatsApp wording
-#     each: a bare "()" line (English), a "(ur)" line and a "(b+ur+Latn)" line
+#    each: a bare "()" line (English), a "(ur)" line and a "(b+ur+Latn)" line
 
-# 4. Website builds must KEEP targetSdk 34 and their self-update code —
-#    only the play flavor drops them.
+# c. Website builds must KEEP targetSdk 34 and their self-update code —
+#    only the play flavor drops them. (targetSdk is also printed by the script.)
 $BT/aapt2 dump badging $SIM  | grep targetSdkVersion    # '34'
 $BT/aapt2 dump badging $PLUS | grep targetSdkVersion    # '34'
 $BT/aapt2 dump permissions $SIM | grep REQUEST_INSTALL_PACKAGES   # must be present
 
-# 5. Call back (Task 1381) is IN both website builds…
+# d. Call back (Task 1381) is IN both website builds…
 $BT/aapt2 dump permissions $SIM  | grep FOREGROUND_SERVICE_DATA_SYNC   # present
 $BT/aapt2 dump permissions $PLUS | grep FOREGROUND_SERVICE_DATA_SYNC   # present
 
@@ -357,7 +377,9 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 1. Source changes committed.
 2. `versionCode` +1 and `versionName` bumped in `caller-app/app/build.gradle`
    (shared by all three flavors).
-3. Build both website flavors + run the verification block above.
+3. Build both website flavors, then `bash scripts/apk-release-check.sh <sim> <plus>`
+   (+ the caller-specific `aapt2` extras above). The sim APK must print PASS; the
+   plus APK must print PASS WITH 1 KNOWN EXCEPTION and nothing else.
 4. scp both APKs to live `public_html/public/downloads/`.
 5. Deploy PHP (`git push origin HEAD:main`; `.cpanel.yml` auto-deploys).
 6. **Owner phone-tests both builds** — see

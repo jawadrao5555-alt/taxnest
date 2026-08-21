@@ -133,6 +133,22 @@ class PosCallerIdController extends Controller
         return !\App\Services\PosFeatureService::planAllows($company, 'caller_id_enabled');
     }
 
+    /**
+     * Task 1380: does this DB have the cleared_at flag yet? Cached 5 min like the
+     * table-existence check (DDL never runs mid-session) so the 20-second poll
+     * doesn't hit information_schema. Missing column (prod schema drift) simply
+     * means "clearing unavailable" — the list stays read-only, nothing 500s.
+     */
+    private function clearSupported(): bool
+    {
+        return \Illuminate\Support\Facades\Cache::remember(
+            'caller_events_cleared_col',
+            300,
+            fn () => Schema::hasTable('pos_caller_events')
+                && Schema::hasColumn('pos_caller_events', 'cleared_at')
+        );
+    }
+
     // ─── Caller app API (stateless) ─────────────────────────────────────────
 
     /** POST /api/caller-app/v1/login {email, password, device?} */
@@ -419,6 +435,8 @@ class PosCallerIdController extends Controller
             ->where('company_id', $companyId)
             ->where('id', '>', $after)
             ->where('created_at', '>=', now()->subSeconds(self::EVENT_FRESH_SECONDS))
+            // Task 1380: a ring cleared on one counter must not pop on another.
+            ->when($this->clearSupported(), fn ($q) => $q->whereNull('cleared_at'))
             ->orderBy('id')
             ->limit(5)
             ->get();
@@ -469,6 +487,7 @@ class PosCallerIdController extends Controller
      * Same gating as events. Newest first, deduped display comes from the
      * DEDUPE_SECONDS collapse at ingest. Unseen counting is CLIENT-side
      * (localStorage cursor), so this endpoint is read-only.
+     * Task 1380: calls the shop has cleared are skipped (shop-wide flag).
      */
     public function recentCalls(Request $request)
     {
@@ -483,6 +502,7 @@ class PosCallerIdController extends Controller
         $rows = DB::table('pos_caller_events')
             ->where('company_id', $companyId)
             ->where('created_at', '>=', now()->subHours(24))
+            ->when($this->clearSupported(), fn ($q) => $q->whereNull('cleared_at'))
             ->orderByDesc('id')
             ->limit(30)
             ->get();
@@ -499,6 +519,49 @@ class PosCallerIdController extends Controller
         })->values();
 
         return response()->json(['enabled' => true, 'calls' => $calls]);
+    }
+
+    /**
+     * POST /pos/api/caller-clear {id?: int, all?: bool} — Task 1380.
+     *
+     * Handle ho chuki (ya test) call ko "Haaliya calls" list se hata deta hai.
+     * SHOP-wide flag: refresh ke baad bhi, aur usi shop ke doosre counter par
+     * bhi wapas nahi aati. Rows delete NAHI hotin — ring retention purge hi
+     * unka malik hai — sirf cleared_at stamp hota hai, is liye nayi ring aane
+     * ka poll/cursor bilkul pehle jaisa chalta rehta hai.
+     *
+     * Boundary: koi bhi signed-in POS user (call counter par cashier hi handle
+     * karta hai) — yeh sale-screen ka rozana ka kaam hai, settings ka nahi.
+     */
+    public function clearCalls(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company || !($company->caller_id_enabled ?? false)
+            || $this->planLocked($company)
+            || !Schema::hasTable('pos_caller_events')) {
+            return response()->json(['ok' => false, 'error' => 'disabled'], 403);
+        }
+        if (!$this->clearSupported()) {
+            // Schema drift: column abhi nahi hai — 500 ke bajaye saaf jawab.
+            return response()->json(['ok' => false, 'error' => 'unsupported']);
+        }
+
+        $all = $request->boolean('all');
+        $id = (int) $request->input('id', 0);
+        if (!$all && $id <= 0) {
+            return response()->json(['ok' => false, 'error' => 'empty'], 422);
+        }
+
+        $query = DB::table('pos_caller_events')
+            ->where('company_id', $companyId)
+            ->whereNull('cleared_at');
+        if (!$all) {
+            $query->where('id', $id);
+        }
+        $cleared = (int) $query->update(['cleared_at' => now()]);
+
+        return response()->json(['ok' => true, 'cleared' => $cleared]);
     }
 
     /**

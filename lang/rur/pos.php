@@ -5012,6 +5012,14 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_dev_offline' => 'Offline',
     'caller_dev_revoke' => 'Hatao',
     'caller_dev_revoke_confirm' => 'Is phone ko unpair karein? Calls bhejne ke liye dobara login karna hoga.',
+    // Task 1380 — attached customer / handled call hatana
+    'ti_remove_customer' => 'Is customer ko bill se hatayein',
+    'customer_removed' => 'Customer bill se hata diya',
+    'caller_clear_call' => 'Yeh call list se hatayein',
+    'caller_clear_all' => 'Sab hatayein',
+    'caller_clear_all_q' => 'List se saari calls hata dein? Nai calls phir bhi aati rahengi.',
+    'caller_cleared' => 'Calls hata di gayin',
+    'caller_clear_failed' => 'Hataya nahi ja saka — dobara koshish karein.',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',

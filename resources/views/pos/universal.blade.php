@@ -1503,6 +1503,19 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                     </div>
+                    {{-- Task 1380 (owner video, Aug 2026): attached customer ko YAHIN se
+                         hatane ka rasta. Pehle clear ka ✕ sirf products column ke customer
+                         search box par tha, is liye call se bana customer is card par
+                         chipka reh jata tha (Takeaway/Dine In par switch karne se bhi).
+                         Delivery-address wale ✕ se alag pehchan: yeh card ke UPAR-DAAYEN
+                         kone par gol bordered button hai (address ka ✕ neeche dropdown ki
+                         qatar mein, red) — aur yeh poora customer record hatata hai.
+                         Card .tn-cart-main ke andar hai, is liye dono layouts (grid ON
+                         aur products-OFF wide cart) mein wahin dikhta hai. --}}
+                    <button type="button" @click="clearAttachedCustomer()" title="{{ __('pos.ti_remove_customer') }}" aria-label="{{ __('pos.ti_remove_customer') }}"
+                            class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-blue-500 dark:text-blue-300 bg-white/70 dark:bg-gray-900/40 border border-blue-200 dark:border-blue-800 hover:bg-red-500 hover:text-white hover:border-red-500 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
             </template>
 
@@ -4033,6 +4046,9 @@ window.addEventListener('popstate', function() {
         <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
             <div class="flex items-center gap-2 px-4 py-2.5 bg-sky-600 text-white">
                 <span class="text-xs font-extrabold">{{ __('pos.caller_log_title') }}</span>
+                {{-- Task 1380: test + purani calls 24 ghante list mein padi rehti thin.
+                     "Sab hatayen" poori list ko cleared mark karta hai (shop-wide). --}}
+                <button type="button" x-show="callerLog.length > 0" x-cloak @click="clearAllCallerEvents()" class="ml-auto flex-shrink-0 px-2 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[10px] font-bold transition" title="{{ __('pos.caller_clear_all') }}">{{ __('pos.caller_clear_all') }}</button>
                 <button type="button" @click="showCallerLog = false" class="ml-auto flex-shrink-0 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition" title="{{ __('pos.close') }}">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -4050,6 +4066,11 @@ window.addEventListener('popstate', function() {
                             </p>
                         </div>
                         <button type="button" @click="callerBillFrom(ev); showCallerLog = false" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold transition">{{ __('pos.caller_make_bill_short') }}</button>
+                        {{-- Task 1380: handle ho chuki call ko list se hatao (server par
+                             cleared mark — refresh aur doosre counter par bhi saaf). --}}
+                        <button type="button" @click="clearCallerEvent(ev)" title="{{ __('pos.caller_clear_call') }}" aria-label="{{ __('pos.caller_clear_call') }}" class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-red-500 transition">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
                     </div>
                 </template>
             </div>
@@ -8644,6 +8665,21 @@ function restaurantPos() {
             finally { this.savingCustomer = false; }
         },
 
+        // Task 1380: cart card ka ✕ — ek click mein caller/customer ka poora
+        // nishan saaf. clearCustomerInput() customer, stats, search text, inline
+        // new-customer fields aur saved addresses (+ chuna hua delivery address)
+        // le jata hai; yahan uske sath wo delivery state bhi reset hoti hai jo
+        // caller flow ne khadi ki thi — delivery-charge line (synthetic manual
+        // fee row, koi bika hua item nahi) aur prepaid toggle. Cart ke asli
+        // items aur order type ko haath nahi lagta.
+        clearAttachedCustomer() {
+            const had = !!this.selectedCustomer;
+            this.clearCustomerInput();
+            this.removeDeliveryCharge();
+            this.deliveryPrepaid = false;
+            if (had) { this.showToast(window.TXT.customer_removed, 'info'); }
+        },
+
         clearCustomerInput() {
             this.customerPhoneQuery = '';
             this.customerPhoneResults = [];
@@ -11263,6 +11299,9 @@ function restaurantPos() {
         // v2: recent-calls panel — opening it clears the unseen badge (cursor).
         openCallerLog() {
             this.showCallerLog = true;
+            this.loadCallerLog();
+        },
+        loadCallerLog() {
             this.callerLogLoading = true;
             this.callerLog = [];
             fetch('{{ route('pos.api.caller-recent', [], false) }}', { headers: { 'Accept': 'application/json' } })
@@ -11276,6 +11315,51 @@ function restaurantPos() {
                 })
                 .catch(() => {})
                 .finally(() => { this.callerLogLoading = false; });
+        },
+        // ── Task 1380: handled call ko list se hatana ─────────────────────────
+        // Row foran ghayab (optimistic) + server par cleared_at stamp, taake
+        // refresh par aur usi shop ke doosre counter par bhi na dikhe. Rings ka
+        // poll/cursor waise ka waisa — nai call pehle ki tarah popup + list mein.
+        clearCallerEvent(ev) {
+            const id = ev && (parseInt(ev.id, 10) || 0);
+            if (!id) { return; }
+            this.callerLog = this.callerLog.filter(c => (parseInt(c.id, 10) || 0) !== id);
+            // Wohi ring agar abhi popup/queue mein hai to wahan se bhi jaye.
+            this.callerQueue = this.callerQueue.filter(c => (parseInt(c.id, 10) || 0) !== id);
+            if (this.callerPopup && (parseInt(this.callerPopup.id, 10) || 0) === id) { this.dismissCallerPopup(); }
+            this.callerUnseen = this.callerLog.filter(c => (parseInt(c.id, 10) || 0) > this.callerSeenId).length;
+            this.postCallerClear({ id: id });
+        },
+        clearAllCallerEvents() {
+            if (this.callerLog.length === 0) { return; }
+            if (!confirm(window.TXT.caller_clear_all_q)) { return; }
+            this.callerLog = [];
+            this.callerQueue = [];
+            if (this.callerPopup) { this.dismissCallerPopup(); }
+            this.callerUnseen = 0;
+            this.postCallerClear({ all: true }, true);
+        },
+        // Server hi sach hai: clear fail ho to list dobara load kar ke asli
+        // haalat dikhao (warna cashier ko lagta hai call hat gayi).
+        postCallerClear(body, toastOnSuccess) {
+            fetch('{{ route('pos.api.caller-clear', [], false) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                body: JSON.stringify(body),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.ok) {
+                        if (toastOnSuccess) { this.showToast(window.TXT.caller_cleared, 'success'); }
+                        return;
+                    }
+                    this.showToast(window.TXT.caller_clear_failed, 'error');
+                    this.loadCallerLog();
+                })
+                .catch(() => {
+                    this.showToast(window.TXT.caller_clear_failed, 'error');
+                    this.loadCallerLog();
+                });
         },
         // v2: boot-time unseen count (badge survives reloads without waiting
         // for fresh rings) — one cheap fetch, then the poll increments.

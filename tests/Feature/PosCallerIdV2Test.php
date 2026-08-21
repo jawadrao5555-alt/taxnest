@@ -26,6 +26,9 @@ use Tests\TestCase;
  *      the devices table exists.
  *   3. Device revoke is admin-only (cashier 403, no delete).
  *   4. caller-recent: last-24h rows only, plan-locked → enabled:false.
+ *   4b. caller-clear (Task 1380): a cleared ring leaves the recent list AND the
+ *       poll for EVERY counter of that shop, uncleared rings survive, and the
+ *       ring cursor keeps moving so the next call still arrives.
  *   5. caller-last-order: last completed bill's product lines; deal/manual
  *      lines reported as skipped; disabled/plan-locked → 403.
  *   6. matchCustomer surfaces khata_balance as an int.
@@ -104,6 +107,7 @@ class PosCallerIdV2Test extends TestCase
             $t->string('caller_name')->nullable();
             $t->string('source')->default('sim');
             $t->timestamp('ring_at')->nullable();
+            $t->timestamp('cleared_at')->nullable();
             $t->timestamp('created_at')->nullable();
         });
         Schema::create('pos_customers', function (Blueprint $t) {
@@ -317,6 +321,97 @@ class PosCallerIdV2Test extends TestCase
         $data = $this->posGet('recentCalls')->getData(true);
         $this->assertFalse($data['enabled']);
         $this->assertSame([], $data['calls']);
+    }
+
+    // ─── 2b. Clearing handled calls (Task 1380) ──────────────────────────────
+
+    private function posPost(string $method, array $body = []): \Illuminate\Http\JsonResponse
+    {
+        $request = Request::create('/pos/api/caller-clear', 'POST', $body);
+        $request->setLaravelSession(app('session.store'));
+        app()->instance('request', $request);
+        return app(PosCallerIdController::class)->{$method}($request);
+    }
+
+    public function test_cleared_call_leaves_the_list_and_the_poll_but_new_rings_still_arrive(): void
+    {
+        $company = $this->makeCompany();
+        app()->instance('currentCompanyId', (int) $company->id);
+        $this->makeUser((int) $company->id, 'pos_cashier', 'cash@shop.test'); // cashier may clear
+
+        $handled = DB::table('pos_caller_events')->insertGetId([
+            'company_id' => $company->id, 'phone' => '923001112223', 'source' => 'sim',
+            'ring_at' => now(), 'created_at' => now(),
+        ]);
+        $other = DB::table('pos_caller_events')->insertGetId([
+            'company_id' => $company->id, 'phone' => '923004445556', 'source' => 'sim',
+            'ring_at' => now(), 'created_at' => now(),
+        ]);
+
+        $res = $this->posPost('clearCalls', ['id' => $handled])->getData(true);
+        $this->assertTrue($res['ok']);
+        $this->assertSame(1, $res['cleared']);
+
+        // Row kept (retention purge owns deletion), just flagged.
+        $this->assertNotNull(DB::table('pos_caller_events')->where('id', $handled)->value('cleared_at'));
+
+        // Gone from the list on EVERY counter; the untouched ring survives.
+        $calls = $this->posGet('recentCalls')->getData(true)['calls'];
+        $this->assertSame([$other], array_map(fn ($c) => (int) $c['id'], $calls));
+
+        // Gone from the popup poll too — but the cursor still advances past it,
+        // so a fresh ring after the cleared one is delivered normally.
+        $poll = $this->posGet('events', ['after' => 0])->getData(true);
+        $this->assertSame([$other], array_map(fn ($e) => (int) $e['id'], $poll['events']));
+        $this->assertSame($other, (int) $poll['last_id']);
+
+        $fresh = DB::table('pos_caller_events')->insertGetId([
+            'company_id' => $company->id, 'phone' => '923007778889', 'source' => 'sim',
+            'ring_at' => now(), 'created_at' => now(),
+        ]);
+        $poll = $this->posGet('events', ['after' => $other])->getData(true);
+        $this->assertSame([$fresh], array_map(fn ($e) => (int) $e['id'], $poll['events']));
+    }
+
+    public function test_clear_all_empties_the_list_and_is_company_scoped(): void
+    {
+        $company = $this->makeCompany();
+        $otherShop = $this->makeCompany(['name' => 'Other Shop']);
+        app()->instance('currentCompanyId', (int) $company->id);
+        $this->makeUser((int) $company->id);
+
+        DB::table('pos_caller_events')->insert([
+            ['company_id' => $company->id, 'phone' => '92300111', 'source' => 'sim', 'ring_at' => now(), 'created_at' => now()],
+            ['company_id' => $company->id, 'phone' => '92300222', 'source' => 'sim', 'ring_at' => now(), 'created_at' => now()],
+            ['company_id' => $otherShop->id, 'phone' => '92300333', 'source' => 'sim', 'ring_at' => now(), 'created_at' => now()],
+        ]);
+
+        $res = $this->posPost('clearCalls', ['all' => true])->getData(true);
+        $this->assertSame(2, $res['cleared']);
+        $this->assertSame([], $this->posGet('recentCalls')->getData(true)['calls']);
+        // Another shop's ring is untouched.
+        $this->assertNull(DB::table('pos_caller_events')->where('company_id', $otherShop->id)->value('cleared_at'));
+
+        // Nothing to clear / no target → no silent success.
+        $this->assertSame(422, $this->posPost('clearCalls', [])->getStatusCode());
+    }
+
+    public function test_clear_is_refused_when_caller_id_is_off_or_plan_locked(): void
+    {
+        $company = $this->makeCompany(['caller_id_enabled' => false]);
+        app()->instance('currentCompanyId', (int) $company->id);
+        $this->makeUser((int) $company->id);
+        $id = DB::table('pos_caller_events')->insertGetId([
+            'company_id' => $company->id, 'phone' => '92300111', 'source' => 'sim',
+            'ring_at' => now(), 'created_at' => now(),
+        ]);
+
+        $this->assertSame(403, $this->posPost('clearCalls', ['id' => $id])->getStatusCode());
+
+        DB::table('companies')->where('id', $company->id)->update(['caller_id_enabled' => true]);
+        $this->lockPlan(Company::findOrFail($company->id));
+        $this->assertSame(403, $this->posPost('clearCalls', ['id' => $id])->getStatusCode());
+        $this->assertNull(DB::table('pos_caller_events')->where('id', $id)->value('cleared_at'));
     }
 
     // ─── 3. Repeat last order + khata ────────────────────────────────────────

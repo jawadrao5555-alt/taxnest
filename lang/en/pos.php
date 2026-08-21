@@ -5014,6 +5014,14 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'caller_dev_offline' => 'Offline',
     'caller_dev_revoke' => 'Remove',
     'caller_dev_revoke_confirm' => 'Unpair this phone? It will need to sign in again to send calls.',
+    // Task 1380 — clearing an attached customer / a handled call
+    'ti_remove_customer' => 'Remove this customer from the bill',
+    'customer_removed' => 'Customer removed from the bill',
+    'caller_clear_call' => 'Clear this call from the list',
+    'caller_clear_all' => 'Clear all',
+    'caller_clear_all_q' => 'Clear all calls from this list? New calls will still arrive.',
+    'caller_cleared' => 'Calls cleared',
+    'caller_clear_failed' => 'Could not clear — please try again.',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',

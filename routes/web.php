@@ -926,6 +926,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Caller ID (Task 1039): sale-screen popup poll — fresh ring events + customer match.
     Route::get('/api/caller-events', [\App\Http\Controllers\PosCallerIdController::class, 'events'])->name('pos.api.caller-events');
     Route::get('/api/caller-recent', [\App\Http\Controllers\PosCallerIdController::class, 'recentCalls'])->name('pos.api.caller-recent');
+    // Task 1380: handle ho chuki call(en) recent-calls list se hatana (shop-wide).
+    Route::post('/api/caller-clear', [\App\Http\Controllers\PosCallerIdController::class, 'clearCalls'])->name('pos.api.caller-clear');
     Route::get('/api/caller-last-order', [\App\Http\Controllers\PosCallerIdController::class, 'lastOrder'])->name('pos.api.caller-last-order');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
     Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');

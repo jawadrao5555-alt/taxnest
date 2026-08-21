@@ -5009,6 +5009,14 @@ return [
     'caller_dev_offline' => 'غیر جڑا',
     'caller_dev_revoke' => 'ہٹائیں',
     'caller_dev_revoke_confirm' => 'اس فون کو الگ کریں؟ کالیں بھیجنے کے لیے دوبارہ لاگ اِن کرنا ہوگا۔',
+    // Task 1380 — گاہک / کال ہٹانا
+    'ti_remove_customer' => 'اس گاہک کو بل سے ہٹائیں',
+    'customer_removed' => 'گاہک بل سے ہٹا دیا گیا',
+    'caller_clear_call' => 'یہ کال فہرست سے ہٹائیں',
+    'caller_clear_all' => 'سب ہٹائیں',
+    'caller_clear_all_q' => 'فہرست سے تمام کالیں ہٹا دیں؟ نئی کالیں پھر بھی آتی رہیں گی۔',
+    'caller_cleared' => 'کالیں ہٹا دی گئیں',
+    'caller_clear_failed' => 'ہٹایا نہیں جا سکا — دوبارہ کوشش کریں۔',
 
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'واٹس ایپ بل',

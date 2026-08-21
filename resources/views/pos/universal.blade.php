@@ -5318,14 +5318,18 @@ function restaurantPos() {
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
             setTimeout(() => this._startAutoSync(), 4000);
-            // ── Caller ID (Task 1039): light 7s poll, feature-gated, paused
-            // while the tab is hidden. Cursor survives reloads via localStorage
-            // so an already-shown ring never re-alerts after a refresh.
+            // ── Caller ID (Task 1039): ADAPTIVE poll, feature-gated, paused
+            // while the tab is hidden. A flat 7 s tick meant a ring surfaced up
+            // to 7 s late (owner: "2-3 second ka gap"), so the chain now runs at
+            // 1.5 s WHILE a paired phone is online and falls back to 7 s when no
+            // phone is connected — no ring can arrive then, so there is nothing
+            // to hurry for. Self-scheduling (see scheduleCallerPoll), not
+            // setInterval. Cursor survives reloads via localStorage so an
+            // already-shown ring never re-alerts after a refresh.
             if (this.callerIdOn) {
                 try { this.callerLastId = parseInt(localStorage.getItem('tn_caller_last_id') || '0', 10) || 0; } catch (e) {}
                 try { this.callerSeenId = parseInt(localStorage.getItem('tn_caller_seen_id') || '0', 10) || 0; } catch (e) {}
-                setTimeout(() => this.pollCallerEvents(), 2500);
-                setInterval(() => { if (!document.hidden) this.pollCallerEvents(); }, 7000);
+                setTimeout(() => this.pollCallerEvents(), 1500);
                 // v2: unseen badge survives reloads — one boot fetch counts the
                 // last-24h calls newer than the cashier's seen-cursor.
                 setTimeout(() => this.refreshCallerUnseen(), 4000);
@@ -11305,8 +11309,16 @@ function restaurantPos() {
                 || !!this.tableSwitchPrompt || this.submitting;
         },
         async pollCallerEvents() {
-            if (this._callerBusy) { return; }
+            // Self-scheduling chain: EVERY exit path must re-arm, otherwise one
+            // stuck request silently ends caller polling for the whole shift.
+            if (this._callerBusy) {
+                // In-flight for over 20 s = dead request; release the lock so
+                // the chain heals instead of going quiet forever.
+                if (Date.now() - (this._callerBusyAt || 0) > 20000) { this._callerBusy = false; }
+                else { this.scheduleCallerPoll(); return; }
+            }
             this._callerBusy = true;
+            this._callerBusyAt = Date.now();
             try {
                 const res = await fetch('/pos/api/caller-events?after=' + (this.callerLastId || 0), { headers: { 'Accept': 'application/json' } });
                 if (res.ok) {
@@ -11330,6 +11342,9 @@ function restaurantPos() {
                             this.callerLastId = lid;
                             try { localStorage.setItem('tn_caller_last_id', String(lid)); } catch (e) {}
                         }
+                        // Cadence follows the phone: online → 1.5 s ticks so the
+                        // popup is near-instant, offline → back to 7 s.
+                        this._callerFast = (data.online !== false);
                         // v2: one-time offline warning — feature ON but no paired
                         // phone has contacted the server recently.
                         if (data.online === false && !this._callerWarnedOffline) {
@@ -11340,11 +11355,23 @@ function restaurantPos() {
                         // Task 1397: feature beech shift mein band ya plan lock
                         // ho jaye to badge bhi ghayab — purani ginti chipki na reh jaye.
                         this.callerPending = 0;
+                        this._callerFast = false;
                     }
                 }
             } catch (e) {}
             this._callerBusy = false;
+            this.scheduleCallerPoll();
             this.maybeShowCallerPopup();
+        },
+        // Arms the next caller poll: 1.5 s while a paired phone is online, 7 s
+        // otherwise. clearTimeout first — a manual call must never leave two
+        // chains ticking. A hidden tab skips the fetch but keeps the chain alive.
+        scheduleCallerPoll() {
+            clearTimeout(this._callerPollTimer);
+            this._callerPollTimer = setTimeout(() => {
+                if (document.hidden) { this.scheduleCallerPoll(); return; }
+                this.pollCallerEvents();
+            }, this._callerFast ? 1500 : 7000);
         },
         maybeShowCallerPopup() {
             if (this.callerPopup || this.callerQueue.length === 0 || this.callerBlocked()) { return; }

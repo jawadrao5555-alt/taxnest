@@ -55,6 +55,9 @@ class FbrPosCustomerController extends Controller
                 $w->where('name', 'like', $like)
                     ->orWhere('phone', 'like', $like)
                     ->orWhere('email', 'like', $like)
+                    // PRA parity: pata list par nazar aata hai to search bhi
+                    // usay dekhe — gali/mohalla se customer milna chahiye.
+                    ->orWhere('address', 'like', $like)
                     ->orWhere('city', 'like', $like)
                     ->orWhere('cnic', 'like', $like)
                     ->orWhere('ntn', 'like', $like);

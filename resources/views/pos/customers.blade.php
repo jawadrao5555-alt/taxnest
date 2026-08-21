@@ -123,7 +123,10 @@
                         <th class="px-4 py-3">{{ __('pos.customer_word') }}</th>
                         <th class="px-4 py-3 hidden sm:table-cell">{{ __('pos.phone_label') }}</th>
                         <th class="px-4 py-3 hidden lg:table-cell">{{ __('pos.email_label') }}</th>
-                        <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.city_label') }}</th>
+                        {{-- Owner (21 Aug 2026): naam aur phone to the, pata nahi tha.
+                             City ka column ab PATA dikhata hai, sheher uske neeche
+                             chhoti line mein — column ginti wahi rehti hai. --}}
+                        <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.address_label') }}</th>
                         <th class="px-4 py-3 text-center hidden sm:table-cell">{{ __('pos.type_label') }}</th>
                         <th class="px-4 py-3 text-center hidden sm:table-cell">{{ __('pos.status_col') }}</th>
                         @if(!($isCashier ?? false))
@@ -134,7 +137,7 @@
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($customers as $customer)
                     <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="custRow({{ (int) $customer->id }})"
-                        data-search="{{ Str::lower(trim(($customer->name ?? '') . ' ' . ($customer->phone ?? '') . ' ' . ($customer->email ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->cnic ?? '') . ' ' . ($customer->ntn ?? ''))) }}">
+                        data-search="{{ Str::lower(trim(($customer->name ?? '') . ' ' . ($customer->phone ?? '') . ' ' . ($customer->email ?? '') . ' ' . ($customer->address ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->cnic ?? '') . ' ' . ($customer->ntn ?? ''))) }}">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
                             {{ $customer->name }}
                             {{-- Task 1161: khamosh-repeat chip — same PosRepeatCustomerAlert service as the dashboard card. --}}
@@ -145,7 +148,20 @@
                         </td>
                         <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ $customer->phone ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $customer->email ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $customer->city ?? '—' }}</td>
+                        @php
+                            $addrTxt = trim((string) ($customer->address ?? ''));
+                            $cityTxt = trim((string) ($customer->city ?? ''));
+                        @endphp
+                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">
+                            @if($addrTxt !== '')
+                                {{-- inline max-width: arbitrary Tailwind classes need a fresh build --}}
+                                <div class="truncate" style="max-width:240px" title="{{ $addrTxt }}">{{ $addrTxt }}</div>
+                            @endif
+                            @if($cityTxt !== '')
+                                <div class="text-xs text-gray-400">{{ $cityTxt }}</div>
+                            @endif
+                            @if($addrTxt === '' && $cityTxt === ''){{ '—' }}@endif
+                        </td>
                         <td class="px-4 py-3 text-center hidden sm:table-cell">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->type === 'registered' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">{{ $customer->type === 'registered' ? __('pos.registered') : __('pos.unregistered') }}</span>
                         </td>

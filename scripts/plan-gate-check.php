@@ -454,6 +454,143 @@ try {
     } else {
         bad('fbrpos Starter/Business/Trial rows missing — cannot run functional fbrpos checks');
     }
+
+    // ── 8. FBR POS comparison table (Task 1383) ─────────────────────────
+    //       Same contract as the PRA table in section 6: the ladders below are
+    //       written here independently of FbrPosPlanComparisonService, so a
+    //       hand-edited plan row, a renamed column or a new unnamed FBR gate
+    //       blocks the deploy instead of quietly publishing a promise the FBR
+    //       gates do not keep.
+    $FBR_BILL_LADDER    = ['Starter' => 500, 'Business' => 2000, 'Pro' => 'Unlimited'];
+    $FBR_TEAM_LADDER    = ['Starter' => 1,   'Business' => 3,    'Pro' => 'Unlimited'];
+    $FBR_BRANCH_LADDER  = ['Starter' => 1,   'Business' => 2,    'Pro' => 'Unlimited'];
+    $FBR_COUNTER_LADDER = ['Starter' => 1,   'Business' => 3,    'Pro' => 'Unlimited'];
+    // Products stay CAPPED on FBR POS. PRA POS went unlimited in Aug 2026
+    // (section 6 asserts that); the fbrpos rows deliberately did not follow.
+    $FBR_PRODUCT_LADDER = ['Starter' => 100, 'Business' => 500,  'Pro' => 'Unlimited'];
+
+    $fbrFeatureColumns = array_column(\App\Services\FbrPosPlanComparisonService::FEATURE_ROWS, 'column');
+    $fbrFeatureKeys    = array_keys(\App\Services\FbrPosPlanComparisonService::FEATURE_ROWS);
+
+    // The strict-gating matrix above must stay inside the table's own gate
+    // list, or the table would quietly stop covering a column this file pins.
+    foreach ($fbrGateCols as $col) {
+        check(in_array($col, \App\Services\FbrPosPlanComparisonService::GATE_COLUMNS, true),
+            "fbr comparison: gate column '{$col}' is asserted above but missing from "
+            . 'FbrPosPlanComparisonService::GATE_COLUMNS.');
+    }
+
+    $fbrExpectedLimits = [];
+    $fbrExpectedFeatures = [];
+    foreach ($FBR_MATRIX as $name => $row) {
+        if ($name === 'Trial') {
+            continue; // the table shows PAID packages only
+        }
+        $fbrExpectedLimits[$name] = [
+            'bills'    => $FBR_BILL_LADDER[$name],
+            'team'     => $FBR_TEAM_LADDER[$name],
+            'branches' => $FBR_BRANCH_LADDER[$name],
+            'counters' => $FBR_COUNTER_LADDER[$name],
+            'products' => $FBR_PRODUCT_LADDER[$name],
+        ];
+        $expected = [];
+        foreach ($fbrGateCols as $i => $gateCol) {
+            // gate column → comparison row key (inventory has no tick/cross
+            // row — it is "included in every package").
+            $rowIndex = array_search($gateCol, $fbrFeatureColumns, true);
+            if ($rowIndex === false) { continue; }
+            $expected[$fbrFeatureKeys[$rowIndex]] = $row[$i + 1]; // $row[0] is the price
+        }
+        $fbrExpectedFeatures[$name] = $expected;
+    }
+
+    $fbrComparisonPlans = \App\Services\FbrPosPlanComparisonService::plans();
+    check($fbrComparisonPlans->count() === count($fbrExpectedLimits),
+        'fbr comparison: expected ' . count($fbrExpectedLimits) . ' paid FBR POS packages, got '
+        . $fbrComparisonPlans->count());
+
+    // The product cap is a SELLING POINT of the upgrade, so it has to stay a
+    // real cap — an accidental -1 on Starter/Business would make the table
+    // print "Unlimited" and quietly hand away the ladder.
+    foreach ($fbrComparisonPlans as $p) {
+        if (($FBR_PRODUCT_LADDER[$p->name] ?? null) === 'Unlimited') { continue; }
+        check(!\App\Services\FbrPosPlanComparisonService::isUnlimited($p->max_products),
+            "fbr comparison: {$p->name} must keep a product cap, got " . var_export($p->max_products, true));
+    }
+
+    foreach (\App\Services\FbrPosPlanComparisonService::audit($fbrComparisonPlans, $fbrExpectedLimits, $fbrExpectedFeatures) as $problem) {
+        bad('fbr comparison: ' . $problem);
+    }
+
+    // The gate the FBR panel enforces must return the number the table prints.
+    foreach ($fbrComparisonPlans as $p) {
+        $want = $FBR_TEAM_LADDER[$p->name] ?? null;
+        $got = PlanLimitService::teamAccountLimit(\App\Models\PricingPlan::find($p->id));
+        check(($want === 'Unlimited' ? $got === null : $got === $want),
+            "fbr comparison: PlanLimitService::teamAccountLimit({$p->name}) expected " . var_export($want, true)
+            . ', got ' . var_export($got, true));
+    }
+
+    // ── 9. Digital Invoice comparison table (Task 1383) ─────────────────
+    //       DI has no boolean gate COLUMNS: its premium tier is the name-keyed
+    //       DiFeatureService::PLAN_FEATURES matrix, so the ticks are pinned by
+    //       gate key here and the limits by column, both written independently
+    //       of DiPlanComparisonService.
+    $DI_INVOICE_LADDER = ['Retail' => 100, 'Business' => 700, 'Industrial' => 2500,
+                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
+    // Seats: the TIGHTER of user_limit (canAddUser) and max_users
+    // (plan.limit:users) — both guard POST /company/users.
+    $DI_USER_LADDER    = ['Retail' => 2, 'Business' => 5, 'Industrial' => 15,
+                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
+    $DI_BRANCH_LADDER  = ['Retail' => 1, 'Business' => 3, 'Industrial' => 'Unlimited',
+                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
+    // KNOWN ODDITY, pinned on purpose so it cannot spread: Business is the only
+    // DI row carrying a max_products cap, so a cheaper Retail account may hold
+    // MORE products. Changing the ladder is an owner pricing call, not a deploy
+    // fix — until then the table prints it honestly and this line freezes it.
+    $DI_PRODUCT_LADDER = ['Retail' => 'Unlimited', 'Business' => 500, 'Industrial' => 'Unlimited',
+                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
+    $DI_GATE_MATRIX = [
+        'Retail'     => [],
+        'Business'   => ['recurring_invoices'],
+        'Industrial' => ['recurring_invoices'],
+        'Enterprise' => ['recurring_invoices'],
+        'Premium'    => ['recurring_invoices', 'white_label', 'ai_reader', 'public_api'],
+    ];
+
+    // A brand-new DI gate must be pinned here too, not just named in the table.
+    foreach (\App\Services\DiFeatureService::GATES as $gate) {
+        $pinned = false;
+        foreach ($DI_GATE_MATRIX as $granted) {
+            if (in_array($gate, $granted, true)) { $pinned = true; break; }
+        }
+        check($pinned, "di comparison: gate '{$gate}' is not pinned by any package in this file's matrix.");
+    }
+
+    $diExpectedLimits = [];
+    $diExpectedFeatures = [];
+    foreach ($DI_GATE_MATRIX as $name => $granted) {
+        $diExpectedLimits[$name] = [
+            'invoices' => $DI_INVOICE_LADDER[$name],
+            'users'    => $DI_USER_LADDER[$name],
+            'branches' => $DI_BRANCH_LADDER[$name],
+            'products' => $DI_PRODUCT_LADDER[$name],
+        ];
+        $expected = [];
+        foreach (\App\Services\DiPlanComparisonService::FEATURE_ROWS as $rowKey => $spec) {
+            $expected[$rowKey] = in_array($spec['gate'], $granted, true);
+        }
+        $diExpectedFeatures[$name] = $expected;
+    }
+
+    $diComparisonPlans = \App\Services\DiPlanComparisonService::plans();
+    check($diComparisonPlans->count() === count($diExpectedLimits),
+        'di comparison: expected ' . count($diExpectedLimits) . ' paid DI packages, got '
+        . $diComparisonPlans->count());
+
+    foreach (\App\Services\DiPlanComparisonService::audit($diComparisonPlans, $diExpectedLimits, $diExpectedFeatures) as $problem) {
+        bad('di comparison: ' . $problem);
+    }
 } catch (\Throwable $e) {
     DB::rollBack();
     fwrite(STDERR, 'ERROR: check crashed: ' . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n");

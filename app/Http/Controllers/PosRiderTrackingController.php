@@ -1240,6 +1240,16 @@ class PosRiderTrackingController extends Controller
     // delivered next day) — excluded from the average so they don't poison it.
     private const REPORT_MAX_DELIVERY_MINUTES = 24 * 60;
 
+    // Task #1402: how the day's route reached us — live, or out of the phone's
+    // offline buffer. Share of late points decides the plain-wording verdict.
+    private const REPORT_LATE_LOW_PCT = 25;   // below this = "mostly live"
+    private const REPORT_LATE_HIGH_PCT = 75;  // at/above this = "almost all late"
+    // Worst fix→arrival delay worth printing (same 2-min rule the live map uses
+    // before it shows "location taken :min min earlier").
+    private const REPORT_LAG_MIN_SECS = 120;
+    // Below this the delay reads in minutes; at/above it, in hours.
+    private const REPORT_LAG_HOUR_SECS = 90 * 60;
+
     /**
      * GET /pos/riders/report — per-rider, per-day performance report.
      * Same Unlimited gates + locked-card upsell as the tracking page.
@@ -1287,6 +1297,10 @@ class PosRiderTrackingController extends Controller
         $movement = $this->movementStats($companyId, $from, $to);
         $delivery = $this->deliveryStats($companyId, $from, $to);
 
+        // Task #1402: the refusal reason lives on pos_riders (latest one only).
+        $hasRejectCols = Schema::hasColumn('pos_riders', 'last_reject_reason')
+            && Schema::hasColumn('pos_riders', 'last_reject_at');
+
         $rows = [];
         foreach (PosRider::where('company_id', $companyId)->orderBy('name')->get() as $r) {
             $m = $movement[$r->id] ?? null;
@@ -1294,6 +1308,7 @@ class PosRiderTrackingController extends Controller
             if (!$r->is_active && !$m && !$d) {
                 continue; // inactive rider with zero activity in the window
             }
+            $reject = $hasRejectCols ? $this->rejectInWindow($r, $from, $to) : null;
             $rows[] = [
                 'rider'        => $r,
                 'km'           => $m ? round($m['km'], 1) : 0.0,
@@ -1301,6 +1316,11 @@ class PosRiderTrackingController extends Controller
                 'days_active'  => $m['days_active'] ?? 0,
                 'delivered'    => $d['delivered'] ?? 0,
                 'avg_minutes'  => $d['avg_minutes'] ?? null,
+                // Task #1402: how the route arrived (live vs offline buffer),
+                // and the last upload the server refused inside this window.
+                'sync'           => $this->syncSummary($m),
+                'reject_reason'  => $reject['reason'] ?? null,
+                'reject_at'      => $reject['at'] ?? null,
             ];
         }
 
@@ -1316,7 +1336,87 @@ class PosRiderTrackingController extends Controller
             // Avg column renders only when both stamps exist (PROD schema drift).
             'hasDeliveryStamps' => Schema::hasColumn('pos_transactions', 'rider_assigned_at')
                 && Schema::hasColumn('pos_transactions', 'delivered_at'),
+            // Refused-upload column likewise (Task #1402 columns may be missing
+            // on a drifted live schema — the rest of the report still renders).
+            'hasRejectCols' => $hasRejectCols,
         ]);
+    }
+
+    /**
+     * Task #1402: the last refused upload, but only when it happened inside the
+     * window on screen.
+     *
+     * pos_riders keeps ONE refusal per rider (the newest) — it is a live-map
+     * diagnosis, not a log. Showing it on an older day would be a lie, so a
+     * stamp outside [from, to] is treated as "nothing refused that day".
+     *
+     * @return array{reason: string, at: Carbon}|null
+     */
+    private function rejectInWindow(PosRider $rider, Carbon $from, Carbon $to): ?array
+    {
+        $at = $rider->last_reject_at;
+        $reason = $rider->last_reject_reason;
+        if (!$at || !$reason) {
+            return null;
+        }
+        $at = Carbon::parse($at);
+        if ($at->lt($from) || $at->gt($to)) {
+            return null;
+        }
+
+        // Unknown/new reason codes fall back to a plain "refused" wording
+        // instead of rendering a missing translation key.
+        $known = ['duty_off', 'plan_locked', 'too_old'];
+
+        return [
+            'reason' => in_array($reason, $known, true) ? $reason : 'other',
+            'at'     => $at,
+        ];
+    }
+
+    /**
+     * Task #1402: turn the raw live/late point counts into something an owner
+     * can read — a verdict plus, when the route really did sit on the phone,
+     * the worst fix→arrival delay behind it.
+     *
+     * Counts of rows are never shown; the share of the route is.
+     *
+     * @param array{points?: int, late_points?: int, max_lag_secs?: int}|null $m
+     * @return array{state: string|null, late_pct: int, lag_unit: string|null, lag_value: int}
+     */
+    private function syncSummary(?array $m): array
+    {
+        $none = ['state' => null, 'late_pct' => 0, 'lag_unit' => null, 'lag_value' => 0];
+
+        $points = (int) ($m['points'] ?? 0);
+        if ($points < 1) {
+            return $none; // no route recorded that day — nothing to judge
+        }
+
+        $late = (int) ($m['late_points'] ?? 0);
+        if ($late < 1) {
+            return ['state' => 'all_live', 'late_pct' => 0, 'lag_unit' => null, 'lag_value' => 0];
+        }
+
+        // A single late point out of thousands must still read as ≥ 1%.
+        $pct = max(1, min(100, (int) round($late / $points * 100)));
+        $state = $pct < self::REPORT_LATE_LOW_PCT ? 'mostly_live'
+            : ($pct < self::REPORT_LATE_HIGH_PCT ? 'part_late' : 'mostly_late');
+
+        $lagSecs = (int) ($m['max_lag_secs'] ?? 0);
+        $lagUnit = null;
+        $lagValue = 0;
+        if ($lagSecs >= self::REPORT_LAG_MIN_SECS) {
+            if ($lagSecs >= self::REPORT_LAG_HOUR_SECS) {
+                $lagUnit = 'h';
+                $lagValue = max(1, (int) round($lagSecs / 3600));
+            } else {
+                $lagUnit = 'm';
+                $lagValue = max(1, (int) round($lagSecs / 60));
+            }
+        }
+
+        return ['state' => $state, 'late_pct' => $pct, 'lag_unit' => $lagUnit, 'lag_value' => $lagValue];
     }
 
     /**
@@ -1370,10 +1470,18 @@ class PosRiderTrackingController extends Controller
      * Duty: APPROXIMATED as first→last location point per day (there is no
      * duty session log — the UI states this approximation explicitly).
      *
+     * Live vs late (Task #1402): each point is also classified by HOW it
+     * reached us — in real time, or later out of the phone's offline buffer.
+     * Same signal the trail endpoint uses: the insert-time is_offline stamp
+     * when present, else the created_at − recorded_at heuristic for
+     * pre-migration rows. Folded into this pass on purpose — it is the same
+     * window over the same rows, and a second scan of a 30-day point table
+     * would double the cost of the report page.
+     *
      * Streams with cursor() — a 30-day window over several riders can be
      * hundreds of thousands of rows; never ->get() this.
      *
-     * @return array<int, array{km: float, duty_minutes: int, days_active: int}>
+     * @return array<int, array{km: float, duty_minutes: int, days_active: int, points: int, late_points: int, max_lag_secs: int}>
      */
     private function movementStats(int $companyId, Carbon $from, Carbon $to): array
     {
@@ -1382,14 +1490,22 @@ class PosRiderTrackingController extends Controller
         }
 
         $gapSecs = self::GAP_THRESHOLD_MINUTES * 60;
+        $lateSecs = self::OFFLINE_HEURISTIC_MINUTES * 60;
+        // PROD schema drift: without the stamp column the heuristic still works.
+        $hasOfflineFlag = Schema::hasColumn('pos_rider_locations', 'is_offline');
         $stats = [];
         $prev = null; // [rider_id, dayKey, ts, lat, lng]
+
+        $cols = ['rider_id', 'lat', 'lng', 'recorded_at', 'created_at'];
+        if ($hasOfflineFlag) {
+            $cols[] = 'is_offline';
+        }
 
         $points = DB::table('pos_rider_locations')
             ->where('company_id', $companyId)
             ->whereBetween('recorded_at', [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')])
             ->orderBy('rider_id')->orderBy('recorded_at')
-            ->select(['rider_id', 'lat', 'lng', 'recorded_at'])
+            ->select($cols)
             ->cursor();
 
         foreach ($points as $p) {
@@ -1401,8 +1517,24 @@ class PosRiderTrackingController extends Controller
             $lng = (float) $p->lng;
 
             if (!isset($stats[$rid])) {
-                $stats[$rid] = ['km' => 0.0, 'days' => []];
+                $stats[$rid] = ['km' => 0.0, 'days' => [],
+                    'points' => 0, 'late_points' => 0, 'max_lag_secs' => 0];
             }
+
+            // How late did this point reach the server?
+            $arrived = $p->created_at ? strtotime((string) $p->created_at) : null;
+            $lag = ($arrived !== null && $ts !== false) ? max(0, $arrived - $ts) : 0;
+            $flag = $hasOfflineFlag ? ($p->is_offline ?? null) : null;
+            $isLate = $flag !== null ? (bool) (int) $flag : ($lag >= $lateSecs);
+
+            $stats[$rid]['points']++;
+            if ($isLate) {
+                $stats[$rid]['late_points']++;
+                if ($lag > $stats[$rid]['max_lag_secs']) {
+                    $stats[$rid]['max_lag_secs'] = $lag;
+                }
+            }
+
             if (!isset($stats[$rid]['days'][$dayKey])) {
                 $stats[$rid]['days'][$dayKey] = ['first' => $ts, 'last' => $ts];
             } else {

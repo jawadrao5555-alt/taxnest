@@ -36,6 +36,8 @@ class PosRiderPerformanceReportTest extends TestCase
             $table->decimal('lng', 10, 7);
             $table->dateTime('recorded_at');
             $table->timestamp('created_at')->nullable();
+            // Task #1402: insert-time live/late stamp (NULL = pre-migration row).
+            $table->boolean('is_offline')->nullable();
             $table->index(['company_id', 'rider_id', 'recorded_at']);
         });
 
@@ -68,6 +70,33 @@ class PosRiderPerformanceReportTest extends TestCase
             'recorded_at' => $at,
             'created_at'  => $at,
         ]);
+    }
+
+    /**
+     * Task #1402: a point whose arrival time differs from its fix time.
+     * $isOffline null reproduces a pre-migration row (heuristic classification).
+     */
+    private function arrivedPoint(int $riderId, string $recordedAt, string $arrivedAt, ?bool $isOffline): void
+    {
+        DB::table('pos_rider_locations')->insert([
+            'company_id'  => self::COMPANY,
+            'rider_id'    => $riderId,
+            'lat'         => 31.5204000,
+            'lng'         => 74.3587000,
+            'recorded_at' => $recordedAt,
+            'created_at'  => $arrivedAt,
+            'is_offline'  => $isOffline,
+        ]);
+    }
+
+    /** @return array{state: string|null, late_pct: int, lag_unit: string|null, lag_value: int} */
+    private function sync(?array $movementRow): array
+    {
+        $controller = app(PosRiderTrackingController::class);
+        $method = new \ReflectionMethod($controller, 'syncSummary');
+        $method->setAccessible(true);
+
+        return $method->invoke($controller, $movementRow);
     }
 
     private function movement(Carbon $from, Carbon $to): array
@@ -199,6 +228,87 @@ class PosRiderPerformanceReportTest extends TestCase
         $this->assertSame(5, $stats[$rider]['delivered']);
         $this->assertSame(20, $stats[$rider]['avg_minutes'],
             'Only the 30- and 10-minute stamped spans should be averaged.');
+    }
+
+    public function test_movement_separates_live_points_from_ones_that_arrived_late(): void
+    {
+        $date = '2026-08-10';
+        $day = $this->day($date);
+
+        // Route uploaded in one batch after the shift: the stamp says offline,
+        // and the worst fix→arrival delay is the whole afternoon.
+        $batched = $this->riderId();
+        $this->arrivedPoint($batched, "$date 13:00:00", "$date 19:00:00", true);
+        $this->arrivedPoint($batched, "$date 14:00:00", "$date 19:00:00", true);
+        $this->arrivedPoint($batched, "$date 19:00:30", "$date 19:00:30", false);
+
+        // Pre-migration rows carry no stamp — the arrival heuristic decides.
+        $legacy = $this->riderId();
+        $this->arrivedPoint($legacy, "$date 09:00:00", "$date 09:00:10", null); // live
+        $this->arrivedPoint($legacy, "$date 09:05:00", "$date 09:20:00", null); // 15 min late
+
+        $stats = $this->movement($day, $day->copy()->endOfDay());
+
+        $this->assertSame(3, $stats[$batched]['points']);
+        $this->assertSame(2, $stats[$batched]['late_points']);
+        $this->assertSame(6 * 3600, $stats[$batched]['max_lag_secs'],
+            'The worst delay must come from the late points, not the live one.');
+
+        $this->assertSame(2, $stats[$legacy]['points']);
+        $this->assertSame(1, $stats[$legacy]['late_points'],
+            'Without the stamp, an arrival 5+ minutes after the fix is still late.');
+        $this->assertSame(15 * 60, $stats[$legacy]['max_lag_secs']);
+    }
+
+    public function test_sync_summary_reads_as_plain_wording_with_a_share_and_worst_delay(): void
+    {
+        $this->assertSame(null, $this->sync(null)['state'],
+            'A rider with no route that day gets no verdict.');
+        $this->assertSame(null, $this->sync(['points' => 0, 'late_points' => 0, 'max_lag_secs' => 0])['state']);
+
+        $this->assertSame('all_live', $this->sync(['points' => 100, 'late_points' => 0, 'max_lag_secs' => 0])['state']);
+
+        // One late point in a thousand still deserves a visible 1%.
+        $rare = $this->sync(['points' => 1000, 'late_points' => 1, 'max_lag_secs' => 60]);
+        $this->assertSame('mostly_live', $rare['state']);
+        $this->assertSame(1, $rare['late_pct']);
+        $this->assertSame(null, $rare['lag_unit'], 'A one-minute delay is not worth printing.');
+
+        $half = $this->sync(['points' => 100, 'late_points' => 50, 'max_lag_secs' => 20 * 60]);
+        $this->assertSame('part_late', $half['state']);
+        $this->assertSame(50, $half['late_pct']);
+        $this->assertSame(['m', 20], [$half['lag_unit'], $half['lag_value']]);
+
+        $batched = $this->sync(['points' => 100, 'late_points' => 96, 'max_lag_secs' => 6 * 3600]);
+        $this->assertSame('mostly_late', $batched['state']);
+        $this->assertSame(96, $batched['late_pct']);
+        $this->assertSame(['h', 6], [$batched['lag_unit'], $batched['lag_value']]);
+    }
+
+    public function test_refused_upload_shows_only_on_the_day_it_happened(): void
+    {
+        $controller = app(PosRiderTrackingController::class);
+        $method = new \ReflectionMethod($controller, 'rejectInWindow');
+        $method->setAccessible(true);
+
+        $rider = new PosRider();
+        $rider->last_reject_reason = 'duty_off';
+        $rider->last_reject_at = Carbon::parse('2026-08-10 17:30:00');
+
+        $day = $this->day('2026-08-10');
+        $hit = $method->invoke($controller, $rider, $day, $day->copy()->endOfDay());
+        $this->assertSame('duty_off', $hit['reason']);
+
+        $other = $this->day('2026-08-09');
+        $this->assertNull($method->invoke($controller, $rider, $other, $other->copy()->endOfDay()),
+            'Only the newest refusal is stored — it must never be shown on an older day.');
+
+        // An unknown reason code degrades to the plain "refused" wording.
+        $rider->last_reject_reason = 'brand_new_code';
+        $this->assertSame('other', $method->invoke($controller, $rider, $day, $day->copy()->endOfDay())['reason']);
+
+        $rider->last_reject_reason = null;
+        $this->assertNull($method->invoke($controller, $rider, $day, $day->copy()->endOfDay()));
     }
 
     public function test_ranking_prioritizes_deliveries_average_time_then_kilometres(): void

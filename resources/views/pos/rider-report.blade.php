@@ -79,6 +79,9 @@
                             <th class="px-4 py-3">{{ __('pos.rr_col_km') }}</th>
                             <th class="px-4 py-3">{{ __('pos.rr_col_duty') }}</th>
                             @if($range !== 'day')<th class="px-4 py-3">{{ __('pos.rr_days_active') }}</th>@endif
+                            {{-- Task #1402: how the route reached us, and the refused uploads --}}
+                            <th class="px-4 py-3">{{ __('pos.rr_col_route_arrival') }}</th>
+                            @if($hasRejectCols)<th class="px-4 py-3">{{ __('pos.rr_col_refused') }}</th>@endif
                             <th class="px-4 py-3 text-right">{{ __('pos.cash_khata') }}</th>
                         </tr>
                     </thead>
@@ -118,12 +121,53 @@
                             @if($range !== 'day')
                             <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ $row['days_active'] ?: '—' }}</td>
                             @endif
+                            {{-- Task #1402: "route live aaya ya shaam ko ek saath?" — share of the
+                                 route that came out of the phone's offline buffer, plus the worst
+                                 fix→arrival delay behind it. Row counts stay out of the owner's view. --}}
+                            @php
+                                $sync = $row['sync'];
+                                $syncPill = [
+                                    'all_live'    => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+                                    'mostly_live' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+                                    'part_late'   => 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+                                    'mostly_late' => 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
+                                ][$sync['state']] ?? '';
+                            @endphp
+                            <td class="px-4 py-3">
+                                @if($sync['state'] === null)
+                                    <span class="text-gray-400">—</span>
+                                @else
+                                    <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold {{ $syncPill }}">{{ __('pos.rr_sync_' . $sync['state']) }}</span>
+                                    @if($sync['late_pct'] > 0)
+                                    <div class="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+                                        {{ __('pos.rr_sync_share', ['pct' => $sync['late_pct']]) }}@if($sync['lag_unit']) · {{ __($sync['lag_unit'] === 'h' ? 'pos.rr_sync_lag_hrs' : 'pos.rr_sync_lag_min', ['n' => $sync['lag_value']]) }}@endif
+                                    </div>
+                                    @endif
+                                @endif
+                            </td>
+                            @if($hasRejectCols)
+                            <td class="px-4 py-3">
+                                @if($row['reject_reason'])
+                                    <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300">⛔ {{ __('pos.rr_refused_' . $row['reject_reason']) }}</span>
+                                    <div class="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+                                        {{ $range === 'day' ? $row['reject_at']->format('h:i A') : $row['reject_at']->format('d/m h:i A') }}
+                                    </div>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
+                            @endif
                             <td class="px-4 py-3 text-right">
                                 <a href="{{ route('pos.deliveries') }}" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap">{{ __('pos.cash_khata') }} →</a>
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="8" class="px-4 py-10 text-center text-sm text-gray-400">{{ __('pos.rr_no_data') }}</td></tr>
+                        @php
+                            // rider + deliveries + distance + duty + route arrival + khata,
+                            // plus the columns that only render in some modes.
+                            $cols = 6 + ($range !== 'day' ? 2 : 0) + ($hasDeliveryStamps ? 1 : 0) + ($hasRejectCols ? 1 : 0);
+                        @endphp
+                        <tr><td colspan="{{ $cols }}" class="px-4 py-10 text-center text-sm text-gray-400">{{ __('pos.rr_no_data') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -132,6 +176,12 @@
 
         {{-- Approximation disclaimer — duty has no session log; km is GPS-derived. --}}
         <p class="mt-3 text-[11px] text-gray-400 dark:text-gray-500">ℹ️ {{ __('pos.rr_approx_note') }}</p>
+        {{-- Task #1402: what "late" means, and why an old day can show no refusal
+             (pos_riders keeps only each rider's newest refusal). --}}
+        <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">ℹ️ {{ __('pos.rr_sync_note') }}</p>
+        @if($hasRejectCols)
+        <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">ℹ️ {{ __('pos.rr_refused_note') }}</p>
+        @endif
     </div>
 @endif
 </x-pos-layout>

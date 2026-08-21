@@ -562,22 +562,41 @@ class PosController extends Controller
             $settings = $company->printerSettings();
             $known = collect($settings['available_printers'])->pluck('name')->all();
 
-            // Only accept printers the agent actually reported (or blank = unset).
-            $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
-            $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
-            // Task 1194 — KOT-family picks ride the UNION picker: a value may
-            // carry its owning counter ("uid::name", validated against THAT
-            // device's own reported list) or stay a legacy plain name (company-
-            // wide list check, exactly as before). Invalid = silent unset,
-            // same rule the plain names always had.
-            $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
-            $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
-            $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
-            // Counter KOT Copy (dine-in only): printer + its own ON/OFF tick.
-            $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
-            $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
-            $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
-            $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+            // Stale-form guard (Task 1393 — same shape as the PRA Receipt Settings
+            // page, Task 1377). Every value below is rebuilt wholesale from what the
+            // request happens to carry, so a POST that never carried this form at all
+            // silently unset the printers and switched the tick-boxes OFF. Unchecked
+            // checkboxes send nothing, so "form absent" and "everything unticked" look
+            // identical on the wire — only the marker can tell them apart.
+            //
+            // The WHOLE form is ONE block here, deliberately: PosCounterKotGuardTest
+            // locks the rule that a real printer-settings POST which omits the Counter
+            // KOT fields means the admin cleared them. So the fallback spans every
+            // field of the form (scripted and legacy POSTs keep working), and only a
+            // request carrying none of them leaves the stored settings alone.
+            $psPresent = $request->has('ps_present') || $request->hasAny([
+                'silent_print_enabled', 'print_confirm_ask', 'counter_kot_enabled',
+                'receipt_printer', 'kot_printer', 'counter_kot_printer',
+            ]);
+
+            if ($psPresent) {
+                // Only accept printers the agent actually reported (or blank = unset).
+                $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
+                $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
+                // Task 1194 — KOT-family picks ride the UNION picker: a value may
+                // carry its owning counter ("uid::name", validated against THAT
+                // device's own reported list) or stay a legacy plain name (company-
+                // wide list check, exactly as before). Invalid = silent unset,
+                // same rule the plain names always had.
+                $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
+                $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
+                $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
+                // Counter KOT Copy (dine-in only): printer + its own ON/OFF tick.
+                $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
+                $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
+                $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
+                $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+            }
 
             // Task 1166 — per-counter devices: persist the multi-counter section
             // BEFORE the master eligibility check so a shop configured ONLY with
@@ -599,11 +618,13 @@ class PosController extends Controller
                     $hasDevicePrinter = false;
                 }
             }
-            $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
-                && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
-            // Task 565: opt-in Yes/No print-confirm dialog — independent of the
-            // silent-print master (works for iframe/popup shops too).
-            $settings['print_confirm_ask'] = $request->boolean('print_confirm_ask');
+            if ($psPresent) {
+                $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
+                    && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
+                // Task 565: opt-in Yes/No print-confirm dialog — independent of the
+                // silent-print master (works for iframe/popup shops too).
+                $settings['print_confirm_ask'] = $request->boolean('print_confirm_ask');
+            }
             // Manual save = deliberate choice — the sale-screen one-click prompt
             // must never nag this shop again (even if they chose to stay OFF).
             $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
@@ -2464,45 +2485,82 @@ class PosController extends Controller
             'pos_tax_rate_card' => 'nullable|numeric|min:0|max:100',
         ]);
 
-        $flags = [];
-        foreach (PosFeatureService::ALL_FLAGS as $flag) {
-            $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
-        }
-        // Restaurant module plan gating (Jul 2026): when the plan doesn't
-        // include it, IGNORE the request for restaurant flags and PRESERVE the
-        // stored values — runtime masking keeps them inert, and a later plan
-        // upgrade restores the shop's previous kitchen configuration.
-        if (!PosFeatureService::restaurantAllowed($company)) {
-            $stored = is_array($company->feature_flags) ? $company->feature_flags : [];
-            foreach (PosFeatureService::RESTAURANT_FLAGS as $flag) {
-                $flags[$flag] = (bool) ($stored[$flag] ?? false);
+        // Stale-form guard, per block (Task 1393 — same shape as the PRA Receipt
+        // Settings page, Task 1377). Both blocks below are WHOLESALE rewrites
+        // driven by checkbox presence, so a POST from an outdated copy of this
+        // page silently switched OFF every feature the copy did not carry.
+        // Unchecked checkboxes send nothing, so "stale form" and "everything
+        // unticked" look identical on the wire — only a marker can tell them
+        // apart. A block is rewritten when THIS request actually carries it: the
+        // hidden marker (freshly rendered form) or any of that block's own fields
+        // (scripted and legacy POSTs keep working). Otherwise the stored block is
+        // left exactly as it is; wiping is never the safe default.
+        $fsPresent      = $request->has('fs_present');
+        $flagsPresent   = $fsPresent || $request->has('feature_flags');
+        $kitchenPresent = $fsPresent || $request->hasAny([
+            'auto_print_kot', 'kot_reprint_enabled', 'pos_guided_flow_enabled',
+        ]);
+
+        $companyUpdates = [
+            'business_category' => $data['business_category'] ?? $company->business_category,
+            'pos_ui_density'    => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
+            // Finishing the wizard marks setup complete so it never auto-launches again.
+            'pos_setup_completed' => true,
+        ];
+
+        // Manual PRA tax-rate overrides. These are number inputs, so the rendered
+        // form ALWAYS submits them — has() therefore separates "submitted blank"
+        // (clear the override back to the global default) from "this request never
+        // carried the field" (stale form: keep whatever the shop already saved).
+        foreach (['pos_tax_rate_cash', 'pos_tax_rate_card'] as $rateField) {
+            if ($request->has($rateField)) {
+                $companyUpdates[$rateField] = $request->filled($rateField)
+                    ? round((float) $request->input($rateField), 2)
+                    : null;
             }
         }
-        // Canonicalize server-side: a child feature can't persist ON while its
-        // required parent is OFF (mirrors the wizard's client-side resolveDeps).
-        $flags = PosFeatureService::normalize($flags);
 
-        $company->update([
-            'business_category'    => $data['business_category'] ?? $company->business_category,
-            'feature_flags'        => $flags,
+        if ($flagsPresent) {
+            $flags = [];
+            foreach (PosFeatureService::ALL_FLAGS as $flag) {
+                $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
+            }
+            // Restaurant module plan gating (Jul 2026): when the plan doesn't
+            // include it, IGNORE the request for restaurant flags and PRESERVE the
+            // stored values — runtime masking keeps them inert, and a later plan
+            // upgrade restores the shop's previous kitchen configuration.
+            if (!PosFeatureService::restaurantAllowed($company)) {
+                $stored = is_array($company->feature_flags) ? $company->feature_flags : [];
+                foreach (PosFeatureService::RESTAURANT_FLAGS as $flag) {
+                    $flags[$flag] = (bool) ($stored[$flag] ?? false);
+                }
+            }
+            // Canonicalize server-side: a child feature can't persist ON while its
+            // required parent is OFF (mirrors the wizard's client-side resolveDeps).
+            $flags = PosFeatureService::normalize($flags);
+            $companyUpdates['feature_flags'] = $flags;
             // Master inventory module switch follows the wizard's
             // "Inventory Tracking" flag so both surfaces always agree.
-            'inventory_enabled'    => (bool) ($flags['inventory'] ?? false),
-            'use_universal_pos'    => (bool) ($data['use_universal_pos'] ?? false),
-            'pos_ui_density'       => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
+            $companyUpdates['inventory_enabled'] = (bool) ($flags['inventory'] ?? false);
+        }
+
+        // use_universal_pos rides a hidden input, so its absence is unambiguous:
+        // only a form that predates the field can omit it. Never reset it blind.
+        if ($request->has('use_universal_pos')) {
+            $companyUpdates['use_universal_pos'] = (bool) ($data['use_universal_pos'] ?? false);
+        }
+
+        if ($kitchenPresent) {
             // Kitchen preferences (checkboxes — absent value = off).
             // NOTE: pos_receipt_show_tax moved to the Receipt Settings page
             // (receiptSettings) — do NOT save it here or every Features save
             // would force it off.
-            'auto_print_kot'       => (bool) $request->input('auto_print_kot', false),
-            'kot_reprint_enabled'  => (bool) $request->input('kot_reprint_enabled', false),
-            'pos_guided_flow_enabled' => (bool) $request->input('pos_guided_flow_enabled', false),
-            // Manual PRA tax-rate overrides — blank clears back to the global default.
-            'pos_tax_rate_cash' => $request->filled('pos_tax_rate_cash') ? round((float) $request->input('pos_tax_rate_cash'), 2) : null,
-            'pos_tax_rate_card' => $request->filled('pos_tax_rate_card') ? round((float) $request->input('pos_tax_rate_card'), 2) : null,
-            // Finishing the wizard marks setup complete so it never auto-launches again.
-            'pos_setup_completed'  => true,
-        ]);
+            $companyUpdates['auto_print_kot']          = (bool) $request->input('auto_print_kot', false);
+            $companyUpdates['kot_reprint_enabled']     = (bool) $request->input('kot_reprint_enabled', false);
+            $companyUpdates['pos_guided_flow_enabled'] = (bool) $request->input('pos_guided_flow_enabled', false);
+        }
+
+        $company->update($companyUpdates);
 
         // Step 3 "Start Using POS" → drop the cashier straight onto the sale screen.
         return redirect()->route('pos.invoice.create')->with('success', __('pos.pos_ready_start_billing'));

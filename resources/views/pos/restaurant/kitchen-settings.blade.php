@@ -25,6 +25,12 @@
 
     <form method="POST" action="{{ route('pos.restaurant.kitchen-settings.update') }}" class="space-y-6">
         @csrf
+        {{-- Task 1393 marker: proves this form was FRESHLY rendered, so the handler may
+             safely rebuild both kitchen panels (workflow toggles + KOT print style) from
+             checkbox presence. A stale cached copy of this page lacks the marker and
+             leaves those panels untouched — an outdated form and a form with everything
+             unticked are otherwise identical on the wire. --}}
+        <input type="hidden" name="ks_present" value="1">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
             <div class="p-5 flex items-center justify-between">
                 <div>

@@ -59,6 +59,12 @@
 
     <form method="POST" action="{{ route('fbrpos.printer-settings') }}" class="space-y-5">
         @csrf
+        {{-- Task 1393 marker: proves this form was FRESHLY rendered, so the handler may
+             safely rebuild the printer picks and tick-boxes from what the request carries.
+             A stale cached copy of this page lacks the marker and leaves them untouched —
+             an outdated form and a form with everything unticked are otherwise identical
+             on the wire. --}}
+        <input type="hidden" name="ps_present" value="1">
 
         {{-- Master toggle. NOTE: no print_confirm_ask card here — FBR's
              Receipt Settings page already owns that key (Task 1263). --}}

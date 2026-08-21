@@ -55,6 +55,12 @@
 
         <form method="POST" action="{{ route('pos.features.update') }}">
             @csrf
+            {{-- Task 1393 marker: proves this form was FRESHLY rendered, so the handler
+                 may safely rebuild the feature-flag map and the kitchen checkboxes from
+                 checkbox presence. A stale cached copy of this page lacks the marker and
+                 leaves those blocks untouched — an outdated form and a form with
+                 everything unticked are otherwise identical on the wire. --}}
+            <input type="hidden" name="fs_present" value="1">
             <input type="hidden" name="business_category" :value="selectedPreset">
             <input type="hidden" name="use_universal_pos" value="1">
 

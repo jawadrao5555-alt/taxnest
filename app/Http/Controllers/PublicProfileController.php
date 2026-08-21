@@ -226,9 +226,27 @@ class PublicProfileController extends Controller
             'about_text' => 'nullable|string|max:600',
         ]);
 
+        // Stale-form guard (Task 1393 — same shape as the PRA Receipt Settings page,
+        // Task 1377). This whole block is a wholesale rewrite driven by checkbox
+        // presence, so a POST from an outdated copy of the Business Profile page
+        // silently switched the public page OFF along with every line it shows.
+        // Unchecked checkboxes send nothing, so a stale form and a form with
+        // everything unticked look identical on the wire — only the marker can tell
+        // them apart. The block is rewritten when THIS request carries it: the hidden
+        // marker (freshly rendered form) or any of the block's own fields (scripted
+        // and legacy POSTs keep working). Otherwise the stored settings stand.
+        $showKeys  = ['show_phone', 'show_mobile', 'show_email', 'show_address', 'show_ntn', 'show_website', 'show_hours', 'show_menu'];
+        $ppPresent = $request->has('pp_present') || $request->hasAny(array_merge(
+            ['pp_enabled', 'hours_text', 'about_text'],
+            array_map(fn ($k) => 'pp_' . $k, $showKeys)
+        ));
+        if (!$ppPresent) {
+            return back()->with('success', 'Public profile settings saved.');
+        }
+
         $settings = self::settingsFor($company);
         $settings['enabled'] = $request->has('pp_enabled');
-        foreach (['show_phone', 'show_mobile', 'show_email', 'show_address', 'show_ntn', 'show_website', 'show_hours', 'show_menu'] as $key) {
+        foreach ($showKeys as $key) {
             $settings[$key] = $request->has('pp_' . $key);
         }
         $settings['hours_text'] = trim((string) $request->input('hours_text', ''));
@@ -265,6 +283,19 @@ class PublicProfileController extends Controller
             'menu_product_ids' => 'nullable|array|max:300',
             'menu_product_ids.*' => 'integer',
         ]);
+
+        // Stale-form guard (Task 1393). Below, every menu row NOT listed in this
+        // request is deleted — so a POST that never carried the picker wipes the
+        // shop's whole QR menu. Unticked checkboxes send nothing, which makes an
+        // outdated copy of the page and a deliberate "clear everything" look
+        // identical on the wire. The hidden marker proves a freshly rendered
+        // picker; any menu_product_ids[] value is the fallback that keeps scripted
+        // and legacy POSTs working. Neither present = leave the menu untouched.
+        // (Same silent no-op the profile-settings guard above uses: the shop is not
+        // shown an error for a request it never knowingly made.)
+        if (!$request->has('pm_present') && !$request->has('menu_product_ids')) {
+            return back()->with('success', 'Public menu updated.');
+        }
 
         $ids = collect($request->input('menu_product_ids', []))
             ->map(fn ($v) => (int) $v)

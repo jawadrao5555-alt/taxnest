@@ -2208,36 +2208,56 @@ class RestaurantPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        $updates = [
-            'kds_enabled' => (bool) $request->kds_enabled,
-            'kitchen_printer_enabled' => (bool) $request->kitchen_printer_enabled,
-            'print_on_hold' => (bool) $request->print_on_hold,
-            'print_on_pay' => (bool) $request->print_on_pay,
-        ];
-        // Dine-In Auto KOT (owner, Jul 2026): table select auto-holds + fires KOT.
-        // hasColumn guard = prod self-heal parity (code may land before migrate --force).
-        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'dine_in_auto_kot')) {
-            $updates['dine_in_auto_kot'] = (bool) $request->dine_in_auto_kot;
-        }
-        // KOT Full Mode (ZFC feedback, Jul 2026) — hasColumn guard = prod self-heal parity.
-        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_kot_full_mode')) {
-            $updates['pos_kot_full_mode'] = (bool) $request->pos_kot_full_mode;
-        }
-        // Delivery: payment pehle, KOT baad (customer voice note, 1 Aug 2026) —
-        // provisional delivery bills par KOT promote/finalize tak ruki rahti hai.
-        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'delivery_kot_after_payment')) {
-            $updates['delivery_kot_after_payment'] = (bool) $request->delivery_kot_after_payment;
-        }
-        // Task 1356: bill final ho aur kitchen ne lines dekhi hi na hon to ticket
-        // khud chali jaye (default ON). hasColumn guard = prod self-heal parity.
-        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_on_final_if_unsent')) {
-            $updates['kot_on_final_if_unsent'] = (bool) $request->kot_on_final_if_unsent;
+        // Stale-form guard, one marker per PANEL (Task 1393 — same shape as the PRA
+        // Receipt Settings page, Task 1377). Both panels below are WHOLESALE rewrites
+        // driven by checkbox presence, so a POST from an outdated copy of this page
+        // silently switched OFF every kitchen option the copy did not carry. Unchecked
+        // checkboxes send nothing, so a stale form and a form with everything unticked
+        // are identical on the wire — only the marker can tell them apart. A panel is
+        // rewritten when THIS request carries it: the hidden marker (freshly rendered
+        // form) or any of that panel's own fields (scripted and legacy POSTs keep
+        // working). Otherwise the stored panel is left exactly as it is.
+        $ksPresent = $request->has('ks_present');
+        $flowFields = ['kds_enabled', 'kitchen_printer_enabled', 'print_on_hold', 'print_on_pay',
+            'dine_in_auto_kot', 'pos_kot_full_mode', 'delivery_kot_after_payment', 'kot_on_final_if_unsent'];
+        $styleFields = ['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode',
+            'kot_show_footer', 'kot_show_kitchen_notes', 'kot_align_center', 'kot_left_margin_mm'];
+        $flowPresent  = $ksPresent || $request->hasAny($flowFields);
+        $stylePresent = $ksPresent || $request->hasAny($styleFields);
+
+        $updates = [];
+        if ($flowPresent) {
+            $updates['kds_enabled'] = (bool) $request->kds_enabled;
+            $updates['kitchen_printer_enabled'] = (bool) $request->kitchen_printer_enabled;
+            $updates['print_on_hold'] = (bool) $request->print_on_hold;
+            $updates['print_on_pay'] = (bool) $request->print_on_pay;
+            // Dine-In Auto KOT (owner, Jul 2026): table select auto-holds + fires KOT.
+            // hasColumn guard = prod self-heal parity (code may land before migrate --force).
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'dine_in_auto_kot')) {
+                $updates['dine_in_auto_kot'] = (bool) $request->dine_in_auto_kot;
+            }
+            // KOT Full Mode (ZFC feedback, Jul 2026) — hasColumn guard = prod self-heal parity.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_kot_full_mode')) {
+                $updates['pos_kot_full_mode'] = (bool) $request->pos_kot_full_mode;
+            }
+            // Delivery: payment pehle, KOT baad (customer voice note, 1 Aug 2026) —
+            // provisional delivery bills par KOT promote/finalize tak ruki rahti hai.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'delivery_kot_after_payment')) {
+                $updates['delivery_kot_after_payment'] = (bool) $request->delivery_kot_after_payment;
+            }
+            // Task 1356: bill final ho aur kitchen ne lines dekhi hi na hon to ticket
+            // khud chali jaye (default ON). hasColumn guard = prod self-heal parity.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_on_final_if_unsent')) {
+                $updates['kot_on_final_if_unsent'] = (bool) $request->kot_on_final_if_unsent;
+            }
         }
         // KOT Print Style (customer feedback 27 Jul 2026): paper-saving toggles +
         // print position. hasColumn guards = prod self-heal parity.
-        foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_show_kitchen_notes', 'kot_align_center'] as $kotFlag) {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', $kotFlag)) {
-                $updates[$kotFlag] = (bool) $request->input($kotFlag);
+        if ($stylePresent) {
+            foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_show_kitchen_notes', 'kot_align_center'] as $kotFlag) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', $kotFlag)) {
+                    $updates[$kotFlag] = (bool) $request->input($kotFlag);
+                }
             }
         }
         // Receipt fallback guard (Task 718): receipt_80mm/58mm + proof-bill fall
@@ -2251,7 +2271,7 @@ class RestaurantPosController extends Controller
             && $company->receipt_align_center === null) {
             $updates['receipt_align_center'] = (bool) ($company->kot_align_center ?? false);
         }
-        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
+        if ($stylePresent && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
             $updates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('kot_left_margin_mm', 0)));
         }
         // Task 767: a kitchen-settings save is an explicit verify — clear the

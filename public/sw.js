@@ -263,7 +263,24 @@ self.addEventListener('fetch', e => {
     // wiped (owner 21 Aug 2026: "QR uncheck karne ke baad bhi QR chhap raha hai",
     // local bill lost its tax line). '/fbr-pos/receipt-settings' was already skipped
     // for the same reason; the PRA page was missed.
-    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/pos/receipt-settings', '/fbr-pos/receipt-settings', '/return', '/pos/restaurant/tables', '/track/'];
+    //
+    // Task 1393 — SETTINGS PAGES ARE NEVER CACHED, AND ALWAYS IN SIBLING PAIRS.
+    // Every page below renders a form that rebuilds whole option blocks from
+    // checkbox presence, so serving an outdated copy is enough to switch a shop's
+    // options off. Note the patterns are substring matches and '/pos/x' does NOT
+    // match '/fbr-pos/x' (the char before "pos" is '-', not '/') — that asymmetry
+    // is exactly how the PRA receipt page was missed while its FBR twin was listed.
+    // When a new settings page is added, add BOTH panels' paths here.
+    const SETTINGS_PAGES = [
+        '/pos/receipt-settings',            '/fbr-pos/receipt-settings',
+        '/pos/business-profile',            '/fbr-pos/business-profile',
+        '/pos/printer-settings',            '/fbr-pos/printer-settings',
+        '/pos/customize',                   '/fbr-pos/customize',
+        '/pos/pra-settings',                '/fbr-pos/settings',
+        '/pos/features',                    // PRA-only (Customize wizard; FBR has no twin)
+        '/pos/restaurant/kitchen-settings', // PRA-only (KOT settings)
+    ];
+    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/return', '/pos/restaurant/tables', '/track/', ...SETTINGS_PAGES];
     if (skipPatterns.some(p => url.pathname.includes(p))) return;
 
     // HTML pages: network-first → cache → offline page

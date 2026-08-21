@@ -44,7 +44,10 @@ class PosKitchenSettingsFieldCoverageTest extends TestCase
     use RefreshDatabase;
 
     /** Fields the page submits that are NOT company columns (framework noise). */
-    private const NON_COLUMN_FIELDS = ['_token', '_method'];
+    // ks_present is the Task 1393 stale-form marker, not a setting: it only tells
+    // updateKitchenSettings that this POST really came from a freshly rendered
+    // form, so it has no companies column and is never mass-assigned.
+    private const NON_COLUMN_FIELDS = ['_token', '_method', 'ks_present'];
 
     /**
      * Every field name the Kitchen Settings form POSTs to

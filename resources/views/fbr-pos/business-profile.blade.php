@@ -216,6 +216,12 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ __('pos.receipt_display_label') }}</label>
                 @php $rd = $company->displayPrefs('fbrpos'); @endphp
+                {{-- Task 1393 marker: proves this form was FRESHLY rendered, so the handler
+                     may safely rebuild the whole receipt-display set from checkbox presence.
+                     A stale cached copy of this page lacks the marker and leaves the stored
+                     set untouched — an outdated form and a form with everything unticked are
+                     otherwise identical on the wire. --}}
+                <input type="hidden" name="rd_present" value="1">
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     @foreach([
                         'rd_show_address' => [__('pos.show_address'), $rd['show_address']],

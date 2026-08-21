@@ -242,6 +242,12 @@
         {{-- Settings + link --}}
         <form method="POST" action="{{ route('pos.public-profile.save') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6 space-y-5">
             @csrf
+            {{-- Task 1393 marker: proves this form was FRESHLY rendered, so the handler may
+                 safely rebuild the whole public-profile set from checkbox presence. A stale
+                 cached copy of this page lacks the marker and leaves the stored set
+                 untouched — an outdated form and a form with everything unticked are
+                 otherwise identical on the wire. --}}
+            <input type="hidden" name="pp_present" value="1">
             <div class="flex items-center justify-between gap-4">
                 <div>
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.public_page') }}</h3>
@@ -324,6 +330,14 @@
         <form method="POST" action="{{ route('pos.public-profile.menu') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6"
             x-data="{ selected: {{ json_encode(array_map('intval', array_values($ppSelectedIds ?? []))) ?: '[]' }} }">
             @csrf
+            {{-- Stale-form marker (Task 1393). Unticked checkboxes send NOTHING, so a
+                 POST with no menu_product_ids[] is indistinguishable from an outdated
+                 copy of this page that never carried the picker — and saveMenu deletes
+                 every unlisted row. This marker proves the picker was really submitted,
+                 so "untick everything and Save" still clears the menu while a request
+                 that never carried the block leaves it alone. --}}
+            <input type="hidden" name="pm_present" value="1">
+            {{-- /Stale-form marker --}}
             <div class="flex items-center justify-between gap-4 mb-1">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.public_menu_items') }}</h3>
                 <span class="text-xs font-semibold text-gray-500 dark:text-gray-400" x-text="selected.length + ' ' + {{ Js::from(__('pos.selected_word')) }}"></span>

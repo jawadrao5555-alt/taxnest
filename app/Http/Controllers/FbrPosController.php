@@ -3984,16 +3984,32 @@ class FbrPosController extends Controller
             $settings = $company->printerSettings();
             $known = collect($settings['available_printers'])->pluck('name')->all();
 
-            // Only accept printers the agent actually reported (or blank = unset).
-            $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
-            $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
-            $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
-            $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
-            $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
-            $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
-            $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
-            $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
-            $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+            // Stale-form guard (Task 1393 — mirrors the PRA printer-settings page and
+            // the PRA Receipt Settings page, Task 1377). Every value below is rebuilt
+            // wholesale from what the request happens to carry, so a POST that never
+            // carried this form at all silently unset the printers and switched the
+            // tick-boxes OFF. Unchecked checkboxes send nothing, so "form absent" and
+            // "everything unticked" look identical on the wire — only the marker can
+            // tell them apart. As on the PRA twin, the WHOLE form is ONE block: a real
+            // POST that omits the Counter KOT fields still means the admin cleared
+            // them (locked by PosCounterKotGuardTest).
+            $psPresent = $request->has('ps_present') || $request->hasAny([
+                'silent_print_enabled', 'counter_kot_enabled',
+                'receipt_printer', 'kot_printer', 'counter_kot_printer',
+            ]);
+
+            if ($psPresent) {
+                // Only accept printers the agent actually reported (or blank = unset).
+                $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
+                $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
+                $kotPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['kot_printer'] ?? '');
+                $settings['kot_printer'] = $kotPick['valid'] ? $kotPick['name'] : null;
+                $settings['kot_printer_device'] = $kotPick['valid'] ? $kotPick['device_uid'] : null;
+                $counterPick = \App\Models\PosAgentDevice::resolvePick($company, $validated['counter_kot_printer'] ?? '');
+                $settings['counter_kot_printer'] = $counterPick['valid'] ? $counterPick['name'] : null;
+                $settings['counter_kot_printer_device'] = $counterPick['valid'] ? $counterPick['device_uid'] : null;
+                $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
+            }
 
             // Multi-counter section BEFORE the master eligibility check (a shop
             // configured only with per-counter printers can still enable silent).
@@ -4009,8 +4025,10 @@ class FbrPosController extends Controller
                     $hasDevicePrinter = false;
                 }
             }
-            $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
-                && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
+            if ($psPresent) {
+                $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
+                    && ($settings['receipt_printer'] || $settings['kot_printer'] || $hasDevicePrinter);
+            }
             // print_confirm_ask: PRESERVED as-is (owned by FBR receipt-settings).
             // Manual save = deliberate choice — never nag with the one-click prompt.
             $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
@@ -5603,21 +5621,43 @@ class FbrPosController extends Controller
             // Task 769: merge-preserve keys owned by other pages (show_verify_line
             // lives on receipt-settings) — a wholesale rewrite here would erase them.
             $fbrExisting = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
-            $prefs['fbrpos'] = array_merge($fbrExisting, [
-                'show_address' => $request->has('rd_show_address'),
-                'show_ntn' => $request->has('rd_show_ntn'),
-                'show_mobile' => $request->has('rd_show_phone'),
-                'show_cashier' => $request->has('rd_show_cashier'),
-                'show_footer' => $request->has('rd_show_footer'),
+            // Stale-form guard (Task 1393 — same shape as the PRA Receipt Settings
+            // page, Task 1377). This block is a WHOLESALE rewrite driven by checkbox
+            // presence, so a POST from an outdated copy of this page silently switched
+            // OFF every receipt line the copy did not carry. Unchecked checkboxes send
+            // nothing, so a stale form and a form with everything unticked look
+            // identical on the wire — only the marker can tell them apart. The block is
+            // rewritten when THIS request carries it: the hidden marker (freshly
+            // rendered form) or any of the block's own fields (scripted and legacy
+            // POSTs keep working). Otherwise the stored block is left as it is.
+            $rdPresent = $request->has('rd_present') || $request->hasAny([
+                'rd_show_address', 'rd_show_ntn', 'rd_show_phone',
+                'rd_show_cashier', 'rd_show_footer',
             ]);
+            if ($rdPresent) {
+                $prefs['fbrpos'] = array_merge($fbrExisting, [
+                    'show_address' => $request->has('rd_show_address'),
+                    'show_ntn' => $request->has('rd_show_ntn'),
+                    'show_mobile' => $request->has('rd_show_phone'),
+                    'show_cashier' => $request->has('rd_show_cashier'),
+                    'show_footer' => $request->has('rd_show_footer'),
+                ]);
+            }
 
             // Print position (Task 828, Aug 2026): receipt_* columns are now the
             // dedicated FBR receipt position — decoupled from KOT (kot_*) columns.
             // hasColumn guards = prod self-heal parity (columns added Aug 14 2026).
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')) {
+            // Task 1393: these two ride the same receipt panel, but a select/number
+            // input always submits a value — so their absence is unambiguous proof the
+            // form never carried them. filled() keeps a stale POST from re-centering
+            // the receipt or resetting the margin to 0 (mirrors rp_align_center on the
+            // PRA receipt-settings page).
+            if ($request->filled('receipt_align_center')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')) {
                 $company->receipt_align_center = (bool) $request->input('receipt_align_center');
             }
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_left_margin_mm')) {
+            if ($request->filled('receipt_left_margin_mm')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_left_margin_mm')) {
                 $company->receipt_left_margin_mm = max(0, min(30, (int) $request->input('receipt_left_margin_mm', 0)));
             }
 

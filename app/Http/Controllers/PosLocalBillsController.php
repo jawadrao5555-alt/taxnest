@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\PosTransaction;
 use App\Models\User;
+use App\Services\AuditLogService;
+use App\Services\LocalViewerService;
+use App\Services\ViewablePasswordService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -69,7 +72,31 @@ class PosLocalBillsController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('pos.local.index', compact('bills', 'stats', 'cashiers'));
+        // ── Viewer Account management (Task 665) — OWNER ONLY ──────────────
+        // Only the real owner (base role company_admin) gets the section and
+        // its decrypted passwords. A pos_manager viewing this portal sees the
+        // bills exactly as before and nothing else; the endpoints 403 for him
+        // too (hiding UI alone is never the gate).
+        $canManageViewers = (bool) auth('pos')->user()?->canManageLocalViewers();
+        $viewers = collect();
+        $viewerPasswords = [];
+        if ($canManageViewers) {
+            $viewers = $this->viewerQuery($companyId)->orderBy('id', 'desc')->get();
+            foreach ($viewers as $v) {
+                // reveal() = the single read path (APP_KEY rotation / corrupt
+                // payload degrades to "not stored", never a 500).
+                $plain = ViewablePasswordService::reveal($v->pos_team_password_enc);
+                if ($plain !== null) {
+                    $viewerPasswords[$v->id] = $plain;
+                }
+            }
+        }
+        $viewerCap = LocalViewerService::MAX_PER_COMPANY;
+
+        return view('pos.local.index', compact(
+            'bills', 'stats', 'cashiers',
+            'canManageViewers', 'viewers', 'viewerPasswords', 'viewerCap'
+        ));
     }
 
     public function show($id)
@@ -122,5 +149,143 @@ class PosLocalBillsController extends Controller
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Viewer Accounts — self-service (Task 665, owner request)
+    //
+    // The read-only local_viewer login used to be super-admin-only. The company
+    // OWNER can now create/manage it himself from this portal. Mirrors the SaaS
+    // flow (AdminCompanyController::storeLocalViewer et al) exactly — same
+    // role/pos_role/is_active shape — so both panels manage the SAME accounts.
+    //
+    // Gate: role === 'company_admin' on EVERY endpoint (never isPosAdmin(),
+    // which counts pos_manager as admin). PosAuth already lets POS admins into
+    // this prefix, so the manager reaches these routes and MUST be stopped here.
+    // ══════════════════════════════════════════════════════════════════════
+
+    /** Company-scoped viewer-account query (shared with the SaaS admin panel). */
+    private function viewerQuery(int $companyId)
+    {
+        return LocalViewerService::query($companyId);
+    }
+
+    /** Owner-only guard: anyone else (manager, cashier, the viewer itself) → 403. */
+    private function assertOwner(): void
+    {
+        $user = auth('pos')->user();
+        if (!$user || !$user->canManageLocalViewers()) {
+            abort(403);
+        }
+    }
+
+    public function storeViewer(Request $request)
+    {
+        $this->assertOwner();
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:190|unique:users,email',
+            'password' => 'required|string|min:8',
+        ]);
+
+        // Team-account plan quota does NOT apply: PlanLimitService::canAddPosUser
+        // counts pos_manager + pos_cashier only, so read-only portal logins have
+        // always been quota-exempt (SaaS-created ones too). Nothing to charge here.
+        //
+        // The cap is company-wide (shared with the SaaS admin panel) and checked
+        // inside the service's locked transaction — null = already at capacity.
+        $user = LocalViewerService::create($companyId, $request->name, $request->email, $request->password);
+        if (!$user) {
+            return back()->with('error', LocalViewerService::capacityMessage());
+        }
+
+        AuditLogService::log(
+            'pos_local_viewer_created',
+            'User',
+            $user->id,
+            null,
+            ['name' => $user->name, 'email' => $user->email],
+            $companyId,
+            auth('pos')->id()
+        );
+
+        return back()->with('success', "Viewer account created — {$user->email} can now sign in at /pos/login.");
+    }
+
+    public function updateViewer(Request $request, $userId)
+    {
+        $this->assertOwner();
+        $companyId = app('currentCompanyId');
+        $viewer = $this->viewerQuery($companyId)->findOrFail($userId);
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:190|unique:users,email,' . $viewer->id,
+            'password' => 'nullable|string|min:8',
+        ]);
+
+        $old = ['name' => $viewer->name, 'email' => $viewer->email];
+        $update = ['name' => $request->name, 'email' => $request->email];
+        if ($request->filled('password')) {
+            $update['password'] = bcrypt($request->password);
+            $update = ViewablePasswordService::apply($update, $request->password);
+        }
+        $viewer->update($update);
+
+        AuditLogService::log(
+            'pos_local_viewer_updated',
+            'User',
+            $viewer->id,
+            $old,
+            ['name' => $viewer->name, 'email' => $viewer->email, 'password_changed' => $request->filled('password')],
+            $companyId,
+            auth('pos')->id()
+        );
+
+        return back()->with('success', 'Viewer account updated.');
+    }
+
+    public function toggleViewer($userId)
+    {
+        $this->assertOwner();
+        $companyId = app('currentCompanyId');
+        $viewer = $this->viewerQuery($companyId)->findOrFail($userId);
+
+        $viewer->update(['is_active' => !$viewer->is_active]);
+
+        AuditLogService::log(
+            $viewer->is_active ? 'pos_local_viewer_activated' : 'pos_local_viewer_deactivated',
+            'User',
+            $viewer->id,
+            ['is_active' => !$viewer->is_active],
+            ['is_active' => (bool) $viewer->is_active],
+            $companyId,
+            auth('pos')->id()
+        );
+
+        return back()->with('success', $viewer->is_active ? 'Viewer account enabled.' : 'Viewer account disabled.');
+    }
+
+    public function deleteViewer($userId)
+    {
+        $this->assertOwner();
+        $companyId = app('currentCompanyId');
+        $viewer = $this->viewerQuery($companyId)->findOrFail($userId);
+
+        AuditLogService::log(
+            'pos_local_viewer_deleted',
+            'User',
+            $viewer->id,
+            ['name' => $viewer->name, 'email' => $viewer->email],
+            null,
+            $companyId,
+            auth('pos')->id()
+        );
+
+        $viewer->delete();
+
+        return back()->with('success', 'Viewer account removed.');
     }
 }

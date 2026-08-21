@@ -315,10 +315,20 @@ Route::middleware(['pos.auth'])->prefix('pos/archive')->group(function () {
 // Isolated read-only portal for users with pos_role='local_viewer'. Same /pos/login URL
 // (auto-detected). PosAuth middleware confines local_viewer to /pos/local-bills/* and
 // blocks every other pos_role from these routes (404). This is the ONLY surface where
-// local (non-PRA) bills are visible. Account created/managed only by SaaS super-admin.
+// local (non-PRA) bills are visible. Accounts are created/managed by the SaaS
+// super-admin AND (Task 665) by the company OWNER himself from this portal.
 Route::middleware(['pos.auth'])->prefix('pos/local-bills')->group(function () {
     Route::get('/', [\App\Http\Controllers\PosLocalBillsController::class, 'index'])->name('pos.local.index');
     Route::get('/export', [\App\Http\Controllers\PosLocalBillsController::class, 'exportCsv'])->name('pos.local.export');
+
+    // Viewer-account self-service (Task 665) — OWNER ONLY. PosAuth lets every POS
+    // admin (incl. pos_manager) into this prefix, so each endpoint enforces
+    // role === 'company_admin' itself (403) — hiding the UI is never the gate.
+    Route::post('/viewers', [\App\Http\Controllers\PosLocalBillsController::class, 'storeViewer'])->name('pos.local.viewers.store');
+    Route::put('/viewers/{userId}', [\App\Http\Controllers\PosLocalBillsController::class, 'updateViewer'])->whereNumber('userId')->name('pos.local.viewers.update');
+    Route::post('/viewers/{userId}/toggle', [\App\Http\Controllers\PosLocalBillsController::class, 'toggleViewer'])->whereNumber('userId')->name('pos.local.viewers.toggle');
+    Route::delete('/viewers/{userId}', [\App\Http\Controllers\PosLocalBillsController::class, 'deleteViewer'])->whereNumber('userId')->name('pos.local.viewers.delete');
+
     Route::get('/{id}', [\App\Http\Controllers\PosLocalBillsController::class, 'show'])->whereNumber('id')->name('pos.local.show');
 });
 

@@ -52,12 +52,13 @@ class NewPasswordController extends Controller
             'password' => Hash::make($request->password),
             'remember_token' => Str::random(60),
         ];
-        // POS team roles keep the admin-viewable encrypted copy in sync
-        // (owner, Jul 2026) so /pos/team never shows a stale password after a
-        // forgot-password reset. Drift-safe: only when the column exists.
-        if (in_array($user->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true)
-            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
-            $fill['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
+        // Roles with an owner/admin-viewable password copy keep it in sync
+        // (owner, Jul 2026) so /pos/team — and, since Task 665, the owner's
+        // Local Bills viewer section — never shows a stale password after a
+        // forgot-password reset. ViewablePasswordService = single truth for
+        // the role list and the drift guard.
+        if (\App\Services\ViewablePasswordService::supports($user->pos_role)) {
+            $fill = \App\Services\ViewablePasswordService::apply($fill, $request->password);
         }
         $user->forceFill($fill)->save();
 

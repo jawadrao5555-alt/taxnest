@@ -308,6 +308,21 @@ class User extends Authenticatable
         return $this->pos_role === 'local_viewer';
     }
 
+    /**
+     * Local Bills Portal — self-service viewer accounts (owner request, Task
+     * 665): the company OWNER may create/manage the read-only local_viewer
+     * logins himself, straight from /pos/local-bills. STRICTLY the real owner
+     * (base role company_admin) — pos_manager must never see the section nor
+     * pass the endpoint guard, so isPosAdmin() (which treats managers as
+     * admin-equivalent) must NOT be used here. Same strictness as
+     * canRequeueExemptPra(); single truth for the controller guard AND the
+     * Blade section.
+     */
+    public function canManageLocalViewers(): bool
+    {
+        return $this->role === 'company_admin';
+    }
+
     public function isPosKitchen()
     {
         return $this->pos_role === 'pos_kitchen';

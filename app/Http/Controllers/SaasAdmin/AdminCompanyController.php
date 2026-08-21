@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Services\CredentialLedgerService;
+use App\Services\LocalViewerService;
+use App\Services\ViewablePasswordService;
 use App\Models\Notification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -707,15 +709,15 @@ class AdminCompanyController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
-            'company_id' => $company->id,
-            'role' => 'employee',
-            'pos_role' => 'local_viewer',
-            'is_active' => true,
-        ]);
+        // One shared creation path with the owner's own portal section (Task
+        // 665): same row shape, same company-wide cap, and the owner-viewable
+        // password copy — the owner re-reads that password on /pos/local-bills,
+        // so a SaaS-side write that skipped the copy would leave him with a
+        // blank/stale one.
+        $user = LocalViewerService::create($company->id, $request->name, $request->email, $request->password);
+        if (!$user) {
+            return back()->with('error', LocalViewerService::capacityMessage());
+        }
 
         AdminAuditLog::log(auth('admin')->id(), 'Local Bills Viewer created', 'User', $user->id, [
             'company_id' => $company->id,
@@ -746,6 +748,8 @@ class AdminCompanyController extends Controller
         ];
         if ($request->filled('password')) {
             $update['password'] = bcrypt($request->password);
+            // Keep the owner-viewable copy in step (Task 665) — see storeLocalViewer.
+            $update = ViewablePasswordService::apply($update, $request->password);
         }
         $user->update($update);
 

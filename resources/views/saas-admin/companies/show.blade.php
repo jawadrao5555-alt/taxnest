@@ -717,17 +717,28 @@
     @endif
 
     @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin())
+    @php
+        // Cap is company-wide and SHARED with the owner's own section on
+        // /pos/local-bills (Task 665) — the service is the single truth.
+        $lvCap = \App\Services\LocalViewerService::MAX_PER_COMPANY;
+        $lvAtCap = $localViewers->count() >= $lvCap;
+    @endphp
     <div class="bg-gradient-to-br from-violet-950/40 to-slate-900 border border-violet-800/40 rounded-xl p-5 mt-6" x-data="{ showCreateLv: false }">
         <div class="flex items-center justify-between mb-3">
             <div>
                 <h3 class="text-sm font-semibold text-white flex items-center gap-2">
                     <span class="text-violet-400">🧾</span> Local Bills Portal — Viewer Accounts
                 </h3>
-                <p class="text-xs text-gray-400 mt-0.5">Dedicated read-only logins for LIVE + archived local (non-PRA) bills — the ONLY jagah jahan local bills nazar aate hain. Login at <code class="text-violet-300">/pos/login</code> (auto-detected). POS admin/cashier ko ye accounts nazar nahi aate.</p>
+                <p class="text-xs text-gray-400 mt-0.5">Dedicated read-only logins for LIVE + archived local (non-PRA) bills — the ONLY jagah jahan local bills nazar aate hain. Login at <code class="text-violet-300">/pos/login</code> (auto-detected). POS admin/cashier ko ye accounts nazar nahi aate. Company owner khud bhi ye accounts bana sakta hai (max {{ $lvCap }} per company, dono panels ka same limit).</p>
             </div>
-            <button type="button" @click="showCreateLv = !showCreateLv" class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition">+ New Viewer</button>
+            @if($lvAtCap)
+                <span class="px-3 py-1.5 bg-gray-800 text-gray-500 text-xs font-medium rounded-lg cursor-not-allowed" title="Limit reached">Limit reached ({{ $lvCap }}/{{ $lvCap }})</span>
+            @else
+                <button type="button" @click="showCreateLv = !showCreateLv" class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition">+ New Viewer</button>
+            @endif
         </div>
 
+        @unless($lvAtCap)
         <div x-show="showCreateLv" x-cloak class="bg-gray-900/60 border border-violet-800/30 rounded-lg p-4 mb-3">
             <form method="POST" action="{{ route('saas.admin.companies.local-viewer.store', $company->id) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 @csrf
@@ -739,6 +750,11 @@
                 </div>
             </form>
         </div>
+        @else
+        <p class="text-xs text-amber-300/80 bg-amber-950/30 border border-amber-900/40 rounded-lg px-3 py-2 mb-3">
+            This company already has {{ $lvCap }} viewer accounts (owner-created and admin-created share the limit). Delete one below to add another.
+        </p>
+        @endunless
 
         @if($localViewers->isEmpty())
             <p class="text-xs text-gray-500">No Local Bills Viewer accounts yet.</p>

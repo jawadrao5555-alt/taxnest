@@ -90,6 +90,10 @@ class PosTransaction extends Model
         'tax_menu_rate' => 'decimal:2',
         'lock_time' => 'datetime',
         'is_wastage' => 'boolean',
+        // Archive portal (Task 1339): the archive list/detail/CSV all call
+        // ->archived_at?->format(); without this cast the raw DB string blew up
+        // the ONLY page an archive_viewer account can open.
+        'archived_at' => 'datetime',
     ];
 
     public function company()

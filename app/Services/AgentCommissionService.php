@@ -17,6 +17,12 @@ use Illuminate\Support\Facades\Schema;
  * proof counts as a NEW sale (rate_new); every later one is a RENEWAL
  * (rate_renewal). Rates are frozen on the ledger line at creation time —
  * changing an agent's Schedule A rates only affects future lines.
+ *
+ * PACKAGE proofs only. The extra-branch add-on (Rs 10,000/branch/year) rides
+ * on the same payment_proofs table but is NOT a package sale: commissioning it
+ * would both invent ledger lines and — worse — let an add-on proof count as the
+ * company's "earlier" payment, silently demoting a real new sale to the lower
+ * renewal rate. Every proof query here stays on the subscription lane.
  */
 class AgentCommissionService
 {
@@ -25,6 +31,9 @@ class AgentCommissionService
     {
         try {
             if (!Schema::hasTable('agent_commissions')) {
+                return;
+            }
+            if ($proof->isExtraBranch()) {
                 return;
             }
             self::createEarnLine($proof);
@@ -49,7 +58,8 @@ class AgentCommissionService
                 return;
             }
 
-            $proofs = PaymentProof::whereIn('company_id', $companyIds)
+            $proofs = PaymentProof::subscriptionKind()
+                ->whereIn('company_id', $companyIds)
                 ->where('status', 'verified')
                 ->orderBy('verified_at')
                 ->orderBy('id')
@@ -118,8 +128,11 @@ class AgentCommissionService
             return;
         }
 
-        // First cleared payment for the company = NEW sale; later = renewal.
-        $earlierProofExists = PaymentProof::where('company_id', $company->id)
+        // First cleared PACKAGE payment for the company = NEW sale; later =
+        // renewal. Add-on proofs are excluded so they can never demote a real
+        // new sale to the renewal rate.
+        $earlierProofExists = PaymentProof::subscriptionKind()
+            ->where('company_id', $company->id)
             ->where('status', 'verified')
             ->where('id', '!=', $proof->id)
             ->where(function ($q) use ($proof) {

@@ -360,17 +360,43 @@ class PlanLimitService
             return ['allowed' => false, 'reason' => 'No active subscription.'];
         }
 
-        $limit = $sub->pricingPlan->branch_limit;
-        if ($limit === null || $limit === -1) {
+        $included = $sub->pricingPlan->branch_limit;
+        if ($included === null || $included === -1) {
             return ['allowed' => true];
         }
 
+        // Paid extra-branch slots (Rs 10,000/branch/year add-on, Aug 2026) ride
+        // ON TOP of the branches the package already includes. Admin override
+        // above still wins outright; internal accounts never get here.
+        //
+        // applicableSlots(), NOT slots(): this method also gates FBR POS / DI
+        // companies, and the add-on is PRA-POS-only — a stored slot count must
+        // never widen a limit it was never sold for.
+        $slots = \App\Services\BranchAddonService::applicableSlots($company, $sub);
+        $limit = (int) $included + $slots;
+
         $count = Branch::where('company_id', $companyId)->count();
         if ($count >= $limit) {
-            return ['allowed' => false, 'reason' => "Branch limit reached ({$count}/{$limit}). Please upgrade your plan."];
+            // PRA POS shops can buy their way past this — point them at the
+            // add-on instead of a package upgrade (own localized string).
+            $reason = \App\Services\BranchAddonService::supportsPlan($sub->pricingPlan)
+                ? "Branch limit reached ({$count}/{$limit}). Buy an extra branch to add more."
+                : "Branch limit reached ({$count}/{$limit}). Please upgrade your plan.";
+
+            return [
+                'allowed' => false,
+                'reason' => $reason,
+                'included' => (int) $included,
+                'slots' => $slots,
+            ];
         }
 
-        return ['allowed' => true, 'remaining' => $limit - $count];
+        return [
+            'allowed' => true,
+            'remaining' => $limit - $count,
+            'included' => (int) $included,
+            'slots' => $slots,
+        ];
     }
 
     /**
@@ -444,7 +470,15 @@ class PlanLimitService
 
         $invoiceLimit = $company?->invoice_limit_override ?? $plan?->invoice_limit ?? 0;
         $userLimit = $company?->user_limit_override ?? $plan?->user_limit ?? 0;
-        $branchLimit = $company?->branch_limit_override ?? $plan?->branch_limit ?? 0;
+
+        // Branch limit = package ki shamil branches + khareede hue paid slots
+        // (admin override, jaisa hamesha, sab par bhaari). Reported limit must
+        // match what canAddBranch() actually enforces, so the same PRA-POS-only
+        // gate applies here — never the raw stored count.
+        $branchSlots = \App\Services\BranchAddonService::applicableSlots($company, $sub);
+        $planBranches = $plan?->branch_limit ?? 0;
+        $branchLimit = $company?->branch_limit_override
+            ?? (((int) $planBranches === -1) ? -1 : (int) $planBranches + $branchSlots);
 
         $invoiceCount = Invoice::where('company_id', $companyId)->count();
         $userCount = User::where('company_id', $companyId)->where('is_active', true)->count();
@@ -468,6 +502,7 @@ class PlanLimitService
                 'used' => $branchCount,
                 'source' => $company?->branch_limit_override !== null ? 'admin_override' : 'plan',
                 'display' => $branchLimit === -1 ? 'Unlimited' : $branchLimit,
+                'extra_slots' => $branchSlots,
             ],
         ];
     }

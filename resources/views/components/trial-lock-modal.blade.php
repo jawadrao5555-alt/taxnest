@@ -52,14 +52,16 @@
         $rejectedProof = null;
         $everRejected = false;
         if ($companyId && \Illuminate\Support\Facades\Schema::hasTable('payment_proofs')) {
-            $pendingProof = \App\Models\PaymentProof::where('company_id', $companyId)
+            // Package proofs only — an extra-branch add-on request must never
+            // hide the renewal form behind "under review".
+            $pendingProof = \App\Models\PaymentProof::subscriptionKind()->where('company_id', $companyId)
                 ->where('status', 'pending')->exists();
-            $everRejected = \App\Models\PaymentProof::where('company_id', $companyId)
+            $everRejected = \App\Models\PaymentProof::subscriptionKind()->where('company_id', $companyId)
                 ->where('status', 'rejected')->exists();
             // No pending proof + the LATEST proof was rejected → show the
             // reason right where the company resubmits.
             if (!$pendingProof) {
-                $latestProof = \App\Models\PaymentProof::where('company_id', $companyId)
+                $latestProof = \App\Models\PaymentProof::subscriptionKind()->where('company_id', $companyId)
                     ->orderByDesc('id')->first();
                 if ($latestProof && $latestProof->status === 'rejected') {
                     $rejectedProof = $latestProof;
@@ -87,14 +89,18 @@
                 ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')]]
                 : [['key' => 'annual', 'label' => __('pos.cycle_annual')]]);
 
+        // Total = base package + paid extra-branch slots (Rs 10,000/branch/year).
+        // $lockCompany is passed so this modal shows the SAME number the renewal
+        // actually charges — never a package-only price.
         $lockPlans = [];
         foreach (\App\Models\PricingPlan::where('is_trial', false)->where('product_type', $lockProductType)->orderBy('price')->get() as $lp) {
             $prices = [];
             foreach ($lockCycles as $lc) {
-                $prices[$lc['key']] = \App\Services\SubscriptionAssignmentService::computePrice($lp, $lc['key'])['final_price'];
+                $prices[$lc['key']] = \App\Services\SubscriptionAssignmentService::computePrice($lp, $lc['key'], $lockCompany)['final_price'];
             }
             $lockPlans[] = ['id' => $lp->id, 'name' => $lp->name, 'prices' => $prices];
         }
+        $lockBranchSlots = \App\Services\BranchAddonService::slots($lockCompany);
         // Sale note is only relevant for POS — quarterly is annual-only there.
         // DI has quarterly as a real discounted cycle so we never show this warning there.
         $lockSaleActive = $lockProductType === 'pos' && \App\Models\SaleCampaign::activeFor('pos') !== null;
@@ -251,6 +257,10 @@
                          class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                         {{ __('pos.se_sale_annual_note') }}
                     </div>
+                    @if($lockBranchSlots > 0)
+                    {{-- Paid extra branches ride on the package total (Rs 10,000/branch/year). --}}
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.eb_total_note', ['slots' => $lockBranchSlots, 'price' => number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR)]) }}</p>
+                    @endif
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="{{ __('pos.pp_amount_paid') }}"

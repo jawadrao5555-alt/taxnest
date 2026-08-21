@@ -106,16 +106,21 @@
                     ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')]]
                     : [['key' => 'annual', 'label' => __('pos.cycle_annual')]]);
             try {
+                // Total = base package + paid extra-branch slots (Rs 10,000/branch/
+                // year). $seCompany is passed so this popup shows the SAME number
+                // the renewal actually charges.
                 foreach (\App\Models\PricingPlan::where('is_trial', false)->where('product_type', $seProductType)->orderBy('price')->get() as $seLp) {
                     $sePrices = [];
                     foreach ($seCycles as $seLc) {
-                        $sePrices[$seLc['key']] = \App\Services\SubscriptionAssignmentService::computePrice($seLp, $seLc['key'])['final_price'];
+                        $sePrices[$seLc['key']] = \App\Services\SubscriptionAssignmentService::computePrice($seLp, $seLc['key'], $seCompany)['final_price'];
                     }
                     $sePlans[] = ['id' => $seLp->id, 'name' => $seLp->name, 'prices' => $sePrices];
                 }
                 $seSaleActive = $seProductType === 'pos' && \App\Models\SaleCampaign::activeFor('pos') !== null;
                 if (\Illuminate\Support\Facades\Schema::hasTable('payment_proofs')) {
-                    $sePendingProof = \App\Models\PaymentProof::where('company_id', $seCompanyId)
+                    // Package proofs only — an extra-branch request must not
+                    // replace the renewal form with "under review".
+                    $sePendingProof = \App\Models\PaymentProof::subscriptionKind()->where('company_id', $seCompanyId)
                         ->where('status', 'pending')->exists();
                 }
             } catch (\Throwable $seEx2) {
@@ -128,6 +133,7 @@
         $seForceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('amount')
             || $errors->has('pricing_plan_id') || $errors->has('billing_cycle');
 
+        $seBranchSlots = \App\Services\BranchAddonService::slots($seCompany);
         $seSnoozeKey = 'se_snooze_' . $seCompanyId . '_' . ($sePopup['until'] ?? 'x');
     }
 @endphp
@@ -280,6 +286,10 @@
                          class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                         {{ __('pos.se_sale_annual_note') }}
                     </div>
+                    @if($seBranchSlots > 0)
+                    {{-- Paid extra branches ride on the package total (Rs 10,000/branch/year). --}}
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.eb_total_note', ['slots' => $seBranchSlots, 'price' => number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR)]) }}</p>
+                    @endif
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="{{ __('pos.pp_amount_paid') }}"

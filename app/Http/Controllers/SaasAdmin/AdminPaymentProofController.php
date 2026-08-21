@@ -49,12 +49,20 @@ class AdminPaymentProofController extends Controller
 
     public function approve(Request $request, $id)
     {
+        $proof = PaymentProof::with('pricingPlan')->findOrFail($id);
+
+        // Extra-branch add-on request: apna raasta — SIRF slots barhte hain.
+        // Package, uski miyaad, uski qeemat aur subscription row jyun ki tyun
+        // (normal approve subscription DOBARA banata hai — us se bachna zaroori
+        // hai, warna chalte hue admin grants toot jate hain).
+        if ($proof->isExtraBranch()) {
+            return $this->approveExtraBranch($request, $proof);
+        }
+
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
         ]);
-
-        $proof = PaymentProof::with('pricingPlan')->findOrFail($id);
 
         $plan = PricingPlan::findOrFail((int) $request->pricing_plan_id);
         if ($plan->is_trial) {
@@ -140,6 +148,68 @@ class AdminPaymentProofController extends Controller
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
 
         return back()->with('success', 'Payment approved & subscription activated — company is now unlocked.');
+    }
+
+    /**
+     * Extra-branch add-on approval (Rs 10,000/branch/year).
+     *
+     * Sirf companies.extra_branch_slots barhta hai — subscription row, plan,
+     * miyaad, qeemat aur company status ko bilkul haath nahi lagaya jata.
+     * Admin approve karte waqt tadaad theek kar sakta hai (agar shop ne kam/
+     * zyada paisa bheja ho).
+     */
+    private function approveExtraBranch(Request $request, PaymentProof $proof)
+    {
+        $request->validate([
+            'extra_branch_qty' => 'nullable|integer|min:1|max:' . \App\Services\BranchAddonService::MAX_QTY,
+        ]);
+
+        if (!\App\Services\BranchAddonService::slotsColumnExists()) {
+            return back()->with('error', 'The extra_branch_slots column is missing — run php artisan migrate --force first.');
+        }
+
+        $qty = (int) ($request->input('extra_branch_qty') ?: $proof->extra_branch_qty ?: 1);
+        $qty = max(1, min(\App\Services\BranchAddonService::MAX_QTY, $qty));
+
+        $result = DB::transaction(function () use ($proof, $qty) {
+            $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
+            if (!$locked || $locked->status !== 'pending') {
+                return null;
+            }
+
+            $company = Company::where('id', $locked->company_id)->lockForUpdate()->first();
+            if (!$company) {
+                return null;
+            }
+
+            $before = \App\Services\BranchAddonService::slots($company);
+            $company->update(['extra_branch_slots' => $before + $qty]);
+
+            $locked->update([
+                'status' => 'verified',
+                'extra_branch_qty' => $qty,
+                'verified_by' => auth('admin')->id(),
+                'verified_at' => now(),
+                'reject_reason' => null,
+            ]);
+
+            return ['company' => $company, 'before' => $before, 'after' => $before + $qty];
+        });
+
+        if (!$result) {
+            return back()->with('error', 'This payment proof was already processed.');
+        }
+
+        AdminAuditLog::log(auth('admin')->id(), 'Extra branch slots approved', 'PaymentProof', $proof->id, [
+            'company_id' => $proof->company_id,
+            'qty' => $qty,
+            'slots_before' => $result['before'],
+            'slots_after' => $result['after'],
+        ]);
+
+        $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
+
+        return back()->with('success', "Extra branch approved — {$result['company']->name} now has {$result['after']} paid branch slot(s). The package and its expiry were not changed.");
     }
 
     public function reject(Request $request, $id)
@@ -287,6 +357,82 @@ class AdminPaymentProofController extends Controller
                 'fbrpos' => ['Nest FBR POS', url('/fbr-pos/login')],
                 default => ['Digital Invoicing', url('/login')],
             };
+
+            // Extra-branch add-on: package ki baat hi nahi — sirf branch slots.
+            if ($proof->isExtraBranch()) {
+                $qty = max(1, (int) ($proof->extra_branch_qty ?? 1));
+                $total = \App\Services\BranchAddonService::slots($company);
+
+                if ($decision === 'approved') {
+                    $title = 'Extra branch approved';
+                    $message = "Your extra branch request ({$qty}) has been approved. You can add the new branch now — your package and its expiry date have not changed.";
+                    $subject = 'Extra branch approved — you can add it now';
+                    $headline = 'Your extra branch request has been approved.';
+                    $paragraphs = [
+                        "We have verified your payment for {$qty} extra branch(es) for {$company->name}.",
+                        "Paid extra branch slots: {$total}.",
+                        'Open Branches in your NestPOS panel and add the new branch. Your package, its expiry date and its price stay exactly the same.',
+                    ];
+                    $ctaLabel = 'Add My Branch';
+                } else {
+                    $reason = trim((string) $proof->reject_reason);
+                    $reasonLine = $reason !== '' ? $reason : 'No reason specified — please contact support.';
+                    if (!str_ends_with($reasonLine, '.')) {
+                        $reasonLine .= '.';
+                    }
+                    $title = 'Extra branch request rejected';
+                    $message = 'Your extra branch request was rejected: ' . $reasonLine . ' No branch slots were added.';
+                    $subject = 'Extra branch request rejected — action required';
+                    $headline = 'Your extra branch request could not be verified.';
+                    $paragraphs = [
+                        "The extra branch payment you submitted for {$company->name} could not be verified.",
+                        "Reason: {$reasonLine}",
+                        'No branch slots were added. Please submit a new payment proof from the Branches page, or contact our support team on WhatsApp.',
+                    ];
+                    $ctaLabel = 'Log In & Resubmit';
+                }
+
+                Notification::create([
+                    'company_id' => $company->id,
+                    'type' => $decision === 'approved' ? 'extra_branch_approved' : 'extra_branch_rejected',
+                    'title' => $title,
+                    'message' => $message,
+                    'read' => false,
+                    'metadata' => [
+                        'payment_proof_id' => $proof->id,
+                        'product_type' => $plan?->product_type ?? 'pos',
+                        'extra_branch_qty' => $qty,
+                    ],
+                ]);
+
+                $email = $this->companyRecipientEmail($company);
+                if ($email) {
+                    try {
+                        Mail::to($email)->send(new \App\Mail\TrialReminderMail(
+                            subjectLine: $subject,
+                            companyName: $company->name ?? 'your company',
+                            headline: $headline,
+                            paragraphs: $paragraphs,
+                            ctaUrl: $ctaUrl,
+                            ctaLabel: $ctaLabel,
+                            panelName: $panelName,
+                        ));
+
+                        \App\Services\MailHealth::recordSuccess();
+                    } catch (\Throwable $e) {
+                        Log::warning('Extra branch decision email failed', [
+                            'payment_proof_id' => $proof->id,
+                            'company_id' => $company->id,
+                            'decision' => $decision,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        \App\Services\MailHealth::recordFailure('Extra branch decision email', $e);
+                    }
+                }
+
+                return;
+            }
 
             if ($decision === 'approved') {
                 $title = 'Payment verified — account unlocked';

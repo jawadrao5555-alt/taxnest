@@ -47,6 +47,8 @@ class SubscriptionAccessService
             // Branch quota (Task 1347): plan limit vs admin override — the POS
             // Branches page shows this to the shop owner, so it must localize.
             preg_match('/^Branch limit reached \((\d+)\/(\d+)\)\. Please contact admin/', $reason, $m) === 1 => __('pos.tl_reason_branch_admin', ['used' => $m[1], 'limit' => $m[2]]),
+            // PRA POS: package ki branches khatam — agli branch paid add-on hai.
+            preg_match('/^Branch limit reached \((\d+)\/(\d+)\)\. Buy an extra branch/', $reason, $m) === 1 => __('pos.tl_reason_branch_addon', ['used' => $m[1], 'limit' => $m[2], 'price' => number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR)]),
             preg_match('/^Branch limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_branch_plan', ['used' => $m[1], 'limit' => $m[2]]),
             default => $reason,
         };

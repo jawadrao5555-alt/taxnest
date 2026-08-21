@@ -49,6 +49,9 @@ class Company extends Model
         'invoice_limit_override',
         'user_limit_override',
         'branch_limit_override',
+        // Paid extra-branch slots (Rs 10,000/branch/year add-on, Aug 2026) —
+        // package ki shamil branches se OOPER khareede hue slots.
+        'extra_branch_slots',
         'requested_plan_id',
         'referred_by_user_id',
         'referral_code_used',
@@ -180,6 +183,7 @@ class Company extends Model
     ];
 
     protected $casts = [
+        'extra_branch_slots' => 'integer',
         'token_expires_at' => 'datetime',
         'suspended_at' => 'datetime',
         'token_expiry_date' => 'date',

@@ -25,6 +25,34 @@
             </div>
             @endif
 
+            {{-- Paid extra branches (Rs 10,000/branch/year add-on). The renewal total
+                 comes from SubscriptionAssignmentService::computePrice($plan, $cycle,
+                 $company) — the SAME formula the renewal charge uses, so this page can
+                 never disagree with the expiry popup / lock modal / admin panel. --}}
+            @php
+                $ebSlots = \App\Services\BranchAddonService::slots($company);
+                $ebRenewal = ($ebSlots > 0 && $currentSubscription && $currentSubscription->pricingPlan)
+                    ? \App\Services\SubscriptionAssignmentService::computePrice(
+                        $currentSubscription->pricingPlan,
+                        $currentSubscription->billing_cycle ?? 'annual',
+                        $company
+                      )
+                    : null;
+            @endphp
+            @if($ebRenewal)
+            <div class="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-700 rounded-xl p-4 mb-8">
+                <p class="text-sm font-semibold text-sky-800 dark:text-sky-200">
+                    {{ __('pos.eb_billing_title', ['slots' => $ebSlots]) }}
+                </p>
+                <p class="text-xs text-sky-700 dark:text-sky-300 mt-1">
+                    PKR {{ number_format($ebRenewal['base_price']) }} {{ __('pos.eb_package_word') }}
+                    + PKR {{ number_format($ebRenewal['extra_branch_price']) }} {{ __('pos.eb_branches_word') }}
+                    = <span class="font-bold">PKR {{ number_format($ebRenewal['final_price']) }}</span>
+                    {{ __('pos.eb_on_renewal') }}
+                </p>
+            </div>
+            @endif
+
             @php $annualDiscount = 6; @endphp
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -85,8 +113,12 @@
                             </div>
                             <div class="flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-200">
                                 <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                                {{ $plan->getBranchLimitDisplay() }} branch{{ $plan->branch_limit === 1 ? '' : 'es' }}
+                                {{ $plan->getBranchLimitDisplay() }} branch{{ $plan->branch_limit === 1 ? '' : 'es' }} included
                             </div>
+                            {{-- Included branches are free; beyond them it is a paid add-on. --}}
+                            @if(!$plan->isUnlimitedBranches())
+                            <p class="text-[11px] text-gray-400 dark:text-gray-500 pl-6">+ PKR {{ number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR) }}/year per extra branch</p>
+                            @endif
                         </div>
 
                         @if(!empty($planFeatures))

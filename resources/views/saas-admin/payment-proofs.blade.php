@@ -49,13 +49,28 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-gray-300">
-                                @if($proof->pricingPlan)
+                                @if($proof->isExtraBranch())
+                                    {{-- Extra-branch add-on request — no package, no cycle. --}}
+                                    @php $ebQty = max(1, (int) ($proof->extra_branch_qty ?? 1)); @endphp
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-sky-900/40 text-sky-300 border border-sky-700/60">Extra branch &times; {{ $ebQty }}</span>
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                        Add-on only · Rs {{ number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR) }}/branch/year
+                                        @if($proof->pricingPlan)
+                                            · on {{ $proof->pricingPlan->name }}
+                                        @endif
+                                    </span>
+                                @elseif($proof->pricingPlan)
                                     @php
                                         $reqCycle = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle);
-                                        $reqPriced = \App\Services\SubscriptionAssignmentService::computePrice($proof->pricingPlan, $reqCycle);
+                                        $reqPriced = \App\Services\SubscriptionAssignmentService::computePrice($proof->pricingPlan, $reqCycle, $proof->company);
                                     @endphp
                                     <span class="text-white font-medium">{{ $proof->pricingPlan->name }}</span>
-                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ \App\Models\Subscription::getCycleLabel($reqPriced['cycle']) }} · PKR {{ number_format($reqPriced['final_price']) }}</span>
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400">
+                                        {{ \App\Models\Subscription::getCycleLabel($reqPriced['cycle']) }} · PKR {{ number_format($reqPriced['final_price']) }}
+                                        @if(($reqPriced['extra_branch_price'] ?? 0) > 0)
+                                            <span class="block">= PKR {{ number_format($reqPriced['base_price']) }} package + PKR {{ number_format($reqPriced['extra_branch_price']) }} for {{ $reqPriced['extra_branch_slots'] }} extra branch(es)</span>
+                                        @endif
+                                    </span>
                                 @else
                                     <span class="text-gray-500 dark:text-gray-400">—</span>
                                 @endif
@@ -114,6 +129,22 @@
                                     <button @click="panel = (panel === 'approve' ? null : 'approve')" class="text-xs text-emerald-400 hover:text-emerald-300 mr-2">Approve</button>
                                     <button @click="panel = (panel === 'reject' ? null : 'reject')" class="text-xs text-red-400 hover:text-red-300">Reject</button>
 
+                                    @if($proof->isExtraBranch())
+                                    {{-- Add-on approval: SIRF slots barhte hain. Koi plan/cycle
+                                         select nahi — subscription row, miyaad aur qeemat
+                                         bilkul waise hi rehte hain. --}}
+                                    <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px]">
+                                        @php $ebQtySel = max(1, (int) ($proof->extra_branch_qty ?? 1)); @endphp
+                                        <p class="text-[11px] text-gray-400 mb-1">Extra branch request. Approving adds <span class="text-gray-200 font-medium">branch slots only</span> — the package, its expiry and the subscription row are not touched.</p>
+                                        <p class="text-[11px] text-gray-500">Current paid slots: {{ (int) ($proof->company->extra_branch_slots ?? 0) }}</p>
+                                        <form method="POST" action="{{ route('saas.admin.payment-proofs.approve', $proof->id) }}" class="space-y-2">
+                                            @csrf
+                                            <label class="block text-[11px] text-gray-400">Branch slots to add</label>
+                                            <input type="number" name="extra_branch_qty" value="{{ $ebQtySel }}" min="1" max="{{ \App\Services\BranchAddonService::MAX_QTY }}" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Extra Branch</button>
+                                        </form>
+                                    </div>
+                                    @else
                                     <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px]">
                                         @php $reqCycleSel = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle); @endphp
                                         @if($proof->pricingPlan)
@@ -138,6 +169,7 @@
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve &amp; Unlock</button>
                                         </form>
                                     </div>
+                                    @endif
 
                                     <div x-show="panel === 'reject'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px]">
                                         <form method="POST" action="{{ route('saas.admin.payment-proofs.reject', $proof->id) }}" class="space-y-2">

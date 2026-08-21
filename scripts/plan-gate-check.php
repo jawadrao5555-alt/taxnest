@@ -32,9 +32,12 @@ $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Http\Controllers\PublicProfileController;
+use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\BranchAddonService;
+use App\Services\PlanLimitService;
 use App\Services\PosFeatureService;
 use App\Services\PosAccessService;
 use Illuminate\Support\Facades\DB;
@@ -82,6 +85,13 @@ $MATRIX = [
     'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true,  true, true, true, false, true],
     'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true, true,  true],
 ];
+// Branch ladder (owner-approved 21 Aug 2026): har package apne card wali
+// branches MUFT deta hai; us se ooper har branch Rs 10,000 SAALANA paid add-on
+// (BranchAddonService + companies.extra_branch_slots). Unlimited ki hadd -1 se
+// 5 hui — warna branch feature live hote hi wo shop bila hisaab branches bana
+// leti. Ye qatar aur pricing formula lockstep mein rehni chahiye.
+$BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Pro' => 2, 'Pro Max' => 3, 'Unlimited' => 5];
+
 // Derived-surface expectations per plan:
 $CUSTOM_SET_PLANS = ['Unlimited'];                   // customSet() honored only here
 $QR_URL_PLANS     = ['Pro', 'Pro Max', 'Unlimited']; // publicUrlFor() non-null only here
@@ -173,6 +183,11 @@ try {
         check(($set !== null) === $wantSet,
             "plan {$planName}: customSet() should be " . ($wantSet ? 'HONORED' : 'inert (null)') . ', got ' . ($set === null ? 'null' : 'set'));
 
+        // Branch ladder: the plan row must match the owner-approved count.
+        $wantBranches = $BRANCH_LADDER[$planName] ?? null;
+        check((int) $plans[$planName]->branch_limit === $wantBranches,
+            "plan {$planName}: branch_limit must be {$wantBranches}, got " . var_export($plans[$planName]->branch_limit, true));
+
         // QR Menu public URL: enabled page + slug, gate decides.
         $c->public_profile_slug = strtolower(str_pad(dechex($c->id), 16, 'a'));
         $c->public_profile_settings = ['enabled' => true];
@@ -220,6 +235,55 @@ try {
     $c->is_internal_account = true;
     $c->save();
     $assertGates($c->fresh(), $allTrue, 'internal account');
+
+    // ── 6b. Paid extra-branch add-on (Rs 10,000/branch/year) ────────────
+    //   included branches free → hadd par ruke → khareede hue slots se aage
+    //   khule → renewal ka total base + slots×10,000 bane. Admin override aur
+    //   trial ke rules waise ke waise.
+    $ebPlan = $plans['Pro'];                    // 2 included branches
+    $c = $mkCompany('BranchAddon');
+    $mkSub($c, $ebPlan->id);
+    $mkBranch = function (Company $co, string $nm) {
+        Branch::create(['company_id' => $co->id, 'name' => $nm, 'is_active' => true, 'is_head_office' => false]);
+    };
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === true, 'add-on: included branches must be free (0/2)');
+    $mkBranch($c, 'B1');
+    $mkBranch($c, 'B2');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop at the package limit (2/2)');
+    $c->extra_branch_slots = 1;
+    $c->save();
+    check(PlanLimitService::canAddBranch($c->fresh()->id)['allowed'] === true, 'add-on: a paid slot must open the next branch (2/3)');
+    $mkBranch($c, 'B3');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop again once the paid slot is used (3/3)');
+
+    // Pricing formula — one source of truth for every surface.
+    check(BranchAddonService::priceForMonths(1, 12) === 10000.0, 'add-on: 1 slot / 12 months must be Rs 10,000');
+    check(BranchAddonService::priceForMonths(3, 12) === 30000.0, 'add-on: 3 slots / 12 months must be Rs 30,000');
+    check(BranchAddonService::priceForMonths(1, 6) === 5000.0, 'add-on: 1 slot / 6 months pro-rata must be Rs 5,000');
+    $ebPriced = \App\Services\SubscriptionAssignmentService::computePrice(
+        \App\Models\PricingPlan::find($ebPlan->id), 'annual', $c->fresh()
+    );
+    check((float) $ebPriced['extra_branch_price'] === 10000.0,
+        'add-on: renewal total must include 1 slot × Rs 10,000, got ' . $ebPriced['extra_branch_price']);
+    check((float) $ebPriced['final_price'] === (float) $ebPriced['base_price'] + 10000.0,
+        'add-on: renewal total must be base package + slots');
+
+    // Trial wali company add-on nahi khareed sakti.
+    if ($trialPlan) {
+        $ct = $mkCompany('BranchAddonTrial');
+        $mkSub($ct, $trialPlan->id, ['trial_ends_at' => now()->addDays(7)]);
+        check(BranchAddonService::purchaseEligibility($ct->fresh())['allowed'] === false,
+            'add-on: trial company must not be able to buy extra branches');
+    }
+    // Admin branch override still wins outright (aur kharidari band).
+    $co = $mkCompany('BranchAddonOverride');
+    $mkSub($co, $ebPlan->id);
+    $co->branch_limit_override = 9;
+    $co->save();
+    check(BranchAddonService::purchaseEligibility($co->fresh())['allowed'] === false,
+        'add-on: admin branch override must disable the purchase path');
+    check(PlanLimitService::canAddBranch($co->id)['allowed'] === true,
+        'add-on: admin branch override must still win over plan+slots');
 
     // ── 7. FBR POS ladder (owner-approved 9 Aug 2026 — strict binding +
     //       reprice 999/1999/2999). Rows matched by product_type+name; a

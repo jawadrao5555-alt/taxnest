@@ -42,7 +42,21 @@ class PosBranchController extends Controller
         $branches = Branch::where('company_id', $this->companyId())
             ->orderByDesc('is_head_office')->orderBy('name')->get();
         $quota = PlanLimitService::canAddBranch($this->companyId());
-        return view('pos.branches', compact('branches', 'quota'));
+
+        // Paid extra-branch add-on (Rs 10,000/branch/year). Prices come from
+        // BranchAddonService so the page always quotes exactly what the
+        // approval will charge — no client-side arithmetic.
+        $company = \App\Models\Company::find($this->companyId());
+        $addon = \App\Services\BranchAddonService::status($company);
+        $bank = [
+            'bank_name' => \App\Models\SystemSetting::get('payment_bank_name', ''),
+            'account_title' => \App\Models\SystemSetting::get('payment_account_title', ''),
+            'account_number' => \App\Models\SystemSetting::get('payment_account_number', ''),
+            'iban' => \App\Models\SystemSetting::get('payment_iban', ''),
+            'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
+        ];
+
+        return view('pos.branches', compact('branches', 'quota', 'addon', 'bank'));
     }
 
     public function store(Request $r)

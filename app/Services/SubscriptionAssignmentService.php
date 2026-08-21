@@ -38,9 +38,35 @@ class SubscriptionAssignmentService
      *  - pos / standalone: sale_price is ALREADY the ANNUAL total (6% baked in) → use as-is (annual only).
      *  - fbrpos:           sale_price is MONTHLY           → annual = sale_price × 12 × 0.94 (6% off).
      *
+     * Pass $company to get the TOTAL the shop actually pays: base package +
+     * paid extra-branch slots (Rs 10,000/branch/year, PRA POS only). Every
+     * surface that shows or charges a renewal total must pass it, so the shop
+     * never sees two different numbers.
+     *
+     * @return array{cycle:string, final_price:float, discount_percent:float, base_price:float, extra_branch_price:float, extra_branch_slots:int}
+     */
+    public static function computePrice(PricingPlan $plan, string $cycle, ?\App\Models\Company $company = null): array
+    {
+        $priced = self::computeBasePrice($plan, $cycle);
+
+        $addon = BranchAddonService::addonForCycle($company, $plan, $priced['cycle']);
+
+        return [
+            'cycle' => $priced['cycle'],
+            'final_price' => $priced['final_price'] + $addon,
+            'discount_percent' => $priced['discount_percent'],
+            'base_price' => $priced['final_price'],
+            'extra_branch_price' => $addon,
+            'extra_branch_slots' => $addon > 0 ? BranchAddonService::slots($company) : 0,
+        ];
+    }
+
+    /**
+     * Package ki apni qeemat (add-on ke baghair) — computePrice ka core.
+     *
      * @return array{cycle:string, final_price:float, discount_percent:float}
      */
-    public static function computePrice(PricingPlan $plan, string $cycle): array
+    private static function computeBasePrice(PricingPlan $plan, string $cycle): array
     {
         $type = $plan->product_type ?? 'di';
         $cycle = self::normalizeCycle($cycle);
@@ -92,7 +118,9 @@ class SubscriptionAssignmentService
 
         // Product-type-aware pricing also normalizes/forces the correct cycle
         // (e.g. POS is annual-only), so the expiry below always matches the charge.
-        $priced = self::computePrice($plan, $billingCycle);
+        // The company is passed so a renewal is charged base package + the
+        // extra-branch slots it has already bought (Rs 10,000/branch/year).
+        $priced = self::computePrice($plan, $billingCycle, BranchAddonService::findCompany($companyId));
         $cycle = $priced['cycle'];
         $months = Subscription::getMonthsForCycle($cycle);
 

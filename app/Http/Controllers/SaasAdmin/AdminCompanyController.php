@@ -922,14 +922,38 @@ class AdminCompanyController extends Controller
             'invoice_limit_override' => 'nullable|integer|min:0',
             'user_limit_override' => 'nullable|integer|min:0',
             'branch_limit_override' => 'nullable|integer|min:0',
+            // Paid extra-branch slots — admin ke hath se (paisa bahar se
+            // wasool hone ki soorat mein). Rs 10,000/branch/year add-on.
+            'extra_branch_slots' => 'nullable|integer|min:0|max:' . \App\Services\BranchAddonService::MAX_QTY * 10,
         ]);
 
-        $company->update($request->only(['invoice_limit_override', 'user_limit_override', 'branch_limit_override']));
+        $fields = ['invoice_limit_override', 'user_limit_override', 'branch_limit_override'];
+        $slotsBefore = \App\Services\BranchAddonService::slots($company);
+        $slotsAfter = $slotsBefore;
+
+        if ($request->has('extra_branch_slots') && \App\Services\BranchAddonService::slotsColumnExists()) {
+            $slotsAfter = max(0, (int) $request->input('extra_branch_slots'));
+
+            // The add-on is a PRA POS product. Storing a count on an FBR POS /
+            // DI / standalone / trial company would be a number the branch gate
+            // deliberately ignores — refuse it instead of pretending it worked.
+            // Clearing to zero stays allowed so a stale count can be cleaned up.
+            if ($slotsAfter > 0 && !\App\Services\BranchAddonService::supportsCompany($company)) {
+                return back()->with('error', 'Paid extra branch slots apply to active NestPOS (PRA) packages only — this company\'s current plan cannot use them.');
+            }
+
+            $fields[] = 'extra_branch_slots';
+            $request->merge(['extra_branch_slots' => $slotsAfter]);
+        }
+
+        $company->update($request->only($fields));
         AdminAuditLog::log(auth('admin')->id(), 'Company limits updated', 'Company', $id, [
             'name' => $company->name,
             'invoice_limit' => $request->invoice_limit_override,
             'user_limit' => $request->user_limit_override,
             'branch_limit' => $request->branch_limit_override,
+            'extra_branch_slots_before' => $slotsBefore,
+            'extra_branch_slots_after' => $slotsAfter,
         ]);
         return back()->with('success', "Limits updated for '{$company->name}'.");
     }

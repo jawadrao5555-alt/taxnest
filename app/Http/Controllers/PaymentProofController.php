@@ -31,6 +31,13 @@ class PaymentProofController extends Controller
         }
 
         $company = \App\Models\Company::find($companyId);
+
+        // Extra-branch add-on request (Rs 10,000/branch/year) — apna alag
+        // raasta: koi package/cycle nahi, approve par sirf slots barhte hain.
+        if ($request->input('request_type') === 'extra_branch') {
+            return $this->storeExtraBranchRequest($request, $company);
+        }
+
         $productType = $this->resolveProductType($company);
         $allowedCycles = match ($productType) {
             'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
@@ -59,8 +66,12 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
-        // One pending proof at a time — avoid duplicate review queue entries.
-        $existing = PaymentProof::where('company_id', $companyId)
+        // One pending PACKAGE proof at a time — avoid duplicate review queue
+        // entries. Extra-branch requests live in their own lane (see the
+        // subscriptionKind scope) so an add-on request never hides the
+        // renewal form, and vice-versa.
+        $existing = PaymentProof::subscriptionKind()
+            ->where('company_id', $companyId)
             ->where('status', 'pending')
             ->exists();
         if ($existing) {
@@ -108,6 +119,115 @@ class PaymentProofController extends Controller
     }
 
     /**
+     * Extra-branch add-on request (owner-approved, Aug 2026).
+     *
+     * Package se ooper har branch Rs 10,000 saalana. Yahan sirf REQUEST banti
+     * hai — slots admin ke approve karne par barhte hain. Deliberately NO
+     * instant access grant and NO subscription touch: ye package ki payment
+     * nahi, sirf ek add-on hai.
+     */
+    private function storeExtraBranchRequest(Request $request, ?\App\Models\Company $company)
+    {
+        // PRA POS panel ka feature hai — baqi panels par raasta hi nahi.
+        if (!$company || !auth('pos')->check() || $this->resolveProductType($company) !== 'pos') {
+            return back()->with('error', __('pos.eb_not_available'))
+                ->with('payment_proof', 'error');
+        }
+
+        $eligibility = \App\Services\BranchAddonService::purchaseEligibility($company);
+        if (!$eligibility['allowed']) {
+            return back()->with('error', __($eligibility['reason_key'] ?? 'pos.eb_not_available'))
+                ->with('payment_proof', 'error');
+        }
+
+        $validated = $request->validate([
+            'extra_branch_qty' => 'required|integer|min:1|max:' . \App\Services\BranchAddonService::MAX_QTY,
+            'amount' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
+            'reference' => 'nullable|string|max:120',
+            'payment_date' => 'nullable|date',
+            'notes' => 'nullable|string|max:500',
+            'proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+        ]);
+
+        // One pending add-on request at a time (package proofs are a separate lane).
+        $pending = PaymentProof::extraBranchKind()
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->exists();
+        if ($pending) {
+            return back()->with('success', __('pos.eb_already_pending'))
+                ->with('payment_proof', 'pending');
+        }
+
+        $qty = (int) $validated['extra_branch_qty'];
+        $quote = \App\Services\BranchAddonService::quote($company, $qty);
+
+        $path = $request->file('proof')->store('payment-proofs/' . $company->id, 'local');
+
+        $sub = \App\Services\BranchAddonService::activeSubscription($company);
+
+        $proof = PaymentProof::create([
+            'company_id' => $company->id,
+            // Context only — the approval path never reads it for pricing.
+            'pricing_plan_id' => $sub?->pricing_plan_id,
+            'billing_cycle' => null,
+            'request_type' => 'extra_branch',
+            'extra_branch_qty' => $quote['qty'],
+            'amount' => $validated['amount'] ?? $quote['price'],
+            'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
+            'reference' => $validated['reference'] ?? null,
+            'payment_date' => $validated['payment_date'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'proof_path' => $path,
+            'status' => 'pending',
+        ]);
+
+        $this->alertAdminsExtraBranch($company, $proof, $quote);
+
+        return back()->with('success', __('pos.eb_submitted'))
+            ->with('payment_proof', 'submitted');
+    }
+
+    /** Admins ko extra-branch request ki ittila (best-effort, kabhi submission na toray). */
+    private function alertAdminsExtraBranch(\App\Models\Company $company, PaymentProof $proof, array $quote): void
+    {
+        try {
+            $emails = \App\Models\AdminUser::whereNotNull('email')
+                ->where('email', '!=', '')
+                ->pluck('email')->unique()->values();
+            if ($emails->isEmpty()) {
+                return;
+            }
+
+            $amount = $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : 'Not specified';
+            $body = "An EXTRA BRANCH request is waiting for review.\n\n"
+                . 'Company: ' . ($company->name ?? ('Company #' . $proof->company_id)) . "\n"
+                . 'Panel: NestPOS (PRA)' . "\n"
+                . 'Extra branches requested: ' . $proof->extra_branch_qty . "\n"
+                . 'Quoted amount: PKR ' . number_format($quote['price'])
+                . ($quote['prorated'] ? ' (pro-rata for ' . $quote['months'] . ' month(s) left on the package)' : ' (full year)') . "\n"
+                . "Amount paid: {$amount}\n"
+                . ($proof->reference ? 'Reference: ' . $proof->reference . "\n" : '')
+                . "\nApproving adds ONLY the branch slots — the package, its expiry and the subscription row stay untouched.\n"
+                . 'Review: ' . route('saas.admin.payment-proofs') . "\n\nTaxNest";
+
+            Mail::raw($body, function ($m) use ($emails, $company) {
+                $m->to($emails->all())->subject('Extra branch request — ' . ($company->name ?? 'Company'));
+            });
+
+            \App\Services\MailHealth::recordSuccess();
+        } catch (\Throwable $e) {
+            Log::warning('Extra branch request admin alert failed', [
+                'proof_id' => $proof->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            \App\Services\MailHealth::recordFailure('Extra branch request admin alert', $e);
+        }
+    }
+
+    /**
      * Auto-grant a 10-day temporary override on proof upload.
      *
      * Granted ONLY when ALL hold:
@@ -139,7 +259,10 @@ class PaymentProofController extends Controller
             }
 
             // Owner safeguard: any prior rejection disables instant access.
-            $wasRejected = PaymentProof::where('company_id', $company->id)
+            // Scoped to package proofs — a rejected extra-branch request has
+            // nothing to do with whether a renewal payment is trustworthy.
+            $wasRejected = PaymentProof::subscriptionKind()
+                ->where('company_id', $company->id)
                 ->where('status', 'rejected')
                 ->where('id', '!=', $proof->id)
                 ->exists();

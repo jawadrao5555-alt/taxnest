@@ -389,6 +389,27 @@
                     <label class="text-xs text-gray-400 mb-1 block">Branch Limit</label>
                     <input type="number" name="branch_limit_override" value="{{ $company->branch_limit_override }}" placeholder="Plan default" min="0" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
                 </div>
+                {{-- Paid extra-branch slots (Rs 10,000/branch/year add-on). Sits ON TOP of
+                     the package's included branches; the Branch Limit override above,
+                     if set, still overrides everything. --}}
+                @php
+                    // Add-on = NestPOS (PRA) packages only. Show the field where it
+                    // can actually do something, plus wherever a stale count is
+                    // already stored so an admin can clear it.
+                    $ebSupported = \App\Services\BranchAddonService::supportsCompany($company);
+                    $ebStored = (int) ($company->extra_branch_slots ?? 0);
+                @endphp
+                @if(\App\Services\BranchAddonService::slotsColumnExists() && ($ebSupported || $ebStored > 0))
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Paid Extra Branch Slots</label>
+                    <input type="number" name="extra_branch_slots" value="{{ $ebStored }}" min="0" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
+                    @if($ebSupported)
+                        <p class="text-[11px] text-gray-500 mt-1">Rs {{ number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR) }}/branch/year, on top of the package's included branches. Renewal price rises automatically.</p>
+                    @else
+                        <p class="text-[11px] text-amber-400 mt-1">This company's current plan cannot use extra branch slots (NestPOS/PRA packages only) — the stored count is ignored by the branch limit. Set it to 0 to clear it.</p>
+                    @endif
+                </div>
+                @endif
                 <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Update Limits</button>
             </form>
         </div>

@@ -10,6 +10,16 @@ Task 1381; v1.3.0 was the English / Roman Urdu / Urdu language switch, Task 1382
 > **disclosure (consent) screen**, the 1.3.0 language switch and the 1.4.0 call
 > back. Building the code without this step ships nothing: the website keeps
 > serving the old file until someone rebuilds, re-hosts and flips the settings.
+>
+> The hosted bytes were re-verified on 21 Aug 2026 (Task 1387) by downloading
+> both canonical URLs and running both guards plus the three-locale badge check
+> over the **downloaded** files — see "Prove the hosted file, not the local one".
+> The language switch was announced to POS shops the same day. The owner also
+> reported the required physical-phone QA as passed: install/update, English /
+> Roman Urdu / Urdu switching and persistence, Urdu RTL, and the WhatsApp
+> disclosure's five points in all three languages. The recorded checklist is
+> `docs/qa/task-1387-caller-id-languages-qa.md`; phone model and Android version
+> were not supplied, so that owner-reported result is not device-specific.
 
 > **Play (AAB) ka hissa is file mein NAHI hai.** Play build banane, sign karne,
 > uske key ke faisle aur Console ke saare form: `docs/play/` — khaas tor par
@@ -358,6 +368,9 @@ PLUS=caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk
 $BT/aapt2 dump permissions $SIM     # READ_PHONE_STATE + READ_CALL_LOG expected
 $BT/aapt2 dump permissions $PLUS    # neither of those expected
 
+
+# b. Language switch (Task 1382): each build must show its OWN badge. That the
+# b. Language switch (Task 1382): each build must show its OWN badge. That the
 # b. Language switch (Task 1382): each build must show its OWN badge. That the
 #    badge (and every other key) exists in all three locales is now
 #    scripts/caller-lang-check.sh's job — this grep is only the "right wording
@@ -507,6 +520,14 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
    `docs/qa/task-1381-caller-id-call-back-qa.md`: ring, miss, call back from the
    popup / the list / the customer card, phone offline, a phone still on the old
    app, and the Play build untouched.
+
+   **Completed for the 21 Aug 2026 v1.4.0 rollout (Task 1387):** the owner
+   reported PASS for install/update, the English / Roman Urdu / Urdu switch,
+   Urdu RTL, restart and logout/login persistence, and all five disclosure
+   points in all three languages. See
+   `docs/qa/task-1387-caller-id-languages-qa.md`. The phone model and Android
+   version were not captured, so this is an owner-reported QA record rather than
+   device-specific evidence.
 8. Flip the two version settings in admin.
 9. What's New elaan (Roman Urdu, with the reason).
 
@@ -518,7 +539,21 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 | Version | versionCode | Notes |
 |---------|-------------|-------|
 | 1.4.0 | 5 | **Call back from the POS** (Task 1381) — website builds only. New `CallerApp` + `DialWatchService` (foreground `dataSync`, ~5 s poll of `GET /dial-requests`, interval server-tunable via `poll_ms`) + `DialActivity` (tap → `ACTION_DIAL`, never `CALL_PHONE`) + `DialBootReceiver`, all in `src/web/`. Four new permissions, **none** on Play Protect's blocked list. The poll carries a `notif` flag (notifications enabled + offer channel not muted) — a muted phone stays `dial_seen_at`-fresh but loses `supports_dial`, so POS falls back to the copy-number card instead of a silent "sent", and the app toasts the reason once per launch. `/dial-result` is bound to the device that claimed the row. **`src/play/` untouched — the Play build gets no call back and no new permission.** Server side: `pos_caller_dial_requests` queue + `called_back_at` on ring events. Bump `caller_app_latest_version` **and** `caller_app_plus_latest_version` to `1.4.0` so signed-in website phones self-update — until then a phone on an older build makes POS show the "app purani hai" fallback, which is expected, not a bug. **Built, hosted and both settings flipped on 21 Aug 2026 (Task 1362)** — this is the build the website serves today, and it is the first hosted APK to carry the 1.2.0 disclosure screen and the 1.3.0 language switch. |
-| 1.3.0 | 4 | **Language switch** (Task 1382): the whole app is now English / Roman Urdu / Urdu, picked from a compact three-way selector on the login **and** main screens. **A fresh install opens in English** whatever the phone's language is; the choice is saved on the phone and survives app restarts, logout/login and updates. Every user-visible line is translated — login and its errors, status, battery and permission lines with their toasts, the test-ring button and toast, "Last call sent: …", the update prompts and their download toasts, log out, and the whole "how does this work" paragraph — plus the notification-access **disclosure screen** in both notification builds, saying exactly the same five things in all three languages. The two-line build badge became one translated line per build (the old Roman recap lines are gone — the user picks a language now). Detection, permissions and the POS payload are untouched. |
+| 1.3.0 | 4 | **Language switch** (Task 1382): the whole app is now English / Roman Urdu / Urdu, picked from a compact three-way selector on the login **and** main screens. **A fresh install opens in English** whatever the phone's language is; the choice is saved on the phone and survives app restarts, logout/login and updates. Every user-visible line is translated — login and its errors, status, battery and permission lines with their toasts, the test-ring button and toast, "Last call sent: …", the update prompts and their download toasts, log out, and the whole "how does this work" paragraph — plus the notification-access **disclosure screen** in both notification builds, saying exactly the same five things in all three languages. The two-line build badge became one translated line per build (the old Roman recap lines are gone — the user picks a language now). Detection, permissions and the POS payload are untouched. **Never hosted under its own version number** — it reached shops inside the 1.4.0 rollout (Task 1362), and the What's New elaan telling shops the app now speaks all three languages went out on 21 Aug 2026 (Task 1387). |
 | 1.0.0 | 1 | Initial release — notification listener only (SIM + WhatsApp). **Uninstallable from the website once Play Protect's enhanced fraud protection rolled out.** |
 | 1.2.0 | 3 | **Third flavor `play`** (Task 1346) for the Google Play Store: no self-update, no `REQUEST_INSTALL_PACKAGES`, no battery permission, `targetSdk 36`, edge-to-edge insets. Both notification builds (`plus` + `play`) gained the **prominent disclosure** screen before notification access. Website APKs unchanged in behaviour — same permissions, same `targetSdk 34`, same self-update. This version was **never hosted on its own** — the website stayed on 1.1.0 until the 1.4.0 rollout (Task 1362) carried its disclosure screen to shops. |
 | 1.1.0 | 2 | **Two builds** (Task 1345): `sim` = clean telephony build, installs with no Play Protect block, default download; `plus` = the old SIM + WhatsApp behaviour. Shared `RingReporter` (payload + 60 s dedupe + 401 handling, dedupe moved to SharedPreferences so a fresh receiver process cannot double-post), per-build setup screen + build badge, per-build update check, `device` string now records which build a phone runs. |
+
+#    in the right APK" spot check.
+$BT/aapt2 dump resources $SIM  | grep -A3 "string/build_badge"   # SIM-only wording
+$BT/aapt2 dump resources $PLUS | grep -A3 "string/build_badge"   # WhatsApp wording
+
+
+#    badge (and every other key) exists in all three locales is now
+
+#    badge (and every other key) exists in all three locales is now
+
+#    in the right APK" spot check.
+$BT/aapt2 dump resources $SIM  | grep -A3 "string/build_badge"   # SIM-only wording
+$BT/aapt2 dump resources $PLUS | grep -A3 "string/build_badge"   # WhatsApp wording
+

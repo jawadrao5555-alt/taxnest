@@ -121,6 +121,12 @@
             storeSlipOn: {{ $fbrStoreSlipOn ? 'true' : 'false' }}, savingStoreSlip: false,
             deliveryOn: {{ $fbrDeliveryOn ? 'true' : 'false' }}, savingDelivery: false,
             storeNoteOn: {{ $fbrStoreNoteOn ? 'true' : 'false' }}, savingStoreNote: false,
+            {{-- Downgraded-but-still-ON: the switch stays LIVE so the owner can turn
+                 the feature off, and freezes the moment it is off so it cannot come
+                 back without an upgrade. Read as: "locked, off-only". --}}
+            slipOffOnly: {{ $fbrSlipLockedOn ? 'true' : 'false' }},
+            delivOffOnly: {{ $fbrDelivLockedOn ? 'true' : 'false' }},
+            noteOffOnly: {{ $fbrNoteLockedOn ? 'true' : 'false' }},
             featSave(feature, prop, savingProp) {
                 if (this[savingProp]) return;
                 const want = !this[prop];
@@ -338,7 +344,7 @@
                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_feat_store_slip_sub') }}</p>
                         </div>
                         @if($fbrKotPlan || $fbrSlipLockedOn)
-                        <button type="button" :disabled="savingStoreSlip @if($fbrSlipLockedOn) || !storeSlipOn @endif" @click="featSave('store_slip', 'storeSlipOn', 'savingStoreSlip')"
+                        <button type="button" :disabled="savingStoreSlip || (slipOffOnly && !storeSlipOn)" @click="featSave('store_slip', 'storeSlipOn', 'savingStoreSlip')"
                             class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="storeSlipOn ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'">
                             <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="storeSlipOn && 'translate-x-6'"></span>
                         </button>
@@ -376,7 +382,7 @@
                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_feat_delivery_sub') }}</p>
                         </div>
                         @if($fbrRidersPlan || $fbrDelivLockedOn)
-                        <button type="button" :disabled="savingDelivery @if($fbrDelivLockedOn) || !deliveryOn @endif" @click="featSave('delivery', 'deliveryOn', 'savingDelivery')"
+                        <button type="button" :disabled="savingDelivery || (delivOffOnly && !deliveryOn)" @click="featSave('delivery', 'deliveryOn', 'savingDelivery')"
                             class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="deliveryOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
                             <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="deliveryOn && 'translate-x-6'"></span>
                         </button>
@@ -407,7 +413,7 @@
                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_feat_store_notes_sub') }}</p>
                         </div>
                         @if($fbrKotPlan || $fbrNoteLockedOn)
-                        <button type="button" :disabled="savingStoreNote || !storeSlipOn @if($fbrNoteLockedOn) || !storeNoteOn @endif" @click="featSave('store_notes', 'storeNoteOn', 'savingStoreNote')"
+                        <button type="button" :disabled="savingStoreNote || (!storeSlipOn && !storeNoteOn) || (noteOffOnly && !storeNoteOn)" @click="featSave('store_notes', 'storeNoteOn', 'savingStoreNote')"
                             class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-40" :class="storeNoteOn ? 'bg-violet-500' : 'bg-gray-300 dark:bg-gray-600'">
                             <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="storeNoteOn && 'translate-x-6'"></span>
                         </button>

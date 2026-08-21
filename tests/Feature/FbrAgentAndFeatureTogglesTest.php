@@ -718,6 +718,97 @@ class FbrAgentAndFeatureTogglesTest extends TestCase
         $this->agentFetch($txnJob)->assertOk()->assertSee('Biryani')->assertDontSee('mirch tez');
     }
 
+    // ── 7. The downgraded shop's card must still HAVE a working switch ───────
+    //
+    // The endpoint accepts OFF from a shop whose package no longer covers the
+    // feature — but that promise is worthless if the only control on screen is
+    // a disabled toggle. These render the real page and evaluate the real
+    // :disabled expression, because that is where the promise can quietly die.
+
+    /**
+     * Evaluate a toggle's rendered :disabled expression against the initial
+     * x-data the same page shipped. Only booleans, !, &&, || and parens can
+     * survive the whitelist, so this is the Alpine truth, not a re-implementation.
+     */
+    private function toggleDisabled(string $html, string $feature): bool
+    {
+        $q = preg_quote($feature, '/');
+        $this->assertSame(1, preg_match('/<button[^>]*featSave\(\''.$q.'\'[^>]*>/', $html, $btn),
+            "No toggle button rendered for '{$feature}' — a downgraded shop needs a switch, not a padlock");
+        $this->assertSame(1, preg_match('/:disabled="([^"]+)"/', $btn[0], $d));
+
+        $resolved = preg_replace_callback('/[A-Za-z_][A-Za-z0-9_]*/', function ($t) use ($html, $feature) {
+            $this->assertSame(1, preg_match('/\b'.$t[0].':\s*(true|false)\b/', $html, $v),
+                "x-data ships no initial value for '{$t[0]}' used by the {$feature} toggle");
+            return $v[1];
+        }, $d[1]);
+        $this->assertMatchesRegularExpression('/^[a-z()!&| ]+$/', $resolved, 'Unexpected token in :disabled');
+
+        return (bool) eval("return {$resolved};");
+    }
+
+    public function test_a_downgraded_shop_can_still_switch_its_locked_features_off(): void
+    {
+        // Package taken away while all three features are still running.
+        $this->company->update([
+            'kitchen_printer_enabled' => true,
+            'feature_flags'           => ['delivery' => true, 'kitchen_notes' => true, 'customer_profile' => true],
+        ]);
+        $this->setPlanFlags(['kot_enabled' => false, 'riders_enabled' => false]);
+
+        $html = $this->actingAs($this->admin, 'fbrpos')->get('/fbr-pos/customize')
+            ->assertOk()->getContent();
+
+        foreach (['store_slip', 'delivery', 'store_notes'] as $feature) {
+            $this->assertFalse($this->toggleDisabled($html, $feature),
+                "A locked-but-still-ON '{$feature}' must stay clickable so the owner can turn it off");
+        }
+
+        // And the click actually lands: OFF is accepted for each of them.
+        foreach ([['store_slip', 'storeSlipOn'], ['delivery', 'deliveryOn'], ['store_notes', 'storeNoteOn']] as [$feature, $_]) {
+            $this->company->update([
+                'kitchen_printer_enabled' => true,
+                'feature_flags'           => ['delivery' => true, 'kitchen_notes' => true, 'customer_profile' => true],
+            ]);
+            $this->actingAs($this->admin, 'fbrpos')
+                ->postJson('/fbr-pos/settings/feature-toggle', ['feature' => $feature, 'enabled' => false])
+                ->assertOk()->assertJson(['success' => true, 'enabled' => false]);
+        }
+    }
+
+    public function test_a_locked_feature_cannot_be_switched_back_on_from_the_card(): void
+    {
+        // Same downgraded shop, but the features are already off — the switch
+        // must now be frozen so it cannot come back without an upgrade.
+        $this->company->update(['kitchen_printer_enabled' => false, 'feature_flags' => []]);
+        $this->setPlanFlags(['kot_enabled' => false, 'riders_enabled' => false]);
+
+        $html = $this->actingAs($this->admin, 'fbrpos')->get('/fbr-pos/customize')
+            ->assertOk()->getContent();
+
+        // Nothing is ON, so no card renders a live switch at all.
+        foreach (['store_slip', 'delivery', 'store_notes'] as $feature) {
+            $this->assertSame(0, preg_match('/<button[^>]*featSave\(\''.preg_quote($feature, '/').'\'/', $html),
+                "A fully locked '{$feature}' should show the padlock, not a switch");
+        }
+    }
+
+    public function test_a_covered_shop_gets_a_normal_two_way_switch(): void
+    {
+        $this->company->update(['kitchen_printer_enabled' => false, 'feature_flags' => []]);
+        $this->setPlanFlags(['kot_enabled' => true, 'riders_enabled' => true]);
+
+        $html = $this->actingAs($this->admin, 'fbrpos')->get('/fbr-pos/customize')
+            ->assertOk()->getContent();
+
+        // Slip and delivery are freely switchable; the note waits on the slip
+        // it prints on, which is the dependency the card explains on screen.
+        $this->assertFalse($this->toggleDisabled($html, 'store_slip'));
+        $this->assertFalse($this->toggleDisabled($html, 'delivery'));
+        $this->assertTrue($this->toggleDisabled($html, 'store_notes'),
+            'The note switch has nothing to print on until the Store Slip is on');
+    }
+
     public function test_the_note_gate_reports_off_when_the_slip_master_switch_is_off(): void
     {
         // Slip off but the note flag still set (exactly the stale state a sale

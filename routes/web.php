@@ -820,6 +820,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/restock-toggle', [PosController::class, 'updateRestockToggle'])->name('pos.settings.restock-toggle');
     Route::post('/settings/auto-purge-local-toggle', [PosController::class, 'toggleAutoPurgeLocal'])->name('pos.settings.auto-purge-local-toggle');
     Route::post('/settings/local-billing', [PosController::class, 'updateLocalBillingSettings'])->name('pos.settings.local-billing');
+    // Task 1358: owner-confirmed clear of ARCHIVED local bills so the L-series
+    // restarts at L-001 (admin-only, permanent — never runs on its own).
+    Route::post('/settings/local-billing/clear-archived', [PosController::class, 'clearArchivedLocalBills'])->name('pos.settings.local-billing.clear-archived');
     Route::post('/settings/auto-dayclose-toggle', [PosController::class, 'toggleAutoDayclose'])->name('pos.settings.auto-dayclose-toggle');
     Route::post('/settings/cashier-dayclose-toggle', [PosController::class, 'toggleCashierDayclose'])->name('pos.settings.cashier-dayclose-toggle');
     Route::post('/settings/cashier-ordercancel-toggle', [PosController::class, 'toggleCashierOrderCancel'])->name('pos.settings.cashier-ordercancel-toggle');

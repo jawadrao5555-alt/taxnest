@@ -776,6 +776,64 @@
                                 <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="lbPersist && 'translate-x-6'"></span>
                             </button>
                         </div>
+
+                        {{-- Task 1358 — WHY the L-series never restarts: a new local bill takes
+                             the smallest FREE number, and day-close ARCHIVED bills keep theirs
+                             reserved. Shown only when such bills actually exist. The clear is
+                             owner-confirmed and permanent (never automatic). --}}
+                        @if(($localSeries['count'] ?? 0) > 0)
+                        <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
+                             x-data="{ lsOpen: false, lsBusy: false, lsDone: false, lsMsg: '', lsErr: '',
+                                clearSeries() {
+                                    if (this.lsBusy) return;
+                                    this.lsBusy = true; this.lsErr = '';
+                                    fetch('{{ route('pos.settings.local-billing.clear-archived', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:'{}'})
+                                        .then(r=>r.json())
+                                        .then(d=>{ if (d && d.success === true) { this.lsMsg = d.message || ''; this.lsDone = true; this.lsOpen = false; } else { this.lsErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } })
+                                        .catch(()=>{ this.lsErr = {{ Js::from(__('pos.setting_save_failed')) }}; })
+                                        .finally(()=>{ this.lsBusy = false; });
+                                } }">
+                            <div x-show="!lsDone" class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
+                                <p class="text-[11px] font-bold text-amber-900 dark:text-amber-300">{{ __('pos.local_series_stuck_line', ['count' => $localSeries['count'], 'from' => $localSeries['from'], 'to' => $localSeries['to'], 'next' => $localSeries['next']]) }}</p>
+                                <p class="text-[11px] text-amber-800 dark:text-amber-400 mt-1">{{ __('pos.local_series_stuck_hint') }}</p>
+                                <button type="button" @click="lsOpen = true"
+                                    class="mt-2.5 px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] font-bold transition">{{ __('pos.local_series_clear_btn') }}</button>
+                            </div>
+                            <div x-show="lsDone" x-cloak class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700">
+                                <p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300" x-text="lsMsg"></p>
+                            </div>
+
+                            <template x-teleport="body">
+                            <div x-show="lsOpen" x-cloak class="fixed inset-0 flex items-center justify-center p-4"
+                                 style="z-index:120; background: rgba(15,10,40,0.55); backdrop-filter: blur(3px);"
+                                 @keydown.escape.window="if (!lsBusy) lsOpen = false">
+                                <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden" @click.outside="if (!lsBusy) lsOpen = false"
+                                     x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+                                    <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+                                        <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.local_series_modal_title') }}</h3>
+                                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.local_series_modal_sub', ['next' => $localSeries['next_after']]) }}</p>
+                                    </div>
+                                    <div class="px-5 py-4 space-y-2.5">
+                                        <p class="text-[12px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.local_series_modal_count', ['count' => $localSeries['count'], 'from' => $localSeries['from'], 'to' => $localSeries['to']]) }}</p>
+                                        <p class="text-[11px] text-red-700 dark:text-red-400 font-semibold">{{ __('pos.local_series_modal_permanent') }}</p>
+                                        <p class="text-[11px] text-gray-600 dark:text-gray-300">{{ __('pos.local_series_modal_safe') }}</p>
+                                        <p x-show="lbPersist" class="text-[11px] text-gray-600 dark:text-gray-300">{{ __('pos.local_series_modal_spend') }}</p>
+                                        <p x-show="lsErr" x-cloak class="text-[11px] font-bold text-red-700 dark:text-red-400" x-text="lsErr"></p>
+                                    </div>
+                                    <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-end gap-2">
+                                        <button type="button" @click="lsOpen = false" :disabled="lsBusy"
+                                            class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-[12px] font-bold">{{ __('pos.cancel') }}</button>
+                                        <button type="button" @click="clearSeries()" :disabled="lsBusy" :class="lsBusy && 'opacity-60 cursor-not-allowed'"
+                                            class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] font-bold">
+                                            <span x-show="!lsBusy">{{ __('pos.local_series_modal_confirm', ['next' => $localSeries['next_after']]) }}</span>
+                                            <span x-show="lsBusy" x-cloak>{{ __('pos.local_series_clearing') }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            </template>
+                        </div>
+                        @endif
                     </div>
                 </div>
 

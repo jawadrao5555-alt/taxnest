@@ -112,6 +112,21 @@ class PlanLimitService
                 // column missing pre-migration — quota falls back to live count only
             }
 
+            // Same contract for the Customize POS → Local Billing "clear archived
+            // local bills" action (Task 1358): it hard-deletes ARCHIVED
+            // reporting-OFF finals, which ARE part of the live count above
+            // (archived rows still count). Without this add-back, clearing would
+            // hand the shop free bill quota. Table/Schema-guarded for prod drift.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('pos_local_series_resets')) {
+                    $deletedFinals += (int) \App\Models\PosLocalSeriesReset::where('company_id', $companyId)
+                        ->whereBetween('reset_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+                        ->sum('deleted_final_count');
+                }
+            } catch (\Throwable $e) {
+                // table missing pre-migration — quota falls back to the counts above
+            }
+
             return $live + $deletedFinals;
         };
 

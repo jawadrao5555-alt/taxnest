@@ -1205,7 +1205,11 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
-        return view('pos.customize', compact('company'));
+        // Local Billing card (Task 1358): archived local bills silently reserve
+        // their L-numbers, so the card explains WHY the series is stuck and offers
+        // the clear action. count 0 = nothing to show.
+        $localSeries = $this->localSeriesStatus((int) $companyId);
+        return view('pos.customize', compact('company', 'localSeries'));
     }
 
     public function dashboard(Request $request)
@@ -1594,12 +1598,12 @@ class PosController extends Controller
         // customers that appear on THAT cashier's bills (pos_customers has no
         // created_by column, so bill linkage is the attributable metric —
         // never the company-wide total, which would leak/mislead).
-        $hasCustomersTable = \Schema::hasTable('pos_customers');
+        $hasCustomersTable = \Illuminate\Support\Facades\Schema::hasTable('pos_customers');
         $newCustQ = function ($since) use ($companyId, $dashCashierId) {
             $q = PosCustomer::where('company_id', $companyId)
                 ->where('created_at', '>=', $since);
             if ($dashCashierId) {
-                if (!\Schema::hasColumn('pos_transactions', 'customer_id')) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'customer_id')) {
                     return 0; // drift guard: fail closed, never company-wide
                 }
                 $q->whereIn('id', PosTransaction::withoutGlobalScope('hide_archived')
@@ -1758,7 +1762,7 @@ class PosController extends Controller
         // cutoff), matching the dashboard card that posts here.
         $date = \App\Services\PosBusinessDay::current($companyId);
 
-        if (!\Schema::hasTable('pos_day_openings')) {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('pos_day_openings')) {
             return back()->with('error', __('pos.opening_cash_feature_setup'));
         }
 
@@ -2432,7 +2436,7 @@ class PosController extends Controller
         // ran between attempts) still dedupes. Schema guard covers the brief
         // deploy-before-migrate window on PROD.
         $offlineUuid = trim((string) $request->input('offline_uuid', ''));
-        $offlineUuidColumnExists = $offlineUuid !== '' && \Schema::hasColumn('pos_transactions', 'offline_uuid');
+        $offlineUuidColumnExists = $offlineUuid !== '' && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'offline_uuid');
         if ($offlineUuidColumnExists) {
             $existing = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
@@ -2857,7 +2861,7 @@ class PosController extends Controller
                 // sale moment so an offline 1 AM bill lands in the right
                 // trading day.
                 try {
-                    if (\Schema::hasColumn('pos_transactions', 'business_date')) {
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date')) {
                         $stampDay = \App\Services\PosBusinessDay::forMoment((int) $companyId, $offlineQueuedAt);
                         // A closed day never reopens (its Z-report is final):
                         // if the original trading day was already day-closed,
@@ -4272,7 +4276,7 @@ class PosController extends Controller
             ->where('company_id', $companyId)
             ->where('status', 'completed')
             ->where(function ($q) {
-                if (\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
                     $q->where('is_archived', false)
                       ->orWhereNull('is_archived')
                       ->orWhere('invoice_mode', 'local');
@@ -4308,7 +4312,7 @@ class PosController extends Controller
         // number (null when feature off / unroutable → client hides the action).
         $company = Company::find($companyId);
         $waBillOn = $company
-            && \Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
             && $company->pos_whatsapp_bill_enabled
             && \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled');
 
@@ -4316,7 +4320,7 @@ class PosController extends Controller
         // restaurant_tables so the Reprint list can show "Dine-in • Table 5".
         // One IN query — no N+1 on the 300-bill list.
         $tableByTx = [];
-        if ($bills->isNotEmpty() && \Schema::hasTable('restaurant_orders') && \Schema::hasTable('restaurant_tables')) {
+        if ($bills->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('restaurant_orders') && \Illuminate\Support\Facades\Schema::hasTable('restaurant_tables')) {
             // orderBy id: if duplicate orders ever point at one transaction
             // (data drift), pluck keeps the LAST row = the newest order.
             $tableByTx = \DB::table('restaurant_orders')
@@ -5155,7 +5159,7 @@ class PosController extends Controller
         // Return-button eligibility (Task 678): remaining returnable quantity
         // per row, aggregated in the SAME page query (no N+1) — a fully
         // returned bill hides its Return action.
-        if (\Schema::hasColumn('pos_transaction_items', 'returned_quantity')) {
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'returned_quantity')) {
             $query->withSum('items as items_qty_total', 'quantity')
                 ->withSum('items as items_returned_total', 'returned_quantity');
         }
@@ -5209,7 +5213,7 @@ class PosController extends Controller
 
         // Wastage filter (Task 593): only wastage-flagged return bills —
         // spoiled goods whose stock was NOT restored. Schema-drift guarded.
-        if ($request->boolean('wastage') && \Schema::hasColumn('pos_transactions', 'is_wastage')) {
+        if ($request->boolean('wastage') && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_wastage')) {
             $query->where('transaction_type', 'return')->where('is_wastage', true);
         }
 
@@ -5269,7 +5273,7 @@ class PosController extends Controller
         $transaction = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where(function ($q) {
-                if (\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
                     $q->where('is_archived', false)
                       ->orWhereNull('is_archived')
                       ->orWhere('invoice_mode', 'local');
@@ -5295,7 +5299,7 @@ class PosController extends Controller
         $transaction = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where(function ($q) {
-                if (\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
                     $q->where('is_archived', false)
                       ->orWhereNull('is_archived')
                       ->orWhere('invoice_mode', 'local');
@@ -5477,7 +5481,7 @@ class PosController extends Controller
         // also gates minting; missing column fails OPEN (feature default is
         // ON — prod schema drift must not kill the pre-existing Share button).
         $company = Company::find($companyId);
-        $shareOn = (!\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
+        $shareOn = (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_whatsapp_bill_enabled')
                 || (bool) ($company?->pos_whatsapp_bill_enabled ?? true))
             && \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled');
         if (!$shareOn || $transaction->isDeliberateProvisional()) {
@@ -5707,7 +5711,7 @@ class PosController extends Controller
         // Return / credit-note netting (Task 570): revenue figures are SIGNED
         // (returns subtract), bill counts stay sales-only. Schema-guarded for
         // prod drift — pre-migration boxes fall back to the old unsigned sums.
-        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $typeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
         $signExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END" : '1';
         $saleRowExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN 0 ELSE 1 END" : '1';
 
@@ -6965,6 +6969,287 @@ class PosController extends Controller
             'provisional_action' => $company->pos_dayclose_provisional_action,
             'spend_persist' => (bool) $company->pos_customer_spend_persist,
             'message' => __('pos.local_billing_policy_saved'),
+        ]);
+    }
+
+    /**
+     * ARCHIVED local bills that still hold an L-number (Task 1358).
+     *
+     * generateLocalInvoiceNumber hands out the SMALLEST FREE number, and day-close
+     * ARCHIVED rows are NOT free (they stay in the table + the unique index). So a
+     * shop that archived 149 local bills and only later switched the policy to
+     * "delete" never restarts at L-001 — every day begins at L-150.
+     *
+     * This is the single selector behind BOTH the Customize POS status line and the
+     * clear action, so the count the owner confirms is exactly what gets deleted.
+     * ALWAYS read it through archivedLocalSeriesRows() — the `like 'L-%'` here is a
+     * coarse prefilter and the exact /^L-\d+$/ narrowing happens there.
+     * Rules are IDENTICAL to the day-close DELETE policy (performDayClose):
+     *   - never a PRA row: pra_invoice_number NULL + the two disjoint local sets
+     *     (provisional = local+local triple, reporting-OFF final = completed +
+     *     pra/NULL mode + NULL pra_status)
+     *   - never a return / credit note (would desync the parent + eat quota)
+     *   - never an unsettled rider CASH bill (live khata proof)
+     * Plus one extra narrowing the wash does not need: only the L-series — legacy
+     * "LOCAL-YYYY-NNNNN" rows block nothing, so they are left alone.
+     */
+    private function archivedLocalSeriesQuery(int $companyId)
+    {
+        $riderGuardReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id');
+
+        return PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('is_archived', true)
+            ->whereNull('pra_invoice_number')
+            ->where('invoice_number', 'like', 'L-%')
+            ->where('invoice_number', 'not like', 'LOCAL-%')
+            ->where(function ($w) {
+                $w->where(function ($prov) {
+                    $prov->where('invoice_mode', 'local')->where('pra_status', 'local');
+                })->orWhere(function ($fin) {
+                    $fin->where('status', 'completed')
+                        ->where(function ($m) {
+                            $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                        })
+                        ->whereNull('pra_status');
+                });
+            })
+            ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
+                $q->where(function ($t) {
+                    $t->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                });
+            })
+            // Rider khata guard, mirrored in SQL. Written as the NEGATION of the
+            // wash's PHP guard ($t->rider_id && cash && !settled && !returned) —
+            // note the explicit whereNull('payment_method') leg: `!= 'cash'` alone
+            // is NULL-unknown in SQL and would silently protect (i.e. skip) bills
+            // the day-close wash happily deletes.
+            ->when($riderGuardReady, function ($q) {
+                $q->where(function ($g) {
+                    $g->whereNull('rider_id')
+                        ->orWhere(function ($p) {
+                            $p->where('payment_method', '!=', 'cash')->orWhereNull('payment_method');
+                        })
+                        ->orWhereNotNull('rider_settlement_id')
+                        ->orWhere('delivery_status', 'returned');
+                });
+            });
+    }
+
+    /**
+     * The archived L-series rows, narrowed to EXACT L-NNN serials (Task 1358).
+     *
+     * The SQL `like 'L-%'` in archivedLocalSeriesQuery() is only a coarse prefilter:
+     * both generators (and the preview below) treat ONLY /^L-\d+$/ as an occupied
+     * number, so anything else that happens to start with "L-" — a hand-typed
+     * "L-001-extra", a legacy "L-DRAFT" — reserves nothing. Such a bill must never
+     * be counted as a blocker or swept up by the (permanent) clear. preg_match keeps
+     * that contract identical on MySQL and sqlite, where REGEXP support differs.
+     *
+     * Every figure the owner is shown AND the deletion itself come from this one
+     * set, so the confirmed count is exactly what gets deleted.
+     */
+    private function archivedLocalSeriesRows(int $companyId, array $columns = ['*'], bool $lock = false)
+    {
+        return $this->archivedLocalSeriesQuery($companyId)
+            ->when($lock, fn ($q) => $q->lockForUpdate())
+            ->get($columns)
+            ->filter(fn ($t) => (bool) preg_match('/^L-\d+$/', (string) $t->invoice_number))
+            ->values();
+    }
+
+    /**
+     * Read-only preview of the next L-number (Task 1358) — same SMALLEST-FREE rule
+     * as generateLocalInvoiceNumber, minus the lock (nothing is being issued here).
+     * $excludeIds lets the UI answer "and what will it be AFTER the clear?".
+     * Keep in sync with BOTH generators (PosController + RestaurantPosController).
+     */
+    private function previewNextLocalNumber(int $companyId, array $excludeIds = []): string
+    {
+        $taken = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('invoice_number', 'like', 'L-%')
+            ->where('invoice_number', 'not like', 'LOCAL-%')
+            ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
+            ->pluck('invoice_number');
+
+        $used = [];
+        foreach ($taken as $serial) {
+            if (preg_match('/^L-(\d+)$/', $serial, $matches)) {
+                $used[(int) $matches[1]] = true;
+            }
+        }
+
+        $next = 1;
+        while (isset($used[$next])) {
+            $next++;
+        }
+
+        return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Status figures for the Customize POS → Local Billing card (Task 1358):
+     * how many archived local bills are holding the series, over which dates, what
+     * the next number is today and what it would become after a clear.
+     * Fully schema-guarded — a prod box mid-deploy just gets count 0 (card hides).
+     */
+    private function localSeriesStatus(int $companyId): array
+    {
+        $empty = ['count' => 0, 'from' => null, 'to' => null, 'next' => 'L-001', 'next_after' => 'L-001'];
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                return $empty;
+            }
+            $rows = $this->archivedLocalSeriesRows($companyId, ['id', 'invoice_number', 'business_date', 'created_at']);
+            if ($rows->isEmpty()) {
+                return array_merge($empty, ['next' => $this->previewNextLocalNumber($companyId)]);
+            }
+            // business_date is the trading day the bill belongs to; pre-column rows
+            // (or NULLs) fall back to the calendar date.
+            $dates = $rows->map(fn ($t) => $t->business_date ?: $t->created_at?->toDateString())
+                ->filter()->sort()->values();
+            $ids = $rows->pluck('id')->all();
+
+            return [
+                'count' => $rows->count(),
+                'from' => $dates->first(),
+                'to' => $dates->last(),
+                'next' => $this->previewNextLocalNumber($companyId),
+                'next_after' => $this->previewNextLocalNumber($companyId, $ids),
+            ];
+        } catch (\Throwable $e) {
+            return $empty;
+        }
+    }
+
+    /**
+     * Customize POS → Local Billing — "clear archived local bills, restart at L-001"
+     * (Task 1358). ADMIN/OWNER only and never automatic: the owner confirms a count
+     * + date range first (deletion is permanent).
+     *
+     * Deletes exactly what archivedLocalSeriesRows() selects, following the
+     * day-close DELETE policy step for step: customer spend snapshots FIRST (when
+     * the company keeps the spend record), then items + payments, then the bills.
+     * Deleted CURRENT-MONTH reporting-OFF finals are written to the
+     * pos_local_series_resets ledger so PlanLimitService can add them back —
+     * clearing must never become a way to buy back monthly bill quota.
+     */
+    public function clearArchivedLocalBills(Request $request)
+    {
+        // Stricter than the sibling settings endpoints' posCashierBlocked(): this
+        // permanently deletes bills, so custom-access cashiers are out too.
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $companyId = (int) app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 404);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 503);
+        }
+
+        $spendPersist = (bool) ($company->pos_customer_spend_persist ?? true);
+        // Quota month bounds — basis MUST be created_at, not business_date.
+        // The ledger row is stamped with TODAY's reset_date, and PlanLimitService
+        // adds it back for the month that date falls in, so this count has to be
+        // exactly "bills the CURRENT month's live count was counting" — and that
+        // live count is `whereBetween('created_at', [startOfMonth, endOfMonth])`.
+        // Boundary that business_date would get wrong: a final created 1 Aug 00:30
+        // with business_date 31 Jul is inside AUGUST's live quota; counting it as
+        // July would delete it with no add-back and hand the shop a free bill.
+        // (The day-close wash filters by business_date because its credit month is
+        // the REPORT month, not the month the wash runs in — different anchor.)
+        // Earlier months stay excluded: their quota month is already over.
+        $monthStart = now()->startOfMonth();
+        $monthEnd = now()->endOfMonth();
+        $inThisMonth = function ($t) use ($monthStart, $monthEnd) {
+            return $t->created_at && $t->created_at >= $monthStart && $t->created_at <= $monthEnd;
+        };
+        $isProvisional = fn ($t) => $t->invoice_mode === 'local' && $t->pra_status === 'local';
+
+        $deleted = 0;
+        \DB::transaction(function () use ($companyId, $spendPersist, $inThisMonth, $isProvisional, $user, &$deleted) {
+            // Candidates are selected INSIDE the transaction and locked (SELECT ...
+            // FOR UPDATE). A second admin — or a double-clicked / replayed POST —
+            // blocks here until this commit and then reads an empty set, so the
+            // permanent delete can never write duplicate spend snapshots or a second
+            // quota ledger row (which would overstate the shop's monthly usage).
+            // Snapshots, delete IDs and ledger counts all come from these locked rows.
+            $rows = $this->archivedLocalSeriesRows($companyId, ['*'], true);
+            if ($rows->isEmpty()) {
+                return;
+            }
+            $ids = $rows->pluck('id')->all();
+            $dates = $rows->map(fn ($t) => $t->business_date ?: $t->created_at?->toDateString())->filter()->sort()->values();
+
+            if ($spendPersist && \Illuminate\Support\Facades\Schema::hasTable('pos_customer_spend_snapshots')) {
+                $now = now();
+                $snapshots = $rows
+                    ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone))
+                    ->map(fn ($t) => [
+                        'company_id' => $companyId,
+                        'customer_id' => $t->customer_id,
+                        'customer_phone' => $t->customer_phone,
+                        'customer_name' => $t->customer_name,
+                        'invoice_number' => $t->invoice_number,
+                        'bill_kind' => $isProvisional($t) ? 'provisional' : 'final_local',
+                        'payment_method' => $t->payment_method,
+                        'subtotal' => $t->subtotal,
+                        'discount_amount' => $t->discount_amount,
+                        'tax_amount' => $t->tax_amount,
+                        'total_amount' => $t->total_amount,
+                        'sold_at' => $t->created_at,
+                        // No day-close report behind this one — the ledger row
+                        // below is the audit trail instead.
+                        'dayclose_report_id' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ])->values()->all();
+                if (!empty($snapshots)) {
+                    \App\Models\PosCustomerSpendSnapshot::insert($snapshots);
+                }
+            }
+
+            \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)->delete();
+            \App\Models\PosPayment::whereIn('transaction_id', $ids)->delete();
+            $deleted = PosTransaction::withoutGlobalScope('hide_archived')->whereIn('id', $ids)->delete();
+
+            $thisMonth = $rows->filter($inThisMonth);
+            \App\Models\PosLocalSeriesReset::create([
+                'company_id' => $companyId,
+                'reset_date' => now()->toDateString(),
+                'deleted_final_count' => $thisMonth->reject($isProvisional)->count(),
+                'deleted_provisional_count' => $thisMonth->filter($isProvisional)->count(),
+                'total_deleted' => $rows->count(),
+                'from_date' => $dates->first(),
+                'to_date' => $dates->last(),
+                'performed_by' => $user->id,
+            ]);
+        });
+
+        $next = $this->previewNextLocalNumber($companyId);
+
+        // Nothing was there to clear — either the card was stale or another admin
+        // (or a replayed POST) already did it. Never a ledger row, never an error.
+        if ($deleted === 0) {
+            return response()->json([
+                'success' => true,
+                'deleted' => 0,
+                'next_number' => $next,
+                'message' => __('pos.local_series_nothing_to_clear'),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'deleted' => $deleted,
+            'next_number' => $next,
+            'message' => __('pos.local_series_cleared_done', ['count' => $deleted, 'next' => $next]),
         ]);
     }
 
@@ -10347,7 +10632,7 @@ class PosController extends Controller
         // Return / credit-note netting (Task 570): the day-close preview nets
         // returns exactly like the stored Z-report (performDayClose) so the
         // page, PDF and thermal never disagree.
-        $dcTypeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $dcTypeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
         $dcReturnRows = $dcTypeReady
             ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
             : collect();
@@ -10483,9 +10768,9 @@ class PosController extends Controller
         // Bill-by-bill list (Task 677): the page shows each pending bill with
         // its own action selector — fetch display columns too. Rider columns
         // are schema-guarded (prod drift self-heal convention).
-        $washRiderReady = \Schema::hasColumn('pos_transactions', 'rider_id');
+        $washRiderReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id');
         $washCols = ['id', 'invoice_number', 'status', 'created_at', 'business_date', 'total_amount', 'payment_method'];
-        if (\Schema::hasColumn('pos_transactions', 'customer_name')) {
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'customer_name')) {
             $washCols[] = 'customer_name';
         }
         if ($washRiderReady) {
@@ -10617,7 +10902,7 @@ class PosController extends Controller
         $restaurantEnabled = $company
             && (bool) ($company->restaurant_mode ?? false)
             && \App\Services\PosFeatureService::restaurantAllowed($company);
-        if (! $restaurantEnabled || ! \Schema::hasTable('restaurant_orders')) {
+        if (! $restaurantEnabled || ! \Illuminate\Support\Facades\Schema::hasTable('restaurant_orders')) {
             return $empty;
         }
 
@@ -10669,8 +10954,8 @@ class PosController extends Controller
     {
         $empty = (object) ['active' => false, 'count' => 0, 'amount' => 0.0, 'assigned' => 0, 'unassigned' => 0, 'khata_count' => 0, 'khata_amount' => 0.0];
         try {
-            if (! \Schema::hasColumn('pos_transactions', 'rider_id')
-                || ! \Schema::hasColumn('pos_transactions', 'delivery_status')) {
+            if (! \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
+                || ! \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status')) {
                 return $empty;
             }
             $company = $company ?: Company::find($companyId);
@@ -10680,8 +10965,8 @@ class PosController extends Controller
                 return $empty;
             }
 
-            $hasBizDate = \Schema::hasColumn('pos_transactions', 'business_date');
-            $hasType = \Schema::hasColumn('pos_transactions', 'transaction_type');
+            $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+            $hasType = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
             // Default scope (hide_archived) applies: an archived bill is out of
             // the operational stream and must not block a close.
             $rows = PosTransaction::where('company_id', $companyId)
@@ -10717,7 +11002,7 @@ class PosController extends Controller
             $khataCount = 0;
             $khataAmount = 0.0;
             try {
-                if (\Schema::hasTable('pos_riders')) {
+                if (\Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
                 $khata = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->whereNotNull('rider_id')
@@ -11116,7 +11401,7 @@ class PosController extends Controller
             // hourly, cashier ranking) — return/credit-note rows are EXCLUDED
             // here (like topItems), not netted; netted figures live in the
             // reports() headline queries and day-close. Schema-guarded.
-            ->when(\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
+            ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
                 $q->where(function ($w) {
                     $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 });
@@ -11128,7 +11413,7 @@ class PosController extends Controller
                 ['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method'],
                 // Schema-guarded: order_type column added Jul 2026; pre-migration PROD
                 // schemas omit it — unconditional selection would throw unknown-column SQL.
-                \Schema::hasColumn('pos_transactions', 'order_type') ? ['order_type'] : []
+                \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'order_type') ? ['order_type'] : []
             ));
 
         $ids = $transactions->pluck('id')->all();
@@ -11321,7 +11606,7 @@ class PosController extends Controller
         // breakdown would be a single "General" row — hide it entirely.
         $isRestaurant = (bool) ($company->restaurant_mode ?? false);
         $orderTypes = collect();
-        if ($isRestaurant && \Schema::hasColumn('pos_transactions', 'order_type')) {
+        if ($isRestaurant && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'order_type')) {
             $labelMap = [
                 'dine_in'  => 'Dine-In',
                 'takeaway' => 'Takeaway',
@@ -11500,7 +11785,7 @@ class PosController extends Controller
     {
         $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
         try {
-            if (!\Schema::hasTable('pos_riders') || !\Schema::hasColumn('pos_transactions', 'rider_id')) {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_riders') || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
                 return $empty;
             }
 
@@ -11523,7 +11808,7 @@ class PosController extends Controller
             // bills, partial or full). The legacy bill-based query stays for
             // pre-feature settlements (no allocation) so the transition day
             // never double-counts.
-            $hasAllocation = \Schema::hasColumn('pos_rider_settlements', 'allocation');
+            $hasAllocation = \Illuminate\Support\Facades\Schema::hasColumn('pos_rider_settlements', 'allocation');
             $legacyCashInQ = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
@@ -11585,7 +11870,7 @@ class PosController extends Controller
 
             // Khata remaining per bill — partial cash already received today is
             // IN the drawer, only the unpaid remainder is out with the rider.
-            $hasPartialCol = \Schema::hasColumn('pos_transactions', 'rider_partial_paid');
+            $hasPartialCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_partial_paid');
             $remainingOf = fn ($t) => (float) $t->total_amount - ($hasPartialCol ? (float) ($t->rider_partial_paid ?? 0) : 0);
 
             $cashOut = (float) $dayBills
@@ -12003,7 +12288,7 @@ class PosController extends Controller
         // ($transactions) but must NET the Z-report figures, not inflate them.
         // Counts + fiscal serial range stay SALES-only (returns carry RET-
         // numbers outside the USIN sequence).
-        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $typeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
         $returnRows = $typeReady
             ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
             : collect();
@@ -12027,7 +12312,7 @@ class PosController extends Controller
         // recompute from surviving rows would undercount the Local stream —
         // this is also why the old Invoice Summary "Amount" column printed
         // "-"). Schema-guarded (prod drift self-heal).
-        if (\Schema::hasColumn('pos_day_close_reports', 'stream_summary')) {
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'stream_summary')) {
             // Task 705: the STORED split carries the COMPLETE local stream —
             // L-series provisionals merged in (the PRA-mode figure set above
             // deliberately excludes invoice_mode='local' rows, so the Local
@@ -12045,7 +12330,7 @@ class PosController extends Controller
         // live query behind the page's audit list can lose them afterwards.
         // Company-wide (BOTH streams) like the live Task-678 list; the page
         // filters by the viewer's billing scope via the stored 'stream' key.
-        if ($typeReady && \Schema::hasColumn('pos_day_close_reports', 'returns_detail')) {
+        if ($typeReady && \Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'returns_detail')) {
             $data['returns_detail'] = $this->buildDayCloseReturnsDetail($companyId, $date);
         }
 
@@ -12062,7 +12347,7 @@ class PosController extends Controller
         // fallback when the close request didn't carry one — this also covers the
         // MIDNIGHT AUTO close ($cashRecon null), so the Z-report still shows the
         // opening + expected cash even without an evening count.
-        if (\Schema::hasColumn('pos_day_close_reports', 'opening_float')) {
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'opening_float')) {
             $openingFloat = $cashRecon['opening_float'] ?? null;
             $countedCash = $cashRecon['counted_cash'] ?? null;
             if ($openingFloat === null) {
@@ -12105,7 +12390,7 @@ class PosController extends Controller
         // NOT settled yet is a live khata entry — permanent delete would erase the
         // proof of what the rider owes. Those bills get ARCHIVED instead (recoverable,
         // khata queries use withoutGlobalScope so they still count). Schema-guarded.
-        $riderGuardReady = \Schema::hasColumn('pos_transactions', 'rider_id');
+        $riderGuardReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id');
 
         $archivedCount = 0;
         $deletedCount = 0;
@@ -12157,7 +12442,7 @@ class PosController extends Controller
                         // deleting one would desync the parent's returned_quantity,
                         // un-net the reports, and (via deleted_final_count) eat
                         // quota the return never consumed. Schema-guarded.
-                        ->when(\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
+                        ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
                             $q->where(function ($w) {
                                 $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                             });
@@ -12554,15 +12839,15 @@ class PosController extends Controller
         ];
 
         // Returns detail on the Z-report (schema-guarded, drift self-heal).
-        if (\Schema::hasColumn('pos_day_close_reports', 'returns_count')) {
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'returns_count')) {
             $data['returns_count'] = $returnRows->count();
             $data['returns_amount'] = round((float) $returnRows->sum('total_amount'), 2);
         }
 
         // Wastage detail (Task 596): spoiled-goods returns — same is_wastage
         // filter the day-close SCREEN preview uses, so print matches screen.
-        if (\Schema::hasColumn('pos_day_close_reports', 'wastage_count')
-            && \Schema::hasColumn('pos_transactions', 'is_wastage')) {
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'wastage_count')
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_wastage')) {
             $wastageRows = $returnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false));
             $data['wastage_count'] = $wastageRows->count();
             $data['wastage_amount'] = round((float) $wastageRows->sum('total_amount'), 2);
@@ -12631,7 +12916,7 @@ class PosController extends Controller
 
     private function buildDayCloseStreamSplit($transactions): array
     {
-        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $typeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
         $returnRows = $typeReady
             ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
             : collect();
@@ -12684,7 +12969,7 @@ class PosController extends Controller
         );
         $exemptItems = [];
         $saleIds = $saleRows->pluck('id')->filter()->all();
-        if (!empty($saleIds) && \Schema::hasColumn('pos_transaction_items', 'is_tax_exempt')) {
+        if (!empty($saleIds) && \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_tax_exempt')) {
             $exemptItems = \App\Models\PosTransactionItem::whereIn('transaction_id', $saleIds)
                 ->where('is_tax_exempt', true)
                 ->get(['item_name', 'quantity', 'subtotal'])
@@ -12775,7 +13060,7 @@ class PosController extends Controller
                 ->with('error', __('pos.no_transactions_for_date', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]));
         }
 
-        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $typeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
         $returnRows = $typeReady
             ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
             : collect();

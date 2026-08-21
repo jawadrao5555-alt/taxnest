@@ -1007,7 +1007,7 @@ class AdminCompanyController extends Controller
         $orphanTables = [
             'pos_riders', 'pos_rider_settlements', 'pos_day_close_reports',
             'pos_deals', 'pos_stations', 'pos_menu_items', 'pos_print_jobs',
-            'pos_customer_addresses', 'pos_customer_spend_snapshots',
+            'pos_customer_addresses', 'pos_customer_spend_snapshots', 'pos_local_series_resets',
             'pos_caller_events', 'pos_caller_devices', 'pos_app_devices', 'pos_agent_devices',
             'fbr_day_close_reports', 'fbr_pos_held_sales',
             'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',

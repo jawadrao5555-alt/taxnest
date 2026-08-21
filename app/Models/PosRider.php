@@ -20,6 +20,9 @@ class PosRider extends Model
         'duty_auto_off_at',
         // Task #1106: instant push + battery reporting
         'fcm_token', 'last_battery_pct',
+        // Task #1357: upload diagnostics — when the phone last reached us, and
+        // why we refused it (duty off / plan locked / point too old).
+        'last_upload_at', 'last_reject_reason', 'last_reject_at',
     ];
 
     protected $casts = [
@@ -29,6 +32,8 @@ class PosRider extends Model
         'last_located_at' => 'datetime',
         'duty_auto_off_at' => 'datetime',
         'last_battery_pct' => 'integer',
+        'last_upload_at' => 'datetime',
+        'last_reject_at' => 'datetime',
     ];
 
     public function company()

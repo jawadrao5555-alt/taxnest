@@ -3296,6 +3296,19 @@ return [
     // Task #1106: battery reporting on the live map
     'rt_battery_low_badge' => 'بیٹری کم ہے',
     'rt_battery_label' => 'بیٹری',
+    // Task #1357: satellite basemap, Google Maps deep link, late-sync trail
+    'rt_layer_streets' => 'سڑکیں',
+    'rt_layer_satellite' => 'سیٹلائٹ',
+    'rt_open_in_gmaps' => 'Google Maps میں کھولیں',
+    'rt_gap_offline_sync_at' => 'لائیو نہیں تھی — :time پر سنک ہوئی (:min منٹ)',
+    'rt_late_legend' => 'ٹوٹی لکیر = لائیو نہیں تھی: :n پوائنٹس بعد میں سنک ہوئے (آخری سنک :time)',
+    'rt_late_point' => 'لائیو نہیں تھی — :time پر سنک ہوئی',
+    'rt_last_upload' => 'آخری اپ لوڈ',
+    'rt_upload_lag' => 'لوکیشن :min منٹ پہلے لی گئی تھی',
+    'rt_reject_duty_off' => 'اپ لوڈ رد — رائیڈر ڈیوٹی پر نہیں تھا',
+    'rt_reject_plan_locked' => 'اپ لوڈ رد — پیکج لاک ہے',
+    'rt_reject_too_old' => 'اپ لوڈ رد — پوائنٹس بہت پرانے',
+    'rt_reject_other' => 'اپ لوڈ رد ہوا',
     'rt_upgrade_btn' => 'پیکجز دیکھیں',
     // Task #1105: customer delivery pin + public live tracking link
     'cl_locate_btn' => 'لوکیشن',

@@ -214,9 +214,63 @@ class PosRiderTrackingController extends Controller
             }
         }
         if ($msg = $this->planLockMessage(Company::find($rider->company_id))) {
+            // Task #1357: the phone DID reach us and was refused — record why,
+            // so the live card can explain an empty trail instead of leaving
+            // the owner guessing ("location aur net dono on the, phir bhi kuch nahi").
+            $this->stampUploadOutcome($rider, false, 'plan_locked');
             abort(response()->json(['ok' => false, 'error' => 'plan_locked', 'message' => $msg], 403));
         }
         return $rider;
+    }
+
+    /**
+     * Task #1357 — upload diagnostics for the live map card.
+     *
+     * last_upload_at : the moment the phone reached the server, no matter how
+     *   old the points inside were. Deliberately OUTSIDE the last_located_at
+     *   regression guard — a drained offline buffer must not move the rider's
+     *   position, but it IS proof the phone spoke to us just now. Fix time vs
+     *   upload time is exactly the "late sync" evidence the owner asked for.
+     * last_reject_* : why the server refused the phone's points (duty off /
+     *   plan locked / points beyond the accepted window).
+     *
+     * Every column hasColumn-guarded (PROD schema drift) and $fillable on the
+     * model, so a live server still on the old schema keeps working untouched.
+     */
+    private function stampUploadOutcome(PosRider $rider, bool $stored, ?string $reject = null): void
+    {
+        $hasUpload = Schema::hasColumn('pos_riders', 'last_upload_at');
+        $hasReject = Schema::hasColumn('pos_riders', 'last_reject_reason')
+            && Schema::hasColumn('pos_riders', 'last_reject_at');
+        if (!$hasUpload && !$hasReject) {
+            return;
+        }
+
+        $upd = [];
+        if ($hasUpload && $stored) {
+            $upd['last_upload_at'] = now();
+        }
+        if ($hasReject) {
+            if ($reject !== null) {
+                // Throttle: a phone re-sending the same rejected batch every few
+                // seconds must not turn into a write storm on pos_riders.
+                $prev = $rider->last_reject_at;
+                $sameRecently = $rider->last_reject_reason === $reject
+                    && $prev && abs(now()->diffInSeconds($prev)) < 60;
+                if (!$sameRecently) {
+                    $upd['last_reject_reason'] = $reject;
+                    $upd['last_reject_at'] = now();
+                }
+            } elseif ($stored && $rider->last_reject_reason !== null) {
+                // Uploads are landing again — a stale reason on a LIVE card lies.
+                $upd['last_reject_reason'] = null;
+                $upd['last_reject_at'] = null;
+            }
+        }
+
+        if ($upd) {
+            $rider->update($upd);
+        }
     }
 
     // ─── Rider app API (stateless) ──────────────────────────────────────────
@@ -349,6 +403,7 @@ class PosRiderTrackingController extends Controller
         $points = array_slice($points, 0, 240);
 
         $rows      = [];
+        $rejectReason = null; // Task #1357: why we refused points, for the live card
         $newestLive = null; // newest fresh (non-offline) point — drives regression guard
         $newestLiveBat = null; // battery % riding on the newest live point (Task #1106)
         $oldestAccepted = now()->subDays(self::POINT_MAX_AGE_DAYS);
@@ -377,6 +432,9 @@ class PosRiderTrackingController extends Controller
                     $at = now();
                 }
                 if ($at->lt($oldestAccepted)) {
+                    // Task #1357: remember WHY — an owner staring at a blank map
+                    // deserves "points too old", not silence.
+                    $rejectReason = $rejectReason ?: 'too_old';
                     continue; // stale offline buffer — beyond accepted window
                 }
             }
@@ -397,6 +455,7 @@ class PosRiderTrackingController extends Controller
             // Per-point duty gate: fresh points require duty=ON; buffered past
             // points (is_offline) are accepted regardless of duty status.
             if (!$isOffline && !$dutyOn) {
+                $rejectReason = 'duty_off'; // Task #1357: surfaced on the live card
                 continue; // fresh GPS fix while rider is off-duty — skip
             }
 
@@ -463,6 +522,11 @@ class PosRiderTrackingController extends Controller
                 }
             }
         }
+
+        // Task #1357: stamp when the phone last reached us — and why we said
+        // no, if we did. Outside the "if ($rows)" block on purpose: a fully
+        // rejected batch is still a phone that got through to the server.
+        $this->stampUploadOutcome($rider, (bool) $rows, $rejectReason);
 
         // Opportunistic retention purge — no cron dependency.
         if (random_int(1, 200) === 1) {
@@ -820,6 +884,10 @@ class PosRiderTrackingController extends Controller
         $hasAutoOff = Schema::hasColumn('pos_riders', 'duty_auto_off_at');
         // Task #1106: battery kam hai indicator — hasColumn: PROD drift.
         $hasBattery = Schema::hasColumn('pos_riders', 'last_battery_pct');
+        // Task #1357: last-upload stamp + last upload-reject reason.
+        $hasUploadAt = Schema::hasColumn('pos_riders', 'last_upload_at');
+        $hasReject   = Schema::hasColumn('pos_riders', 'last_reject_reason')
+            && Schema::hasColumn('pos_riders', 'last_reject_at');
 
         $riders = $rows->map(fn ($r) => [
             'id' => (int) $r->id,
@@ -849,6 +917,25 @@ class PosRiderTrackingController extends Controller
                 ? (int) $r->last_battery_pct : null,
             'low_battery' => $hasBattery && (bool) $r->on_duty
                 && $r->last_battery_pct !== null && (int) $r->last_battery_pct <= 20,
+            // ── Task #1357: "location to li thi, bheji der se" ───────────────
+            // uploaded_at = when the phone last reached us; upload_lag_secs =
+            // how much older the fix inside it was. The card shows this only
+            // when the two differ noticeably (threshold lives client-side).
+            'uploaded_at' => ($hasUploadAt && $r->last_upload_at)
+                ? Carbon::parse($r->last_upload_at)->toIso8601String() : null,
+            'upload_secs_ago' => ($hasUploadAt && $r->last_upload_at)
+                ? (int) abs(now()->diffInSeconds(Carbon::parse($r->last_upload_at))) : null,
+            'upload_lag_secs' => ($hasUploadAt && $r->last_upload_at && $r->last_located_at)
+                ? max(0, Carbon::parse($r->last_upload_at)->getTimestamp() - $r->last_located_at->getTimestamp())
+                : null,
+            // Last refused upload (duty off / plan locked / too old), 24h window
+            // only — an older reason is history, not a live diagnosis.
+            'reject_reason' => ($hasReject && $r->last_reject_at
+                && abs(now()->diffInHours(Carbon::parse($r->last_reject_at))) < 24)
+                ? (string) $r->last_reject_reason : null,
+            'reject_secs_ago' => ($hasReject && $r->last_reject_at
+                && abs(now()->diffInHours(Carbon::parse($r->last_reject_at))) < 24)
+                ? (int) abs(now()->diffInSeconds(Carbon::parse($r->last_reject_at))) : null,
         ])->values();
 
         return response()->json(['ok' => true, 'riders' => $riders, 'server_time' => now()->toIso8601String()]);
@@ -895,6 +982,19 @@ class PosRiderTrackingController extends Controller
         $gapThresholdSecs = $gapMin * 60;
         $offlineThresholdSecs = self::OFFLINE_HEURISTIC_MINUTES * 60;
 
+        // Task #1357: single truth for "did this point arrive live, or later
+        // from the phone's offline buffer?" — the gap pills AND the per-point
+        // trail styling both use it, so they can never disagree.
+        // is_offline (stamped at insert) wins; NULL rows (pre-migration) fall
+        // back to the original created_at − recorded_at heuristic.
+        $isLatePoint = function ($p) use ($offlineThresholdSecs) {
+            if ($p->is_offline !== null) {
+                return (bool) $p->is_offline;
+            }
+            return (strtotime((string) $p->created_at) - strtotime((string) $p->recorded_at))
+                >= $offlineThresholdSecs;
+        };
+
         $gapMeta    = []; // keyed by full-set index of the point BEFORE the gap
         $boundaries = []; // set of full-set indices that must survive downsampling
 
@@ -919,18 +1019,8 @@ class PosRiderTrackingController extends Controller
                 $offlineCount = 0;
                 $checkUpTo = min($i + 3, $total);
                 for ($j = $i; $j < $checkUpTo; $j++) {
-                    $pt = $rawPoints[$j];
-                    if ($pt->is_offline !== null) {
-                        // Column is authoritative — no heuristic needed.
-                        if ((bool) $pt->is_offline) {
-                            $offlineCount++;
-                        }
-                    } else {
-                        // Pre-migration row: fall back to created_at − recorded_at.
-                        $lag = strtotime($pt->created_at) - strtotime($pt->recorded_at);
-                        if ($lag >= $offlineThresholdSecs) {
-                            $offlineCount++;
-                        }
+                    if ($isLatePoint($rawPoints[$j])) {
+                        $offlineCount++;
                     }
                 }
                 $isOfflineAfter = $offlineCount >= (int) ceil(($checkUpTo - $i) / 2);
@@ -938,6 +1028,12 @@ class PosRiderTrackingController extends Controller
                 $gapMeta[$i - 1] = [
                     'gap_secs'        => $gapSecs,
                     'is_offline_after' => $isOfflineAfter,
+                    // Task #1357: WHEN the stretch after the gap actually
+                    // reached the server, so the pill can say "live nahi thi —
+                    // itne baje sync hui". Formatted server-side: the client
+                    // never converts epochs, so time zones cannot drift.
+                    'synced_at'       => $isOfflineAfter
+                        ? Carbon::parse($curr->created_at)->format('H:i') : null,
                 ];
                 // Protect boundary points from stride-based downsampling.
                 $boundaries[$i - 1] = true;
@@ -950,8 +1046,21 @@ class PosRiderTrackingController extends Controller
         $kept = []; // map: full-set index → kept point array index
         $trail = [];
 
+        $lateCount    = 0;
+        $lateLastSync = null; // newest arrival time among late points (epoch)
+
         foreach ($rawPoints->values() as $idx => $p) {
             if ($stride === 1 || $idx % $stride === 0 || isset($boundaries[$idx])) {
+                // Task #1357: live point, or one that arrived later from the
+                // phone's offline buffer?
+                $late = $isLatePoint($p);
+                $arrivedTs = strtotime((string) $p->created_at);
+                if ($late) {
+                    $lateCount++;
+                    if ($lateLastSync === null || $arrivedTs > $lateLastSync) {
+                        $lateLastSync = $arrivedTs;
+                    }
+                }
                 $kept[$idx] = count($trail);
                 $trail[] = [
                     (float) $p->lat,
@@ -961,6 +1070,12 @@ class PosRiderTrackingController extends Controller
                     // + stop durations + playback readout from deltas (extra
                     // array slot is backward-compatible for old clients).
                     strtotime((string) $p->recorded_at),
+                    // Task #1357: slot 4 = late-sync flag (1 = this stretch was
+                    // NOT live), slot 5 = the H:i it actually reached the
+                    // server (late points only). Extra slots stay backward
+                    // compatible with older clients.
+                    $late ? 1 : 0,
+                    $late ? date('H:i', $arrivedTs) : null,
                 ];
             }
         }
@@ -976,6 +1091,7 @@ class PosRiderTrackingController extends Controller
                 'after_idx'        => $kept[$fullIdx],
                 'minutes'          => (int) round($meta['gap_secs'] / 60),
                 'is_offline_after' => $meta['is_offline_after'],
+                'synced_at'        => $meta['synced_at'] ?? null,
             ];
         }
 
@@ -985,6 +1101,10 @@ class PosRiderTrackingController extends Controller
             'date' => $day->format('Y-m-d'),
             'points' => array_values($trail),
             'gaps'   => $gaps,
+            // Task #1357: the legend needs to say how much of this trail was
+            // NOT live, and when that stretch finally reached the server.
+            'late_count'     => $lateCount,
+            'late_last_sync' => $lateLastSync ? date('H:i', $lateLastSync) : null,
         ]);
     }
 

@@ -52,6 +52,8 @@
         .rt-warn-pill.silent { background: #ef4444; color: #fff; }
         /* Task #1106: battery kam hai */
         .rt-warn-pill.battery { background: #dc2626; color: #fff; }
+        /* Task #1357: server ne upload reject kiya */
+        .rt-warn-pill.reject { background: #4f46e5; color: #fff; }
         /* .rt-warn-map is the Leaflet divIcon container.  Leaflet defaults it to
            12×12 px, so a transform here shifts by only 6px — not by the pill's
            actual width.  The centering transform is applied INLINE on the pill
@@ -99,6 +101,19 @@
             {{-- Task #1106: battery kam hai indicator --}}
             'battery_low_badge' => __('pos.rt_battery_low_badge'),
             'battery_label' => __('pos.rt_battery_label'),
+            {{-- Task #1357: satellite/galiyan, Google link, late-sync --}}
+            'layer_streets' => __('pos.rt_layer_streets'),
+            'layer_satellite' => __('pos.rt_layer_satellite'),
+            'open_in_gmaps' => __('pos.rt_open_in_gmaps'),
+            'gap_offline_at' => __('pos.rt_gap_offline_sync_at'),
+            'late_legend' => __('pos.rt_late_legend'),
+            'late_point' => __('pos.rt_late_point'),
+            'last_upload' => __('pos.rt_last_upload'),
+            'upload_lag' => __('pos.rt_upload_lag'),
+            'reject_duty_off' => __('pos.rt_reject_duty_off'),
+            'reject_plan_locked' => __('pos.rt_reject_plan_locked'),
+            'reject_too_old' => __('pos.rt_reject_too_old'),
+            'reject_other' => __('pos.rt_reject_other'),
         ],
     ]))" x-init="init()">
 
@@ -181,7 +196,15 @@
                         <template x-if="r.auto_off">
                             <div class="mt-1 text-[10px] text-gray-400 dark:text-gray-500" x-text="i18n.auto_off_note"></div>
                         </template>
+                        {{-- Task #1357: server ne is rider ka upload reject kiya tha --}}
+                        <template x-if="r.reject_reason">
+                            <div class="mt-1"><span class="rt-warn-pill reject" x-text="rejectText(r)"></span></div>
+                        </template>
                         <div class="text-[11px] text-gray-400 dark:text-gray-500" x-text="agoText(r)"></div>
+                        {{-- Task #1357: location ka waqt aur upload ka waqt alag hon to dono dikhao --}}
+                        <template x-if="uploadLate(r)">
+                            <div class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400" x-text="uploadText(r)"></div>
+                        </template>
                     </button>
                 </template>
             </div>
@@ -231,6 +254,10 @@
                             </button>
                             <span class="ml-1.5 font-semibold text-gray-600 dark:text-gray-300" x-show="playReadout" x-text="playReadout"></span>
                             <span class="ml-1.5" x-text="i18n.speed_legend"></span>
+                            {{-- Task #1357: jo hissa live nahi tha, legend usay saaf kehti hai --}}
+                            <template x-if="lateCount > 0">
+                                <span class="ml-1.5 font-semibold" style="color:#6366f1" x-text="lateLegendText()"></span>
+                            </template>
                         </span>
                     </template>
                 </p>
@@ -254,6 +281,9 @@
             gapLayers: [],
             // Task #1102: trail playback state
             trailPts: [],
+            // Task #1357: loaded trail ka kitna hissa late (offline buffer se) aaya
+            lateCount: 0,
+            lateLastSync: '',
             playing: false,
             playIdx: 0,
             playTimer: null,
@@ -291,14 +321,54 @@
                     maxBounds: pkBounds,
                     maxBoundsViscosity: 1.0,
                     minZoom: 5,
+                    // Task #1357: over-zoom past the providers' native zoom (tiles
+                    // get scaled) so a trail inside a 3-metre gali stays readable.
+                    maxZoom: 21,
                 }).setView([31.5204, 74.3587], 12);
                 // Carto Voyager basemap — English/Latin place labels (owner rule Aug 2026:
                 // OSM default tiles label Pakistani cities in Urdu script; owner wants English).
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 19,
+                const streetsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxNativeZoom: 19,
+                    maxZoom: 21,
                     subdomains: 'abcd',
                     attribution: '© OpenStreetMap © CARTO'
-                }).addTo(this.map);
+                });
+                // Task #1357: SATELLITE. Free street data has no lanes for small
+                // abadis ("Doctor Amir Ali Gali") — imagery shows the real gali
+                // and the houses. Esri World Imagery = free, no API key. Place
+                // labels stay ENGLISH via the Carto labels-only overlay on top
+                // (same owner rule as the streets basemap).
+                const satelliteLayer = L.layerGroup([
+                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        maxNativeZoom: 18,
+                        maxZoom: 21,
+                        attribution: 'Imagery © Esri'
+                    }),
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+                        maxNativeZoom: 19,
+                        maxZoom: 21,
+                        subdomains: 'abcd',
+                        attribution: '© OpenStreetMap © CARTO'
+                    }),
+                ]);
+                streetsLayer.rtKey = 'streets';
+                satelliteLayer.rtKey = 'sat';
+                // Chuni hui layer browser mein yaad rehti hai. Satellite tiles
+                // sirf usi waqt load hote hain jab woh layer map par ho — baaki
+                // sab ke liye page ki speed pehle jaisi hi rehti hai.
+                let savedLayer = 'streets';
+                try { savedLayer = localStorage.getItem('rt_basemap') || 'streets'; } catch (e) {}
+                (savedLayer === 'sat' ? satelliteLayer : streetsLayer).addTo(this.map);
+                const layerOptions = {};
+                layerOptions[this.i18n.layer_streets] = streetsLayer;
+                layerOptions[this.i18n.layer_satellite] = satelliteLayer;
+                // collapsed:false — dukandar ko dono naam saaf nazar aayein (collapsed
+                // control sirf ek chhota sa icon dikhata hai).
+                L.control.layers(layerOptions, null, { position: 'topright', collapsed: false }).addTo(this.map);
+                this.map.on('baselayerchange', (e) => {
+                    const key = (e.layer && e.layer.rtKey) === 'sat' ? 'sat' : 'streets';
+                    try { localStorage.setItem('rt_basemap', key); } catch (err) {}
+                });
                 // Task #320: pin-mode click — dukan ki jagah chunna
                 this.map.on('click', (e) => {
                     if (!this.settingShop) return;
@@ -366,7 +436,12 @@
                             + this.esc(this.i18n.battery_label) + ' <b' + (r.low_battery ? ' style="color:#dc2626"' : '') + '>'
                             + r.battery_pct + '%</b>' : '')
                         + (warn ? '<br><b style="color:' + (warn === 'silent' ? '#ef4444' : (warn === 'idle' ? '#d97706' : '#dc2626')) + '">'
-                            + this.esc(warnLabel) + '</b>' : '');
+                            + this.esc(warnLabel) + '</b>' : '')
+                        // Task #1357: der se aaya upload, reject ki wajah, aur gali
+                        // dekhne ke liye Google Maps link.
+                        + (this.uploadLate(r) ? '<br><span style="color:#4f46e5;font-weight:600">' + this.esc(this.uploadText(r)) + '</span>' : '')
+                        + (r.reject_reason ? '<br><span style="color:#4f46e5;font-weight:600">' + this.esc(this.rejectText(r)) + '</span>' : '')
+                        + '<br>' + this.gmapsLink(r.lat, r.lng);
                     // Pill floats above the dot; recreating it every poll is cheap (few riders).
                     if (this.warnBadges[r.id]) {
                         this.warnBadges[r.id].remove();
@@ -506,7 +581,8 @@
             selectRider(r) {
                 this.selected = r;
                 if (r.lat !== null && r.lng !== null) {
-                    this.map.setView([r.lat, r.lng], Math.max(this.map.getZoom(), 14));
+                    // Task #1357: 14 se 16 — gali level par khulo, sirf sarak nahi.
+                    this.map.setView([r.lat, r.lng], Math.max(this.map.getZoom(), 16));
                     if (this.markers[r.id]) this.markers[r.id].openPopup();
                 }
                 fetch(this.trailUrlBase + '/' + r.id, { headers: { 'Accept': 'application/json' } })
@@ -517,6 +593,9 @@
                         const pts = j.points || [];
                         const gaps = j.gaps || [];
                         this.trailPts = pts; // Task #1102: playback source
+                        // Task #1357: kitna hissa live nahi tha, aur kab sync hua.
+                        this.lateCount = j.late_count || 0;
+                        this.lateLastSync = j.late_last_sync || '';
                         if (!pts.length) return;
 
                         // Build gap index: after_idx → gap meta
@@ -574,8 +653,12 @@
                                 const midLat = (fromPt[0] + toPt[0]) / 2;
                                 const midLng = (fromPt[1] + toPt[1]) / 2;
                                 const mins = s.gapAfter.minutes;
-                                const tpl = isOffline ? this.i18n.gap_offline : this.i18n.gap_stopped;
-                                const label = tpl.replace(':min', mins);
+                                // Task #1357: offline gap ab saaf batata hai ke yeh
+                                // hissa live nahi tha, aur kis waqt sync hua.
+                                const tpl = isOffline
+                                    ? (s.gapAfter.synced_at ? this.i18n.gap_offline_at : this.i18n.gap_offline)
+                                    : this.i18n.gap_stopped;
+                                const label = tpl.replace(':min', mins).replace(':time', s.gapAfter.synced_at || '');
                                 const cls   = isOffline ? 'offline' : 'stopped';
                                 const icon  = L.divIcon({
                                     className: '',
@@ -591,9 +674,12 @@
                         this.markStops(pts);
 
                         if (allBounds.length >= 2) {
-                            this.map.fitBounds(allBounds, { padding: [40, 40] });
+                            // Task #1357: map ab 21 tak ja sakta hai — auto-fit ko
+                            // cap karo warna thoda sa chala hua rider poora zoom
+                            // kar deta hai.
+                            this.map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 18 });
                         } else if (allBounds.length === 1) {
-                            this.map.setView(allBounds[0], 15);
+                            this.map.setView(allBounds[0], 17);
                         }
                     })
                     .catch(() => {});
@@ -621,25 +707,52 @@
             // One solid segment → runs of same-colour pairs merged into polylines
             // (avoids thousands of 2-point layers on long trails).
             drawSpeedSegment(segPts) {
-                let run = [segPts[0]], runColor = null;
+                let run = [segPts[0]], runColor = null, runLate = null;
                 const flush = () => {
                     if (run.length >= 2) {
-                        this.gapLayers.push(L.polyline(run.map(p => [p[0], p[1]]), {
-                            color: runColor || '#4f46e5', weight: 4, opacity: 0.8
-                        }).addTo(this.map));
+                        // Task #1357: jo hissa baad mein (offline buffer se) aaya
+                        // woh dashed indigo — offline gap pill wale rang mein, taake
+                        // owner ko saaf dikhe ke yeh live nahi tha.
+                        const style = runLate
+                            ? { color: '#6366f1', weight: 4, opacity: 0.9, dashArray: '6 8' }
+                            : { color: runColor || '#4f46e5', weight: 4, opacity: 0.8 };
+                        const line = L.polyline(run.map(p => [p[0], p[1]]), style).addTo(this.map);
+                        this.attachTrailPopup(line, run.slice());
+                        this.gapLayers.push(line);
                     }
                 };
                 for (let k = 1; k < segPts.length; k++) {
                     const c = this.speedColor(this.segSpeed(segPts[k - 1], segPts[k]));
-                    if (runColor === null) runColor = c;
-                    if (c !== runColor) {
+                    const late = this.isLate(segPts[k]);
+                    if (runColor === null) { runColor = c; runLate = late; }
+                    if (c !== runColor || late !== runLate) {
                         flush();
                         run = [segPts[k - 1]];
                         runColor = c;
+                        runLate = late;
                     }
                     run.push(segPts[k]);
                 }
                 flush();
+            },
+            // Task #1357: trail par kahin bhi click → qareeb tareen point, uska
+            // waqt, live tha ya baad mein sync hua, aur "Google Maps mein kholen"
+            // (gali ka naam wahin se milta hai).
+            attachTrailPopup(layer, pts) {
+                layer.on('click', (e) => {
+                    let best = pts[0], bestD = Infinity;
+                    const here = [e.latlng.lat, e.latlng.lng];
+                    pts.forEach(p => {
+                        const d = this.distM(here, p);
+                        if (d < bestD) { bestD = d; best = p; }
+                    });
+                    if (!best) return;
+                    const html = '<b>' + this.esc(best[2] || '') + '</b>'
+                        + (this.isLate(best) ? '<br><span style="color:#4f46e5;font-weight:600">'
+                            + this.esc(this.i18n.late_point.replace(':time', best[5] || '')) + '</span>' : '')
+                        + '<br>' + this.gmapsLink(best[0], best[1]);
+                    L.popup().setLatLng([best[0], best[1]]).setContent(html).openOn(this.map);
+                });
             },
             // Cluster consecutive points within ~45 m; ≥3 min inside = a stop dot.
             markStops(pts) {
@@ -654,7 +767,9 @@
                         const label = this.i18n.stopped_here.replace(':min', Math.round(dur / 60));
                         const cm = L.circleMarker([pts[i][0], pts[i][1]], {
                             radius: 7, weight: 2, color: '#b45309', fillColor: '#f59e0b', fillOpacity: 0.9
-                        }).addTo(this.map).bindPopup('<b>' + this.esc(label) + '</b><br>' + this.esc(pts[i][2] || ''));
+                        }).addTo(this.map).bindPopup('<b>' + this.esc(label) + '</b><br>' + this.esc(pts[i][2] || '')
+                            // Task #1357: stop par bhi "Google Maps mein kholen".
+                            + '<br>' + this.gmapsLink(pts[i][0], pts[i][1]));
                         this.gapLayers.push(cm);
                         i = j + 1;
                     } else {
@@ -700,6 +815,10 @@
             },
             clearTrailLayers() {
                 if (this.polyline) { this.polyline.remove(); this.polyline = null; }
+                // Task #1357: trail-point popup apni polyline ke baad zinda na rahe.
+                try { this.map.closePopup(); } catch (e) {}
+                this.lateCount = 0;
+                this.lateLastSync = '';
                 this.gapLayers.forEach(l => { try { l.remove(); } catch(e) {} });
                 this.gapLayers = [];
                 // Task #1102: reset playback with the layers it animates over.
@@ -860,6 +979,47 @@
                     return;
                 }
                 this.map.setView([lat, lng], 14);
+            },
+            // ---- Task #1357: Google link + late-sync helpers ----
+            isLate(p) {
+                return !!(p && p.length > 4 && p[4]);
+            },
+            gmapsUrl(lat, lng) {
+                return 'https://www.google.com/maps/search/?api=1&query='
+                    + encodeURIComponent(Number(lat).toFixed(6) + ',' + Number(lng).toFixed(6));
+            },
+            // Sirf free deep link — na Google ki tiles, na koi API key (owner rule).
+            gmapsLink(lat, lng) {
+                if (lat === null || lng === null || !isFinite(lat) || !isFinite(lng)) return '';
+                return '<a href="' + this.gmapsUrl(lat, lng) + '" target="_blank" rel="noopener"'
+                    + ' style="color:#4f46e5;font-weight:600;text-decoration:underline">'
+                    + this.esc(this.i18n.open_in_gmaps) + '</a>';
+            },
+            agoSecsText(s) {
+                if (s === null || s === undefined) return '';
+                if (s < 60) return this.i18n.just_now;
+                return Math.floor(s / 60) + ' ' + this.i18n.min_ago;
+            },
+            // "Phone ne location to li thi, bheji der se" — sirf tab dikhao jab
+            // fix ka waqt aur upload ka waqt numaya tor par alag hon (2+ min).
+            uploadLate(r) {
+                return r.upload_lag_secs !== null && r.upload_lag_secs !== undefined
+                    && r.upload_lag_secs >= 120
+                    && r.upload_secs_ago !== null && r.upload_secs_ago !== undefined;
+            },
+            uploadText(r) {
+                return '📤 ' + this.i18n.last_upload + ': ' + this.agoSecsText(r.upload_secs_ago)
+                    + ' · ' + this.i18n.upload_lag.replace(':min', Math.round(r.upload_lag_secs / 60));
+            },
+            rejectText(r) {
+                const label = this.i18n['reject_' + r.reject_reason] || this.i18n.reject_other;
+                const ago = this.agoSecsText(r.reject_secs_ago);
+                return '⛔ ' + label + (ago ? ' · ' + ago : '');
+            },
+            lateLegendText() {
+                return this.i18n.late_legend
+                    .replace(':n', this.lateCount)
+                    .replace(':time', this.lateLastSync || '');
             },
             esc(s) {
                 return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

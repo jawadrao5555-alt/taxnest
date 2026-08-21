@@ -3298,6 +3298,19 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Task #1106: battery reporting on the live map
     'rt_battery_low_badge' => 'Battery kam hai',
     'rt_battery_label' => 'Battery',
+    // Task #1357: satellite basemap, Google Maps deep link, late-sync trail
+    'rt_layer_streets' => 'Sarkein',
+    'rt_layer_satellite' => 'Satellite',
+    'rt_open_in_gmaps' => 'Google Maps mein kholen',
+    'rt_gap_offline_sync_at' => 'Live nahi thi — :time par sync hui (:min min)',
+    'rt_late_legend' => 'Tooti lakeer = live nahi thi: :n points baad mein sync hue (aakhri sync :time)',
+    'rt_late_point' => 'Live nahi thi — :time par sync hui',
+    'rt_last_upload' => 'Aakhri upload',
+    'rt_upload_lag' => 'location :min min pehle li gayi thi',
+    'rt_reject_duty_off' => 'Upload reject — rider duty par nahi tha',
+    'rt_reject_plan_locked' => 'Upload reject — package lock hai',
+    'rt_reject_too_old' => 'Upload reject — points bohat purane',
+    'rt_reject_other' => 'Upload reject hua',
     'rt_upgrade_btn' => 'Packages dekhein',
     // Task #1105: customer delivery pin + public live tracking link
     'cl_locate_btn' => 'Location',

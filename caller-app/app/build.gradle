@@ -151,6 +151,35 @@ android {
     }
 }
 
+// ── Teen zubaanon ka guard (Task 1388) ──────────────────────────────────────
+// Lint ka `MissingTranslation` sirf tab bolta hai jab key kisi locale file
+// mein hai hi NAHI. Jo surat asal mein pesh aati hai — flavor apni values/
+// mein override kare aur values-ur/ (ya values-b+ur+Latn/) mein na kare — us
+// par lint bilkul khamosh hai, kyunki src/main par gir jana qanooni resource
+// resolution hai. Nateeja: English mein sahi, aur shop ke Urdu par switch
+// karte hi clean build wali line. Wohi bug jo Task 1382 ne khatam kiya tha.
+//
+// scripts/caller-lang-check.sh source tree par yehi cheez pakadta hai (SDK ya
+// APK ki zaroorat nahi). Yahan preBuild se bandha hai, is liye har
+// `gradle -p caller-app ...` build khud hi chala leti hai; alag se bhi chal
+// sakta hai — caller-app/RELEASE.md dekhein.
+def langCheckScript = file("${rootDir}/../scripts/caller-lang-check.sh")
+def checkStringLanguages = tasks.register("checkStringLanguages", Exec) {
+    group = "verification"
+    description = "Har translatable string values/, values-b+ur+Latn/ aur values-ur/ — " +
+            "teenon mein, aur aik hi source set se (Task 1388)."
+    workingDir = langCheckScript.parentFile.parentFile   // repo root
+    commandLine 'bash', langCheckScript.absolutePath
+    doFirst {
+        if (!langCheckScript.exists()) {
+            throw new GradleException(
+                    "scripts/caller-lang-check.sh nahi mila — caller-app taxnest repo ke " +
+                    "andar se build hoti hai (caller-app/RELEASE.md).")
+        }
+    }
+}
+tasks.named("preBuild").configure { dependsOn(checkStringLanguages) }
+
 dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'

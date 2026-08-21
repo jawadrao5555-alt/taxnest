@@ -162,6 +162,14 @@ Two rules that break the build or the translation if ignored:
   inherited `src/main` text. Language-neutral keys (`app_name`, `login_title`,
   `welcome_fmt`, `lang_*`) stay `translatable="false"` in `values/` only.
 
+Lint enforces only the easy half of that second rule. It fires when a key is
+absent from a locale file of the module; it says **nothing** when a flavor
+overrides a key in `values/` and skips `values-ur/`, because falling back to
+`src/main`'s Urdu line is legal resource resolution. English reads right, and
+the shop sees the clean build's wording the moment it switches to Urdu.
+`bash scripts/caller-lang-check.sh` (Task 1388) is the guard for exactly that
+blind spot — see [Verify before hosting](#the-language-guard-source-tree-no-build-needed).
+
 The disclosure screen is fully translated: all five points say exactly the same
 thing in all three languages. Never shorten or soften one language's copy — the
 Play review reads whichever one is on screen.
@@ -299,6 +307,45 @@ stripped self-update from the builds that have no store to fall back on. Drop
 `--apks-only` when a Play AAB was built in the same run: the full command also
 proves the AAB carries none of that (`docs/play/signing-and-build.md` §3).
 
+### The language guard (source tree, no build needed)
+
+```bash
+bash scripts/caller-lang-check.sh
+```
+
+Run it **before** you build — it reads `caller-app/app/src/*/res/values*/strings.xml`
+directly, needs no SDK and no APK, and takes about a fifth of a second. Every
+`gradle -p caller-app …` build also runs it by itself: the `checkStringLanguages`
+task in `app/build.gradle` hangs off `preBuild`, so a half-translated string
+fails the build instead of reaching a phone.
+
+It FAILS on the four ways a screen silently stays in the wrong language, none of
+which `MissingTranslation` can see:
+
+1. a translatable key that a source set declares in `values/` but not in its
+   `values-ur/` or `values-b+ur+Latn/` — the **silent fallback**: that build
+   shows `src/main`'s wording in Urdu while English looks perfect. It names the
+   flavor and both source sets (*"key `build_badge` takes English from
+   `src/plus/res` but Urdu from `src/main/res`"*), and it sees an override split
+   across two res dirs of one flavor, which `src/plus` + `src/notif` + `src/web`
+   makes easy to do;
+2. the mirror image — a key overridden in `values-ur/` only, leaving English
+   inherited — and a `translatable="false"` key that got translated anyway;
+3. a **`values-ur/` line with no Urdu-script character** (a copy-paste that
+   never got translated), and Urdu script sitting in the Roman file. A line that
+   must stay in Latin — a brand name such as "TaxNest Caller ID" — is waived
+   with `<!-- lang-check: allow-latin (why) -->` on the line above it;
+4. anything it cannot verify: a missing locale file, a duplicate key, a
+   `<plurals>`/`<string-array>` it does not read, or a `productFlavors` block it
+   cannot parse. "Could not check" is a failure here, never a pass.
+
+The flavor map comes out of `app/build.gradle`, so a new flavor or a new
+`res.srcDirs` entry is covered without touching the script.
+
+This replaces the by-hand `aapt2 dump resources | grep <key>` pass (looking for
+a bare `()`, a `(ur)` and a `(b+ur+Latn)` line per key), which needed a finished
+APK and someone remembering to look.
+
 Caller-specific extras — these need the SDK's `aapt2` and neither script covers
 them:
 
@@ -311,11 +358,12 @@ PLUS=caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk
 $BT/aapt2 dump permissions $SIM     # READ_PHONE_STATE + READ_CALL_LOG expected
 $BT/aapt2 dump permissions $PLUS    # neither of those expected
 
-# b. Language switch (Task 1382): each build's badge must exist in all three
-#    locales, and each build must show its OWN badge.
+# b. Language switch (Task 1382): each build must show its OWN badge. That the
+#    badge (and every other key) exists in all three locales is now
+#    scripts/caller-lang-check.sh's job — this grep is only the "right wording
+#    in the right APK" spot check.
 $BT/aapt2 dump resources $SIM  | grep -A3 "string/build_badge"   # SIM-only wording
 $BT/aapt2 dump resources $PLUS | grep -A3 "string/build_badge"   # WhatsApp wording
-#    each: a bare "()" line (English), a "(ur)" line and a "(b+ur+Latn)" line
 
 
 # c. Call back (Task 1381) is IN both website builds.
@@ -424,18 +472,21 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 1. Source changes committed.
 2. `versionCode` +1 and `versionName` bumped in `caller-app/app/build.gradle`
    (shared by all three flavors).
-3. Build both website flavors, then **both** guards (+ the caller-specific
+3. `bash scripts/caller-lang-check.sh` — must print PASS before you build. (The
+   build runs it too, but a source-tree failure is cheaper to read than a failed
+   build.)
+4. Build both website flavors, then **both** APK guards (+ the caller-specific
    `aapt2` extras above):
    - `bash scripts/apk-release-check.sh <sim> <plus>` — the sim APK must print
      PASS; the plus APK must print PASS WITH 1 KNOWN EXCEPTION and nothing else.
    - `bash scripts/play-build-check.sh --apks-only` — must print PASS (both APKs
      still have self-update and `targetSdk 34`). If a Play AAB was built in the
      same run, drop `--apks-only` so the bundle is checked too.
-4. scp both APKs to live `public_html/public/downloads/` (versioned name +
+5. scp both APKs to live `public_html/public/downloads/` (versioned name +
    canonical name), then re-run the guard on the **downloaded** canonical URLs
    and md5-match them against the build outputs.
-5. Deploy PHP (`git push origin HEAD:main`; `.cpanel.yml` auto-deploys).
-6. **Owner phone-tests both builds** — see
+6. Deploy PHP (`git push origin HEAD:main`; `.cpanel.yml` auto-deploys).
+7. **Owner phone-tests both builds** — see
    `docs/qa/task-1345-caller-id-two-builds-qa.md`. From 1.3.0 also check the
    language switch:
    - Fresh install on an **English phone** and on an **Urdu phone** — both must
@@ -456,8 +507,8 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
    `docs/qa/task-1381-caller-id-call-back-qa.md`: ring, miss, call back from the
    popup / the list / the customer card, phone offline, a phone still on the old
    app, and the Play build untouched.
-7. Flip the two version settings in admin.
-8. What's New elaan (Roman Urdu, with the reason).
+8. Flip the two version settings in admin.
+9. What's New elaan (Roman Urdu, with the reason).
 
 ---
 

@@ -7,6 +7,7 @@
     <string name="dial_channel_watch">کال بیک سروس</string>
     <string name="dial_channel_offer">واپس کال کریں</string>
 
+    <!-- lang-check: allow-latin (app ka naam — teenon zubaanon mein aik hi) -->
     <string name="dial_service_title">TaxNest Caller ID</string>
     <string name="dial_service_text">POS سے آنے والی کال بیک کے لیے تیار</string>
 

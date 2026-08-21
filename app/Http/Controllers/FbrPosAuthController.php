@@ -16,10 +16,13 @@ use App\Services\CredentialLedgerService;
 
 class FbrPosAuthController extends Controller
 {
+    /** FBR POS portal home — every signed-in FBR user lands here. */
+    private const PORTAL = '/fbr-pos/create';
+
     public function showLogin()
     {
         if (Auth::guard('fbrpos')->check()) {
-            return redirect('/fbr-pos/create');
+            return $this->redirectToPortal();
         }
         return view('fbr-pos.auth.login');
     }
@@ -113,7 +116,7 @@ class FbrPosAuthController extends Controller
                 Auth::guard('fbrpos')->login($user, $remember);
                 $request->session()->regenerate();
                 $request->session()->forget('url.intended');
-                return redirect('/fbr-pos/create');
+                return $this->redirectToPortal();
             }
             // Wrong panel / FBR not enabled → fall through to generic failure (no info leak)
         }
@@ -129,7 +132,7 @@ class FbrPosAuthController extends Controller
     public function showRegister()
     {
         if (Auth::guard('fbrpos')->check()) {
-            return redirect('/fbr-pos/create');
+            return $this->redirectToPortal();
         }
         return view('fbr-pos.auth.register');
     }
@@ -206,7 +209,20 @@ class FbrPosAuthController extends Controller
 
         Auth::guard('fbrpos')->login($user);
 
-        return redirect('/fbr-pos/create');
+        return $this->redirectToPortal();
+    }
+
+    /**
+     * Keep every post-login / post-registration redirect PATH-RELATIVE. The
+     * live app forces HTTPS URLs, but the development preview reaches Laravel
+     * through a local HTTP bridge — an absolute forced-HTTPS Location would
+     * point the browser at TLS on the local PHP server port and block an FBR
+     * POS user right after a valid sign-in. Browsers resolve a relative
+     * Location against the current request, so live behaviour is unchanged.
+     */
+    private function redirectToPortal(): \Illuminate\Http\RedirectResponse
+    {
+        return redirect()->away(self::PORTAL);
     }
 
     /**

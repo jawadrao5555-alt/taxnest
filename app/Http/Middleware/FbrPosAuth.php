@@ -11,30 +11,30 @@ class FbrPosAuth
     public function handle(Request $request, Closure $next)
     {
         if (!Auth::guard('fbrpos')->check()) {
-            return redirect('/fbr-pos/login');
+            return $this->toLogin();
         }
 
         $user = Auth::guard('fbrpos')->user();
 
         if (!$user->is_active) {
             Auth::guard('fbrpos')->logout();
-            return redirect('/fbr-pos/login')->with('error', 'Your account has been deactivated.');
+            return $this->toLogin()->with('error', 'Your account has been deactivated.');
         }
 
         if (!$user->company_id) {
             Auth::guard('fbrpos')->logout();
-            return redirect('/fbr-pos/login')->with('error', 'No company associated with your account.');
+            return $this->toLogin()->with('error', 'No company associated with your account.');
         }
 
         $company = \App\Models\Company::find($user->company_id);
         if (!$company) {
             Auth::guard('fbrpos')->logout();
-            return redirect('/fbr-pos/login')->with('error', 'Company not found. Please contact admin.');
+            return $this->toLogin()->with('error', 'Company not found. Please contact admin.');
         }
 
         if (!$company->fbr_pos_enabled || $company->product_type !== 'fbrpos') {
             Auth::guard('fbrpos')->logout();
-            return redirect('/fbr-pos/login')->with('error', 'FBR POS is not enabled for your company.');
+            return $this->toLogin()->with('error', 'FBR POS is not enabled for your company.');
         }
 
         app()->instance('currentCompanyId', $user->company_id);
@@ -66,5 +66,19 @@ class FbrPosAuth
         view()->share('currentBranch', $branchId ? \App\Models\Branch::find($branchId) : null);
 
         return $next($request);
+    }
+
+    /**
+     * Bounce back to the FBR POS login page with a PATH-RELATIVE redirect. The
+     * live app forces HTTPS URLs, but the development preview reaches Laravel
+     * through a local HTTP bridge — an absolute forced-HTTPS Location would
+     * point the browser at TLS on the local PHP server port, so the user never
+     * reaches the login page (and never gets the flashed reason). Browsers
+     * resolve a relative Location against the current request, so live
+     * behaviour is unchanged.
+     */
+    private function toLogin(): \Illuminate\Http\RedirectResponse
+    {
+        return redirect()->away('/fbr-pos/login');
     }
 }

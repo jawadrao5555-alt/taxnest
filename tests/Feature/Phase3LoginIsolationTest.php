@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
+use App\Http\Middleware\FbrPosAuth;
 use App\Http\Middleware\PosAuth;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -495,6 +496,119 @@ class Phase3LoginIsolationTest extends TestCase
         $this->assertTrue(auth('fbrpos')->check());
         $this->assertFalse(auth('web')->check());
         $this->assertFalse(auth('admin')->check());
+    }
+
+    /**
+     * The FBR POS panel is the twin of the POS panel and needs the same
+     * preview-safety rule: the live app forces HTTPS URLs, but the development
+     * preview reaches Laravel through a local HTTP bridge, so an absolute
+     * Location would send the browser to TLS on the local PHP server port
+     * right after a valid sign-in. assertRedirect() alone cannot catch this —
+     * it normalises both sides — so the raw Location header is asserted.
+     */
+    public function test_fbr_login_redirect_stays_path_relative(): void
+    {
+        URL::forceScheme('https');
+        try {
+            $response = $this->post('/fbr-pos/login', [
+                'login' => 'fbr@taxnest.test',
+                'password' => 'FBR@12345',
+            ]);
+        } finally {
+            URL::forceScheme(null);
+        }
+
+        $response->assertRedirect('/fbr-pos/create');
+        $this->assertSame(
+            '/fbr-pos/create',
+            $response->headers->get('Location'),
+            'FBR sign-in must reach its portal with a path-relative redirect'
+        );
+        $this->assertTrue(auth('fbrpos')->check());
+        $this->assertSame('fbr@taxnest.test', auth('fbrpos')->user()->email);
+        $this->assertFalse(auth('pos')->check());
+        $this->assertFalse(auth('web')->check());
+        $this->assertFalse(auth('admin')->check());
+    }
+
+    /**
+     * An already signed-in FBR user who opens the login or the registration
+     * page is bounced to the portal. Same preview trap, same rule.
+     */
+    public function test_fbr_auth_pages_bounce_signed_in_user_path_relative(): void
+    {
+        $fbrUser = User::where('email', 'fbr@taxnest.test')->firstOrFail();
+
+        foreach (['/fbr-pos/login', '/fbr-pos/register'] as $page) {
+            URL::forceScheme('https');
+            try {
+                $response = $this->actingAs($fbrUser, 'fbrpos')->get($page);
+            } finally {
+                URL::forceScheme(null);
+            }
+
+            $response->assertRedirect('/fbr-pos/create');
+            $this->assertSame(
+                '/fbr-pos/create',
+                $response->headers->get('Location'),
+                "[$page] must bounce a signed-in FBR user with a path-relative Location"
+            );
+        }
+    }
+
+    /**
+     * FbrPosAuth bounces anyone who may not use the FBR panel back to the FBR
+     * login page. That Location has to stay path-relative too — otherwise the
+     * user never reaches the login page in the preview (and never sees the
+     * flashed reason). Panel isolation itself must not loosen: every one of
+     * these requests is still refused.
+     */
+    public function test_fbr_pos_auth_bounce_to_login_stays_path_relative(): void
+    {
+        $fbrUser = User::where('email', 'fbr@taxnest.test')->firstOrFail();
+        $posUser = User::where('email', 'pos@taxnest.test')->firstOrFail();
+
+        // [case => a callback that puts the guard in that state]
+        $cases = [
+            'signed out' => function () {
+                Auth::guard('fbrpos')->logout();
+            },
+            'deactivated FBR user' => function () use ($fbrUser) {
+                DB::table('users')->where('id', $fbrUser->id)->update(['is_active' => false]);
+                Auth::guard('fbrpos')->setUser(User::find($fbrUser->id));
+            },
+            // Cross-panel: a NestPOS account must never pass the FBR gate.
+            'POS-panel account' => function () use ($posUser) {
+                Auth::guard('fbrpos')->setUser($posUser);
+            },
+        ];
+
+        foreach ($cases as $case => $arrange) {
+            $this->app['auth']->forgetGuards();
+            $arrange();
+
+            URL::forceScheme('https');
+            try {
+                $response = (new FbrPosAuth())->handle(
+                    Request::create('https://fbrpos.test/fbr-pos/create', 'GET'),
+                    fn () => response('NEXT-OK')
+                );
+            } finally {
+                URL::forceScheme(null);
+            }
+
+            $this->assertInstanceOf(
+                RedirectResponse::class,
+                $response,
+                "[$case] must be refused by FbrPosAuth"
+            );
+            $this->assertSame(
+                '/fbr-pos/login',
+                $response->headers->get('Location'),
+                "[$case] must be bounced to the FBR login page with a path-relative Location"
+            );
+            $this->assertFalse(auth('fbrpos')->check(), "[$case] must not stay signed in on the FBR guard");
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════

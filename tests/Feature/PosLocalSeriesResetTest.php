@@ -280,12 +280,25 @@ class PosLocalSeriesResetTest extends TestCase
         return $this->callPrivate(new RestaurantPosController(), 'generateLocalInvoiceNumber', [$companyId]);
     }
 
+    private function nextPreview(int $companyId, array $excludeIds = []): string
+    {
+        return $this->callPrivate(new PosController(), 'previewNextLocalNumber', [$companyId, $excludeIds]);
+    }
+
     private function callPrivate(object $target, string $method, array $args)
     {
         $ref = new \ReflectionMethod($target, $method);
         $ref->setAccessible(true);
 
         return $ref->invokeArgs($target, $args);
+    }
+
+    private function callPrivateStatic(string $class, string $method, array $args)
+    {
+        $ref = new \ReflectionMethod($class, $method);
+        $ref->setAccessible(true);
+
+        return $ref->invokeArgs(null, $args);
     }
 
     private function numbers(int $companyId): array
@@ -589,6 +602,95 @@ class PosLocalSeriesResetTest extends TestCase
         $this->clear($this->makeUser($cid, 'pos_manager'))->assertStatus(200);
 
         $this->assertSame([], $this->numbers($cid));
+    }
+
+    // ── 8. one rule behind screen + both printers (Task 1373) ────────────────
+
+    /**
+     * The number the Customize POS card PROMISES and the number the two sale
+     * paths actually PRINT must be the same string in every shape of data:
+     * a fresh shop, a mid-series gap, archived bills holding their numbers,
+     * legacy LOCAL-YYYY rows and stray "L-…" text that reserves nothing.
+     * All three now read one helper — this locks that they cannot drift.
+     */
+    public function test_preview_and_both_sale_paths_always_agree(): void
+    {
+        $cid = $this->makeCompany();
+
+        $assertAgree = function (string $expected, string $case) use ($cid) {
+            $this->assertSame($expected, $this->nextPreview($cid), "preview ({$case})");
+            $this->assertSame($expected, $this->nextRetail($cid), "retail sale path ({$case})");
+            $this->assertSame($expected, $this->nextRestaurant($cid), "restaurant pay path ({$case})");
+        };
+
+        $assertAgree('L-001', 'fresh shop');
+
+        // Mid-series gap: L-002 was deleted, so the next bill fills it.
+        $this->makeBill($cid, 'L-001', ['is_archived' => false]);
+        $this->makeBill($cid, 'L-003', ['is_archived' => false]);
+        $assertAgree('L-002', 'gap fill');
+
+        // Archived bills are NOT free — they still hold their numbers.
+        $this->makeBill($cid, 'L-002');
+        $assertAgree('L-004', 'archived rows reserved');
+
+        // Legacy + stray formats reserve nothing at all.
+        $this->makeBill($cid, 'LOCAL-2026-00004', ['is_archived' => false]);
+        $this->makeBill($cid, 'L-ABC', ['is_archived' => false]);
+        $this->makeBill($cid, 'L-004-extra', ['is_archived' => false]);
+        $assertAgree('L-004', 'legacy and stray numbers ignored');
+
+        // Past the pad width the series just grows (L-1000), still in step.
+        $this->makeBill($cid, 'L-004', ['is_archived' => false]);
+        for ($n = 5; $n <= 999; $n++) {
+            DB::table('pos_transactions')->insert([
+                'company_id' => $cid,
+                'invoice_number' => 'L-' . str_pad((string) $n, 3, '0', STR_PAD_LEFT),
+                'status' => 'completed',
+                'invoice_mode' => 'local',
+                'pra_status' => 'local',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        $assertAgree('L-1000', 'past the 3-digit pad');
+    }
+
+    /**
+     * "…and after the clear?" is the same rule with the doomed rows excluded —
+     * so the modal's promise is exactly what the sale screen then prints.
+     */
+    public function test_preview_after_clear_is_what_the_sale_path_then_issues(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L-001');
+        $this->makeBill($cid, 'L-002');
+        $this->makeBill($cid, 'L-003', ['is_archived' => false]); // live, survives
+
+        $promised = $this->seriesStatus($cid)['next_after'];
+        $this->assertSame('L-001', $promised);
+
+        $this->clear($this->makeUser($cid))->assertStatus(200);
+
+        $this->assertSame($promised, $this->nextRetail($cid));
+        $this->assertSame($promised, $this->nextRestaurant($cid));
+    }
+
+    /**
+     * The one thing the three callers may differ in: a sale path LOCKS the rows
+     * it reads (inside its own transaction, so two cashiers cannot take the same
+     * number), the Customize POS preview stays strictly read-only.
+     * (sqlite compiles no lock clause at all, so assert on the builder itself.)
+     */
+    public function test_sale_paths_lock_the_rows_and_the_preview_does_not(): void
+    {
+        $cid = $this->makeCompany();
+
+        $issuing = $this->callPrivateStatic(\App\Services\PosLocalSeries::class, 'takenQuery', [$cid, true, []]);
+        $previewing = $this->callPrivateStatic(\App\Services\PosLocalSeries::class, 'takenQuery', [$cid, false, []]);
+
+        $this->assertTrue($issuing->getQuery()->lock, 'issuing must select FOR UPDATE');
+        $this->assertNull($previewing->getQuery()->lock, 'the preview must never lock a sale path out');
     }
 
     // ── company isolation ────────────────────────────────────────────────────

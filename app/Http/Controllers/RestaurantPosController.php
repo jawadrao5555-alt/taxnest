@@ -1776,37 +1776,18 @@ class RestaurantPosController extends Controller
         return $prefix . str_pad($maxNum + 1, 5, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * Restaurant pay path — the next local bill number (T004, L-NNN).
+     *
+     * Retail and restaurant share ONE sequence per company, so this must never
+     * be a second copy of the rule: \App\Services\PosLocalSeries owns it and the
+     * retail sale path plus the read-only Customize POS preview call the very
+     * same helper (Task 1373).
+     * issueNext() takes the FOR UPDATE lock — call inside the pay transaction.
+     */
     private function generateLocalInvoiceNumber($companyId)
     {
-        // T004 — vendor-requested short L-NNN provisional invoice format, IDENTICAL to
-        // PosController::generateLocalInvoiceNumber so retail + restaurant share one
-        // sequence per company (keep both in sync).
-        // Owner rule (22 Jul 2026) — SMALLEST FREE NUMBER, not max+1: deleted numbers
-        // are reused by NEW bills (gap-fill / daily restart after day-close delete);
-        // archived rows keep their numbers (withoutGlobalScope('hide_archived'));
-        // existing bills are never renumbered. Exclude legacy "LOCAL-YYYY-NNNNN" rows
-        // so the counter is not corrupted. lockForUpdate + UNIQUE(company_id,
-        // invoice_number) guard concurrent generators.
-        $taken = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('invoice_number', 'like', 'L-%')
-            ->where('invoice_number', 'not like', 'LOCAL-%')
-            ->lockForUpdate()
-            ->pluck('invoice_number');
-
-        $used = [];
-        foreach ($taken as $serial) {
-            if (preg_match('/^L-(\d+)$/', $serial, $matches)) {
-                $used[(int) $matches[1]] = true;
-            }
-        }
-
-        $next = 1;
-        while (isset($used[$next])) {
-            $next++;
-        }
-
-        return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);
+        return \App\Services\PosLocalSeries::issueNext((int) $companyId);
     }
 
     public function customerSearch(Request $request)

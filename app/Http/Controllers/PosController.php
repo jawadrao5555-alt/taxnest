@@ -7106,8 +7106,9 @@ class PosController extends Controller
      *
      * This is the single selector behind BOTH the Customize POS status line and the
      * clear action, so the count the owner confirms is exactly what gets deleted.
-     * ALWAYS read it through archivedLocalSeriesRows() — the `like 'L-%'` here is a
-     * coarse prefilter and the exact /^L-\d+$/ narrowing happens there.
+     * ALWAYS read it through archivedLocalSeriesRows() — PosLocalSeries::filter()
+     * here is the same coarse prefilter the generators use and the exact
+     * /^L-\d+$/ narrowing happens there.
      * Rules are IDENTICAL to the day-close DELETE policy (performDayClose):
      *   - never a PRA row: pra_invoice_number NULL + the two disjoint local sets
      *     (provisional = local+local triple, reporting-OFF final = completed +
@@ -7121,12 +7122,14 @@ class PosController extends Controller
     {
         $riderGuardReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id');
 
-        return PosTransaction::withoutGlobalScope('hide_archived')
+        $query = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('is_archived', true)
-            ->whereNull('pra_invoice_number')
-            ->where('invoice_number', 'like', 'L-%')
-            ->where('invoice_number', 'not like', 'LOCAL-%')
+            ->whereNull('pra_invoice_number');
+
+        // Same series prefilter (and same legacy "LOCAL-YYYY" exclusion) the two
+        // generators and the preview use — one definition of "an L-series bill".
+        return \App\Services\PosLocalSeries::filter($query)
             ->where(function ($w) {
                 $w->where(function ($prov) {
                     $prov->where('invoice_mode', 'local')->where('pra_status', 'local');
@@ -7167,8 +7170,10 @@ class PosController extends Controller
      * both generators (and the preview below) treat ONLY /^L-\d+$/ as an occupied
      * number, so anything else that happens to start with "L-" — a hand-typed
      * "L-001-extra", a legacy "L-DRAFT" — reserves nothing. Such a bill must never
-     * be counted as a blocker or swept up by the (permanent) clear. preg_match keeps
-     * that contract identical on MySQL and sqlite, where REGEXP support differs.
+     * be counted as a blocker or swept up by the (permanent) clear. The narrowing
+     * runs through PosLocalSeries::isSeriesSerial(), the same test the generators
+     * apply, and preg_match keeps that contract identical on MySQL and sqlite,
+     * where REGEXP support differs.
      *
      * Every figure the owner is shown AND the deletion itself come from this one
      * set, so the confirmed count is exactly what gets deleted.
@@ -7178,38 +7183,20 @@ class PosController extends Controller
         return $this->archivedLocalSeriesQuery($companyId)
             ->when($lock, fn ($q) => $q->lockForUpdate())
             ->get($columns)
-            ->filter(fn ($t) => (bool) preg_match('/^L-\d+$/', (string) $t->invoice_number))
+            ->filter(fn ($t) => \App\Services\PosLocalSeries::isSeriesSerial($t->invoice_number))
             ->values();
     }
 
     /**
-     * Read-only preview of the next L-number (Task 1358) — same SMALLEST-FREE rule
-     * as generateLocalInvoiceNumber, minus the lock (nothing is being issued here).
+     * Read-only preview of the next L-number (Task 1358) — the SAME helper the two
+     * sale paths issue from (\App\Services\PosLocalSeries), so the number promised on
+     * the Customize POS card is the number the sale screen actually prints
+     * (Task 1373). previewNext() is the unlocked entry point: nothing is issued here.
      * $excludeIds lets the UI answer "and what will it be AFTER the clear?".
-     * Keep in sync with BOTH generators (PosController + RestaurantPosController).
      */
     private function previewNextLocalNumber(int $companyId, array $excludeIds = []): string
     {
-        $taken = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('invoice_number', 'like', 'L-%')
-            ->where('invoice_number', 'not like', 'LOCAL-%')
-            ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
-            ->pluck('invoice_number');
-
-        $used = [];
-        foreach ($taken as $serial) {
-            if (preg_match('/^L-(\d+)$/', $serial, $matches)) {
-                $used[(int) $matches[1]] = true;
-            }
-        }
-
-        $next = 1;
-        while (isset($used[$next])) {
-            $next++;
-        }
-
-        return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);
+        return \App\Services\PosLocalSeries::previewNext($companyId, $excludeIds);
     }
 
     /**
@@ -10527,46 +10514,18 @@ class PosController extends Controller
         return 'POS-' . $year . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * Retail sale path — the next local bill number (L-001, L-002, …).
+     *
+     * The rule (which serials count, which legacy formats are excluded, how the
+     * lowest free number is picked) lives in ONE place: \App\Services\PosLocalSeries.
+     * The restaurant pay path and the read-only Customize POS preview call the
+     * same helper, so all three can never drift apart (Task 1373).
+     * issueNext() takes the FOR UPDATE lock — call inside the sale transaction.
+     */
     private function generateLocalInvoiceNumber(int $companyId): string
     {
-        // Vendor-requested short format: L-001 (per-company, 3-digit pad, grows naturally
-        // past 999). Distinct from "POS-{year}-NNNNN" final invoices so cashiers can spot
-        // provisional bills at a glance in lists/receipts/PDFs.
-        //
-        // Owner rule (22 Jul 2026) — SMALLEST FREE NUMBER, not max+1: a new local bill
-        // takes the lowest L-number not held by ANY existing row. Two effects the owner
-        // asked for: (a) when day-close DELETES local bills, the series restarts from
-        // L-001 the next day; (b) when bills are kept, a mid-series deletion frees its
-        // number and the next new bill fills that gap, then the series continues upward.
-        // Existing bills are NEVER renumbered — only NEW bills take free numbers.
-        // Numbers held by day-close ARCHIVED rows are NOT free (they stay in the table
-        // + unique index — hence withoutGlobalScope('hide_archived')).
-        // Exclude legacy "LOCAL-YYYY-NNNNN" rows — the LIKE 'L-%' pattern would
-        // otherwise match both formats and corrupt the counter.
-        // lockForUpdate serializes concurrent generators inside the caller's
-        // transaction; UNIQUE(company_id, invoice_number) is the final guard.
-        // Keep IDENTICAL to RestaurantPosController::generateLocalInvoiceNumber —
-        // retail + restaurant share one sequence per company.
-        $taken = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('invoice_number', 'like', 'L-%')
-            ->where('invoice_number', 'not like', 'LOCAL-%')
-            ->lockForUpdate()
-            ->pluck('invoice_number');
-
-        $used = [];
-        foreach ($taken as $serial) {
-            if (preg_match('/^L-(\d+)$/', $serial, $matches)) {
-                $used[(int) $matches[1]] = true;
-            }
-        }
-
-        $next = 1;
-        while (isset($used[$next])) {
-            $next++;
-        }
-
-        return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);
+        return \App\Services\PosLocalSeries::issueNext($companyId);
     }
 
     public function billing()

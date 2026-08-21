@@ -1765,6 +1765,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_scan_to_clear' => 'CLEAR KARNE KO BARCODE SCAN KAREIN',
     'kot_sent_to_printer' => 'KOT printer par bhej di gayi',
     'kot_staff' => 'Staff',
+    // Task 1378: table ke naam se pehle lagne wala label ("01" → "TABLE 01").
+    // Jo naam khud "Table …" se shuru ho, woh jaisa hai waisa hi chhapta hai.
+    'kot_table_label' => 'TABLE',
     'kot_total_qty' => 'Kul Tadaad:',
     'kot_was_sent' => 'KOT bhej di gayi',
     'kot_word' => 'KOT',

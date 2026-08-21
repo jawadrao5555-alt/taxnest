@@ -1765,6 +1765,8 @@ return [
     'kot_scan_to_clear' => 'کلیئر کرنے کے لیے بارکوڈ اسکین کریں',
     'kot_sent_to_printer' => 'KOT پرنٹر کو بھیج دیا گیا',
     'kot_staff' => 'اسٹاف',
+    // Task 1378
+    'kot_table_label' => 'ٹیبل',
     'kot_total_qty' => 'کل مقدار:',
     'kot_was_sent' => 'KOT بھیجی گئی',
     'kot_word' => 'KOT',

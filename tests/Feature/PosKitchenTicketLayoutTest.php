@@ -98,10 +98,10 @@ class PosKitchenTicketLayoutTest extends TestCase
         return collect([$item]);
     }
 
-    private function render(Company $company, RestaurantOrder $order, ?int $kotBatchNo): string
+    private function render(Company $company, RestaurantOrder $order, ?int $kotBatchNo, array $overrides = []): string
     {
         $items = $this->makeItems();
-        return view('pos.restaurant.kitchen-ticket', [
+        return view('pos.restaurant.kitchen-ticket', array_merge([
             'order' => $order,
             'company' => $company,
             'ticketItems' => $items,
@@ -110,8 +110,40 @@ class PosKitchenTicketLayoutTest extends TestCase
             'delta' => false,
             'kotBatchNo' => $kotBatchNo,
             'newItemIds' => collect(),
-        ])->render();
+        ], $overrides))->render();
     }
+
+    /** Dine-in order carrying a table (unsaved relation shim — no DB needed). */
+    private function makeDineInOrder(string $tableNumber, array $attrs = []): RestaurantOrder
+    {
+        $order = $this->makeOrder(array_merge(['order_type' => 'dine_in'], $attrs));
+        $order->setRelation('table', new \App\Models\RestaurantTable(['table_number' => $tableNumber]));
+
+        return $order;
+    }
+
+    /** The single header line that carries the order-type badge + date/time. */
+    private function headerFlexLine(string $body): string
+    {
+        $this->assertSame(1, preg_match('/<div class="flex">.*?<\/div>/s', $body, $m), 'header flex line present');
+
+        return $m[0];
+    }
+
+    /** Text printed on the dedicated table line (fails when the line is absent). */
+    private function tableLine(string $body): string
+    {
+        $this->assertSame(
+            1,
+            preg_match('/<div class="kot-table-line" style="font-size: (\d+)px;">(.*?)<\/div>/s', $body, $m),
+            'table name prints on its own dedicated line'
+        );
+        $this->tableLineFont = (int) $m[1];
+
+        return $m[2];
+    }
+
+    private int $tableLineFont = 0;
 
     /** Markup AFTER </head> — the <title> legitimately carries order_number. */
     private function body(string $html): string
@@ -310,5 +342,129 @@ class PosKitchenTicketLayoutTest extends TestCase
 
         $this->assertStringNotContainsString('priority-badge', $this->stripCss($body));
         $this->assertStringNotContainsString(__('pos.kot_rush'), $this->stripCss($body));
+    }
+
+    // ── 7. Table name owns its own line (Task 1378, owner photo 21 Aug 2026) ──
+    //
+    // The name used to ride beside the order-type badge: on an 80mm roll
+    // "DINE IN T-Table" printed on line 1 and a lone "No 01" on line 2, with
+    // the time's "AM" pushed down too. The table name now prints WHOLE on its
+    // own nowrap line, and the old hard-coded "T-" prefix (which produced
+    // "T-Table No 01") is gone.
+
+    public function test_table_name_prints_whole_on_its_own_line(): void
+    {
+        $company = $this->makeCompany('off');
+        $order = $this->makeDineInOrder('Table No 01');
+
+        $body = $this->body($this->render($company, $order, null));
+
+        // Whole name, one piece, on the dedicated line — and no "T-" doubling.
+        $this->assertSame('Table No 01', $this->tableLine($body));
+        $this->assertStringNotContainsString('T-Table', $body, 'the old T- prefix must never double a "Table …" name');
+        // The badge/date line no longer carries the name (that is what broke it).
+        $this->assertStringNotContainsString('Table No 01', $this->headerFlexLine($body));
+    }
+
+    public function test_bare_table_number_still_reads_as_a_table(): void
+    {
+        // Short names ("01") keep a clear label so the kitchen still reads it
+        // as a table — the label is localized, never a hard-coded word.
+        $company = $this->makeCompany('off');
+        $order = $this->makeDineInOrder('01');
+
+        $body = $this->body($this->render($company, $order, null));
+
+        $this->assertSame(__('pos.kot_table_label') . ' 01', $this->tableLine($body));
+    }
+
+    public function test_t_shorthand_name_gets_no_extra_label(): void
+    {
+        // "T-4" / "T4" already read as a table — no second label in front.
+        foreach (['T-4', 'T4', 'T 4'] as $name) {
+            $company = $this->makeCompany('off');
+            $order = $this->makeDineInOrder($name);
+
+            $body = $this->body($this->render($company, $order, null));
+
+            $this->assertSame($name, $this->tableLine($body), "shorthand {$name} prints verbatim");
+        }
+    }
+
+    public function test_longest_possible_name_stays_on_one_line(): void
+    {
+        // table_number is capped at 20 chars in the DB; with the label that is
+        // the widest line the ticket can ever print — the font must step down
+        // (never wrap, never truncate), on compact tickets too.
+        $longest = 'Family Hall Corner 7';           // 20 chars
+        $this->assertSame(20, strlen($longest));
+
+        foreach ([false, true] as $compact) {
+            $company = $this->makeCompany('off', $compact ? ['kot_compact' => true] : []);
+            $order = $this->makeDineInOrder($longest);
+
+            $html = $this->render($company, $order, null);
+            $body = $this->body($html);
+
+            $this->assertSame(__('pos.kot_table_label') . ' ' . $longest, $this->tableLine($body), 'long name prints in full');
+            $this->assertLessThanOrEqual(13, $this->tableLineFont, 'long name must step the font down to fit 72mm');
+
+            // The line itself must be nowrap — a wrapped name is the bug.
+            $this->assertSame(1, preg_match('/\.kot-table-line\s*\{([^}]*)\}/s', $html, $m), '.kot-table-line rule present');
+            $this->assertStringContainsString('white-space: nowrap', $m[1], 'table line must never wrap');
+        }
+    }
+
+    public function test_order_type_and_time_share_one_unbreakable_line(): void
+    {
+        $company = $this->makeCompany('off');
+        $order = $this->makeDineInOrder('Table No 01');
+
+        $html = $this->render($company, $order, null);
+        $body = $this->body($html);
+        $line = $this->headerFlexLine($body);
+
+        $this->assertStringContainsString('order-type-badge', $line, 'order type stays on the top line');
+        $this->assertStringContainsString($order->created_at->format('h:i A'), $line, 'time stays on the same line');
+        // "AM/PM" may never fall to the next line.
+        $this->assertStringContainsString('kot-when', $line, 'date/time span carries the nowrap class');
+        $this->assertSame(1, preg_match('/\.kot-when\s*\{([^}]*)\}/s', $html, $m), '.kot-when rule present');
+        $this->assertStringContainsString('white-space: nowrap', $m[1], 'date/time must never wrap');
+    }
+
+    public function test_table_line_prints_on_every_ticket_variant(): void
+    {
+        // First dine-in ticket, add-on (delta) ticket, re-sent ticket and a
+        // station/counter ticket all render the same header — the fix must
+        // hold on all four.
+        $variants = [
+            'first' => [null, [], []],
+            'addon' => [2, ['delta' => true], []],
+            'resend' => [null, [], ['kot_print_count' => 3]],
+            'station' => [null, ['stationLabel' => 'TANDOOR'], []],
+        ];
+
+        foreach ($variants as $label => [$batch, $overrides, $orderAttrs]) {
+            $company = $this->makeCompany('off');
+            $order = $this->makeDineInOrder('Table No 01');
+            foreach ($orderAttrs as $k => $v) {
+                $order->{$k} = $v;
+            }
+
+            $body = $this->body($this->render($company, $order, $batch, $overrides));
+
+            $this->assertSame('Table No 01', $this->tableLine($body), "table line prints on the {$label} ticket");
+        }
+    }
+
+    public function test_ticket_without_a_table_prints_no_table_line(): void
+    {
+        // Takeaway/delivery slips (no table) must not gain an empty line.
+        $company = $this->makeCompany('off');
+        $order = $this->makeOrder();   // table relation = null
+
+        $body = $this->body($this->render($company, $order, null));
+
+        $this->assertStringNotContainsString('class="kot-table-line"', $body);
     }
 }

@@ -92,6 +92,16 @@
             font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;
             color: #000; background: #fff;
         }
+        /* Task 1378 (owner photo, 21 Aug 2026): the table name used to sit on the
+           SAME header line as the order-type badge + date/time. On an 80mm roll a
+           name like "Table No 01" broke mid-name ("DINE IN T-Table" / "No 01") and
+           pushed the time's "AM" onto its own line. The name now owns a full line,
+           never wraps (nowrap) and its font size steps down with the name length
+           (set inline from PHP) so even the longest stored name — the column caps
+           at 20 chars — still fits the 72mm printable width in ONE piece.
+           The date/time span keeps its own nowrap so "AM/PM" can never drop. */
+        .kot-table-line { font-weight: 900; white-space: nowrap; margin-top: 3px; line-height: 1.25; color: #000; }
+        .kot-when { white-space: nowrap; }
         /* Aug 2026 (customer photo): the reversed white-on-black RUSH block printed
            as a faint dotted box on thermal printers — same lesson as station headers:
            solid black text on white + heavy border prints crisp everywhere.
@@ -153,6 +163,7 @@
         .items-table .note-label { font-size: 11px; }
         .items-table .note-text { font-size: 14px; }
         .order-type-badge { padding: 1px 6px; font-size: 12px; }
+        .kot-table-line { margin-top: 2px; }
         .station-header { font-size: 13px; padding: 3px 6px; letter-spacing: 1px; }
         .station-section { margin-bottom: 4px; }
         .station-item-count { margin-bottom: 2px; }
@@ -363,14 +374,47 @@
     </div>
     @endif
 
+    @php
+        // Task 1378 (owner photo, 21 Aug 2026): table name gets its OWN header
+        // line, printed WHOLE. Two fixes in one:
+        //   • It used to ride beside the order-type badge, so on an 80mm roll a
+        //     name like "Table No 01" wrapped mid-name and the time lost its
+        //     "AM" to the next line. Badge + date/time now own line 1, the
+        //     table name owns line 2 (nowrap + a length-based font step).
+        //   • The old hard-coded "T-" prefix produced "T-Table No 01" on shops
+        //     that already name their tables "Table …". The name now prints
+        //     exactly as the shop stored it; a clear TABLE label is added ONLY
+        //     when the name doesn't already carry one (so "01" still reads as
+        //     a table). Localized label = never a Latin word on Urdu slips.
+        $kotTableName = trim((string) ($order->table->table_number ?? ''));
+        $kotTableText = '';
+        if ($kotTableName !== '') {
+            $kotTableLabel = trim((string) __('pos.kot_table_label'));
+            $kotTableSelfLabelled = preg_match('/^(table|tbl)/iu', $kotTableName) === 1
+                // "T1" / "T-1" / "T 1" shorthand already reads as a table.
+                || preg_match('/^t[\s\-\._]?\d/i', $kotTableName) === 1
+                || ($kotTableLabel !== '' && mb_stripos($kotTableName, $kotTableLabel) === 0);
+            $kotTableText = $kotTableSelfLabelled ? $kotTableName : trim($kotTableLabel . ' ' . $kotTableName);
+        }
+        // Printable width is 72mm − 3mm padding each side ≈ 66mm; these steps
+        // keep the longest possible label (6-char label + 20-char column) on
+        // ONE line. Compact tickets shrink one notch further.
+        $kotTableLen = mb_strlen($kotTableText);
+        $kotTableFont = $kotTableLen <= 12 ? 20 : ($kotTableLen <= 16 ? 18 : ($kotTableLen <= 20 ? 15 : ($kotTableLen <= 26 ? 13 : 10)));
+        if ($kotCompact) { $kotTableFont = max(10, $kotTableFont - 2); }
+    @endphp
     {{-- 10 Aug 2026 (owner): order-type badge + date + time on ONE line — saves a
-         full printed line. Table number stays beside the badge when present. --}}
+         full printed line. Task 1378: the table name no longer squeezes in here;
+         it prints whole on its own line below (see the block above). --}}
     <div class="flex">
         <span>
-            <span class="order-type-badge">{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_', ' ', $order->order_type)) }}</span>@if($order->table) <span class="bold text-lg">T-{{ $order->table->table_number }}</span>@endif
+            <span class="order-type-badge">{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_', ' ', $order->order_type)) }}</span>
         </span>
-        <span class="bold">{{ $order->created_at->format('M d') }} {{ $order->created_at->format('h:i A') }}</span>
+        <span class="bold kot-when">{{ $order->created_at->format('M d') }} {{ $order->created_at->format('h:i A') }}</span>
     </div>
+    @if($kotTableText !== '')
+    <div class="kot-table-line" style="font-size: {{ $kotTableFont }}px;">{{ $kotTableText }}</div>
+    @endif
 
     {{-- Task 620 (ZFC, Aug 2026): waiter-punched orders must ALWAYS carry the
          waiter's REAL display name on the KOT — the footer "Order by" line is a

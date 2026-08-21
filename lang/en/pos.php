@@ -1765,6 +1765,9 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'kot_scan_to_clear' => 'SCAN BARCODE TO CLEAR',
     'kot_sent_to_printer' => 'KOT sent to printer',
     'kot_staff' => 'Staff',
+    // Task 1378: label printed before a table name that doesn't already say
+    // "Table" (e.g. "01" → "TABLE 01"). Names like "Table No 01" print as-is.
+    'kot_table_label' => 'TABLE',
     'kot_total_qty' => 'Total Qty:',
     'kot_was_sent' => 'KOT sent',
     'kot_word' => 'KOT',

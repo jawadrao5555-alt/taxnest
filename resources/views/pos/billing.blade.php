@@ -152,6 +152,14 @@
                 @endforeach
             </div>
 
+            {{-- Same comparison table the landing page shows (Task 1350), with the
+                 customer's own package highlighted so an upgrade is a glance away. --}}
+            <x-pos-plan-comparison
+                :plans="$plans"
+                :current-plan-id="$currentSubscription->pricing_plan_id ?? null"
+                surface="panel"
+                class="mt-10" />
+
             <div class="mt-8 text-center">
                 <div class="inline-flex items-center gap-6 text-xs text-gray-400 dark:text-gray-500">
                     <span class="flex items-center gap-1.5">

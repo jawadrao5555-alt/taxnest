@@ -230,6 +230,33 @@ class PlanLimitService
     }
 
     /**
+     * THE team-account number for a plan — one column, one answer (Task 1350).
+     *
+     * pricing_plans looks like it carries two candidates: user_limit (what POS
+     * + FBR POS actually enforce) and max_users. Only user_limit is a POS
+     * number — max_users belongs to the DI panel's plan.limit:users middleware,
+     * which guards exactly one route (POST /company/users, web guard) and
+     * counts differently (every user incl. owner and inactive, no company
+     * override). It is deliberately NOT mirrored: copying a POS seat count into
+     * it would hand DI a stricter cap than it has today.
+     *
+     * Everything that shows or enforces a POS team-account number goes through
+     * this resolver, and scripts/plan-gate-check.php fails the deploy if the
+     * comparison table ever computes its own instead.
+     *
+     * @return int|null  null = unlimited (NULL or any negative value)
+     */
+    public static function teamAccountLimit(?\App\Models\PricingPlan $plan): ?int
+    {
+        if (!$plan) {
+            return null;
+        }
+        $limit = $plan->user_limit;
+
+        return ($limit === null || (int) $limit < 0) ? null : (int) $limit;
+    }
+
+    /**
      * PRA POS team-account quota: plan user_limit counts ADDED team accounts
      * only (pos_manager + pos_cashier). The company owner's pos_admin account
      * is EXEMPT (owner rule, Jul 2026) — Starter 1 = owner + 1 team account.
@@ -265,8 +292,8 @@ class PlanLimitService
             return ['allowed' => true];
         }
 
-        $limit = $sub->pricingPlan->user_limit;
-        if ($limit === null || (int) $limit === -1) {
+        $limit = self::teamAccountLimit($sub->pricingPlan);
+        if ($limit === null) {
             return ['allowed' => true];
         }
 

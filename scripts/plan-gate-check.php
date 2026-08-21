@@ -285,6 +285,99 @@ try {
     check(PlanLimitService::canAddBranch($co->id)['allowed'] === true,
         'add-on: admin branch override must still win over plan+slots');
 
+    // ── 6b. Package comparison table (Task 1350) ───────────────────────
+    // The landing + billing comparison table is GENERATED from the plan
+    // columns below. These ladders are written here independently of the
+    // service, so a hand-edited plan row, a renamed column or a new
+    // unnamed gate blocks the deploy instead of quietly publishing a
+    // promise the gates do not keep.
+    $BILL_LADDER    = ['Starter' => 2000, 'Business' => 5000, 'Pro' => 10000, 'Pro Max' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+    $TEAM_LADDER    = ['Starter' => 2, 'Business' => 5, 'Pro' => 10, 'Pro Max' => 20, 'Unlimited' => 'Unlimited'];
+    $COUNTER_LADDER = ['Starter' => 1, 'Business' => 3, 'Pro' => 'Unlimited', 'Pro Max' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+
+    $expectedLimits = [];
+    $expectedFeatures = [];
+    foreach (array_keys($MATRIX) as $name) {
+        $expectedLimits[$name] = [
+            'bills'    => $BILL_LADDER[$name],
+            'team'     => $TEAM_LADDER[$name],
+            'branches' => $BRANCH_LADDER[$name],
+            'counters' => $COUNTER_LADDER[$name],
+        ];
+        $row = ['restaurant' => in_array($name, $RESTAURANT_PLANS, true)];
+        foreach ($EXPECTED_GATE_ORDER as $i => $gateCol) {
+            // gate column → comparison row key (kot/khata/loyalty have no
+            // tick/cross row — they are "included in every package").
+            $rowKey = array_search($gateCol, array_column(
+                \App\Services\PosPlanComparisonService::FEATURE_ROWS, 'column'
+            ), true);
+            if ($rowKey === false) { continue; }
+            $keys = array_keys(\App\Services\PosPlanComparisonService::FEATURE_ROWS);
+            $row[$keys[$rowKey]] = $MATRIX[$name][$i];
+        }
+        $expectedFeatures[$name] = $row;
+    }
+
+    // Products are unlimited on EVERY paid POS package (owner, Aug 2026) —
+    // the old silent Starter 300 / Business 1000 caps are gone. FBR POS keeps
+    // its own max_products ladder (shared column, asserted separately).
+    $comparisonPlans = \App\Services\PosPlanComparisonService::plans();
+    check($comparisonPlans->count() === count($MATRIX),
+        'comparison: expected ' . count($MATRIX) . ' paid POS packages, got ' . $comparisonPlans->count());
+    foreach ($comparisonPlans as $p) {
+        check(((int) ($p->max_products ?? -1)) < 0,
+            "comparison: {$p->name} must have unlimited products, got " . var_export($p->max_products, true));
+    }
+
+    foreach (\App\Services\PosPlanComparisonService::audit($comparisonPlans, $expectedLimits, $expectedFeatures) as $problem) {
+        bad('comparison: ' . $problem);
+    }
+    if (!$fail) { ok('comparison table matches the plan gates'); }
+
+    // The gate the panel enforces must return the number the table prints.
+    foreach ($comparisonPlans as $p) {
+        $planModel = \App\Models\PricingPlan::find($p->id);
+        $want = $TEAM_LADDER[$p->name] ?? null;
+        $got = PlanLimitService::teamAccountLimit($planModel);
+        check(($want === 'Unlimited' ? $got === null : $got === $want),
+            "comparison: PlanLimitService::teamAccountLimit({$p->name}) expected " . var_export($want, true)
+            . ', got ' . var_export($got, true));
+    }
+
+    // ONE team-account number for POS: user_limit, read through the resolver
+    // above. pricing_plans.max_users is a DIFFERENT thing — the DI panel's
+    // plan.limit:users middleware counts every user (owner + inactive
+    // included) and ignores the company override, so it may never be wired to
+    // a POS surface or fed a POS seat count. Any POS/FBR POS route picking up
+    // that middleware = a second, stricter team limit nobody advertised.
+    $usersLimitRoutes = [];
+    foreach (app('router')->getRoutes() as $route) {
+        foreach ($route->gatherMiddleware() as $mw) {
+            if (is_string($mw) && (str_contains($mw, 'plan.limit:users') || str_contains($mw, 'CheckPlanLimit:users'))) {
+                $usersLimitRoutes[] = $route->uri();
+            }
+        }
+    }
+    foreach ($usersLimitRoutes as $uri) {
+        check(!preg_match('#^(pos|fbr-pos)/#', $uri),
+            "comparison: route '{$uri}' carries plan.limit:users — POS team accounts must go through "
+            . 'PlanLimitService::canAddPosUser() (user_limit), never the DI max_users cap.');
+    }
+    check(count($usersLimitRoutes) <= 1,
+        'comparison: plan.limit:users is expected on the single DI route only, found: ' . implode(', ', $usersLimitRoutes));
+
+    // ...and the DI column must never be tightened to a POS seat count either:
+    // on a POS row max_users stays unlimited or at least as generous as the
+    // advertised team-account number, so nothing can refuse a seat the table
+    // offers. (Pro / Pro Max / Unlimited are unlimited here by design.)
+    foreach ($comparisonPlans as $p) {
+        $seats = PlanLimitService::teamAccountLimit(\App\Models\PricingPlan::find($p->id));
+        $diCap = ($p->max_users === null || (int) $p->max_users < 0) ? null : (int) $p->max_users;
+        check($seats === null ? true : ($diCap === null || $diCap >= $seats),
+            "comparison: {$p->name} max_users ({$p->max_users}) is stricter than the advertised "
+            . "team-account number ({$seats}) — never mirror POS seats into the DI users cap.");
+    }
+
     // ── 7. FBR POS ladder (owner-approved 9 Aug 2026 — strict binding +
     //       reprice 999/1999/2999). Rows matched by product_type+name; a
     //       drift here means the fbrpos_plan_reprice_and_strict_gating

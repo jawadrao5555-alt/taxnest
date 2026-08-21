@@ -97,6 +97,19 @@ class CheckPlanLimit
                 }
                 break;
             case 'users':
+                // NOTE (Task 1350): this arm guards exactly ONE route — the DI
+                // panel's POST /company/users (web guard). It is NOT a POS team
+                // -account gate and must not become one:
+                //   • POS team pages call PlanLimitService::canAddPosUser()
+                //     directly (user_limit, owner + confined roles exempt) and
+                //     never pass through here.
+                //   • max_users is this route's own column. Do not repoint this
+                //     at user_limit and do not mirror user_limit into
+                //     max_users — the POS seat count and this all-users count
+                //     mean different things, so either move would silently
+                //     tighten the DI cap.
+                // scripts/plan-gate-check.php asserts no POS/FBR POS route ever
+                // picks up plan.limit:users.
                 if ($plan->max_users !== null && (int) $plan->max_users >= 0) {
                     $current = User::where('company_id', $companyId)->count();
                     if ($current >= (int) $plan->max_users) {

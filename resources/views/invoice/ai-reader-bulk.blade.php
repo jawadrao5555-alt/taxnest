@@ -119,11 +119,11 @@
                         {{-- Task 1343: email the PDF summary straight to another reviewer (e.g. the shop's accountant). --}}
                         <div x-show="shareOpen && (batch.processed || 0) > 0" x-cloak class="mt-3 rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-800 dark:bg-violet-950/20">
                             <h3 class="text-xs font-extrabold uppercase tracking-wider text-violet-900 dark:text-violet-200">Email this summary</h3>
-                            <p class="mt-1 text-[11px] text-violet-700 dark:text-violet-300">PDF summary email par bhej dein — maslan apne accountant ko. Zyada se zyada {{ \App\Services\BulkAiImageImportService::REPORT_SHARE_MAX_RECIPIENTS }} addresses, comma se alag karein. Source photos email mein shamil nahi hoti.</p>
+                            <p class="mt-1 text-[11px] text-violet-700 dark:text-violet-300">Email the PDF summary to someone else — your accountant, for example. Up to {{ \App\Services\BulkAiImageImportService::REPORT_SHARE_MAX_RECIPIENTS }} addresses, separated by commas. The private source photos are never attached.</p>
                             <div class="mt-3 flex flex-wrap items-center gap-2">
                                 <input type="text" x-model="shareEmails" @keydown.enter.prevent="sendReport()" placeholder="accountant@example.com, reviewer@example.com" autocomplete="off" name="bulk_share_emails_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore="true" class="min-w-[260px] flex-1 rounded-lg border-gray-300 text-xs dark:border-gray-700 dark:bg-gray-900">
                                 <button type="button" @click="sendReport()" :disabled="shareBusy || !shareEmails.trim()" class="rounded-lg bg-violet-600 px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:opacity-50">
-                                    <span x-text="shareBusy ? 'Bhej rahe hain…' : 'Send summary'"></span>
+                                    <span x-text="shareBusy ? 'Sending…' : 'Send summary'"></span>
                                 </button>
                             </div>
                             <p x-show="shareMessage" x-cloak class="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300" x-text="shareMessage"></p>
@@ -353,7 +353,7 @@
                 this.shareBusy = true; this.shareMessage = ''; this.shareError = '';
                 try {
                     const result = await this.json('/invoices/ai-reader/bulk-images/' + this.batchId + '/report/email', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':this.csrf()}, body:JSON.stringify({recipients:this.shareEmails})});
-                    this.shareMessage = result.message || 'Review summary bhej di gayi.';
+                    this.shareMessage = result.message || 'Review summary sent.';
                     this.shareEmails = '';
                     if (result.shares) this.batch = {...this.batch, report_shares: result.shares};
                 } catch (e) { this.shareError = e.message; }

@@ -29,6 +29,21 @@ class PushService : FirebaseMessagingService() {
         // Logged out (or 401-evicted) — a raced push must not notify.
         if (Prefs.token(c) == null) return
         val data = message.data
+
+        // v1.7.0 (Task #1359): silent "sync now" nudge. The server sends this
+        // the moment the live map sees a rider go quiet, so recovery does not
+        // wait for the 15-min worker. A high-priority data message is also one
+        // of the few states in which Android still lets a backgrounded app
+        // start a foreground service — so this is our best shot at reviving
+        // tracking on a battery-saver phone.
+        if (data["type"] == "sync_now") {
+            DutyWatchdog.ensureRunning(c)
+            SyncWorker.schedule(c) // self-heal if the periodic job was dropped
+            SyncWorker.runNow(c)   // survives us being killed right after this
+            QueueDrain.drainAsync(c)
+            return
+        }
+
         if (data["type"] != "new_deliveries") return
         val arr = try {
             JSONArray(data["deliveries"] ?: "[]")

@@ -40,6 +40,8 @@ class RiderPushService
 {
     private const TOKEN_CACHE_KEY = 'fcm_oauth_token_v1';
     private const MAX_BILLS_IN_PUSH = 40; // ~60 bytes/bill — stays well under FCM 4KB data cap
+    private const SYNC_PUSH_CACHE_KEY = 'rider_sync_push_v1:';
+    private const SYNC_PUSH_THROTTLE_MIN = 5; // one wake-up nudge per rider per 5 min
 
     // ─── Public API ─────────────────────────────────────────────────────────
 
@@ -66,6 +68,51 @@ class RiderPushService
                 self::sendNewDeliveries($riderId);
             } catch (\Throwable $e) {
                 Log::warning('RiderPushService: push failed (assign completed normally)', [
+                    'rider_id' => $riderId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Task #1359 — silent "sync now" nudge for a rider who has gone quiet on
+     * the live map.
+     *
+     * Why a push and not a cron: the phones that break tracking (Infinix,
+     * Tecno, Vivo, Oppo, Xiaomi battery savers) freeze the app in the
+     * background, and a HIGH-priority FCM data message is one of the very few
+     * events that still wakes it — and one of the few states in which Android
+     * lets a backgrounded app restart a foreground service. So the moment the
+     * map notices silence we knock on the phone directly.
+     *
+     * Throttled per rider (SYNC_PUSH_THROTTLE_MIN) because the admin map polls
+     * every few seconds: without it, one open map tab would fire a push per
+     * poll. Throttle sits BEFORE the terminating() defer so repeated polls do
+     * not even queue callbacks.
+     */
+    public static function queueSyncPush(?int $riderId): void
+    {
+        if (!$riderId || !self::isConfigured()) {
+            return;
+        }
+        try {
+            if (!Schema::hasColumn('pos_riders', 'fcm_token')) {
+                return; // PROD schema drift — migration not run yet
+            }
+            // Cache::add is atomic: first caller in the window wins.
+            if (!Cache::add(self::SYNC_PUSH_CACHE_KEY . $riderId, 1,
+                now()->addMinutes(self::SYNC_PUSH_THROTTLE_MIN))) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            return;
+        }
+        app()->terminating(function () use ($riderId) {
+            try {
+                self::sendSyncNow($riderId);
+            } catch (\Throwable $e) {
+                Log::warning('RiderPushService: sync push failed', [
                     'rider_id' => $riderId,
                     'error' => $e->getMessage(),
                 ]);
@@ -147,6 +194,56 @@ class RiderPushService
             return;
         }
         Log::warning('RiderPushService: FCM send non-2xx', [
+            'rider_id' => $riderId,
+            'status' => $resp->status(),
+            'body' => mb_substr($body, 0, 500),
+        ]);
+    }
+
+    /**
+     * Blocking send of the data-only "sync now" nudge (Task #1359).
+     * Payload carries no business data — the app reacts by draining its GPS
+     * buffer and restarting the duty service, nothing user-visible.
+     */
+    private static function sendSyncNow(int $riderId): void
+    {
+        $rider = PosRider::find($riderId);
+        if (!$rider || !$rider->fcm_token || !$rider->on_duty) {
+            return; // old APK / push never registered / duty ended meanwhile
+        }
+
+        $creds = self::credentials();
+        $accessToken = self::oauthToken($creds);
+        if (!$accessToken) {
+            return;
+        }
+
+        $resp = Http::timeout(8)->connectTimeout(5)
+            ->withToken($accessToken)
+            ->post('https://fcm.googleapis.com/v1/projects/' . $creds['project_id'] . '/messages:send', [
+                'message' => [
+                    'token' => $rider->fcm_token,
+                    // HIGH priority + short TTL: this is only useful while the
+                    // rider is still silent. If the phone is offline right now,
+                    // FCM delivers it the moment data returns — exactly when we
+                    // want the buffer flushed.
+                    'android' => ['priority' => 'HIGH', 'ttl' => '600s'],
+                    'data' => ['type' => 'sync_now'],
+                ],
+            ]);
+
+        if ($resp->successful()) {
+            Log::info('RiderPushService: sync push sent', ['rider_id' => $riderId]);
+            return;
+        }
+
+        $body = (string) $resp->body();
+        if ($resp->status() === 404 || str_contains($body, 'UNREGISTERED')
+            || str_contains($body, 'INVALID_ARGUMENT')) {
+            $rider->update(['fcm_token' => null]);
+            return;
+        }
+        Log::warning('RiderPushService: FCM sync send non-2xx', [
             'rider_id' => $riderId,
             'status' => $resp->status(),
             'body' => mb_substr($body, 0, 500),

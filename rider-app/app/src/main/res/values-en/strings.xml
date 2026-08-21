@@ -63,4 +63,28 @@
     <string name="notif_deliveries_channel">New order alerts</string>
     <string name="notif_new_delivery_one">New order for delivery!</string>
     <string name="notif_new_delivery_many">%1$d new orders for delivery!</string>
+
+    <!-- Sync health + watchdog (v1.7.0, Task #1359) -->
+    <string name="ago_just_now">just now</string>
+    <string name="ago_minutes">%1$d min ago</string>
+    <string name="ago_hours">%1$d hr ago</string>
+    <string name="sync_ok">✓ Location is reaching the shop — last sync: %1$s</string>
+    <string name="sync_late">⚠ Location is not reaching the shop — last sync: %1$s</string>
+    <string name="reason_net">Reason: no internet. Turn on mobile data or Wi-Fi.</string>
+    <string name="reason_perm">Reason: location permission or GPS is off. Turn it on.</string>
+    <string name="reason_battery">Reason: the phone\'s battery settings are blocking this app in the background.</string>
+    <string name="reason_unknown">Reason unknown — keep the app open and check your internet.</string>
+    <string name="notif_text_synced">Sharing location with your shop — last sync: %1$s</string>
+    <string name="notif_text_late">⚠ Location is not going out — last sync: %1$s</string>
+    <string name="notif_watchdog_channel">Tracking recovery</string>
+    <string name="notif_watchdog_title">Tracking has stopped</string>
+    <string name="notif_watchdog_text">Duty is on but the phone stopped location sharing. Tap here to start it again.</string>
+    <string name="tracking_resumed">Tracking started again</string>
+
+    <!-- Battery / autostart gate (v1.7.0, Task #1359) -->
+    <string name="battery_chip">⚠ Battery settings can stop tracking — tap to fix</string>
+    <string name="battery_dialog_title">Keep tracking running</string>
+    <string name="battery_dialog_msg">The phone\'s battery saver shuts this app down in the background, so your route never reaches the map.\n\n1) Tap "Battery settings" and set this app to Unrestricted.\n2) Tap "Autostart" and switch TaxNest Rider on.</string>
+    <string name="battery_btn">Battery settings</string>
+    <string name="autostart_btn">Autostart</string>
 </resources>

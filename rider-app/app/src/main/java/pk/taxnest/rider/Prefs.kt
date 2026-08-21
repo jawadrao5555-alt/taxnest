@@ -20,13 +20,31 @@ object Prefs {
     fun setCompanyName(c: Context, v: String) = sp(c).edit().putString("company_name", v).apply()
 
     fun duty(c: Context): Boolean = sp(c).getBoolean("duty", false)
-    fun setDuty(c: Context, v: Boolean) = sp(c).edit().putBoolean("duty", v).apply()
+    fun setDuty(c: Context, v: Boolean) {
+        // Stamp the moment duty came ON so the sync-health check can give the
+        // rider a grace window before shouting "sync late" (v1.7.0).
+        if (v && !duty(c)) setDutyStartedAt(c, System.currentTimeMillis())
+        sp(c).edit().putBoolean("duty", v).apply()
+    }
 
     fun queueJson(c: Context): String = sp(c).getString("queue", "[]") ?: "[]"
     fun setQueueJson(c: Context, v: String) = sp(c).edit().putString("queue", v).apply()
 
     fun lastSync(c: Context): Long = sp(c).getLong("last_sync", 0L)
     fun setLastSync(c: Context, v: Long) = sp(c).edit().putLong("last_sync", v).apply()
+
+    // ── Sync health (v1.7.0) ───────────────────────────────────────────────
+    // Last upload failure reason, so the home screen / duty notification can
+    // tell the rider WHY nothing is going out (net, permission, plan, ...).
+    // Empty string = last attempt succeeded. Codes live in SyncStatus.
+    fun lastSyncError(c: Context): String = sp(c).getString("last_sync_error", "") ?: ""
+    fun setLastSyncError(c: Context, v: String) =
+        sp(c).edit().putString("last_sync_error", v).apply()
+
+    /** Wall-clock ms of the last duty-ON toggle — grace window for "late sync". */
+    fun dutyStartedAt(c: Context): Long = sp(c).getLong("duty_started_at", 0L)
+    fun setDutyStartedAt(c: Context, v: Long) =
+        sp(c).edit().putLong("duty_started_at", v).apply()
 
     // ── Seen delivery ids (notification dedupe, v1.4.0) ───────────────────
     // Always copy into a fresh HashSet on write — mutating the set returned by

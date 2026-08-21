@@ -153,6 +153,34 @@
             android:textSize="12sp"
             android:textColor="#667085" />
 
+        <!-- Sync health line (v1.7.0, Task #1359) — green when points are
+             reaching the shop, red + reason when they are not. -->
+        <TextView
+            android:id="@+id/syncStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#067647" />
+
+        <!-- Battery / autostart warning chip — stays until the rider grants
+             the exemption, even if he skipped the duty-on dialog. -->
+        <TextView
+            android:id="@+id/batteryChip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:padding="10dp"
+            android:gravity="center"
+            android:text="@string/battery_chip"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#92400E"
+            android:background="#FEF3C7"
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/dutyBtn"
             android:layout_width="match_parent"

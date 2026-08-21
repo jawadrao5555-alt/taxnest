@@ -101,6 +101,33 @@ class PosPlanComparisonService
     /** Business is the flagged column on both the cards and the table. */
     public const POPULAR_PLAN = 'Business';
 
+    /**
+     * The two POS surfaces that render package cards above this table
+     * (Task 1384). auditCards() scans them for hand-written claims, so a card
+     * can never grow its own copy again.
+     */
+    public const CARD_VIEWS = [
+        'resources/views/pos/landing.blade.php',
+        'resources/views/pos/billing.blade.php',
+    ];
+
+    /**
+     * Patterns a package card may NOT contain: the display-only features JSON
+     * (nothing gates on it) and any limit the comparison table already prints.
+     * Numbers live in exactly ONE place — the table.
+     */
+    public const CARD_FORBIDDEN = [
+        '->features'              => 'the display-only pricing_plans.features JSON (no gate reads it)',
+        'getInvoiceLimitDisplay'  => 'the bills-per-month number (comparison table owns it)',
+        'getUserLimitDisplay'     => 'the team-account number (comparison table owns it)',
+        'getBranchLimitDisplay'   => 'the branch number (comparison table owns it)',
+        'invoice_limit'           => 'the bills-per-month column',
+        'user_limit'              => 'the team-account column',
+        'branch_limit'            => 'the branch column',
+        'max_terminals'           => 'the counters column',
+        'max_products'            => 'the products column',
+    ];
+
     /** The paid POS packages, cheapest first — same query the cards use. */
     public static function plans(): Collection
     {
@@ -181,6 +208,317 @@ class PosPlanComparisonService
             ['key' => 'limits',   'title' => __('pos.pcmp_sec_limits'),   'rows' => $limitRows],
             ['key' => 'features', 'title' => __('pos.pcmp_sec_features'), 'rows' => $featureRows],
         ];
+    }
+
+    /**
+     * Package-card bullets — SAME source as the table (Task 1384).
+     *
+     * A card used to carry its own hand-written bullet list (the display-only
+     * features JSON), so it could promise a feature the plan row did not grant
+     * and contradict the table printed right under it. Now:
+     *   • the cheapest package lists what every package includes;
+     *   • every package above it lists ONLY what it newly unlocks over the
+     *     package below — read off the same column the table's tick reads;
+     *   • a capped limit that becomes uncapped gets a claim-free "Unlimited …"
+     *     line (still read off the column, still without a number).
+     * No card ever prints bills / team / branch / counter / product numbers —
+     * those belong to the table alone, so the two cannot drift apart.
+     *
+     * The "Everything in <previous>, plus:" framing is NOT assumed: plan rows
+     * are editable live from the admin panel (price order, a switched-off gate,
+     * a tightened cap, a brand-new package dropped into the middle), so the
+     * claim is verified at render time by cardInherits(). When it does not
+     * hold, the card silently falls back to a standalone list of what THAT
+     * package actually gives — never a stale promise.
+     *
+     * @return array<int, array{key:string,column:?string,label:string,hint:?string,source:string}>
+     */
+    public static function cardHighlights(?PricingPlan $plan, ?PricingPlan $prevPlan = null): array
+    {
+        if (!$plan) {
+            return [];
+        }
+
+        // ── Stands on the package below it: list only the new gains ────────
+        if (self::cardInherits($plan, $prevPlan)) {
+            $rows = [];
+            foreach (self::FEATURE_ROWS as $key => $spec) {
+                if (!$plan->{$spec['column']} || $prevPlan->{$spec['column']}) {
+                    continue;
+                }
+                $rows[] = self::cardFeatureRow($key, $spec);
+            }
+
+            // A cap that lifts is a real upgrade — say it in words, never a number.
+            foreach (self::LIMIT_ROWS as $key => $spec) {
+                if (!self::cardIsUncapped($plan, $key, $spec) || self::cardIsUncapped($prevPlan, $key, $spec)) {
+                    continue;
+                }
+                $rows[] = self::cardLimitRow($key, $spec);
+            }
+
+            return $rows;
+        }
+
+        // ── Standalone card: the base package, or a ladder that no longer
+        //    holds. Everything listed is checked against THIS plan's row. ───
+        $rows = [];
+        foreach (self::INCLUDED_ROWS as $key => $spec) {
+            if (isset($spec['column']) && empty($plan->{$spec['column']})) {
+                continue;
+            }
+            if (isset($spec['unlimited']) && !self::isUnlimited($plan->{$spec['unlimited']})) {
+                continue;
+            }
+            $rows[] = [
+                'key'    => $key,
+                'column' => $spec['column'] ?? ($spec['unlimited'] ?? null),
+                'label'  => __('pos.pcmp_inc_' . $key),
+                'hint'   => null,
+                'source' => 'included',
+            ];
+        }
+        foreach (self::FEATURE_ROWS as $key => $spec) {
+            if ($plan->{$spec['column']}) {
+                $rows[] = self::cardFeatureRow($key, $spec);
+            }
+        }
+        foreach (self::LIMIT_ROWS as $key => $spec) {
+            if (self::cardIsUncapped($plan, $key, $spec)) {
+                $rows[] = self::cardLimitRow($key, $spec);
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * May this card say "Everything in <previous>, plus:"?
+     *
+     * Only when the package below really is a subset: no tick it owns is
+     * switched off here, and no limit it has is tightened here. Checked on
+     * every render because pricing_plans rows are live-editable.
+     */
+    public static function cardInherits(?PricingPlan $plan, ?PricingPlan $prevPlan): bool
+    {
+        if (!$plan || !$prevPlan) {
+            return false;
+        }
+
+        foreach (self::FEATURE_ROWS as $spec) {
+            if ($prevPlan->{$spec['column']} && !$plan->{$spec['column']}) {
+                return false;
+            }
+        }
+        foreach (self::LIMIT_ROWS as $key => $spec) {
+            if (self::cardIsUncapped($plan, $key, $spec)) {
+                continue;
+            }
+            if (self::cardIsUncapped($prevPlan, $key, $spec)) {
+                return false;
+            }
+            if ((int) self::cardLimitValue($plan, $key, $spec) < (int) self::cardLimitValue($prevPlan, $key, $spec)) {
+                return false;
+            }
+        }
+        // The base package's own floor must hold before anything can inherit it.
+        foreach (self::INCLUDED_ROWS as $spec) {
+            if (isset($spec['column']) && (empty($prevPlan->{$spec['column']}) || empty($plan->{$spec['column']}))) {
+                return false;
+            }
+            if (isset($spec['unlimited'])
+                && (!self::isUnlimited($prevPlan->{$spec['unlimited']}) || !self::isUnlimited($plan->{$spec['unlimited']}))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * May the cheapest card say "Every package includes:"?
+     *
+     * That heading speaks for the WHOLE ladder, so it is only honest while
+     * every package really carries the floor. One live admin edit (capping
+     * products on a higher package, switching khata off) makes it false, and
+     * the card then speaks for itself instead.
+     *
+     * @param  Collection<int, PricingPlan>|null  $plans
+     */
+    public static function cardIncludedFloorHolds(?Collection $plans): bool
+    {
+        if (!$plans || $plans->isEmpty()) {
+            return false;
+        }
+
+        foreach ($plans as $plan) {
+            foreach (self::INCLUDED_ROWS as $spec) {
+                if (isset($spec['column']) && empty($plan->{$spec['column']})) {
+                    return false;
+                }
+                if (isset($spec['unlimited']) && !self::isUnlimited($plan->{$spec['unlimited']})) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /** The limit behind a comparison row (team accounts come from the gate's resolver). */
+    private static function cardLimitValue(PricingPlan $plan, string $key, array $spec)
+    {
+        return $key === 'team' ? self::teamAccountLimit($plan) : $plan->{$spec['column']};
+    }
+
+    private static function cardIsUncapped(PricingPlan $plan, string $key, array $spec): bool
+    {
+        return self::isUnlimited(self::cardLimitValue($plan, $key, $spec));
+    }
+
+    private static function cardFeatureRow(string $key, array $spec): array
+    {
+        return [
+            'key'    => $key,
+            'column' => $spec['column'],
+            'label'  => __('pos.pcmp_' . $key),
+            'hint'   => $spec['hint'] ? __('pos.pcmp_' . $key . '_hint') : null,
+            'source' => 'feature',
+        ];
+    }
+
+    private static function cardLimitRow(string $key, array $spec): array
+    {
+        return [
+            'key'    => $key,
+            'column' => $spec['column'],
+            'label'  => __('pos.pcmp_card_unl_' . $key),
+            'hint'   => null,
+            'source' => 'limit',
+        ];
+    }
+
+    /**
+     * Card drift audit — folded into audit(), so scripts/plan-gate-check.php
+     * blocks the deploy when a card claims something the plan does not grant.
+     *
+     * @param  Collection<int, PricingPlan>  $plans
+     * @return array<int, string>
+     */
+    public static function auditCards(Collection $plans): array
+    {
+        $problems = [];
+        $ordered = $plans->values();
+
+        foreach ($ordered as $index => $plan) {
+            $prev = $index > 0 ? $ordered[$index - 1] : null;
+
+            // 1. The ladder itself: a costlier package may never lose a tick or
+            //    tighten a limit. The card protects itself at render time
+            //    (cardInherits() drops the "Everything in X, plus" line), but
+            //    a ladder that slipped is still a pricing bug worth blocking.
+            if ($prev) {
+                foreach (self::FEATURE_ROWS as $key => $spec) {
+                    if ($prev->{$spec['column']} && !$plan->{$spec['column']}) {
+                        $problems[] = "{$plan->name} sits above {$prev->name} but '{$key}' ({$spec['column']}) "
+                            . "is ON for {$prev->name} and OFF for {$plan->name} — the {$plan->name} card can no "
+                            . "longer say \"Everything in {$prev->name}, plus\".";
+                    }
+                }
+                foreach (self::LIMIT_ROWS as $key => $spec) {
+                    if (self::cardIsUncapped($plan, $key, $spec)) {
+                        continue;
+                    }
+                    $now = self::cardLimitValue($plan, $key, $spec);
+                    $was = self::cardLimitValue($prev, $key, $spec);
+                    if (self::isUnlimited($was) || (int) $now < (int) $was) {
+                        $problems[] = "{$plan->name} sits above {$prev->name} but '{$key}' ({$spec['column']}) "
+                            . 'drops from ' . (self::isUnlimited($was) ? 'Unlimited' : (int) $was)
+                            . ' to ' . (int) $now . '.';
+                    }
+                }
+            }
+
+            // 2. "Included in every package" must hold on THIS plan's row — the
+            //    card drops the bullet when it does not, so the drift would
+            //    otherwise ship silently.
+            foreach (self::INCLUDED_ROWS as $key => $spec) {
+                if (isset($spec['column']) && empty($plan->{$spec['column']})) {
+                    $problems[] = "{$plan->name} card lists '{$key}' as included but {$spec['column']} is OFF on that plan.";
+                }
+                if (isset($spec['unlimited']) && !self::isUnlimited($plan->{$spec['unlimited']})) {
+                    $problems[] = "{$plan->name} card lists '{$key}' as unlimited but {$spec['unlimited']} is capped "
+                        . "at {$plan->{$spec['unlimited']}}.";
+                }
+            }
+
+            // 3. Every bullet must be backed by a column that is really ON.
+            $numbers = self::cardBannedNumbers($plan);
+            foreach (self::cardHighlights($plan, $prev) as $row) {
+                if ($row['source'] === 'feature' && empty($plan->{$row['column']})) {
+                    $problems[] = "{$plan->name} card claims '{$row['key']}' but {$row['column']} is OFF on that plan.";
+                }
+                if ($row['source'] === 'included' && $row['column'] && empty($plan->{$row['column']})) {
+                    $problems[] = "{$plan->name} card lists '{$row['key']}' as included but {$row['column']} is OFF on that plan.";
+                }
+                if ($row['source'] === 'limit' && !self::isUnlimited($plan->{$row['column']}) && $row['key'] !== 'team') {
+                    $problems[] = "{$plan->name} card claims unlimited '{$row['key']}' but {$row['column']} is capped at {$plan->{$row['column']}}.";
+                }
+
+                // 3. Labels must exist in all three languages and must never
+                //    repeat one of the table's numbers.
+                foreach (['en', 'rur', 'ur'] as $locale) {
+                    $key = $row['source'] === 'included' ? 'pcmp_inc_' . $row['key']
+                        : ($row['source'] === 'limit' ? 'pcmp_card_unl_' . $row['key'] : 'pcmp_' . $row['key']);
+                    $value = __('pos.' . $key, [], $locale);
+                    if (!is_string($value) || trim($value) === '' || $value === 'pos.' . $key) {
+                        $problems[] = "Missing lang key pos.{$key} in [{$locale}] — every card bullet needs a name in all three languages.";
+                    }
+                }
+                foreach ($numbers as $number) {
+                    foreach ([$row['label'], (string) $row['hint']] as $text) {
+                        if ($text !== '' && preg_match('/(?<!\d)' . preg_quote($number, '/') . '(?!\d)/', $text)) {
+                            $problems[] = "{$plan->name} card bullet '{$row['key']}' repeats the number {$number}, "
+                                . 'which the comparison table already prints — cards must stay number-free.';
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. The card views themselves must not grow hand-written claims back.
+        foreach (self::CARD_VIEWS as $relative) {
+            $path = base_path($relative);
+            if (!is_file($path)) {
+                $problems[] = "Package-card view '{$relative}' is missing — update PosPlanComparisonService::CARD_VIEWS.";
+                continue;
+            }
+            $source = (string) file_get_contents($path);
+            foreach (self::CARD_FORBIDDEN as $needle => $why) {
+                if (str_contains($source, $needle)) {
+                    $problems[] = "'{$relative}' references {$needle} — a package card may not print {$why}. "
+                        . 'Use PosPlanComparisonService::cardHighlights().';
+                }
+            }
+        }
+
+        return $problems;
+    }
+
+    /** The numbers the comparison table prints for this plan — banned on its card. */
+    private static function cardBannedNumbers(PricingPlan $plan): array
+    {
+        $numbers = [];
+        foreach (self::LIMIT_ROWS as $key => $spec) {
+            $raw = $key === 'team' ? self::teamAccountLimit($plan) : $plan->{$spec['column']};
+            if (self::isUnlimited($raw)) {
+                continue;
+            }
+            $numbers[] = (string) (int) $raw;
+            $numbers[] = number_format((int) $raw);
+        }
+
+        return array_values(array_unique($numbers));
     }
 
     /** Labels for the "included in every package" block. */
@@ -302,6 +640,12 @@ class PosPlanComparisonService
                 }
             }
         }
+        // 6. The package cards printed ABOVE the table (Task 1384) — a card
+        //    may only repeat what the table can prove.
+        foreach (self::auditCards($plans) as $problem) {
+            $problems[] = $problem;
+        }
+
         foreach ($expectedFeatures as $planName => $expected) {
             $plan = $byName->get($planName);
             if (!$plan) {

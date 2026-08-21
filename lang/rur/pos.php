@@ -5224,6 +5224,11 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pcmp_branches_hint' => 'Shamil branches ke ooper har branch Rs :price saalana',
     'pcmp_counters' => 'Counters (terminals)',
     'pcmp_counters_hint' => 'Ek branch mein billing counters',
+    // Package-card lines for a cap that lifts (Task 1384) — never a number.
+    'pcmp_card_unl_bills' => 'Har maheene unlimited bills',
+    'pcmp_card_unl_team' => 'Unlimited team accounts',
+    'pcmp_card_unl_branches' => 'Unlimited branches',
+    'pcmp_card_unl_counters' => 'Unlimited billing counters',
     'pcmp_restaurant' => 'Restaurant / Kitchen',
     'pcmp_restaurant_hint' => 'Tables, KOT aur kitchen display',
     'pcmp_deals' => 'Deals aur combos',

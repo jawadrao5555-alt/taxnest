@@ -5220,6 +5220,11 @@ return [
     'pcmp_branches_hint' => 'شامل برانچوں کے بعد ہر برانچ :price روپے سالانہ',
     'pcmp_counters' => 'کاؤنٹر',
     'pcmp_counters_hint' => 'ایک برانچ میں بلنگ کاؤنٹر',
+    // Package-card lines for a cap that lifts (Task 1384) — never a number.
+    'pcmp_card_unl_bills' => 'ہر مہینے لامحدود بل',
+    'pcmp_card_unl_team' => 'لامحدود ٹیم اکاؤنٹس',
+    'pcmp_card_unl_branches' => 'لامحدود برانچیں',
+    'pcmp_card_unl_counters' => 'لامحدود بلنگ کاؤنٹر',
     'pcmp_restaurant' => 'ریسٹورنٹ / کچن',
     'pcmp_restaurant_hint' => 'میزیں، KOT اور کچن سکرین',
     'pcmp_deals' => 'ڈیلز اور کومبو',

@@ -31,7 +31,15 @@
         </div>
         @if($plan->features && is_array($plan->features) && count($plan->features))
         <div class="mt-3 pt-3 border-t border-gray-800">
-            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Landing Page Features</p>
+            {{-- Task 1384: PRA POS cards are GENERATED from the plan's own gate
+                 columns (PosPlanComparisonService), so this list is dead copy
+                 there — say so instead of letting an admin edit a no-op. --}}
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">
+                Landing Page Features
+                @if($plan->product_type === 'pos')
+                    <span class="text-amber-400 normal-case">— not shown on PRA POS cards</span>
+                @endif
+            </p>
             <div class="space-y-1">
                 @foreach($plan->features as $feature)
                 <div class="flex items-center gap-1.5 text-xs text-gray-300">
@@ -90,7 +98,12 @@
             </div>
         </div>
         <div>
-            <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1 block">Features (one per line — shown on landing page)</label>
+            <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1 block">
+                Features (one per line — shown on landing page)
+                @if($plan->product_type === 'pos')
+                    <span class="text-amber-400 normal-case block mt-0.5">PRA POS ignores this: those cards are built from the plan's own limits &amp; feature switches, so a card can never promise more than the package gives.</span>
+                @endif
+            </label>
             <textarea name="features_text" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">{{ $plan->features && is_array($plan->features) ? implode("\n", $plan->features) : '' }}</textarea>
         </div>
         <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save Changes</button>

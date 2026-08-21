@@ -438,8 +438,13 @@
                                 @php
                                     $perMonth = round($plan->sale_price / 12);
                                     $hasOffer = $plan->sale_percent > 0;
-                                    $features = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
                                     $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;
+                                    // Task 1384 — bullets come from the SAME plan columns the
+                                    // comparison table reads, never from hand-written copy, and
+                                    // never carry a number the table already prints.
+                                    $highlights = \App\Services\PosPlanComparisonService::cardHighlights($plan, $prevPlan);
+                                    $inherits   = \App\Services\PosPlanComparisonService::cardInherits($plan, $prevPlan);
+                                    $floorHolds = \App\Services\PosPlanComparisonService::cardIncludedFloorHolds($plans);
                                     $isPopular = $plan->name === 'Business';
                                 @endphp
                                 <div class="p-5 border {{ $isPopular ? 'border-[#0A4D5C] ring-1 ring-[#0A4D5C]' : 'border-purple-700/20' }} bg-purple-50/30 relative overflow-hidden">
@@ -474,26 +479,28 @@
                                         </div>
                                     </div>
                                     <p class="text-xs text-gray-500 mb-3">Effective: PKR {{ number_format($perMonth) }}/mo</p>
-                                    <p class="text-xs font-semibold text-gray-800 mb-1">
-                                        {{ $plan->getInvoiceLimitDisplay() }} bills/month
-                                        · {{ $plan->getUserLimitDisplay() }} team account{{ $plan->user_limit === 1 ? '' : 's' }}
-                                        · {{ $plan->getBranchLimitDisplay() }} branch{{ $plan->branch_limit === 1 ? '' : 'es' }}
-                                    </p>
-                                    @if(!empty($features))
+                                    @if(!empty($highlights))
                                         <div class="mt-4 border-t border-purple-700/10 pt-4">
-                                            @if($prevPlan)
-                                                <p class="text-[10px] font-bold uppercase tracking-widest text-[#0A4D5C] mb-2">Everything in {{ $prevPlan->name }}, plus:</p>
-                                            @endif
+                                            <p class="text-[10px] font-bold uppercase tracking-widest text-[#0A4D5C] mb-2">
+                                                {{-- Only claim the package below (or the whole ladder) when the plan rows still back it up. --}}
+                                                {{ $inherits ? 'Everything in ' . $prevPlan->name . ', plus:' : (!$prevPlan && $floorHolds ? 'Every package includes:' : 'This package includes:') }}
+                                            </p>
                                             <ul class="space-y-2">
-                                                @foreach($features as $feature)
+                                                @foreach($highlights as $highlight)
                                                 <li class="flex items-start text-sm text-gray-700">
                                                     <span class="text-[#0A4D5C] mr-2 mt-0.5 text-xs">■</span>
-                                                    {{ $feature }}
+                                                    <span>
+                                                        {{ $highlight['label'] }}
+                                                        @if(!empty($highlight['hint']))
+                                                            <span class="block text-xs text-gray-500">{{ $highlight['hint'] }}</span>
+                                                        @endif
+                                                    </span>
                                                 </li>
                                                 @endforeach
                                             </ul>
                                         </div>
                                     @endif
+                                    <p class="text-[11px] text-gray-500 mt-3">Bills, team accounts, branches &amp; counters — see the comparison table below.</p>
                                 </div>
                             @endforeach
                         @else

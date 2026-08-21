@@ -108,6 +108,12 @@ class Company extends Model
         'kot_show_orderby',
         'kot_show_barcode',
         'kot_show_footer',
+        // Task 1367: the "kitchen notes on the KOT" switch was NEVER fillable —
+        // Kitchen Settings (and receipt-settings' rp_kot_show_kitchen_notes)
+        // showed "Saved" while Eloquent silently dropped the write, so special
+        // instructions never reached the kitchen. Same class of bug as
+        // delivery_kot_after_payment (Task 1356).
+        'kot_show_kitchen_notes',
         'kot_align_center',
         'kot_center_notice_at',
         'kot_left_margin_mm',
@@ -228,6 +234,7 @@ class Company extends Model
         'kot_show_orderby' => 'boolean',
         'kot_show_barcode' => 'boolean',
         'kot_show_footer' => 'boolean',
+        'kot_show_kitchen_notes' => 'boolean',
         'kot_align_center' => 'boolean',
         'kot_center_notice_at' => 'datetime',
         'delivery_kot_after_payment' => 'boolean',
@@ -499,6 +506,10 @@ class Company extends Model
             'tables_first_flow', 'table_click_direct_open',
             'pos_kot_full_mode', 'kot_compact', 'kot_show_customer',
             'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer',
+            // Task 1367: the kitchen-notes switch joins its KOT-style siblings —
+            // every Kitchen Settings toggle must bust the sale screen's boot
+            // fingerprint, or a cached/offline screen keeps the old setting.
+            'kot_show_kitchen_notes',
             'kot_align_center', 'kot_left_margin_mm',
             // Task 1356: BOTH kitchen-ticket flow toggles are BAKED into the sale
             // screen's kitchenSettings JS object — without them here an offline /

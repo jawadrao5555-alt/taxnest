@@ -39,6 +39,12 @@ Play build alag isliye hai ke Play do cheezon ki ijazat nahi deta:
 Website ki dono builds bilkul pehle jaisi hain: wohi permissions, wohi
 `targetSdk 34`, wohi self-update, wohi keystore.
 
+Yeh poora farq sirf source-sets par khara hai — koi compiler ise nahi pakarta.
+Is liye har build ke baad `bash scripts/play-build-check.sh` lazmi hai: AAB mein
+in mein se koi cheez ghus aaye (ya website APKs se nikal jaye) to woh wahin fail
+ho jati hai, Play ke reject ka intezar nahi karna parta. Tafseel:
+`signing-and-build.md` §3.
+
 Aur ek cheez dono notification builds (`plus` + `play`) mein nai hai:
 **prominent disclosure** — notification access maangne se pehle poori screen par
 saaf likha jata hai ke kya parha jayega, kya nahi, kahan jayega aur kyun. Play

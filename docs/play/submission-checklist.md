@@ -104,7 +104,9 @@ Console → **Policy → App content**. Har item green tick hona chahiye:
 
 ## Qadam 5 — AAB upload  (20 min)
 
-1. AAB banayein: `docs/play/signing-and-build.md` §2.
+1. AAB banayein: `docs/play/signing-and-build.md` §2. Phir **upload se pehle
+   lazmi** `bash scripts/play-build-check.sh` chalayein (§3) — exit 1 aaye to
+   upload bilkul na karein, warna reject ka pata hafton baad chalega.
 2. **App signing:** pehli upload par Google poochega. `signing-and-build.md` §4
    parh kar faisla karein — sifarish "existing key upload" (PEPK) hai, taake
    website wali APK aur Play wali app ek doosre par bina uninstall update hoti

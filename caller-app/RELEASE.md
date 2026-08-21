@@ -78,6 +78,14 @@ src/notif/res   → the strings both notif builds use (plus, play)
 src/play/java   → no-op Updater                     (play)
 ```
 
+That table **is** the contract Google accepted, and nothing in the build fails
+if it drifts — a class dropped into `src/main/java` instead of `src/web/java`,
+or a permission added to `src/main/AndroidManifest.xml`, silently lands in the
+Play build too. `scripts/play-build-check.sh` (Task 1364) is the guard: it
+fails on any of that in the AAB, and on the reverse regression in the two
+website APKs. Run it after every build — see "Verify before hosting" below and
+`docs/play/signing-and-build.md` §3.
+
 Each flavor's own `res/values*/strings.xml` holds **only** the keys that differ
 from the shared sets — today just `build_badge`. The same key in two res dirs of
 one source set fails the build with *"Duplicate resources"*, so `build_badge`
@@ -277,8 +285,22 @@ which is exactly the v1.0.0 incident. The clean `sim` build must come back with
 a plain PASS. `--strict` turns the exception into a failure; `--expect-version` /
 `--expect-code` assert the version you meant to ship.
 
-Caller-specific extras — these need the SDK's `aapt2` and the script does
-**not** cover them:
+
+### …and the Play-drift guard (also one command, also do not skip)
+
+```bash
+bash scripts/play-build-check.sh --apks-only
+```
+
+Same two APKs, a different question: are they still **website** builds? It
+FAILS if either one has lost `REQUEST_INSTALL_PACKAGES`, lost the `UpdateCheck`
+class, or moved off `targetSdk 34` — i.e. if a "tidy up the Play build" edit
+stripped self-update from the builds that have no store to fall back on. Drop
+`--apks-only` when a Play AAB was built in the same run: the full command also
+proves the AAB carries none of that (`docs/play/signing-and-build.md` §3).
+
+Caller-specific extras — these need the SDK's `aapt2` and neither script covers
+them:
 
 ```bash
 BT=/home/runner/android-sdk/build-tools/36.0.0
@@ -295,22 +317,16 @@ $BT/aapt2 dump resources $SIM  | grep -A3 "string/build_badge"   # SIM-only word
 $BT/aapt2 dump resources $PLUS | grep -A3 "string/build_badge"   # WhatsApp wording
 #    each: a bare "()" line (English), a "(ur)" line and a "(b+ur+Latn)" line
 
-# c. Website builds must KEEP targetSdk 34 and their self-update code —
-#    only the play flavor drops them. (targetSdk is also printed by the script.)
-$BT/aapt2 dump badging $SIM  | grep targetSdkVersion    # '34'
-$BT/aapt2 dump badging $PLUS | grep targetSdkVersion    # '34'
-$BT/aapt2 dump permissions $SIM | grep REQUEST_INSTALL_PACKAGES   # must be present
 
-# d. Call back (Task 1381) is IN both website builds…
+# c. Call back (Task 1381) is IN both website builds.
 $BT/aapt2 dump permissions $SIM  | grep FOREGROUND_SERVICE_DATA_SYNC   # present
 $BT/aapt2 dump permissions $PLUS | grep FOREGROUND_SERVICE_DATA_SYNC   # present
-
-# …and NOT in the Play build. Build it only when you are shipping to Play;
-# this check must print nothing.
-PLAY=caller-app/app/build/outputs/apk/play/release/app-play-release.apk
-$BT/aapt2 dump permissions $PLAY | grep -E "FOREGROUND_SERVICE|POST_NOTIFICATIONS|RECEIVE_BOOT_COMPLETED" \
-  && echo "STOP — call back leaked into the Play build" || echo "play OK"
 ```
+
+(`targetSdk 34`, `REQUEST_INSTALL_PACKAGES` and the `UpdateCheck` class used to
+be three more `aapt2` greps here, plus a "did call back leak into the Play
+build?" one. All of them are now `scripts/play-build-check.sh`, which fails
+loudly instead of asking you to read a grep's output — and needs no SDK.)
 
 Equal `versionCode` on both flavors is fine — Android only refuses a true
 downgrade, and swapping builds is a same-signature in-place update.
@@ -408,9 +424,13 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 1. Source changes committed.
 2. `versionCode` +1 and `versionName` bumped in `caller-app/app/build.gradle`
    (shared by all three flavors).
-3. Build both website flavors, then `bash scripts/apk-release-check.sh <sim> <plus>`
-   (+ the caller-specific `aapt2` extras above). The sim APK must print PASS; the
-   plus APK must print PASS WITH 1 KNOWN EXCEPTION and nothing else.
+3. Build both website flavors, then **both** guards (+ the caller-specific
+   `aapt2` extras above):
+   - `bash scripts/apk-release-check.sh <sim> <plus>` — the sim APK must print
+     PASS; the plus APK must print PASS WITH 1 KNOWN EXCEPTION and nothing else.
+   - `bash scripts/play-build-check.sh --apks-only` — must print PASS (both APKs
+     still have self-update and `targetSdk 34`). If a Play AAB was built in the
+     same run, drop `--apks-only` so the bundle is checked too.
 4. scp both APKs to live `public_html/public/downloads/` (versioned name +
    canonical name), then re-run the guard on the **downloaded** canonical URLs
    and md5-match them against the build outputs.

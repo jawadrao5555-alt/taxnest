@@ -48,30 +48,87 @@ Website ki dono APKs pehle ki tarah:
 gradle --no-daemon assembleSimRelease assemblePlusRelease
 ```
 
+> **Banane ke foran baad `bash scripts/play-build-check.sh` chalayein** — §3.
+> Yeh AAB aur dono website APKs, dono ki jaanch ek command mein karti hai, aur
+> exit 1 par upload/host bilkul na karein.
+
 ---
 
-## 3. Build ke baad ki jaanch (har dafa)
+## 3. Build ke baad ki LAZMI jaanch — `scripts/play-build-check.sh`
+
+AAB banne ke baad, upload se **pehle**, yeh ek command chalani hi hai:
 
 ```bash
-export PATH=$ANDROID_HOME/build-tools/36.0.0:$PATH
-cd caller-app/app/build/outputs
+bash scripts/play-build-check.sh
+```
 
-# 1) Play AAB mein blocked permission bilkul nahi honi chahiye
-mkdir -p /tmp/aabx && rm -rf /tmp/aabx/* && cd /tmp/aabx
-unzip -q .../app-play-release.aab
-strings base/manifest/AndroidManifest.xml | grep -E "REQUEST_INSTALL_PACKAGES|BATTERY" && echo "FAIL" || echo "OK: koi blocked permission nahi"
+Bina argument ke yeh upar wale default output paths uthati hai (AAB + dono
+website APKs). Apne paths dene hon to:
 
-# 2) targetSdk 36 hona chahiye
-python3 -c "d=open('/tmp/aabx/base/manifest/AndroidManifest.xml','rb').read(); i=d.find(b'targetSdkVersion'); print(d[i:i+22])"
+```bash
+bash scripts/play-build-check.sh \
+  --aab  caller-app/app/build/outputs/bundle/playRelease/app-play-release.aab \
+  --sim  caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk \
+  --plus caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk
+```
 
-# 3) self-update ka code AAB mein nahi hona chahiye
-strings /tmp/aabx/base/dex/classes.dex | grep -c UpdateCheck     # 0 hona chahiye
+Exit 0 = PASS. Exit 1 = **upload na karein.** Script sirf `python3` maangti hai
+— AAB ka protobuf manifest, APKs ka binary manifest aur dono ke dex khud parh
+leti hai, is liye SDK dobara download karne se pehle bhi chalti hai.
 
-# 4) website builds mein wohi code MOJOOD hona chahiye (regression guard)
-unzip -p apk/plus/release/app-plus-release.apk classes.dex | strings | grep -c UpdateCheck   # > 0
+**Yeh FAIL karti hai agar —**
 
-# 5) dono APKs ka signer wohi purana
-apksigner verify --print-certs apk/sim/release/app-sim-release.apk | grep "SHA-256 digest"
+Play AAB mein:
+
+| # | Kya mila | Kyun ghalat hai |
+|---|---|---|
+| 1 | `REQUEST_INSTALL_PACKAGES` | self-update — Play ki Device and Network Abuse policy mein jaiz nahi |
+| 2 | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | seedha battery "allow?" dialog Play par mana |
+| 3 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED` | call back (Task 1381) — sirf website builds ka hissa |
+| 4 | `READ_PHONE_STATE`, `READ_CALL_LOG` | in ke saath Play ka Call Log declaration form lazmi ho jata hai |
+| 5 | dex mein `UpdateCheck`, `CallerApp`, `DialWatchService`, `DialActivity`, `DialBootReceiver`, `PhoneStateReceiver` | website-only code Play build mein compile ho gaya |
+| 6 | `targetSdk` 36 se kam — ya parha hi na ja sake | Play ki 31 Aug 2026 wali shart |
+
+Website ki dono APKs mein (**ULTA** regression):
+
+| # | Kya mila | Kyun ghalat hai |
+|---|---|---|
+| 7 | `REQUEST_INSTALL_PACKAGES` **gayab** | website phone ke paas store nahi — self-update mar jata hai aur har shop isi version par phans jati hai |
+| 8 | `UpdateCheck` class **gayab** | wohi baat, code ki taraf se |
+| 9 | `targetSdk` 34 nahi raha | website builds jaan-boojh kar 34 par hain; Android ka behaviour targetSdk se badalta hai |
+
+**Yeh checklist ka qadam kyun nahi, script kyun:** play aur website builds ka
+farq kahin aisi jagah likha hua nahi jise compiler pakar sake — woh sirf is
+baat se banta hai ke `caller-app/app/build.gradle` mein kaunsa source set kis
+flavor mein jata hai. Ek nai class `src/main/java` mein rakh dena (bajaye
+`src/web/java` ke), ya ek permission `src/main/AndroidManifest.xml` mein daal
+dena, teenon builds mein chala jata hai — build green rehti hai, AAB upload ho
+jati hai, aur pata hafton baad Play ke reject par chalta hai.
+
+Sirf AAB bani ho (website APKs is dafa nahi banayin) to `--aab-only`;
+website-only release mein `--apks-only`. Asal guard poori command hai — upload
+ya host karne se pehle bina in flags ke dobara chalayein.
+
+Play apni shart barhaye to pehle `--min-target-sdk 37` se chala kar dekh lein,
+phir `play` flavor ka `targetSdk` build.gradle mein bump karein.
+
+Script ka apna regression test (fixtures khud banata hai, SDK ki zarurat nahi):
+
+```bash
+bash scripts/tests/play-build-check-test.sh
+```
+
+### Iske ilawa (script ke daayre se bahar)
+
+```bash
+# Website ki dono APKs par blocked-permission + signer + version guard
+bash scripts/apk-release-check.sh \
+  caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk \
+  caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk
+
+# Signer khud dekhna ho (SDK chahiye)
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs \
+  caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk | grep "SHA-256 digest"
 ```
 
 Expected signer (shared rider key):

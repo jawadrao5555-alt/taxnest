@@ -24,6 +24,7 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         if (Prefs.token(this) != null) { goMain(); return }
         setContentView(R.layout.activity_login)
+        Ui.applyBarInsets(findViewById(R.id.loginRoot))
 
         val email = findViewById<EditText>(R.id.email)
         val password = findViewById<EditText>(R.id.password)
@@ -53,11 +54,16 @@ class LoginActivity : AppCompatActivity() {
             error.visibility = View.GONE
 
             thread {
-                // device string mein build kind bhi (Task 1345) — POS →
+                // device string mein build kind bhi (Task 1345/1346) — POS →
                 // Customize par dikhta hai, support ko foran pata chal jata hai
-                // ke us phone par WhatsApp wali build hai ya clean.
-                val device = (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).trim() +
-                    (if (BuildConfig.BUILD_KIND == "plus") " · WhatsApp build" else " · clean build")
+                // ke us phone par kaunsi build hai: clean (sirf SIM), WhatsApp
+                // (website), ya Play Store wali.
+                val kind = when (BuildConfig.BUILD_KIND) {
+                    "plus" -> " · WhatsApp build"
+                    "play" -> " · Play build"
+                    else -> " · clean build"
+                }
+                val device = (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).trim() + kind
                 val (code, body) = ApiClient.post(
                     "/login",
                     JSONObject().put("email", e).put("password", p).put("device", device.take(120))

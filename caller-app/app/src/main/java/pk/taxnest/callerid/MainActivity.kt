@@ -1,6 +1,7 @@
 package pk.taxnest.callerid
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -19,9 +20,13 @@ import kotlin.concurrent.thread
  * Status + seedhi on-boarding. Build-agnostic (Task 1345): jo permission is
  * build ko chahiye wohi maangta hai —
  *   sim ("clean") → Detector = phone + call log runtime permissions
- *   plus          → Detector = notification access
+ *   plus / play   → Detector = notification access (prominent disclosure ke baad)
  * aur upar saaf likha hota hai ke yeh build kaunsi calls pakadti hai
  * (build_badge / build_badge_roman har flavor ki apni strings.xml se).
+ *
+ * Task 1346: update ka banner ab `Updater` ke hawale hai — website builds ka
+ * asli implementation src/web/java mein, Play build ka no-op src/play/java
+ * mein. Yahan koi `if (playBuild)` nahi hona chahiye.
  *
  *  1) Apni build wali permission dein (is ke baghair kuch nahi)
  *  2) Battery exemption (taake Android app ko na maare)
@@ -55,6 +60,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LoginActivity::class.java)); finish(); return
         }
         setContentView(R.layout.activity_main)
+        Ui.applyBarInsets(findViewById(R.id.mainRoot))
 
         welcomeText = findViewById(R.id.welcomeText)
         buildBadge = findViewById(R.id.buildBadge)
@@ -73,14 +79,7 @@ class MainActivity : AppCompatActivity() {
 
         permBtn.setOnClickListener { Detector.request(this) }
 
-        batteryBtn.setOnClickListener {
-            try {
-                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                    Uri.parse("package:$packageName")))
-            } catch (_: Exception) {
-                try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (_: Exception) {}
-            }
-        }
+        batteryBtn.setOnClickListener { openBatterySettings() }
 
         testBtn.setOnClickListener {
             testBtn.isEnabled = false
@@ -113,7 +112,45 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        checkUpdate()
+        Updater.attach(this, updateRow, findViewById(R.id.updateBtn))
+    }
+
+    /**
+     * Battery optimisation se chhutkara.
+     *
+     * Do raste hain aur farq permission ka hai (Task 1346):
+     *  • Website builds mein REQUEST_IGNORE_BATTERY_OPTIMIZATIONS mojood hai →
+     *    seedha "allow?" dialog khulta hai, ek tap.
+     *  • Play build se yeh permission jaan-boojh kar nikal di gayi hai (Play
+     *    uska istemal chand manzoor-shuda categories tak mehdood karta hai) →
+     *    wahan battery settings ki LIST khulti hai aur toast batata hai ke
+     *    fahrist mein TaxNest Caller ID dhoond kar allow karna hai.
+     *
+     * Faisla runtime par hota hai, BuildConfig se nahi — dono manifest sach
+     * bolti hain aur logic ek hi jagah rehta hai.
+     */
+    private fun openBatterySettings() {
+        val direct = try {
+            checkSelfPermission(android.Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+        } catch (_: Exception) { false }
+
+        if (direct) {
+            try {
+                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName")))
+                return
+            } catch (_: Exception) {}
+        }
+        try {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            Toast.makeText(this, getString(R.string.battery_list_toast), Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:$packageName")))
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onResume() {
@@ -179,28 +216,6 @@ class MainActivity : AppCompatActivity() {
                     body.optString("user").takeIf { it.isNotBlank() }?.let { Prefs.setUserName(this, it) }
                     body.optString("company").takeIf { it.isNotBlank() }?.let { Prefs.setCompanyName(this, it) }
                     renderState()
-                }
-            }
-        }
-    }
-
-    /**
-     * Update check — HAR BUILD apna. `?build=sim|plus` bhejna zaroori hai warna
-     * plus wale phone ko clean build ka APK mil jata aur WhatsApp detection
-     * chupke se khatam ho jati. Comparison semver-strict hai: server par purana
-     * version ho (ya beta phone aage ho) to jhoota banner nahi aata.
-     */
-    private fun checkUpdate() {
-        thread {
-            val (code, body) = ApiClient.get("/version?build=" + BuildConfig.BUILD_KIND, Prefs.token(this))
-            if (code !in 200..299 || body == null) return@thread
-            val latest = body.optString("latest")
-            val url = body.optString("apk_url")
-            if (url.isBlank() || !UpdateCheck.isNewer(latest, BuildConfig.VERSION_NAME)) return@thread
-            runOnUiThread {
-                updateRow.visibility = View.VISIBLE
-                findViewById<Button>(R.id.updateBtn).setOnClickListener {
-                    UpdateCheck.startDownload(this, url)
                 }
             }
         }

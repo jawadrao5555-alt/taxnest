@@ -10,36 +10,48 @@ def ciKeystorePass = System.getenv("RIDER_KS_PASS")
 
 android {
     namespace 'pk.taxnest.callerid'
-    compileSdk 34
+    // compileSdk 36 = Android 16. Play ki 31 Aug 2026 wali shart sirf PLAY
+    // build par lagti hai (neeche play flavor ka targetSdk); website builds
+    // targetSdk 34 par hi hain, is liye un ka runtime behaviour zarra barabar
+    // nahi badla — Android ki behaviour changes targetSdk se chalti hain,
+    // compileSdk se nahi.
+    compileSdk 36
 
     defaultConfig {
         applicationId "pk.taxnest.callerid"
         // Android 8+ — matches the downloads-page "Android 8+".
         minSdk 26
         targetSdk 34
-        versionCode 2
-        versionName "1.1.0"
+        versionCode 3
+        versionName "1.2.0"
     }
 
-    // ── Task 1345: DO builds, ek hi package id + ek hi keystore ─────────────
-    //  sim  = "clean" download (default). Sirf SIM/dialer ki incoming call,
-    //         Android telephony se. Play Protect ki blocked chaar permissions
-    //         (RECEIVE_SMS, READ_SMS, notification-listener, accessibility)
-    //         mein se koi nahi → website se install block nahi hoti.
-    //  plus = pehle wali build: SIM + WhatsApp (NotificationListenerService).
+    // ── Builds (Task 1345 + 1346) — ek hi package id, ek hi keystore ────────
+    //  sim  = website ka "clean" download (default). Sirf SIM/dialer ki incoming
+    //         call, Android telephony se. Play Protect ki blocked chaar
+    //         permissions (RECEIVE_SMS, READ_SMS, notification-listener,
+    //         accessibility) mein se koi nahi → website se install block nahi.
+    //  plus = website ki SIM + WhatsApp build (NotificationListenerService).
     //         Install ke liye shop ko Play Protect waqti tor par band karna
     //         parta hai.
+    //  play = Google Play ke liye (Task 1346). Detection plus jaisi hi (SIM +
+    //         WhatsApp) — Play Store se aane wali app par Play Protect ka
+    //         sideload-block hota hi nahi. Farq sirf yeh:
+    //           • self-update ka poora hissa gair-mojood (src/web/java compile
+    //             hi nahi hota) aur REQUEST_INSTALL_PACKAGES manifest se hataai
+    //             gayi — Play self-update ko mana karta hai
+    //           • targetSdk 36 (Play ki 31 Aug 2026 wali shart)
+    //         Yeh build kabhi website par host NAHI hoti.
     //
-    // applicationId dono mein same hai (pk.taxnest.callerid) taake ek build
-    // doosri par seedhi update ho jaye — sign bhi ek hi rider keystore se.
-    // Server par version check alag hai (`/version?build=sim|plus`) warna plus
-    // wale phone ko clean build ka update chala jata aur WhatsApp detection
-    // chupke se khatam ho jati.
+    // applicationId teenon mein same hai (pk.taxnest.callerid) taake website
+    // ki ek build doosri par seedhi update ho jaye. Play wali copy Google ke
+    // app-signing key se sign hoti hai — website APK aur Play install ke beech
+    // aana-jaana kaise chalta hai, caller-app/RELEASE.md mein likha hai.
     flavorDimensions += "detect"
     productFlavors {
         // create("...") ZAROORI hai: Groovy ke Object.plus() ki wajah se
         // `plus { ... }` flavor banata hi NAHI (build "Task
-        // 'assemblePlusRelease' not found" par girti hai). Dono flavors ek
+        // 'assemblePlusRelease' not found" par girti hai). Teenon flavors ek
         // hi tareeqe se banayein taake yeh trap dobara na lage.
         create("sim") {
             dimension "detect"
@@ -48,6 +60,44 @@ android {
         create("plus") {
             dimension "detect"
             buildConfigField "String", "BUILD_KIND", '"plus"'
+        }
+        create("play") {
+            dimension "detect"
+            buildConfigField "String", "BUILD_KIND", '"play"'
+            // Play Console: 31 Aug 2026 se nai app ke liye Android 16 lazmi.
+            targetSdk = 36
+        }
+    }
+
+    // Kaunsa code kis build mein jata hai (ek jagah, taake logic fork na ho):
+    //   src/web/java   → self-update (UpdateCheck + Updater). SIRF website
+    //                    builds. Play flavor ka apna no-op Updater hai.
+    //   src/notif/*    → notification-listener detector + prominent disclosure.
+    //                    plus AUR play, bilkul ek jaisa.
+    // Ek source set ke do res folders mein ek hi key dobara likhna "Duplicate
+    // resources" error deta hai — is liye har build ki apni key uski apni
+    // res/values/strings.xml mein rehti hai.
+    sourceSets {
+        getByName("sim") {
+            java.srcDirs += 'src/web/java'
+        }
+        getByName("plus") {
+            java.srcDirs += ['src/web/java', 'src/notif/java']
+            res.srcDirs += 'src/notif/res'
+        }
+        getByName("play") {
+            java.srcDirs += 'src/notif/java'
+            res.srcDirs += 'src/notif/res'
+        }
+        // CallSourceRules ke JVM unit tests — plain JUnit, koi emulator nahi.
+        // Rules dono notification builds mein ek hi hain, is liye ek hi test
+        // folder dono flavors ke test source set mein jata hai:
+        //   gradle testPlusReleaseUnitTest testPlayReleaseUnitTest
+        getByName("testPlus") {
+            java.srcDirs += 'src/notifTest/java'
+        }
+        getByName("testPlay") {
+            java.srcDirs += 'src/notifTest/java'
         }
     }
 
@@ -88,4 +138,6 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
+
+    testImplementation 'junit:junit:4.13.2'
 }

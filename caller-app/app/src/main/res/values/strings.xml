@@ -21,6 +21,8 @@
     <string name="battery_on">✔ بیٹری سیٹنگ ٹھیک ہے — ایپ پیچھے چلتی رہے گی</string>
     <string name="battery_off">✖ بیٹری آپٹیمائزیشن آن ہے — ایپ کبھی کبھی سو سکتی ہے</string>
     <string name="battery_btn">بیٹری کی اجازت دیں</string>
+    <!-- Play build battery ki LIST kholti hai (uske paas seedhi permission nahi) -->
+    <string name="battery_list_toast">فہرست میں TaxNest Caller ID ڈھونڈ کر "Don\'t optimize / Unrestricted" کریں</string>
 
     <string name="test_btn">ٹیسٹ رِنگ بھیجیں</string>
     <string name="test_sent">ٹیسٹ بھیج دیا — POS سیل اسکرین پر پاپ اپ دیکھیں</string>

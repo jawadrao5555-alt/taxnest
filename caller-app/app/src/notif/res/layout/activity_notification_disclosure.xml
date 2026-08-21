@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Prominent disclosure screen (Task 1346) — notification access maangne se
+  pehle. Play ki User Data policy: purpose + data + destination + consent,
+  aur "abhi nahin" ka rasta bhi khula ho.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/disclosureRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F6F8F9"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <ImageView
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:src="@drawable/ic_caller"
+            android:contentDescription="@string/app_name" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/disclosure_title"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#0A4D5C" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/disclosure_lead"
+            android:textSize="14sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="#344054" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:background="#FFFFFF"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/disclosure_read"
+                android:textSize="13sp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="#344054" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/disclosure_ignore"
+                android:textSize="13sp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="#344054" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/disclosure_send"
+                android:textSize="13sp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="#344054" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/disclosure_purpose"
+                android:textSize="13sp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="#344054" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/disclosure_control"
+                android:textSize="13sp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="#344054" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/disclosure_roman"
+            android:textSize="12sp"
+            android:lineSpacingExtra="3dp"
+            android:textColor="#475467" />
+
+        <TextView
+            android:id="@+id/privacyLink"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:padding="8dp"
+            android:text="@string/disclosure_privacy"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="#0A4D5C"
+            android:background="?attr/selectableItemBackground" />
+
+        <Button
+            android:id="@+id/agreeBtn"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="14dp"
+            android:text="@string/disclosure_agree"
+            android:textSize="15sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A4D5C" />
+
+        <Button
+            android:id="@+id/declineBtn"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/disclosure_decline"
+            android:textSize="14sp"
+            android:textColor="#475467"
+            android:backgroundTint="#E4E7EC" />
+    </LinearLayout>
+</ScrollView>

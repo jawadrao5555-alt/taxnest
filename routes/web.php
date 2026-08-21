@@ -174,6 +174,13 @@ Route::get('/', function () {
 
 Route::get('/contact', fn () => view('contact'))->name('contact');
 
+// Public legal pages. Google Play in dono URLs ko listing mein maangta hai aur
+// yeh check karta hai ke woh bina login khulen (Task 1346) — is liye yeh guest
+// routes hain, kisi middleware ke andar nahi. /contact#privacy ka chhota
+// khulasa qaim hai; mukammal policy /privacy par hai.
+Route::get('/privacy', fn () => view('privacy'))->name('privacy');
+Route::get('/data-deletion', fn () => view('data-deletion'))->name('data-deletion');
+
 Route::get('/sitemap.xml', function () {
     $urls = [
         ['loc' => url('/'),                'priority' => '1.0', 'changefreq' => 'weekly'],
@@ -183,6 +190,8 @@ Route::get('/sitemap.xml', function () {
         ['loc' => url('/tutorials'),       'priority' => '0.8', 'changefreq' => 'weekly'],
         ['loc' => url('/download'),        'priority' => '0.7', 'changefreq' => 'monthly'],
         ['loc' => url('/contact'),         'priority' => '0.6', 'changefreq' => 'yearly'],
+        ['loc' => url('/privacy'),         'priority' => '0.5', 'changefreq' => 'yearly'],
+        ['loc' => url('/data-deletion'),   'priority' => '0.4', 'changefreq' => 'yearly'],
     ];
     return response()->view('sitemap', compact('urls'))
         ->header('Content-Type', 'application/xml');

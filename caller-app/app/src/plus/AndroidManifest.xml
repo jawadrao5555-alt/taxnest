@@ -10,6 +10,19 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 11+ package visibility: is ke baghair phone ki dialer apps ki
+         fehrist khali aati hai aur CallSourceRules SIM ki ring ko pehchan nahi
+         pata. Sirf calling apps dikhti hain — QUERY_ALL_PACKAGES nahi. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
+
     <application>
         <!-- Event-driven, battery-friendly: Android khud call/WhatsApp notification
              par service jagata hai — koi foreground service ya polling nahi. -->
@@ -21,5 +34,12 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Prominent disclosure — notification access se pehle (Task 1346).
+             Play ki User Data policy ki shart hai, aur website wali is build
+             par bhi wohi saaf screen dikhti hai. -->
+        <activity
+            android:name=".NotificationDisclosureActivity"
+            android:exported="false" />
     </application>
 </manifest>

@@ -212,6 +212,8 @@
 
                 <h4>Your choices</h4>
                 <p>You control the data you enter and can request account closure. Some records must be retained to meet legal and tax obligations even after closure.</p>
+
+                <p class="text-sm"><strong>This is a summary.</strong> The full policy — including exactly what the TaxNest Caller ID Android app collects — is on the <a href="/privacy" class="text-[#0A4D5C] font-semibold hover:underline">Privacy Policy</a> page, and the deletion procedure is on the <a href="/data-deletion" class="text-[#0A4D5C] font-semibold hover:underline">Account &amp; Data Deletion</a> page.</p>
             </div>
 
             <!-- Terms & Conditions -->

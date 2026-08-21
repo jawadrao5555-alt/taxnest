@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Play build ka theme override (Task 1346).
+
+  targetSdk 36 (Android 16) par edge-to-edge LAZMI hai: status bar shaffaf ho
+  jata hai aur screen ka halka background (#F6F8F9) uske peeche aa jata hai.
+  Purane theme ka teal statusBarColor ab nazar-andaz hota hai, is liye bar ke
+  icons ko dark kar dete hain warna safed icons safed background par gum ho
+  jate hain.
+
+  Website builds (targetSdk 34) main/res ka theme hi istemal karti hain — un ka
+  teal status bar jyun ka tyun.
+-->
+<resources>
+    <style name="Theme.TaxNestCaller" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">#0A4D5C</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#E7BF3B</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

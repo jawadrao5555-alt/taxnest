@@ -37,4 +37,13 @@ object Prefs {
     /** Runtime permission maangi ja chuki hai? ("don't ask again" detect karne ke liye) */
     fun permAsked(c: Context): Boolean = sp(c).getBoolean("perm_asked", false)
     fun setPermAsked(c: Context, v: Boolean) = sp(c).edit().putBoolean("perm_asked", v).apply()
+
+    /**
+     * Notification-access ki prominent disclosure par user ne "samajh gaya —
+     * ijazat dein" dabaya? (Task 1346; sirf notif builds likhte hain.)
+     * Record rehta hai ke consent liya gaya tha — screen kabhi bypass na ho.
+     */
+    fun notifDisclosureAccepted(c: Context): Boolean = sp(c).getBoolean("notif_disclosure_ok", false)
+    fun setNotifDisclosureAccepted(c: Context, v: Boolean) =
+        sp(c).edit().putBoolean("notif_disclosure_ok", v).apply()
 }

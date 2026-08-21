@@ -52,8 +52,10 @@
                 <ul class="space-y-3 text-sm text-white/60">
                     <li><a href="/contact" class="hover:text-white transition-colors">Contact Us</a></li>
                     <li><a href="/contact#responsibility" class="hover:text-white transition-colors">Responsibilities</a></li>
-                    <li><a href="/contact#privacy" class="hover:text-white transition-colors">Privacy Policy</a></li>
+                    {{-- Privacy ab apna poora safha hai (Play ki shart: public URL) --}}
+                    <li><a href="/privacy" class="hover:text-white transition-colors">Privacy Policy</a></li>
                     <li><a href="/contact#terms" class="hover:text-white transition-colors">Terms &amp; Conditions</a></li>
+                    <li><a href="/data-deletion" class="hover:text-white transition-colors">Data Deletion</a></li>
                     <li><a href="{{ $loginUrl }}" class="hover:text-white transition-colors">{{ $loginLabel }}</a></li>
                 </ul>
             </div>

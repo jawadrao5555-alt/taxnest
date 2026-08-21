@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "play" build (Google Play) ke apne overrides. Detection plus build jaisi hi
+  hai (src/notif), is liye yahan sirf badge ki Roman line alag hai — baqi
+  notification wali strings src/notif/res se aati hain.
+-->
+<resources>
+    <string name="build_badge_roman">Play Store build — SIM + WhatsApp calls dono. Update Play Store se aati hai.</string>
+</resources>

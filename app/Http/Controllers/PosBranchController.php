@@ -71,6 +71,12 @@ class PosBranchController extends Controller
             'is_head_office' => !Branch::where('company_id', $this->companyId())->exists(),
         ]);
 
+        // Per-branch stock (Task 1354): everything the shop owned before it had
+        // branches is branch-less. The moment the FIRST branch exists that stock
+        // must land in head office, otherwise the whole inventory would read as
+        // zero on every branch-scoped screen.
+        \App\Services\BranchStockService::adoptLegacyRows($this->companyId());
+
         return back()->with('success', __('pos.branch_added'));
     }
 

@@ -49,6 +49,22 @@ class FbrPosKitchenTicketLayoutTest extends TestCase
     private const TOKEN_BOX = 'class="token-box"';
     private const CODE_BOX  = 'class="code-box"';
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // This is a LAYOUT lock, not a clock test. The KOT stamps the current
+        // time, so the held-vs-reprint comparisons below rendered a different
+        // minute whenever the two renders straddled a minute boundary — a rare
+        // but real random CI failure. Freeze the clock so only markup differs.
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::parse('2026-08-11 13:45:00'));
+    }
+
+    protected function tearDown(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     // ── Fixture builders (mirror kotTicket()/kotReprint() variable sets) ──
 
     private function makeCompany(string $style): Company

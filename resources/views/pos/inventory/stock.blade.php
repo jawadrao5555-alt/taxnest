@@ -20,7 +20,12 @@
         <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.movements') }}</a>
         <a href="{{ route('pos.inventory.low-stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.low_stock_alerts') }}</a>
         <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.adjust_stock') }}</a>
+        @if($canTransfer ?? false)
+        <a href="{{ route('pos.inventory.transfers') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.branch_transfer') }}</a>
+        @endif
     </div>
+
+    @include('pos.inventory.partials.branch-bar')
 
     @if(session('success'))
     <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-3 text-sm text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
@@ -50,6 +55,9 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50">
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.product_col') }}</th>
+                        @if($allBranches ?? false)
+                        <th class="px-5 py-3.5 font-semibold">{{ __('pos.branch_word') }}</th>
+                        @endif
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.stock_level') }}</th>
                         <th class="px-5 py-3.5 text-right font-semibold hidden sm:table-cell">{{ __('pos.min_level') }}</th>
                         <th class="px-5 py-3.5 text-right font-semibold hidden lg:table-cell">{{ __('pos.avg_cost') }}</th>
@@ -83,6 +91,13 @@
                                 <span class="font-semibold text-gray-900 dark:text-white">{{ $stock->posProduct->name ?? __('pos.unknown_word') }}</span>
                             </div>
                         </td>
+                        @if($allBranches ?? false)
+                        <td class="px-5 py-4">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                                {{ $branchNames[$stock->branch_id] ?? __('pos.branch_unassigned') }}
+                            </span>
+                        </td>
+                        @endif
                         <td class="px-5 py-4">
                             <div class="flex items-center gap-3">
                                 <span class="font-bold text-sm min-w-[2rem] {{ $stock->quantity <= 0 ? 'text-red-600' : ($stock->isLowStock() ? 'text-amber-600' : 'text-gray-900 dark:text-white') }}">{{ number_format($stock->quantity, 0) }}</span>
@@ -105,7 +120,7 @@
                             <template x-if="editing">
                                 <div class="flex items-center justify-end gap-1">
                                     <input type="number" x-model="minLevel" min="0" step="1" class="w-20 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-sm px-2 py-1.5 text-right focus:ring-2 focus:ring-purple-500">
-                                    <button @click="saving = true; fetch('/pos/inventory/min-stock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ product_id: {{ $stock->product_id }}, min_stock_level: minLevel }) }).then(r => r.json()).then(d => { saving = false; editing = false; }).catch(() => { saving = false; })" :disabled="saving" class="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-lg transition font-semibold">
+                                    <button @click="saving = true; fetch('/pos/inventory/min-stock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ product_id: {{ $stock->product_id }}, min_stock_level: minLevel, branch_id: {{ $stock->branch_id ? (int) $stock->branch_id : 'null' }} }) }).then(r => r.json()).then(d => { saving = false; editing = false; }).catch(() => { saving = false; })" :disabled="saving" class="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-lg transition font-semibold">
                                         <span x-text="saving ? '...' : @js(__('pos.save_btn'))"></span>
                                     </button>
                                     <button @click="editing = false" class="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition">X</button>
@@ -115,7 +130,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="px-5 py-16 text-center">
+                        <td colspan="{{ ($allBranches ?? false) ? 8 : 7 }}" class="px-5 py-16 text-center">
                             <div class="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
                                 <svg class="w-7 h-7 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                             </div>

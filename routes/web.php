@@ -996,6 +996,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/inventory/movements', [PosInventoryController::class, 'movements'])->name('pos.inventory.movements');
         Route::get('/inventory/low-stock', [PosInventoryController::class, 'lowStockAlerts'])->name('pos.inventory.low-stock');
         Route::match(['get', 'post'], '/inventory/adjust', [PosInventoryController::class, 'adjustStock'])->name('pos.inventory.adjust');
+        // Branch-to-branch stock transfer (Task 1354) — owner/manager only.
+        Route::get('/inventory/transfer', [PosInventoryController::class, 'transfers'])->name('pos.inventory.transfers');
+        Route::post('/inventory/transfer', [PosInventoryController::class, 'storeTransfer'])->name('pos.inventory.transfer.store');
         Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
         Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
         Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');

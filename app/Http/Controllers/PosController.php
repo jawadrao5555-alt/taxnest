@@ -2980,7 +2980,10 @@ class PosController extends Controller
             $stockItems,
             $transaction->id,
             $invoiceNumber,
-            auth('pos')->id()
+            auth('pos')->id(),
+            // Per-branch stock (Task 1354): the goods leave the shop that made
+            // the bill — take the branch from the transaction, never the session.
+            $transaction->branch_id ?? null
         );
 
         // F3 Dine-In (Jul 2026): a table reserved from the universal sale screen is
@@ -3380,8 +3383,10 @@ class PosController extends Controller
             // deduct the new quantities. Net effect keeps stock true to the bill
             // as it now stands (only when restock-on-void is enabled).
             if ($restockOnEdit) {
+                // Per-branch stock (Task 1354): both legs of the reconcile ride
+                // the BILL's branch so an edit never shuffles stock between shops.
                 PosInventoryController::restoreStockForInvoice(
-                    $companyId, $oldStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_edit'
+                    $companyId, $oldStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_edit', $transaction->branch_id ?? null
                 );
                 $newStockItems = $this->expandDealComponentsForStock(array_map(fn ($ri) => [
                     'type' => $ri['type'],
@@ -3391,7 +3396,7 @@ class PosController extends Controller
                     'deal_snapshot' => $ri['deal_snapshot'] ?? null,
                 ], $companyItems));
                 PosInventoryController::deductStockForInvoice(
-                    $companyId, $newStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id()
+                    $companyId, $newStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), $transaction->branch_id ?? null
                 );
             }
 
@@ -3491,7 +3496,7 @@ class PosController extends Controller
                     'deal_snapshot' => $i->deal_snapshot,
                 ])->all());
                 PosInventoryController::restoreStockForInvoice(
-                    $companyId, $restoreItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_void'
+                    $companyId, $restoreItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_void', $transaction->branch_id ?? null
                 );
             }
 
@@ -4414,7 +4419,7 @@ class PosController extends Controller
         DB::transaction(function () use ($tx, $companyId, $restoreItems) {
             if (!empty($restoreItems)) {
                 PosInventoryController::restoreStockForInvoice(
-                    $companyId, $restoreItems, $tx->id, $tx->invoice_number, auth('pos')->id(), 'pos_void'
+                    $companyId, $restoreItems, $tx->id, $tx->invoice_number, auth('pos')->id(), 'pos_void', $tx->branch_id ?? null
                 );
             }
             PosTransactionItem::where('transaction_id', $tx->id)->delete();
@@ -8010,7 +8015,31 @@ class PosController extends Controller
         // Usage-vs-cap banner (Task 362): visibility for shops at/over their
         // plan's product cap (e.g. after a downgrade). null = unlimited.
         $productLimitStatus = \App\Services\PlanLimitService::productLimitStatus($companyId, 'pos');
-        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes', 'company', 'productLimitStatus'));
+
+        // Per-branch stock (Task 1354): the catalogue is company-wide but the
+        // stock figure belongs to a shop. Overlay each row with the quantity of
+        // the branch the user is standing in; on the owner's all-branches view
+        // the mirror already holds the company total, so it is left as-is (and
+        // the page marks the column read-only there).
+        $stockBranchId = \App\Services\BranchStockService::viewBranchId($companyId);
+        $stockAllBranches = \App\Services\BranchStockService::viewingAllBranches($companyId);
+        $stockBranchName = \App\Services\BranchStockService::branchName($companyId, $stockBranchId);
+        if ($stockBranchId && $company && $company->inventory_enabled) {
+            $branchQty = \App\Services\BranchStockService::quantities(
+                $companyId, $stockBranchId, $products->pluck('id')->all()
+            );
+            foreach ($products as $p) {
+                // NULL stays NULL — "untracked" must never become 0.
+                if ($p->stock_quantity !== null) {
+                    $p->stock_quantity = (int) round($branchQty[$p->id] ?? 0);
+                }
+            }
+        }
+
+        return view('pos.products', compact(
+            'products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes',
+            'company', 'productLimitStatus', 'stockBranchId', 'stockBranchName', 'stockAllBranches'
+        ));
     }
 
     /**
@@ -8223,8 +8252,11 @@ class PosController extends Controller
             // products page start in sync instead of the module seeing 0.
             $companyRow = \App\Models\Company::find($companyId);
             if ($companyRow && $companyRow->inventory_enabled && $product->stock_quantity !== null) {
+                // Per-branch stock (Task 1354): opening stock lands in the shop
+                // the product was added from, not in a company-wide pile.
+                $stockBranchId = \App\Services\BranchStockService::writeBranchId($companyId);
                 $stockRow = \App\Models\InventoryStock::firstOrCreate(
-                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => $stockBranchId],
                     [
                         'quantity' => (float) $product->stock_quantity,
                         'min_stock_level' => (float) ($product->low_stock_threshold ?? 0),
@@ -8236,6 +8268,7 @@ class PosController extends Controller
                     \App\Models\InventoryMovement::create([
                         'company_id' => $companyId,
                         'product_id' => $product->id,
+                        'branch_id' => $stockBranchId,
                         'type' => \App\Models\InventoryMovement::TYPE_OPENING,
                         'quantity' => (float) $product->stock_quantity,
                         'balance_after' => (float) $product->stock_quantity,
@@ -8863,13 +8896,27 @@ class PosController extends Controller
         $companyRow = \App\Models\Company::find($companyId);
         $oldStockQty = $product->stock_quantity;
         $newStockQty = $data['stock_quantity'];
+
+        // Per-branch stock (Task 1354): the number typed here belongs to ONE
+        // shop. On the owner's all-branches view the field shows the company
+        // total, which cannot be "set" onto a single branch without inventing
+        // goods — so the stock edit is ignored there (the page marks it
+        // read-only and points at Adjust Stock / Transfer instead).
+        $stockBranchId = \App\Services\BranchStockService::viewBranchId($companyId);
+        $stockEditBlocked = \App\Services\BranchStockService::viewingAllBranches($companyId);
+        if ($stockEditBlocked) {
+            $data['stock_quantity'] = $oldStockQty;
+            $newStockQty = null;
+        }
+
         if (
             $companyRow && $companyRow->inventory_enabled
             && $newStockQty !== null && (int) $newStockQty !== (int) ($oldStockQty ?? PHP_INT_MIN)
         ) {
-            \DB::transaction(function () use ($companyId, $product, $newStockQty) {
+            \DB::transaction(function () use ($companyId, $product, $newStockQty, $stockBranchId, &$data) {
+                $branchId = \App\Services\BranchStockService::writeBranchId($companyId, $stockBranchId);
                 $stockRow = \App\Models\InventoryStock::firstOrCreate(
-                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => $branchId],
                     ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
                 );
                 $prevQty = (float) $stockRow->quantity;
@@ -8879,6 +8926,7 @@ class PosController extends Controller
                     \App\Models\InventoryMovement::create([
                         'company_id' => $companyId,
                         'product_id' => $product->id,
+                        'branch_id' => $branchId,
                         'type' => $setQty > $prevQty
                             ? \App\Models\InventoryMovement::TYPE_ADJUSTMENT_IN
                             : \App\Models\InventoryMovement::TYPE_ADJUSTMENT_OUT,
@@ -8899,6 +8947,14 @@ class PosController extends Controller
                         'notes' => null,
                         'created_by' => auth('pos')->id(),
                     ]);
+                }
+                // The mirror holds the COMPANY TOTAL — with branches that is the
+                // sum across every shop, not the single figure just typed in.
+                if ($branchId) {
+                    $data['stock_quantity'] = (int) round((float) \DB::table('inventory_stocks')
+                        ->where('company_id', $companyId)
+                        ->where('product_id', $product->id)
+                        ->sum('quantity'));
                 }
             });
         }

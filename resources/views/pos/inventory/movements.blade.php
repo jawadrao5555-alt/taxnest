@@ -14,7 +14,12 @@
         <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm">{{ __('pos.movements') }}</a>
         <a href="{{ route('pos.inventory.low-stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.low_stock_alerts') }}</a>
         <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.adjust_stock') }}</a>
+        @if($canTransfer ?? false)
+        <a href="{{ route('pos.inventory.transfers') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.branch_transfer') }}</a>
+        @endif
     </div>
+
+    @include('pos.inventory.partials.branch-bar')
 
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 mb-6">
         <form method="GET" action="{{ route('pos.inventory.movements') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -25,6 +30,10 @@
                 <option value="adjustment_in" {{ request('type') === 'adjustment_in' ? 'selected' : '' }}>{{ __('pos.type_adjustment_in') }}</option>
                 <option value="adjustment_out" {{ request('type') === 'adjustment_out' ? 'selected' : '' }}>{{ __('pos.type_adjustment_out') }}</option>
                 <option value="opening" {{ request('type') === 'opening' ? 'selected' : '' }}>{{ __('pos.type_opening') }}</option>
+                @if($multiBranch ?? false)
+                <option value="transfer_in" {{ request('type') === 'transfer_in' ? 'selected' : '' }}>{{ __('pos.type_transfer_in') }}</option>
+                <option value="transfer_out" {{ request('type') === 'transfer_out' ? 'selected' : '' }}>{{ __('pos.type_transfer_out') }}</option>
+                @endif
             </select>
             <select name="product_id" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition">
                 <option value="">{{ __('pos.all_products') }}</option>
@@ -48,6 +57,9 @@
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50">
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.receipt_date') }}</th>
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.product_col') }}</th>
+                        @if($allBranches ?? false)
+                        <th class="px-5 py-3.5 font-semibold">{{ __('pos.branch_word') }}</th>
+                        @endif
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.type_label') }}</th>
                         <th class="px-5 py-3.5 text-right font-semibold">{{ __('pos.receipt_qty') }}</th>
                         <th class="px-5 py-3.5 text-right font-semibold">{{ __('pos.balance_col') }}</th>
@@ -71,6 +83,13 @@
                     <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition">
                         <td class="px-5 py-3.5 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">{{ $m->created_at->format('d M Y H:i') }}</td>
                         <td class="px-5 py-3.5 font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? __('pos.unknown_word') }}</td>
+                        @if($allBranches ?? false)
+                        <td class="px-5 py-3.5 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                                {{ $branchNames[$m->branch_id] ?? __('pos.branch_unassigned') }}
+                            </span>
+                        </td>
+                        @endif
                         <td class="px-5 py-3.5 whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold {{ $typeColors[$m->type] ?? 'bg-gray-100 text-gray-600' }}">
                                 {{ ucwords(str_replace('_', ' ', $m->type)) }}
@@ -84,7 +103,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="8" class="px-5 py-16 text-center">
+                        <td colspan="{{ ($allBranches ?? false) ? 9 : 8 }}" class="px-5 py-16 text-center">
                             <div class="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
                                 <svg class="w-7 h-7 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                             </div>

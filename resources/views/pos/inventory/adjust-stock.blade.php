@@ -14,6 +14,9 @@
         <a href="{{ route('pos.inventory.movements') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">{{ __('pos.movements') }}</a>
         <a href="{{ route('pos.inventory.low-stock') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">{{ __('pos.low_stock_alerts') }}</a>
         <a href="{{ route('pos.inventory.adjust') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white">{{ __('pos.adjust_stock') }}</a>
+        @if($canTransfer ?? false)
+        <a href="{{ route('pos.inventory.transfers') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">{{ __('pos.branch_transfer') }}</a>
+        @endif
     </div>
 
     @if(session('error'))
@@ -42,6 +45,21 @@
                     @endforeach
                 </select>
             </div>
+
+            {{-- Per-branch stock (Task 1354): an adjustment must name the shop it
+                 lands in, otherwise an owner on the all-branches view has no way
+                 to say WHERE the maal actually is. --}}
+            @if($multiBranch ?? false)
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.branch_word') }}</label>
+                <select name="branch_id" required class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
+                    @foreach($branches as $b)
+                    <option value="{{ $b->id }}" {{ (int) old('branch_id', request('branch_id', $activeBranchId ?? 0)) === (int) $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.adjust_branch_hint') }}</p>
+            </div>
+            @endif
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.adjustment_type') }}</label>

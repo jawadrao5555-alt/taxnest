@@ -320,7 +320,10 @@ class PosReturnService
                                 (float) $it['quantity'],
                                 (float) $it['unit_price'],
                                 InventoryMovement::TYPE_RETURN_IN,
-                                null,
+                                // Per-branch stock (Task 1354): goods go back to
+                                // the shop that sold them, keeping the restore
+                                // symmetric with the original sale's deduction.
+                                \App\Services\BranchStockService::writeBranchId($companyId, $original->branch_id ?? null),
                                 ['type' => 'pos_return', 'id' => $return->id, 'number' => $invNum],
                                 'POS return restock (bill ' . $original->invoice_number . ')',
                                 $userId

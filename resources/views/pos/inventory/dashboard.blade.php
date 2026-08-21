@@ -28,7 +28,12 @@
             @endif
         </a>
         <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.adjust_stock') }}</a>
+        @if($canTransfer ?? false)
+        <a href="{{ route('pos.inventory.transfers') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.branch_transfer') }}</a>
+        @endif
     </div>
+
+    @include('pos.inventory.partials.branch-bar')
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
@@ -166,6 +171,49 @@
             </div>
         </div>
     </div>
+
+    {{-- Per-branch stock (Task 1354): the "kis branch mein kitna maal para hai"
+         answer, only on the owner's company-wide view. --}}
+    @if(($allBranches ?? false) && ($branchTotals ?? collect())->isNotEmpty())
+    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                </div>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.stock_by_branch') }}</h3>
+            </div>
+            @if($canTransfer ?? false)
+            <a href="{{ route('pos.inventory.transfers') }}" class="text-xs font-semibold text-purple-600 hover:text-purple-800 transition">{{ __('pos.branch_transfer') }} &rarr;</a>
+            @endif
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700">
+                        <th class="py-2.5 font-semibold">{{ __('pos.branch_word') }}</th>
+                        <th class="py-2.5 text-right font-semibold">{{ __('pos.tracked_items') }}</th>
+                        <th class="py-2.5 text-right font-semibold">{{ __('pos.total_qty') }}</th>
+                        <th class="py-2.5 text-right font-semibold">{{ __('pos.stock_value') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
+                    @foreach($branchTotals as $bt)
+                    <tr>
+                        <td class="py-3 font-semibold text-gray-900 dark:text-white">
+                            {{ $bt->name }}
+                            @if($bt->is_head_office)<span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 font-bold uppercase">{{ __('pos.branch_hq_badge') }}</span>@endif
+                        </td>
+                        <td class="py-3 text-right text-gray-600 dark:text-gray-400">{{ number_format($bt->items) }}</td>
+                        <td class="py-3 text-right font-bold text-gray-900 dark:text-white">{{ number_format($bt->qty, 0) }}</td>
+                        <td class="py-3 text-right text-gray-600 dark:text-gray-400">PKR {{ number_format($bt->value, 0) }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5">

@@ -1402,7 +1402,9 @@ class RestaurantPosController extends Controller
                 'pos_transaction_id' => $transaction->id,
             ]);
 
-            $this->deductInventoryForOrder($companyId, $order, $transaction->id, $invoiceNumber, $user->id);
+            // Per-branch stock (Task 1354): the bill carries the branch, the
+            // held order does not — pass it down so the goods leave the right shop.
+            $this->deductInventoryForOrder($companyId, $order, $transaction->id, $invoiceNumber, $user->id, $transaction->branch_id ?? null);
 
             if ($order->table_id) {
                 $otherActive = RestaurantOrder::where('company_id', $companyId)
@@ -1670,7 +1672,7 @@ class RestaurantPosController extends Controller
         return $errors;
     }
 
-    private function deductInventoryForOrder($companyId, $order, $transactionId, $invoiceNumber, $userId)
+    private function deductInventoryForOrder($companyId, $order, $transactionId, $invoiceNumber, $userId, $branchId = null)
     {
         $company = Company::find($companyId);
         if (!$company || !$company->inventory_enabled) return;
@@ -1697,6 +1699,7 @@ class RestaurantPosController extends Controller
                         InventoryMovement::create([
                             'company_id' => $companyId,
                             'product_id' => $item->item_id,
+                            'branch_id' => $branchId,
                             'type' => 'recipe_sale',
                             'quantity' => $deductQty,
                             'unit_price' => $ingredient->cost_per_unit,
@@ -1714,7 +1717,11 @@ class RestaurantPosController extends Controller
                 $itemData = [
                     ['type' => 'product', 'item_id' => $item->item_id, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price]
                 ];
-                \App\Http\Controllers\PosInventoryController::deductStockForInvoice($companyId, $itemData, $transactionId, $invoiceNumber, $userId);
+                // Per-branch stock (Task 1354): a dine-in order empties the
+                // stock of the branch its bill belongs to.
+                \App\Http\Controllers\PosInventoryController::deductStockForInvoice(
+                    $companyId, $itemData, $transactionId, $invoiceNumber, $userId, $branchId
+                );
             }
         }
     }

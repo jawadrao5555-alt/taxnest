@@ -30,6 +30,22 @@
         @endif
     @endif
 
+    {{-- Per-branch stock (Task 1354): products are shared company-wide, but the
+         stock column belongs to ONE shop — say which one so nobody reads
+         Gulberg's numbers as Main Shop's. --}}
+    @if($stockBranchName ?? null)
+    <div class="mb-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/60 dark:bg-purple-900/10 px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2">
+        <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <span>
+            @if($stockAllBranches ?? false)
+                {{ __('pos.products_stock_scope_all') }}
+            @else
+                {!! __('pos.products_stock_scope_one', ['branch' => '<span class="font-bold">' . e($stockBranchName) . '</span>']) !!}
+            @endif
+        </span>
+    </div>
+    @endif
+
     @if(session('success'))
     <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
     @endif
@@ -249,6 +265,9 @@
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.opening_stock') }} <span class="text-gray-400">{{ __('pos.paren_blank_not_tracked') }}</span></label>
                         <input type="number" name="stock_quantity" step="1" min="0" placeholder="{{ __('pos.ph_eg_50') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                        @if(($stockBranchName ?? null) && !($stockAllBranches ?? false))
+                        <p class="mt-1 text-[10px] text-purple-600 dark:text-purple-300">{{ __('pos.stock_lands_in_branch', ['branch' => $stockBranchName]) }}</p>
+                        @endif
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.low_stock_alert_at') }}</label>
@@ -762,8 +781,20 @@
                                 <span class="text-[11px] font-bold uppercase tracking-wider" :class="editing.show_on_sale ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'" x-text="editing.show_on_sale ? @js(__('pos.on_sale_screen')) : @js(__('pos.hidden_from_sale'))"></span>
                             </label>
                             <div>
-                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.stock_word') }} <span class="text-gray-400">{{ __('pos.paren_blank_untracked') }}</span></label>
-                                <input type="number" name="stock_quantity" x-model="editing.stock_quantity" step="1" min="0" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                    {{ __('pos.stock_word') }}
+                                    @if($stockBranchName ?? null)<span class="text-purple-600 dark:text-purple-300 font-semibold">— {{ $stockBranchName }}</span>@endif
+                                    <span class="text-gray-400">{{ __('pos.paren_blank_untracked') }}</span>
+                                </label>
+                                {{-- Per-branch stock (Task 1354): on the company-wide view a single
+                                     number cannot say WHICH shop it belongs to, so the edit is
+                                     disabled and the user is pointed at Adjust Stock / Transfer. --}}
+                                <input type="number" name="stock_quantity" x-model="editing.stock_quantity" step="1" min="0"
+                                    @if($stockAllBranches ?? false) disabled @endif
+                                    class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed">
+                                @if($stockAllBranches ?? false)
+                                <p class="mt-1 text-[10px] text-gray-500 dark:text-gray-400">{{ __('pos.stock_edit_pick_branch') }}</p>
+                                @endif
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.low_stock_alert_at') }}</label>

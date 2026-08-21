@@ -14,7 +14,12 @@
         <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.movements') }}</a>
         <a href="{{ route('pos.inventory.low-stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm">{{ __('pos.low_stock_alerts') }}</a>
         <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.adjust_stock') }}</a>
+        @if($canTransfer ?? false)
+        <a href="{{ route('pos.inventory.transfers') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.branch_transfer') }}</a>
+        @endif
     </div>
+
+    @include('pos.inventory.partials.branch-bar')
 
     @if($outOfStock->count() > 0)
     <div class="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-700 rounded-2xl p-5 mb-6">
@@ -27,7 +32,10 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             @foreach($outOfStock as $item)
             <div class="flex items-center justify-between bg-white/80 dark:bg-gray-900/80 rounded-xl p-3.5 border border-red-100 dark:border-red-800/50 backdrop-blur-sm">
-                <span class="font-semibold text-sm text-gray-900 dark:text-white truncate mr-2">{{ $item->posProduct->name ?? __('pos.unknown_word') }}</span>
+                <span class="font-semibold text-sm text-gray-900 dark:text-white truncate mr-2">
+                    {{ $item->posProduct->name ?? __('pos.unknown_word') }}
+                    @if($allBranches ?? false)<span class="block text-[10px] font-medium text-purple-600 dark:text-purple-300">{{ $branchNames[$item->branch_id] ?? __('pos.branch_unassigned') }}</span>@endif
+                </span>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">0</span>
                     <a href="{{ route('pos.inventory.adjust') }}?product_id={{ $item->product_id }}" class="text-xs text-purple-600 hover:text-purple-800 font-bold transition">{{ __('pos.restock') }}</a>
@@ -83,6 +91,9 @@
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50">
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.product_col') }}</th>
+                        @if($allBranches ?? false)
+                        <th class="px-5 py-3.5 font-semibold">{{ __('pos.branch_word') }}</th>
+                        @endif
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.urgency_col') }}</th>
                         <th class="px-5 py-3.5 font-semibold">{{ __('pos.stock_level') }}</th>
                         <th class="px-5 py-3.5 text-right font-semibold">{{ __('pos.min_level') }}</th>
@@ -101,6 +112,13 @@
                     @endphp
                     <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition {{ $pct < 25 ? 'bg-red-50/30 dark:bg-red-900/5' : '' }}">
                         <td class="px-5 py-4 font-semibold text-gray-900 dark:text-white">{{ $item->posProduct->name ?? __('pos.unknown_word') }}</td>
+                        @if($allBranches ?? false)
+                        <td class="px-5 py-4">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300">
+                                {{ $branchNames[$item->branch_id] ?? __('pos.branch_unassigned') }}
+                            </span>
+                        </td>
+                        @endif
                         <td class="px-5 py-4">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider {{ $urgencyClass }}">
                                 @if($pct < 25)<svg class="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="5"/></svg>@endif
@@ -121,7 +139,7 @@
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">-{{ number_format($shortage, 0) }}</span>
                         </td>
                         <td class="px-5 py-4 text-center">
-                            <a href="{{ route('pos.inventory.adjust') }}?product_id={{ $item->product_id }}" class="inline-flex items-center px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 transition shadow-sm">
+                            <a href="{{ route('pos.inventory.adjust') }}?product_id={{ $item->product_id }}{{ $item->branch_id ? '&branch_id=' . $item->branch_id : '' }}" class="inline-flex items-center px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 transition shadow-sm">
                                 <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 {{ __('pos.restock') }}
                             </a>

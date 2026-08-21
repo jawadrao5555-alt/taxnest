@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PricingPlan;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Lang;
 
 /**
  * PRA POS package comparison — SINGLE SOURCE OF TRUTH (Task 1350).
@@ -23,8 +24,9 @@ use Illuminate\Support\Collection;
  * THE RULE: nothing below is a hand-typed tick. Every cell is read straight
  * off the pricing_plans row that actually opens or closes the feature, so the
  * table cannot say one thing while the gate does another. Add a gate column
- * and it must be named here (or declared COVERED_BY) or scripts/plan-gate-check.php
- * blocks the deploy.
+ * and it must be named here (or declared COVERED_BY) or auditNames() fails —
+ * in the normal test suite (tests/Unit/PosPlanComparisonNamingTest.php) and
+ * again in scripts/plan-gate-check.php, which blocks the deploy.
  *
  * Labels/hints are lang keys (pos.pcmp_*) so the table reads correctly in
  * English, Roman Urdu and Urdu.
@@ -470,8 +472,9 @@ class PosPlanComparisonService
                 foreach (['en', 'rur', 'ur'] as $locale) {
                     $key = $row['source'] === 'included' ? 'pcmp_inc_' . $row['key']
                         : ($row['source'] === 'limit' ? 'pcmp_card_unl_' . $row['key'] : 'pcmp_' . $row['key']);
-                    $value = __('pos.' . $key, [], $locale);
-                    if (!is_string($value) || trim($value) === '' || $value === 'pos.' . $key) {
+                    // Same no-fallback rule as the table rows: an English-only
+                    // bullet must not pass as translated.
+                    if (self::langLineMissing('pos.' . $key, $locale)) {
                         $problems[] = "Missing lang key pos.{$key} in [{$locale}] — every card bullet needs a name in all three languages.";
                     }
                 }
@@ -533,17 +536,28 @@ class PosPlanComparisonService
     }
 
     /**
-     * Drift audit — called by scripts/plan-gate-check.php before every deploy.
-     * Returns a list of human-readable problems; empty means table and gates
-     * agree.
+     * The half of the audit that needs NO database (Task 1385):
+     *   1. every plan-gate column has a customer-facing row (or is declared
+     *      COVERED_BY one), and
+     *   2. every row label / declared hint resolves in English, Roman Urdu
+     *      and Urdu.
      *
-     * @param  Collection<int, PricingPlan>  $plans
-     * @param  array<string, array<string, int|string|null>>  $expectedLimits
-     *         plan name => [row key => expected number, or 'Unlimited']
-     * @param  array<string, array<string, bool>>  $expectedFeatures
-     *         plan name => [row key => expected tick]
+     * Both read constants and lang files only, so the normal test suite runs
+     * them (tests/Unit/PosPlanComparisonNamingTest.php) and an unnamed new
+     * gate — or a label missing from one language — fails the moment it is
+     * added, instead of waiting for the staging DB and the pre-deploy check.
+     * audit() still calls this first, so scripts/plan-gate-check.php keeps
+     * blocking the deploy on exactly the same problems.
+     *
+     * The two arrays are test hooks: they let a test prove the guard really
+     * bites without editing the constants. Nothing in the app passes them.
+     *
+     * @param  array<int, string>   $extraGateColumns  pretend these gate columns exist
+     * @param  array<string, bool>  $extraRowSpecs     pretend these lang keys are rows
+     *                                                 (key => does it need a _hint line)
+     * @return array<int, string>
      */
-    public static function audit(Collection $plans, array $expectedLimits = [], array $expectedFeatures = []): array
+    public static function auditNames(array $extraGateColumns = [], array $extraRowSpecs = []): array
     {
         $problems = [];
 
@@ -554,7 +568,7 @@ class PosPlanComparisonService
                 $named[] = $spec['column'];
             }
         }
-        $gateColumns = array_merge(PosFeatureService::PLAN_GATES, ['restaurant_enabled']);
+        $gateColumns = array_merge(PosFeatureService::PLAN_GATES, ['restaurant_enabled'], $extraGateColumns);
         foreach ($gateColumns as $column) {
             if (in_array($column, $named, true) || isset(self::COVERED_BY[$column])) {
                 continue;
@@ -585,16 +599,55 @@ class PosPlanComparisonService
         foreach ($chrome as $key) {
             $rowSpecs[$key] = false;
         }
+        foreach ($extraRowSpecs as $key => $needsHint) {
+            $rowSpecs[$key] = (bool) $needsHint;
+        }
         foreach (['en', 'rur', 'ur'] as $locale) {
             foreach ($rowSpecs as $key => $needsHint) {
                 foreach ($needsHint ? [$key, $key . '_hint'] : [$key] as $fullKey) {
-                    $value = __('pos.' . $fullKey, [], $locale);
-                    if (!is_string($value) || trim($value) === '' || $value === 'pos.' . $fullKey) {
+                    if (self::langLineMissing('pos.' . $fullKey, $locale)) {
                         $problems[] = "Missing lang key pos.{$fullKey} in [{$locale}] — every comparison row needs a name in all three languages.";
                     }
                 }
             }
         }
+
+        return $problems;
+    }
+
+    /**
+     * Does this line really exist in THIS language?
+     *
+     * __() / trans() fall back to the app fallback locale (en), so a row named
+     * in English and forgotten in Urdu would come back as the English text and
+     * pass — the exact drift this audit exists to catch (the shop then reads an
+     * English label, or a blank cell once the English line is renamed away).
+     * The lookup therefore runs with fallback OFF: a locale with no line of its
+     * own gets the key back instead of somebody else's translation.
+     */
+    private static function langLineMissing(string $key, string $locale): bool
+    {
+        $value = Lang::get($key, [], $locale, false);
+
+        return !is_string($value) || trim($value) === '' || $value === $key;
+    }
+
+    /**
+     * Drift audit — called by scripts/plan-gate-check.php before every deploy.
+     * Returns a list of human-readable problems; empty means table and gates
+     * agree.
+     *
+     * @param  Collection<int, PricingPlan>  $plans
+     * @param  array<string, array<string, int|string|null>>  $expectedLimits
+     *         plan name => [row key => expected number, or 'Unlimited']
+     * @param  array<string, array<string, bool>>  $expectedFeatures
+     *         plan name => [row key => expected tick]
+     */
+    public static function audit(Collection $plans, array $expectedLimits = [], array $expectedFeatures = []): array
+    {
+        // 1 + 2. Gate coverage and three-language row names — no DB needed, so
+        //        the normal test suite runs them too (Task 1385).
+        $problems = self::auditNames();
 
         // 3. "Included in every package" must actually be true on every POS plan.
         foreach (self::INCLUDED_ROWS as $key => $spec) {

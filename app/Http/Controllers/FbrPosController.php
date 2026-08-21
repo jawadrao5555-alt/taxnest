@@ -1253,11 +1253,19 @@ class FbrPosController extends Controller
         // "product:ID"; user pref overrides admin show_on_sale BOTH directions.
         $userGridPrefs = \App\Models\PosUserItemPref::mapForFbrUser(Auth::guard('fbrpos')->id());
 
+        // Task 1389: baked store-slip REPRINT verdict — the held-sales modal and
+        // the post-billing receipt popup hide their Store Slip / Re-send buttons
+        // on this flag; the slip routes and the print-job endpoint re-enforce the
+        // SAME verdict (PosAccessService::kotReprintAllowed — PRA twin).
+        $canKotReprint = \App\Services\PosAccessService::kotReprintAllowed(
+            Auth::guard('fbrpos')->user(), $company
+        );
+
         return response(view($viewName, compact(
             'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
             'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed',
-            'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin'
+            'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin', 'canKotReprint'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('X-TaxNest-Sale-Document', 'fbr')
@@ -1315,6 +1323,11 @@ class FbrPosController extends Controller
             // Task 1271: per-user grid prefs are BAKED into the screen — a
             // toggle/reset must refresh the SW-cached copy (PRA twin rule).
             \App\Models\PosUserItemPref::mapForFbrUser($user->id),
+            // Task 1389: the store-slip REPRINT verdict is BAKED into the screen —
+            // flipping the Customize switch or a Custom Access tick must refresh
+            // the offline-cached copy, or a cached screen keeps showing (and
+            // firing) buttons the server now refuses.
+            (bool) \App\Services\PosAccessService::kotReprintAllowed($user, $company),
         ]));
 
         $screenPath = resource_path('views/fbr-pos/universal.blade.php');
@@ -3527,30 +3540,48 @@ class FbrPosController extends Controller
         $company   = Company::find($companyId);
         $held      = \App\Models\FbrPosHeldSale::where('company_id', $companyId)->findOrFail($id);
 
-        $cartData  = $held->cart_data ?? [];
-        $items     = is_array($cartData['items'] ?? null) ? $cartData['items'] : [];
+        // Task 1389 — REPRINT permission gate (PRA twin: RestaurantPosController::
+        // kitchenTicket). Hiding the button is not a block: a blocked staffer must
+        // not get the slip by pasting the URL or reusing an old tab. Only REPRINTS
+        // are gated — the FIRST "Send to Store" fire always reaches the store.
+        // Unauthenticated renders (Desktop Agent print jobs) never reach here;
+        // those are gated at enqueue in fbrApiCreatePrintJob().
+        $claim = $this->fbrKotReprintGate($held, $company, 'fbr_pos_held_sales');
 
-        // Notes stored on a held cart from BEFORE the feature was switched off (or
-        // before a downgrade) must not print now — the switch decides at render
-        // time, not at hold time.
-        if (!$this->fbrStoreNotesEnabled($company)) {
-            $items = array_map(function ($it) {
-                if (is_array($it)) { unset($it['special_notes']); }
-                return $it;
-            }, $items);
+        // The slip counts as sent only once its HTML actually exists — render it
+        // here (not lazily after the response leaves) so a template failure hands
+        // the first send back instead of locking the store out of a retry.
+        try {
+            $cartData  = $held->cart_data ?? [];
+            $items     = is_array($cartData['items'] ?? null) ? $cartData['items'] : [];
+
+            // Notes stored on a held cart from BEFORE the feature was switched off (or
+            // before a downgrade) must not print now — the switch decides at render
+            // time, not at hold time.
+            if (!$this->fbrStoreNotesEnabled($company)) {
+                $items = array_map(function ($it) {
+                    if (is_array($it)) { unset($it['special_notes']); }
+                    return $it;
+                }, $items);
+            }
+            $tokenNo   = isset($held->token_no)   ? (int)  $held->token_no   : (isset($cartData['token_no'])   ? (int)  $cartData['token_no']   : null);
+            $orderCode = isset($held->order_code) ? (string) $held->order_code : (isset($cartData['order_code']) ? (string) $cartData['order_code'] : null);
+            $customerName = $held->customer_name ?? ($cartData['customer_name'] ?? null);
+            $kitchenNotes = $cartData['kitchen_notes'] ?? null;
+            $now = now();
+
+            $autoPrint = request()->boolean('auto_print');
+
+            $html = view('fbr-pos.kitchen-ticket', compact(
+                'company', 'held', 'items', 'tokenNo', 'orderCode',
+                'customerName', 'kitchenNotes', 'now', 'autoPrint'
+            ))->render();
+        } catch (\Throwable $e) {
+            $this->fbrReleaseKotSend($held, 'fbr_pos_held_sales', $claim);
+            throw $e;
         }
-        $tokenNo   = isset($held->token_no)   ? (int)  $held->token_no   : (isset($cartData['token_no'])   ? (int)  $cartData['token_no']   : null);
-        $orderCode = isset($held->order_code) ? (string) $held->order_code : (isset($cartData['order_code']) ? (string) $cartData['order_code'] : null);
-        $customerName = $held->customer_name ?? ($cartData['customer_name'] ?? null);
-        $kitchenNotes = $cartData['kitchen_notes'] ?? null;
-        $now = now();
 
-        $autoPrint = request()->boolean('auto_print');
-
-        return view('fbr-pos.kitchen-ticket', compact(
-            'company', 'held', 'items', 'tokenNo', 'orderCode',
-            'customerName', 'kitchenNotes', 'now', 'autoPrint'
-        ));
+        return response($html);
     }
 
     /**
@@ -3568,40 +3599,166 @@ class FbrPosController extends Controller
             ->where('company_id', $companyId)
             ->findOrFail($id);
 
-        $tokenNo   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'token_no')
-            ? ($transaction->token_no ? (int) $transaction->token_no : null)
-            : null;
-        $orderCode = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_code')
-            ? ($transaction->order_code ?: null)
-            : null;
+        // Task 1389 — REPRINT permission gate. Despite the route name this path
+        // also serves the FIRST slip of a straight (never-held) bill: auto-KOT
+        // fires it right after payment. kot_sent_at is what tells the two apart,
+        // so a genuine first fire is never blocked.
+        $claim = $this->fbrKotReprintGate($transaction, $company, 'fbr_pos_transactions');
 
-        // Build a simple items array from the transaction lines (KOT needs name+qty
-        // plus the per-item Store note). Task 1403: the note used to be hardcoded
-        // null here, so a slip reprinted after payment silently lost every note the
-        // cashier typed. hasColumn-guarded for PROD schema drift.
-        // Task 1403: the switch decides at REPRINT time. A note captured while the
-        // feature was on must stop printing once the shop switches it off.
-        $hasNotes = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes')
-            && $this->fbrStoreNotesEnabled($company);
-        $items = $transaction->items->map(function ($it) use ($hasNotes) {
-            return [
-                'item_name'     => $it->item_name,
-                'quantity'      => (float) $it->quantity,
-                'special_notes' => $hasNotes ? ($it->special_notes ?: null) : null,
-            ];
-        })->all();
+        // See kotTicket() — render inside the try so a failure releases the claim.
+        try {
+            $tokenNo   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'token_no')
+                ? ($transaction->token_no ? (int) $transaction->token_no : null)
+                : null;
+            $orderCode = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_code')
+                ? ($transaction->order_code ?: null)
+                : null;
 
-        $customerName = $transaction->customer_name;
-        $kitchenNotes = null;
-        $now = $transaction->created_at ?? now();
-        $held = null; // not a held sale — template branches on this
+            // Build a simple items array from the transaction lines (KOT needs name+qty
+            // plus the per-item Store note). Task 1403: the note used to be hardcoded
+            // null here, so a slip reprinted after payment silently lost every note the
+            // cashier typed. hasColumn-guarded for PROD schema drift.
+            // Task 1403: the switch decides at REPRINT time. A note captured while the
+            // feature was on must stop printing once the shop switches it off.
+            $hasNotes = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes')
+                && $this->fbrStoreNotesEnabled($company);
+            $items = $transaction->items->map(function ($it) use ($hasNotes) {
+                return [
+                    'item_name'     => $it->item_name,
+                    'quantity'      => (float) $it->quantity,
+                    'special_notes' => $hasNotes ? ($it->special_notes ?: null) : null,
+                ];
+            })->all();
 
-        $autoPrint = request()->boolean('auto_print');
+            $customerName = $transaction->customer_name;
+            $kitchenNotes = null;
+            $now = $transaction->created_at ?? now();
+            $held = null; // not a held sale — template branches on this
 
-        return view('fbr-pos.kitchen-ticket', compact(
-            'company', 'held', 'items', 'tokenNo', 'orderCode',
-            'customerName', 'kitchenNotes', 'now', 'autoPrint'
-        ));
+            $autoPrint = request()->boolean('auto_print');
+
+            $html = view('fbr-pos.kitchen-ticket', compact(
+                'company', 'held', 'items', 'tokenNo', 'orderCode',
+                'customerName', 'kitchenNotes', 'now', 'autoPrint'
+            ))->render();
+        } catch (\Throwable $e) {
+            $this->fbrReleaseKotSend($transaction, 'fbr_pos_transactions', $claim);
+            throw $e;
+        }
+
+        return response($html);
+    }
+
+    /**
+     * Task 1389 — FBR store-slip REPRINT gate, shared by the two render routes
+     * and the silent print-job enqueue so they can never drift apart.
+     *
+     * The verdict itself is PosAccessService::kotReprintAllowed() — the SAME
+     * single source of truth the PRA screen uses (company master switch
+     * `kot_reprint_enabled` + per-member Custom Access tick). The reprint test
+     * is `kot_sent_at`: FBR holds are JSON carts and FBR bills are their own
+     * table, but both now carry that column, written on the first send — the
+     * same signal KotPrintService::isTransactionReprint() reads for PRA.
+     *
+     * Only a REPRINT is refused. A first fire (Send to Store, auto-KOT after
+     * payment) always reaches the store: a lost slip is worse than a duplicate.
+     *
+     * The first send is CLAIMED, not merely detected: two requests that both
+     * read an unsent row (double-click, two tabs, multi-worker server) would
+     * otherwise both be waved through as "first sends" and the block would be
+     * bypassable. The claim is a conditional whereNull update — exactly one
+     * request can win it; every other request is a reprint and is gated.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model|null  $row  held sale or transaction
+     * @param  string  $table  the row's table, for the claim
+     * @return string|null  the claim token when THIS request won the first send
+     *                      (pass it to fbrReleaseKotSend if the send then fails);
+     *                      null when there was nothing to claim
+     */
+    private function fbrKotReprintGate($row, ?Company $company, string $table): ?string
+    {
+        $claim = $this->fbrClaimKotSend($row, $table);
+        if ($claim !== false) {
+            return $claim; // won the first send (string) — or no signal available (null)
+        }
+
+        // The slip is already out (an earlier send, or a racing request that won
+        // the claim), so this one is a REPRINT.
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || \App\Services\PosAccessService::kotReprintAllowed($user, $company)) {
+            return null;
+        }
+        if (request()->expectsJson()) {
+            abort(response()->json([
+                'success' => false,
+                'reason' => 'not_allowed',
+                'message' => __('pos.kot_reprint_not_allowed'),
+            ], 403));
+        }
+        abort(403, __('pos.kot_reprint_not_allowed'));
+    }
+
+    /**
+     * Task 1389 — atomically claim "the store is getting this slip now".
+     *
+     * @return string|false|null  claim token when this caller won the first send;
+     *                            false when the slip was already sent (= reprint);
+     *                            null when there is no signal to read, so nothing
+     *                            can be judged a reprint (PROD drift: migration
+     *                            not yet run → today's behaviour, printing never
+     *                            breaks; likewise any DB error — bookkeeping must
+     *                            never be why a slip misses the store).
+     */
+    private function fbrClaimKotSend($row, string $table)
+    {
+        try {
+            if (!$row || !\Illuminate\Support\Facades\Schema::hasColumn($table, 'kot_sent_at')) {
+                return null;
+            }
+            if (!empty($row->kot_sent_at)) {
+                return false;
+            }
+            $claimed = \Illuminate\Support\Facades\DB::table($table)
+                ->where('id', $row->id)
+                ->whereNull('kot_sent_at')
+                ->update(['kot_sent_at' => now()->format('Y-m-d H:i:s')]);
+            // Read the value BACK: the token has to be what the column really
+            // holds, not what we handed it. A plain MySQL `timestamp` keeps
+            // whole seconds, so a token carrying anything finer would never
+            // match again and the claim could never be released.
+            $stored = \Illuminate\Support\Facades\DB::table($table)
+                ->where('id', $row->id)->value('kot_sent_at');
+            $row->kot_sent_at = $stored;
+            if (!$claimed) {
+                return false; // someone else won it between our read and the update
+            }
+            return is_string($stored) && $stored !== '' ? $stored : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Task 1389 — give a claimed first send BACK when it never happened (the
+     * print job could not be queued). The sale screen falls back to browser
+     * printing on any non-2xx, and that fallback must still count as the first
+     * send, or a blocked staffer is left with no slip at all. Matches on the
+     * token so a racing worker's genuine send is never released.
+     */
+    private function fbrReleaseKotSend($row, string $table, ?string $claim): void
+    {
+        if (!$row || !$claim) {
+            return;
+        }
+        try {
+            \Illuminate\Support\Facades\DB::table($table)
+                ->where('id', $row->id)
+                ->where('kot_sent_at', $claim)
+                ->update(['kot_sent_at' => null]);
+            $row->kot_sent_at = null;
+        } catch (\Throwable $e) {
+            // Best effort — a stuck claim only costs one blocked reprint.
+        }
     }
 
     public function testConnection()
@@ -4333,15 +4490,63 @@ class FbrPosController extends Controller
         // id rides the restaurant_order_id column (FBR holds are Phase2 JSON
         // carts — there is no RestaurantOrder row).
         if ($request->filled('restaurant_order_id')) {
-            $exists = \App\Models\FbrPosHeldSale::where('company_id', $companyId)
-                ->where('id', (int) $validated['restaurant_order_id'])
-                ->exists();
-            if (!$exists) {
+            $held = \App\Models\FbrPosHeldSale::where('company_id', $companyId)
+                ->find((int) $validated['restaurant_order_id']);
+            if (!$held) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
             }
+            // Task 1389 — REPRINT gate on the SILENT path, mirroring the render
+            // gate in kotTicket(). The Desktop Agent renders the slip through an
+            // unauthenticated route, so enqueue time is where a blocked staffer
+            // must be stopped — and where the first-send stamp has to be written.
+            $claim = $this->fbrKotReprintGate($held, $company, 'fbr_pos_held_sales');
+            try {
+                $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                    ->where('type', 'fbr_kot')
+                    ->where('restaurant_order_id', (int) $validated['restaurant_order_id'])
+                    ->whereIn('status', ['pending', 'printing'])
+                    ->where('created_at', '>=', now()->subMinutes(2))
+                    ->orderByDesc('id')->first();
+                if ($inFlight) {
+                    // A slip IS on its way — the claim stays taken.
+                    return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
+                }
+                $attrs = [
+                    'company_id' => $companyId,
+                    'type' => 'fbr_kot',
+                    'target_printer' => $settings['kot_printer'],
+                    'restaurant_order_id' => (int) $validated['restaurant_order_id'],
+                    'status' => 'pending',
+                    'created_by' => $user->id,
+                ];
+                // Route to the counter that owns the KOT printer (ONLINE only).
+                if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['kot_printer_device'] ?? null)) {
+                    $attrs['device_uid'] = $stamp;
+                }
+                $job = \App\Models\PosPrintJob::create($attrs);
+            } catch (\Throwable $e) {
+                // The slip never left: give the claimed first send back so the
+                // screen's iframe fallback is still treated as a FIRST print.
+                $this->fbrReleaseKotSend($held, 'fbr_pos_held_sales', $claim);
+                throw $e;
+            }
+            return response()->json(['success' => true, 'job_id' => $job->id]);
+        }
+
+        // KOT REPRINT from a completed transaction (K key / post-pay button).
+        $txn = FbrPosTransaction::where('company_id', $companyId)
+            ->find((int) $validated['transaction_id']);
+        if (!$txn) {
+            return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+        }
+        // Task 1389 — same gate + first-send stamp as the held branch above.
+        // Auto-KOT after payment also lands here, so kot_sent_at (not the route
+        // name) is what decides whether this send is a reprint.
+        $claim = $this->fbrKotReprintGate($txn, $company, 'fbr_pos_transactions');
+        try {
             $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
                 ->where('type', 'fbr_kot')
-                ->where('restaurant_order_id', (int) $validated['restaurant_order_id'])
+                ->where('transaction_id', (int) $validated['transaction_id'])
                 ->whereIn('status', ['pending', 'printing'])
                 ->where('created_at', '>=', now()->subMinutes(2))
                 ->orderByDesc('id')->first();
@@ -4352,46 +4557,20 @@ class FbrPosController extends Controller
                 'company_id' => $companyId,
                 'type' => 'fbr_kot',
                 'target_printer' => $settings['kot_printer'],
-                'restaurant_order_id' => (int) $validated['restaurant_order_id'],
+                'transaction_id' => (int) $validated['transaction_id'],
                 'status' => 'pending',
                 'created_by' => $user->id,
             ];
-            // Route to the counter that owns the KOT printer (ONLINE only).
             if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['kot_printer_device'] ?? null)) {
                 $attrs['device_uid'] = $stamp;
             }
             $job = \App\Models\PosPrintJob::create($attrs);
-            return response()->json(['success' => true, 'job_id' => $job->id]);
+        } catch (\Throwable $e) {
+            // See the held branch — an enqueue that never happened must not
+            // leave the slip looking sent.
+            $this->fbrReleaseKotSend($txn, 'fbr_pos_transactions', $claim);
+            throw $e;
         }
-
-        // KOT REPRINT from a completed transaction (K key / post-pay button).
-        $exists = FbrPosTransaction::where('company_id', $companyId)
-            ->where('id', (int) $validated['transaction_id'])
-            ->exists();
-        if (!$exists) {
-            return response()->json(['success' => false, 'reason' => 'not_found'], 404);
-        }
-        $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
-            ->where('type', 'fbr_kot')
-            ->where('transaction_id', (int) $validated['transaction_id'])
-            ->whereIn('status', ['pending', 'printing'])
-            ->where('created_at', '>=', now()->subMinutes(2))
-            ->orderByDesc('id')->first();
-        if ($inFlight) {
-            return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
-        }
-        $attrs = [
-            'company_id' => $companyId,
-            'type' => 'fbr_kot',
-            'target_printer' => $settings['kot_printer'],
-            'transaction_id' => (int) $validated['transaction_id'],
-            'status' => 'pending',
-            'created_by' => $user->id,
-        ];
-        if ($stamp = \App\Services\KotPrintService::deviceStampFor($companyId, $settings['kot_printer_device'] ?? null)) {
-            $attrs['device_uid'] = $stamp;
-        }
-        $job = \App\Models\PosPrintJob::create($attrs);
         return response()->json(['success' => true, 'job_id' => $job->id]);
     }
 

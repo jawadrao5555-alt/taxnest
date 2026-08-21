@@ -1884,7 +1884,7 @@ return [
     'fbr_store_slip_sent_to_printer' => 'سٹور سلپ پرنٹر کو بھیج دی گئی',
     'fbr_resent_to_store_prefix' => 'سٹور کو دوبارہ بھیجا (#',
     'fbr_store_slip_reprint_toggle_title' => 'سٹور سلپ دوبارہ پرنٹ بٹن',
-    'fbr_store_slip_reprint_toggle_sub' => 'بلنگ کے بعد رسید پاپ اپ پر سٹور سلپ دوبارہ پرنٹ کا بٹن دکھائیں',
+    'fbr_store_slip_reprint_toggle_sub' => 'سٹور سلپ دوبارہ پرنٹ یا دوبارہ بھیجنے کا ماسٹر سوئچ۔ بند کرنے پر یہ بٹن سب کے لیے غائب ہو جاتے ہیں — سکرین پر بھی اور سرور پر بھی۔ پہلی سلپ ہمیشہ پرنٹ ہوتی ہے۔',
     'fbr_sent_to_store' => 'سٹور کو بھیج دیا گیا',
     'fbr_auto_store_slip_requires_feature' => 'آٹو سٹور سلپ کے لیے سٹور سلپ فیچر کا آن ہونا ضروری ہے۔',
     'fbr_store_slip_switched_off' => 'اس دکان کے لیے سٹور سلپ بند ہے، اس لیے کوئی سٹور سلپ پرنٹ نہیں ہوئی۔ کسٹمائز سے آن کریں۔',

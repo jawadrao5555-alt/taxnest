@@ -1879,9 +1879,12 @@ window.addEventListener('popstate', function() {
                             @if($features->kot)
                             {{-- Order Matching (Aug 2026): FBR held sales live in fbr_pos_held_sales,
                                  NOT pos_restaurant_orders. Use FBR KOT endpoints — never the PRA
-                                 /pos/restaurant/... routes which 404 for all FBR companies. --}}
-                            <a :href="'/fbr-pos/held/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.fbr_ti_view_print_store_slip') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">{{ __('pos.fbr_store_slip_word') }}</a>
-                            <button @click="resendKitchen(order)" title="{{ __('pos.fbr_ti_resend_store') }}" class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
+                                 /pos/restaurant/... routes which 404 for all FBR companies.
+                                 Task 1389: a cart whose slip never went out (kot_sent_at null) is a
+                                 FIRST print — always offered; once it is out only canKotReprint may
+                                 see it. Re-send is a reprint by definition → plain canKotReprint. --}}
+                            <a x-show="canKotReprint || !order.kot_sent_at" :href="'/fbr-pos/held/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.fbr_ti_view_print_store_slip') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">{{ __('pos.fbr_store_slip_word') }}</a>
+                            <button x-show="canKotReprint" @click="resendKitchen(order)" title="{{ __('pos.fbr_ti_resend_store') }}" class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
@@ -2989,18 +2992,17 @@ window.addEventListener('popstate', function() {
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         {{ __('pos.print') }} <kbd class="text-[8px] bg-blue-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    {{-- 2. KOT (K) - shown only when an orderId exists (restaurant flow) + admin allows reprint --}}
-                    @if(($company->kot_reprint_enabled ?? true))
-                    <button x-show="lastOrderId" @click="printKitchenTicket()" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.fbr_ti_print_store_slip') }}">
+                    {{-- 2. KOT (K) - shown only when an orderId exists (restaurant flow).
+                         Task 1389: the shop-wide switch + per-cashier tick now decide, via the
+                         baked canKotReprint verdict, NOT the raw column. While this bill's slip
+                         has not gone out yet (lastKotPending) it is a FIRST send — never a
+                         reprint — so the button stays for everyone, exactly as the server rules. --}}
+                    <button x-show="lastOrderId && (canKotReprint || lastKotPending)" @click="printKitchenTicket()" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.fbr_ti_print_store_slip') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         {{ __('pos.fbr_store_slip_word') }} <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
-                    {{-- Spacer when KOT hidden so grid stays balanced --}}
-                    <div x-show="!lastOrderId"></div>
-                    @else
-                    {{-- Reprint disabled by admin — keep grid cell balanced --}}
-                    <div></div>
-                    @endif
+                    {{-- Spacer when the slip button is hidden so the grid stays balanced --}}
+                    <div x-show="!(lastOrderId && (canKotReprint || lastKotPending))"></div>
                     {{-- 3. New Sale (Enter) --}}
                     <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_clear_cart_new_sale') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
@@ -3723,6 +3725,15 @@ function restaurantPos() {
         lastInvoiceNumber: '',
         lastTransactionId: null,
         lastOrderId: null,
+        // Task 1389 — baked store-slip REPRINT verdict (company Customize switch
+        // + per-member Custom Access tick, PosAccessService::kotReprintAllowed).
+        // Same flag the slip routes and the print-job endpoint re-enforce, and it
+        // rides the boot fingerprint so an SW-cached screen refreshes when it flips.
+        canKotReprint: {{ !empty($canKotReprint) ? 'true' : 'false' }},
+        // TRUE while the CURRENT bill's store slip has not gone out yet — that
+        // send is a first print, never a reprint, so it stays open to everyone
+        // (the server agrees: fbr_pos_transactions.kot_sent_at is still null).
+        lastKotPending: false,
         // Order Matching (Aug 2026) — FBR: token/code that lives with the current
         // cart. Set at first holdOrder() from server response; preserved on re-hold
         // by embedding in cartData before the POST (same-token invariant).
@@ -4138,6 +4149,7 @@ function restaurantPos() {
             this.lastInvoiceNumber = 'OFFLINE-' + uuid.slice(0, 8).toUpperCase();
             this.lastTransactionId = null;
             this.lastOrderId = null;
+            this.lastKotPending = false; // Task 1389: offline bill has no server-side slip state
             this.lastTotal = rec.total;
             this.lastPaymentMethod = method;
             this.lastFbrNumber = '';
@@ -5780,7 +5792,10 @@ function restaurantPos() {
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showReceipt = false; return; }
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
                 if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.lastIsOffline ? this.printOfflineReceipt() : this.printReceipt(); return; }
-                if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); return; }
+                // Task 1389: the K shortcut obeys the same verdict as the hidden
+                // button — a cached/offline copy of this screen must say WHY
+                // instead of firing a slip the server will refuse.
+                if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); if (!this.canKotReprint && !this.lastKotPending) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; } this.printKitchenTicket(); return; }
                 return;
             }
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
@@ -6483,7 +6498,10 @@ function restaurantPos() {
                     // subtotal fallback (pre-discount/tax) only covers legacy rows.
                     const total = (cd.total_amount || cd.total_amount === 0) ? parseFloat(cd.total_amount)
                         : items.reduce((s, i) => s + ((parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0)), 0);
-                    return { id: r.id, order_number: r.hold_name || ('#' + r.id), customer_name: r.customer_name || null, status: 'held', total_amount: total, items, cart_data: cd };
+                    // Task 1389: kot_sent_at rides along so the modal can tell a
+                    // never-printed cart (first send — open to everyone) from one
+                    // whose slip is already out (reprint — needs the permission).
+                    return { id: r.id, order_number: r.hold_name || ('#' + r.id), customer_name: r.customer_name || null, status: 'held', total_amount: total, items, cart_data: cd, kot_sent_at: r.kot_sent_at || null };
                 });
             } catch (e) { /* silent — badge just won't show */ }
         },
@@ -6508,6 +6526,10 @@ function restaurantPos() {
         // fbr_pos_held_sales, not pos_restaurant_orders.
         async resendKitchen(order) {
             if (!order || !order.id) return;
+            // Task 1389: same verdict as the (hidden) button — an SW-cached or
+            // offline copy of this screen must explain itself instead of firing
+            // a slip the server will refuse. A re-send is always a reprint.
+            if (!this.canKotReprint) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; }
             // Re-print the FBR KOT. No POST needed — no print-count tracking on FBR held carts.
             this.printKitchenTicket(order.id, null, /* isFbrHeld */ true);
             this.showToast(window.TXT.fbr_resent_to_store_prefix ? window.TXT.fbr_resent_to_store_prefix + '1)' : 'Store slip re-sent', 'success');
@@ -6792,6 +6814,10 @@ function restaurantPos() {
                 // the post-pay KOT button (K key) can trigger printKitchenTicket →
                 // /fbr-pos/transaction/{id}/kot-reprint. isFbrHeld=false path used.
                 this.lastOrderId = data.transaction_id || null;
+                // Task 1389: brand-new bill — its store slip has NOT gone out yet,
+                // so the popup's slip button is a FIRST print for everyone. Cleared
+                // the moment a slip is actually fired (auto-KOT chain or K key).
+                this.lastKotPending = !!data.transaction_id;
                 this.lastTotal = savedTotal || data.total_amount || 0;
                 this.lastPaymentMethod = method;
                 this.lastFbrNumber = data.fbr_invoice_number || '';
@@ -7013,6 +7039,10 @@ function restaurantPos() {
             }
             const id = orderId || this.lastOrderId;
             if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            // Task 1389: this bill's slip is going out now — every later send for
+            // it is a reprint, exactly as the server will see it once kot_sent_at
+            // is stamped. Keeps the popup button and the K key honest.
+            if (id === this.lastOrderId) this.lastKotPending = false;
             // FBR post-payment KOT reprint (K key / post-pay button): lastOrderId is
             // set to the transaction id after billing (see processPaymentManual).
             // Use /fbr-pos/transaction/{id}/kot-reprint when in FBR context.
@@ -7894,6 +7924,7 @@ function restaurantPos() {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
                     this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
                     this.lastOrderId = orderId || null;
+                    this.lastKotPending = false; // Task 1389: PRA-shim path — this order's KOT already went out at hold time
                     this.lastTotal = savedTotal || data.total_amount || 0; this.lastPaymentMethod = method;
                     this.lastFbrNumber = data.fbr_invoice_number || ''; this.lastFbrStatus = data.fbr_status || '';
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);

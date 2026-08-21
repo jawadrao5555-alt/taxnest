@@ -1886,7 +1886,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'fbr_store_slip_sent_to_printer' => 'Store slip printer par bhej di gayi',
     'fbr_resent_to_store_prefix' => 'Store ko dobara bhej diya (#',
     'fbr_store_slip_reprint_toggle_title' => 'Store Slip Reprint Button',
-    'fbr_store_slip_reprint_toggle_sub' => 'Billing ke baad receipt popup par Reprint Store Slip button dikhayen',
+    'fbr_store_slip_reprint_toggle_sub' => 'Store slip dobara print ya dobara bhejne ka master switch. Band karne par ye buttons sab ke liye ghayab — screen par bhi, server par bhi. Pehli slip hamesha print hoti hai.',
     'fbr_sent_to_store' => 'Store ko bhej diya gaya',
     'fbr_auto_store_slip_requires_feature' => 'Auto Store Slip ke liye store-slip feature ka on hona zaroori hai.',
     'fbr_store_slip_switched_off' => 'Is dukan ke liye Store Slip band hai, is liye koi store slip print nahi hui. Customize se on karein.',

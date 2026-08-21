@@ -8,13 +8,13 @@ use App\Models\FbrPosHeldSale;
 use App\Models\FbrPosTransaction;
 use App\Http\Controllers\FbrPosController;
 use App\Http\Controllers\FbrPosPhase2Controller;
-use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * FBR POS Order Matching — feature coverage (Aug 2026).
@@ -527,11 +527,15 @@ class FbrPosOrderMatchingTest extends TestCase
 
         $result = (new FbrPosController())->kotTicket($heldId);
 
+        // The slip is rendered inside the controller (so a render failure can
+        // give the first-send claim back), so what comes out is the finished
+        // ticket, not a lazy View.
         $this->assertInstanceOf(
-            ViewContract::class,
+            SymfonyResponse::class,
             $result,
-            'kotTicket() must return a View for the correct company'
+            'kotTicket() must return the rendered slip for the correct company'
         );
+        $this->assertStringContainsString('Chai', $result->getContent(), 'the slip must carry the order');
     }
 
     public function test_kot_held_throws_not_found_for_wrong_company(): void
@@ -571,10 +575,11 @@ class FbrPosOrderMatchingTest extends TestCase
         $result = (new FbrPosController())->kotReprint($txnId);
 
         $this->assertInstanceOf(
-            ViewContract::class,
+            SymfonyResponse::class,
             $result,
-            'kotReprint() must return a View for the correct company'
+            'kotReprint() must return the rendered slip for the correct company'
         );
+        $this->assertNotSame('', trim($result->getContent()), 'the slip must actually render');
     }
 
     public function test_kot_txn_reprint_throws_not_found_for_wrong_company(): void

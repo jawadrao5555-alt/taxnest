@@ -43,6 +43,10 @@ class FbrPosTransaction extends Model
         // Task 492: trading-day bucket (PosBusinessDay cutoff rule, FBR mirror).
         // Shop-facing grouping only — FBR/tax reporting keeps real created_at.
         'business_date',
+        // Task 1389: stamped the first time this bill's store slip is rendered
+        // or enqueued — separates a first print from a reprint (FBR twin of
+        // pos_transactions.kot_sent_at, read by isTransactionReprint()).
+        'kot_sent_at',
     ];
 
     protected static function booted()
@@ -84,6 +88,7 @@ class FbrPosTransaction extends Model
         'loyalty_redemption_amount' => 'decimal:2',
         'payment_breakdown' => 'array',
         'fbr_auto_retry_count' => 'integer',
+        'kot_sent_at' => 'datetime',
     ];
 
     public function company()

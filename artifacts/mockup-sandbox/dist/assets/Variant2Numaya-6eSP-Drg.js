@@ -1,0 +1,1 @@
+import{j as o}from"./index-Da2LefC0.js";import{C as r,a as t}from"./skins-B_CSY8xN.js";import"./createLucideIcon-eRi4Hnqu.js";import"./check-Bfks5IfZ.js";import"./x-Bk1K0xmt.js";function n(){return o.jsx(r,{skin:t})}export{n as Variant2Numaya,n as default};

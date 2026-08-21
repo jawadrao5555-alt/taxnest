@@ -1,0 +1,1 @@
+import{j as t}from"./index-Da2LefC0.js";import{H as e,B as s,E as a,F as r}from"./CartParts-fVYaowyW.js";function n(){return t.jsxs("div",{className:"h-screen w-full bg-white flex flex-col font-sans",children:[t.jsx(e,{a:s}),t.jsx(a,{a:s}),t.jsx(r,{a:s,empty:!0,total:"0",subtotal:"0"})]})}export{n as Current};

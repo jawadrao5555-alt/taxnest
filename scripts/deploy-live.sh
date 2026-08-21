@@ -494,6 +494,20 @@ step "Preflight: final-bill KOT safety net (unseen lines reach the kitchen, no d
 node scripts/kot-on-final-check.mjs \
   || fail "kot-on-final check FAILED — a finalized bill either leaves the kitchen with no ticket (owner's Table 02 bug, Task 1356) or prints a duplicate slip; fix before deploying"
 
+# The .mjs check above only covers the CLIENT half (the sale screen's print
+# chain). These two suites cover the SERVER half and — crucially — the wire
+# between them: the kot_pending / kot_order_id keys in the payment endpoints'
+# JSON. Without this step a refactor could drop or rename those keys, pass
+# every other check here, and silently stop the kitchen from getting orders
+# (Task 1369). sqlite :memory:, no MySQL/dev-server dependency.
+step "Preflight: final-bill KOT server contract (pay responses still carry kot_pending/kot_order_id)"
+env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE \
+  APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=':memory:' CACHE_STORE=array \
+  php vendor/bin/phpunit \
+    tests/Feature/PosKotOnFinalSafetyNetTest.php \
+    tests/Feature/PosKotOnFinalPayResponseTest.php \
+  || fail "kot-on-final SERVER check FAILED — the payment endpoints no longer report an owed kitchen ticket (kot_pending/kot_order_id) or the KotPrintService signal regressed; fix before deploying"
+
 step "Preflight: PWA refresh-button check (slow-install wait, no-update reload+toast, offline, timeout)"
 node scripts/pwa-refresh-check.mjs \
   || fail "pwa-refresh check FAILED — the header update icon click contract regressed (Task 706); fix before deploying"

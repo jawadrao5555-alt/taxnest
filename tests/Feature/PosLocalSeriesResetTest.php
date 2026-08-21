@@ -422,6 +422,97 @@ class PosLocalSeriesResetTest extends TestCase
         $this->assertSame(0, DB::table('pos_local_series_resets')->count());
     }
 
+    // ── 4b. saying WHY the series did not restart at L-001 (Task 1374) ───────
+
+    /**
+     * The clear spares archived bills whose rider cash is still unsettled, so the
+     * series can honestly restart at L-003 instead of L-001. Silence there reads
+     * as "the clear failed" — the response must say how many were kept and why.
+     */
+    public function test_clear_reports_the_bills_a_rider_still_holds(): void
+    {
+        $cid = $this->makeCompany();
+        $riderArgs = ['rider_id' => 7, 'payment_method' => 'cash', 'rider_settlement_id' => null, 'delivery_status' => 'dispatched'];
+        $this->makeBill($cid, 'L-001', $riderArgs);
+        $this->makeBill($cid, 'L-002', $riderArgs);
+        $this->makeBill($cid, 'L-003');
+        $this->makeBill($cid, 'L-004');
+        $this->makeBill($cid, 'L-005');
+
+        $res = $this->clear($this->makeUser($cid));
+
+        // Figures stay honest: three deleted, numbering resumes at the first free
+        // number ABOVE the two khata bills that were kept.
+        $res->assertStatus(200)->assertJson([
+            'success' => true,
+            'deleted' => 3,
+            'next_number' => 'L-003',
+            'rider_held' => 2,
+        ]);
+        // …and the reason is spelled out from the lang file, never hardcoded.
+        $this->assertSame(
+            trans('pos.local_series_rider_kept', ['count' => 2], 'en'),
+            $res->json('rider_held_message')
+        );
+        $this->assertSame(['L-001', 'L-002'], $this->numbers($cid));
+    }
+
+    public function test_no_rider_note_when_the_clear_kept_nothing_back(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L-001');
+        $this->makeBill($cid, 'L-002');
+
+        $res = $this->clear($this->makeUser($cid));
+
+        $res->assertStatus(200)->assertJson(['deleted' => 2, 'next_number' => 'L-001', 'rider_held' => 0]);
+        $this->assertNull($res->json('rider_held_message'), 'nothing was kept — the card must stay quiet');
+    }
+
+    /**
+     * The kept count is the exact COMPLEMENT of the delete rule, never a loose
+     * "has a rider" count: settled, returned and card rider bills are deleted
+     * like any other archived local bill, and a stray "L-…" row reserves no
+     * number so it is neither deleted nor reported as a blocker.
+     */
+    public function test_only_genuinely_held_l_series_bills_are_reported_as_kept(): void
+    {
+        $cid = $this->makeCompany();
+        $rider = ['rider_id' => 7, 'payment_method' => 'cash', 'delivery_status' => 'dispatched', 'rider_settlement_id' => null];
+        $this->makeBill($cid, 'L-001', array_merge($rider, ['rider_settlement_id' => 55]));      // cash already handed over
+        $this->makeBill($cid, 'L-002', array_merge($rider, ['delivery_status' => 'returned']));  // never delivered
+        $this->makeBill($cid, 'L-003', ['rider_id' => 7, 'payment_method' => 'card']);           // shop got the money
+        $this->makeBill($cid, 'L-ABC', $rider);                                                  // reserves no number
+        $this->makeBill($cid, 'L-004', $rider);                                                  // the only real blocker
+
+        $res = $this->clear($this->makeUser($cid));
+
+        $res->assertStatus(200)->assertJson(['deleted' => 3, 'rider_held' => 1, 'next_number' => 'L-001']);
+        $this->assertSame(['L-004', 'L-ABC'], $this->numbers($cid));
+    }
+
+    /**
+     * The worst-looking case: every archived bill is khata-held, so the clear
+     * deletes nothing at all. "Nothing left to clear" alone would be a flat lie
+     * about numbering — the kept count must ride along on this branch too.
+     */
+    public function test_nothing_to_clear_still_reports_the_held_bills(): void
+    {
+        $cid = $this->makeCompany();
+        $riderArgs = ['rider_id' => 7, 'payment_method' => 'cash', 'rider_settlement_id' => null, 'delivery_status' => 'delivered'];
+        $this->makeBill($cid, 'L-001', $riderArgs);
+        $this->makeBill($cid, 'L-002', $riderArgs);
+
+        $res = $this->clear($this->makeUser($cid));
+
+        $res->assertStatus(200)->assertJson(['deleted' => 0, 'next_number' => 'L-003', 'rider_held' => 2]);
+        $this->assertSame(
+            trans('pos.local_series_rider_kept', ['count' => 2], 'en'),
+            $res->json('rider_held_message')
+        );
+        $this->assertSame(['L-001', 'L-002'], $this->numbers($cid));
+    }
+
     // ── 5. customer spend record ─────────────────────────────────────────────
 
     public function test_spend_snapshot_is_written_before_deleting_when_persist_is_on(): void

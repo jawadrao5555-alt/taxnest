@@ -783,13 +783,13 @@
                              owner-confirmed and permanent (never automatic). --}}
                         @if(($localSeries['count'] ?? 0) > 0)
                         <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
-                             x-data="{ lsOpen: false, lsBusy: false, lsDone: false, lsMsg: '', lsErr: '',
+                             x-data="{ lsOpen: false, lsBusy: false, lsDone: false, lsMsg: '', lsErr: '', lsKept: 0, lsKeptMsg: '',
                                 clearSeries() {
                                     if (this.lsBusy) return;
                                     this.lsBusy = true; this.lsErr = '';
                                     fetch('{{ route('pos.settings.local-billing.clear-archived', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:'{}'})
                                         .then(r=>r.json())
-                                        .then(d=>{ if (d && d.success === true) { this.lsMsg = d.message || ''; this.lsDone = true; this.lsOpen = false; } else { this.lsErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } })
+                                        .then(d=>{ if (d && d.success === true) { this.lsMsg = d.message || ''; this.lsKept = Number(d.rider_held || 0); this.lsKeptMsg = d.rider_held_message || ''; this.lsDone = true; this.lsOpen = false; } else { this.lsErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } })
                                         .catch(()=>{ this.lsErr = {{ Js::from(__('pos.setting_save_failed')) }}; })
                                         .finally(()=>{ this.lsBusy = false; });
                                 } }">
@@ -801,6 +801,16 @@
                             </div>
                             <div x-show="lsDone" x-cloak class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700">
                                 <p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300" x-text="lsMsg"></p>
+                                {{-- Task 1374 — WHY numbering can still start at, say, L-006 after a
+                                     clear: bills whose rider cash is still unsettled are deliberately
+                                     spared (same rule as the day-close wash). Say how many were kept
+                                     and where to settle them, otherwise the owner reads the honest
+                                     recomputed number as a failed clear. --}}
+                                <div x-show="lsKept > 0" x-cloak class="mt-2 pt-2 border-t border-emerald-200 dark:border-emerald-800">
+                                    <p class="text-[11px] font-semibold text-amber-800 dark:text-amber-300" x-text="lsKeptMsg"></p>
+                                    <a href="{{ route('pos.deliveries', [], false) }}"
+                                        class="inline-block mt-1.5 text-[11px] font-bold text-teal-700 dark:text-teal-400 underline">{{ __('pos.local_series_rider_kept_link') }} &rarr;</a>
+                                </div>
                             </div>
 
                             <template x-teleport="body">

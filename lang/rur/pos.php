@@ -1905,6 +1905,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'local_series_modal_sub' => 'Iske baad local numbering phir :next se shuru hogi.',
     'local_series_modal_title' => 'Archived local bills clear karein?',
     'local_series_nothing_to_clear' => 'Koi archived local bill baqi nahi — local numbering pehle hi free hai.',
+    'local_series_rider_kept' => ':count archived local bills rakhi gayi hain — in ka rider cash abhi settle nahi hua, is liye un ke number reserve rehte hain.',
+    'local_series_rider_kept_link' => 'Rider ka cash settle karein, phir dobara clear karein',
     'local_series_stuck_hint' => 'Local bill hamesha sab se chhota khali number leta hai, aur archived bills apna number reserve kiye rakhti hain. Inhein clear karein to numbering phir L-001 se shuru hogi.',
     'local_series_stuck_line' => ':count purani archived local bills (:from – :to) numbering rok rahi hain — agla local bill :next milega.',
     'local_tax_reports' => 'Local tax reports',

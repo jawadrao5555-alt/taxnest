@@ -7117,11 +7117,40 @@ class PosController extends Controller
      *   - never an unsettled rider CASH bill (live khata proof)
      * Plus one extra narrowing the wash does not need: only the L-series — legacy
      * "LOCAL-YYYY-NNNNN" rows block nothing, so they are left alone.
+     *
+     * The non-rider half lives in archivedLocalSeriesBase() so the deletable set
+     * and the rider-HELD set (riderHeldLocalSeriesCount, Task 1374) stay literal
+     * complements of ONE predicate: whatever this query skips for rider reasons
+     * is exactly what that count reports back to the owner.
      */
     private function archivedLocalSeriesQuery(int $companyId)
     {
         $riderGuardReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id');
 
+        return $this->archivedLocalSeriesBase($companyId)
+            // Rider khata guard, mirrored in SQL. Written as the NEGATION of the
+            // wash's PHP guard ($t->rider_id && cash && !settled && !returned) —
+            // note the explicit whereNull('payment_method') leg: `!= 'cash'` alone
+            // is NULL-unknown in SQL and would silently protect (i.e. skip) bills
+            // the day-close wash happily deletes.
+            ->when($riderGuardReady, function ($q) {
+                $q->where(function ($g) {
+                    $g->whereNull('rider_id')
+                        ->orWhere(function ($p) {
+                            $p->where('payment_method', '!=', 'cash')->orWhereNull('payment_method');
+                        })
+                        ->orWhereNotNull('rider_settlement_id')
+                        ->orWhere('delivery_status', 'returned');
+                });
+            });
+    }
+
+    /**
+     * Everything an archived L-series bill is, EXCEPT the rider decision — see
+     * archivedLocalSeriesQuery() above for the full contract.
+     */
+    private function archivedLocalSeriesBase(int $companyId)
+    {
         $query = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('is_archived', true)
@@ -7145,22 +7174,42 @@ class PosController extends Controller
                 $q->where(function ($t) {
                     $t->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 });
-            })
-            // Rider khata guard, mirrored in SQL. Written as the NEGATION of the
-            // wash's PHP guard ($t->rider_id && cash && !settled && !returned) —
-            // note the explicit whereNull('payment_method') leg: `!= 'cash'` alone
-            // is NULL-unknown in SQL and would silently protect (i.e. skip) bills
-            // the day-close wash happily deletes.
-            ->when($riderGuardReady, function ($q) {
-                $q->where(function ($g) {
-                    $g->whereNull('rider_id')
-                        ->orWhere(function ($p) {
-                            $p->where('payment_method', '!=', 'cash')->orWhereNull('payment_method');
-                        })
-                        ->orWhereNotNull('rider_settlement_id')
-                        ->orWhere('delivery_status', 'returned');
-                });
             });
+    }
+
+    /**
+     * The archived L-series bills the clear DELIBERATELY keeps back because a
+     * rider's cash for them is still unsettled (Task 1374).
+     *
+     * Exactly the complement of the rider guard above — i.e. the live khata
+     * predicate (PosRider::openCashBills): rider set + cash + not settled + not
+     * returned — narrowed to real /^L-\d+$/ serials, because only those actually
+     * reserve a number. Without this figure the owner clears and sees numbering
+     * restart at L-006 instead of L-001 with no explanation, which reads as a
+     * broken feature. Schema-guarded like every other rider read: a prod box
+     * mid-deploy (or any throw) reports 0 and the card simply says nothing.
+     */
+    private function riderHeldLocalSeriesCount(int $companyId): int
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')
+                || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
+                return 0;
+            }
+
+            return $this->archivedLocalSeriesBase($companyId)
+                ->whereNotNull('rider_id')
+                ->where('payment_method', 'cash')
+                ->whereNull('rider_settlement_id')
+                ->where(function ($d) {
+                    $d->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
+                })
+                ->get(['id', 'invoice_number'])
+                ->filter(fn ($t) => \App\Services\PosLocalSeries::isSeriesSerial($t->invoice_number))
+                ->count();
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     /**
@@ -7345,6 +7394,16 @@ class PosController extends Controller
 
         $next = $this->previewNextLocalNumber($companyId);
 
+        // Task 1374 — why the series may still not restart at L-001: the bills the
+        // rider guard above deliberately spared keep their numbers. Reported on BOTH
+        // branches (a "nothing to clear" run with khata bills left is exactly the
+        // case that looks broken), and always AFTER the transaction so a settlement
+        // done meanwhile is reflected. 0 = the card stays quiet.
+        $riderHeld = $this->riderHeldLocalSeriesCount($companyId);
+        $riderKeptMessage = $riderHeld > 0
+            ? __('pos.local_series_rider_kept', ['count' => $riderHeld])
+            : null;
+
         // Nothing was there to clear — either the card was stale or another admin
         // (or a replayed POST) already did it. Never a ledger row, never an error.
         if ($deleted === 0) {
@@ -7353,6 +7412,8 @@ class PosController extends Controller
                 'deleted' => 0,
                 'next_number' => $next,
                 'message' => __('pos.local_series_nothing_to_clear'),
+                'rider_held' => $riderHeld,
+                'rider_held_message' => $riderKeptMessage,
             ]);
         }
 
@@ -7361,6 +7422,8 @@ class PosController extends Controller
             'deleted' => $deleted,
             'next_number' => $next,
             'message' => __('pos.local_series_cleared_done', ['count' => $deleted, 'next' => $next]),
+            'rider_held' => $riderHeld,
+            'rider_held_message' => $riderKeptMessage,
         ]);
     }
 

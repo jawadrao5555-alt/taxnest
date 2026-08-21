@@ -16,6 +16,9 @@ import android.widget.Toast
  * Play-Store-jaisa APK download + install helper (rider-app template).
  * MainActivity /version se latest version parhta hai; Update button dabane par
  * APK download ho kar Android ka install prompt khulta hai.
+ *
+ * Task 1382: dono toasts strings.xml se aate hain (pehle Roman Urdu yahin
+ * hard-coded thi aur zubaan badalne par bhi wohi rehti thi).
  */
 object UpdateCheck {
 
@@ -55,7 +58,7 @@ object UpdateCheck {
             }
             val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = dm.enqueue(request)
-            Toast.makeText(activity, "Update download ho rahi hai…", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, activity.getString(R.string.update_downloading), Toast.LENGTH_LONG).show()
 
             val appCtx = activity.applicationContext
             val receiver = object : BroadcastReceiver() {
@@ -70,7 +73,15 @@ object UpdateCheck {
                         }
                         appCtx.startActivity(install)
                     } catch (_: Exception) {
-                        Toast.makeText(appCtx, "Download mukammal — notification se install karein.", Toast.LENGTH_LONG).show()
+                        // appCtx = application context, is par user ki chuni hui
+                        // zubaan lagi hui NAHI hoti (Task 1382) — Lang.wrap se
+                        // string uthayein warna yeh line phone ki system
+                        // language mein aa jati hai.
+                        Toast.makeText(
+                            appCtx,
+                            Lang.wrap(appCtx).getString(R.string.update_downloaded),
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }

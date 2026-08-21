@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  "play" build (Google Play) ke apne overrides. Detection plus build jaisi hi
-  hai (src/notif), is liye yahan sirf badge ki Roman line alag hai — baqi
-  notification wali strings src/notif/res se aati hain.
+  "play" build (Google Play) ke apne overrides — DEFAULT (English).
+
+  Detection plus build jaisi hi hai (src/notif), is liye yahan sirf badge alag
+  hai — baqi notification wali strings src/notif/res se aati hain.
+
+  Task 1382: badge teenon zubaanon mein chahiye — values/, values-b+ur+Latn/,
+  values-ur/.
 -->
 <resources>
-    <string name="build_badge_roman">Play Store build — SIM + WhatsApp calls dono. Update Play Store se aati hai.</string>
+    <string name="build_badge">Play Store build — catches both SIM and WhatsApp calls. Updates come from the Play Store.</string>
 </resources>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification-access builds ki shared strings — Urdu script (Task 1382).
+  Yeh app ka purana text hai (v1.2.0 tak default), jyun ka tyun.
+  Key set src/notif/res/values/strings.xml ke barabar rahe.
+-->
+<resources>
+    <string name="perm_on">✔ نوٹیفکیشن کی اجازت مل گئی</string>
+    <string name="perm_off">✖ نوٹیفکیشن کی اجازت نہیں — اس کے بغیر ایپ کالیں نہیں پکڑ سکتی</string>
+    <string name="perm_btn">نوٹیفکیشن کی اجازت دیں</string>
+    <string name="perm_toast">فہرست میں TaxNest Caller ID ڈھونڈ کر آن کریں</string>
+    <string name="status_need_permission">پہلے نوٹیفکیشن کی اجازت دیں — نیچے بٹن دبائیں</string>
+
+    <string name="howto_body">یہ ایپ شاپ کے فون پر آنے والی کالوں (عام کال اور واٹس ایپ کال) کی نوٹیفکیشن پڑھتی ہے اور نمبر POS کو بھیج دیتی ہے — سیل اسکرین پر فوراً پاپ اپ آتا ہے کہ کون سا گاہک کال کر رہا ہے اور اس کی پرانی خریداری کیا ہے۔ ایپ کو کھلا رکھنے کی ضرورت نہیں، بس فون آن رہے۔</string>
+
+    <string name="disclosure_title">نوٹیفکیشن تک رسائی کیوں چاہیے</string>
+    <string name="disclosure_lead">اجازت دینے سے پہلے یہ پڑھ لیں۔ TaxNest Caller ID آپ کے فون کی نوٹیفکیشن اِس طرح استعمال کرتی ہے:</string>
+    <string name="disclosure_read">1) ایپ صرف آنے والی کال والی نوٹیفکیشن پڑھتی ہے، اور وہ بھی صرف دو جگہوں سے: آپ کے فون کی اپنی کال والی ایپ (ڈائلر) سے، اور واٹس ایپ / واٹس ایپ بزنس سے۔ اُس میں سے صرف کال کرنے والے کا نمبر اور نام لیا جاتا ہے۔</string>
+    <string name="disclosure_ignore">2) باقی ہر نوٹیفکیشن نظر انداز کر دی جاتی ہے — پیغامات، چیٹ، ای میل، اور دوسری ایپس کی کالیں بھی (میسنجر، ٹیلیگرام، وائبر، اسکائپ وغیرہ) — نہ پڑھی جاتی ہے، نہ محفوظ ہوتی ہے، نہ کہیں بھیجی جاتی ہے۔</string>
+    <string name="disclosure_send">3) صرف چار چیزیں آپ ہی کے TaxNest شاپ اکاؤنٹ کو (taxnest.com.pk پر، محفوظ HTTPS کنکشن سے) بھیجی جاتی ہیں: نمبر، نام، وقت، اور کال سِم کی تھی یا واٹس ایپ کی۔ کسی تیسرے فریق کو کچھ نہیں دیا جاتا۔</string>
+    <string name="disclosure_purpose">4) مقصد صرف ایک ہے: آپ کی POS سیل اسکرین پر فوراً پاپ اپ آ جائے کہ کون سا گاہک کال کر رہا ہے اور اُس کی پچھلی خریداری کیا ہے۔</string>
+    <string name="disclosure_control">5) کال کا یہ ریکارڈ تقریباً 48 گھنٹے بعد خود مٹ جاتا ہے۔ اجازت آپ جب چاہیں فون کی سیٹنگز سے واپس لے سکتے ہیں، یا POS → Customize سے فیچر بند / فون ریووک کر سکتے ہیں — ایپ پھر بھی چلتی رہے گی۔</string>
+    <string name="disclosure_privacy">پرائیویسی پالیسی پڑھیں (taxnest.com.pk/privacy)</string>
+    <string name="disclosure_agree">میں سمجھ گیا — اجازت دیں</string>
+    <string name="disclosure_decline">ابھی نہیں</string>
+</resources>

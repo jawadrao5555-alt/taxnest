@@ -8,15 +8,17 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
 /**
  * Portal-credentials sign-in (rider-app template). Sirf shop ka admin/manager
  * login chalta hai — server side isPosAdmin() check karta hai.
+ *
+ * Task 1382: `BaseActivity` se aati hai (chuni hui zubaan) aur upar teen-tarfa
+ * language picker dikhata hai — login se PEHLE zubaan badalna mumkin ho.
  */
-class LoginActivity : AppCompatActivity() {
+class LoginActivity : BaseActivity() {
 
     private var passwordVisible = false
 
@@ -25,6 +27,7 @@ class LoginActivity : AppCompatActivity() {
         if (Prefs.token(this) != null) { goMain(); return }
         setContentView(R.layout.activity_login)
         Ui.applyBarInsets(findViewById(R.id.loginRoot))
+        attachLangSwitch()
 
         val email = findViewById<EditText>(R.id.email)
         val password = findViewById<EditText>(R.id.password)

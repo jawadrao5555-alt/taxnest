@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  "plus" build (website, SIM + WhatsApp) ke apne overrides.
+  "plus" build (website, SIM + WhatsApp) ke apne overrides — DEFAULT (English).
 
-  Notification-access wali saari mushtarak strings ab src/notif/res mein hain
+  Notification-access wali saari mushtarak strings src/notif/res mein hain
   (plus + play dono use karte hain). Yahan SIRF wo key rehti hai jo is build ki
   apni hai — ek hi source set ke do res folders mein ek key dobara likhna
-  "Duplicate resources" error deta hai.
+  "Duplicate resources" error deta hai, is liye `build_badge` src/notif/res
+  mein NAHI hona chahiye.
+
+  Task 1382: badge ab har zubaan ke liye alag file mein bhi chahiye —
+  values/, values-b+ur+Latn/, values-ur/ (teenon).
 -->
 <resources>
-    <string name="build_badge_roman">WhatsApp wali build (website) — SIM + WhatsApp calls dono.</string>
+    <string name="build_badge">WhatsApp build (from the website) — catches both SIM and WhatsApp calls.</string>
 </resources>

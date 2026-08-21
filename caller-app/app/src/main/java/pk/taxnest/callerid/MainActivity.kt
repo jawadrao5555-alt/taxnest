@@ -12,7 +12,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
@@ -22,21 +21,24 @@ import kotlin.concurrent.thread
  *   sim ("clean") → Detector = phone + call log runtime permissions
  *   plus / play   → Detector = notification access (prominent disclosure ke baad)
  * aur upar saaf likha hota hai ke yeh build kaunsi calls pakadti hai
- * (build_badge / build_badge_roman har flavor ki apni strings.xml se).
+ * (`build_badge`, har flavor ki apni strings.xml se — teenon zubaanon mein).
  *
  * Task 1346: update ka banner ab `Updater` ke hawale hai — website builds ka
  * asli implementation src/web/java mein, Play build ka no-op src/play/java
  * mein. Yahan koi `if (playBuild)` nahi hona chahiye.
  *
+ * Task 1382: `BaseActivity` se aati hai (chuni hui zubaan) aur header ke neeche
+ * teen-tarfa language picker dikhata hai. Har user-visible line strings se
+ * aati hai — yahan koi text hard-code na karein.
+ *
  *  1) Apni build wali permission dein (is ke baghair kuch nahi)
  *  2) Battery exemption (taake Android app ko na maare)
  *  3) Test ring bhejein — sale screen par popup aana chahiye
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : BaseActivity() {
 
     private lateinit var welcomeText: TextView
     private lateinit var buildBadge: TextView
-    private lateinit var buildBadgeRoman: TextView
     private lateinit var statusText: TextView
     private lateinit var permRow: TextView
     private lateinit var batteryRow: TextView
@@ -61,10 +63,10 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_main)
         Ui.applyBarInsets(findViewById(R.id.mainRoot))
+        attachLangSwitch()
 
         welcomeText = findViewById(R.id.welcomeText)
         buildBadge = findViewById(R.id.buildBadge)
-        buildBadgeRoman = findViewById(R.id.buildBadgeRoman)
         statusText = findViewById(R.id.statusText)
         permRow = findViewById(R.id.permRow)
         batteryRow = findViewById(R.id.batteryRow)
@@ -75,7 +77,6 @@ class MainActivity : AppCompatActivity() {
         updateRow = findViewById(R.id.updateRow)
 
         buildBadge.text = getString(R.string.build_badge)
-        buildBadgeRoman.text = getString(R.string.build_badge_roman)
 
         permBtn.setOnClickListener { Detector.request(this) }
 

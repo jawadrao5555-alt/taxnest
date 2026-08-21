@@ -94,15 +94,12 @@
                 android:textColor="#344054" />
         </LinearLayout>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/disclosure_roman"
-            android:textSize="12sp"
-            android:lineSpacingExtra="3dp"
-            android:textColor="#475467" />
-
+        <!--
+          Task 1382: yahan pehle `disclosure_roman` — poori disclosure ka Roman
+          Urdu khulasa — hota tha, kyunki screen sirf Urdu mein thi. Ab poora
+          screen teenon zubaanon (English / Roman Urdu / Urdu) mein aata hai, is
+          liye woh khulasa hata diya gaya; koi baat kam nahi hui.
+        -->
         <TextView
             android:id="@+id/privacyLink"
             android:layout_width="match_parent"

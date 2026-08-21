@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compact teen-tarfa language picker (Task 1382) — login aur main, dono screens
+  par include hota hai.
+
+  Labels jaan-boojh kar tarjuma NAHI hote: har zubaan apne hi naam se likhi hai
+  (English / Roman / اردو), is liye user ko apni zubaan hamesha nazar aati hai
+  chahe app abhi kisi bhi zubaan mein ho. Pills wrap_content hain (chhoti screen
+  par bhi teenon ek line mein aa jate hain) aur `paddingStart/End` ki wajah se
+  Urdu (RTL) mein bhi theek baithte hain.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/langSwitch"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/lang_switch_bg"
+    android:padding="3dp">
+
+    <TextView
+        android:id="@+id/langEn"
+        style="@style/LangPill"
+        android:text="@string/lang_en" />
+
+    <TextView
+        android:id="@+id/langRur"
+        style="@style/LangPill"
+        android:text="@string/lang_rur" />
+
+    <TextView
+        android:id="@+id/langUr"
+        style="@style/LangPill"
+        android:text="@string/lang_ur" />
+</LinearLayout>

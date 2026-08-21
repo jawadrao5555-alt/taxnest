@@ -134,9 +134,10 @@ is liye `.local/rider-signing/` ka backup owner ke paas apne pass rehna chahiye
 
 ## 5. Version numbers
 
-- `versionCode` ab **3**, `versionName` **1.2.0** (teenon flavors ka ek hi).
+- `versionCode` ab **4**, `versionName` **1.3.0** (teenon flavors ka ek hi) —
+  Task 1382 (English / Roman Urdu / Urdu ka switch) ke sath bump hua.
 - Play par har nai upload ka `versionCode` pichli se **bara** hona lazmi hai.
-  Agli Play release: `versionCode 4` / `1.2.1` (ya jo bhi), aur website builds
+  Agli Play release: `versionCode 5` / `1.3.1` (ya jo bhi), aur website builds
   bhi usi number par chali jayengi — yeh theek hai.
 - **Website par host shuda APKs abhi bhi 1.1.0 hain** aur `/api/app-version` map
   bhi 1.1.0 keh raha hai. Jab tak owner nai APKs bana kar host nahi karta, kisi
@@ -145,7 +146,7 @@ is liye `.local/rider-signing/` ka backup owner ke paas apne pass rehna chahiye
   1. `assembleSimRelease assemblePlusRelease` se banayein,
   2. `public/downloads/` mein rakhein (RELEASE.md ka tareeqa),
   3. `routes/web.php` ke `/api/app-version` map mein `caller` aur `caller_plus`
-     dono ka version 1.2.0 kar dein — warna purane phone update nahi dekhenge.
+     dono ka version 1.3.0 kar dein — warna purane phone update nahi dekhenge.
 
 ---
 

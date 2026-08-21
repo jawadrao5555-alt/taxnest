@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "play" build ka badge — Roman Urdu (Task 1382). -->
+<resources>
+    <string name="build_badge">Play Store build — SIM aur WhatsApp, dono calls pakadti hai. Update Play Store se aati hai.</string>
+</resources>

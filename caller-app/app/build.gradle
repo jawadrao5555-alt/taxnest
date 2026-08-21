@@ -22,8 +22,8 @@ android {
         // Android 8+ — matches the downloads-page "Android 8+".
         minSdk 26
         targetSdk 34
-        versionCode 3
-        versionName "1.2.0"
+        versionCode 4
+        versionName "1.3.0"
     }
 
     // ── Builds (Task 1345 + 1346) — ek hi package id, ek hi keystore ────────
@@ -76,7 +76,13 @@ android {
     //                    plus AUR play, bilkul ek jaisa.
     // Ek source set ke do res folders mein ek hi key dobara likhna "Duplicate
     // resources" error deta hai — is liye har build ki apni key uski apni
-    // res/values/strings.xml mein rehti hai.
+    // res/values/strings.xml mein rehti hai (misal `build_badge`: src/plus/res
+    // aur src/play/res mein, src/notif/res mein NAHI).
+    //
+    // Task 1382 — teen zubaanein: har res folder ke teen variants hain
+    //   values/  (English, default) · values-b+ur+Latn/ (Roman Urdu) · values-ur/ (Urdu)
+    // Override HAR variant ke liye alag likhna parta hai: sirf values/ override
+    // karne se Urdu/Roman mode mein src/main wali line reh jati hai.
     sourceSets {
         getByName("sim") {
             java.srcDirs += 'src/web/java'

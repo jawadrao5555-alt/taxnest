@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Roman Urdu (Task 1382) — `Lang.RUR`, locale tag `ur-Latn`.
+
+  Lehja POS panel ki Roman Urdu (`lang/rur/pos.php`) jaisa: wohi alfaz, wohi
+  seedhi baat. Yahan Urdu script ka koi harf nahi aana chahiye — woh
+  values-ur/ mein jata hai.
+
+  Key set values/ ke barabar rakhein (`translatable="false"` walon ke ilawa),
+  warna release build lint par girti hai.
+-->
+<resources>
+    <!-- Login -->
+    <string name="login_hint">Shop ke admin ya manager login se sign in karein — wohi email aur password jo portal par chalta hai</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="show_password">Password dikhayein</string>
+    <string name="login_btn">Sign in karein</string>
+    <string name="fill_both">Email aur password dono likhein</string>
+    <string name="network_error">Internet ka masla — dobara koshish karein</string>
+    <string name="login_failed">Sign in nakaam — email ya password check karein</string>
+
+    <!-- Main -->
+    <string name="status_ok">✔ Sab tayyar — call aate hi POS screen par popup aa jayega</string>
+    <string name="status_feature_off">POS settings mein Caller ID abhi band hai — portal se on karein</string>
+
+    <string name="battery_on">✔ Battery setting theek hai — app peeche chalti rahegi</string>
+    <string name="battery_off">✖ Battery optimisation on hai — app kabhi kabhi so sakti hai</string>
+    <string name="battery_btn">Battery ki ijazat dein</string>
+    <string name="battery_list_toast">Fehrist mein TaxNest Caller ID dhoond kar \"Don\'t optimize / Unrestricted\" karein</string>
+
+    <string name="test_btn">Test ring bhejein</string>
+    <string name="test_sent">Test bhej diya — POS sale screen par popup dekhein</string>
+    <string name="feature_off_toast">Caller ID POS settings mein band hai — pehle portal se on karein</string>
+
+    <string name="last_sent_fmt">Aakhri call bheji: %1$s</string>
+    <string name="just_now">abhi abhi</string>
+    <string name="mins_ago_fmt">%1$d minute pehle</string>
+
+    <string name="update_available">Naya version aa gaya hai</string>
+    <string name="update_btn">Update karein</string>
+    <string name="update_downloading">Update download ho rahi hai…</string>
+    <string name="update_downloaded">Download mukammal — notification se install karein.</string>
+    <string name="logout_btn">Logout</string>
+
+    <string name="howto_title">Yeh kaise kaam karti hai?</string>
+
+    <!-- Build-specific (clean / sim build) — plus + play apni res se override karti hain -->
+    <string name="build_badge">Yeh build sirf SIM (aam) calls pakadti hai — WhatsApp calls nahi. WhatsApp calls ke liye website se \"WhatsApp wali\" APK lein.</string>
+
+    <string name="perm_on">✔ Phone aur call log ki ijazat mil gayi</string>
+    <string name="perm_off">✖ Phone aur call log ki ijazat nahi — is ke baghair app call ka number nahi parh sakti</string>
+    <string name="perm_btn">Call ki ijazat dein</string>
+    <string name="perm_toast">Ijazat dene ke liye Permissions mein Phone aur Call logs on karein</string>
+    <string name="status_need_permission">Pehle call ki ijazat dein — neeche button dabayein</string>
+
+    <string name="howto_body">Yeh app shop ke phone par aane wali aam (SIM) call ka number POS ko bhej deti hai — sale screen par foran popup aata hai ke kaun sa gaahak call kar raha hai aur us ki purani khareedari kya hai. App ko khula rakhne ki zaroorat nahi, bas phone on rahe.\n\nWhatsApp calls yeh build nahi pakadti. Agar WhatsApp calls bhi chahiyen to website ke download safhe se \"WhatsApp wali\" app lein.</string>
+</resources>

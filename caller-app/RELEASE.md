@@ -1,6 +1,6 @@
 # TaxNest Caller ID APK — Build & Release Runbook
 
-Last updated: Aug 2026 (v1.2.0 — third `play` flavor for Google Play, Task 1346)
+Last updated: Aug 2026 (v1.3.0 — English / Roman Urdu / Urdu language switch, Task 1382)
 
 > **Play (AAB) ka hissa is file mein NAHI hai.** Play build banane, sign karne,
 > uske key ke faisle aur Console ke saare form: `docs/play/` — khaas tor par
@@ -66,9 +66,44 @@ src/notif/res   → the strings both notif builds use (plus, play)
 src/play/java   → no-op Updater                     (play)
 ```
 
-Each flavor's own `res/values/strings.xml` holds **only** the keys that differ
-(`build_badge_roman`) — the same key in two res dirs of one source set fails the
-build with *"Duplicate resources"*.
+Each flavor's own `res/values*/strings.xml` holds **only** the keys that differ
+from the shared sets — today just `build_badge`. The same key in two res dirs of
+one source set fails the build with *"Duplicate resources"*, so `build_badge`
+lives in `src/plus/res` + `src/play/res` and must never be added to
+`src/notif/res`.
+
+### Three languages (Task 1382)
+
+The whole UI is English / Roman Urdu / Urdu, chosen **in the app**, never from
+the phone's system language:
+
+```
+res/values/            → English      (default — a fresh install opens in English)
+res/values-b+ur+Latn/  → Roman Urdu   (`ur-Latn`; a real BCP-47 tag, and LTR)
+res/values-ur/         → Urdu script  (the pre-1.3.0 text, unchanged)
+```
+
+`Lang.kt` holds the codes and builds the locale `Context`; `BaseActivity`
+applies it in `attachBaseContext` and wires the three-way picker
+(`view_lang_switch.xml`, on the login and main screens). The choice is stored in
+the existing `caller_prefs` under `ui_lang`, so it survives logout and app
+updates.
+
+Two rules that break the build or the translation if ignored:
+
+- **Every new Activity extends `BaseActivity`**, not `AppCompatActivity` — an
+  `AppCompatActivity` screen silently stays in the phone's system language.
+  Outside an Activity (e.g. the `DownloadManager` receiver in `UpdateCheck`)
+  read strings via `Lang.wrap(appCtx).getString(...)`.
+- **Every translatable key must exist in all three files of the source set that
+  declares it.** `MissingTranslation` is fatal in `lintVitalRelease`, and an
+  override supplied only in `values/` leaves Urdu/Roman mode showing the
+  inherited `src/main` text. Language-neutral keys (`app_name`, `login_title`,
+  `welcome_fmt`, `lang_*`) stay `translatable="false"` in `values/` only.
+
+The disclosure screen is fully translated: all five points say exactly the same
+thing in all three languages. Never shorten or soften one language's copy — the
+Play review reads whichever one is on screen.
 
 Both notification builds now show a **prominent disclosure** screen before
 notification access is requested (Play User Data policy). `Detector.request()`
@@ -179,7 +214,13 @@ $BT/aapt2 dump permissions $PLUS    # neither of those expected
 $BT/apksigner verify --print-certs $SIM  | grep "certificate DN"   # CN=TaxNest Rider
 $BT/apksigner verify --print-certs $PLUS | grep "certificate DN"
 $BT/aapt2 dump badging $SIM  | head -1
-$BT/aapt2 dump badging $PLUS | head -1   # both: versionCode='3' versionName='1.2.0'
+$BT/aapt2 dump badging $PLUS | head -1   # both: versionCode='4' versionName='1.3.0'
+
+# 3b. Language switch (Task 1382): each build's badge must exist in all three
+#     locales, and each build must show its OWN badge.
+$BT/aapt2 dump resources $SIM  | grep -A3 "string/build_badge"   # SIM-only wording
+$BT/aapt2 dump resources $PLUS | grep -A3 "string/build_badge"   # WhatsApp wording
+#     each: a bare "()" line (English), a "(ur)" line and a "(b+ur+Latn)" line
 
 # 4. Website builds must KEEP targetSdk 34 and their self-update code —
 #    only the play flavor drops them.
@@ -265,7 +306,21 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 4. scp both APKs to live `public_html/public/downloads/`.
 5. Deploy PHP (`git push origin HEAD:main`; `.cpanel.yml` auto-deploys).
 6. **Owner phone-tests both builds** — see
-   `docs/qa/task-1345-caller-id-two-builds-qa.md`.
+   `docs/qa/task-1345-caller-id-two-builds-qa.md`. From 1.3.0 also check the
+   language switch:
+   - Fresh install on an **English phone** and on an **Urdu phone** — both must
+     open in **English** (the app ignores the system language).
+   - Tap Roman, then Urdu, on the login screen: the screen changes instantly,
+     and Urdu lays out right-to-left while Roman stays left-to-right.
+   - Sign in, switch the language on the main screen, then **kill the app and
+     reopen it** — the chosen language is still there. Same after a log out and
+     log back in.
+   - Walk the main screen in each language: status line, battery line + its
+     toast, the permission line + its toast, "Send a test ring" and its toast,
+     "Last call sent: …", the update banner and Log out. No line may stay stuck
+     in another language.
+   - On the **WhatsApp build**, open the notification-access disclosure in all
+     three languages — all five points must be there in each.
 7. Flip the two version settings in admin.
 8. What's New elaan (Roman Urdu, with the reason).
 
@@ -275,6 +330,7 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 
 | Version | versionCode | Notes |
 |---------|-------------|-------|
+| 1.3.0 | 4 | **Language switch** (Task 1382): the whole app is now English / Roman Urdu / Urdu, picked from a compact three-way selector on the login **and** main screens. **A fresh install opens in English** whatever the phone's language is; the choice is saved on the phone and survives app restarts, logout/login and updates. Every user-visible line is translated — login and its errors, status, battery and permission lines with their toasts, the test-ring button and toast, "Last call sent: …", the update prompts and their download toasts, log out, and the whole "how does this work" paragraph — plus the notification-access **disclosure screen** in both notification builds, saying exactly the same five things in all three languages. The two-line build badge became one translated line per build (the old Roman recap lines are gone — the user picks a language now). Detection, permissions and the POS payload are untouched. |
 | 1.0.0 | 1 | Initial release — notification listener only (SIM + WhatsApp). **Uninstallable from the website once Play Protect's enhanced fraud protection rolled out.** |
 | 1.2.0 | 3 | **Third flavor `play`** (Task 1346) for the Google Play Store: no self-update, no `REQUEST_INSTALL_PACKAGES`, no battery permission, `targetSdk 36`, edge-to-edge insets. Both notification builds (`plus` + `play`) gained the **prominent disclosure** screen before notification access. Website APKs unchanged in behaviour — same permissions, same `targetSdk 34`, same self-update. **Hosted website APKs are still the 1.1.0 files**; they only move to 1.2.0 when the owner rebuilds, re-hosts and flips the admin version settings. |
 | 1.1.0 | 2 | **Two builds** (Task 1345): `sim` = clean telephony build, installs with no Play Protect block, default download; `plus` = the old SIM + WhatsApp behaviour. Shared `RingReporter` (payload + 60 s dedupe + 401 handling, dedupe moved to SharedPreferences so a fresh receiver process cannot double-post), per-build setup screen + build badge, per-build update check, `device` string now records which build a phone runs. |

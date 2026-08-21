@@ -1,42 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Notification-access builds ki shared strings (Task 1346).
+  Notification-access builds ki shared strings — DEFAULT (English), Task 1346 + 1382.
 
   Yeh folder `plus` (website) AUR `play` (Play Store) dono source sets mein
   add hai (app/build.gradle → sourceSets), is liye yahan sirf wo keys hain jo
   DONO builds mein bilkul ek jaisi hain. Jo key har build mein alag honi hai
-  (build_badge_roman) woh flavor ki apni res/values/strings.xml mein hai —
-  ek hi source set ke do res folders mein ek key dobara likhne se build
-  "Duplicate resources" par girti hai.
+  (build_badge) woh flavor ki apni res/values*/strings.xml mein hai — ek hi
+  source set ke do res folders mein ek key dobara likhne se build "Duplicate
+  resources" par girti hai.
 
-  Baqi sab strings src/main/res/values/strings.xml se aati hain.
+  Task 1382 — teen zubaanein: har key TEENON files mein honi chahiye
+    values/            → English
+    values-b+ur+Latn/  → Roman Urdu
+    values-ur/         → Urdu script
+  Sirf English override karna kaafi NAHI: us soorat mein Urdu/Roman mode ek
+  notif build par bhi src/main wali (clean build ki) line dikhata hai.
+
+  Baqi sab strings src/main/res/values*/strings.xml se aati hain.
 -->
 <resources>
-    <string name="build_badge">یہ بلڈ: سِم (عام) کالیں اور واٹس ایپ کالیں — دونوں پکڑتی ہے</string>
+    <string name="perm_on">✔ Notification access granted</string>
+    <string name="perm_off">✖ No notification access — without it the app cannot catch calls</string>
+    <string name="perm_btn">Allow notification access</string>
+    <string name="perm_toast">Find TaxNest Caller ID in the list and switch it on</string>
+    <string name="status_need_permission">Allow notification access first — tap the button below</string>
 
-    <string name="perm_on">✔ نوٹیفکیشن کی اجازت مل گئی</string>
-    <string name="perm_off">✖ نوٹیفکیشن کی اجازت نہیں — اس کے بغیر ایپ کالیں نہیں پکڑ سکتی</string>
-    <string name="perm_btn">نوٹیفکیشن کی اجازت دیں</string>
-    <string name="perm_toast">فہرست میں TaxNest Caller ID ڈھونڈ کر آن کریں</string>
-    <string name="status_need_permission">پہلے نوٹیفکیشن کی اجازت دیں — نیچے بٹن دبائیں</string>
-
-    <string name="howto_body">یہ ایپ شاپ کے فون پر آنے والی کالوں (عام کال اور واٹس ایپ کال) کی نوٹیفکیشن پڑھتی ہے اور نمبر POS کو بھیج دیتی ہے — سیل اسکرین پر فوراً پاپ اپ آتا ہے کہ کون سا گاہک کال کر رہا ہے اور اس کی پرانی خریداری کیا ہے۔ ایپ کو کھلا رکھنے کی ضرورت نہیں، بس فون آن رہے۔</string>
+    <string name="howto_body">This app reads the notifications of calls that reach the shop\'s phone (normal calls and WhatsApp calls) and sends the number to your POS — a popup appears on the sale screen right away showing which customer is calling and what they bought before. You do not have to keep the app open, the phone just has to be on.</string>
 
     <!--
       Prominent disclosure (Play User Data policy). Notification access maangne
       se PEHLE dikhti hai. Isay narm ya mukhtasar na karein — reviewer yahi
       alfaz dhoondta hai: kya parha jata hai, kya nahi, kahan jata hai, kyun,
-      aur kaise band karna hai.
+      aur kaise band karna hai. Teenon zubaanein BILKUL yehi baaten kahti hain;
+      kisi ek zubaan mein nukta kam karna policy tor dega.
     -->
-    <string name="disclosure_title">نوٹیفکیشن تک رسائی کیوں چاہیے</string>
-    <string name="disclosure_lead">اجازت دینے سے پہلے یہ پڑھ لیں۔ TaxNest Caller ID آپ کے فون کی نوٹیفکیشن اِس طرح استعمال کرتی ہے:</string>
-    <string name="disclosure_read">1) ایپ صرف آنے والی کال والی نوٹیفکیشن پڑھتی ہے، اور وہ بھی صرف دو جگہوں سے: آپ کے فون کی اپنی کال والی ایپ (ڈائلر) سے، اور واٹس ایپ / واٹس ایپ بزنس سے۔ اُس میں سے صرف کال کرنے والے کا نمبر اور نام لیا جاتا ہے۔</string>
-    <string name="disclosure_ignore">2) باقی ہر نوٹیفکیشن نظر انداز کر دی جاتی ہے — پیغامات، چیٹ، ای میل، اور دوسری ایپس کی کالیں بھی (میسنجر، ٹیلیگرام، وائبر، اسکائپ وغیرہ) — نہ پڑھی جاتی ہے، نہ محفوظ ہوتی ہے، نہ کہیں بھیجی جاتی ہے۔</string>
-    <string name="disclosure_send">3) صرف چار چیزیں آپ ہی کے TaxNest شاپ اکاؤنٹ کو (taxnest.com.pk پر، محفوظ HTTPS کنکشن سے) بھیجی جاتی ہیں: نمبر، نام، وقت، اور کال سِم کی تھی یا واٹس ایپ کی۔ کسی تیسرے فریق کو کچھ نہیں دیا جاتا۔</string>
-    <string name="disclosure_purpose">4) مقصد صرف ایک ہے: آپ کی POS سیل اسکرین پر فوراً پاپ اپ آ جائے کہ کون سا گاہک کال کر رہا ہے اور اُس کی پچھلی خریداری کیا ہے۔</string>
-    <string name="disclosure_control">5) کال کا یہ ریکارڈ تقریباً 48 گھنٹے بعد خود مٹ جاتا ہے۔ اجازت آپ جب چاہیں فون کی سیٹنگز سے واپس لے سکتے ہیں، یا POS → Customize سے فیچر بند / فون ریووک کر سکتے ہیں — ایپ پھر بھی چلتی رہے گی۔</string>
-    <string name="disclosure_roman">Sirf phone ki apni dialer app aur WhatsApp ki incoming-call notification parhi jati hai (SIM + WhatsApp); doosri apps ki call ya koi bhi aur notification nahi. Number, naam, waqt aur call ki qism aap ke apne TaxNest shop account ko bheji jati hai taake sale screen par gaahak ka popup aaye. Baqi koi notification na parhi jati hai na bheji jati hai. Ijazat jab chahen wapas le sakte hain.</string>
-    <string name="disclosure_privacy">پرائیویسی پالیسی پڑھیں (taxnest.com.pk/privacy)</string>
-    <string name="disclosure_agree">میں سمجھ گیا — اجازت دیں</string>
-    <string name="disclosure_decline">ابھی نہیں</string>
+    <string name="disclosure_title">Why notification access is needed</string>
+    <string name="disclosure_lead">Please read this before you allow it. TaxNest Caller ID uses your phone\'s notifications like this:</string>
+    <string name="disclosure_read">1) The app reads incoming-call notifications only, and only from two places: your phone\'s own calling app (dialer), and WhatsApp / WhatsApp Business. From those, only the caller\'s number and name are taken.</string>
+    <string name="disclosure_ignore">2) Every other notification is ignored — messages, chats, email, and calls from other apps as well (Messenger, Telegram, Viber, Skype and so on) — none of it is read, none of it is stored, and none of it is sent anywhere.</string>
+    <string name="disclosure_send">3) Only four things are sent to your own TaxNest shop account (at taxnest.com.pk, over a secure HTTPS connection): the number, the name, the time, and whether the call was a SIM call or a WhatsApp call. Nothing is given to any third party.</string>
+    <string name="disclosure_purpose">4) There is only one purpose: a popup appears on your POS sale screen right away showing which customer is calling and what they bought before.</string>
+    <string name="disclosure_control">5) This call record deletes itself after about 48 hours. You can withdraw the permission whenever you like from your phone\'s settings, or switch the feature off / revoke the phone from POS → Customize — the app keeps working either way.</string>
+    <string name="disclosure_privacy">Read the privacy policy (taxnest.com.pk/privacy)</string>
+    <string name="disclosure_agree">I understand — allow it</string>
+    <string name="disclosure_decline">Not now</string>
 </resources>

@@ -5,7 +5,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 
 /**
  * Prominent disclosure (Task 1346) — shown BEFORE the Android notification-access
@@ -18,8 +17,13 @@ import androidx.appcompat.app.AppCompatActivity
  *     permission request. Declining must be possible and must not break the app.
  *
  * Reject-proof rule: NEVER call Detector.openSettings() from anywhere else.
+ *
+ * Task 1382 — `BaseActivity` se aati hai, is liye poori disclosure user ki
+ * chuni hui zubaan (English / Roman Urdu / Urdu) mein aati hai. Teenon
+ * versions bilkul ek hi baat kahte hain; kisi ek ko chhota karna Play ki User
+ * Data policy tor dega.
  */
-class NotificationDisclosureActivity : AppCompatActivity() {
+class NotificationDisclosureActivity : BaseActivity() {
 
     companion object {
         const val PRIVACY_URL = "https://taxnest.com.pk/privacy"

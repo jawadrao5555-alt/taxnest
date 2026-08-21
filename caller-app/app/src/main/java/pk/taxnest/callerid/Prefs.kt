@@ -13,6 +13,19 @@ object Prefs {
     fun token(c: Context): String? = sp(c).getString("token", null)
     fun setToken(c: Context, v: String?) = sp(c).edit().putString("token", v).apply()
 
+    /**
+     * UI ki zubaan (Task 1382): "en" | "rur" | "ur" — matlab `Lang` mein.
+     *
+     * null = user ne abhi tak nahi chuni → `Lang.DEFAULT` (English). Phone ki
+     * apni system language kabhi nahi dekhi jati.
+     *
+     * Yeh key logout par saaf NAHI hoti (logout sirf token null karta hai) aur
+     * SharedPreferences app update ke baad bhi rehti hain — is liye chuni hui
+     * zubaan dono soorton mein qayam rehti hai.
+     */
+    fun lang(c: Context): String? = sp(c).getString("ui_lang", null)
+    fun setLang(c: Context, v: String) = sp(c).edit().putString("ui_lang", v).apply()
+
     fun userName(c: Context): String = sp(c).getString("user_name", "") ?: ""
     fun setUserName(c: Context, v: String) = sp(c).edit().putString("user_name", v).apply()
 

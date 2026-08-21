@@ -48,9 +48,18 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Language picker (Task 1382) -->
+        <include
+            layout="@layout/view_lang_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginTop="12dp" />
+
         <!-- Build badge (Task 1345): saaf likha ho ke YEH build kaunsi calls
-             pakadti hai — clean (sirf SIM) ya plus (SIM + WhatsApp). Text har
-             flavor ki apni strings.xml se aata hai. -->
+             pakadti hai — clean (sirf SIM), plus (SIM + WhatsApp) ya Play wali.
+             Text har flavor ki apni strings.xml se aata hai, har zubaan ke liye
+             alag (Task 1382 se ek hi line — pehle Urdu + Roman do lines thin). -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -66,14 +75,6 @@
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:textColor="#0A4D5C" />
-
-            <TextView
-                android:id="@+id/buildBadgeRoman"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:textSize="11sp"
-                android:textColor="#475467" />
         </LinearLayout>
 
         <!-- Update row (hidden by default) -->

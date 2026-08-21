@@ -8,6 +8,14 @@
     android:padding="28dp"
     android:background="#F6F8F9">
 
+    <!-- Language picker (Task 1382) — login se PEHLE zubaan badli ja sake -->
+    <include
+        layout="@layout/view_lang_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="18dp" />
+
     <ImageView
         android:layout_width="84dp"
         android:layout_height="84dp"

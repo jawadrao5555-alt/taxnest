@@ -71,9 +71,19 @@ class PlanLadderGuard
             return [];
         }
 
-        $service = self::SERVICES[$productType];
+        try {
+            $service = self::SERVICES[$productType];
 
-        return self::run($productType, $service::plans());
+            return self::run($productType, $service::plans());
+        } catch (\Throwable $e) {
+            // plans() itself filters on product_type — on a database that has
+            // not got that column yet (the drift AdminPlanController@index
+            // already degrades for) the QUERY throws, before run() can fail
+            // open. The plans page must still render.
+            Log::warning('Plan ladder read failed for ' . $productType . ': ' . $e->getMessage());
+
+            return [];
+        }
     }
 
     /**
@@ -184,6 +194,18 @@ class PlanLadderGuard
                     }
                 }
             }
+        }
+
+        // Columns the ladder read itself stands on, plus the two seat columns
+        // the DI audit compares directly (they belong to no row map, so the
+        // loop above cannot find them — and a missing one would read back as
+        // "no cap" and hide a real discrepancy).
+        $columns[] = 'product_type';
+        $columns[] = 'price';
+        $columns[] = 'is_trial';
+        if ($service === DiPlanComparisonService::class) {
+            $columns[] = 'user_limit';
+            $columns[] = 'max_users';
         }
 
         return array_values(array_unique($columns));

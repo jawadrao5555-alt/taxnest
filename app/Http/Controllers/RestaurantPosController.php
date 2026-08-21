@@ -1498,6 +1498,12 @@ class RestaurantPosController extends Controller
                 Log::warning('[PAY] waBillPayload failed post-commit (degraded to null extras): ' . $waE->getMessage());
                 $waShare = ['wa_phone' => null, 'share_url' => null];
             }
+            // Task 1356 — final-bill KOT safety net. TRUE = this bill has lines the
+            // kitchen has NEVER seen (line-level kot_printed_at, never kot_sent_at),
+            // so the sale screen must fire a delta ticket even for dine-in. A held
+            // order whose KOT already printed reports false → no second slip.
+            $kotPending = \App\Services\KotPrintService::pendingForFinal($company, $order);
+
             return response()->json([
                 'success' => true,
                 'message' => "Payment received. Invoice: {$invoiceNumber}",
@@ -1506,6 +1512,8 @@ class RestaurantPosController extends Controller
                 'total_amount' => $totalAmount,
                 'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
                 'pra_status' => $transaction->pra_status ?? null,
+                'kot_pending' => $kotPending,
+                'kot_order_id' => $kotPending ? $order->id : null,
                 'wa_phone' => $waShare['wa_phone'],
                 'share_url' => $waShare['share_url'],
             ]);
@@ -1608,10 +1616,20 @@ class RestaurantPosController extends Controller
             Log::warning('[PAY] waBillPayload failed on replay (degraded to null extras): ' . $waE->getMessage());
             $waShare = ['wa_phone' => null, 'share_url' => null];
         }
+        // Task 1356: replay must carry the SAME safety-net signal — the lost
+        // attempt's print chain never ran, so the ticket is still owed. Read live
+        // stamps: if the ticket DID print before the response was lost, this is
+        // false and the replay prints nothing.
+        $replayKotPending = \App\Services\KotPrintService::pendingForFinal(
+            Company::find($companyId), $originalOrder
+        );
+
         return response()->json([
             'success' => true,
             'replayed' => true,
             'order_id' => $originalOrder?->id,
+            'kot_pending' => $replayKotPending,
+            'kot_order_id' => $replayKotPending ? $originalOrder?->id : null,
             'message' => "Payment received. Invoice: {$existingTxn->invoice_number}",
             'transaction_id' => $existingTxn->id,
             'invoice_number' => $existingTxn->invoice_number,
@@ -2207,6 +2225,11 @@ class RestaurantPosController extends Controller
         // provisional delivery bills par KOT promote/finalize tak ruki rahti hai.
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'delivery_kot_after_payment')) {
             $updates['delivery_kot_after_payment'] = (bool) $request->delivery_kot_after_payment;
+        }
+        // Task 1356: bill final ho aur kitchen ne lines dekhi hi na hon to ticket
+        // khud chali jaye (default ON). hasColumn guard = prod self-heal parity.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_on_final_if_unsent')) {
+            $updates['kot_on_final_if_unsent'] = (bool) $request->kot_on_final_if_unsent;
         }
         // KOT Print Style (customer feedback 27 Jul 2026): paper-saving toggles +
         // print position. hasColumn guards = prod self-heal parity.

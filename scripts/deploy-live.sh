@@ -490,6 +490,10 @@ step "Preflight: print-confirm check (\"No\" = receipt-only skip, KOT alive; tab
 node scripts/print-confirm-check.mjs \
   || fail "print-confirm check FAILED — the Yes/No print dialog or the tables-first return regressed (Task 1025); fix before deploying"
 
+step "Preflight: final-bill KOT safety net (unseen lines reach the kitchen, no duplicate slips)"
+node scripts/kot-on-final-check.mjs \
+  || fail "kot-on-final check FAILED — a finalized bill either leaves the kitchen with no ticket (owner's Table 02 bug, Task 1356) or prints a duplicate slip; fix before deploying"
+
 step "Preflight: PWA refresh-button check (slow-install wait, no-update reload+toast, offline, timeout)"
 node scripts/pwa-refresh-check.mjs \
   || fail "pwa-refresh check FAILED — the header update icon click contract regressed (Task 706); fix before deploying"

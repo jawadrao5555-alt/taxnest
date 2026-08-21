@@ -8,6 +8,57 @@ use Illuminate\Http\Request;
 
 class RestaurantKdsController extends Controller
 {
+    /**
+     * Task 1356 — KDS rescue window. A bill can be finalised without the kitchen
+     * ever seeing it (cashier hits CASH on a dine-in cart, or a takeaway counter
+     * sale on a KDS-only shop). Those orders go straight to 'completed', so the
+     * board's held/preparing/ready filter hid them and the food was never made.
+     *
+     * Rescue rule: a COMPLETED order that still has never-printed lines and was
+     * never cleared stays on the board for the CURRENT business day only.
+     * Clock-based on purpose (restaurant_orders has no business_date column and
+     * this runs on every 15s poll): the window opens at the company's business-day
+     * cutoff and spans at most 24h, so the board can never fill up with history.
+     */
+    private function rescueWindowStart(int $companyId): \Carbon\Carbon
+    {
+        $now = now();
+        try {
+            $cutoff = \App\Services\PosBusinessDay::cutoffFor($companyId);
+            $start = $now->copy()->setTimeFromTimeString($cutoff)->startOfMinute();
+            if ($start->greaterThan($now)) {
+                $start->subDay(); // still trading yesterday's day (post-midnight)
+            }
+            return $start;
+        } catch (\Throwable $e) {
+            return $now->copy()->subDay();
+        }
+    }
+
+    /**
+     * Task 1356 — shared board filter for BOTH payload builders (index + the
+     * liveOrders poll). They MUST stay in sync: the board renders the first from
+     * Blade and then replaces it with the second every 15s.
+     */
+    private function boardOrders(int $companyId)
+    {
+        $rescueSince = $this->rescueWindowStart($companyId);
+
+        return RestaurantOrder::where('company_id', $companyId)
+            ->whereNull('kitchen_cleared_at')
+            ->where(function ($q) use ($rescueSince) {
+                $q->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->orWhere(function ($paid) use ($rescueSince) {
+                        $paid->where('status', 'completed')
+                            ->where('created_at', '>=', $rescueSince)
+                            ->whereHas('items', fn ($i) => $i->whereNull('kot_printed_at'));
+                    });
+            })
+            ->with(['table', 'items', 'creator'])
+            ->orderBy('created_at', 'asc')
+            ->get();
+    }
+
     public function index()
     {
         $companyId = app('currentCompanyId');
@@ -18,12 +69,8 @@ class RestaurantKdsController extends Controller
         // P5 (F4): the KDS board is driven by the KITCHEN lifecycle, not the billing
         // one. Cleared orders (scan or manual Clear) disappear from the board even
         // though the cashier still has them held for payment.
-        $orders = RestaurantOrder::where('company_id', $companyId)
-            ->whereIn('status', ['held', 'preparing', 'ready'])
-            ->whereNull('kitchen_cleared_at')
-            ->with(['table', 'items', 'creator'])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        // Task 1356: + paid-but-never-seen orders (see boardOrders()).
+        $orders = $this->boardOrders((int) $companyId);
 
         // P6 (F5): KDS auto-print flag — the KDS device prints new-order KOTs itself.
         $company = \App\Models\Company::find($companyId);
@@ -299,12 +346,9 @@ class RestaurantKdsController extends Controller
         // never swallow kitchen tickets.
         \Illuminate\Support\Facades\Cache::put('kds_seen_' . $companyId, time(), 300);
 
-        $orders = RestaurantOrder::where('company_id', $companyId)
-            ->whereIn('status', ['held', 'preparing', 'ready'])
-            ->whereNull('kitchen_cleared_at')
-            ->with(['table', 'items', 'creator'])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        // Task 1356: same filter as index() — held/preparing/ready PLUS paid
+        // orders the kitchen never saw and never cleared (see boardOrders()).
+        $orders = $this->boardOrders((int) $companyId);
 
         // Counter/Station routing: resolve station per item ONCE for the whole
         // payload (2 bulk queries total — stations + product categories).

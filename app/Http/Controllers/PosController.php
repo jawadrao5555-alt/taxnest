@@ -3033,6 +3033,21 @@ class PosController extends Controller
         // response so the receipt modal can render in-place. Legacy form-POST
         // callers (pos/create-invoice.blade.php) continue to receive the
         // traditional redirect-with-flash response.
+        // Task 1356 — final-bill KOT safety net signal for the settled waiter
+        // order (the only restaurant order this endpoint ever finalises).
+        // Post-commit + Throwable-guarded: a signal lookup must NEVER 500 an
+        // already-committed bill.
+        $settleKotPending = false;
+        if ($waiterOrderSettled) {
+            try {
+                $settledOrder = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                    ->find((int) $request->input('incoming_order_id'));
+                $settleKotPending = \App\Services\KotPrintService::pendingForFinal($company, $settledOrder);
+            } catch (\Throwable $kotE) {
+                Log::warning('[PAY] kot_pending lookup failed post-commit: ' . $kotE->getMessage());
+            }
+        }
+
         if ($request->wantsJson()) {
             // Task 1036: WhatsApp Bill extras ride the pay response (no extra
             // client fetch) — nulls when feature off / no routable number.
@@ -3054,6 +3069,13 @@ class PosController extends Controller
                 // Task 646: true = waiter order already settled server-side;
                 // the client skips its completeIncomingOrder fallback call.
                 'waiter_order_settled' => $waiterOrderSettled,
+                // Task 1356 — final-bill KOT safety net. Only the waiter-order
+                // settle path has a restaurant order here; a plain manual cart
+                // reports false (no order rows to stamp, KOT rides the txn).
+                // A waiter order whose ticket already printed reports false, so
+                // settling it never produces a second slip.
+                'kot_pending' => $settleKotPending,
+                'kot_order_id' => $settleKotPending ? (int) $request->input('incoming_order_id') : null,
                 'wa_phone' => $waShare['wa_phone'],
                 'share_url' => $waShare['share_url'],
                 'message' => $successMessage,

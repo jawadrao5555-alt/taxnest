@@ -4097,6 +4097,10 @@ $kitchenSettings = [
     // Delivery: payment pehle, KOT baad (1 Aug 2026) — provisional delivery
     // bills par KOT promote tak ruki rehti hai.
     'delivery_kot_after_payment' => (bool)($company->delivery_kot_after_payment ?? false),
+    // Task 1356 (owner video, dine-in Table 02): bill final ho aur kuch lines
+    // kitchen ne kabhi dekhi hi na hon to unhi lines ki parchi khud chali jaye —
+    // dine-in par bhi. DEFAULT ON; missing column bhi ON (prod self-heal).
+    'kot_on_final_if_unsent' => ($company->kot_on_final_if_unsent ?? true) !== false,
     // KDS liveness (Jul 2026): baked snapshot — refreshed every 20s via the
     // incoming-orders poll's X-KDS-Alive header. KDS closed → cashier auto-KOT.
     'kds_alive' => (time() - (int)\Illuminate\Support\Facades\Cache::get('kds_seen_' . $company->id, 0)) < 90,
@@ -9188,7 +9192,13 @@ function restaurantPos() {
                 const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId && !kotHeldForPayment)
                     ? (data.transaction_id || null) : null;
                 if (kotHeldForPayment) this.showToast(window.TXT.kot_held_until_payment, 'info');
-                this.runAutoPrintChain(null, this.orderType, txnKotId, skipReceipt);
+                // Task 1356: waiter-origin final bills DO have a restaurant order.
+                // The server tells us when that order still has never-printed lines
+                // (waiter's own KOT never reached a printer) — only THEN do we pass
+                // its id so the safety net can fire. A normally-printed waiter order
+                // reports kot_pending=false, so settling it prints nothing (unchanged).
+                const rescueKotOrderId = (data.kot_pending && data.kot_order_id) ? data.kot_order_id : null;
+                this.runAutoPrintChain(rescueKotOrderId, this.orderType, txnKotId, skipReceipt, false, !!data.kot_pending);
                 // P7: settle the linked waiter order (atomic server-side claim) —
                 // frees the table and clears it from every cashier's Incoming list.
                 // FINAL bills only: a provisional is editable/deletable, so it must
@@ -9823,7 +9833,11 @@ function restaurantPos() {
         // skipReceiptOverride (Task 514): cashier ne per-bill "Receipt print karein"
         // checkbox UNTICK kiya — SIRF is bill ki receipt auto-print skip; KOT gate
         // (wantsKot) aur baaki chain waise hi chalti hai.
-        runAutoPrintChain(orderId, orderType = null, txnKotId = null, skipReceiptOverride = false, askConfirmed = false) {
+        // kotPending (Task 1356): server ne bataya ke is bill ki kuch lines
+        // kitchen ne KABHI nahi dekhin (line-level kot_printed_at se — hold ka
+        // kot_sent_at jhooth bol sakta hai). Aisi surat mein dine-in ki blanket
+        // bandish hat jati hai aur SIRF un-dekhi lines ki delta parchi nikalti hai.
+        runAutoPrintChain(orderId, orderType = null, txnKotId = null, skipReceiptOverride = false, askConfirmed = false, kotPending = false) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             // Telemetry (Task #63): silent-print shops expect paper on every sale —
             // record WHY the chain did nothing so a "bill never printed" report is
@@ -9846,7 +9860,26 @@ function restaurantPos() {
             // (kitchen cooks AFTER payment there).
             // txnKotId (ZFC 28 Jul 2026): order-less delivery bills (provisional
             // rider khata / manual-cart finals) KOT from the TRANSACTION instead.
-            const wantsKot = !!this.autoKotEnabled && (!!orderId || !!txnKotId) && orderType !== 'dine_in' && !this.kdsHandlesKot();
+            //
+            // TASK 1356 SAFETY NET (owner video, dine-in Table 02 — cashier pressed
+            // CASH without "Send to Kitchen": receipt printed, kitchen got NOTHING).
+            // The dine-in blanket block above assumes the ticket already went at
+            // hold — true for a held/recalled order, FALSE for a cart settled
+            // straight to pay. So the block now yields to a server-confirmed fact:
+            // kotPending = this order still has lines the kitchen has NEVER seen
+            // (line-level kot_printed_at). Then, and only then, dine-in fires too —
+            // as a DELTA, so a fully-printed bill still prints nothing (no second
+            // slip on held / waiter settles) and an empty ticket is impossible.
+            // Server-side gates (restaurant mode + KOT feature + the shop's
+            // kot_on_final_if_unsent switch) mean plain retail never sees this.
+            // kdsHandlesKot: a live auto-printing KDS owns the slip — the order is
+            // surfaced on the KDS board instead (RestaurantKdsController rescue).
+            const kotRescue = !!kotPending
+                && !!orderId
+                && this.kitchenSettings.kot_on_final_if_unsent !== false
+                && !this.kdsHandlesKot();
+            const wantsKot = (!!this.autoKotEnabled && (!!orderId || !!txnKotId) && orderType !== 'dine_in' && !this.kdsHandlesKot())
+                || kotRescue;
             const wantsReceipt = hasReceipt && !dineinSkipReceipt && !skipReceiptOverride;
             // KOT delta = ALWAYS in the auto chain (owner, Jul 2026): the kitchen
             // already has every line that printed at hold / waiter-send / recall —
@@ -9880,11 +9913,16 @@ function restaurantPos() {
             // chalti hai, callbacks/idle signal kabhi stall nahi hote.
             if (this.printConfirmAsk && !askConfirmed && wantsReceipt) {
                 this.openPrintConfirm(
-                    () => this.runAutoPrintChain(orderId, orderType, txnKotId, skipReceiptOverride, true),
-                    () => this.runAutoPrintChain(orderId, orderType, txnKotId, true, true),
+                    () => this.runAutoPrintChain(orderId, orderType, txnKotId, skipReceiptOverride, true, kotPending),
+                    () => this.runAutoPrintChain(orderId, orderType, txnKotId, true, true, kotPending),
                 );
                 return;
             }
+            // Task 1356: cashier ko batao ke kitchen tak parchi chali gayi — warna
+            // usay pata hi nahi chalta ke us ne "Send to Kitchen" dabaya hi nahi
+            // tha. Yahan (chain ke faisle par) toast dete hain, printKitchenTicket
+            // ke andar nahi: silent aur popup dono raaste cover ho jate hain.
+            if (kotRescue) this.showToast(window.TXT.kot_auto_sent_on_final, 'success');
             // Blind-spot beacon (review catch): KOT will print but NO receipt is
             // possible (lastTransactionId missing) — the bill itself vanishes.
             if (wantsKot && !wantsReceipt && (this.silentBillPrint || this.silentKotPrint)) {
@@ -10538,7 +10576,9 @@ function restaurantPos() {
             // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
             // on slow networks where KOT iframe loaded before receipt iframe).
             // Replay edge (no order_id in the response): KOT from the transaction.
-            this.runAutoPrintChain(orderId, payOrderType, orderId ? null : (data.transaction_id || null), skipReceipt);
+            // Task 1356: data.kot_pending = server-confirmed "kitchen ne ye lines
+            // dekhi hi nahi" — dine-in finals par safety-net KOT isi se chalti hai.
+            this.runAutoPrintChain(orderId, payOrderType, orderId ? null : (data.transaction_id || null), skipReceipt, false, !!(data && data.kot_pending));
             // Refresh provisional badge count when this save was provisional.
             if (provisional) { this.loadLocalBills(); }
             // Refresh failed badge so cashier sees pending/failed state in real time.

@@ -108,6 +108,12 @@ class Company extends Model
         'kot_align_center',
         'kot_center_notice_at',
         'kot_left_margin_mm',
+        // Task 1356: "Payment pehle, KOT baad" (delivery) was NEVER fillable —
+        // updateKitchenSettings' write was silently dropped by Eloquent, so the
+        // toggle looked saved but never persisted. Fixed alongside the new
+        // final-bill KOT safety-net switch.
+        'delivery_kot_after_payment',
+        'kot_on_final_if_unsent',
         'receipt_align_center',
         'receipt_left_margin_mm',
         'print_on_pay_dinein',
@@ -220,6 +226,8 @@ class Company extends Model
         'kot_show_footer' => 'boolean',
         'kot_align_center' => 'boolean',
         'kot_center_notice_at' => 'datetime',
+        'delivery_kot_after_payment' => 'boolean',
+        'kot_on_final_if_unsent' => 'boolean',
         'print_on_pay_dinein' => 'boolean',
         'pos_kds_auto_print' => 'boolean',
         'pos_waiter_cancel_enabled' => 'boolean',
@@ -488,6 +496,11 @@ class Company extends Model
             'pos_kot_full_mode', 'kot_compact', 'kot_show_customer',
             'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer',
             'kot_align_center', 'kot_left_margin_mm',
+            // Task 1356: BOTH kitchen-ticket flow toggles are BAKED into the sale
+            // screen's kitchenSettings JS object — without them here an offline /
+            // cached sale screen keeps obeying the OLD setting after a save.
+            // delivery_kot_after_payment was missing since Aug 2026.
+            'delivery_kot_after_payment', 'kot_on_final_if_unsent',
             // Day-close / limits / pins
             'pos_auto_purge_local_on_dayclose', 'pos_auto_dayclose_24h',
             'pos_dayclose_final_local_action', 'pos_dayclose_provisional_action',

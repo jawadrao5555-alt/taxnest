@@ -63,6 +63,69 @@ class KotPrintService
     }
 
     /**
+     * Task 1356 — "kitchen ne ye lines dekhi hi nahi" ka WAHID sach.
+     *
+     * Line-level `restaurant_order_items.kot_printed_at` is the ONLY trustworthy
+     * signal. `restaurant_orders.kot_sent_at` must NEVER be used for this: hold
+     * stamps it on EVERY held order (RestaurantPosController::holdOrder) even
+     * when no ticket was rendered or enqueued, so a straight-to-pay dine-in cart
+     * looks "sent" while the kitchen got nothing. Stamps are written at real
+     * print time only (kitchenTicket ?auto_print=1 render + agent result), which
+     * is exactly the "kitchen saw it" moment we need.
+     *
+     * Re-queries instead of using a loaded relation: pay paths hold the order in
+     * memory from BEFORE the lock/commit, and a concurrent KOT print may have
+     * stamped rows in between.
+     */
+    public static function unseenLineCount(?RestaurantOrder $order): int
+    {
+        if (!$order || !$order->id) {
+            return 0;
+        }
+        try {
+            return (int) \App\Models\RestaurantOrderItem::where('order_id', $order->id)
+                ->whereNull('kot_printed_at')
+                ->count();
+        } catch (\Throwable $e) {
+            return 0; // never let the signal break a committed bill
+        }
+    }
+
+    /**
+     * TRUE when a just-finalised bill still owes the kitchen a ticket, i.e. the
+     * safety net should fire. Deliberately conservative — every gate below must
+     * pass or the sale screen prints nothing new:
+     *   • shop actually uses kitchen tickets (restaurant mode + KOT feature) so
+     *     plain retail can NEVER get a surprise slip;
+     *   • the shop-level off-switch (default ON, missing column = ON);
+     *   • at least one line the kitchen has never seen (empty slip impossible).
+     * The KDS-owns-printing case is decided client-side (kdsHandlesKot) — those
+     * shops surface the order on the KDS board instead of printing.
+     */
+    public static function pendingForFinal(?Company $company, ?RestaurantOrder $order): bool
+    {
+        if (!$company || !$order) {
+            return false;
+        }
+        if (!(bool) ($company->restaurant_mode ?? false)) {
+            return false;
+        }
+        if (($company->kot_on_final_if_unsent ?? true) === false) {
+            return false;
+        }
+        try {
+            $features = \App\Services\PosFeatureService::forCompany($company);
+            if (!($features->kot ?? false)) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return self::unseenLineCount($order) > 0;
+    }
+
+    /**
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
     public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false): array

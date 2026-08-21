@@ -1435,6 +1435,16 @@ class AgentController extends Controller
         // Send-to-Kitchen ticket — FBR holds are JSON carts, no RestaurantOrder
         // rows); transaction_id = post-pay reprint. Mirrors kotTicket/kotReprint.
         if ($job->type === 'fbr_kot') {
+            // Task 1403: the Store Slip switch is re-asked at RENDER time, not
+            // trusted from queue time. The agent carries no session, so the
+            // controller's auth-based gate would pass here — a slip queued a
+            // second before the owner switched the feature off (or before a
+            // downgrade) must still not print. 204 = nothing to print, the
+            // agent marks the job done instead of retrying forever.
+            if (!\App\Services\PosFeatureService::fbrStoreSlipOn($company)) {
+                return response('', 204);
+            }
+            $notesOn = \App\Services\PosFeatureService::fbrStoreNotesOn($company);
             $this->setPrintLocale(null, $job, $company);
             if ($job->restaurant_order_id) {
                 $held = \App\Models\FbrPosHeldSale::where('company_id', $company->id)
@@ -1444,6 +1454,12 @@ class AgentController extends Controller
                 }
                 $cartData  = $held->cart_data ?? [];
                 $items     = is_array($cartData['items'] ?? null) ? $cartData['items'] : [];
+                if (!$notesOn) {
+                    $items = array_map(function ($it) {
+                        if (is_array($it)) { unset($it['special_notes']); }
+                        return $it;
+                    }, $items);
+                }
                 $tokenNo   = isset($held->token_no)   ? (int)  $held->token_no   : (isset($cartData['token_no'])   ? (int)  $cartData['token_no']   : null);
                 $orderCode = isset($held->order_code) ? (string) $held->order_code : (isset($cartData['order_code']) ? (string) $cartData['order_code'] : null);
                 $customerName = $held->customer_name ?? ($cartData['customer_name'] ?? null);
@@ -1468,11 +1484,16 @@ class AgentController extends Controller
             $orderCode = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_code')
                 ? ($transaction->order_code ?: null)
                 : null;
-            $items = $transaction->items->map(function ($it) {
+            // Task 1403: the note used to be hardcoded null here, so a silently
+            // reprinted slip lost every note the cashier typed (including a deal
+            // note, which store() parks on the combo's first component row).
+            $hasNotes = $notesOn
+                && \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes');
+            $items = $transaction->items->map(function ($it) use ($hasNotes) {
                 return [
                     'item_name'     => $it->item_name,
                     'quantity'      => (float) $it->quantity,
-                    'special_notes' => null,
+                    'special_notes' => $hasNotes ? ($it->special_notes ?: null) : null,
                 ];
             })->all();
             $customerName = $transaction->customer_name;

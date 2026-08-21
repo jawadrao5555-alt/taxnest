@@ -313,6 +313,42 @@ class PosFeatureService
      *
      * PRA call sites must keep using forCompany() — masking is deliberate there.
      */
+    /**
+     * FBR Store Slip — the SHOP's own master switch (companies.kitchen_printer_enabled).
+     *
+     * These three live here rather than on FbrPosController because the silent
+     * Desktop Agent asks the same questions with NO logged-in user: it fetches a
+     * job by agent key, so an auth-based gate would silently pass. A slip queued
+     * while the feature was on must not print after the owner switches it off,
+     * so the agent re-asks at RENDER time, not at queue time.
+     *
+     * Missing column = PROD schema drift; fail OPEN so slips keep printing.
+     */
+    public static function fbrSlipSwitchOn(?Company $company): bool
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kitchen_printer_enabled')) {
+            return true;
+        }
+        return (bool) ($company?->kitchen_printer_enabled ?? false);
+    }
+
+    /** Store Slip allowed right now: the package AND the shop's own switch. */
+    public static function fbrStoreSlipOn(?Company $company): bool
+    {
+        return self::planAllows($company, 'kot_enabled') && self::fbrSlipSwitchOn($company);
+    }
+
+    /**
+     * Per-item Store note allowed right now. The note rides ON the slip, so the
+     * slip must be on too. Read RAW: kitchen_notes is a RESTAURANT_FLAG and every
+     * fbrpos plan ships restaurant_enabled=0, so forCompany() would mask it off
+     * forever.
+     */
+    public static function fbrStoreNotesOn(?Company $company): bool
+    {
+        return self::fbrStoreSlipOn($company) && self::rawFlag($company, 'kitchen_notes');
+    }
+
     public static function rawFlag(?Company $company, string $flag): bool
     {
         if (!$company) {

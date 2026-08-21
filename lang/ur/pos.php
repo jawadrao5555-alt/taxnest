@@ -1887,6 +1887,7 @@ return [
     'fbr_store_slip_reprint_toggle_sub' => 'بلنگ کے بعد رسید پاپ اپ پر سٹور سلپ دوبارہ پرنٹ کا بٹن دکھائیں',
     'fbr_sent_to_store' => 'سٹور کو بھیج دیا گیا',
     'fbr_auto_store_slip_requires_feature' => 'آٹو سٹور سلپ کے لیے سٹور سلپ فیچر کا آن ہونا ضروری ہے۔',
+    'fbr_store_slip_switched_off' => 'اس دکان کے لیے سٹور سلپ بند ہے، اس لیے کوئی سٹور سلپ پرنٹ نہیں ہوئی۔ کسٹمائز سے آن کریں۔',
     'kpi_average_bill' => 'اوسط بل',
     'kpi_cost' => 'لاگت',
     'kpi_customers' => 'گاہک',

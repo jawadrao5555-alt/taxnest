@@ -1889,6 +1889,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'fbr_store_slip_reprint_toggle_sub' => 'Billing ke baad receipt popup par Reprint Store Slip button dikhayen',
     'fbr_sent_to_store' => 'Store ko bhej diya gaya',
     'fbr_auto_store_slip_requires_feature' => 'Auto Store Slip ke liye store-slip feature ka on hona zaroori hai.',
+    'fbr_store_slip_switched_off' => 'Is dukan ke liye Store Slip band hai, is liye koi store slip print nahi hui. Customize se on karein.',
     'kpi_average_bill' => 'Average bill',
     'kpi_cost' => 'Cost',
     'kpi_customers' => 'Customers',

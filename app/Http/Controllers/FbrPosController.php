@@ -1732,6 +1732,14 @@ class FbrPosController extends Controller
                 $dealStockNeeds = [];
                 $dealStockNames = [];
 
+                // Per-item Store note gate (Task 1403). Resolved ONCE here, not per
+                // item: a note only exists if the package allows store slips, the
+                // shop's Store Slip master switch is on, AND the note feature itself
+                // is on. Anything else and the posted note is dropped — the sale
+                // screen keeps its old state after a toggle or a downgrade, so the
+                // payload can never be trusted on its own.
+                $storeNotesOn = $this->fbrStoreNotesEnabled($company);
+
                 foreach ($request->items as $item) {
                     // ── 🍔 DEAL LINE (Task 1273): fixed-price combo → REAL component
                     // rows, each at its own FBR tax rate, gross summing EXACTLY to
@@ -1799,6 +1807,19 @@ class FbrPosController extends Controller
                         $dealGroup = (string) \Illuminate\Support\Str::uuid();
                         $dealColsOk = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'deal_group');
 
+                        // Per-item Store note on a DEAL line (Task 1403). The cart
+                        // holds ONE note for the whole combo, but the deal explodes
+                        // into component rows — so the note rides on the FIRST
+                        // component only. Repeating it on every row would print the
+                        // same line three times on the slip; dropping it (the old
+                        // behavior) meant a note visible on the pre-pay ticket
+                        // vanished from the post-pay reprint. Same write-time gate
+                        // as normal lines.
+                        $dealNoteCol = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes');
+                        $dealNote = $storeNotesOn ? trim((string) ($item['special_notes'] ?? '')) : '';
+                        $dealNote = $dealNote === '' ? null : \Illuminate\Support\Str::limit($dealNote, 190, '');
+                        $dealNoteUsed = false;
+
                         foreach ($dealUnits as $u) {
                             $pid = (int) $u['product']->id;
                             $rowQty = $u['component_qty'] * $dealQty;
@@ -1844,6 +1865,10 @@ class FbrPosController extends Controller
                                 $compRow['deal_name'] = (string) $deal->name;
                                 $compRow['deal_quantity'] = $dealQty;
                                 $compRow['deal_unit_price'] = round((float) $deal->price, 2);
+                            }
+                            if ($dealNoteCol) {
+                                $compRow['special_notes'] = $dealNoteUsed ? null : $dealNote;
+                                $dealNoteUsed = true;
                             }
                             $itemsData[] = $compRow;
                         }
@@ -2013,8 +2038,12 @@ class FbrPosController extends Controller
                     }
                     // Per-item Store note (Task 1403). hasColumn-guarded: PROD has
                     // drifted before, and a missing column here would 500 the sale.
+                    // $storeNotesOn is resolved ONCE before the item loop: a sale
+                    // screen opened while notes were on keeps posting them after
+                    // the owner switches the feature off, so the note is dropped
+                    // here rather than trusted from the payload.
                     if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes')) {
-                        $note = trim((string) ($item['special_notes'] ?? ''));
+                        $note = $storeNotesOn ? trim((string) ($item['special_notes'] ?? '')) : '';
                         $itemDataRow['special_notes'] = $note === '' ? null : \Illuminate\Support\Str::limit($note, 190, '');
                     }
                     $itemsData[] = $itemDataRow;
@@ -3433,18 +3462,83 @@ class FbrPosController extends Controller
     }
 
     /**
+     * Store Slip master switch — companies.kitchen_printer_enabled.
+     *
+     * Task 1403: the shop's OWN switch, separate from the package gate
+     * (planAllows('kot_enabled')). Both must pass before a slip is rendered
+     * or queued, otherwise a sale screen that was already open when the owner
+     * switched Store Slip off — or a hand-typed ticket URL — keeps printing
+     * slips the shop has turned off. Bill printing is deliberately untouched.
+     *
+     * On a deployment where the column was never added we fall back to the
+     * plan gate alone rather than dead-locking every slip.
+     */
+    protected function fbrStoreSlipEnabled(?Company $company = null): bool
+    {
+        $company = $company ?: Company::find(app('currentCompanyId'));
+        return \App\Services\PosFeatureService::fbrSlipSwitchOn($company);
+    }
+
+    /**
+     * Per-item Store note switch — feature_flags.kitchen_notes.
+     *
+     * Read RAW: kitchen_notes is a RESTAURANT_FLAG and every fbrpos plan ships
+     * restaurant_enabled=0, so forCompany() would mask it to false forever.
+     * The note rides ON the slip, so all three must hold: the package allows
+     * store slips, the shop's Store Slip switch is on, and the note feature
+     * itself is on. Used on both the write path and both render paths — a sale
+     * screen keeps its old state after a toggle or a downgrade, so neither a
+     * posted payload nor an already-stored note can be trusted on its own.
+     */
+    protected function fbrStoreNotesEnabled(?Company $company = null): bool
+    {
+        $company = $company ?: Company::find(app('currentCompanyId'));
+        return $this->fbrPlanAllows('kot_enabled')
+            && $this->fbrStoreSlipEnabled($company)
+            && \App\Services\PosFeatureService::rawFlag($company, 'kitchen_notes');
+    }
+
+    /**
+     * Response twin of fbrStoreSlipEnabled() for the two ticket views.
+     * Call AFTER fbrPlanGate() so a package problem still routes to billing
+     * and only a switched-off shop is sent to Customize.
+     */
+    protected function fbrStoreSlipGate(?Company $company = null)
+    {
+        if ($this->fbrStoreSlipEnabled($company)) {
+            return null;
+        }
+        if (request()->expectsJson()) {
+            abort(403, __('pos.fbr_store_slip_switched_off'));
+        }
+        return redirect()->route('fbrpos.customize')
+            ->with('error', __('pos.fbr_store_slip_switched_off'));
+    }
+
+    /**
      * FBR KOT — kitchen ticket for a held sale.
      * GET /fbr-pos/held/{id}/kitchen-ticket
      */
     public function kotTicket(int $id)
     {
         if ($resp = $this->fbrPlanGate('kot_enabled')) return $resp;
+        if ($resp = $this->fbrStoreSlipGate()) return $resp;
         $companyId = app('currentCompanyId');
         $company   = Company::find($companyId);
         $held      = \App\Models\FbrPosHeldSale::where('company_id', $companyId)->findOrFail($id);
 
         $cartData  = $held->cart_data ?? [];
         $items     = is_array($cartData['items'] ?? null) ? $cartData['items'] : [];
+
+        // Notes stored on a held cart from BEFORE the feature was switched off (or
+        // before a downgrade) must not print now — the switch decides at render
+        // time, not at hold time.
+        if (!$this->fbrStoreNotesEnabled($company)) {
+            $items = array_map(function ($it) {
+                if (is_array($it)) { unset($it['special_notes']); }
+                return $it;
+            }, $items);
+        }
         $tokenNo   = isset($held->token_no)   ? (int)  $held->token_no   : (isset($cartData['token_no'])   ? (int)  $cartData['token_no']   : null);
         $orderCode = isset($held->order_code) ? (string) $held->order_code : (isset($cartData['order_code']) ? (string) $cartData['order_code'] : null);
         $customerName = $held->customer_name ?? ($cartData['customer_name'] ?? null);
@@ -3466,6 +3560,7 @@ class FbrPosController extends Controller
     public function kotReprint(int $id)
     {
         if ($resp = $this->fbrPlanGate('kot_enabled')) return $resp;
+        if ($resp = $this->fbrStoreSlipGate()) return $resp;
         $companyId = app('currentCompanyId');
         $company   = Company::find($companyId);
 
@@ -3484,7 +3579,10 @@ class FbrPosController extends Controller
         // plus the per-item Store note). Task 1403: the note used to be hardcoded
         // null here, so a slip reprinted after payment silently lost every note the
         // cashier typed. hasColumn-guarded for PROD schema drift.
-        $hasNotes = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes');
+        // Task 1403: the switch decides at REPRINT time. A note captured while the
+        // feature was on must stop printing once the shop switches it off.
+        $hasNotes = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes')
+            && $this->fbrStoreNotesEnabled($company);
         $items = $transaction->items->map(function ($it) use ($hasNotes) {
             return [
                 'item_name'     => $it->item_name,
@@ -4219,6 +4317,13 @@ class FbrPosController extends Controller
         // ── KOT: needs ONE of the two ids ───────────────────────────────────
         if (!$request->filled('restaurant_order_id') && !$request->filled('transaction_id')) {
             return response()->json(['success' => false, 'reason' => 'missing_id'], 422);
+        }
+        // Task 1403: the Store Slip switch is the master gate for slips — plan
+        // AND the shop's own toggle. A sale screen left open before the owner
+        // switched it off must not keep queueing slips. Bills are unaffected:
+        // this check sits after the fbr_bill branch has already returned.
+        if (!$this->fbrPlanAllows('kot_enabled') || !$this->fbrStoreSlipEnabled($company)) {
+            return response()->json(['success' => false, 'reason' => 'store_slip_off'], 409);
         }
         if (!$settings['kot_printer']) {
             return response()->json(['success' => false, 'reason' => 'no_printer'], 409);

@@ -186,7 +186,7 @@ class PosBranchStockTest extends TestCase
     }
 
     /** Opening stock straight into the table, bypassing the code under test. */
-    private function seedStock(?int $branchId, float $qty, ?int $productId = null): int
+    private function seedStock(?int $branchId, float $qty, ?int $productId = null, float $cost = 200): int
     {
         return (int) DB::table('inventory_stocks')->insertGetId([
             'company_id' => $this->companyId,
@@ -194,10 +194,20 @@ class PosBranchStockTest extends TestCase
             'branch_id' => $branchId,
             'quantity' => $qty,
             'min_stock_level' => 5,
-            'avg_purchase_price' => 200,
-            'last_purchase_price' => 200,
+            'avg_purchase_price' => $cost,
+            'last_purchase_price' => $cost,
             'created_at' => now(), 'updated_at' => now(),
         ]);
+    }
+
+    /** The receiving shelf's stock row, for cost assertions. */
+    private function costRow(int $branchId, ?int $productId = null)
+    {
+        return DB::table('inventory_stocks')
+            ->where('company_id', $this->companyId)
+            ->where('product_id', $productId ?? $this->productId)
+            ->where('branch_id', $branchId)
+            ->first();
     }
 
     private function qty(?int $branchId, ?int $productId = null): ?float
@@ -462,6 +472,36 @@ class PosBranchStockTest extends TestCase
         $this->assertSame(45.0, $this->qty($this->mainBranchId));
         $this->assertSame(55.0, $this->qty($this->cityBranchId));
         $this->assertSame(100, $this->mirror(), 'a transfer never creates or destroys maal');
+    }
+
+    public function test_transfer_reweights_the_cost_of_a_destination_that_already_has_stock(): void
+    {
+        // Same rule as the FBR panel (Task 1365): 10 units at Rs.100 plus 10
+        // arriving at Rs.200 leaves the shelf at Rs.150. Keeping the old rate
+        // would undervalue the maal and inflate that branch's munafa.
+        $this->seedStock($this->mainBranchId, 10, null, 200);
+        $this->seedStock($this->cityBranchId, 10, null, 100);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 10);
+
+        $dest = $this->costRow($this->cityBranchId);
+        $this->assertSame(20.0, (float) $dest->quantity);
+        $this->assertSame(150.0, (float) $dest->avg_purchase_price, 'weighted across old and arriving maal');
+        $this->assertSame(200.0, (float) $dest->last_purchase_price, 'the arriving units are the latest rate');
+    }
+
+    public function test_transfer_of_rateless_goods_does_not_wipe_the_destination_rate(): void
+    {
+        $this->seedStock($this->mainBranchId, 10, null, 0);
+        $this->seedStock($this->cityBranchId, 10, null, 120);
+        $this->actAs($this->makeUser('pos_admin'), $this->mainBranchId);
+
+        $this->transfer($this->mainBranchId, $this->cityBranchId, 5);
+
+        $dest = $this->costRow($this->cityBranchId);
+        $this->assertSame(15.0, (float) $dest->quantity, 'the goods still moved');
+        $this->assertSame(120.0, (float) $dest->avg_purchase_price, 'known rate survives an unknown one');
     }
 
     public function test_transfer_writes_a_paired_out_and_in_ledger_row(): void

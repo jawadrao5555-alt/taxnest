@@ -4864,6 +4864,7 @@ return [
     'stock_pur_void_confirm' => 'خریداری :number منسوخ کریں؟ اس خریداری سے شامل ہوا اسٹاک واپس کٹ جائے گا اور خرید ریٹ پچھلی خریداری پر واپس چلا جائے گا۔ یہ واپس نہیں ہو سکتا۔',
     'stock_pur_voided_msg' => 'خریداری منسوخ ہو گئی: :number — اسٹاک واپس کٹ گیا۔',
     'stock_pur_void_already' => 'یہ خریداری پہلے ہی منسوخ ہو چکی ہے۔',
+    'stock_pur_void_branch_mixed' => 'یہ خریداری ایک سے زیادہ برانچوں میں پھیلی ہوئی ہے۔ جس برانچ نے مال وصول کیا تھا، اُسی کے اسٹاک صفحے سے منسوخ کریں۔',
     'stock_pur_void_not_received' => 'صرف وصول شدہ خریداری منسوخ ہو سکتی ہے۔',
 
     // ── Return / credit-note flow for PRA bills (Task 570) ──
@@ -5138,6 +5139,7 @@ return [
     // Per-branch stock & branch-to-branch transfers (Task 1354)
     'nav_branch_transfer' => 'برانچ ٹرانسفر',
     'branch_transfer' => 'برانچ ٹرانسفر',
+    'transfer_page_sub' => 'ایک برانچ سے دوسری برانچ میں مال بھیجیں — دونوں برانچز کا اسٹاک ساتھ ہی اپ ڈیٹ ہو گا۔',
     'branch_unassigned' => 'غیر متعین',
     'branch_stock_all_label' => 'تمام برانچز',
     'branch_stock_all_hint' => 'تمام برانچز ملا کر دکھائی جا رہی ہیں',

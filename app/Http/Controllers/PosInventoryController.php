@@ -461,13 +461,22 @@ class PosInventoryController extends Controller
                 $sourceQty = round((float) $source->quantity - $qty, 3);
                 $source->update(['quantity' => $sourceQty]);
 
-                $destQty = round((float) $destination->quantity + $qty, 3);
+                // Cost travels WITH the goods: the destination's average is
+                // re-weighted across what it already held and what just
+                // arrived. Keeping its old rate would mis-value the maal and
+                // every later sale there would snapshot the wrong cost.
+                $destQtyBefore = (float) $destination->quantity;
+                $movedCost = (float) $source->avg_purchase_price;
+                $destQty = round($destQtyBefore + $qty, 3);
                 $destination->update([
                     'quantity' => $destQty,
-                    // Cost travels with the goods so the receiving branch values
-                    // its stock correctly instead of at zero.
-                    'avg_purchase_price' => (float) $destination->avg_purchase_price ?: (float) $source->avg_purchase_price,
-                    'last_purchase_price' => (float) $destination->last_purchase_price ?: (float) $source->last_purchase_price,
+                    'avg_purchase_price' => BranchStockService::blendCost(
+                        $destQtyBefore, (float) $destination->avg_purchase_price, $qty, $movedCost
+                    ),
+                    // These units are the most recent arrival on that shelf.
+                    'last_purchase_price' => $movedCost > 0
+                        ? round($movedCost, 2)
+                        : (float) $destination->last_purchase_price,
                 ]);
 
                 foreach ([

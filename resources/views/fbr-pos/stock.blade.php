@@ -25,6 +25,10 @@
     @if(session('success'))<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">{{ session('success') }}</div>@endif
     @if(session('error'))<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">{{ session('error') }}</div>@endif
 
+    {{-- Per-branch stock (Task 1365): whose maal is on screen + the switcher.
+         Renders nothing for a single-shop company. --}}
+    @include('fbr-pos.partials.branch-bar')
+
     @if(!$stockEnabled)
     <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 px-4 py-3 rounded-lg mb-5 text-sm">
         {{ __('pos.stock_off_notice') }}
@@ -81,6 +85,20 @@
                     @endif
                     @endforeach
                 </select>
+
+                @if($multiBranch ?? false)
+                {{-- Per-branch stock (Task 1365): received maal has to land in ONE
+                     shop, so a multi-branch company must say which. Defaults to the
+                     branch being viewed; on the "sab branches" view nothing is
+                     pre-picked and the controller refuses a blank choice. --}}
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_lands_in_branch') }}</label>
+                <select name="branch_id" required class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mb-3">
+                    <option value="">{{ __('pos.branch_select') }}</option>
+                    @foreach($branches as $b)
+                    <option value="{{ $b->id }}" {{ (int) ($activeBranchId ?? 0) === (int) $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                    @endforeach
+                </select>
+                @endif
 
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_add_product_lbl') }}</label>
                 <div class="relative mb-3">
@@ -228,10 +246,15 @@
                             {{ rtrim(rtrim(number_format($r->quantity, 3), '0'), '.') }} <span class="text-xs font-normal text-gray-400">{{ $r->uom }}</span>
                         </td>
                         <td class="px-4 py-2 text-right">
+                            {{-- Task 1365: the alert level belongs to ONE shop's shelf.
+                                 The all-branches view is a total, so editing here would
+                                 have no single row to write — greyed out until a branch
+                                 is picked (the controller refuses it too). --}}
                             <input type="number" value="{{ $r->min_stock_level > 0 ? rtrim(rtrim(number_format($r->min_stock_level, 3, '.', ''), '0'), '.') : '' }}"
                                    step="0.001" min="0" placeholder="—"
                                    @change="saveMinLevel({{ $r->product_id }}, $event.target)"
-                                   class="w-20 border rounded px-2 py-1 text-right text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                                   @if($allBranches ?? false) disabled title="{{ __('pos.stock_edit_pick_branch') }}" @endif
+                                   class="w-20 border rounded px-2 py-1 text-right text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
                         </td>
                         <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{{ $r->last_purchase_price > 0 ? 'Rs ' . number_format($r->last_purchase_price, 2) : '—' }}</td>
                         <td class="px-4 py-2 text-right">
@@ -296,11 +319,21 @@
                             </select>
                         </div>
                     </div>
+                    {{-- Task 1365: sale price + unit are the same item everywhere, so
+                         they stay editable on the all-branches view. Kharid rate and
+                         the quantity correction sit on ONE branch's shelf — locked
+                         until a branch is picked. --}}
+                    @if($allBranches ?? false)
+                    <div class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                        {{ __('pos.stock_edit_pick_branch') }}
+                    </div>
+                    @endif
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_edit_kharid') }}</label>
                         <input type="number" name="kharid_rate" x-model="edit.kharid" step="0.01" min="0"
                                autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
-                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                               @if($allBranches ?? false) disabled title="{{ __('pos.stock_edit_pick_branch') }}" @endif
+                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
                         <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.stock_edit_kharid_note') }}</p>
                     </div>
                     <div class="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
@@ -309,10 +342,12 @@
                         <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_edit_correct_qty') }}</label>
                         <input type="number" name="new_quantity" x-model="edit.qty" step="0.001"
                                autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
-                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mb-2">
+                               @if($allBranches ?? false) disabled title="{{ __('pos.stock_edit_pick_branch') }}" @endif
+                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed mb-2">
                         <input type="text" name="qty_reason" maxlength="200" placeholder="{{ __('pos.stock_edit_qty_reason') }}"
                                autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
-                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                               @if($allBranches ?? false) disabled @endif
+                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
                         <p class="text-xs text-gray-400 mt-1">{{ __('pos.stock_edit_qty_note') }}</p>
                     </div>
                     <a :href="'{{ url('/fbr-pos/products') }}/' + edit.id + '/edit'" class="inline-block text-xs text-blue-600 dark:text-blue-400 hover:underline">{{ __('pos.stock_edit_full_link') }} →</a>

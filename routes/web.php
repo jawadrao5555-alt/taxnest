@@ -1745,6 +1745,9 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/stock/supplier/{id}/reactivate', [\App\Http\Controllers\FbrPosStockController::class, 'reactivateSupplier'])->name('fbrpos.stock.supplier.reactivate')->middleware('plan.limit:inventory');
     Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase')->middleware('plan.limit:inventory');
     Route::post('/stock/purchase/{id}/void', [\App\Http\Controllers\FbrPosStockController::class, 'voidPurchase'])->name('fbrpos.stock.purchase.void')->middleware('plan.limit:inventory');
+    // Branch-to-branch stock transfer (Task 1365) — owner/manager only.
+    Route::get('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'transfers'])->name('fbrpos.stock.transfers');
+    Route::post('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'storeTransfer'])->name('fbrpos.stock.transfer.store')->middleware('plan.limit:inventory');
     Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
     Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
     Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');

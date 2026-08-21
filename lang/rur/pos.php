@@ -4867,6 +4867,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_pur_void_confirm' => 'Purchase :number void karein? Is purchase se add hua stock wapis kat jayega aur kharid rate pichli purchase par wapis chala jayega. Yeh wapis nahi ho sakta.',
     'stock_pur_voided_msg' => 'Purchase void ho gayi: :number — stock wapis kat gaya.',
     'stock_pur_void_already' => 'Yeh purchase pehle hi void ho chuki hai.',
+    'stock_pur_void_branch_mixed' => 'Yeh purchase aik se zyada branch mein phaili hui hai. Jis branch ne maal wasool kiya thha, usi ke Stock page se void karein.',
     'stock_pur_void_not_received' => 'Sirf receive shuda purchase void ho sakti hai.',
 
     // ── Return / credit-note flow for PRA bills (Task 570) ──
@@ -5142,6 +5143,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Per-branch stock & branch-to-branch transfers (Task 1354)
     'nav_branch_transfer' => 'Branch Transfer',
     'branch_transfer' => 'Branch Transfer',
+    'transfer_page_sub' => 'Ek branch se doosri branch mein maal bhejein — dono branches ka stock saath hi update hoga.',
     'branch_unassigned' => 'Ghair-mutayyan',
     'branch_stock_all_label' => 'Sab branches',
     'branch_stock_all_hint' => 'sab branches mila kar dikhai ja rahi hain',

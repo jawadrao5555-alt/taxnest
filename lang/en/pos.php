@@ -4869,6 +4869,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'stock_pur_void_confirm' => 'Void purchase :number? The stock this purchase added will be removed and the kharid rate rolled back to the previous purchase. This cannot be undone.',
     'stock_pur_voided_msg' => 'Purchase voided: :number — stock reversed.',
     'stock_pur_void_already' => 'This purchase is already voided.',
+    'stock_pur_void_branch_mixed' => 'This purchase is spread across more than one branch. Void it from the Stock page of the branch that received it.',
     'stock_pur_void_not_received' => 'Only received purchases can be voided.',
 
     // ── Return / credit-note flow for PRA bills (Task 570) ──
@@ -5144,6 +5145,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     // Per-branch stock & branch-to-branch transfers (Task 1354)
     'nav_branch_transfer' => 'Branch Transfer',
     'branch_transfer' => 'Branch Transfer',
+    'transfer_page_sub' => 'Move stock from one branch to another — both branches update together.',
     'branch_unassigned' => 'Unassigned',
     'branch_stock_all_label' => 'All branches',
     'branch_stock_all_hint' => 'showing every branch together',

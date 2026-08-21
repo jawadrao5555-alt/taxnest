@@ -266,16 +266,48 @@
                 @php
                     // Retail Core (Aug 2026): current stock row — min-stock default
                     // and the edit-mode stock adjustment card (Task 1276).
-                    $stockRow = $isEdit
-                        ? \App\Models\InventoryStock::where('company_id', $product->company_id)->where('product_id', $product->id)->whereNull('branch_id')->first()
+                    // Per-branch stock (Task 1365): the row belongs to the shop the
+                    // user is standing in, and any adjustment saved from this form
+                    // lands on that same shelf (FbrPosController::panelStockBranchId).
+                    $pfCompanyId = (int) ($isEdit
+                        ? $product->company_id
+                        : (app()->bound('currentCompanyId') ? app('currentCompanyId') : 0));
+                    // From the owner's "sab branches" view there is no single
+                    // shelf to read or write: show the company total read-only
+                    // and switch every stock control off, rather than letting
+                    // the save silently land on head office.
+                    $pfAllBranches = $pfCompanyId > 0
+                        && \App\Services\BranchStockService::viewingAllBranches($pfCompanyId);
+                    $pfBranchId = ($isEdit && !$pfAllBranches)
+                        ? \App\Services\BranchStockService::writeBranchId($pfCompanyId, null)
                         : null;
-                    $currentStockQty = $stockRow ? rtrim(rtrim(number_format($stockRow->quantity, 3, '.', ''), '0'), '.') : '0';
+                    $stockRow = ($isEdit && !$pfAllBranches)
+                        ? \App\Models\InventoryStock::where('company_id', $product->company_id)
+                            ->where('product_id', $product->id)
+                            ->where(fn ($q) => $pfBranchId ? $q->where('branch_id', $pfBranchId) : $q->whereNull('branch_id'))
+                            ->first()
+                        : null;
+                    $pfTrimQty = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
+                    $currentStockQty = ($isEdit && $pfAllBranches)
+                        ? $pfTrimQty(\App\Models\InventoryStock::where('company_id', $product->company_id)
+                            ->where('product_id', $product->id)->sum('quantity'))
+                        : ($stockRow ? $pfTrimQty($stockRow->quantity) : '0');
+                    $pfBranchName = $pfBranchId
+                        ? \App\Services\BranchStockService::branchName($pfCompanyId, $pfBranchId)
+                        : null;
                 @endphp
+                @if($pfAllBranches)
+                {{-- Task 1365: one clear reason why the stock boxes are off. --}}
+                <div class="md:col-span-2 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <svg class="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">{{ __('pos.stock_edit_pick_branch') }}</p>
+                </div>
+                @endif
                 @unless($isEdit)
                 {{-- Edit mode handles stock in its own adjustment card (Task 1276) --}}
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.fbr_pf_opening_stock') }} <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="number" step="0.001" min="0" name="opening_stock" value="{{ old('opening_stock') }}" :disabled="mode === 'multi'"
+                    <input type="number" step="0.001" min="0" name="opening_stock" value="{{ old('opening_stock') }}" :disabled="mode === 'multi'" @disabled($pfAllBranches)
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         placeholder="0">
                 </div>
@@ -291,7 +323,7 @@
                 @endif
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Min Stock Alert Level <span class="text-gray-400 text-xs">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="number" step="0.001" min="0" name="min_stock_level" value="{{ old('min_stock_level', $stockRow->min_stock_level ?? '') }}" :disabled="mode === 'multi'"
+                    <input type="number" step="0.001" min="0" name="min_stock_level" value="{{ old('min_stock_level', $stockRow->min_stock_level ?? '') }}" :disabled="mode === 'multi'" @disabled($pfAllBranches)
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         placeholder="e.g. 10">
                     <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.min_level_alert_hint') }}</p>
@@ -501,8 +533,25 @@
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">{{ __('pos.fbr_pf_stock_heading') }}</h3>
                 <div class="text-sm text-gray-600 dark:text-gray-300">
                     {{ __('pos.fbr_pf_stock_current') }}: <strong class="text-gray-900 dark:text-white">{{ $currentStockQty }} {{ $product->uom ?? 'U' }}</strong>
+                    @if($pfBranchName)
+                    {{-- Task 1365: stock is per-branch — say WHICH shop this number
+                         is for, and where an adjustment saved here will land. --}}
+                    <span class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[11px] font-bold align-middle">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        {{ $pfBranchName }}
+                    </span>
+                    @endif
                 </div>
             </div>
+            @if($pfAllBranches)
+            {{-- Task 1365: an adjustment must name ONE shop's shelf. The number
+                 above is the company total, so nothing here can be saved from
+                 the all-branches view. --}}
+            <div class="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <svg class="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">{{ __('pos.stock_edit_pick_branch') }}</p>
+            </div>
+            @else
             <div class="flex flex-wrap gap-2 mb-4">
                 <label class="cursor-pointer px-4 py-2 rounded-lg border-2 text-sm font-bold transition"
                        :class="stockAction === 'none' ? 'border-gray-500 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'">
@@ -565,6 +614,7 @@
                 </div>
                 <p class="md:col-span-3 text-[11px] text-gray-400 -mt-2">{{ __('pos.fbr_pf_stock_correct_hint') }}</p>
             </div>
+            @endif
         </div>
         @endif
 

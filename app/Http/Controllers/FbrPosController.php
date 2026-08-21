@@ -1695,14 +1695,29 @@ class FbrPosController extends Controller
 
                 $defaultTaxRate = 18;
 
+                // ── PER-BRANCH STOCK (Task 1365) ─────────────────────────────────
+                // Every stock read and write below is keyed to the branch this
+                // BILL belongs to — never the session selector. An owner ringing
+                // up from another shop, or an offline bill synced later, must
+                // still move the maal of the branch that actually sold it.
+                // NULL for a company with no branches (single-shop, unchanged).
+                $billBranchId = \App\Services\BranchStockService::writeBranchId(
+                    $companyId,
+                    $offlineBranchId ?? (app()->bound('currentBranchId') ? app('currentBranchId') : null)
+                );
+                $branchStockScope = function ($query) use ($billBranchId) {
+                    // STRICT: a branch-less row must not leak into a branch's
+                    // figures (healLegacyRows has already adopted them anyway).
+                    return $billBranchId ? $query->where('branch_id', $billBranchId) : $query->whereNull('branch_id');
+                };
+
                 // ── COST SNAPSHOT (Munafa report, Aug 2026) ──────────────────────
                 // Freeze the purchase cost per line at SALE time so later purchase
                 // rate changes never rewrite profit history. avg first, last as
                 // fallback; manual items (no product_id) stay NULL = cost unknown.
                 $costProductIds = collect($request->items)->pluck('product_id')->filter()->unique()->values();
                 $costMap = $costProductIds->isEmpty() ? collect() :
-                    \App\Models\InventoryStock::where('company_id', $companyId)
-                        ->whereNull('branch_id')
+                    $branchStockScope(\App\Models\InventoryStock::where('company_id', $companyId))
                         ->whereIn('product_id', $costProductIds)
                         ->get(['product_id', 'avg_purchase_price', 'last_purchase_price'])
                         ->keyBy('product_id');
@@ -1770,8 +1785,7 @@ class FbrPosController extends Controller
                         // Component cost snapshot (costMap only covers top-level
                         // request product_ids — deal components need their own read).
                         $compIds = array_map(fn ($u) => (int) $u['product']->id, $dealUnits);
-                        $compStock = \App\Models\InventoryStock::where('company_id', $companyId)
-                            ->whereNull('branch_id')
+                        $compStock = $branchStockScope(\App\Models\InventoryStock::where('company_id', $companyId))
                             ->whereIn('product_id', $compIds)
                             ->get(['product_id', 'avg_purchase_price', 'last_purchase_price'])
                             ->keyBy('product_id');
@@ -2008,8 +2022,7 @@ class FbrPosController extends Controller
                 // both pass on the same last units). InventoryService::deductStock
                 // later re-locks the same rows in the SAME transaction (no-op).
                 if (!empty($dealStockNeeds) && $company->inventory_enabled) {
-                    $dealStockRows = \App\Models\InventoryStock::where('company_id', $companyId)
-                        ->whereNull('branch_id')
+                    $dealStockRows = $branchStockScope(\App\Models\InventoryStock::where('company_id', $companyId))
                         ->whereIn('product_id', array_keys($dealStockNeeds))
                         ->orderBy('product_id')
                         ->lockForUpdate()
@@ -2197,7 +2210,12 @@ class FbrPosController extends Controller
                     'company_id' => $companyId,
                     // Offline sync: book under the branch the bill was RUNG UP on
                     // (company-verified above), not whoever's session synced it.
-                    'branch_id' => $offlineBranchId ?? (app()->bound('currentBranchId') ? app('currentBranchId') : null),
+                    // Task 1365: the SAME resolved branch the stock moved on —
+                    // the bill and its maal must never disagree. From the owner's
+                    // all-branches view the raw selector is NULL, which would
+                    // leave a branch-less bill sitting against a head-office
+                    // stock movement and break returns and branch reporting.
+                    'branch_id' => $billBranchId,
                     'terminal_id' => $request->terminal_id,
                     'shift_id' => $shift?->id,
                     'invoice_number' => $invoiceNumber,
@@ -2357,7 +2375,8 @@ class FbrPosController extends Controller
                                     (float) $itemData['quantity'],
                                     (float) $itemData['unit_price'],
                                     \App\Models\InventoryMovement::TYPE_SALE,
-                                    null,
+                                    // Task 1365: the BILL's branch, not the session's.
+                                    $billBranchId,
                                     ['type' => 'fbr_pos_transaction', 'id' => $transaction->id, 'number' => $invoiceNumber],
                                     null,
                                     Auth::guard('fbrpos')->id()
@@ -6676,6 +6695,10 @@ class FbrPosController extends Controller
             return $this->storeMultipleProducts($request);
         }
 
+        // Task 1365: opening stock / min level belong to ONE shop's shelf —
+        // refuse before creating anything if the selector is on all branches.
+        $this->assertPanelStockBranch($request, (int) app('currentCompanyId'));
+
         $request->validate([
             'name' => 'required|string|max:255',
             'default_price' => 'required|numeric|min:0',
@@ -6765,6 +6788,7 @@ class FbrPosController extends Controller
     private function storeMultipleProducts(Request $request)
     {
         $companyId = app('currentCompanyId');
+        $this->assertPanelStockBranch($request, (int) $companyId);
 
         $request->validate([
             'tax_type' => 'required|in:taxable,exempt,custom',
@@ -6870,7 +6894,8 @@ class FbrPosController extends Controller
                     } else {
                         \App\Services\InventoryService::addStock(
                             $companyId, $product->id, $opening, $cost,
-                            \App\Models\InventoryMovement::TYPE_OPENING, null,
+                            \App\Models\InventoryMovement::TYPE_OPENING,
+                            $this->panelStockBranchId($companyId),
                             ['type' => 'product_form', 'id' => $product->id, 'number' => null],
                             'Opening stock (product form)',
                             Auth::guard('fbrpos')->id()
@@ -6911,6 +6936,11 @@ class FbrPosController extends Controller
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
         $companyId = app('currentCompanyId');
         $product = Product::where('company_id', $companyId)->findOrFail($id);
+
+        // Task 1365: the stock-adjustment card and min level write ONE branch's
+        // shelf. Company-wide fields still save from the all-branches view;
+        // only a real stock write is refused there.
+        $this->assertPanelStockBranch($request, (int) $companyId);
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -7016,6 +7046,68 @@ class FbrPosController extends Controller
     }
 
     /**
+     * Per-branch stock (Task 1365): the branch a PANEL stock write lands in —
+     * the shop the user is standing in, head office when the selector is on
+     * "sab branches" or nothing usable is active. NULL for a company with no
+     * branches (single-shop, byte-for-byte the old behaviour).
+     *
+     * Sales do NOT use this: they key off the BILL's branch (see $billBranchId
+     * in the sale path) so an offline replay or an owner browsing from another
+     * shop still moves the right maal.
+     */
+    private function panelStockBranchId(int $companyId): ?int
+    {
+        // Hard backstop: writeBranchId() silently falls back to head office, so
+        // from the owner's "sab branches" view it would guess a shelf. Refuse
+        // instead — callers reach this only when a stock write is really about
+        // to happen, and every entry point already checks the same thing up
+        // front via assertPanelStockBranch().
+        if (\App\Services\BranchStockService::viewingAllBranches($companyId)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'branch_id' => __('pos.stock_edit_pick_branch'),
+            ]);
+        }
+
+        return \App\Services\BranchStockService::writeBranchId($companyId, null);
+    }
+
+    /**
+     * Task 1365: refuse a product-form submit that carries BRANCH-BOUND stock
+     * input while the selector sits on "sab branches" — there is no single
+     * shelf to write to and head office must not be guessed.
+     *
+     * Deliberately narrow: it fires only when the form actually asks for a
+     * stock write. Renaming a product or fixing its price from the
+     * all-branches view keeps working, because those fields are company-wide.
+     */
+    private function assertPanelStockBranch(Request $request, int $companyId): void
+    {
+        if (!\App\Services\BranchStockService::viewingAllBranches($companyId)) {
+            return;
+        }
+
+        $wantsStockWrite = $request->filled('min_stock_level')
+            || (float) ($request->input('opening_stock') ?? 0) > 0
+            || in_array($request->input('stock_action'), ['add', 'correct'], true);
+
+        if (!$wantsStockWrite) {
+            // Multi-row entry mode: any row with an opening quantity counts.
+            foreach ((array) $request->input('rows', []) as $row) {
+                if (is_array($row) && (float) ($row['opening_stock'] ?? 0) > 0) {
+                    $wantsStockWrite = true;
+                    break;
+                }
+            }
+        }
+
+        if ($wantsStockWrite) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'branch_id' => __('pos.stock_edit_pick_branch'),
+            ]);
+        }
+    }
+
+    /**
      * Stock adjustment from the product edit form (Task 1276).
      *
      * add     → new stock in. With a supplier it is recorded as a RECEIVED
@@ -7036,6 +7128,7 @@ class FbrPosController extends Controller
         }
         $companyId = app('currentCompanyId');
         $userId = Auth::guard('fbrpos')->id();
+        $branchId = $this->panelStockBranchId($companyId);
 
         if ($action === 'add') {
             $qty = round((float) $request->add_qty, 3);
@@ -7048,11 +7141,11 @@ class FbrPosController extends Controller
             if ($supplier) {
                 $this->recordProductFormPurchase($companyId, $supplier, [
                     ['product_id' => $product->id, 'quantity' => $qty, 'unit_price' => $cost],
-                ]);
+                ], $branchId);
             } else {
                 \App\Services\InventoryService::addStock(
                     $companyId, $product->id, $qty, $cost,
-                    \App\Models\InventoryMovement::TYPE_PURCHASE, null,
+                    \App\Models\InventoryMovement::TYPE_PURCHASE, $branchId,
                     ['type' => 'product_form', 'id' => $product->id, 'number' => null],
                     'Stock added (product edit form)',
                     $userId
@@ -7065,11 +7158,8 @@ class FbrPosController extends Controller
         $newQty = round((float) $request->new_qty, 3);
         $reason = trim((string) ($request->qty_reason ?? ''));
         $note = 'Stock correction (product edit form)' . ($reason !== '' ? ' — ' . $reason : '');
-        DB::transaction(function () use ($companyId, $product, $newQty, $note, $userId) {
-            $stock = \App\Models\InventoryStock::lockForUpdate()->firstOrCreate(
-                ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
-                ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
-            );
+        DB::transaction(function () use ($companyId, $product, $newQty, $note, $userId, $branchId) {
+            $stock = \App\Services\BranchStockService::stockRow($companyId, (int) $product->id, $branchId);
             $delta = round($newQty - (float) $stock->quantity, 3);
             if (abs($delta) < 0.0005) {
                 return;
@@ -7077,10 +7167,10 @@ class FbrPosController extends Controller
             $ref = ['type' => 'product_form', 'id' => $product->id, 'number' => null];
             if ($delta > 0) {
                 \App\Services\InventoryService::addStock($companyId, $product->id, $delta, 0,
-                    \App\Models\InventoryMovement::TYPE_ADJUSTMENT_IN, null, $ref, $note, $userId);
+                    \App\Models\InventoryMovement::TYPE_ADJUSTMENT_IN, $branchId, $ref, $note, $userId);
             } else {
                 \App\Services\InventoryService::deductStock($companyId, $product->id, abs($delta), 0,
-                    \App\Models\InventoryMovement::TYPE_ADJUSTMENT_OUT, null, $ref, $note, $userId);
+                    \App\Models\InventoryMovement::TYPE_ADJUSTMENT_OUT, $branchId, $ref, $note, $userId);
             }
         });
     }
@@ -7098,16 +7188,19 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // Task 1365: resolve the branch LAZILY — panelStockBranchId() refuses
+        // the all-branches view, and a plain rename must not trip that when the
+        // form asks for no stock write at all.
         if ($request->filled('min_stock_level')) {
-            $stock = \App\Models\InventoryStock::firstOrCreate(
-                ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
-                ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
+            $stock = \App\Services\BranchStockService::stockRow(
+                $companyId, (int) $product->id, $this->panelStockBranchId($companyId)
             );
             $stock->update(['min_stock_level' => (float) $request->min_stock_level]);
         }
 
         $opening = (float) ($request->opening_stock ?? 0);
         if ($opening > 0) {
+            $branchId = $this->panelStockBranchId($companyId);
             // OPENING or PURCHASE: once first stock came in via either path
             // (or the Stock page), this form never adds again — the blade
             // shows the read-only "current stock" box for the same condition.
@@ -7121,7 +7214,7 @@ class FbrPosController extends Controller
                     if ($supplier) {
                         $this->recordProductFormPurchase($companyId, $supplier, [
                             ['product_id' => $product->id, 'quantity' => $opening, 'unit_price' => $cost],
-                        ]);
+                        ], $branchId);
                     } else {
                         \App\Services\InventoryService::addStock(
                             $companyId,
@@ -7129,7 +7222,7 @@ class FbrPosController extends Controller
                             $opening,
                             $cost,
                             \App\Models\InventoryMovement::TYPE_OPENING,
-                            null,
+                            $branchId,
                             ['type' => 'product_form', 'id' => $product->id, 'number' => null],
                             'Opening stock (product form)',
                             Auth::guard('fbrpos')->id()
@@ -7208,9 +7301,15 @@ class FbrPosController extends Controller
      * the purchases list, purchase void and avg/last kharid all behave as if
      * the entry was made on the Stock & Purchase page.
      */
-    private function recordProductFormPurchase(int $companyId, \App\Models\Supplier $supplier, array $lines): \App\Models\PurchaseOrder
+    private function recordProductFormPurchase(int $companyId, \App\Models\Supplier $supplier, array $lines, ?int $branchId = null): \App\Models\PurchaseOrder
     {
-        return DB::transaction(function () use ($companyId, $supplier, $lines) {
+        // Task 1365: the maal lands in the shop the user is standing in. The
+        // caller passes its already-resolved branch where the call sits inside
+        // a catch-all — panelStockBranchId() throws on the all-branches view
+        // and that refusal must reach the user, not get logged as a warning.
+        $branchId = $branchId ?? $this->panelStockBranchId($companyId);
+
+        return DB::transaction(function () use ($companyId, $supplier, $lines, $branchId) {
             $total = 0;
             foreach ($lines as $l) {
                 $total += round((float) $l['quantity'] * (float) $l['unit_price'], 2);
@@ -7241,7 +7340,7 @@ class FbrPosController extends Controller
                     (float) $l['quantity'],
                     (float) $l['unit_price'],
                     \App\Models\InventoryMovement::TYPE_PURCHASE,
-                    null,
+                    $branchId,
                     ['type' => 'purchase_order', 'id' => $po->id, 'number' => $po->po_number],
                     null,
                     Auth::guard('fbrpos')->id()

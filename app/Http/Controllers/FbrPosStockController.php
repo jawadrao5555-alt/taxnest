@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Supplier;
+use App\Services\BranchStockService;
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,24 +45,191 @@ class FbrPosStockController extends Controller
         }
     }
 
+    /**
+     * Per-branch stock (Task 1365) — FBR POS now keys every stock row by
+     * branch exactly like PRA POS does. Before anything is read or written,
+     * make sure no pre-branch (branch-less) row is stranded: those goods
+     * belong to the head office. Cheap and idempotent — see
+     * BranchStockService::healLegacyRows().
+     */
+    private function healBranchStock(int $companyId): void
+    {
+        BranchStockService::healLegacyRows($companyId);
+    }
+
+    /**
+     * View-model shared by the stock pages: which branch is on screen, its
+     * name, and the branch list for the picker / "sab branches" view.
+     */
+    private function branchView(int $companyId): array
+    {
+        $branches = BranchStockService::branches($companyId);
+        $activeBranchId = BranchStockService::viewBranchId($companyId);
+
+        return [
+            // Pickers only ever offer branches THIS user may touch; the
+            // company-wide list stays behind branchNames (labels) so an
+            // owner's all-branches view can still name every shop.
+            'branches' => BranchStockService::actorBranches($companyId),
+            'multiBranch' => $branches->isNotEmpty(),
+            'canTransfer' => BranchStockService::canTransfer($companyId),
+            'activeBranchId' => $activeBranchId,
+            'activeBranchName' => BranchStockService::branchName($companyId, $activeBranchId),
+            'allBranches' => BranchStockService::viewingAllBranches($companyId),
+            'branchNames' => $branches->pluck('name', 'id')->all(),
+        ];
+    }
+
+    /**
+     * A branch id that arrived from the browser must be one the user is
+     * allowed to touch — company ownership alone is not enough, or a manager
+     * confined to Gulberg could receive stock into Main Shop.
+     */
+    private function assertBranchAllowed(int $companyId, ?int $branchId): void
+    {
+        if ($branchId !== null && !BranchStockService::actorCanUse($companyId, $branchId)) {
+            abort(403, __('pos.access_denied'));
+        }
+    }
+
+    /** Branch-scope every stock query the same (STRICT) way. */
+    private function scopeBranch($query, int $companyId)
+    {
+        return BranchStockService::applyViewFilter($query, $companyId);
+    }
+
+    /**
+     * Task 1365: purchase_orders has NO branch column — a purchase belongs to
+     * whichever branch its PURCHASE movements landed in. Scope the history
+     * list to the branch on screen so a manager confined to one shop can
+     * neither see nor void another shop's purchase.
+     *
+     * NULL viewBranchId = single-shop company, or the owner's all-branches
+     * view; both legitimately see everything.
+     */
+    private function scopePurchaseBranch($query, int $companyId)
+    {
+        $branchId = BranchStockService::viewBranchId($companyId);
+        if (!$branchId) {
+            return $query;
+        }
+
+        return $query->whereExists(function ($sub) use ($companyId, $branchId) {
+            $sub->selectRaw('1')
+                ->from('inventory_movements')
+                ->whereColumn('inventory_movements.reference_id', 'purchase_orders.id')
+                ->where('inventory_movements.company_id', $companyId)
+                ->where('inventory_movements.reference_type', 'purchase_order')
+                ->where('inventory_movements.type', InventoryMovement::TYPE_PURCHASE)
+                ->where('inventory_movements.branch_id', $branchId);
+        });
+    }
+
+    /**
+     * The ONE branch a purchase's goods actually went into, read back from its
+     * PURCHASE movements, plus the permission check that must pass before any
+     * of it is reversed.
+     *
+     * Returns ['ok' => true, 'branch' => ?int] or ['ok' => false, 'error' => string].
+     *
+     * A purchase whose movements straddle two branches is refused rather than
+     * guessed: reversing it would deduct one shop's stock to unwind another's.
+     */
+    private function resolvePurchaseBranch(int $companyId, PurchaseOrder $po): array
+    {
+        // Single-shop company — branch stays NULL exactly as before.
+        if (!BranchStockService::isMultiBranch($companyId)) {
+            return ['ok' => true, 'branch' => null];
+        }
+
+        $branchIds = InventoryMovement::where('company_id', $companyId)
+            ->where('type', InventoryMovement::TYPE_PURCHASE)
+            ->where('reference_type', 'purchase_order')
+            ->where('reference_id', $po->id)
+            ->distinct()
+            ->pluck('branch_id')
+            ->map(fn ($b) => $b === null ? null : (int) $b)
+            ->unique()
+            ->values();
+
+        if ($branchIds->count() > 1) {
+            return ['ok' => false, 'error' => __('pos.stock_pur_void_branch_mixed')];
+        }
+
+        // No movement to read (nothing was ever put in, or the rows are gone):
+        // fall back to the branch on screen, and refuse to guess from the
+        // owner's all-branches view.
+        $branchId = $branchIds->first();
+        if ($branchId === null) {
+            if (BranchStockService::viewingAllBranches($companyId)) {
+                return ['ok' => false, 'error' => __('pos.stock_edit_pick_branch')];
+            }
+            $branchId = BranchStockService::viewBranchId($companyId);
+        }
+
+        if (!BranchStockService::actorCanUse($companyId, $branchId)) {
+            return ['ok' => false, 'error' => __('pos.branch_switch_denied')];
+        }
+
+        return ['ok' => true, 'branch' => (int) $branchId];
+    }
+
+    /**
+     * Which branch a stock WRITE from the stock page lands in: the explicitly
+     * picked shop, else the one being viewed. NULL only for a company with no
+     * branches (single-shop, unchanged behaviour).
+     *
+     * On the owner's all-branches view there is no single answer — callers
+     * must refuse (viewingAllBranches) instead of letting this silently fall
+     * back to head office.
+     */
+    private function writeBranch(int $companyId, ?int $picked = null): ?int
+    {
+        return BranchStockService::writeBranchId(
+            $companyId,
+            $picked ?? BranchStockService::viewBranchId($companyId)
+        );
+    }
+
     public function index()
     {
         $this->assertNotCashier();
         $companyId = $this->companyId();
         $company = Company::find($companyId);
 
+        $this->healBranchStock($companyId);
+        $branchView = $this->branchView($companyId);
+
         $products = Product::where('company_id', $companyId)
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'sku', 'barcode', 'uom', 'default_price']);
 
-        $stocks = InventoryStock::where('company_id', $companyId)
-            ->whereNull('branch_id')
-            ->get()
-            ->keyBy('product_id');
+        // One row per product on screen. On a single branch that is exactly
+        // that branch's row; on the owner's all-branches view the branch rows
+        // are summed (STRICT filter — no NULL rows sneak in and double-count).
+        $stocks = [];
+        $stockQuery = $this->scopeBranch(InventoryStock::where('company_id', $companyId), $companyId);
+        foreach ($stockQuery->orderByDesc('updated_at')->get() as $row) {
+            $pid = (int) $row->product_id;
+            if (!isset($stocks[$pid])) {
+                $stocks[$pid] = [
+                    'quantity' => 0.0,
+                    'min_stock_level' => 0.0,
+                    // Rate shown company-wide = the most recently updated
+                    // branch row that actually has one (rows come newest first).
+                    'last_purchase_price' => 0.0,
+                ];
+            }
+            $stocks[$pid]['quantity'] += (float) $row->quantity;
+            $stocks[$pid]['min_stock_level'] = max($stocks[$pid]['min_stock_level'], (float) $row->min_stock_level);
+            if ($stocks[$pid]['last_purchase_price'] <= 0) {
+                $stocks[$pid]['last_purchase_price'] = (float) $row->last_purchase_price;
+            }
+        }
 
         $rows = $products->map(function ($p) use ($stocks) {
-            $s = $stocks->get($p->id);
+            $s = $stocks[(int) $p->id] ?? null;
             return (object) [
                 'product_id' => $p->id,
                 'name' => $p->name,
@@ -69,9 +237,9 @@ class FbrPosStockController extends Controller
                 'barcode' => $p->barcode,
                 'uom' => $p->uom ?: 'U',
                 'default_price' => (float) $p->default_price,
-                'quantity' => $s ? (float) $s->quantity : 0.0,
-                'min_stock_level' => $s ? (float) $s->min_stock_level : 0.0,
-                'last_purchase_price' => $s ? (float) $s->last_purchase_price : 0.0,
+                'quantity' => $s ? round($s['quantity'], 3) : 0.0,
+                'min_stock_level' => $s ? $s['min_stock_level'] : 0.0,
+                'last_purchase_price' => $s ? $s['last_purchase_price'] : 0.0,
                 'tracked' => (bool) $s,
             ];
         });
@@ -87,7 +255,9 @@ class FbrPosStockController extends Controller
         // from purchases() below. items.product eager-loaded — live runs with
         // strict lazy-loading, every relation the serializer reads must be
         // covered by with().
-        $recentPurchases = PurchaseOrder::where('company_id', $companyId)
+        $recentPurchases = $this->scopePurchaseBranch(
+                PurchaseOrder::where('company_id', $companyId), $companyId
+            )
             ->with('supplier:id,name', 'items.product:id,name')
             ->orderByDesc('id')
             ->limit(self::PURCHASES_PER_PAGE + 1)
@@ -104,7 +274,7 @@ class FbrPosStockController extends Controller
         $correctionsHasMore = $recentCorrections->count() > self::CORRECTIONS_PER_PAGE;
         $recentCorrections = $recentCorrections->take(self::CORRECTIONS_PER_PAGE);
 
-        return view('fbr-pos.stock', [
+        return view('fbr-pos.stock', array_merge($branchView, [
             'company' => $company,
             'recentCorrectionsData' => $this->serializeCorrections($recentCorrections),
             'correctionsHasMore' => $correctionsHasMore,
@@ -115,7 +285,7 @@ class FbrPosStockController extends Controller
             'recentPurchasesData' => $this->serializePurchases($recentPurchases),
             'purchasesHasMore' => $purchasesHasMore,
             'stockEnabled' => (bool) $company->inventory_enabled,
-        ]);
+        ]));
     }
 
     /** Page size for the Recent Purchases list (initial render + search/load-more). */
@@ -130,6 +300,10 @@ class FbrPosStockController extends Controller
     {
         $this->assertNotCashier();
         $companyId = $this->companyId();
+        // Standalone AJAX endpoint: a legacy branch-less purchase movement must
+        // be adopted onto head office BEFORE the branch filter runs, or the
+        // purchase would simply vanish from the list.
+        $this->healBranchStock($companyId);
 
         $data = $request->validate([
             'q' => 'nullable|string|max:100',
@@ -140,8 +314,12 @@ class FbrPosStockController extends Controller
         $q = trim((string) ($data['q'] ?? ''));
         $page = max(1, (int) ($data['page'] ?? 1));
 
-        $query = PurchaseOrder::where('company_id', $companyId)
-            ->with('supplier:id,name', 'items.product:id,name');
+        // Task 1365: the history follows the branch on screen — a manager
+        // pinned to Gulberg must not even see Main Shop's purchases (they are
+        // voidable from this list).
+        $query = $this->scopePurchaseBranch(
+            PurchaseOrder::where('company_id', $companyId), $companyId
+        )->with('supplier:id,name', 'items.product:id,name');
 
         // Optional exact supplier filter (Task 488) — company-scoped lookup so
         // a foreign supplier_id 404s instead of silently matching nothing.
@@ -223,6 +401,9 @@ class FbrPosStockController extends Controller
     {
         $this->assertNotCashier();
         $companyId = $this->companyId();
+        // Standalone AJAX endpoint — heal here too, so a direct hit never
+        // reads a branch-filtered history while legacy rows are still NULL.
+        $this->healBranchStock($companyId);
 
         $data = $request->validate([
             'product_id' => 'required|integer',
@@ -235,10 +416,12 @@ class FbrPosStockController extends Controller
         // product_id 404s before any movement row is read.
         $product = Product::where('company_id', $companyId)->findOrFail($data['product_id']);
 
-        $query = InventoryMovement::where('company_id', $companyId)
-            ->where('product_id', $product->id)
-            ->with('creator:id,name')
-            ->orderByDesc('id');
+        // Task 1365: the history follows the branch on screen — a manager
+        // looking at Gulberg must not see Main Shop's movements.
+        $query = $this->scopeBranch(
+            InventoryMovement::where('company_id', $companyId)->where('product_id', $product->id),
+            $companyId
+        )->with('creator:id,name')->orderByDesc('id');
 
         // Optional single-day filter (Task 465) — same range predicate (not
         // whereDate) as correctionsQuery() so an index on created_at stays usable.
@@ -289,6 +472,7 @@ class FbrPosStockController extends Controller
     {
         $this->assertNotCashier();
         $companyId = $this->companyId();
+        $this->healBranchStock($companyId);
 
         $data = $request->validate([
             'q' => 'nullable|string|max:100',
@@ -321,10 +505,12 @@ class FbrPosStockController extends Controller
     {
         // product + creator eager-loaded — live runs with strict lazy-loading,
         // every relation the serializer reads must be covered by with().
-        $query = InventoryMovement::where('company_id', $companyId)
-            ->whereIn('type', [InventoryMovement::TYPE_ADJUSTMENT_IN, InventoryMovement::TYPE_ADJUSTMENT_OUT])
-            ->with('product:id,name', 'creator:id,name')
-            ->orderByDesc('id');
+        // Task 1365: branch-scoped like every other stock read.
+        $query = $this->scopeBranch(
+            InventoryMovement::where('company_id', $companyId)
+                ->whereIn('type', [InventoryMovement::TYPE_ADJUSTMENT_IN, InventoryMovement::TYPE_ADJUSTMENT_OUT]),
+            $companyId
+        )->with('product:id,name', 'creator:id,name')->orderByDesc('id');
 
         if ($q !== '') {
             $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
@@ -458,6 +644,7 @@ class FbrPosStockController extends Controller
         $this->assertNotCashier();
         $request->validate([
             'supplier_id' => 'nullable|integer',
+            'branch_id' => 'nullable|integer',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|numeric|min:0.001',
@@ -466,6 +653,20 @@ class FbrPosStockController extends Controller
         ]);
 
         $companyId = $this->companyId();
+        $this->healBranchStock($companyId);
+
+        // Task 1365: received goods land in ONE shop. The form posts the
+        // branch explicitly (multi-branch companies); otherwise the branch
+        // being viewed is used. A single-shop company resolves to NULL and
+        // behaves exactly as before.
+        $picked = $request->filled('branch_id') ? (int) $request->branch_id : null;
+        $this->assertBranchAllowed($companyId, $picked);
+        if ($picked === null && BranchStockService::viewingAllBranches($companyId)) {
+            // Owner on the "sab branches" view — head office would be a silent
+            // guess, so ask which shop received the maal instead.
+            return back()->withInput()->with('error', __('pos.stock_edit_pick_branch'));
+        }
+        $branchId = $this->writeBranch($companyId, $picked);
 
         $supplier = null;
         if ($request->supplier_id) {
@@ -480,7 +681,7 @@ class FbrPosStockController extends Controller
             return back()->with('error', 'Ghalat product select hua — dobara koshish karein.');
         }
 
-        $po = DB::transaction(function () use ($request, $companyId, $supplier) {
+        $po = DB::transaction(function () use ($request, $companyId, $supplier, $branchId) {
             $total = 0;
             foreach ($request->items as $row) {
                 $total += round((float) $row['quantity'] * (float) $row['unit_price'], 2);
@@ -516,7 +717,7 @@ class FbrPosStockController extends Controller
                     $qty,
                     $price,
                     InventoryMovement::TYPE_PURCHASE,
-                    null,
+                    $branchId,
                     ['type' => 'purchase_order', 'id' => $po->id, 'number' => $po->po_number],
                     null,
                     $this->user()->id
@@ -544,6 +745,7 @@ class FbrPosStockController extends Controller
     {
         $this->assertNotCashier();
         $companyId = $this->companyId();
+        $this->healBranchStock($companyId);
         $po = PurchaseOrder::where('company_id', $companyId)->with('items')->findOrFail($id);
 
         if ($po->status === PurchaseOrder::STATUS_CANCELLED) {
@@ -557,7 +759,19 @@ class FbrPosStockController extends Controller
             return redirect()->route('fbrpos.stock')->with('error', __('pos.stock_pur_void_not_received'));
         }
 
-        DB::transaction(function () use ($po, $companyId) {
+        // Task 1365: resolve — and AUTHORIZE — the branch this purchase's goods
+        // actually went into BEFORE anything is mutated. Without this a manager
+        // confined to one shop could void another shop's purchase and deduct
+        // its stock. Voiding also has to unwind the goods where they landed:
+        // the session's branch may be a different shop by now, which would
+        // invent stock there and leave a hole in the real one.
+        $resolved = $this->resolvePurchaseBranch($companyId, $po);
+        if (!$resolved['ok']) {
+            return redirect()->route('fbrpos.stock')->with('error', $resolved['error']);
+        }
+        $branchId = $resolved['branch'];
+
+        DB::transaction(function () use ($po, $companyId, $branchId) {
             // Row lock + re-check — double-submit must not reverse stock twice.
             $locked = PurchaseOrder::lockForUpdate()->find($po->id);
             if (!$locked || $locked->status !== PurchaseOrder::STATUS_RECEIVED) {
@@ -578,9 +792,16 @@ class FbrPosStockController extends Controller
                 // PO-referenced movement only qualifies while its PO is still
                 // RECEIVED (never this one, never a cancelled one). NULL =
                 // no valid prior purchase → reversePurchase resets to 0.
+                // Task 1365: the rate must come from THIS branch's own purchase
+                // history — another shop's kharid rate is not this shelf's cost.
                 $fallback = InventoryMovement::where('inventory_movements.company_id', $companyId)
                     ->where('inventory_movements.product_id', $item->product_id)
                     ->where('inventory_movements.type', InventoryMovement::TYPE_PURCHASE)
+                    ->where(function ($b) use ($branchId) {
+                        return $branchId
+                            ? $b->where('inventory_movements.branch_id', $branchId)
+                            : $b->whereNull('inventory_movements.branch_id');
+                    })
                     ->where(function ($w) use ($po) {
                         $w->where(function ($q) use ($po) {
                             $q->where('reference_type', 'purchase_order')
@@ -603,7 +824,7 @@ class FbrPosStockController extends Controller
                     (int) $item->product_id,
                     $qty,
                     (float) $item->unit_price,
-                    null,
+                    $branchId,
                     ['type' => 'purchase_void', 'id' => $po->id, 'number' => $po->po_number],
                     'Purchase void — ' . $po->po_number,
                     $this->user()->id,
@@ -629,11 +850,16 @@ class FbrPosStockController extends Controller
 
         $companyId = $this->companyId();
         $product = Product::where('company_id', $companyId)->findOrFail($request->product_id);
+        $this->healBranchStock($companyId);
 
-        $stock = InventoryStock::firstOrCreate(
-            ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
-            ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
-        );
+        // Task 1365: the alert threshold belongs to a branch's shelf, not to
+        // the whole company — on the "sab branches" view there is no single
+        // row to write, so the page disables the input and this refuses.
+        if (BranchStockService::viewingAllBranches($companyId)) {
+            return response()->json(['success' => false, 'message' => __('pos.stock_edit_pick_branch')], 422);
+        }
+
+        $stock = BranchStockService::stockRow($companyId, (int) $product->id, $this->writeBranch($companyId));
         $stock->update(['min_stock_level' => (float) $request->min_stock_level]);
 
         return response()->json(['success' => true]);
@@ -674,6 +900,15 @@ class FbrPosStockController extends Controller
 
         $companyId = $this->companyId();
         $product = Product::where('company_id', $companyId)->findOrFail($request->product_id);
+        $this->healBranchStock($companyId);
+
+        // Task 1365: sale price / unit stay company-wide (same item everywhere),
+        // but kharid rate and the quantity correction live on ONE branch's
+        // shelf. The all-branches view has no single row to write, so those two
+        // are skipped with a clear message instead of guessing head office.
+        $stockBranchId = $this->writeBranch($companyId);
+        $branchAmbiguous = BranchStockService::viewingAllBranches($companyId);
+        $skippedStockEdit = false;
 
         $changedAny = false;
 
@@ -695,12 +930,13 @@ class FbrPosStockController extends Controller
             $rate = round((float) $request->kharid_rate, 2);
             $rateOrig = $request->filled('kharid_rate_orig') ? round((float) $request->kharid_rate_orig, 2) : null;
             if ($rateOrig === null || abs($rate - $rateOrig) > 0.009) {
-                $stock = InventoryStock::firstOrCreate(
-                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
-                    ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
-                );
-                $stock->update(['avg_purchase_price' => $rate, 'last_purchase_price' => $rate]);
-                $changedAny = true;
+                if ($branchAmbiguous) {
+                    $skippedStockEdit = true;
+                } else {
+                    $stock = BranchStockService::stockRow($companyId, (int) $product->id, $stockBranchId);
+                    $stock->update(['avg_purchase_price' => $rate, 'last_purchase_price' => $rate]);
+                    $changedAny = true;
+                }
             }
         }
 
@@ -709,33 +945,193 @@ class FbrPosStockController extends Controller
             $newQty = round((float) $request->new_quantity, 3);
             $qtyOrig = $request->filled('quantity_orig') ? round((float) $request->quantity_orig, 3) : null;
             if ($qtyOrig === null || abs($newQty - $qtyOrig) > 0.0005) {
-                $reason = trim((string) ($request->qty_reason ?? ''));
-                $note = 'Stock correction (quick edit)' . ($reason !== '' ? ' — ' . $reason : '');
-                DB::transaction(function () use ($companyId, $product, $newQty, $note, &$changedAny) {
-                    $stock = InventoryStock::lockForUpdate()->firstOrCreate(
-                        ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
-                        ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
-                    );
-                    $delta = round($newQty - (float) $stock->quantity, 3);
-                    if (abs($delta) < 0.0005) {
-                        return;
-                    }
-                    $ref = ['type' => 'stock_quick_edit', 'id' => $product->id, 'number' => null];
-                    if ($delta > 0) {
-                        InventoryService::addStock($companyId, $product->id, $delta, 0,
-                            InventoryMovement::TYPE_ADJUSTMENT_IN, null, $ref, $note, $this->user()->id);
-                    } else {
-                        InventoryService::deductStock($companyId, $product->id, abs($delta), 0,
-                            InventoryMovement::TYPE_ADJUSTMENT_OUT, null, $ref, $note, $this->user()->id);
-                    }
-                    $changedAny = true;
-                });
+                if ($branchAmbiguous) {
+                    $skippedStockEdit = true;
+                } else {
+                    $reason = trim((string) ($request->qty_reason ?? ''));
+                    $note = 'Stock correction (quick edit)' . ($reason !== '' ? ' — ' . $reason : '');
+                    DB::transaction(function () use ($companyId, $product, $newQty, $note, $stockBranchId, &$changedAny) {
+                        $stock = BranchStockService::stockRow($companyId, (int) $product->id, $stockBranchId);
+                        $delta = round($newQty - (float) $stock->quantity, 3);
+                        if (abs($delta) < 0.0005) {
+                            return;
+                        }
+                        $ref = ['type' => 'stock_quick_edit', 'id' => $product->id, 'number' => null];
+                        if ($delta > 0) {
+                            InventoryService::addStock($companyId, $product->id, $delta, 0,
+                                InventoryMovement::TYPE_ADJUSTMENT_IN, $stockBranchId, $ref, $note, $this->user()->id);
+                        } else {
+                            InventoryService::deductStock($companyId, $product->id, abs($delta), 0,
+                                InventoryMovement::TYPE_ADJUSTMENT_OUT, $stockBranchId, $ref, $note, $this->user()->id);
+                        }
+                        $changedAny = true;
+                    });
+                }
             }
+        }
+
+        if ($skippedStockEdit) {
+            return redirect()->route('fbrpos.stock')->with('error', __('pos.stock_edit_pick_branch'));
         }
 
         return redirect()->route('fbrpos.stock')->with('success', $changedAny
             ? __('pos.stock_item_updated', ['name' => $product->name])
             : __('pos.stock_item_no_change', ['name' => $product->name]));
+    }
+
+    /**
+     * Branch-to-branch stock transfer (Task 1365 — FBR port of the PRA POS
+     * page). Moves goods from one shop to another; the ledger keeps a paired
+     * TRANSFER_OUT / TRANSFER_IN so both branches tell the same story.
+     */
+    public function transfers()
+    {
+        $this->assertNotCashier();
+        $companyId = $this->companyId();
+        $company = Company::find($companyId);
+        $this->healBranchStock($companyId);
+        $branchView = $this->branchView($companyId);
+
+        // Needs two shops THIS user may move stock between — a manager tied to
+        // a single branch has nowhere to send it, so the page is not theirs.
+        if (!$branchView['canTransfer']) {
+            abort(403, __('pos.access_denied'));
+        }
+
+        // Everything below is limited to the user's own branches: the picker,
+        // the availability map and the history all leak holdings otherwise.
+        $branchIds = collect($branchView['branches'])->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $products = Product::where('company_id', $companyId)
+            ->where('is_active', true)->orderBy('name')->get(['id', 'name', 'sku', 'uom']);
+
+        // Current holdings per branch for the picker — the user must see what
+        // is actually available before choosing a quantity.
+        $stockMap = [];
+        foreach (InventoryStock::where('company_id', $companyId)->whereIn('branch_id', $branchIds)->get() as $row) {
+            $stockMap[(int) $row->branch_id][(int) $row->product_id] = (float) $row->quantity;
+        }
+
+        $recent = InventoryMovement::where('company_id', $companyId)
+            ->where('reference_type', 'branch_transfer')
+            ->where('type', InventoryMovement::TYPE_TRANSFER_OUT)
+            ->whereIn('branch_id', $branchIds)
+            ->with(['product:id,name', 'creator:id,name'])
+            ->orderByDesc('created_at')
+            ->limit(30)
+            ->get();
+
+        return view('fbr-pos.stock-transfer', array_merge($branchView, compact(
+            'company', 'products', 'stockMap', 'recent'
+        )));
+    }
+
+    public function storeTransfer(Request $request)
+    {
+        $this->assertNotCashier();
+        $companyId = $this->companyId();
+        $this->healBranchStock($companyId);
+
+        $request->validate([
+            'product_id' => 'required|integer',
+            'from_branch_id' => 'required|integer',
+            'to_branch_id' => 'required|integer|different:from_branch_id',
+            'quantity' => 'required|numeric|min:0.01',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $from = (int) $request->from_branch_id;
+        $to = (int) $request->to_branch_id;
+
+        // BOTH ends must be branches this user may touch — company ownership
+        // alone would let a confined manager drain a branch that is not theirs.
+        if (!BranchStockService::actorCanUse($companyId, $from) || !BranchStockService::actorCanUse($companyId, $to)) {
+            return back()->withInput()->with('error', __('pos.transfer_branch_invalid'));
+        }
+
+        $product = Product::where('company_id', $companyId)->findOrFail($request->product_id);
+        $qty = round((float) $request->quantity, 3);
+
+        try {
+            $result = DB::transaction(function () use ($companyId, $product, $from, $to, $qty, $request) {
+                $source = BranchStockService::stockRow($companyId, (int) $product->id, $from);
+
+                // A transfer can only move goods that exist — unlike a sale
+                // (oversell is allowed there by design), sending stock a shop
+                // does not have would invent inventory out of nothing.
+                if ((float) $source->quantity < $qty) {
+                    return ['error' => __('pos.transfer_not_enough_stock', [
+                        'available' => rtrim(rtrim(number_format((float) $source->quantity, 2, '.', ''), '0'), '.'),
+                    ])];
+                }
+
+                $destination = BranchStockService::stockRow($companyId, (int) $product->id, $to);
+
+                $reference = 'TRF-' . now()->format('ymdHis') . '-' . $product->id;
+                $userId = Auth::guard('fbrpos')->id();
+                $note = trim(__('pos.transfer_movement_note', [
+                    'from' => BranchStockService::branchName($companyId, $from) ?? '—',
+                    'to' => BranchStockService::branchName($companyId, $to) ?? '—',
+                ]) . ($request->filled('notes') ? ' — ' . $request->notes : ''));
+
+                $sourceQty = round((float) $source->quantity - $qty, 3);
+                $source->update(['quantity' => $sourceQty]);
+
+                // Cost travels WITH the goods: the destination's average is
+                // re-weighted across what it already held and what just
+                // arrived. Keeping its old rate would mis-value the maal and
+                // every later sale there would snapshot the wrong cost.
+                $destQtyBefore = (float) $destination->quantity;
+                $movedCost = (float) $source->avg_purchase_price;
+                $destQty = round($destQtyBefore + $qty, 3);
+                $destination->update([
+                    'quantity' => $destQty,
+                    'avg_purchase_price' => BranchStockService::blendCost(
+                        $destQtyBefore, (float) $destination->avg_purchase_price, $qty, $movedCost
+                    ),
+                    // These units are the most recent arrival on that shelf.
+                    'last_purchase_price' => $movedCost > 0
+                        ? round($movedCost, 2)
+                        : (float) $destination->last_purchase_price,
+                ]);
+
+                foreach ([
+                    [InventoryMovement::TYPE_TRANSFER_OUT, $from, $to, $sourceQty],
+                    [InventoryMovement::TYPE_TRANSFER_IN, $to, $from, $destQty],
+                ] as [$type, $branchId, $otherBranchId, $balance]) {
+                    InventoryMovement::create([
+                        'company_id' => $companyId,
+                        'product_id' => $product->id,
+                        'branch_id' => $branchId,
+                        'type' => $type,
+                        'quantity' => $qty,
+                        'unit_price' => (float) $source->avg_purchase_price,
+                        'total_price' => round($qty * (float) $source->avg_purchase_price, 2),
+                        'balance_after' => $balance,
+                        'reference_type' => 'branch_transfer',
+                        'reference_id' => $otherBranchId,
+                        'reference_number' => $reference,
+                        'notes' => $note,
+                        'created_by' => $userId,
+                    ]);
+                }
+
+                return ['ok' => true];
+            });
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', __('pos.transfer_failed', ['error' => $e->getMessage()]));
+        }
+
+        if (isset($result['error'])) {
+            return back()->withInput()->with('error', $result['error']);
+        }
+
+        return redirect()->route('fbrpos.stock.transfers')->with('success', __('pos.transfer_done', [
+            'qty' => rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.'),
+            'product' => $product->name,
+            'from' => BranchStockService::branchName($companyId, $from) ?? '—',
+            'to' => BranchStockService::branchName($companyId, $to) ?? '—',
+        ]));
     }
 
     /**

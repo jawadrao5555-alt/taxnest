@@ -425,6 +425,32 @@ class BranchStockService
      * $branchId is NULL). Used to overlay the products page with the figures
      * of the branch the user is actually standing in.
      */
+    /**
+     * Weighted-average cost for goods ARRIVING on a shelf that may already
+     * hold some of the same product.
+     *
+     * Transferring 10 units worth Rs.200 into a shop already holding 10 units
+     * worth Rs.100 must leave that shelf at Rs.150 — keeping the destination's
+     * old Rs.100 would undervalue the maal and every later sale's cost
+     * snapshot (and therefore that branch's munafa) would be wrong.
+     *
+     * A rate of 0 means "no rate recorded" everywhere in this codebase, not
+     * "free", so it never dilutes a known one:
+     *   - unknown incoming rate  → the shelf keeps the rate it had
+     *   - shelf empty or rateless → it simply takes the incoming rate
+     */
+    public static function blendCost(float $destQty, float $destCost, float $inQty, float $inCost): float
+    {
+        if ($inQty <= 0 || $inCost <= 0) {
+            return round($destCost, 2);
+        }
+        if ($destQty <= 0 || $destCost <= 0) {
+            return round($inCost, 2);
+        }
+
+        return round((($destQty * $destCost) + ($inQty * $inCost)) / ($destQty + $inQty), 2);
+    }
+
     public static function quantities(int $companyId, ?int $branchId, array $productIds): array
     {
         if (empty($productIds)) {

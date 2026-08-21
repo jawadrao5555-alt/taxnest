@@ -1131,6 +1131,13 @@ class FbrPosPhase2Controller extends Controller
                     ->where('reference_type', 'fbr_pos_transaction')
                     ->where('reference_id', $original->id)
                     ->pluck('product_id')->map(fn ($v) => (int) $v)->all();
+                // Per-branch stock (Task 1365): the maal goes back on the shelf
+                // of the branch that SOLD it — the ORIGINAL bill's branch, not
+                // whichever shop the refund is being processed from.
+                $restoreBranchId = \App\Services\BranchStockService::writeBranchId(
+                    $this->companyId(),
+                    $original->branch_id !== null ? (int) $original->branch_id : null
+                );
                 foreach ($returnItems as $it) {
                     if (!empty($it['product_id']) && in_array((int) $it['product_id'], $deductedProductIds, true) && (float) $it['quantity'] > 0) {
                         try {
@@ -1140,7 +1147,7 @@ class FbrPosPhase2Controller extends Controller
                                 (float) $it['quantity'],
                                 (float) $it['unit_price'],
                                 \App\Models\InventoryMovement::TYPE_RETURN_IN,
-                                null,
+                                $restoreBranchId,
                                 ['type' => 'fbr_pos_return', 'id' => $return->id, 'number' => $invNum],
                                 null,
                                 $this->user()->id

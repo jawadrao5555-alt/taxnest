@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "plus" build — SIM + WhatsApp (pehle wali behaviour, jyun ki tyun).
+
+  BIND_NOTIFICATION_LISTENER_SERVICE Play Protect ki blocked chaar mein se ek
+  hai: yeh APK browser/WhatsApp/file manager se install karte waqt "App blocked
+  to protect your device" de sakti hai. Shop ko pehle Play Protect ka scan
+  waqti tor par band karna parta hai (steps /download page aur POS → Customize
+  par likhe hain), install ke baad dobara ON.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Event-driven, battery-friendly: Android khud call/WhatsApp notification
+             par service jagata hai — koi foreground service ya polling nahi. -->
+        <service
+            android:name=".CallListenerService"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

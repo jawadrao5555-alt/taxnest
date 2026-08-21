@@ -282,6 +282,14 @@
                     // download button can never 404.
                     $tnCallerApkLive = trim((string) \App\Models\SystemSetting::get('caller_app_latest_version', '')) !== ''
                         && is_file(public_path('downloads/taxnest-caller.apk'));
+                    // Task 1345: default download ab "clean" build hai (sirf SIM
+                    // calls, Play Protect ki blocked chaar permissions se paak —
+                    // is liye bina rukawat install hoti hai). WhatsApp wali
+                    // ("plus") build ka apna gate hai aur woh apne alag hisse
+                    // mein Play Protect band/chaalu karne ke qadam ke sath dikhti
+                    // hai — default button jhoota WhatsApp ka wada na kare.
+                    $tnCallerPlusApkLive = trim((string) \App\Models\SystemSetting::get('caller_app_plus_latest_version', '')) !== ''
+                        && is_file(public_path('downloads/taxnest-caller-plus.apk'));
                     // Unlimited gate (owner, 17 Aug 2026): Caller ID is plan-locked.
                     $tnCallerPlanAllowed = \App\Services\PosFeatureService::planAllows($company, 'caller_id_enabled');
                     // v2 (Task 1101): multi-device rows — legacy companies-row phone
@@ -369,6 +377,32 @@
                                 </a>
                                 <p class="text-[10px] text-gray-400 mt-1">{{ __('pos.caller_id_download_hint') }}</p>
                             </div>
+                            @if($tnCallerPlusApkLive)
+                                {{-- WhatsApp wali build: alag, kholne par hi qadam dikhein
+                                     (Play Protect ki wajah se yeh install ek extra qadam
+                                     mangta hai — default button ko saada rakhna hai). --}}
+                                <div class="pt-2" x-data="{ plusOpen: false }">
+                                    <button type="button" @click="plusOpen = !plusOpen"
+                                        class="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline">
+                                        <svg class="w-3.5 h-3.5 shrink-0 transition-transform" :class="plusOpen && 'rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        {{ __('pos.caller_id_plus_title') }}
+                                    </button>
+                                    <div x-show="plusOpen" x-cloak class="mt-2 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 p-3">
+                                        <p class="text-[11px] text-gray-700 dark:text-gray-200 leading-relaxed">{{ __('pos.caller_id_plus_intro') }}</p>
+                                        <ol class="mt-2 space-y-1 text-[11px] text-gray-600 dark:text-gray-300 list-decimal pl-4 leading-relaxed">
+                                            <li>{{ __('pos.caller_id_plus_step1') }}</li>
+                                            <li>{{ __('pos.caller_id_plus_step2') }}</li>
+                                            <li>{{ __('pos.caller_id_plus_step3') }}</li>
+                                            <li>{{ __('pos.caller_id_plus_step4') }}</li>
+                                        </ol>
+                                        <a href="{{ url('downloads/taxnest-caller-plus.apk') }}" class="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                            {{ __('pos.caller_id_plus_download') }}
+                                        </a>
+                                        <p class="text-[10px] text-amber-700 dark:text-amber-400 mt-2 font-bold">{{ __('pos.caller_id_plus_warn') }}</p>
+                                    </div>
+                                </div>
+                            @endif
                         @endif
                     </div>
                 </div>

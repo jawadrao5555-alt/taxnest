@@ -53,8 +53,14 @@ class LoginActivity : AppCompatActivity() {
             error.visibility = View.GONE
 
             thread {
+                // device string mein build kind bhi (Task 1345) — POS →
+                // Customize par dikhta hai, support ko foran pata chal jata hai
+                // ke us phone par WhatsApp wali build hai ya clean.
+                val device = (android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL).trim() +
+                    (if (BuildConfig.BUILD_KIND == "plus") " · WhatsApp build" else " · clean build")
                 val (code, body) = ApiClient.post(
-                    "/login", JSONObject().put("email", e).put("password", p)
+                    "/login",
+                    JSONObject().put("email", e).put("password", p).put("device", device.take(120))
                 )
                 runOnUiThread {
                     btn.isEnabled = true

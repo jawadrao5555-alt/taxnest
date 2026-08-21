@@ -30,6 +30,10 @@ class AppVersionEndpointTest extends TestCase
             'rider'  => ['rider_app_latest_version', 'downloads/taxnest-rider.apk'],
             'di'     => ['di_app_latest_version', 'downloads/taxnest-di.apk'],
             'caller' => ['caller_app_latest_version', 'downloads/taxnest-caller.apk'],
+            // Task 1345 — Caller ID ships as TWO builds (clean = default,
+            // plus = SIM + WhatsApp). Separate record so a plus phone is never
+            // offered the clean APK.
+            'caller_plus' => ['caller_app_plus_latest_version', 'downloads/taxnest-caller-plus.apk'],
         ];
         foreach ($expect as $app => [$key, $path]) {
             SystemSetting::set($key, '9.9.9');

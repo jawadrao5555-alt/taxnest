@@ -205,6 +205,9 @@ Route::get('/api/app-version', function () {
         'rider'  => ['setting' => 'rider_app_latest_version',  'apk' => 'downloads/taxnest-rider.apk'],
         'di'     => ['setting' => 'di_app_latest_version',     'apk' => 'downloads/taxnest-di.apk'],
         'caller' => ['setting' => 'caller_app_latest_version', 'apk' => 'downloads/taxnest-caller.apk'],
+        // Caller ID ki WhatsApp wali build (Task 1345) — alag record, alag APK,
+        // taake plus wale phone ko clean build ka update na chala jaye.
+        'caller_plus' => ['setting' => 'caller_app_plus_latest_version', 'apk' => 'downloads/taxnest-caller-plus.apk'],
     ];
     $app = (string) request()->query('app', '');
     if (!isset($map[$app])) {

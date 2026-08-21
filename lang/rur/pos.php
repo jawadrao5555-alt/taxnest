@@ -4948,13 +4948,24 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_bad_login' => 'Email ya password ghalat hai.',
     'caller_admin_only' => 'Sirf shop ke admin/manager login se Caller ID app connect ho sakti hai.',
     'caller_id_title' => 'Caller ID',
-    'caller_id_sub' => 'Customer ki call (SIM ya WhatsApp) aate hi sale screen par popup — naam aur purani kharidari ke saath',
+    'caller_id_sub' => 'Customer ki call aate hi sale screen par popup — naam aur purani kharidari ke saath',
     'caller_id_device' => 'Connected phone',
     'caller_id_no_device' => 'Abhi koi phone connect nahi — Caller ID app se sign in karein',
     'caller_id_last_seen' => 'Aakhri raabta',
     'caller_id_last_event' => 'Aakhri call event',
     'caller_id_download' => 'Caller ID App Download Karein (Beta)',
-    'caller_id_download_hint' => 'Shop ke Android phone par install karein, apne admin login se sign in kar ke notification access dein.',
+    // Task 1345 — do builds. Default = sirf SIM calls (bina Play Protect ki
+    // rukawat install); neeche wali plus keys WhatsApp wali build aur Play
+    // Protect waqti tor par band karne ke qadam ke liye hain.
+    'caller_id_download_hint' => 'Shop ke Android phone par install karein aur apne admin login se sign in karein. Yeh build normal (SIM) calls pakadti hai aur bina Play Protect ki rukawat install ho jati hai.',
+    'caller_id_plus_title' => 'WhatsApp calls bhi chahiyen?',
+    'caller_id_plus_intro' => 'Normal app sirf SIM calls pakadti hai. WhatsApp calls ke liye alag build hai, aur us ki install Play Protect rok deti hai — is liye do minute ke liye scan band karein, install karein, phir dobara ON kar dein.',
+    'caller_id_plus_step1' => 'Play Store kholein → apni profile photo → Play Protect → settings (gear) → "Scan apps with Play Protect" OFF kar dein.',
+    'caller_id_plus_step2' => 'Neeche wali WhatsApp wali APK download kar ke Install karein ("unknown apps" ka sawal aaye to Allow from this source chunein).',
+    'caller_id_plus_step3' => 'Install hote hi Play Protect dobara ON kar dein.',
+    'caller_id_plus_step4' => 'App kholein, sign in karein, notification access dein, phir "Test ring" dabayein — sale screen par popup aana chahiye.',
+    'caller_id_plus_download' => 'WhatsApp wali APK download karein',
+    'caller_id_plus_warn' => 'Play Protect band karna sirf install ke waqt ka qadam hai — foran wapas ON kar dein.',
     'caller_id_plan_locked' => 'Caller ID sirf Unlimited package mein shamil hai — upgrade karein taake call aate hi customer ka naam aur purani kharidari sale screen par nazar aaye.',
     'caller_plan_locked_api' => 'Caller ID aap ke package mein shamil nahi. Caller ID app istemal karne ke liye Unlimited par upgrade karein.',
     // Caller ID v2 (Task 1101)

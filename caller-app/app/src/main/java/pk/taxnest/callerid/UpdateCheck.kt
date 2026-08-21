@@ -19,6 +19,28 @@ import android.widget.Toast
  */
 object UpdateCheck {
 
+    /**
+     * Semver-strict compare (rider-app rule): banner SIRF tab jab server ka
+     * version installed se ZYADA ho. Barabar/purana = koi banner —  warna ek
+     * beta phone (jo server se aage hai) hamesha "update" maangta rehta hai.
+     */
+    fun isNewer(latest: String?, current: String?): Boolean {
+        val a = parts(latest) ?: return false
+        val b = parts(current) ?: return false
+        for (i in 0 until maxOf(a.size, b.size)) {
+            val x = a.getOrElse(i) { 0 }
+            val y = b.getOrElse(i) { 0 }
+            if (x != y) return x > y
+        }
+        return false
+    }
+
+    private fun parts(v: String?): List<Int>? {
+        val s = v?.trim().orEmpty()
+        if (s.isEmpty() || !Regex("^\\d+(\\.\\d+)*$").matches(s)) return null
+        return s.split(".").map { it.toIntOrNull() ?: 0 }
+    }
+
     fun startDownload(activity: Activity, apkUrl: String) {
         try {
             val fileName = URLUtil.guessFileName(apkUrl, null, "application/vnd.android.package-archive")

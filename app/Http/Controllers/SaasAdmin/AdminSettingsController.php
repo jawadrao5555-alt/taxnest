@@ -32,6 +32,7 @@ class AdminSettingsController extends Controller
         'waiter_app_latest_version',
         'rider_app_latest_version',
         'caller_app_latest_version',
+        'caller_app_plus_latest_version',
         'ai_reader_model',
         'ai_reader_model_strong',
     ];
@@ -99,6 +100,10 @@ class AdminSettingsController extends Controller
             // ALSO controls the downloads-page card and the POS → Customize
             // download button — empty keeps everything hidden.
             'caller_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
+            // Caller ID ki WhatsApp wali ("plus") build — Task 1345. Alag
+            // version record: yeh khali ho to /download par WhatsApp wala
+            // hissa aur plus phones ka update prompt dono band rehte hain.
+            'caller_app_plus_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
             // AI Reader (invoice photo/PDF OCR) model overrides. Empty primary
             // model = built-in default; empty strong model = auto-retry
             // escalation disabled. Model ids only (letters/digits . _ -).

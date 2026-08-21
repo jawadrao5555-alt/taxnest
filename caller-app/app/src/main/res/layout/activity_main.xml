@@ -47,6 +47,34 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Build badge (Task 1345): saaf likha ho ke YEH build kaunsi calls
+             pakadti hai — clean (sirf SIM) ya plus (SIM + WhatsApp). Text har
+             flavor ki apni strings.xml se aata hai. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:background="#E6F4F1"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/buildBadge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#0A4D5C" />
+
+            <TextView
+                android:id="@+id/buildBadgeRoman"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textSize="11sp"
+                android:textColor="#475467" />
+        </LinearLayout>
+
         <!-- Update row (hidden by default) -->
         <LinearLayout
             android:id="@+id/updateRow"
@@ -91,7 +119,7 @@
             android:textColor="#0A4D5C" />
 
         <TextView
-            android:id="@+id/notifAccessRow"
+            android:id="@+id/permRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
@@ -99,11 +127,11 @@
             android:textColor="#344054" />
 
         <Button
-            android:id="@+id/notifBtn"
+            android:id="@+id/permBtn"
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_marginTop="6dp"
-            android:text="@string/notif_btn"
+            android:text="@string/perm_btn"
             android:textSize="14sp"
             android:textColor="#FFFFFF"
             android:backgroundTint="#0A4D5C" />

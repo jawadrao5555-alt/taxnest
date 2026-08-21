@@ -947,6 +947,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/deals', [PosController::class, 'storeDeal'])->name('pos.deals.store');
         Route::put('/deals/{id}', [PosController::class, 'updateDeal'])->name('pos.deals.update');
         Route::delete('/deals/{id}', [PosController::class, 'deleteDeal'])->name('pos.deals.delete');
+        // 🏬 Branch management (multi-branch v1, Task 1347) — admin-only in controller.
+        Route::get('/branches', [\App\Http\Controllers\PosBranchController::class, 'index'])->name('pos.branches');
+        Route::post('/branches', [\App\Http\Controllers\PosBranchController::class, 'store'])->name('pos.branches.store');
+        Route::put('/branches/{id}', [\App\Http\Controllers\PosBranchController::class, 'update'])->name('pos.branches.update');
+        Route::post('/branches/{id}/toggle', [\App\Http\Controllers\PosBranchController::class, 'toggle'])->name('pos.branches.toggle');
         Route::get('/terminals', [PosController::class, 'terminals'])->name('pos.terminals');
         Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store')->middleware('plan.limit:terminals');
         Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');

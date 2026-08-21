@@ -1331,6 +1331,13 @@ class RestaurantPosController extends Controller
             if ($taxInclusiveColumnExists) {
                 $transactionData['tax_inclusive'] = $taxInclusive;
             }
+            // Multi-branch v1 (Task 1347): the restaurant pay path never stamped a
+            // branch, so dine-in / delivery bills fell out of every branch report.
+            // stampBranchId() resolves a REAL branch even while the owner is in the
+            // company-wide view — a bill must never be branch-less once branches exist.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'branch_id')) {
+                $transactionData['branch_id'] = app(\App\Services\BranchContextService::class)->stampBranchId();
+            }
             if ($menuRateColumnExists) {
                 $transactionData['tax_menu_rate'] = $menuRate;
             }
@@ -2837,7 +2844,13 @@ class RestaurantPosController extends Controller
         // dashboard is a SEPARATE page — the "Aaj ka Khaata" card was only on
         // the retail dashboard, so restaurant owners never saw it. Same shared
         // builder + partial as PosController::dashboard.
-        $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizDate, $user);
+        // Task 1347 (multi-branch v1): same active-branch predicate the retail
+        // dashboard uses — a restaurant with two branches must not read the
+        // other branch's takings on its headline cards.
+        $dashBranchSvc = app(\App\Services\BranchContextService::class);
+        $dashBranch = function ($q) use ($dashBranchSvc) { $dashBranchSvc->applyToQuery($q, 'branch_id'); };
+
+        $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizDate, $user, null, $dashBranch);
 
         // Task 988 (owner video, 16 Aug 2026, PIZZA POINT): the Today's Revenue
         // card must show the TOTAL sale — PRA + Local (+ exempt) combined from
@@ -2845,10 +2858,10 @@ class RestaurantPosController extends Controller
         // see (video: card said Rs 80 while the ledger showed Local Rs 410).
         // Scope-aware — no local-stream leak. Chart / profit / order tiles
         // keep the RestaurantOrder-based $todaySales.
-        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizDate, $bizDate);
+        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizDate, $bizDate, null, $dashBranch);
         // Yesterday delta compares like-with-like (combined vs combined).
         $yesterdayBizDate = \Carbon\Carbon::parse($bizDate, config('app.timezone'))->subDay()->toDateString();
-        $yesterdayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $yesterdayBizDate, $yesterdayBizDate);
+        $yesterdayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $yesterdayBizDate, $yesterdayBizDate, null, $dashBranch);
 
         // Task 988: "New Customers" card (replaces Avg. Order — owner voice
         // note): customers added in the current BUSINESS day (window starts at

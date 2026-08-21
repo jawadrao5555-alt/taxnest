@@ -536,7 +536,9 @@
                         </nav>
 
                         <div class="hidden md:block ml-1">
-                            <x-branch-switcher color="purple" />
+                            {{-- Multi-branch v1 (Task 1347): POS panel manages its own
+                                 branches, and the owner may fall back to a company-wide view. --}}
+                            <x-branch-switcher color="purple" :manage-url="route('pos.branches', [], false)" :allow-all="true" />
                         </div>
                     </div>
 

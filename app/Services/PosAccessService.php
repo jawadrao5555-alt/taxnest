@@ -86,6 +86,9 @@ class PosAccessService
         '#^pos/inventory#' => 'inventory',
         '#^pos/customize#' => 'customize',
         '#^pos/features#' => 'customize',
+        // Multi-branch v1 (Task 1347): branch CRUD rides the Customize grant —
+        // the controller still hard-gates it to owner/company_admin.
+        '#^pos/branches#' => 'customize',
         // Customize-page POST endpoints. `settings/theme` stays OPEN — it is a
         // per-device display preference every role may change (same for
         // set-language / my-profile / whats-new, which are simply unmapped).

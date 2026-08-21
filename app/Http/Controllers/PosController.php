@@ -1277,6 +1277,16 @@ class PosController extends Controller
             return $q;
         };
 
+        // Multi-branch v1 (Task 1347): every dashboard figure follows the active
+        // branch. Passed as a nested where() closure — applyToQuery adds nothing
+        // when the company has no branches (or the owner picked "all branches"),
+        // and an empty nested group is dropped by the query builder, so the
+        // single-branch SQL is byte-identical to before. Legacy rows
+        // (branch_id NULL) stay visible by design.
+        $dashBranchSvc = app(\App\Services\BranchContextService::class);
+        $dashBranch = function ($q) use ($dashBranchSvc) { $dashBranchSvc->applyToQuery($q, 'branch_id'); };
+        $dashBranchRaw = function ($q) use ($dashBranchSvc) { $dashBranchSvc->applyToQuery($q, 't.branch_id'); };
+
         // Return / credit-note netting (Task 578, same convention as day-close &
         // reports, Task 570): revenue figures are SIGNED (returns subtract),
         // bill counts stay SALES-only. Schema-guarded for prod drift —
@@ -1294,7 +1304,7 @@ class PosController extends Controller
             }
         };
 
-        $todayStats = PosTransaction::where('company_id', $companyId)
+        $todayStats = PosTransaction::where('company_id', $companyId)->where($dashBranch)
             ->where('status', 'completed')
             ->where('business_date', $bizToday)
             ->where($excludeLocal)
@@ -1312,7 +1322,7 @@ class PosController extends Controller
         // Task 705: manager default PRA-only — Pending (local) tile zeroed until
         // the khufia local-check mode is ON.
         $pendingProvisional = (auth('pos')->user()?->posHidesLocalStream() ?? false) ? 0
-            : PosTransaction::where('company_id', $companyId)
+            : PosTransaction::where('company_id', $companyId)->where($dashBranch)
             ->where('status', 'completed')
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
@@ -1320,7 +1330,7 @@ class PosController extends Controller
             ->tap($dashOnly)
             ->count();
 
-        $monthStats = PosTransaction::where('company_id', $companyId)
+        $monthStats = PosTransaction::where('company_id', $companyId)->where($dashBranch)
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->startOfMonth()->toDateString())
             ->where($excludeLocal)
@@ -1347,7 +1357,7 @@ class PosController extends Controller
         // hasColumn guard: the column may not yet exist on older PROD schemas.
         $hasDashFrozenCost = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'cost_price');
         if ($hasDashFrozenCost) {
-            $profitRow = \DB::table('pos_transactions as t')
+            $profitRow = \DB::table('pos_transactions as t')->where($dashBranchRaw)
                 ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
                 ->where('t.company_id', $companyId)
                 ->where('t.status', 'completed')
@@ -1362,7 +1372,7 @@ class PosController extends Controller
                 ')->first();
         } else {
             // Legacy fallback (pre-migration): join live product cost.
-            $profitRow = \DB::table('pos_transactions as t')
+            $profitRow = \DB::table('pos_transactions as t')->where($dashBranchRaw)
                 ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
                 ->leftJoin('pos_products as p', function ($j) {
                     $j->on('p.id', '=', 'i.item_id')->where('i.item_type', '=', 'product');
@@ -1380,7 +1390,7 @@ class PosController extends Controller
                 ')->first();
         }
 
-        $periodOrders = PosTransaction::where('company_id', $companyId)
+        $periodOrders = PosTransaction::where('company_id', $companyId)->where($dashBranch)
             ->where('status', 'completed')
             ->where('business_date', '>=', $periodStart)
             ->where($excludeLocal)
@@ -1412,7 +1422,7 @@ class PosController extends Controller
         ];
 
         // Top products by quantity sold (period)
-        $topSold = \DB::table('pos_transactions as t')
+        $topSold = \DB::table('pos_transactions as t')->where($dashBranchRaw)
             ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
@@ -1430,7 +1440,7 @@ class PosController extends Controller
 
         // Top products by profit (period) — PROFIT-FREEZE: use frozen item snapshot.
         if ($hasDashFrozenCost) {
-            $topProfit = \DB::table('pos_transactions as t')
+            $topProfit = \DB::table('pos_transactions as t')->where($dashBranchRaw)
                 ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
                 ->where('t.company_id', $companyId)
                 ->where('t.status', 'completed')
@@ -1453,7 +1463,7 @@ class PosController extends Controller
                 ->get();
         } else {
             // Legacy fallback (pre-migration): join live product cost.
-            $topProfit = \DB::table('pos_transactions as t')
+            $topProfit = \DB::table('pos_transactions as t')->where($dashBranchRaw)
                 ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
                 ->join('pos_products as p', 'p.id', '=', 'i.item_id')
                 ->where('t.company_id', $companyId)
@@ -1490,7 +1500,7 @@ class PosController extends Controller
         // Coverage: when using frozen snapshots, show % of sold product lines in the
         // period that carry a cost snapshot. Pre-migration fallback: active-product count.
         if ($hasDashFrozenCost) {
-            $covRow = \DB::table('pos_transactions as t')
+            $covRow = \DB::table('pos_transactions as t')->where($dashBranchRaw)
                 ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
                 ->where('t.company_id', $companyId)
                 ->where('t.status', 'completed')
@@ -1514,7 +1524,7 @@ class PosController extends Controller
         }
         // ─────────────────────────────────────────────────────────────────────
 
-        $recentTransactions = PosTransaction::where('company_id', $companyId)
+        $recentTransactions = PosTransaction::where('company_id', $companyId)->where($dashBranch)
             ->where('status', 'completed')
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
@@ -1525,7 +1535,7 @@ class PosController extends Controller
             ->take(10)
             ->get();
 
-        $paymentBreakdown = PosTransaction::where('company_id', $companyId)
+        $paymentBreakdown = PosTransaction::where('company_id', $companyId)->where($dashBranch)
             ->where('status', 'completed')
             ->where('business_date', $bizToday)
             ->where($excludeLocal)
@@ -1538,7 +1548,7 @@ class PosController extends Controller
         // effective reporting state, not the company-wide flag.
         $praStatus = (bool) auth('pos')->user()?->praReportingEnabled($company);
 
-        $drafts = PosTransaction::where('company_id', $companyId)
+        $drafts = PosTransaction::where('company_id', $companyId)->where($dashBranch)
             ->where('status', 'draft')
             ->with('items')
             ->orderBy('updated_at', 'desc')
@@ -1551,7 +1561,10 @@ class PosController extends Controller
         // ── Task 666: "Aaj ka Khaata" — stream-wise today sale/tax summary ──
         // Build extracted to PosTodayKhata (14 Aug 2026) so the RESTAURANT
         // dashboard shows the identical card; conventions documented there.
-        $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizToday, $user, $dashCashierId);
+        // Task 1347: $dashBranch keeps the card on the active branch — without it
+        // the Khaata figures stay company-wide while every tile around them
+        // follows the switcher.
+        $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizToday, $user, $dashCashierId, $dashBranch);
         // ─────────────────────────────────────────────────────────────────────
 
         // Task 988 (owner video, 16 Aug 2026): the Today's Revenue card shows the
@@ -1561,10 +1574,10 @@ class PosController extends Controller
         // PRA-scoped / hidden-local users stay PRA-only, local-scoped stay
         // local-only). The chart / profit / payment tiles keep their existing
         // single-stream sources ($todayStats et al.).
-        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizToday, $bizToday, $dashCashierId);
+        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizToday, $bizToday, $dashCashierId, $dashBranch);
         // Monthly card gets the same combined treatment so the two revenue
         // cards can never contradict each other.
-        $monthTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, now()->startOfMonth()->toDateString(), null, $dashCashierId);
+        $monthTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, now()->startOfMonth()->toDateString(), null, $dashCashierId, $dashBranch);
 
         // Task 988: "New Customers" card (replaces Avg. Order — owner voice note):
         // customers added in the current BUSINESS day + this calendar month.
@@ -1613,10 +1626,10 @@ class PosController extends Controller
             // Task 988: vs-kal delta must compare like-with-like — yesterday's
             // figure is the same scope-aware COMBINED sale as the today card.
             $saafYesterdayBiz = \Carbon\Carbon::parse($bizToday)->subDay()->toDateString();
-            $yesterdayRevenue = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $saafYesterdayBiz, $saafYesterdayBiz, $dashCashierId);
+            $yesterdayRevenue = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $saafYesterdayBiz, $saafYesterdayBiz, $dashCashierId, $dashBranch);
             // Synced-bill count stays SALES-only (a submitted credit note is
             // not a bill; counting it would disagree with the today tile).
-            $praSyncedToday = (int) PosTransaction::where('company_id', $companyId)
+            $praSyncedToday = (int) PosTransaction::where('company_id', $companyId)->where($dashBranch)
                 ->where('status', 'completed')
                 ->where('business_date', $bizToday)
                 ->where($excludeLocal)
@@ -2180,6 +2193,11 @@ class PosController extends Controller
         return [
             'u' => (int) $user->id,
             'c' => (int) $companyId,
+            // Task 1347: the active branch is BAKED into the sale screen (it rides
+            // every offline bill as offline_branch_id). Switching branch must
+            // refresh the cache-first copy, or the new branch keeps billing under
+            // the old one. 0 = single-branch / company-wide, i.e. unchanged.
+            'b' => (int) (app()->bound('currentBranchId') ? (app('currentBranchId') ?? 0) : 0),
             // Task 658: baked i18n is now a USED-KEYS subset — a lang-file-only
             // edit (blade untouched) must still refresh cached copies, so the
             // 's' rev appends the active-locale pos.php mtimes (+ locale).
@@ -2796,7 +2814,10 @@ class PosController extends Controller
 
                 $transaction = PosTransaction::create([
                     'company_id' => $companyId,
-                    'branch_id' => $offlineBranchId ?: (app()->bound('currentBranchId') ? app('currentBranchId') : null),
+                    // Task 1347: stampBranchId() (not the raw currentBranchId binding)
+                    // — the owner's company-wide view binds NULL, and a live bill must
+                    // still land on a real branch. Offline replay keeps its own branch.
+                    'branch_id' => $offlineBranchId ?: app(\App\Services\BranchContextService::class)->stampBranchId(),
                     'terminal_id' => $request->terminal_id,
                     'invoice_number' => $invoiceNumber,
                     'invoice_mode' => $invoiceMode,
@@ -5523,6 +5544,14 @@ class PosController extends Controller
 
     private function applyReportFilters($query, $tab, $cashierFilter = null, $forUser = null)
     {
+        // Multi-branch v1 (Task 1347): SINGLE choke point for branch scoping —
+        // transactions list, sales reports, tax reports, exports and the
+        // analytics PDF all funnel through here. Applied BEFORE the derived-scope
+        // early return below so no caller can slip past it. No-op when the
+        // company has no branches or the owner picked "all branches"; legacy
+        // rows (branch_id NULL) always stay visible.
+        app(\App\Services\BranchContextService::class)->applyToQuery($query, 'branch_id');
+
         // Task 1186 own-bill union: when the viewer is on the DERIVED default
         // scope, their own cross-stream rows join their forced tab
         // ((stream) OR created_by = viewer) so an own F10 provisional never
@@ -7314,7 +7343,30 @@ class PosController extends Controller
         // for the inherit-fallback in praReportingEnabled().
         $company = Company::find($companyId);
 
-        return view('pos.team', compact('team', 'teamPasswords', 'company'));
+        // Multi-branch v1 (Task 1347): the branch column + per-member branch
+        // selector only appear once the company actually has branches.
+        // hasTable guard mirrors BranchContextService::branchesReady() — the
+        // team page must survive a deployment whose branch migration is missing.
+        $branches = \Illuminate\Support\Facades\Schema::hasTable('branches')
+            ? \App\Models\Branch::where('company_id', $companyId)
+                ->orderByDesc('is_head_office')->orderBy('name')->get()
+            : collect();
+
+        return view('pos.team', compact('team', 'teamPasswords', 'company', 'branches'));
+    }
+
+    /**
+     * Company-owned branch id from a team request, or null (main shop).
+     * Twin of FbrPosController::fbrResolveBranchId (Task 1347).
+     */
+    private function posResolveBranchId(Request $request, int $companyId): ?int
+    {
+        if (!$request->filled('default_branch_id')) {
+            return null;
+        }
+        $branchId = (int) $request->default_branch_id;
+        return \App\Models\Branch::where('company_id', $companyId)->where('id', $branchId)->exists()
+            ? $branchId : null;
     }
 
     public function storeCashier(Request $request)
@@ -7337,6 +7389,9 @@ class PosController extends Controller
             // resolves users.username). Globally unique (column has a global
             // unique index); no spaces/@ so it can never look like an email.
             'username' => \App\Services\LoginIdentifierResolver::usernameRules(),
+            // Multi-branch v1 (Task 1347): validated for shape only — ownership
+            // is re-checked against the company in posResolveBranchId().
+            'default_branch_id' => 'nullable|integer',
         ], [
             ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
@@ -7400,6 +7455,14 @@ class PosController extends Controller
             }
         }
         $newUser = User::create($newUserData);
+
+        // Multi-branch v1 (Task 1347): default branch of the new account. NOT in
+        // User::$fillable — a create() key would be silently dropped, so it is
+        // assigned directly after the row exists. hasColumn = prod-drift guard.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id')) {
+            $newUser->default_branch_id = $this->posResolveBranchId($request, (int) $companyId);
+            $newUser->save();
+        }
 
         // Audit: billing scope set at creation (null → value).
         if (!empty($newUserData['pos_billing_scope'])) {
@@ -7618,6 +7681,8 @@ class PosController extends Controller
             // Task 529: admin can set/change the member's login username from
             // the edit row (own row exempt from the unique check).
             'username' => \App\Services\LoginIdentifierResolver::usernameRules($cashier->id),
+            // Multi-branch v1 (Task 1347) — ownership re-checked in posResolveBranchId().
+            'default_branch_id' => 'nullable|integer',
         ], [
             ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
@@ -7633,6 +7698,16 @@ class PosController extends Controller
             $cashierData['username'] = $request->input('username') ?: null;
         }
         $cashier->update($cashierData);
+
+        // Multi-branch v1 (Task 1347): default branch of this account. Same
+        // direct-assignment reason as the billing scope below — the column is
+        // not $fillable, so update() would silently drop it. Only honoured when
+        // the form actually carried the field (branch UI hidden = untouched).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'default_branch_id')
+            && $request->has('default_branch_id')) {
+            $cashier->default_branch_id = $this->posResolveBranchId($request, (int) $companyId);
+            $cashier->save();
+        }
 
         // Billing Scope (07 Aug 2026): stream lock is editable from the team edit
         // row — cashier + manager only. Direct assignment (pos_custom_access
@@ -10182,6 +10257,11 @@ class PosController extends Controller
                 }
             })
             ->when($dayCloseIso, fn ($q) => $q->where('created_by', $dayCloseUser->id))
+            // Multi-branch v1 (Task 1347): the PREVIEW figures follow the active
+            // branch — same precedent as $dayCloseIso above. performDayClose()
+            // and the frozen Z-report stay COMPANY-WIDE on purpose (one close
+            // per business day); the owner's "all branches" view shows everything.
+            ->where(fn ($q) => app(\App\Services\BranchContextService::class)->applyToQuery($q, 'branch_id'))
             ->with('creator')
             ->orderBy('created_at')
             ->get();

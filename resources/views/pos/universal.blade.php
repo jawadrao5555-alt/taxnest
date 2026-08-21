@@ -4906,7 +4906,10 @@ function restaurantPos() {
                     .then(d => {
                         if (!d || !d.ok || !d.fp) return;
                         const fresh = d.fp;
-                        const same = ['u', 'c', 's', 'cat', 'set'].every(k => String(cur[k]) === String(fresh[k]));
+                        // Task 1347: 'b' (active branch) joins the compared keys —
+                        // a branch switch must refresh this cached screen, since the
+                        // branch is baked into every offline bill it queues.
+                        const same = ['u', 'c', 's', 'cat', 'set', 'b'].every(k => String(cur[k]) === String(fresh[k]));
                         if (same) return;
                         const userChanged = String(cur.u) !== String(fresh.u) || String(cur.c) !== String(fresh.c);
                         // Never yank an in-progress sale for a content update.
@@ -4914,7 +4917,7 @@ function restaurantPos() {
                         if (!userChanged && busy) return;
                         // One-shot guard: never reload twice for the same server fingerprint
                         // (protects against a reload loop if the cache update races us).
-                        const sig = [fresh.u, fresh.c, fresh.s, fresh.cat, fresh.set].join(':');
+                        const sig = [fresh.u, fresh.c, fresh.s, fresh.cat, fresh.set, fresh.b].join(':');
                         try {
                             if (!userChanged && sessionStorage.getItem('tnBootFpReloaded') === sig) return;
                         } catch (e) {}

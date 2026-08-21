@@ -83,6 +83,20 @@
                     <option value="pos_delivery">{{ __('pos.role_opt_delivery') }}</option>
                 </select>
             </div>
+            {{-- Multi-branch v1 (Task 1347): which branch this account belongs to.
+                 Only rendered once the company actually has branches. --}}
+            @if($branches->isNotEmpty())
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.branch_word') }}</label>
+                <select name="default_branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <option value="">{{ __('pos.main_branch') }}</option>
+                    @foreach($branches as $b)
+                    <option value="{{ $b->id }}">{{ $b->name }}</option>
+                    @endforeach
+                </select>
+                <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.branch_assign_hint') }}</p>
+            </div>
+            @endif
             {{-- Billing Scope (07 Aug 2026): lock a cashier/manager to one billing
                  stream. Server ignores it for confined roles (kitchen/waiter/delivery).
                  Owner rule: sirf owner (ya allowed admin) ko dikhta hai. --}}
@@ -156,6 +170,7 @@
                         <th class="px-4 py-3 hidden sm:table-cell">{{ __('pos.phone_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.password_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.role_label') }}</th>
+                        @if($branches->isNotEmpty())<th class="px-4 py-3">{{ __('pos.branch_word') }}</th>@endif
                         <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.pra_reporting') }}</th>
                         <th class="px-4 py-3">{{ __('pos.actions_label') }}</th>
@@ -238,6 +253,21 @@
                                 @endif
                             @endif
                         </td>
+                        {{-- Multi-branch v1 (Task 1347): current branch + inline edit
+                             select. "Main shop" = no branch assigned (company-wide). --}}
+                        @if($branches->isNotEmpty())
+                        <td class="px-4 py-3" data-label="{{ __('pos.branch_word') }}">
+                            <span x-show="!editing" class="text-xs text-gray-600 dark:text-gray-400">{{ optional($branches->firstWhere('id', (int) $member->default_branch_id))->name ?? __('pos.main_branch') }}</span>
+                            <template x-if="editing">
+                                <select form="edit-{{ $member->id }}" name="default_branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                                    <option value="">{{ __('pos.main_branch') }}</option>
+                                    @foreach($branches as $b)
+                                    <option value="{{ $b->id }}" @selected((int) $member->default_branch_id === (int) $b->id)>{{ $b->name }}</option>
+                                    @endforeach
+                                </select>
+                            </template>
+                        </td>
+                        @endif
                         <td class="px-4 py-3" data-label="{{ __('pos.status_label') }}">
                             @if($member->is_active)
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('pos.active_word') }}</span>
@@ -409,7 +439,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="8" class="px-4 py-12 text-center text-gray-400">{{ __('pos.no_team_members') }}</td></tr>
+                    <tr><td colspan="{{ $branches->isNotEmpty() ? 10 : 9 }}" class="px-4 py-12 text-center text-gray-400">{{ __('pos.no_team_members') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

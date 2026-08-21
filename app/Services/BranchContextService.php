@@ -21,12 +21,59 @@ class BranchContextService
     public const SESSION_KEY = 'active_branch_id';
 
     /**
+     * Owner-only "all branches" sentinel (Task 1347). Stored in the SAME session
+     * key; getActiveBranchId() reports NULL for it, which every consumer already
+     * treats as "no branch filter" — so company-wide reporting (including legacy
+     * pre-branch rows) needs no special-casing anywhere else.
+     */
+    public const ALL = 'all';
+
+    /** Per-request memo of accessibleBranches() — the switcher + guards ask repeatedly. */
+    private $branchMemo = null;
+
+    /** Per-instance memo of the `branches` table check (see branchesReady()). */
+    private ?bool $tableMemo = null;
+
+    /**
+     * True when the `branches` table is actually present.
+     *
+     * Task 1347: branch context is now consulted on hot read paths (dashboard,
+     * transactions, every report). Those must NOT explode where the table is
+     * absent — lean test schemas that build only the tables they exercise, and
+     * (per the known cPanel schema drift) any deployment whose branch migration
+     * never landed. Missing table = single-branch behaviour, exactly like a
+     * company with no branches. Memoised per instance; never cached statically,
+     * so a test that rebuilds its schema is re-checked.
+     */
+    private function branchesReady(): bool
+    {
+        if ($this->tableMemo === null) {
+            try {
+                $this->tableMemo = \Illuminate\Support\Facades\Schema::hasTable('branches');
+            } catch (\Throwable $e) {
+                $this->tableMemo = false;
+            }
+        }
+        return $this->tableMemo;
+    }
+
+    /**
      * Resolve the active branch ID for the current request/session.
-     * Returns null if user has no branches yet (system still works company-wide).
+     * Returns null if user has no branches yet (system still works company-wide),
+     * or when an owner has explicitly selected the "all branches" view.
      */
     public function getActiveBranchId(): ?int
     {
         $sessionId = session(self::SESSION_KEY);
+        if ($sessionId === self::ALL) {
+            // Only an owner/admin may hold the company-wide view; a demoted
+            // account falls back to normal auto-selection.
+            if ($this->isOwner()) {
+                return null;
+            }
+            session()->forget(self::SESSION_KEY);
+            $sessionId = null;
+        }
         if ($sessionId) {
             // Validate it's still accessible
             if ($this->canAccess((int) $sessionId)) {
@@ -46,8 +93,39 @@ class BranchContextService
         return $branchId;
     }
 
-    public function setActiveBranch(int $branchId): bool
+    /** True when the owner has selected the company-wide ("all branches") view. */
+    public function isAllBranches(): bool
     {
+        return session(self::SESSION_KEY) === self::ALL && $this->isOwner();
+    }
+
+    /**
+     * Branch a NEW row must be stamped with. Never null while the company has
+     * branches — the owner's "all branches" reporting view must not produce
+     * branch-less bills, so it falls back to their default / head office.
+     */
+    public function stampBranchId(): ?int
+    {
+        $active = $this->getActiveBranchId();
+        if ($active) {
+            return $active;
+        }
+        $user = $this->currentUser();
+        return $user ? $this->autoSelectBranch($user) : null;
+    }
+
+    /** @param int|string $branchId  a branch id, or self::ALL for the owner-only company-wide view */
+    public function setActiveBranch($branchId): bool
+    {
+        if ($branchId === self::ALL) {
+            if (!$this->isOwner()) {
+                return false;
+            }
+            session([self::SESSION_KEY => self::ALL]);
+            app()->instance('currentBranchId', null);
+            return true;
+        }
+        $branchId = (int) $branchId;
         if (!$this->canAccess($branchId)) {
             return false;
         }
@@ -62,10 +140,20 @@ class BranchContextService
      */
     public function accessibleBranches()
     {
+        if ($this->branchMemo !== null) {
+            return $this->branchMemo;
+        }
+
         $user = $this->currentUser();
-        if (!$user || !$user->company_id) return collect();
+        if (!$user || !$user->company_id || !$this->branchesReady()) return collect();
 
         $role = $this->effectiveRole($user);
+
+        return $this->branchMemo = $this->resolveAccessibleBranches($user, $role);
+    }
+
+    private function resolveAccessibleBranches($user, string $role)
+    {
 
         // Owner / admin → all branches in company
         if (in_array($role, ['owner', 'company_admin', 'super_admin'])) {
@@ -93,18 +181,30 @@ class BranchContextService
                 ->get();
         }
 
-        // Cashier / employee → only their default branch
+        // Cashier / employee → only their default branch, and only while that
+        // branch is still switched ON. A deactivated branch must stop taking
+        // sales (Task 1347) — its staff fall through to the safe fallback
+        // below (head office / first active branch) instead of being locked
+        // out or quietly billing a closed shop.
         if ($user->default_branch_id) {
-            return Branch::where('company_id', $user->company_id)
+            $own = Branch::where('company_id', $user->company_id)
                 ->where('id', $user->default_branch_id)
+                ->where(function ($q) {
+                    $q->where('is_active', true)->orWhereNull('is_active');
+                })
                 ->get();
+            if ($own->isNotEmpty()) {
+                return $own;
+            }
         }
 
-        // Fallback: no specific branch — return all (will pick head office)
+        // Fallback: no usable default branch — head office, else first active.
         return Branch::where('company_id', $user->company_id)
             ->where(function ($q) {
                 $q->where('is_active', true)->orWhereNull('is_active');
             })
+            ->orderByDesc('is_head_office')
+            ->orderBy('id')
             ->limit(1)
             ->get();
     }
@@ -138,11 +238,26 @@ class BranchContextService
     }
 
     /**
-     * Effective role — checks both `role` and `pos_role` columns.
+     * Effective role — checks both `role` and `pos_role` columns, then NORMALISES
+     * the panel role names onto this class's branch hierarchy.
+     *
+     * Task 1347: without the mapping a POS/FBR owner (role=company_admin,
+     * pos_role=pos_admin) resolved to the literal 'pos_admin', matched neither
+     * the owner nor the manager branch, and fell through to the cashier
+     * fallback — so the switcher only ever offered ONE branch and the whole
+     * multi-branch panel looked dead. pos_role wins over role by design (a
+     * company_admin acting as a POS cashier stays a cashier).
      */
     public function effectiveRole($user): string
     {
-        return $user->pos_role ?: ($user->role ?: 'employee');
+        $role = $user->pos_role ?: ($user->role ?: 'employee');
+
+        return match ($role) {
+            'pos_admin', 'admin' => 'company_admin',
+            'pos_manager' => 'manager',
+            'pos_cashier', 'pos_kitchen', 'pos_waiter', 'pos_delivery', 'pos_rider' => 'cashier',
+            default => $role,
+        };
     }
 
     public function isOwner($user = null): bool
@@ -174,9 +289,19 @@ class BranchContextService
 
     private function autoSelectBranch($user): ?int
     {
+        if (!$this->branchesReady()) {
+            return null;
+        }
+
+        // A branch that has been switched OFF is never auto-selected — not even
+        // as somebody's saved default (Task 1347): staff of a closed branch move
+        // to head office rather than keep billing under it.
+        $active = function ($q) { $q->where('is_active', true)->orWhereNull('is_active'); };
+
         if ($user->default_branch_id) {
             $exists = Branch::where('company_id', $user->company_id)
                 ->where('id', $user->default_branch_id)
+                ->where($active)
                 ->exists();
             if ($exists) return (int) $user->default_branch_id;
         }
@@ -184,12 +309,13 @@ class BranchContextService
         // Head office for company
         $head = Branch::where('company_id', $user->company_id)
             ->where('is_head_office', true)
+            ->where($active)
             ->first();
         if ($head) return (int) $head->id;
 
         // First active branch
         $first = Branch::where('company_id', $user->company_id)
-            ->where(function ($q) { $q->where('is_active', true)->orWhereNull('is_active'); })
+            ->where($active)
             ->orderBy('id')
             ->first();
         return $first ? (int) $first->id : null;

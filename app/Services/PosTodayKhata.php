@@ -32,8 +32,13 @@ class PosTodayKhata
      * @param int|null $onlyCreatedBy Task 1197 — per-cashier isolation / admin
      *   per-cashier view: when set, every aggregate narrows to bills created
      *   by this user id (ANDs with the stream split — compose, never replace).
+     * @param \Closure|null $branchFilter Task 1347 — active-branch predicate
+     *   (BranchContextService::applyToQuery). Null / "all branches" = no
+     *   filter, so legacy pre-branch rows stay counted. ANDs with everything
+     *   else: without it the Khaata card stays company-wide while the rest of
+     *   the dashboard follows the switcher.
      */
-    public static function build(int $companyId, string $bizToday, $user, ?int $onlyCreatedBy = null): array
+    public static function build(int $companyId, string $bizToday, $user, ?int $onlyCreatedBy = null, ?\Closure $branchFilter = null): array
     {
         $dashScope = $user?->posBillingScope() ?? 'both';
 
@@ -68,11 +73,12 @@ class PosTodayKhata
             ? "COALESCE(SUM(CASE WHEN payment_method IN ({$cardIn}) THEN ({$signExpr}) * total_amount ELSE 0 END),0)"
             : '0';
 
-        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr, $cashSaleExpr, $cardSaleExpr, $onlyCreatedBy) {
+        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr, $cashSaleExpr, $cardSaleExpr, $onlyCreatedBy, $branchFilter) {
             $row = PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', $bizToday)
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
+                ->when($branchFilter, fn ($q) => $q->where($branchFilter))
                 ->tap(fn ($q) => PosTransaction::applyStreamTab($q, $tab))
                 ->selectRaw("
                     COALESCE(SUM({$saleRowExpr}),0) as bills,
@@ -131,7 +137,7 @@ class PosTodayKhata
      * $bizTo null = open-ended range (business_date >= $bizFrom) for the
      * retail Monthly card; pass the same date twice for a single day.
      */
-    public static function combinedSale(int $companyId, $user, string $bizFrom, ?string $bizTo = null, ?int $onlyCreatedBy = null): float
+    public static function combinedSale(int $companyId, $user, string $bizFrom, ?string $bizTo = null, ?int $onlyCreatedBy = null, ?\Closure $branchFilter = null): float
     {
         $scope = $user?->posBillingScope() ?? 'both';
 
@@ -140,12 +146,13 @@ class PosTodayKhata
 
         // Task 1197 ($onlyCreatedBy): per-cashier isolation / admin
         // per-cashier view — narrows every stream sum to one creator.
-        $sum = function (string $tab) use ($companyId, $bizFrom, $bizTo, $signExpr, $onlyCreatedBy) {
+        $sum = function (string $tab) use ($companyId, $bizFrom, $bizTo, $signExpr, $onlyCreatedBy, $branchFilter) {
             return (float) (PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', '>=', $bizFrom)
                 ->when($bizTo !== null, fn ($q) => $q->where('business_date', '<=', $bizTo))
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
+                ->when($branchFilter, fn ($q) => $q->where($branchFilter))
                 ->tap(fn ($q) => PosTransaction::applyStreamTab($q, $tab))
                 ->selectRaw("COALESCE(SUM(({$signExpr}) * total_amount),0) as sale")
                 ->value('sale') ?? 0);

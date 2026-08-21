@@ -425,6 +425,8 @@ PRA_PAGES=(
   "/pos/invoice/create|restaurantPos\(|manualItemNameInput"
   "/pos/riders/tracking|rt-page|rt-map|riderTracking\("
   "/pos/billing|or PKR|3 months"
+  # Multi-branch v1 (Task 1347): owner/admin-only branch management page.
+  "/pos/branches|pos/branches\"|name=\"city\""
 )
 FBR_PAGES=(
   "/fbr-pos/dashboard|fbr-pos/day-close|fbr-pos/create"

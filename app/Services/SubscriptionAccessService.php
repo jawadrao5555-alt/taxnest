@@ -44,6 +44,10 @@ class SubscriptionAccessService
             preg_match('/^Monthly bill limit reached \((\d+)\/(\d+) this month\)/', $reason, $m) === 1 => __('pos.tl_reason_monthly_admin', ['used' => $m[1], 'limit' => $m[2]]),
             preg_match('/^Team account limit reached \((\d+)\/(\d+) on the (.+) plan\)/', $reason, $m) === 1 => __('pos.tl_reason_team_plan', ['used' => $m[1], 'limit' => $m[2], 'plan' => $m[3]]),
             preg_match('/^Team account limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_team_admin', ['used' => $m[1], 'limit' => $m[2]]),
+            // Branch quota (Task 1347): plan limit vs admin override — the POS
+            // Branches page shows this to the shop owner, so it must localize.
+            preg_match('/^Branch limit reached \((\d+)\/(\d+)\)\. Please contact admin/', $reason, $m) === 1 => __('pos.tl_reason_branch_admin', ['used' => $m[1], 'limit' => $m[2]]),
+            preg_match('/^Branch limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_branch_plan', ['used' => $m[1], 'limit' => $m[2]]),
             default => $reason,
         };
     }

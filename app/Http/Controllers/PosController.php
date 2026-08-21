@@ -3613,6 +3613,26 @@ class PosController extends Controller
 
         DB::beginTransaction();
         try {
+            // Re-read under a row lock: a raced / replayed DELETE must not
+            // restock twice or bank a second quota ledger row for one bill.
+            // (sqlite ignores FOR UPDATE — MySQL is where the race lives.)
+            $locked = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('id', $transaction->id)
+                ->lockForUpdate()
+                ->first();
+            if (!$locked) {
+                DB::rollBack();
+                return redirect()->route('pos.transactions')
+                    ->with('success', __('pos.invoice_deleted_success', ['number' => $transaction->invoice_number]));
+            }
+
+            // QUOTA LEDGER (Task 1372) — write it BEFORE the row disappears.
+            // A deleted bill that already consumed this month's quota must keep
+            // consuming it (same rule as the day-close DELETE policy), otherwise
+            // deleting bills one by one buys the shop free monthly bills.
+            $this->recordBillDeletionForQuota($locked, $companyId);
+
             // Return the sold stock to inventory before the items disappear —
             // only when tracking is on AND the owner opted into restock-on-void.
             if ($company && $company->inventory_enabled && $company->pos_restock_on_void) {
@@ -3640,6 +3660,58 @@ class PosController extends Controller
 
         return redirect()->route('pos.transactions')
             ->with('success', __('pos.invoice_deleted_success', ['number' => $transaction->invoice_number]));
+    }
+
+    /**
+     * Bank a hard-deleted bill against the monthly quota (Task 1372).
+     *
+     * PlanLimitService::canCreatePosBill counts the FINAL bills still present in
+     * pos_transactions, so a delete silently returns the slot. The batch deletes
+     * (day-close DELETE policy, clear archived local bills) each persist their
+     * own deleted_final_count; the per-bill admin delete writes one
+     * pos_bill_deletions row here and PlanLimitService adds it back in.
+     *
+     * Recorded ONLY when the bill was actually consuming quota — the predicate
+     * mirrors that live count exactly (completed + invoice_mode not 'local' +
+     * not a return). Deliberate provisionals and drafts never consumed a slot,
+     * and returns never do either, so they leave no row. The month is NOT
+     * decided here: sold_at carries the bill's created_at and the service bounds
+     * it, so deleting a PREVIOUS month's bill can never touch this month's count.
+     *
+     * Must run INSIDE deleteTransaction's DB transaction (and after its row
+     * lock) so a rollback can never leave a phantom row behind.
+     */
+    private function recordBillDeletionForQuota(PosTransaction $transaction, int $companyId): void
+    {
+        if ($transaction->status !== 'completed'
+            || $transaction->invoice_mode === 'local'
+            || ($transaction->transaction_type ?? 'sale') === 'return') {
+            return;
+        }
+
+        // Table/Schema-guarded for the deploy-before-migrate window on PROD:
+        // a missing ledger must never block an admin from deleting a bill.
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_bill_deletions')) {
+                return;
+            }
+            \App\Models\PosBillDeletion::firstOrCreate(
+                ['company_id' => $companyId, 'transaction_id' => $transaction->id],
+                [
+                    'invoice_number' => $transaction->invoice_number,
+                    'sold_at' => $transaction->created_at,
+                    'business_date' => $transaction->business_date,
+                    'total_amount' => $transaction->total_amount,
+                    'deleted_by' => auth('pos')->id(),
+                ]
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('POS bill delete quota ledger failed', [
+                'company_id' => $companyId,
+                'transaction_id' => $transaction->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

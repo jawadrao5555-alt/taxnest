@@ -197,6 +197,20 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
             $table->timestamps();
         });
 
+        // ...and finals hard-deleted one by one from a bill page (Task 1372).
+        Schema::create('pos_bill_deletions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('transaction_id')->nullable();
+            $table->string('invoice_number')->nullable();
+            $table->timestamp('sold_at')->nullable();
+            $table->date('business_date')->nullable();
+            $table->decimal('total_amount', 12, 2)->default(0);
+            $table->unsignedBigInteger('deleted_by')->nullable();
+            $table->timestamps();
+            $table->unique(['company_id', 'transaction_id']);
+        });
+
         Schema::create('pricing_plans', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -1047,6 +1061,83 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         // 2 finals against invoice_limit 1 — trial plans skip the monthly gate
         // (their 20-bill total cap lives in SubscriptionAccessService).
         $this->assertTrue(PlanLimitService::canCreatePosBill($companyId)['allowed']);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // DELETE PATH — PosController::deleteTransaction (per-bill admin delete)
+    //
+    // The count is taken off the rows still in the table, so a hard delete used
+    // to hand the slot straight back: delete a reporting-OFF final, bill again
+    // for free, repeat past the package limit (Task 1372). The delete now banks
+    // the bill in pos_bill_deletions and PlanLimitService adds it back — same
+    // contract as the day-close DELETE policy.
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function test_deleting_a_final_bill_does_not_give_back_monthly_quota(): void
+    {
+        $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
+        $billId = $this->makeFinal($companyId, 'L-050');
+        $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed'], 'quota should be full before the delete');
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->from("/pos/transaction/{$billId}")
+            ->delete("/pos/transaction/{$billId}");
+
+        $response->assertRedirect('/pos/transactions')->assertSessionHas('success');
+        $this->assertSame(0, $this->finalsCount($companyId), 'the bill really is gone');
+
+        $quota = PlanLimitService::canCreatePosBill($companyId);
+        $this->assertFalse($quota['allowed'], 'a deleted bill must keep occupying its slot this month');
+        $this->assertSame(self::OVERRIDE_FULL_1, $quota['reason']);
+
+        $this->assertDatabaseHas('pos_bill_deletions', [
+            'company_id' => $companyId,
+            'transaction_id' => $billId,
+            'invoice_number' => 'L-050',
+        ]);
+    }
+
+    public function test_deleting_a_provisional_bill_is_never_banked(): void
+    {
+        // A deliberate provisional never consumed a slot, so there is nothing to
+        // add back — deleting one must leave the allowance exactly as it was.
+        $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
+        $billId = $this->makeProvisional($companyId, 'L-001');
+
+        $this->actingAs($this->makeUser($companyId), 'pos')
+            ->from("/pos/transaction/{$billId}")
+            ->delete("/pos/transaction/{$billId}")
+            ->assertRedirect('/pos/transactions');
+
+        $this->assertSame(0, DB::table('pos_bill_deletions')->count(), 'provisionals must leave no ledger row');
+
+        $quota = PlanLimitService::canCreatePosBill($companyId);
+        $this->assertTrue($quota['allowed']);
+        $this->assertSame(1, $quota['remaining'], 'the full month allowance must still be there');
+    }
+
+    public function test_deleting_a_previous_month_bill_never_touches_this_months_count(): void
+    {
+        // Banked on the BILL's own created_at, so last month's delete lands in
+        // last month — this month's allowance stays untouched.
+        $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
+        $lastMonth = now()->subMonthNoOverflow();
+        $billId = $this->makeFinal($companyId, 'L-050', [
+            'business_date' => $lastMonth->toDateString(),
+            'created_at' => $lastMonth,
+            'updated_at' => $lastMonth,
+        ]);
+
+        $this->actingAs($this->makeUser($companyId), 'pos')
+            ->from("/pos/transaction/{$billId}")
+            ->delete("/pos/transaction/{$billId}")
+            ->assertRedirect('/pos/transactions');
+
+        $this->assertDatabaseHas('pos_bill_deletions', ['transaction_id' => $billId]);
+
+        $quota = PlanLimitService::canCreatePosBill($companyId);
+        $this->assertTrue($quota['allowed'], "an old month's delete must not eat this month's allowance");
+        $this->assertSame(1, $quota['remaining']);
     }
 
     public function test_counting_internal_account_bypasses_quota(): void

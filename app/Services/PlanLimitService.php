@@ -127,6 +127,22 @@ class PlanLimitService
                 // table missing pre-migration — quota falls back to the counts above
             }
 
+            // ...and for the one-by-one admin delete on a bill page (Task 1372),
+            // which hard-deletes a single quota-consuming final with no report
+            // and no reset to hang a count on. pos_bill_deletions holds one row
+            // per such bill, anchored on the bill's OWN created_at (sold_at) —
+            // the same basis as the live count above, so a previous month's
+            // delete never inflates this one. Table/Schema-guarded for prod drift.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('pos_bill_deletions')) {
+                    $deletedFinals += \App\Models\PosBillDeletion::where('company_id', $companyId)
+                        ->whereBetween('sold_at', [now()->startOfMonth(), now()->endOfMonth()])
+                        ->count();
+                }
+            } catch (\Throwable $e) {
+                // table missing pre-migration — quota falls back to the counts above
+            }
+
             return $live + $deletedFinals;
         };
 

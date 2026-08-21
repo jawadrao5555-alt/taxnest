@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\ProcessBulkAiImageJob;
 use App\Models\BulkAiImageBatch;
 use App\Models\BulkAiImageItem;
+use App\Models\BulkAiReportShare;
 use App\Models\Company;
 use App\Models\Invoice;
 use App\Models\AiInvoiceParse;
@@ -45,6 +46,21 @@ class BulkAiImageImportService
     /** A hand-off summary stays readable only while it stays short. */
     private const REPORT_MAX_NOTES = 3;
     private const REPORT_NOTE_CHARS = 160;
+
+    /**
+     * Task 1343: emailing the summary is a real outbound channel, so it is
+     * capped twice — how many reviewers one send may reach, and how many
+     * addresses one company may mail in a rolling 24h. The 24h count is read
+     * from the recorded rows, so it survives a cache flush and a restart.
+     */
+    public const REPORT_SHARE_MAX_RECIPIENTS = 5;
+    public const REPORT_SHARE_DAILY_LIMIT = 30;
+
+    /** Reserved-but-not-yet-sent hand-off; still counts against the 24h cap. */
+    public const REPORT_SHARE_QUEUED = 'queued';
+
+    /** Most recent hand-offs shown back on the batch page. */
+    private const REPORT_SHARE_HISTORY = 20;
 
     public function quotaState(Company $company): array
     {
@@ -431,6 +447,9 @@ class BulkAiImageImportService
                 'rows' => array_values(array_filter($batch->annexureRowsArray(), fn ($row) => !empty($row['valid']))),
             ],
             'annexure_audits' => app(AnnexureProductService::class)->auditTrail($batch, Company::findOrFail($batch->company_id)),
+            // Task 1343: who this batch's summary was emailed to, so the owner
+            // sees the hand-off history on the batch itself.
+            'report_shares' => $this->reportShares($batch),
         ];
     }
 
@@ -487,6 +506,22 @@ class BulkAiImageImportService
         return 'bulk-ai-review-batch-' . $batch->id . '-' . now()->format('Ymd-His') . '.' . $extension;
     }
 
+    /**
+     * The printable summary. Shared by the download button and the emailed
+     * hand-off so both always carry byte-identical content.
+     */
+    public function reviewReportPdf(BulkAiImageBatch $batch): \Barryvdh\DomPDF\PDF
+    {
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.ai-reader-bulk-report', [
+            'company' => Company::findOrFail($batch->company_id),
+            'title' => 'Bulk AI Image Import Review',
+            'report' => $this->reviewReport($batch),
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf;
+    }
+
     public function reviewReportCsv(BulkAiImageBatch $batch): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $report = $this->reviewReport($batch);
@@ -507,6 +542,115 @@ class BulkAiImageImportService
             }
             fclose($out);
         }, $this->reviewReportFilename($batch, 'csv'), ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Task 1343: emailed hand-offs of this batch's summary, newest first.
+     * Company-scoped by construction (a batch already belongs to one company)
+     * and safe to call before the table exists on an un-migrated install.
+     *
+     * @return array<int, array{id:int,recipient:string,status:string,sent_by:string,at:string,error:string}>
+     */
+    public function reportShares(BulkAiImageBatch $batch): array
+    {
+        if (!Schema::hasTable('bulk_ai_report_shares')) {
+            return [];
+        }
+
+        return BulkAiReportShare::where('company_id', $batch->company_id)
+            ->where('batch_id', $batch->id)
+            ->orderByDesc('id')
+            ->limit(self::REPORT_SHARE_HISTORY)
+            ->get()
+            ->map(fn (BulkAiReportShare $share) => [
+                'id' => (int) $share->id,
+                'recipient' => (string) $share->recipient,
+                'status' => (string) $share->status,
+                'sent_by' => (string) ($share->sent_by ?: ''),
+                'at' => $share->created_at?->format('d M Y, h:i A') ?? '',
+                'error' => (string) ($share->error ?: ''),
+            ])->all();
+    }
+
+    /**
+     * Addresses this company may still email in the current rolling 24h.
+     *
+     * Counts every row in the window — queued reservations and failed attempts
+     * included — so an in-flight send and a bad address never become free
+     * retries. Read-only: for the enforced check use reserveReportShares().
+     */
+    public function reportShareAllowanceLeft(int $companyId): int
+    {
+        if (!Schema::hasTable('bulk_ai_report_shares')) {
+            return self::REPORT_SHARE_DAILY_LIMIT;
+        }
+
+        $used = BulkAiReportShare::where('company_id', $companyId)
+            ->where('created_at', '>=', now()->subDay())
+            ->count();
+
+        return max(0, self::REPORT_SHARE_DAILY_LIMIT - $used);
+    }
+
+    /**
+     * Claim 24h allowance for these recipients BEFORE a single mail goes out.
+     *
+     * Checking the allowance and then sending would be a read-then-write race:
+     * with 8 PHP workers, two staff sessions could each read "2 left" and both
+     * send, blowing past the cap. So the whole claim runs in one transaction
+     * that first takes an exclusive lock on the company row — every reservation
+     * for a company is therefore serialised — and writes the recipient rows as
+     * 'queued' inside it. The rows themselves are the reservation: they count
+     * against the window the moment they commit, and the caller settles each
+     * one to sent/failed afterwards. Capacity is deliberately NEVER released,
+     * so a crash mid-send costs the shop its allowance rather than handing an
+     * abuser unlimited retries.
+     *
+     * @param  array<int, string>  $recipients
+     * @return array{rows: array<int, BulkAiReportShare>, allowance_left: int}
+     *         rows empty = refused, nothing reserved, nothing to send.
+     */
+    public function reserveReportShares(
+        BulkAiImageBatch $batch,
+        array $recipients,
+        ?int $userId,
+        string $senderName = ''
+    ): array {
+        return DB::transaction(function () use ($batch, $recipients, $userId, $senderName) {
+            // Serialise every concurrent reservation for this company.
+            DB::table('companies')->where('id', $batch->company_id)->lockForUpdate()->first();
+
+            $left = $this->reportShareAllowanceLeft((int) $batch->company_id);
+            if (count($recipients) > $left) {
+                return ['rows' => [], 'allowance_left' => $left];
+            }
+
+            $rows = [];
+            foreach ($recipients as $recipient) {
+                $rows[] = BulkAiReportShare::create([
+                    'batch_id' => $batch->id,
+                    'company_id' => $batch->company_id,
+                    'user_id' => $userId,
+                    'sent_by' => $senderName !== '' ? mb_substr($senderName, 0, 120) : null,
+                    'recipient' => mb_substr($recipient, 0, 191),
+                    'status' => self::REPORT_SHARE_QUEUED,
+                ]);
+            }
+
+            return ['rows' => $rows, 'allowance_left' => max(0, $left - count($rows))];
+        });
+    }
+
+    /**
+     * Close out a reserved hand-off row once the mail attempt is over. The row
+     * keeps its place in the 24h window either way — only its status changes.
+     */
+    public function settleReportShare(BulkAiReportShare $share, string $status, ?string $error = null): void
+    {
+        $share->forceFill([
+            'status' => $status,
+            'error' => $error ? mb_substr($error, 0, 500) : null,
+        ])->save();
     }
 
     /**

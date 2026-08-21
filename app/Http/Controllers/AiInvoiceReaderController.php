@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AiReaderException;
+use App\Mail\BulkAiReviewSummaryMail;
 use App\Models\AiInvoiceParse;
 use App\Models\BulkAiImageBatch;
 use App\Models\Company;
@@ -10,9 +11,11 @@ use App\Services\AiInvoiceReaderService;
 use App\Services\AnnexureProductService;
 use App\Services\BulkAiImageImportService;
 use App\Services\DiFeatureService;
+use App\Services\MailHealth;
 use App\Services\PlanLimitService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Task 142: AI Invoice Reader (Premium gate key 'ai_reader').
@@ -275,17 +278,147 @@ class AiInvoiceReaderController extends Controller
         }
 
         if (strtolower((string) $request->query('format')) === 'pdf') {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.ai-reader-bulk-report', [
-                'company' => Company::findOrFail($batch->company_id),
-                'title' => 'Bulk AI Image Import Review',
-                'report' => $service->reviewReport($batch),
-            ]);
-            $pdf->setPaper('a4', 'landscape');
-
-            return $pdf->download($service->reviewReportFilename($batch, 'pdf'));
+            return $service->reviewReportPdf($batch)->download($service->reviewReportFilename($batch, 'pdf'));
         }
 
         return $service->reviewReportCsv($batch);
+    }
+
+    /**
+     * Task 1343: email the same PDF summary straight to another reviewer
+     * (typically the shop's accountant) so the hand-off never leaves TaxNest.
+     *
+     * Guard rails:
+     *   - company scoped exactly like the download (another company's batch
+     *     is a 404) and refused while nothing has been processed yet;
+     *   - capped per send (max recipients) AND per company per rolling 24h,
+     *     on top of the route's per-minute throttle;
+     *   - every recipient is recorded — sent or failed — so an owner can see
+     *     who the summary went to and who sent it;
+     *   - the PDF is rendered ONCE and reused for each recipient; the private
+     *     source photos are never attached or linked.
+     */
+    public function bulkReportEmail(Request $request, int $batchId, BulkAiImageImportService $service)
+    {
+        $companyId = (int) app('currentCompanyId');
+        $batch = $service->batchForCompany($batchId, $companyId);
+        if (!$batch) {
+            return response()->json(['error' => 'Bulk AI batch not found.'], 404);
+        }
+
+        $recipients = $this->parseRecipients($request->input('recipients'));
+        if (!$recipients) {
+            return response()->json(['error' => 'Kam az kam ek sahi email address likhein.'], 422);
+        }
+        if (count($recipients) > BulkAiImageImportService::REPORT_SHARE_MAX_RECIPIENTS) {
+            return response()->json([
+                'error' => 'Ek waqt mein zyada se zyada ' . BulkAiImageImportService::REPORT_SHARE_MAX_RECIPIENTS . ' email addresses par bhej sakte hain.',
+            ], 422);
+        }
+        foreach ($recipients as $email) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return response()->json(['error' => 'Yeh email address sahi format mein nahi hai: ' . $email], 422);
+            }
+        }
+
+        $report = $service->reviewReport($batch);
+        if (($report['batch']['processed'] ?? 0) < 1) {
+            return response()->json(['error' => 'Abhi tak koi photo process nahi hui — summary bhejne se pehle batch ko chalne dein.'], 422);
+        }
+
+        $senderName = (string) (auth()->user()?->name ?? '');
+
+        // Claim the 24h allowance BEFORE rendering or sending anything, so two
+        // simultaneous sends cannot both read the same remaining allowance.
+        $reservation = $service->reserveReportShares($batch, $recipients, auth()->id(), $senderName);
+        if (!$reservation['rows']) {
+            $allowance = $reservation['allowance_left'];
+
+            return response()->json([
+                'error' => $allowance > 0
+                    ? 'Aaj sirf ' . $allowance . ' aur email bheji ja sakti hain (24 ghante mein ' . BulkAiImageImportService::REPORT_SHARE_DAILY_LIMIT . ' ki hadd).'
+                    : '24 ghante ki email limit (' . BulkAiImageImportService::REPORT_SHARE_DAILY_LIMIT . ') poori ho chuki hai. Baad mein dobara koshish karein.',
+                'shares' => $service->reportShares($batch),
+            ], 429);
+        }
+
+        $company = Company::findOrFail($batch->company_id);
+        $filename = $service->reviewReportFilename($batch, 'pdf');
+
+        try {
+            $pdfBytes = $service->reviewReportPdf($batch)->output();
+        } catch (\Throwable $e) {
+            Log::error('Bulk AI review summary PDF render failed', [
+                'batch_id' => $batch->id,
+                'err' => mb_substr($e->getMessage(), 0, 300),
+            ]);
+            // The reservation stays spent — it only changes from queued to failed.
+            foreach ($reservation['rows'] as $share) {
+                $service->settleReportShare($share, 'failed', 'Summary PDF render failed: ' . $e->getMessage());
+            }
+
+            return response()->json([
+                'error' => 'Summary PDF ban nahi saki. Thori dair baad dobara koshish karein.',
+                'shares' => $service->reportShares($batch),
+            ], 500);
+        }
+
+        $sent = [];
+        $failed = [];
+        foreach ($reservation['rows'] as $share) {
+            $email = (string) $share->recipient;
+            try {
+                Mail::to($email)->send(new BulkAiReviewSummaryMail($company, $report, $pdfBytes, $filename, $senderName));
+                MailHealth::recordSuccess();
+                $service->settleReportShare($share, 'sent');
+                $sent[] = $email;
+            } catch (\Throwable $e) {
+                MailHealth::recordFailure('Bulk AI review summary (batch #' . $batch->id . ')', $e);
+                Log::warning("Bulk AI batch #{$batch->id} summary email to {$email} failed: " . $e->getMessage());
+                $service->settleReportShare($share, 'failed', $e->getMessage());
+                $failed[] = $email;
+            }
+        }
+
+        $shares = $service->reportShares($batch);
+
+        if (!$sent) {
+            return response()->json([
+                'error' => 'Email send nahi ho saki: ' . implode(', ', $failed) . '. Thori dair baad dobara koshish karein.',
+                'shares' => $shares,
+            ], 500);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Review summary bhej di gayi: ' . implode(', ', $sent)
+                . ($failed ? ' — nakaam: ' . implode(', ', $failed) : ''),
+            'sent' => $sent,
+            'failed' => $failed,
+            'shares' => $shares,
+            'allowance_left' => $service->reportShareAllowanceLeft($companyId),
+        ]);
+    }
+
+    /**
+     * Recipients arrive either as a JSON array or as one typed line — commas,
+     * semicolons, spaces, and newlines all separate addresses.
+     *
+     * @return array<int, string> lower-cased, de-duplicated, order preserved
+     */
+    private function parseRecipients($input): array
+    {
+        $parts = is_array($input) ? $input : preg_split('/[,;\s]+/', (string) $input);
+
+        $emails = [];
+        foreach ((array) $parts as $part) {
+            $email = strtolower(trim((string) $part));
+            if ($email !== '' && !in_array($email, $emails, true)) {
+                $emails[] = $email;
+            }
+        }
+
+        return $emails;
     }
 
     public function bulkRetry(int $batchId, int $itemId, BulkAiImageImportService $service)

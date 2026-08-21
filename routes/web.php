@@ -448,6 +448,10 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         // scoped, and it never links or embeds the private source photo.
         Route::get('/invoices/ai-reader/bulk-images/{batchId}/report', [AiInvoiceReaderController::class, 'bulkReport'])
             ->middleware('throttle:20,1')->name('invoices.ai-reader.bulk.report');
+        // Task 1343: email that same PDF summary to another reviewer. Throttled
+        // per minute here; the per-company 24h cap lives in the controller.
+        Route::post('/invoices/ai-reader/bulk-images/{batchId}/report/email', [AiInvoiceReaderController::class, 'bulkReportEmail'])
+            ->middleware('throttle:5,1')->name('invoices.ai-reader.bulk.report.email');
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);

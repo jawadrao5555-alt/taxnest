@@ -96,12 +96,42 @@
                                     <span class="flex items-center gap-2">
                                         <a :href="reportUrl('csv')" class="rounded-lg border border-gray-200 px-2 py-1 text-[10px] font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Download CSV</a>
                                         <a :href="reportUrl('pdf')" class="rounded-lg border border-gray-200 px-2 py-1 text-[10px] font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Download PDF</a>
+                                        <button type="button" @click="shareOpen = !shareOpen" class="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">Email summary</button>
                                     </span>
                                 </template>
                                 <span class="rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200" x-text="(batch.processed || 0) + ' / ' + (batch.total || files.length) + ' processed'"></span>
                             </div>
                         </div>
                         <p x-show="(batch.processed || 0) > 0" class="mt-2 text-[11px] text-gray-400">Share the review summary with another reviewer — it lists each source filename, its status, short notes, and the draft number. The private source photos are never included.</p>
+
+                        {{-- Task 1343: email the PDF summary straight to another reviewer (e.g. the shop's accountant). --}}
+                        <div x-show="shareOpen && (batch.processed || 0) > 0" x-cloak class="mt-3 rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-800 dark:bg-violet-950/20">
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider text-violet-900 dark:text-violet-200">Email this summary</h3>
+                            <p class="mt-1 text-[11px] text-violet-700 dark:text-violet-300">PDF summary email par bhej dein — maslan apne accountant ko. Zyada se zyada {{ \App\Services\BulkAiImageImportService::REPORT_SHARE_MAX_RECIPIENTS }} addresses, comma se alag karein. Source photos email mein shamil nahi hoti.</p>
+                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                                <input type="text" x-model="shareEmails" @keydown.enter.prevent="sendReport()" placeholder="accountant@example.com, reviewer@example.com" autocomplete="off" name="bulk_share_emails_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore="true" class="min-w-[260px] flex-1 rounded-lg border-gray-300 text-xs dark:border-gray-700 dark:bg-gray-900">
+                                <button type="button" @click="sendReport()" :disabled="shareBusy || !shareEmails.trim()" class="rounded-lg bg-violet-600 px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:opacity-50">
+                                    <span x-text="shareBusy ? 'Bhej rahe hain…' : 'Send summary'"></span>
+                                </button>
+                            </div>
+                            <p x-show="shareMessage" x-cloak class="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300" x-text="shareMessage"></p>
+                            <p x-show="shareError" x-cloak class="mt-2 text-[11px] font-semibold text-red-600 dark:text-red-400" x-text="shareError"></p>
+
+                            <template x-if="(batch.report_shares || []).length">
+                                <div class="mt-3 border-t border-violet-200 pt-3 dark:border-violet-800">
+                                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-violet-800 dark:text-violet-300">Sent to</p>
+                                    <ul class="mt-1 space-y-1">
+                                        <template x-for="share in batch.report_shares" :key="share.id">
+                                            <li class="flex flex-wrap items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300">
+                                                <span class="font-semibold" x-text="share.recipient"></span>
+                                                <span class="rounded-full px-2 py-0.5 text-[10px] font-bold" :class="share.status === 'sent' ? 'bg-emerald-100 text-emerald-700' : (share.status === 'queued' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700')" x-text="share.status === 'sent' ? 'Sent' : (share.status === 'queued' ? 'Sending…' : 'Failed')"></span>
+                                                <span class="text-gray-400" x-text="share.at + (share.sent_by ? ' · ' + share.sent_by : '')"></span>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
+                            </template>
+                        </div>
                         <div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"><div class="h-full bg-violet-600 transition-all" :style="'width:' + progress() + '%'"></div></div>
                         <p class="mt-2 text-xs text-gray-500" x-text="busy ? busyLabel : 'Photos are processed separately in the background. You may keep this page open to review live results.'"></p>
 
@@ -192,6 +222,7 @@
         return {
             files: [], annexureFile: null, annexure: {status: 'none', headers: [], fields: [], mapping: {}, rows: []},
             batchId: null, batch: {items: []}, priceDecisions: {}, metadataFields: {}, metadataKeys: ['name','barcode','sku','hs_code','pct_code','uom','default_tax_rate','tax_type','schedule_type','sro_reference','serial_number','mrp'], busy: false, busyLabel: '', error: null,
+            shareOpen: false, shareEmails: '', shareBusy: false, shareMessage: '', shareError: '',
             quota: @json($quota),
             csrf() { return document.querySelector('meta[name=csrf-token]')?.content || ''; },
             init() {},
@@ -288,6 +319,17 @@
                 this.metadataFields[itemId] = checked ? [...new Set([...selected, field])] : selected.filter(key => key !== field);
             },
             reportUrl(format) { return '/invoices/ai-reader/bulk-images/' + this.batchId + '/report?format=' + format; },
+            async sendReport() {
+                if (this.shareBusy || !this.batchId || !this.shareEmails.trim()) return;
+                this.shareBusy = true; this.shareMessage = ''; this.shareError = '';
+                try {
+                    const result = await this.json('/invoices/ai-reader/bulk-images/' + this.batchId + '/report/email', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':this.csrf()}, body:JSON.stringify({recipients:this.shareEmails})});
+                    this.shareMessage = result.message || 'Review summary bhej di gayi.';
+                    this.shareEmails = '';
+                    if (result.shares) this.batch = {...this.batch, report_shares: result.shares};
+                } catch (e) { this.shareError = e.message; }
+                this.shareBusy = false;
+            },
             progress() { return this.batch.total ? Math.round(((this.batch.processed || 0) / this.batch.total) * 100) : 0; },
             label(s) { return ({not_started:'Not started',uploading:'Uploading',queued:'Queued',processing:'Reading',ready:'Ready',needs_review:'Needs review',duplicate:'Duplicate',failed:'Failed'})[s] || s; },
             statusClass(s) { return ({ready:'bg-emerald-100 text-emerald-700',needs_review:'bg-amber-100 text-amber-800',duplicate:'bg-gray-200 text-gray-700',failed:'bg-red-100 text-red-700',processing:'bg-violet-100 text-violet-700',queued:'bg-blue-100 text-blue-700'})[s] || 'bg-gray-100 text-gray-600'; }

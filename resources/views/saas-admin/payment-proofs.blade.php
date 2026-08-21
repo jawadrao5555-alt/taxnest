@@ -145,29 +145,130 @@
                                         </form>
                                     </div>
                                     @else
-                                    <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px]">
-                                        @php $reqCycleSel = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle); @endphp
+                                    <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px] max-w-[280px]">
+                                        @php
+                                            $reqCycleSel = \App\Services\SubscriptionAssignmentService::normalizeCycle($proof->billing_cycle);
+
+                                            // Renewal review (Aug 2026): jis shop ne paid extra-branch slots
+                                            // le rakhe hain, uska renewal total = base package + (slots ×
+                                            // 10,000). Ab tak koi nahi dekhta tha ke shop ne wo BARHA HUA
+                                            // total bheja bhi hai — is liye mutawaqqa total aur shop ki likhi
+                                            // raqam saath saath dikhti hai, aur slots isi qadam mein rakhe ya
+                                            // kam kiye ja sakte hain.
+                                            $ebReview = \App\Services\BranchAddonService::renewalReview(
+                                                $proof->company, $proof->pricingPlan, $reqCycleSel, $proof->amount
+                                            );
+
+                                            // Har qabil-e-intikhab package ka base aur har slot-ginti ka
+                                            // add-on SERVER par — screen wahi raqam dikhaye jo approve hone
+                                            // par charge hogi, chahe admin package ya cycle badal de.
+                                            $ebPlanRows = [];
+                                            if ($ebReview['applies']) {
+                                                foreach ($plans as $ebPlan) {
+                                                    if (!\App\Services\BranchAddonService::supportsPlan($ebPlan)) {
+                                                        continue;
+                                                    }
+                                                    $ebMin = \App\Services\BranchAddonService::minimumSlotsForBranches($proof->company, $ebPlan);
+                                                    $ebRow = [
+                                                        'min' => $ebMin,
+                                                        'included' => ($ebPlan->branch_limit === null || (int) $ebPlan->branch_limit === -1) ? null : (int) $ebPlan->branch_limit,
+                                                        'base' => [],
+                                                        'addon' => [],
+                                                    ];
+                                                    foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $ebCycle) {
+                                                        $ebPriced = \App\Services\SubscriptionAssignmentService::computePrice($ebPlan, $ebCycle);
+                                                        $ebMonths = \App\Services\BranchAddonService::monthsForCycle($ebPriced['cycle']);
+                                                        $ebRow['base'][$ebCycle] = (float) $ebPriced['final_price'];
+                                                        $ebRow['addon'][$ebCycle] = [];
+                                                        for ($ebS = $ebMin; $ebS <= $ebReview['slots']; $ebS++) {
+                                                            $ebRow['addon'][$ebCycle][$ebS] = \App\Services\BranchAddonService::priceForMonths($ebS, $ebMonths);
+                                                        }
+                                                        // 0..N ki lagatar keys warna JS array ban jati hain — object hi rehne dein.
+                                                        $ebRow['addon'][$ebCycle] = (object) $ebRow['addon'][$ebCycle];
+                                                    }
+                                                    $ebPlanRows[(string) $ebPlan->id] = $ebRow;
+                                                }
+                                            }
+                                        @endphp
                                         @if($proof->pricingPlan)
                                             <p class="text-[11px] text-gray-400 mb-1">Requested: <span class="text-gray-200 font-medium">{{ $proof->pricingPlan->name }}</span> · {{ \App\Models\Subscription::getCycleLabel($reqCycleSel) }}. Approve as-is or change below.</p>
                                         @else
                                             <p class="text-[11px] text-gray-400 mb-1">No package requested — choose one to assign.</p>
                                         @endif
+                                        <div x-data="{
+                                                slots: {{ $ebReview['slots'] }},
+                                                maxSlots: {{ $ebReview['slots'] }},
+                                                cycle: @js($reqCycleSel),
+                                                plan: @js((string) $proof->pricing_plan_id),
+                                                rows: @js($ebPlanRows),
+                                                paid: @js($ebReview['paid']),
+                                                num(v) { return Number(v || 0); },
+                                                row() { return this.rows[String(this.plan)] || null; },
+                                                applies() { return this.row() !== null; },
+                                                minSlots() { const r = this.row(); return r ? r.min : 0; },
+                                                included() { const r = this.row(); return r ? r.included : null; },
+                                                baseNow() { const r = this.row(); if (!r) { return 0; } const v = r.base[this.cycle]; return v === undefined ? 0 : v; },
+                                                addonNow() { const r = this.row(); if (!r) { return 0; } const t = r.addon[this.cycle] || {}; const v = t[String(this.num(this.slots))]; return v === undefined ? 0 : v; },
+                                                expected() { return this.baseNow() + this.addonNow(); },
+                                                shortBy() { return this.paid === null ? 0 : Math.max(0, this.expected() - this.paid); },
+                                                fmt(v) { return 'PKR ' + Number(v || 0).toLocaleString('en-US'); }
+                                             }"
+                                             x-effect="if (applies()) { const n = num(slots); if (n < minSlots()) { slots = minSlots(); } else if (n > maxSlots) { slots = maxSlots; } }">
+                                        @if($ebReview['applies'])
+                                        {{-- Mutawaqqa total bmuqabla adayegi — kam paisa approve hone se pehle saamne. --}}
+                                        <div x-show="applies()" x-cloak class="rounded-lg border px-2.5 py-2 mb-2 text-[11px] leading-relaxed"
+                                             :class="shortBy() > 0 ? 'border-red-700/70 bg-red-900/25' : 'border-emerald-800/60 bg-emerald-900/15'">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-gray-400">Expected total</span>
+                                                <span class="text-white font-semibold" x-text="fmt(expected())"></span>
+                                            </div>
+                                            <p class="text-gray-500" x-text="'= ' + fmt(baseNow()) + ' package + ' + fmt(addonNow()) + ' for ' + num(slots) + ' extra branch(es)'"></p>
+                                            <div class="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-gray-700/60">
+                                                <span class="text-gray-400">Shop says paid</span>
+                                                <span class="font-semibold" :class="shortBy() > 0 ? 'text-red-300' : 'text-emerald-300'">
+                                                    {{ $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : 'Not stated' }}
+                                                </span>
+                                            </div>
+                                            <template x-if="shortBy() > 0">
+                                                <p class="mt-1 font-bold text-red-300" x-text="'SHORT by ' + fmt(shortBy()) + ' — this payment does not cover the extra branch slots.'"></p>
+                                            </template>
+                                            @if($proof->amount === null)
+                                                <p class="mt-1 text-amber-400">The shop did not state an amount — check the receipt before approving.</p>
+                                            @endif
+                                        </div>
+                                        @endif
                                         <form method="POST" action="{{ route('saas.admin.payment-proofs.approve', $proof->id) }}" class="space-y-2">
                                             @csrf
-                                            <select name="pricing_plan_id" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                            <select name="pricing_plan_id" x-model="plan" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="">Select Plan</option>
                                                 @foreach($plans as $p)
                                                     <option value="{{ $p->id }}" @selected($proof->pricing_plan_id == $p->id)>{{ $p->name }} — {{ strtoupper($p->product_type ?? 'di') }} (PKR {{ number_format($p->price) }})</option>
                                                 @endforeach
                                             </select>
-                                            <select name="billing_cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                            <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="monthly" @selected($reqCycleSel === 'monthly')>Monthly</option>
                                                 <option value="quarterly" @selected($reqCycleSel === 'quarterly')>Quarterly</option>
                                                 <option value="semi_annual" @selected($reqCycleSel === 'semi_annual')>Semi-Annual</option>
                                                 <option value="annual" @selected($reqCycleSel === 'annual')>Annual</option>
                                             </select>
+                                            @if($ebReview['applies'])
+                                            {{-- Slots isi qadam mein: rakhein ya kam karein. Barhane ka
+                                                 raasta shop ki apni extra-branch request hai. --}}
+                                            <div x-show="applies()" x-cloak>
+                                                <label class="block text-[11px] text-gray-400 mb-1">Paid extra branch slots after this renewal</label>
+                                                <input type="number" name="extra_branch_slots" x-model="slots" step="1"
+                                                       :min="minSlots()" :max="maxSlots" :required="applies()" :disabled="!applies()"
+                                                       class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                                <p class="text-[11px] text-gray-500 mt-1">
+                                                    Now {{ $ebReview['slots'] }} paid slot(s). This shop has {{ $ebReview['branches'] }} branch(es); the package includes <span x-text="included() === null ? 'unlimited' : included()"></span>.
+                                                    <span class="text-amber-400" x-show="minSlots() > 0" x-cloak x-text="'Cannot go below ' + minSlots() + ' — a branch would be left above the limit.'"></span>
+                                                    Keep or reduce only; no refund is issued.
+                                                </p>
+                                            </div>
+                                            @endif
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve &amp; Unlock</button>
                                         </form>
+                                        </div>
                                     </div>
                                     @endif
 

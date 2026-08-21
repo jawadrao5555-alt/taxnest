@@ -62,6 +62,9 @@ class AdminPaymentProofController extends Controller
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
+            // Paid extra-branch slots ka faisla, isi renewal ke sath (rakhein
+            // ya kam karein). Ghair-mojood = purana behaviour, kuch na badle.
+            'extra_branch_slots' => 'nullable|integer|min:0|max:' . \App\Services\BranchAddonService::MAX_QTY * 10,
         ]);
 
         $plan = PricingPlan::findOrFail((int) $request->pricing_plan_id);
@@ -94,11 +97,63 @@ class AdminPaymentProofController extends Controller
         // customer notification must all carry THIS cycle, never raw input.
         $enforcedCycle = SubscriptionAssignmentService::computePrice($plan, $requestedCycle)['cycle'];
 
+        // Renewal ka jaiza: mutawaqqa total (base + paid slots) bmuqabla jo
+        // raqam shop ne likhi. Agar shop ne sirf package ke paise bheje to ab
+        // tak slots khamoshi se qaim rehte the — admin unhen isi qadam mein
+        // rakh ya kam kar sakta hai (koi refund, koi khud-kar katauti nahi).
+        $company = Company::find($proof->company_id);
+        $review = \App\Services\BranchAddonService::renewalReview($company, $plan, $enforcedCycle, $proof->amount);
+
+        $slotsChosen = null;
+        if ($review['applies'] && \App\Services\BranchAddonService::slotsColumnExists()) {
+            $raw = $request->input('extra_branch_slots');
+            if ($raw !== null && $raw !== '') {
+                $slotsChosen = (int) $raw;
+
+                // Renewal par slots sirf rakhe ya kam kiye ja sakte hain —
+                // barhane ka raasta shop ki apni extra-branch request hai
+                // (wahan qeemat pro-rata bhi hoti hai).
+                if ($slotsChosen > $review['slots']) {
+                    return back()->with('error', 'Approving a renewal can only keep or reduce paid branch slots (currently ' . $review['slots'] . '). To sell more, approve the shop\'s extra-branch request instead.');
+                }
+
+                // Hadd se neeche jana branch ko limit se bahar chhod dega.
+                if ($slotsChosen < $review['min_slots']) {
+                    return back()->with('error', 'Cannot drop below ' . $review['min_slots'] . ' paid slot(s): this shop already has ' . $review['branches'] . ' branch(es) and the package includes ' . ($review['included'] ?? 0) . '. Delete the extra branch(es) first, then reduce the slots.');
+                }
+            }
+        }
+
         // Race-safe: lock the row, bail out if another admin already processed it.
-        $subscription = DB::transaction(function () use ($proof, $plan, $enforcedCycle) {
+        $result = DB::transaction(function () use ($proof, $plan, $enforcedCycle, $slotsChosen) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
-                return null;
+                return ['outcome' => 'already_processed'];
+            }
+
+            $slotsBefore = null;
+            $slotsAfter = null;
+
+            if ($slotsChosen !== null) {
+                $lockedCompany = Company::where('id', $locked->company_id)->lockForUpdate()->first();
+                $slotsBefore = \App\Services\BranchAddonService::slots($lockedCompany);
+                $slotsAfter = $slotsBefore;
+
+                // Ho sakta hai isi darmiyan koi add-on request approve ho gayi
+                // ho — admin ka number ab barhotri banega. Khamoshi se clamp
+                // karne se behtar hai saaf mana kar dena.
+                if ($slotsChosen > $slotsBefore) {
+                    return ['outcome' => 'slots_changed'];
+                }
+
+                // Slots PEHLE likhein: naye subscription ki final_price isi
+                // ginti se banti hai (assign → computePrice → addonForCycle),
+                // warna record us add-on ka paisa dikhata rahega jo admin ne
+                // abhi hata diya.
+                if ($lockedCompany && $slotsChosen !== $slotsBefore) {
+                    $lockedCompany->update(['extra_branch_slots' => $slotsChosen]);
+                    $slotsAfter = $slotsChosen;
+                }
             }
 
             $sub = SubscriptionAssignmentService::assign(
@@ -117,18 +172,29 @@ class AdminPaymentProofController extends Controller
                 'reject_reason' => null,
             ]);
 
-            return $sub;
+            return [
+                'outcome' => 'ok',
+                'subscription' => $sub,
+                'slots_before' => $slotsBefore,
+                'slots_after' => $slotsAfter,
+            ];
         });
 
-        if (!$subscription) {
+        if (($result['outcome'] ?? null) === 'slots_changed') {
+            return back()->with('error', 'This company\'s paid branch slots changed while you were reviewing. Reload the page and approve again.');
+        }
+
+        if (($result['outcome'] ?? null) !== 'ok') {
             return back()->with('error', 'This payment proof was already processed.');
         }
+
+        $subscription = $result['subscription'];
 
         // A verified payment must also unlock the company itself: mirror the
         // admin grant flow (BOTH status columns), never reversing a deliberate
         // suspension/rejection. Covers companies demoted to pending by the
         // expired-grant reconciler before the admin got to this proof.
-        $company = Company::find($proof->company_id);
+        $company = $company?->fresh();
         if ($company
             && !in_array($company->status, ['suspended', 'rejected'], true)
             && !in_array($company->company_status, ['suspended', 'rejected'], true)
@@ -140,14 +206,42 @@ class AdminPaymentProofController extends Controller
         // earns the introducing agent their Schedule A cut. Never breaks approval.
         \App\Services\AgentCommissionService::recordForProof($proof->fresh());
 
-        AdminAuditLog::log(auth('admin')->id(), 'Payment proof approved', 'PaymentProof', $proof->id, [
+        AdminAuditLog::log(auth('admin')->id(), 'Payment proof approved', 'PaymentProof', $proof->id, array_filter([
             'company_id' => $proof->company_id,
             'subscription_id' => $subscription->id,
-        ]);
+            'expected_total' => $review['applies'] ? $review['expected_total'] : null,
+            'amount_claimed' => $review['applies'] ? $review['paid'] : null,
+            'extra_branch_slots_before' => $result['slots_before'],
+            'extra_branch_slots_after' => $result['slots_after'],
+        ], fn ($v) => $v !== null));
+
+        // Slots ka faisla company ke audit trail par bhi — bilkul usi shakl
+        // mein jaise admin ke hath se ki gayi tabdeeli (before/after), plus wo
+        // renewal period jiske liye ye slots ke paise mile.
+        if ($result['slots_before'] !== null) {
+            AdminAuditLog::log(auth('admin')->id(), 'Extra branch slots set at renewal', 'Company', $proof->company_id, [
+                'name' => $company->name ?? null,
+                'payment_proof_id' => $proof->id,
+                'extra_branch_slots_before' => $result['slots_before'],
+                'extra_branch_slots_after' => $result['slots_after'],
+                'expected_total' => $review['expected_total'],
+                'amount_claimed' => $review['paid'],
+                'billing_cycle' => $enforcedCycle,
+                'period_start' => (string) $subscription->start_date,
+                'period_end' => (string) $subscription->end_date,
+            ]);
+        }
 
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
 
-        return back()->with('success', 'Payment approved & subscription activated — company is now unlocked.');
+        $message = 'Payment approved & subscription activated — company is now unlocked.';
+        if ($result['slots_before'] !== null) {
+            $message .= $result['slots_after'] === $result['slots_before']
+                ? " Paid extra branch slots kept at {$result['slots_after']}."
+                : " Paid extra branch slots reduced from {$result['slots_before']} to {$result['slots_after']}.";
+        }
+
+        return back()->with('success', $message);
     }
 
     /**

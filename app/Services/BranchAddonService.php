@@ -151,6 +151,109 @@ class BranchAddonService
         return $slots;
     }
 
+    /** Shop ki abhi ki branches (gate bhi isi ginti par chalta hai). */
+    public static function branchCount(?Company $company): int
+    {
+        if (!$company) {
+            return 0;
+        }
+
+        try {
+            return Branch::where('company_id', $company->id)->count();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Kam se kam kitne paid slots RAKHNE parenge, taake koi maujooda branch
+     * hadd se bahar na reh jaye.
+     *
+     * Renewal approve karte waqt admin slots kam kar sakta hai (shop ne base
+     * package ke paise bheje, add-on ke nahi). Ye us kami ki hadd hai: package
+     * ki shamil branches + baqi slots shop ki maujooda branches se kam nahi ho
+     * sakte — warna branch to bani rehti hai magar limit se bahar, aur koi gate
+     * use hata bhi nahi sakta.
+     *
+     * Admin branch override ya internal account ki soorat mein branch limit ka
+     * slots se koi taalluq hi nahi rehta, is liye wahan koi floor bhi nahi.
+     *
+     * Floor kabhi shop ke maujooda slots se ooper nahi jata: agar shop pehle hi
+     * hadd se bahar hai (maslan admin ne hath se slots kam kar diye the), to
+     * matlab sirf itna hai ke ab kami mumkin nahi — renewal khud block nahi hota.
+     */
+    public static function minimumSlotsForBranches(?Company $company, ?PricingPlan $plan): int
+    {
+        if (!$company || !self::supportsPlan($plan)) {
+            return 0;
+        }
+
+        if ($company->is_internal_account || ($company->branch_limit_override ?? null) !== null) {
+            return 0;
+        }
+
+        $included = $plan->branch_limit;
+        if ($included === null || (int) $included === -1) {
+            return 0;
+        }
+
+        $floor = max(0, self::branchCount($company) - (int) $included);
+
+        return min($floor, self::slots($company));
+    }
+
+    /**
+     * Renewal proof ka jaiza — mutawaqqa total bmuqabla jo raqam shop keh raha
+     * hai ke usne bheji.
+     *
+     * Renewal ka quote pehle hi base package + (slots × 10,000) hota hai, magar
+     * ab tak koi ye nahi dekhta tha ke shop ne wo BARHA HUA total bheja bhi hai
+     * ya sirf package ke paise. Dono number — aur wo kam se kam slots jin se
+     * neeche jana branches ko hadd se bahar chhod dega — YAHIN se nikalte hain,
+     * taake admin ki screen aur approve wali validation kabhi alag baat na karen.
+     *
+     * @param  float|string|null  $paid  Jo raqam shop ne proof par likhi.
+     * @return array{applies:bool,slots:int,min_slots:int,branches:int,included:?int,cycle:string,base_price:float,addon_price:float,expected_total:float,paid:?float,short:bool,shortfall:float}
+     */
+    public static function renewalReview(?Company $company, ?PricingPlan $plan, ?string $cycle, $paid = null): array
+    {
+        $slots = self::slots($company);
+        $applies = $company !== null && $slots > 0 && self::supportsPlan($plan);
+
+        $cycle = SubscriptionAssignmentService::normalizeCycle($cycle);
+        $base = 0.0;
+        $addon = 0.0;
+
+        if ($plan) {
+            // Wahi hisaab jo renewal par charge hota hai — dobara nahi banaya jata.
+            $priced = SubscriptionAssignmentService::computePrice($plan, $cycle, $applies ? $company : null);
+            $cycle = $priced['cycle'];
+            $base = (float) $priced['base_price'];
+            $addon = (float) $priced['extra_branch_price'];
+        }
+
+        $expected = $base + $addon;
+        $paidAmount = ($paid === null || $paid === '') ? null : (float) $paid;
+        $shortfall = $paidAmount === null ? 0.0 : max(0.0, round($expected - $paidAmount));
+
+        $includedRaw = $plan?->branch_limit;
+
+        return [
+            'applies' => $applies,
+            'slots' => $slots,
+            'min_slots' => $applies ? self::minimumSlotsForBranches($company, $plan) : 0,
+            'branches' => $applies ? self::branchCount($company) : 0,
+            'included' => ($includedRaw === null || (int) $includedRaw === -1) ? null : (int) $includedRaw,
+            'cycle' => $cycle,
+            'base_price' => $base,
+            'addon_price' => $addon,
+            'expected_total' => $expected,
+            'paid' => $paidAmount,
+            'short' => $paidAmount !== null && $shortfall > 0,
+            'shortfall' => $shortfall,
+        ];
+    }
+
     /** Add-on sirf PRA POS packages par. */
     public static function supportsPlan(?PricingPlan $plan): bool
     {

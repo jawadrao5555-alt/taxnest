@@ -69,8 +69,14 @@ dependencies {
 
 // Firebase config activates ONLY when the owner drops in the real
 // app/google-services.json (Firebase console → same project as rider app →
-// Android app pk.taxnest.fbrpos). Conditional apply keeps the build green
+// Android app pk.taxnest.fbrpos). Conditional apply keeps DEBUG builds green
 // without it — push stays dormant, everything else works (Task #1283).
 if (file('google-services.json').exists()) {
     apply plugin: 'com.google.gms.google-services'
 }
+
+// Task #1399: a RELEASE may NOT be push-dead. The guard blocks assembleRelease
+// when the config is missing, and re-opens the finished APK to prove Firebase
+// really landed inside it. The v1.1.0 beta was built config-less and hosted
+// with push dormant — that must not happen silently again.
+apply from: file("$rootDir/../scripts/lib/android-firebase-guard.gradle")

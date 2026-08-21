@@ -9,9 +9,15 @@ for the full prerequisite setup. This file covers the POS-specific bits.
 
 ## Firebase prerequisite (v1.1.0+ instant push) — one-time owner setup
 
-Push is OPTIONAL at build time: without the config below the APK still builds
-and runs exactly like v1.0.x. To enable instant push (naya order / order
-tayyar / day-close):
+**A release build REFUSES to run without this config** (shared guard
+`scripts/lib/android-firebase-guard.gradle`): `assembleRelease` fails at
+`verifyFirebaseConfigPresent` when `app/google-services.json` is missing, and
+after packaging it re-opens the finished APK to prove the config really landed
+inside it. Debug builds are never gated. The rider shell shipped a push-dead
+v1.6.0 exactly because this was optional — the file is gitignored, so any
+build in a fresh container hits the same trap.
+
+To enable instant push (naya order / order tayyar / day-close):
 
 1. **Use the EXISTING Firebase project** (the one created for the rider app —
    do NOT create a second project; the server credential
@@ -72,8 +78,9 @@ breaks in-place updates for everything. NEVER commit it (public repo).
    `versionCode` N+1 (never reuse), `versionName "X.Y.Z"`.
 2. **Server side deployed** — push to origin (`.cpanel.yml` auto-deploys),
    `ea-php84 artisan migrate --force` on live, verify the live commit.
-3. **Build the signed APK** (above), then verify it before it leaves the box —
-   one command, no SDK needed:
+3. **Build the signed APK** (above); `apksigner verify --print-certs` must show
+   the shared key. Then verify it before it leaves the box — one command, no
+   SDK needed:
    ```bash
    bash scripts/apk-release-check.sh pos-app/app/build/outputs/apk/release/app-release.apk
    ```
@@ -85,22 +92,31 @@ breaks in-place updates for everything. NEVER commit it (public repo).
    `pos-app/app/build.gradle` (a stale APK re-uses its `versionCode` and never
    updates a phone in place). The shell must never hit the Caller ID listener
    exception — if it does, a feature added a blocked permission.
-4. **Host as a versioned BETA first**:
+4. **Verify push is really inside the APK** — the gradle guard already checked
+   it, but re-run on the exact file you are about to upload:
+   ```bash
+   bash scripts/verify-apk-firebase.sh \
+       pos-app/app/build/outputs/apk/release/app-release.apk \
+       pos-app/app/google-services.json
+   ```
+   Must print `OK: Firebase config is baked in`. By hand:
+   `unzip -p <apk> resources.arsc | strings | grep -E "AIza|:android:"` —
+   **silence means push is dead; do not host the APK.**
+5. **Host as a versioned BETA first**:
    `scp … taxnestc@cpanel.taxnest.com.pk:public_html/public/downloads/taxnest-pos-<ver>.apk`
    **NEVER GitHub Releases** — desktop agents self-update from
    `releases/latest` of this repo and would try to install the APK.
-5. **Owner phone-tests the beta** (mandatory rollout rule). For a push
+6. **Owner phone-tests the beta** (mandatory rollout rule). For a push
    release: every notification type arrives within seconds with the app
    CLOSED, tapping it opens the app, logout stops pushes, and
    downloads / uploads / fullscreen video still work.
-6. **Only after owner sign-off**: copy the beta over
+7. **Only after owner sign-off**: copy the beta over
    `public_html/public/downloads/taxnest-pos.apk`, bump the
    `pos_app_latest_version` SystemSetting (admin panel → Settings) so old
    shells (UA `TaxNestPOSApp/<ver>`) see the update banner, and create the
    What's New `AppUpdate` row announcing the release.
 
 ---
-
 ## Version history
 
 | Version | versionCode | Notes |

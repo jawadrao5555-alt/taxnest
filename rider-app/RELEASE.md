@@ -6,9 +6,20 @@ Last updated: Aug 2026 (v1.7.0 live-tracking reliability)
 
 ## Firebase prerequisite (v1.5.0+ instant push) — one-time owner setup
 
-Push is OPTIONAL at build time: without the config below the APK still
-builds and runs exactly like v1.4.x (15-min poll notifications). To enable
-instant push:
+**A release build REFUSES to run without this config.** `assembleRelease`
+fails at `verifyFirebaseConfigPresent` when `app/google-services.json` is
+missing, and after packaging it re-opens the finished APK to prove the config
+really landed inside it. Debug builds (`assembleDebug`) are never gated — that
+is the way to check the shell still compiles without the owner's file.
+
+Why the gate exists: **v1.6.0 shipped without it.** The APK installed fine,
+looked completely normal and was correctly signed — and push was stone dead.
+25 riders live, not one push token, so new-delivery alerts and the "sync now"
+nudge could never reach a single phone. Nothing failed loudly, so nobody
+noticed for weeks. The file is gitignored (public repo), so **any** build made
+in a fresh container walks straight into the same trap.
+
+To enable instant push:
 
 1. **Create a free Firebase project** at https://console.firebase.google.com
    (any name, e.g. "TaxNest Rider"; Analytics not needed).
@@ -74,6 +85,25 @@ Output APK:
 rider-app/app/build/outputs/apk/release/app-release.apk
 ```
 
+A good release build prints **both** of these lines. If you do not see them,
+the APK is push-dead — do not host it:
+
+```
+Firebase config OK for pk.taxnest.rider (project …, app 1:…:android:…)
+Firebase config verified inside app-release.apk (app 1:…:android:…) — instant push is live in this build.
+```
+
+Deliberate config-less compile check (throwaway, **never** shippable):
+
+```bash
+… assembleRelease -PallowPushlessRelease=true
+```
+
+It prints a loud warning and renames the output to `app-release-NO-PUSH.apk`,
+so the usual path simply does not exist and cannot be uploaded by muscle
+memory. Guard source: `scripts/lib/android-firebase-guard.gradle` (shared by
+the POS and FBR POS shells too).
+
 ---
 
 ## Release checklist
@@ -111,26 +141,38 @@ rider-app/app/build/outputs/apk/release/app-release.apk
    live at `~/rider-signing/` (outside public_html).
    **NEVER commit the keystore — repo is public.**
 
-6. **Deploy to live** (owner runs on their cPanel machine):
+6. **Verify push is really inside the APK** — the Gradle guard already checked
+   this, but re-run it on the exact file you are about to upload:
+   ```bash
+   bash scripts/verify-apk-firebase.sh \
+       rider-app/app/build/outputs/apk/release/app-release.apk \
+       rider-app/app/google-services.json
+   ```
+   Must print `OK: Firebase config is baked in`. Raw evidence if you prefer it:
+   `unzip -p <apk> resources.arsc | strings | grep -E "AIza|:android:"` —
+   **silence there means push is dead and the APK must NOT be hosted.**
+
+7. **Deploy to live** (owner runs on their cPanel machine):
    ```bash
    scp rider-app/app/build/outputs/apk/release/app-release.apk \
        taxnestc@taxnest.com.pk:public_html/public/downloads/taxnest-rider.apk
    ```
 
-7. **Deploy PHP changes**:
+8. **Deploy PHP changes**:
    ```bash
    git push origin HEAD:main       # .cpanel.yml auto-deploys
    php artisan migrate --force     # run on live via cPanel SSH
    ```
 
-8. **Owner phone-tests the new APK** before any panel card or
+9. **Owner phone-tests the new APK** before any panel card or
    What's New announcement goes live (mandatory rollout rule).
+   For a push release, "works" includes: a notification actually arrives with
+   the app CLOSED.
 
-9. **What's New announcement** — create an `AppUpdate` row in the admin
+10. **What's New announcement** — create an `AppUpdate` row in the admin
    panel after owner sign-off so the in-app popup fires.
 
 ---
-
 ## Key constraints (do NOT skip)
 
 - **Never publish to GitHub Releases.**  The desktop agent polls
@@ -158,4 +200,4 @@ rider-app/app/build/outputs/apk/release/app-release.apk
 | 1.4.x   | 5–7         | **New-delivery notifications** — 15-min DeliveryCheckWorker poll + DeliveryNotifier dedupe (Touseef case); in-app APK update download |
 | 1.5.0   | 8           | **Instant push (FCM)** — data-only push through the same DeliveryNotifier dedupe (poll stays as fallback); FCM token rotates with login/logout; **battery %** on location points → admin map "battery kam hai" badge. Needs the Firebase prerequisite above; builds/runs fine without it |
 | 1.7.0   | 10          | **Live tracking reliability** (Task #1359) — 15-min network-constrained `SyncWorker` (drains the buffer even when the app is closed / the duty service was killed), `DutyWatchdog` restart + ongoing tap-to-resume notification when Android blocks a background FGS start, 2-min stationary heartbeat, last-sync line on the home screen and in the duty notification (red + reason when late), battery-optimisation / autostart gate at duty-on with a warning chip, and a server-sent data-only `sync_now` push the moment the live map sees a rider go silent (throttled 5 min/rider, no cron). Queue acknowledgement is now timestamp-anchored (`PointQueue.ackBatch`) so a cap-trim during an upload cannot delete un-uploaded points |
-| 1.6.0   | 9           | **Delivered button** (Task #1160) — rider marks his own assigned/dispatched bill delivered from the delivery card (confirm dialog, Urdu/English). Additive `POST /deliveries/{id}/delivered` returns the refreshed `/me` payload (shared `applyMePayload` re-render); 404 also carries the payload so a reassigned bill resyncs the list instead of error-looping |
+| 1.6.0   | 9           | ⚠️ **built WITHOUT google-services.json — push dead on every phone it reached** (silent; found Aug 2026, cause of the release gate above). **Delivered button** (Task #1160) — rider marks his own assigned/dispatched bill delivered from the delivery card (confirm dialog, Urdu/English). Additive `POST /deliveries/{id}/delivered` returns the refreshed `/me` payload (shared `applyMePayload` re-render); 404 also carries the payload so a reassigned bill resyncs the list instead of error-looping |

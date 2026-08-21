@@ -9,9 +9,16 @@ toolchain (`rider-app/RELEASE.md`). This file covers the FBR-specific bits.
 
 ## Firebase prerequisite (v1.1.0+ push) — one-time owner setup
 
-Push is OPTIONAL at build time: without the config below the APK still builds
-and runs exactly like v1.0.x. To enable push (fail-queue alert / day-close
-reminder from Task 1275's server side):
+**A release build REFUSES to run without this config** (shared guard
+`scripts/lib/android-firebase-guard.gradle`): `assembleRelease` fails at
+`verifyFirebaseConfigPresent` when `app/google-services.json` is missing, and
+after packaging it re-opens the finished APK to prove the config really landed
+inside it. Debug builds are never gated. Both the rider v1.6.0 release and the
+v1.1.0 beta below went out push-dead because this used to be optional — the
+file is gitignored, so any build in a fresh container hits the same trap.
+
+To enable push (fail-queue alert / day-close reminder from Task 1275's server
+side):
 
 1. **Use the EXISTING Firebase project** (the rider one — do NOT create a
    second project; the server credential `storage/app/firebase/rider-fcm.json`
@@ -57,7 +64,8 @@ Output APK: `fbr-pos-app/app/build/outputs/apk/release/app-release.apk`
 ## Release checklist
 
 1. Bump `versionCode`/`versionName` in `fbr-pos-app/app/build.gradle`.
-2. Build the signed APK, then verify it before hosting — one command, no SDK
+2. Build the signed APK; `apksigner verify --print-certs` must show the shared
+   key (CN=TaxNest Rider). Then verify it before hosting — one command, no SDK
    needed:
    ```bash
    bash scripts/apk-release-check.sh fbr-pos-app/app/build/outputs/apk/release/app-release.apk
@@ -69,19 +77,28 @@ Output APK: `fbr-pos-app/app/build/outputs/apk/release/app-release.apk`
    signature = the shared key (`CN=TaxNest Rider`), and the version matching
    `fbr-pos-app/app/build.gradle` (a stale APK re-uses its `versionCode` and
    never updates a phone in place).
-3. Host as a versioned BETA first:
+3. **Verify push is really inside the APK** — the gradle guard already checked
+   it, but re-run on the exact file you are about to upload:
+   ```bash
+   bash scripts/verify-apk-firebase.sh \
+       fbr-pos-app/app/build/outputs/apk/release/app-release.apk \
+       fbr-pos-app/app/google-services.json
+   ```
+   Must print `OK: Firebase config is baked in`. By hand:
+   `unzip -p <apk> resources.arsc | strings | grep -E "AIza|:android:"` —
+   **silence means push is dead; do not host the APK.**
+4. Host as a versioned BETA first:
    `scp … public_html/public/downloads/taxnest-fbr-pos-<ver>.apk`
    **NEVER GitHub Releases** (desktop agents self-update from releases/latest).
-4. **Owner phone-tests the beta** (mandatory rollout rule). For a push
+5. **Owner phone-tests the beta** (mandatory rollout rule). For a push
    release: fail-queue alert + day-close reminder arrive with the app CLOSED,
    tap opens the app, logout stops pushes, downloads/uploads/fullscreen video
    still work.
-5. Only after owner sign-off: copy the beta over
+6. Only after owner sign-off: copy the beta over
    `public_html/public/downloads/taxnest-fbr-pos.apk`, bump the FBR shell
    latest-version setting (admin panel) so old shells (UA
    `TaxNestFBRPosApp/<ver>`) see the update banner, and create the What's New
    `AppUpdate` row.
-
 ## Version history
 
 | Version | versionCode | Notes |

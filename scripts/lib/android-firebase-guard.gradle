@@ -1,0 +1,197 @@
+// ---------------------------------------------------------------------------
+// TaxNest Android shells — Firebase (FCM) config guard.
+//
+// Applied from rider-app / pos-app / fbr-pos-app  ->  app/build.gradle
+//
+// WHY THIS EXISTS
+//   app/google-services.json is gitignored (this repo is PUBLIC) and the
+//   Google Services plugin is applied only when that file exists. A release
+//   built in a fresh container therefore produced a completely normal-looking,
+//   correctly-signed APK — with push stone dead. Nothing failed, nothing
+//   warned. That shipped: rider v1.6.0 went out to riders with no Firebase
+//   config, so new-delivery notifications and the "sync now" nudge could never
+//   reach a single phone (25 riders live, zero push tokens). The FBR POS
+//   v1.1.0 beta went out the same way.
+//
+// WHAT IT DOES
+//   1. GATE  — `assembleRelease` / `bundleRelease` refuse to start when
+//              app/google-services.json is missing, or when it carries no
+//              Android client for this shell's applicationId.
+//   2. PROOF — after the build it re-opens the finished APK and proves the
+//              Firebase config really landed inside resources.arsc. Same
+//              evidence as:
+//                  unzip -p app-release.apk resources.arsc \
+//                      | strings | grep -E "AIza|:android:"
+//              The gate alone is not enough: it only proves a file was on
+//              disk, not that the plugin actually baked it into the artifact.
+//
+// DELIBERATE CONFIG-LESS BUILD (compile smoke test only, NEVER shippable):
+//       gradle -p rider-app assembleRelease -PallowPushlessRelease=true
+//   The build then prints a loud warning and renames the output to
+//   `app-release-NO-PUSH.apk`, so the usual `app-release.apk` path simply
+//   does not exist and cannot be scp'd to live out of muscle memory.
+//   (Debug builds are never gated — `assembleDebug` is the normal way to
+//   check that the shell still compiles without the owner's config.)
+// ---------------------------------------------------------------------------
+
+import java.util.zip.ZipFile
+
+def allowPushless = ['true', '1', 'yes'].contains(
+        project.findProperty('allowPushlessRelease')?.toString()?.toLowerCase())
+
+// --- shared helpers --------------------------------------------------------
+
+// Parses app/google-services.json and returns the Android client block for
+// `pkg` (api key + mobilesdk app id), or null when there is no entry for it.
+ext.taxnestFcmClientFor = { File jsonFile, String pkg ->
+    def root = new groovy.json.JsonSlurper().parse(jsonFile)
+    def client = (root?.client ?: []).find {
+        it?.client_info?.android_client_info?.package_name == pkg
+    }
+    if (client == null) {
+        return null
+    }
+    return [
+            appId    : client.client_info?.mobilesdk_app_id?.toString(),
+            apiKey   : client.api_key?.getAt(0)?.current_key?.toString(),
+            projectId: root?.project_info?.project_id?.toString(),
+    ]
+}
+
+// Reads resources.arsc out of a built APK and hands back its bytes as a
+// searchable string — the JVM equivalent of `unzip -p <apk> resources.arsc |
+// strings`. arsc string pools are UTF-8 or UTF-16LE, so the NUL-stripped copy
+// is appended to keep the same plain patterns working in both encodings.
+ext.taxnestArscText = { File apk ->
+    def zip = new ZipFile(apk)
+    try {
+        def entry = zip.getEntry('resources.arsc')
+        if (entry == null) {
+            return null
+        }
+        def raw = new String(zip.getInputStream(entry).bytes, 'ISO-8859-1')
+        return raw + '\n' + raw.replace('\u0000', '')
+    } finally {
+        zip.close()
+    }
+}
+
+// --- 1. gate: refuse to start a release build without the config -----------
+
+def fcmGate = tasks.register('verifyFirebaseConfigPresent') {
+    group = 'verification'
+    description = 'Refuses a release build that would ship with push silently dead.'
+    doLast {
+        def pkg = project.android.defaultConfig.applicationId
+        def cfg = project.file('google-services.json')
+        def cfgPath = project.rootDir.name + '/app/google-services.json'
+
+        if (!cfg.exists()) {
+            def why = """
+  MISSING: ${cfg}
+
+  This release would install fine and look perfectly normal, but Firebase
+  would never initialize on the phone — no instant push at all. That is
+  exactly how rider v1.6.0 shipped push-dead to 25 riders.
+
+  Fix: drop the owner's Firebase config in at
+      ${cfgPath}
+  (Firebase console -> project settings -> the Android app for ${pkg} ->
+   google-services.json; backup copy lives on live at ~/rider-signing/.)
+  It is gitignored on purpose — the repo is PUBLIC. Never commit it.
+
+  Only if you deliberately want a throwaway, NON-SHIPPABLE build:
+      -PallowPushlessRelease=true
+"""
+            if (allowPushless) {
+                logger.warn("""
+################################################################################
+#  WARNING: building a PUSH-DEAD release (-PallowPushlessRelease=true)         #
+#  ${cfgPath} is missing, so this APK will have NO instant                     #
+#  notifications. The output is renamed to app-release-NO-PUSH.apk.            #
+#  NEVER host this file for riders/shops.                                      #
+################################################################################
+""")
+                return
+            }
+            throw new GradleException("Release build blocked — Firebase config missing.\n${why}")
+        }
+
+        def client = project.ext.taxnestFcmClientFor.call(cfg, pkg)
+        if (client == null) {
+            throw new GradleException(
+                    "Release build blocked — ${cfgPath} has no Android client for " +
+                    "applicationId '${pkg}'. Wrong shell's config file? Add the app in the " +
+                    "Firebase console and re-download google-services.json.")
+        }
+        if (!client.appId || !client.apiKey) {
+            throw new GradleException(
+                    "Release build blocked — ${cfgPath} is missing mobilesdk_app_id or " +
+                    "api_key for '${pkg}'; the file looks truncated or hand-edited.")
+        }
+        logger.lifecycle("Firebase config OK for ${pkg} (project ${client.projectId}, app ${client.appId})")
+    }
+}
+
+// preReleaseBuild is AGP's release-variant entry point, so this fires before a
+// single source file is compiled — and covers bundleRelease too.
+tasks.matching { it.name ==~ /pre.*ReleaseBuild/ }.configureEach { dependsOn fcmGate }
+
+// --- 2. proof: the finished APK really carries the config ------------------
+
+tasks.matching { it.name == 'assembleRelease' }.configureEach { assembleTask ->
+    assembleTask.doLast {
+        def pkg = project.android.defaultConfig.applicationId
+        def cfg = project.file('google-services.json')
+        def apkDir = project.layout.buildDirectory.dir('outputs/apk/release').get().asFile
+        def apks = (apkDir.listFiles() ?: []).findAll { it.name.endsWith('.apk') }
+
+        if (apks.isEmpty()) {
+            throw new GradleException("assembleRelease produced no APK in ${apkDir}")
+        }
+
+        // Escape hatch was used: brand the artifact so it can never be mistaken
+        // for a shippable build.
+        if (!cfg.exists() && allowPushless) {
+            apks.each { apk ->
+                def branded = new File(apk.parentFile, apk.name.replaceFirst(/\.apk$/, '-NO-PUSH.apk'))
+                branded.delete()
+                if (apk.renameTo(branded)) {
+                    logger.warn("PUSH-DEAD build renamed to ${branded.name} — do NOT host this APK.")
+                } else {
+                    throw new GradleException("Could not rename push-dead APK ${apk} — delete it by hand.")
+                }
+            }
+            return
+        }
+
+        def client = project.ext.taxnestFcmClientFor.call(cfg, pkg)
+        apks.each { apk ->
+            def arsc = project.ext.taxnestArscText.call(apk)
+            if (arsc == null) {
+                throw new GradleException("${apk.name} has no resources.arsc — not a valid APK?")
+            }
+            def missing = []
+            if (!arsc.contains(client.appId)) {
+                missing << "google_app_id ${client.appId}"
+            }
+            if (!arsc.contains(client.apiKey)) {
+                missing << "google_api_key ${client.apiKey.take(8)}…"
+            }
+            if (!missing.isEmpty()) {
+                throw new GradleException("""
+Release blocked — ${apk.name} does NOT contain the Firebase config.
+Push would be dead on every phone that installs it.
+
+  not baked in : ${missing.join(', ')}
+  check yourself: unzip -p ${apk} resources.arsc | strings | grep -E "AIza|:android:"
+
+app/google-services.json exists, so the Google Services plugin either did not
+apply or did not run. Confirm the `apply plugin: 'com.google.gms.google-services'`
+line at the bottom of app/build.gradle, then rebuild after `gradle clean`.
+""")
+            }
+            logger.lifecycle("Firebase config verified inside ${apk.name} (app ${client.appId}) — instant push is live in this build.")
+        }
+    }
+}

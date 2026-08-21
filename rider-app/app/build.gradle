@@ -69,8 +69,14 @@ dependencies {
 
 // Task #1106: Google Services plugin can only run with a real
 // google-services.json (owner's Firebase console download). Conditional apply
-// keeps the project building before the config drop-in exists — push simply
+// keeps DEBUG builds green before the config drop-in exists — push simply
 // stays dormant and DeliveryCheckWorker keeps covering notifications.
 if (file('google-services.json').exists()) {
     apply plugin: 'com.google.gms.google-services'
 }
+
+// Task #1399: a RELEASE may NOT be push-dead. The guard blocks assembleRelease
+// when the config is missing, and re-opens the finished APK to prove Firebase
+// really landed inside it — v1.6.0 shipped to riders without it and instant
+// push was silently dead on every phone.
+apply from: file("$rootDir/../scripts/lib/android-firebase-guard.gradle")

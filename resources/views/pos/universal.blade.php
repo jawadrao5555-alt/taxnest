@@ -1790,7 +1790,9 @@ window.addEventListener('popstate', function() {
                             <button @click="panelProofBill()" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; {{ __('pos.panel_proof_bill') }}</button>
                             <button @click="panelAskFinal()" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(roundedTotal).toLocaleString()"></button>
                         </div>
-                        @if(($features->kot ?? false) || ($features->kitchen ?? false))
+                        {{-- Task 1379: kitchen-ticket reprint gate ($canKotReprint =
+                             company switch + per-cashier Custom Access tick). --}}
+                        @if((($features->kot ?? false) || ($features->kitchen ?? false)) && $canKotReprint)
                         <div class="grid grid-cols-2 gap-1.5" x-show="panelKotSent()">
                             <button @click="panelResendKot()" :disabled="submitting || boardBusy" title="{{ __('pos.kot_resend_btn') }}" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">{{ __('pos.resend_short') }}</button>
                             <button @click="panelLastKot()" :disabled="submitting || boardBusy" title="{{ __('pos.ti_kot_last_addon') }}" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-40 transition">{{ __('pos.kot_last_addon_short') }}</button>
@@ -2180,7 +2182,8 @@ window.addEventListener('popstate', function() {
                                  dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
                             <button @click="boardProofBill()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill Print (bina final)</button>
                             <button @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
-                            @if(($features->kot ?? false) || ($features->kitchen ?? false))
+                            {{-- Task 1379: reprint gate — see $canKotReprint. --}}
+                            @if((($features->kot ?? false) || ($features->kitchen ?? false)) && $canKotReprint)
                             <button x-show="boardMenuTable.order.kot_sent_at" @click="boardResendKot()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">{{ __('pos.kot_resend_btn') }}</button>
                             {{-- Task 753 MISSED-DELTA RECOVERY: akhri add-on (delta) KOT ka reprint —
                                  physical print fail par slip wapas nikalne ka rasta. --}}
@@ -2443,12 +2446,17 @@ window.addEventListener('popstate', function() {
                 <div class="p-3 space-y-2">
                     <button @click="heldMenuRecall()" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition">{{ __('pos.open_edit_bill') }}</button>
                     <button @click="heldMenuPay()" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 transition" x-text="window.TXT.pay_rs_prefix + Math.round(heldMenu.total_amount || 0).toLocaleString()"></button>
+                    {{-- Task 1379: reprint gate. Re-send and Last Add-on are reprints
+                         by definition → plain canKotReprint. The "KOT dekho" link is
+                         NOT: on an order the kitchen has never seen (payment-first
+                         hold) it renders the FIRST ticket, so it survives the block
+                         exactly like the server does (kot_sent_at = already seen). --}}
                     @if($features->kot ?? false)
                     <div class="grid grid-cols-2 gap-2">
-                        <a :href="'/pos/restaurant/orders/' + heldMenu.id + '/kitchen-ticket'" target="_blank" class="py-2 rounded-xl text-xs font-bold text-center text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition">{{ __('pos.kot_dekho') }}</a>
-                        <button @click="heldMenuResend()" class="py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 hover:bg-orange-100 transition">{{ __('pos.kot_resend_btn') }}</button>
+                        <a x-show="canKotReprint || !heldMenu.kot_sent_at" :href="'/pos/restaurant/orders/' + heldMenu.id + '/kitchen-ticket'" target="_blank" class="py-2 rounded-xl text-xs font-bold text-center text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition">{{ __('pos.kot_dekho') }}</a>
+                        <button x-show="canKotReprint" @click="heldMenuResend()" class="py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 hover:bg-orange-100 transition">{{ __('pos.kot_resend_btn') }}</button>
                     </div>
-                    <button @click="heldMenuLastKot()" title="{{ __('pos.ti_kot_last_addon') }}" class="w-full py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_btn') }}</button>
+                    <button x-show="canKotReprint" @click="heldMenuLastKot()" title="{{ __('pos.ti_kot_last_addon') }}" class="w-full py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_btn') }}</button>
                     @endif
                     <button @click="heldMenuDelete()" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition">{{ __('pos.order_delete_btn') }}</button>
                 </div>
@@ -2490,10 +2498,13 @@ window.addEventListener('popstate', function() {
                         <template x-if="order.table"><p class="text-[10px] text-purple-600 ml-7" x-text="window.TXT.table_t_colon + order.table.table_number + (elapsedSince(order.table.occupied_since) ? window.TXT.occupied_glue + elapsedSince(order.table.occupied_since) : '')"></p></template>
                         <div class="flex gap-2 mt-2 ml-7">
                             <button @click="recallOrder(order)" class="flex-1 py-2 text-xs font-bold text-purple-600 border border-purple-300 rounded-xl hover:bg-purple-50 transition">{{ __('pos.recall') }}</button>
+                            {{-- Task 1379: reprint gate — same split as the held-order
+                                 menu. The KOT link can still be a FIRST ticket, so it
+                                 only disappears once the kitchen has seen the order. --}}
                             @if($features->kot)
-                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.ti_view_print_kot') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
-                            <button @click="resendKitchen(order)" title="Re-send full order ticket to kitchen (marked REPRINT)." class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
-                            <button @click="reprintLastKot(order)" title="{{ __('pos.ti_kot_last_addon') }}" class="py-2 px-2 text-xs font-bold text-amber-700 border border-amber-400 rounded-xl bg-amber-50 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_short') }}</button>
+                            <a x-show="canKotReprint || !order.kot_sent_at" :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.ti_view_print_kot') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
+                            <button x-show="canKotReprint" @click="resendKitchen(order)" title="Re-send full order ticket to kitchen (marked REPRINT)." class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
+                            <button x-show="canKotReprint" @click="reprintLastKot(order)" title="{{ __('pos.ti_kot_last_addon') }}" class="py-2 px-2 text-xs font-bold text-amber-700 border border-amber-400 rounded-xl bg-amber-50 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_short') }}</button>
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
@@ -3135,9 +3146,12 @@ window.addEventListener('popstate', function() {
                                  loadIncomingToCart here would bypass single-winner claiming and two
                                  terminals could finalize the same order twice. --}}
                             <button @click="claimAndLoadIncoming(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.load_to_cart') }}</button>
-                            @if(($company->kot_reprint_enabled ?? true))
-                            <button @click="printIncomingKot(o)" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold transition" title="{{ __('pos.ti_print_full_kot') }}">KOT</button>
-                            @endif
+                            {{-- Task 1379: the FULL ticket is a reprint only once EVERY
+                                 line has already been printed — exactly the server's
+                                 rule (KotPrintService::isReprintRender). An order the
+                                 kitchen has never seen still prints for a blocked
+                                 cashier; the "Added" delta button below always does. --}}
+                            <button x-show="canKotReprint || !(o.items || []).every(i => i.printed)" @click="printIncomingKot(o)" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold transition" title="{{ __('pos.ti_print_full_kot') }}">KOT</button>
                             <button x-show="o.unprinted_count > 0 && o.items.some(i => i.printed)" @click="printIncomingKot(o, true)" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition" title="{{ __('pos.ti_print_only_new') }}">{{ __('pos.added_short') }}</button>
                             {{-- Task #409 (owner, 10 Aug 2026): waiter ke takeaway/delivery orders
                                  SIRF yahan dikhte hain — cancel bhi yahin se (soft-cancel →
@@ -3828,18 +3842,19 @@ window.addEventListener('popstate', function() {
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         {{ __('pos.print') }} <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
-                    {{-- 2. KOT (K) - shown only when an orderId exists (restaurant flow) + admin allows reprint --}}
-                    @if(($company->kot_reprint_enabled ?? true))
-                    <button x-show="lastOrderId || lastTxnKotId" @click="lastOrderId ? printKitchenTicket() : printTxnKitchenTicket(lastTxnKotId)" :disabled="!lastOrderId && !lastTxnKotId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_print_kot') }}">
+                    {{-- 2. KOT (K) - shown only when an orderId exists (restaurant flow) --}}
+                    {{-- Task 1379: this popup is ALSO the "Payment First, Then KOT"
+                         release button — for a bill whose kitchen ticket has not gone
+                         out yet (lastKotPending) it is a FIRST send, never a reprint,
+                         so a blocked cashier must keep it. Once the ticket has been
+                         fired, pressing it again is a reprint and it follows
+                         canKotReprint, matching the server's own decision. --}}
+                    <button x-show="(lastOrderId || lastTxnKotId) && (canKotReprint || lastKotPending)" @click="lastOrderId ? printKitchenTicket() : printTxnKitchenTicket(lastTxnKotId)" :disabled="!lastOrderId && !lastTxnKotId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_print_kot') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
                     {{-- Spacer when KOT hidden so grid stays balanced --}}
-                    <div x-show="!lastOrderId && !lastTxnKotId"></div>
-                    @else
-                    {{-- Reprint disabled by admin — keep grid cell balanced --}}
-                    <div></div>
-                    @endif
+                    <div x-show="!((lastOrderId || lastTxnKotId) && (canKotReprint || lastKotPending))"></div>
                     {{-- 3. New Sale (Enter) --}}
                     <button @click="startNewAfterPayment()" class="py-3 text-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_clear_cart_new_sale') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
@@ -4559,6 +4574,12 @@ function restaurantPos() {
         // "Order Cancel", bell-panel Cancel AND the claimed-cart Cancel when false.
         // Server (deleteOrder) re-enforces the SAME verdict with a 403.
         canOrderCancel: {{ !empty($canOrderCancel) ? 'true' : 'false' }},
+        // Task 1379 (owner voice notes 20 Aug 2026): baked KOT-reprint verdict
+        // (company switch AND the per-cashier Custom Access tick). Hides every
+        // Reprint / Re-send / Last Add-on button; the kitchen-ticket, resend and
+        // print-job endpoints re-enforce the SAME verdict with a 403, so an old
+        // tab or a pasted URL cannot reprint either.
+        canKotReprint: {{ !empty($canKotReprint) ? 'true' : 'false' }},
         tableBoardOpen: false, // board ab MODAL hai (owner 26 Jul 2026) — load par band, Alt+B / TABLE button se khulta hai
         boardMenuTable: null,   // tile clicked → action menu modal
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
@@ -4790,6 +4811,12 @@ function restaurantPos() {
         // "Payment pehle, KOT baad": promoted delivery bill ki txn-KOT id — receipt
         // popup ka K button/shortcut is se manual reprint kar sakta hai (recovery path).
         lastTxnKotId: null,
+        // Task 1379: is the just-paid bill's kitchen ticket STILL unsent? TRUE = the
+        // receipt popup's KOT button is a FIRST send (payment-first release / auto-KOT
+        // off), so it survives the reprint block; FALSE = pressing it is a reprint.
+        // Set from the server's own kot_pending flag, cleared the moment the auto-print
+        // chain actually fires the ticket.
+        lastKotPending: false,
         // Task 1025: PAID bill ki order type ka SNAPSHOT (payment-success par set,
         // cart/state reset se pehle — kabhi live widget se na parhna). Tables-first
         // wapsi (returnToTablesAfterReceipt) sirf dine_in snapshot par chalti hai;
@@ -5428,6 +5455,7 @@ function restaurantPos() {
             this.lastInvoiceNumber = 'OFFLINE-' + uuid.slice(0, 8).toUpperCase();
             this.lastTransactionId = null;
             this.lastOrderId = null;
+            this.lastKotPending = false; // Task 1379: offline bill has no server-side KOT state
             this.lastOrderType = this.orderType || null; // Task 1025: snapshot before clearCart
             this.lastTotal = rec.total;
             this.lastPaymentMethod = method;
@@ -7012,7 +7040,9 @@ function restaurantPos() {
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.closeReceiptPopup(); return; }
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
                 if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.lastIsOffline ? this.printOfflineReceipt() : this.printReceipt(); return; }
-                if ((e.key === 'k' || e.key === 'K') && (this.lastOrderId || this.lastTxnKotId)) { e.preventDefault(); this.lastOrderId ? this.printKitchenTicket() : this.printTxnKitchenTicket(this.lastTxnKotId); return; }
+                // Task 1379: K mirrors the KOT button exactly — a still-unsent ticket
+                // (payment-first release) always fires; only a reprint is refused.
+                if ((e.key === 'k' || e.key === 'K') && (this.lastOrderId || this.lastTxnKotId)) { e.preventDefault(); if (!this.canKotReprint && !this.lastKotPending) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; } this.lastOrderId ? this.printKitchenTicket() : this.printTxnKitchenTicket(this.lastTxnKotId); return; }
                 return;
             }
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
@@ -8836,6 +8866,9 @@ function restaurantPos() {
         // so the printed ticket is marked "*** UPDATED ***".
         async resendKitchen(order) {
             if (!order || !order.id) return;
+            // Task 1379: same verdict as the (hidden) button — a cached/offline
+            // copy of this screen must explain itself instead of failing mutely.
+            if (!this.canKotReprint) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; }
             try {
                 const res = await fetch('/pos/restaurant/orders/' + order.id + '/resend-kitchen', {
                     method: 'POST',
@@ -8860,6 +8893,8 @@ function restaurantPos() {
         // Stamping server par whereNull-guarded hai: kabhi re-number nahi hota.
         reprintLastKot(order) {
             if (!order || !order.id) return;
+            // Task 1379 — see resendKitchen().
+            if (!this.canKotReprint) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; }
             const url = '/pos/restaurant/orders/' + order.id + '/kitchen-ticket?auto_print=1&batch=last';
             const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=380,height=620');
             if (!this.silentKotPrint) { fallback(); return; }
@@ -9313,6 +9348,10 @@ function restaurantPos() {
                 // the receipt popup's KOT button can reprint the full kitchen ticket.
                 this.lastOrderId = this.incomingOrderId || null;
                 this.lastTxnKotId = null; // fresh sale — purani promoted-KOT id clear
+                // Task 1379: server-confirmed "kitchen ne ye lines abhi tak nahi dekhin".
+                // Same flag the auto-print chain uses below, so the popup's KOT button
+                // knows whether pressing it would be a first send or a reprint.
+                this.lastKotPending = !!data.kot_pending;
                 // Task 1025: paid bill ki order type ka snapshot — clearCart/reset ke
                 // baad tables-first wapsi isi se faisla karti hai (live widget se nahi).
                 this.lastOrderType = this.orderType || null;
@@ -9893,6 +9932,10 @@ function restaurantPos() {
         },
         // Full KOT reprint (all items) or delta print (only newly-added items).
         printIncomingKot(o, delta = false) {
+            // Task 1379: mirrors the button's x-show AND the server's rule — a full
+            // ticket is a reprint only once every line is already printed. Delta
+            // ("Added") prints are always a first fire for those rows.
+            if (!delta && !this.canKotReprint && ((o && o.items) || []).every(i => i.printed)) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; }
             const url = '/pos/restaurant/orders/' + o.id + '/kitchen-ticket?auto_print=1' + (delta ? '&delta=1' : '');
             const done = () => this.loadIncoming();
             const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=350,height=600', done);
@@ -10075,9 +10118,15 @@ function restaurantPos() {
             if (wantsKot && !wantsReceipt && (this.silentBillPrint || this.silentKotPrint)) {
                 this.printBeacon('kot-without-receipt', { order_id: orderId || txnKotId, type: orderType || '' });
             }
-            const fireKot = (cb) => orderId
-                ? this.printKitchenTicket(orderId, cb, kotDelta)
-                : this.printTxnKitchenTicket(txnKotId, cb);
+            // Task 1379: the moment the chain sends the ticket, the popup's KOT
+            // button stops being a first send and becomes a reprint — so a blocked
+            // cashier loses it exactly when the server would start refusing it.
+            const fireKot = (cb) => {
+                this.lastKotPending = false;
+                return orderId
+                    ? this.printKitchenTicket(orderId, cb, kotDelta)
+                    : this.printTxnKitchenTicket(txnKotId, cb);
+            };
             this.$nextTick(() => {
                 if (wantsReceipt && wantsKot) {
                     // FAST PATH (ZFC 28 Jul 2026 — "KOT 15-20 sec late"): when BOTH
@@ -10535,7 +10584,12 @@ function restaurantPos() {
                     const promoKotId = (!!this.kitchenSettings.delivery_kot_after_payment && bill.order_type === 'delivery' && bill.kot_pending !== false)
                         ? (data.id || bill.id) : null;
                     this.lastTxnKotId = promoKotId; // receipt popup ka K button bhi isi se chalega
-                    if (promoKotId && !this.kdsHandlesKot()) this.printTxnKitchenTicket(promoKotId);
+                    // Task 1379: promoKotId only exists when the ticket is still UNSENT,
+                    // so the popup button is a first send — until the direct fire below
+                    // actually sends it (KDS-handled shops skip that fire, so there the
+                    // popup stays the first-send release even for a blocked cashier).
+                    this.lastKotPending = !!promoKotId;
+                    if (promoKotId && !this.kdsHandlesKot()) { this.printTxnKitchenTicket(promoKotId); this.lastKotPending = false; }
                     // "No receipt print" (Aug 2026): skip the receipt auto-print chain when the
                     // cashier ticked the box — delivery customer isn't present, paper saved.
                     // KOT release above is NEVER skipped (kitchen must still cook).
@@ -10725,6 +10779,8 @@ function restaurantPos() {
             // Replay edge (no order_id in the response): KOT from the transaction.
             // Task 1356: data.kot_pending = server-confirmed "kitchen ne ye lines
             // dekhi hi nahi" — dine-in finals par safety-net KOT isi se chalti hai.
+            // Task 1379: same flag drives the popup's KOT button (first send vs reprint).
+            this.lastKotPending = !!(data && data.kot_pending);
             this.runAutoPrintChain(orderId, payOrderType, orderId ? null : (data.transaction_id || null), skipReceipt, false, !!(data && data.kot_pending));
             // Refresh provisional badge count when this save was provisional.
             if (provisional) { this.loadLocalBills(); }

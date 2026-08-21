@@ -975,12 +975,22 @@ class PosController extends Controller
             if (!$settings['kot_printer']) {
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
-            $exists = PosTransaction::withoutGlobalScope('hide_archived')
+            $txn = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('id', (int) $validated['transaction_id'])
-                ->exists();
-            if (!$exists) {
+                ->first();
+            if (!$txn) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            // Task 1379 — REPRINT gate (see the order branch below). A bill
+            // already stamped kot_sent_at has its slip in the kitchen.
+            if (\App\Services\KotPrintService::isTransactionReprint($txn)
+                && !\App\Services\PosAccessService::kotReprintAllowed($user, $company)) {
+                return response()->json([
+                    'success' => false,
+                    'reason' => 'not_allowed',
+                    'message' => __('pos.kot_reprint_not_allowed'),
+                ], 403);
             }
             // In-flight dedupe — see proof branch (client-side retry, 30 Jul 2026).
             $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
@@ -1016,6 +1026,20 @@ class PosController extends Controller
             ->find((int) $validated['restaurant_order_id']);
         if (!$order) {
             return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+        }
+
+        // Task 1379 — REPRINT permission gate on the SILENT path, mirroring the
+        // render gate in RestaurantPosController::kitchenTicket. Placed before
+        // the batch=last branch so "Akhri Add-on", plain reprints and every
+        // future KOT branch below are all covered by ONE check. Only reprints
+        // are gated — first fires and deltas always reach the kitchen.
+        if (\App\Services\KotPrintService::isReprintRender($order, $request->boolean('delta'), $request->input('batch') === 'last')
+            && !\App\Services\PosAccessService::kotReprintAllowed($user, $company)) {
+            return response()->json([
+                'success' => false,
+                'reason' => 'not_allowed',
+                'message' => __('pos.kot_reprint_not_allowed'),
+            ], 403);
         }
 
         // Task 753 MISSED-DELTA RECOVERY: explicit "Akhri Add-on KOT" reprint —
@@ -2171,6 +2195,12 @@ class PosController extends Controller
         // deleteOrder server gate re-enforces the SAME verdict.
         $canOrderCancel = \App\Services\PosAccessService::orderCancelAllowed($user, $company);
 
+        // Task 1379: baked KOT-reprint verdict — the bill panel, table-board
+        // menu, held/incoming order lists and the post-billing receipt popup
+        // all hide their Reprint / Re-send / Last Add-on buttons on this flag;
+        // the kitchen-ticket, resend and print-job endpoints re-enforce it.
+        $canKotReprint = \App\Services\PosAccessService::kotReprintAllowed($user, $company);
+
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
@@ -2178,7 +2208,7 @@ class PosController extends Controller
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
             'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated',
-            'recallOrderIdForJs', 'canOrderCancel', 'terminalsForJs'
+            'recallOrderIdForJs', 'canOrderCancel', 'canKotReprint', 'terminalsForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('X-TaxNest-Sale-Document', 'pra')
@@ -2234,6 +2264,11 @@ class PosController extends Controller
             // Task 643: the Order Cancel verdict is BAKED into the sale screen —
             // toggling the company switch / custom access must refresh the cache.
             (bool) \App\Services\PosAccessService::orderCancelAllowed($user, $company),
+            // Task 1379: the KOT-reprint verdict is BAKED into the sale screen —
+            // flipping the company switch or a Custom Access tick must refresh
+            // the offline-cached copy, or a cached screen keeps showing (and
+            // firing) buttons the server now refuses.
+            (bool) \App\Services\PosAccessService::kotReprintAllowed($user, $company),
             // Task 657: restaurant flags (KOT/tables buttons) are BAKED into the
             // sale screen after the restaurantAllowed() mask — a plan flip
             // (e.g. Starter→Business now unlocks Kitchen mode) must refresh the

@@ -106,6 +106,81 @@ class PosAccessServiceTest extends TestCase
         $this->assertFalse(PosAccessService::orderCancelAllowed($this->member('pos_manager', '["reports"]'), $on));
     }
 
+    // ── kotReprintAllowed verdict (Task 1379) ──────────────────────────
+    //
+    // Precedence is deliberately NOT orderCancelAllowed's: the company switch
+    // is a MASTER off-switch (that is what "Allow KOT Reprint" already meant),
+    // and when it is ON the default stays OPEN so existing shops do not change
+    // behaviour without an announcement.
+
+    public function test_kot_reprint_denied_without_user(): void
+    {
+        $this->assertFalse(PosAccessService::kotReprintAllowed(null));
+    }
+
+    public function test_kot_reprint_default_allowed_for_every_role(): void
+    {
+        // Fresh company: kot_reprint_enabled unset → treated as ON.
+        $company = new \App\Models\Company();
+        foreach (['pos_admin', 'pos_manager', 'pos_cashier', 'pos_waiter'] as $role) {
+            $this->assertTrue(
+                PosAccessService::kotReprintAllowed($this->member($role, null), $company),
+                "role $role must keep today's behaviour when nothing is configured"
+            );
+        }
+    }
+
+    public function test_kot_reprint_company_switch_off_blocks_everyone(): void
+    {
+        $off = new \App\Models\Company();
+        $off->kot_reprint_enabled = false;
+
+        // Owner included — the switch is a master off-switch, not a cashier rule.
+        $this->assertFalse(PosAccessService::kotReprintAllowed($this->member('pos_admin', null, 'company_admin'), $off));
+        $this->assertFalse(PosAccessService::kotReprintAllowed($this->member('pos_manager', null), $off));
+        $this->assertFalse(PosAccessService::kotReprintAllowed($this->member('pos_cashier', null), $off));
+        // A Custom Access tick cannot override the company switch either.
+        $this->assertFalse(PosAccessService::kotReprintAllowed($this->member('pos_cashier', '["kot_reprint"]'), $off));
+    }
+
+    public function test_kot_reprint_custom_access_tick_wins_both_ways_when_switch_on(): void
+    {
+        $on = new \App\Models\Company();
+        $on->kot_reprint_enabled = true;
+
+        $this->assertTrue(PosAccessService::kotReprintAllowed($this->member('pos_cashier', '["kot_reprint"]'), $on));
+        // Saved set WITHOUT the tick = the owner took the buttons away.
+        $this->assertFalse(PosAccessService::kotReprintAllowed($this->member('pos_cashier', '["reports"]'), $on));
+        $this->assertFalse(PosAccessService::kotReprintAllowed($this->member('pos_manager', '["reports"]'), $on));
+        // Confined roles ignore stored sets entirely → still allowed.
+        $this->assertTrue(PosAccessService::kotReprintAllowed($this->member('pos_waiter', '["reports"]'), $on));
+        // Owner is never restricted by a set.
+        $this->assertTrue(PosAccessService::kotReprintAllowed($this->member('pos_cashier', '["reports"]', 'company_admin'), $on));
+    }
+
+    public function test_kot_reprint_kitchen_display_accounts_are_exempt(): void
+    {
+        // KDS internals are out of this control's scope — even the master
+        // switch must not reach into the kitchen's own screen.
+        $off = new \App\Models\Company();
+        $off->kot_reprint_enabled = false;
+        $this->assertTrue(PosAccessService::kotReprintAllowed($this->member('pos_kitchen', '["reports"]'), $off));
+    }
+
+    public function test_kot_reprint_is_a_known_feature_key_but_gates_no_path(): void
+    {
+        $this->assertContains('kot_reprint', PosAccessService::FEATURES);
+        // Verdict-only: the kitchen-ticket URLs also serve legitimate FIRST
+        // prints, so they must never be blanket-blocked by the path middleware.
+        foreach ([
+            'pos/restaurant/orders/5/kitchen-ticket',
+            'pos/restaurant/orders/5/resend-kitchen',
+            'pos/api/print-jobs',
+        ] as $path) {
+            $this->assertNotSame('kot_reprint', PosAccessService::featureForPath($path), "$path must not be path-gated");
+        }
+    }
+
     // ── featureForPath mapping ─────────────────────────────────────────
 
     public function test_billing_paths_are_always_unmapped(): void

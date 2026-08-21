@@ -41,6 +41,8 @@ class PosAccessService
         'tax_reports',
         'day_close',
         'order_cancel',
+        // Task 1379: kitchen-ticket REPRINT / Re-send / Last Add-on.
+        'kot_reprint',
         'returns',
         'inventory',
         'customize',
@@ -278,6 +280,49 @@ class PosAccessService
         } catch (\Throwable $e) {
             return false; // fail closed — admin/manager path unaffected
         }
+    }
+
+    /**
+     * Kitchen-ticket REPRINT verdict (Task 1379, owner voice notes 20 Aug 2026)
+     * — SINGLE source of truth for the sale screen's "KOT reprint / Re-send /
+     * Last Add-on" buttons (bill panel, table-board menu, held + incoming
+     * order lists, post-billing receipt popup) AND the server gates on the
+     * kitchen-ticket render, resend and silent print-job endpoints.
+     *
+     * Precedence is deliberately DIFFERENT from orderCancelAllowed: here the
+     * company switch is a MASTER off-switch, because that is what the old
+     * "Allow KOT Reprint" toggle already meant on the two surfaces it covered.
+     *   • companies.kot_reprint_enabled OFF → nobody reprints, owner included.
+     *   • ON (default; missing column = ON) → a Custom Access tick decides per
+     *     member; NO set = allowed for every role, i.e. today's behaviour.
+     *
+     * Kitchen Display accounts are exempt on purpose: the KDS *is* the kitchen
+     * and its internal reprint behaviour is out of this control's scope.
+     */
+    public static function kotReprintAllowed(?User $user, $company = null): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        if (($user->pos_role ?? null) === 'pos_kitchen') {
+            return true;
+        }
+        try {
+            $company = $company ?: \App\Models\Company::find($user->company_id);
+            // hasColumn guard: PROD drift (column missing) → attribute null →
+            // default ON, so a stale schema can never kill kitchen printing.
+            if (!(bool) ($company->kot_reprint_enabled ?? true)) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            // A company lookup failure must never silently stop the kitchen.
+        }
+        $custom = self::customAllows($user, 'kot_reprint');
+        if ($custom !== null) {
+            return $custom;
+        }
+
+        return true;
     }
 
     /**

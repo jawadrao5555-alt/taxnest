@@ -2309,6 +2309,20 @@ class RestaurantPosController extends Controller
         // chhapi hui rows kabhi re-number/re-consume nahi hotin. Batch data hi
         // na ho (legacy rows) to poora ticket render hota hai.
         $batchLast = $request->query('batch') === 'last';
+
+        // Task 1379 — REPRINT permission gate. Hiding the buttons is not a
+        // block: a blocked staffer must not get the ticket by pasting the URL,
+        // reusing an old tab or firing it from the mobile shell. Only REPRINTS
+        // are gated (see KotPrintService::isReprintRender) — a first fire and
+        // every delta stay open, and unauthenticated renders (Desktop Agent
+        // print jobs, which are gated at enqueue time) pass through untouched.
+        $kotUser = Auth::guard('pos')->user();
+        if ($kotUser
+            && \App\Services\KotPrintService::isReprintRender($order, $delta, $batchLast)
+            && !\App\Services\PosAccessService::kotReprintAllowed($kotUser, $company)) {
+            abort(403, __('pos.kot_reprint_not_allowed'));
+        }
+
         if ($batchLast) {
             $delta = true;
             $maxBatch = (int) $order->items->max('kot_batch_no');
@@ -2485,7 +2499,23 @@ class RestaurantPosController extends Controller
     /** GET /pos/transactions/{id}/kitchen-ticket — iframe/popup KOT for order-less bills. */
     public function transactionKitchenTicket(Request $request, $transactionId)
     {
-        $html = self::renderTransactionKot((int) app('currentCompanyId'), (int) $transactionId);
+        $companyId = (int) app('currentCompanyId');
+
+        // Task 1379 — REPRINT gate. renderTransactionKot stamps kot_sent_at on
+        // the FIRST render, so an already-stamped bill = reprint. The first
+        // send (F10 "Payment First, Then KOT" release) always stays open.
+        $kotUser = Auth::guard('pos')->user();
+        if ($kotUser) {
+            $txn = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->find((int) $transactionId);
+            if (\App\Services\KotPrintService::isTransactionReprint($txn)
+                && !\App\Services\PosAccessService::kotReprintAllowed($kotUser)) {
+                abort(403, __('pos.kot_reprint_not_allowed'));
+            }
+        }
+
+        $html = self::renderTransactionKot($companyId, (int) $transactionId);
         abort_if($html === null, 404);
 
         return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
@@ -2500,6 +2530,14 @@ class RestaurantPosController extends Controller
     public function resendKitchen($orderId)
     {
         $companyId = app('currentCompanyId');
+
+        // Task 1379 — Re-send IS a reprint by definition (it exists to hand the
+        // kitchen the same ticket again), so it is gated unconditionally. Same
+        // verdict as the buttons; a hidden button must also be a dead URL.
+        $kotUser = Auth::guard('pos')->user();
+        if ($kotUser && !\App\Services\PosAccessService::kotReprintAllowed($kotUser)) {
+            return response()->json(['success' => false, 'message' => __('pos.kot_reprint_not_allowed')], 403);
+        }
 
         // Atomic single-statement update — protects against lost increments
         // when two cashiers click "Re-send" on the same order at once.

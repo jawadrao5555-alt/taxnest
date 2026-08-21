@@ -126,6 +126,54 @@ class KotPrintService
     }
 
     /**
+     * Task 1379 — "is this send a REPRINT?" — the WAHID rule behind every
+     * kitchen-ticket permission gate (render, silent enqueue, resend). Kept
+     * here (not in the controllers) so the render path and the print-job path
+     * can never drift apart and open a bypass.
+     *
+     * Deliberately conservative — a blocked staffer must be stopped, but a
+     * genuine FIRST fire must NEVER be blocked (a lost KOT is worse than a
+     * duplicate one):
+     *   • batch=last ("Akhri Add-on" rescue) → reprint by definition.
+     *   • delta=1 → renders ONLY rows the kitchen never saw → first fire.
+     *   • full ticket → reprint only when the kitchen has already seen EVERY
+     *     line (zero unprinted rows). A full ticket that still carries new
+     *     lines (KDS adoption, waiter appends) stays open.
+     * Line-level kot_printed_at is the only trustworthy signal — see
+     * unseenLineCount() for why orders.kot_sent_at must not be used.
+     */
+    public static function isReprintRender(?RestaurantOrder $order, bool $delta, bool $batchLast = false): bool
+    {
+        if ($batchLast) {
+            return true;
+        }
+        if (!$order || !$order->id || $delta) {
+            return false;
+        }
+        try {
+            $row = \App\Models\RestaurantOrderItem::where('order_id', $order->id)
+                ->selectRaw('COUNT(*) AS total, SUM(CASE WHEN kot_printed_at IS NULL THEN 1 ELSE 0 END) AS unseen')
+                ->first();
+            $total = (int) ($row->total ?? 0);
+            $unseen = (int) ($row->unseen ?? 0);
+
+            return $total > 0 && $unseen === 0;
+        } catch (\Throwable $e) {
+            return false; // signal failure must never block a first fire
+        }
+    }
+
+    /**
+     * Task 1379 — transaction (order-less delivery bill) KOTs. renderTransactionKot
+     * stamps kot_sent_at on the FIRST render, so an already-stamped bill means
+     * the kitchen has the slip and this is the reprint.
+     */
+    public static function isTransactionReprint($transaction): bool
+    {
+        return $transaction ? (bool) ($transaction->kot_sent_at ?? null) : false;
+    }
+
+    /**
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
     public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false): array

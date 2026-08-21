@@ -23,6 +23,8 @@ class PosRider extends Model
         // Task #1357: upload diagnostics — when the phone last reached us, and
         // why we refused it (duty off / plan locked / point too old).
         'last_upload_at', 'last_reject_reason', 'last_reject_at',
+        // Task #1405: rider app build last seen (from the TaxNestRider user agent).
+        'app_version',
     ];
 
     protected $casts = [
@@ -125,6 +127,57 @@ class PosRider extends Model
         return (float) $this->openCashBills()
             ->selectRaw('COALESCE(SUM(' . self::remainingExpr('pos_transactions') . '), 0) as rem')
             ->value('rem');
+    }
+
+    // ── Task #1405: rider app build tracking ─────────────────────────────────
+    // The Android app has always identified itself as `TaxNestRider/<version>`
+    // on every API call; these helpers are the ONE place that reads that user
+    // agent and decides whether a build is behind the released one, so the
+    // riders list and the live map can never disagree.
+
+    /**
+     * Version out of a `TaxNestRider/1.7.0` user agent (NULL when the caller
+     * is not the rider app, or sent no parseable version).
+     *
+     * Only digits and dots are accepted: a junk/spoofed agent must never write
+     * a 200-char string into the column, and the value has to stay comparable
+     * with version_compare.
+     */
+    public static function parseAppVersion(?string $userAgent): ?string
+    {
+        if (!$userAgent || !preg_match('~TaxNestRider/(\d+(?:\.\d+)*)~i', $userAgent, $m)) {
+            return null;
+        }
+
+        $version = trim($m[1], '.');
+
+        return ($version === '' || strlen($version) > 20) ? null : $version;
+    }
+
+    /** Released rider-app version (admin-editable); '' = release gate not set. */
+    public static function latestAppVersion(): string
+    {
+        return trim((string) SystemSetting::get('rider_app_latest_version', ''));
+    }
+
+    /**
+     * Is this rider's build behind the released one?
+     *
+     * Unknown build (never opened the app) is NOT "outdated" — it is its own,
+     * louder state on both screens. An empty setting means the owner has not
+     * published a version yet, so nothing can be judged behind it (same rule
+     * the app's own update check follows).
+     */
+    public static function appVersionOutdated(?string $version, ?string $latest = null): bool
+    {
+        $version = trim((string) $version);
+        $latest = $latest === null ? self::latestAppVersion() : trim($latest);
+
+        if ($version === '' || $latest === '') {
+            return false;
+        }
+
+        return version_compare($version, $latest, '<');
     }
 
     /**

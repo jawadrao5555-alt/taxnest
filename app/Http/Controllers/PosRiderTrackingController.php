@@ -214,6 +214,12 @@ class PosRiderTrackingController extends Controller
                 abort(response()->json(['ok' => false, 'error' => 'unauthorized'], 401));
             }
         }
+        // Task #1405: the phone told us its build in the user agent — remember
+        // it BEFORE the plan gate, so even a locked/downgraded shop's riders
+        // still show an app version on the list (the refusal is about the
+        // package, not about which APK the rider is carrying).
+        $this->stampAppVersion($rider, $request);
+
         if ($msg = $this->planLockMessage(Company::find($rider->company_id))) {
             // Task #1357: the phone DID reach us and was refused — record why,
             // so the live card can explain an empty trail instead of leaving
@@ -222,6 +228,37 @@ class PosRiderTrackingController extends Controller
             abort(response()->json(['ok' => false, 'error' => 'plan_locked', 'message' => $msg], 403));
         }
         return $rider;
+    }
+
+    /**
+     * Task #1405 — record the rider app build behind this call.
+     *
+     * The APK has always sent `User-Agent: TaxNestRider/<version>`; nothing
+     * changes on the phone. Every authenticated rider-app call passes through
+     * here (riderFromToken) plus the login, so a rider who is still on the old
+     * build reveals himself the moment his phone talks to us at all.
+     *
+     * Writes ONLY when the value actually changes: uploads land every few
+     * seconds, and an unconditional UPDATE per call would be a write storm on
+     * pos_riders for no new information. A non-rider-app caller (no parseable
+     * agent) never blanks a known version — silence is not evidence of a
+     * downgrade.
+     *
+     * hasColumn guard + $fillable entry (a non-fillable column is silently
+     * dropped by update()) — safe on a live server still on the old schema.
+     */
+    private function stampAppVersion(PosRider $rider, Request $request): void
+    {
+        if (!Schema::hasColumn('pos_riders', 'app_version')) {
+            return;
+        }
+
+        $version = PosRider::parseAppVersion($request->userAgent());
+        if ($version === null || $version === $rider->app_version) {
+            return;
+        }
+
+        $rider->update(['app_version' => $version]);
     }
 
     /**
@@ -297,6 +334,12 @@ class PosRiderTrackingController extends Controller
             return response()->json(['ok' => false, 'error' => 'no_rider',
                 'message' => __('pos.rt_no_rider_record')], 403);
         }
+
+        // Task #1405: a fresh login is the earliest proof of which build the
+        // rider installed — stamp it the moment the rider row is resolved, i.e.
+        // BEFORE the package gate. A locked shop's rider who just logged in
+        // from the old APK must not keep showing as "app never opened".
+        $this->stampAppVersion($rider, $request);
 
         $company = Company::find($rider->company_id);
         if ($msg = $this->planLockMessage($company)) {
@@ -889,6 +932,12 @@ class PosRiderTrackingController extends Controller
         $hasUploadAt = Schema::hasColumn('pos_riders', 'last_upload_at');
         $hasReject   = Schema::hasColumn('pos_riders', 'last_reject_reason')
             && Schema::hasColumn('pos_riders', 'last_reject_at');
+        // Task #1405: which rider app build is on each phone. Outdated-ness is
+        // computed here (never stored) against the released version, read once
+        // per poll. Column missing on a drifted live schema = all three fields
+        // stay quiet rather than claiming "never opened the app".
+        $hasAppVer   = Schema::hasColumn('pos_riders', 'app_version');
+        $latestAppVer = $hasAppVer ? PosRider::latestAppVersion() : '';
 
         $riders = $rows->map(fn ($r) => [
             'id' => (int) $r->id,
@@ -937,6 +986,17 @@ class PosRiderTrackingController extends Controller
             'reject_secs_ago' => ($hasReject && $r->last_reject_at
                 && abs(now()->diffInHours(Carbon::parse($r->last_reject_at))) < 24)
                 ? (int) abs(now()->diffInSeconds(Carbon::parse($r->last_reject_at))) : null,
+            // ── Task #1405: rider app build ──────────────────────────────────
+            // app_version = build last seen from this rider's phone.
+            // app_outdated = behind the released version (only when both known).
+            // app_never = the column exists and this rider has NEVER reached us
+            //   from the app — the shop has to chase him, he gets no push and
+            //   no background delivery sync at all.
+            'app_version' => ($hasAppVer && filled($r->app_version)) ? (string) $r->app_version : null,
+            'app_outdated' => $hasAppVer
+                && PosRider::appVersionOutdated($r->app_version, $latestAppVer),
+            'app_never' => $hasAppVer && blank($r->app_version),
+            'app_latest' => $latestAppVer !== '' ? $latestAppVer : null,
         ])->values();
 
         // Task #1359: a silent rider gets a direct, data-only "sync now" nudge

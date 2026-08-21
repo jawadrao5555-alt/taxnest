@@ -3276,6 +3276,11 @@ return [
     'rider_login_updated' => 'رائیڈر لاگ ان اپ ڈیٹ ہو گیا۔',
     'rider_new_password_optional' => 'نیا پاس ورڈ (اختیاری)',
     'rider_password_unchanged_hint' => 'موجودہ پاس ورڈ برقرار رکھنے کے لیے خالی چھوڑ دیں۔',
+    // Task #1405: rider app build column on the riders list
+    'rider_app_col' => 'رائیڈر ایپ',
+    'rider_app_never' => 'ایپ کبھی نہیں کھولی',
+    'rider_app_old' => 'پرانی ایپ',
+    'rider_app_new_available' => 'v:ver موجود ہے',
     'rider_app_card_desc' => 'آف لائن روٹ ریکارڈنگ — رائیڈر کے فون کا جی پی ایس بند یا نیٹ ورک غائب ہو جائے تب بھی راستہ محفوظ ہوتا رہتا ہے اور بعد میں سنک ہو جاتا ہے۔',
     'rider_name_req' => 'رائیڈر کا نام *',
     'rider_portal_greeting' => 'ہیلو :name — یہ آج کی ڈیلیوریز ہیں۔ جب آپ آرڈر حوالے کر دیں تو "DELIVERED" پر ٹیپ کریں۔',
@@ -3427,6 +3432,11 @@ return [
     'rt_reject_plan_locked' => 'اپ لوڈ رد — پیکج لاک ہے',
     'rt_reject_too_old' => 'اپ لوڈ رد — پوائنٹس بہت پرانے',
     'rt_reject_other' => 'اپ لوڈ رد ہوا',
+    // Task #1405: which rider is still carrying the old app build
+    'rt_app_label' => 'ایپ',
+    'rt_app_old_badge' => 'پرانی ایپ',
+    'rt_app_never_badge' => 'ایپ کبھی نہیں کھولی',
+    'rt_app_update_to' => 'نئی :ver',
     'rt_upgrade_btn' => 'پیکجز دیکھیں',
     // Task #1105: customer delivery pin + public live tracking link
     'cl_locate_btn' => 'لوکیشن',

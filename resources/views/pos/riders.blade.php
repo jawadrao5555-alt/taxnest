@@ -136,6 +136,10 @@
                         <th class="px-4 py-3">{{ __('pos.vehicle_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.cash_khata') }}</th>
                         <th class="px-4 py-3">{{ __('pos.login_label') }}</th>
+                        {{-- Task #1405: kaun sa rider abhi tak purane app par hai --}}
+                        @if($riderAppReady)
+                        <th class="px-4 py-3">{{ __('pos.rider_app_col') }}</th>
+                        @endif
                         <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
                         <th class="px-4 py-3 text-right">{{ __('pos.actions_label') }}</th>
                     </tr>
@@ -178,6 +182,24 @@
                                 <span class="text-[11px] text-gray-400">{{ __('pos.no_login') }}</span>
                             @endif
                         </td>
+                        {{-- Task #1405: app version — purana build ya app kabhi khola hi nahi.
+                             Woh rider background sync aur push dono se mehroom hai, isliye
+                             dukandar ko ek nazar mein dikhna chahiye. --}}
+                        @if($riderAppReady)
+                        @php $app = $riderApp[$rider->id] ?? ['version' => null, 'outdated' => false]; @endphp
+                        <td class="px-4 py-3">
+                            @if($app['version'] === null)
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">{{ __('pos.rider_app_never') }}</span>
+                            @elseif($app['outdated'])
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">v{{ $app['version'] }} · {{ __('pos.rider_app_old') }}</span>
+                                @if($riderAppLatest !== '')
+                                <div class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.rider_app_new_available', ['ver' => $riderAppLatest]) }}</div>
+                                @endif
+                            @else
+                                <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">v{{ $app['version'] }}</span>
+                            @endif
+                        </td>
+                        @endif
                         <td class="px-4 py-3">
                             @if($rider->is_active)
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">{{ __('pos.active_word') }}</span>
@@ -193,7 +215,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_riders_yet') }}</td></tr>
+                    <tr><td colspan="{{ $riderAppReady ? 8 : 7 }}" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_riders_yet') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -54,6 +54,9 @@
         .rt-warn-pill.battery { background: #dc2626; color: #fff; }
         /* Task #1357: server ne upload reject kiya */
         .rt-warn-pill.reject { background: #4f46e5; color: #fff; }
+        /* Task #1405: purana app build / app kabhi khola hi nahi */
+        .rt-warn-pill.oldapp { background: #b45309; color: #fff; }
+        .rt-warn-pill.noapp { background: #7c3aed; color: #fff; }
         /* .rt-warn-map is the Leaflet divIcon container.  Leaflet defaults it to
            12×12 px, so a transform here shifts by only 6px — not by the pill's
            actual width.  The centering transform is applied INLINE on the pill
@@ -114,6 +117,11 @@
             'reject_plan_locked' => __('pos.rt_reject_plan_locked'),
             'reject_too_old' => __('pos.rt_reject_too_old'),
             'reject_other' => __('pos.rt_reject_other'),
+            {{-- Task #1405: purane app par baithe riders --}}
+            'app_label' => __('pos.rt_app_label'),
+            'app_old_badge' => __('pos.rt_app_old_badge'),
+            'app_never_badge' => __('pos.rt_app_never_badge'),
+            'app_update_to' => __('pos.rt_app_update_to'),
         ],
     ]))" x-init="init()">
 
@@ -199,6 +207,16 @@
                         {{-- Task #1357: server ne is rider ka upload reject kiya tha --}}
                         <template x-if="r.reject_reason">
                             <div class="mt-1"><span class="rt-warn-pill reject" x-text="rejectText(r)"></span></div>
+                        </template>
+                        {{-- Task #1405: app ka build — purana hai ya kabhi khola hi nahi --}}
+                        <template x-if="r.app_never">
+                            <div class="mt-1"><span class="rt-warn-pill noapp" x-text="'📵 ' + i18n.app_never_badge"></span></div>
+                        </template>
+                        <template x-if="r.app_outdated">
+                            <div class="mt-1"><span class="rt-warn-pill oldapp" x-text="appOldText(r)"></span></div>
+                        </template>
+                        <template x-if="r.app_version && !r.app_outdated">
+                            <div class="mt-1 text-[10px] text-gray-400 dark:text-gray-500" x-text="'📱 ' + i18n.app_label + ' v' + r.app_version"></div>
                         </template>
                         <div class="text-[11px] text-gray-400 dark:text-gray-500" x-text="agoText(r)"></div>
                         {{-- Task #1357: location ka waqt aur upload ka waqt alag hon to dono dikhao --}}
@@ -441,6 +459,8 @@
                         // dekhne ke liye Google Maps link.
                         + (this.uploadLate(r) ? '<br><span style="color:#4f46e5;font-weight:600">' + this.esc(this.uploadText(r)) + '</span>' : '')
                         + (r.reject_reason ? '<br><span style="color:#4f46e5;font-weight:600">' + this.esc(this.rejectText(r)) + '</span>' : '')
+                        // Task #1405: is phone par app ka kaun sa build hai.
+                        + this.appPopupLine(r)
                         + '<br>' + this.gmapsLink(r.lat, r.lng);
                     // Pill floats above the dot; recreating it every poll is cheap (few riders).
                     if (this.warnBadges[r.id]) {
@@ -1015,6 +1035,29 @@
                 const label = this.i18n['reject_' + r.reject_reason] || this.i18n.reject_other;
                 const ago = this.agoSecsText(r.reject_secs_ago);
                 return '⛔ ' + label + (ago ? ' · ' + ago : '');
+            },
+            // ---- Task #1405: kaun sa rider purane app par hai ----
+            // "Purana app v1.6.0 · nayi 1.7.0" — dukandar ko yehi banda chase
+            // karna hai (na push milta hai, na background delivery sync).
+            appOldText(r) {
+                return '📵 ' + this.i18n.app_old_badge + ' v' + r.app_version
+                    + (r.app_latest ? ' · ' + this.i18n.app_update_to.replace(':ver', r.app_latest) : '');
+            },
+            // Marker popup ki app line — teenon halat (purana / kabhi nahi khola
+            // / theek) ek hi jagah se banti hain.
+            appPopupLine(r) {
+                if (r.app_never) {
+                    return '<br><span style="color:#7c3aed;font-weight:600">📵 '
+                        + this.esc(this.i18n.app_never_badge) + '</span>';
+                }
+                if (r.app_outdated) {
+                    return '<br><span style="color:#b45309;font-weight:600">'
+                        + this.esc(this.appOldText(r)) + '</span>';
+                }
+                if (r.app_version) {
+                    return '<br>📱 ' + this.esc(this.i18n.app_label) + ' v' + this.esc(r.app_version);
+                }
+                return '';
             },
             lateLegendText() {
                 return this.i18n.late_legend

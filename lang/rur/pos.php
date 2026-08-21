@@ -3278,6 +3278,11 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rider_login_updated' => 'Rider login update ho gaya.',
     'rider_new_password_optional' => 'Naya Password (zaroori nahi)',
     'rider_password_unchanged_hint' => 'Maujooda password rakhne ke liye khaali chhor dein.',
+    // Task #1405: rider app build column on the riders list
+    'rider_app_col' => 'Rider app',
+    'rider_app_never' => 'App kabhi khola hi nahi',
+    'rider_app_old' => 'purana app',
+    'rider_app_new_available' => 'v:ver mojood hai',
     'rider_app_card_desc' => 'Offline route recording — riders ke phone ka GPS band ya network gum ho jaye tab bhi trail save hoti hai aur baad mein sync hoti hai.',
     'rider_name_req' => 'Rider Name *',
     'rider_portal_greeting' => 'Salam :name — yeh aaj ki deliveries hain. Deliver karne ke baad "Delivered" dabayen.',
@@ -3429,6 +3434,11 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_reject_plan_locked' => 'Upload reject — package lock hai',
     'rt_reject_too_old' => 'Upload reject — points bohat purane',
     'rt_reject_other' => 'Upload reject hua',
+    // Task #1405: which rider is still carrying the old app build
+    'rt_app_label' => 'App',
+    'rt_app_old_badge' => 'Purana app',
+    'rt_app_never_badge' => 'App kabhi khola hi nahi',
+    'rt_app_update_to' => 'nayi :ver',
     'rt_upgrade_btn' => 'Packages dekhein',
     // Task #1105: customer delivery pin + public live tracking link
     'cl_locate_btn' => 'Location',

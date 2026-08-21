@@ -221,13 +221,29 @@ class PosRiderController extends Controller
             ];
         }
 
+        // Task #1405: which rider app build is on each phone. The column may be
+        // missing on a drifted live schema — then the whole column is hidden
+        // rather than telling every shop that nobody has ever opened the app.
+        $riderAppReady = Schema::hasColumn('pos_riders', 'app_version');
+        $riderAppLatest = $riderAppReady ? PosRider::latestAppVersion() : '';
+        $riderApp = [];
+        if ($riderAppReady) {
+            foreach ($riders as $r) {
+                $version = trim((string) $r->app_version);
+                $riderApp[$r->id] = [
+                    'version'  => $version !== '' ? $version : null,
+                    'outdated' => PosRider::appVersionOutdated($version, $riderAppLatest),
+                ];
+            }
+        }
+
         $pushConfigured = \App\Services\RiderPushService::isConfigured();
         // Firebase setup banner is platform-internal info (cPanel steps) — real
         // customer shops must never see it; only internal/QA accounts do.
         $pushBannerVisible = (bool) ($company->is_internal_account ?? false);
         self::logFcmKeyPresenceOnce();
 
-        return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderLoginIssues', 'riderPasswords', 'settlements', 'trackingEnabled', 'riderTrackingSettings', 'pushConfigured'));
+        return view('pos.riders', compact('riders', 'khata', 'riderUsers', 'riderLoginIssues', 'riderPasswords', 'settlements', 'trackingEnabled', 'riderTrackingSettings', 'pushConfigured', 'riderAppReady', 'riderApp', 'riderAppLatest'));
     }
 
     /**

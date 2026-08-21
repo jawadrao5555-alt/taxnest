@@ -609,15 +609,28 @@ class PosCallerIdController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    // ─── POS panel (session, /pos/*) ────────────────────────────────────────
+    // ─── POS panel (session, /pos/* AND /fbr-pos/*) ─────────────────────────
 
-    /** POST /pos/settings/caller-id {enabled} — admin-only toggle. */
+    /**
+     * Task 1353: the same endpoints now serve BOTH sale screens. Every panel
+     * method resolves the company from app('currentCompanyId') — bound by
+     * PosAuth *and* FbrPosAuth — so the only guard-specific bit is the signed-in
+     * user. Resolve it from whichever panel guard owns this request instead of
+     * hardcoding auth('pos'), or an FBR admin's toggle/revoke/dial silently
+     * looks like a logged-out cashier (403 / requested_by NULL).
+     */
+    private function panelUser()
+    {
+        return auth('pos')->user() ?: auth('fbrpos')->user();
+    }
+
+    /** POST /pos/settings/caller-id (+ FBR twin) {enabled} — admin-only toggle. */
     public function toggle(Request $request)
     {
         // Company-wide integration switch = admin/manager ONLY. A cashier with
         // custom 'customize' access passes posCashierBlocked(), so enforce the
         // same isPosAdmin() boundary the app-login uses.
-        $user = auth('pos')->user();
+        $user = $this->panelUser();
         if (!$user || !$user->isPosAdmin() || $user->posCashierBlocked()) {
             return response()->json(['ok' => false], 403);
         }
@@ -913,7 +926,7 @@ class PosCallerIdController extends Controller
             'dial_digits' => $digits,
             'caller_name' => $name,
             'status' => 'pending',
-            'requested_by' => optional(auth('pos')->user())->id,
+            'requested_by' => optional($this->panelUser())->id,
             'expires_at' => now()->addSeconds(self::DIAL_EXPIRY_SECONDS),
             'created_at' => now(),
             'updated_at' => now(),
@@ -1002,7 +1015,7 @@ class PosCallerIdController extends Controller
      */
     public function revokeDevice(Request $request)
     {
-        $user = auth('pos')->user();
+        $user = $this->panelUser();
         if (!$user || !$user->isPosAdmin() || $user->posCashierBlocked()) {
             return response()->json(['ok' => false], 403);
         }

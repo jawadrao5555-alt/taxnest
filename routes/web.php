@@ -1550,6 +1550,13 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
         return back()->with('success', __('pos.language_saved'));
     })->name('fbrpos.settings.default-language');
     Route::get('/customize', [FbrPosController::class, 'customize'])->name('fbrpos.customize');
+    // Caller ID (Task 1353 — FBR twin of the PRA routes): admin toggle +
+    // paired-phone revoke on the customize hub. PosCallerIdController resolves
+    // the company from currentCompanyId (bound by FbrPosAuth too) and the user
+    // from whichever panel guard owns the request, so both handlers are reused
+    // as-is — one server-side gate, no FBR-only copy that can drift.
+    Route::post('/settings/caller-id', [\App\Http\Controllers\PosCallerIdController::class, 'toggle'])->name('fbrpos.settings.caller-id');
+    Route::post('/settings/caller-devices/revoke', [\App\Http\Controllers\PosCallerIdController::class, 'revokeDevice'])->name('fbrpos.settings.caller-devices.revoke');
     Route::match(['get', 'post'], '/receipt-settings', [FbrPosController::class, 'fbrReceiptSettings'])->name('fbrpos.receipt-settings');
 
     // 🎯 Universal Header API — Local / Provisional bills (F10) + Failed bills (F11)
@@ -1658,6 +1665,16 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('fbrpos.api.customer-addresses');
     Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('fbrpos.api.customer-addresses.store');
     Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('fbrpos.api.customer-addresses.delete');
+    // Caller ID popup poll (Task 1353) — exact FBR mirrors of the PRA sale-screen
+    // endpoints. Same handlers: the plan gate (Unlimited) + caller_id_enabled
+    // check live INSIDE them, so a non-Unlimited or toggled-off FBR shop gets the
+    // same empty payload the PRA screen gets — no data leaks into the FBR poll.
+    Route::get('/api/caller-events', [\App\Http\Controllers\PosCallerIdController::class, 'events'])->name('fbrpos.api.caller-events');
+    Route::get('/api/caller-recent', [\App\Http\Controllers\PosCallerIdController::class, 'recentCalls'])->name('fbrpos.api.caller-recent');
+    Route::post('/api/caller-clear', [\App\Http\Controllers\PosCallerIdController::class, 'clearCalls'])->name('fbrpos.api.caller-clear');
+    Route::post('/api/caller-dial', [\App\Http\Controllers\PosCallerIdController::class, 'dialBack'])
+        ->middleware('throttle:60,1')->name('fbrpos.api.caller-dial');
+    Route::get('/api/caller-last-order', [\App\Http\Controllers\PosCallerIdController::class, 'lastOrder'])->name('fbrpos.api.caller-last-order');
     // NO plan.limit middleware (Task 362): the middleware would 403 the whole
     // request at cap, breaking dedupe/barcode-rescue of EXISTING products for
     // at-cap shops. The controller enforces the cap on genuinely NEW rows only.

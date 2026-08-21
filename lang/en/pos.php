@@ -5028,6 +5028,20 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'caller_cleared' => 'Calls cleared',
     'caller_clear_failed' => 'Could not clear — please try again.',
 
+    // Task 1381 — call back from the POS (paired counter phone dials)
+    'caller_call_back' => 'Call back',
+    'ti_call_back' => 'Call this number back from the counter phone',
+    'caller_dial_sent' => 'Sent to the counter phone — tap the notification to dial',
+    'caller_dial_failed' => 'Could not send the call-back request — please try again.',
+    'caller_dial_no_number' => 'This call has no number — call back is not possible',
+    'caller_dial_title' => 'Dial this number',
+    'caller_dial_no_device' => 'No shop phone is connected right now — dial this number yourself.',
+    'caller_dial_old_app' => 'The phone app is out of date, please update it — dial this number yourself for now.',
+    'caller_dial_notif_off' => 'Notifications are turned off on the shop phone, so it cannot show the call — turn them on in the phone\'s settings; dial this number yourself for now.',
+    'caller_dial_copy' => 'Copy number',
+    'caller_dial_copied' => 'Number copied',
+    'caller_called_back' => 'called back',
+
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',
     'wa_bill_toggle_sub' => 'Show a WhatsApp button on the receipt popup — send the customer their bill and receipt link in one tap.',

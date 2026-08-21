@@ -22,8 +22,14 @@ android {
         // Android 8+ — matches the downloads-page "Android 8+".
         minSdk 26
         targetSdk 34
-        versionCode 4
-        versionName "1.3.0"
+        // Website builds ka self-update isi number se chalta hai — bump ke baad
+        // SystemSetting `caller_app_latest_version` (+ `caller_app_plus_latest_version`)
+        // bhi wohi versionName karna zaroori hai, warna signed-in phone khud
+        // update nahi hoga. RELEASE.md dekhein.
+        //   1.3.0 = teen zubaanon ka switch (Task 1382)
+        //   1.4.0 = POS se call back (Task 1381)
+        versionCode 5
+        versionName "1.4.0"
     }
 
     // ── Builds (Task 1345 + 1346) — ek hi package id, ek hi keystore ────────
@@ -70,8 +76,12 @@ android {
     }
 
     // Kaunsa code kis build mein jata hai (ek jagah, taake logic fork na ho):
-    //   src/web/java   → self-update (UpdateCheck + Updater). SIRF website
-    //                    builds. Play flavor ka apna no-op Updater hai.
+    //   src/web/java   → self-update (UpdateCheck + Updater) AUR call back ka
+    //                    tap-to-dial (Task 1381: CallerApp, DialWatchService,
+    //                    DialActivity, DialBootReceiver). SIRF website builds.
+    //                    Play flavor ka apna no-op Updater hai aur call back
+    //                    us mein bilkul nahi jata.
+    //   src/web/res    → sirf Task 1381 ki dial strings (web/java ke saath).
     //   src/notif/*    → notification-listener detector + prominent disclosure.
     //                    plus AUR play, bilkul ek jaisa.
     // Ek source set ke do res folders mein ek hi key dobara likhna "Duplicate
@@ -86,10 +96,11 @@ android {
     sourceSets {
         getByName("sim") {
             java.srcDirs += 'src/web/java'
+            res.srcDirs += 'src/web/res'
         }
         getByName("plus") {
             java.srcDirs += ['src/web/java', 'src/notif/java']
-            res.srcDirs += 'src/notif/res'
+            res.srcDirs += ['src/notif/res', 'src/web/res']
         }
         getByName("play") {
             java.srcDirs += 'src/notif/java'

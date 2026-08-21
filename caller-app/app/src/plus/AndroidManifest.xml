@@ -10,6 +10,15 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Task 1381 (call back) — hu-ba-hu src/sim/AndroidManifest.xml jaisa
+         block; ek source set ka ek hi manifest hota hai is liye duplication
+         majboori hai. Ek jagah badlein to doosri bhi badlein. Play build ke
+         manifest mein yeh KABHI nahi jana. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- Android 11+ package visibility: is ke baghair phone ki dialer apps ki
          fehrist khali aati hai aur CallSourceRules SIM ki ring ko pehchan nahi
          pata. Sirf calling apps dikhti hain — QUERY_ALL_PACKAGES nahi. -->
@@ -23,9 +32,13 @@
         </intent>
     </queries>
 
-    <application>
+    <!-- android:name sirf website builds mein: src/main ka <application> koi
+         name set nahi karta, is liye merge sirf yeh add karta hai. -->
+    <application android:name=".CallerApp">
         <!-- Event-driven, battery-friendly: Android khud call/WhatsApp notification
-             par service jagata hai — koi foreground service ya polling nahi. -->
+             par service jagata hai — koi foreground service ya polling nahi.
+             (Task 1381 ki dial-watch service is se alag hai — woh POS se aane
+             wali call-back request ke liye hai, call detection ke liye nahi.) -->
         <service
             android:name=".CallListenerService"
             android:exported="false"
@@ -41,5 +54,28 @@
         <activity
             android:name=".NotificationDisclosureActivity"
             android:exported="false" />
+
+        <!-- Task 1381: POS ki dial request ka intezar (foreground, dataSync). -->
+        <service
+            android:name=".DialWatchService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Notification tap ka trampoline — dialer kholta hai, koi UI nahi. -->
+        <activity
+            android:name=".DialActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
+
+        <receiver
+            android:name=".DialBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

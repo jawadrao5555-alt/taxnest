@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Task 1381 — call back (tap-to-dial) ki strings. ENGLISH (default).
+
+  Yeh folder SIRF website builds (sim + plus) ke source sets mein add hai
+  (app/build.gradle → sourceSets). Play build in strings ko dekhti tak nahi —
+  us ka source set aur manifest bilkul waise ke waise hain.
+
+  Task 1382 ka usool: har key TEENON files mein honi chahiye —
+  values/ (en), values-b+ur+Latn/ (Roman Urdu), values-ur/ (Urdu). Ek bhi
+  chhoot jaye to lintVitalRelease MissingTranslation par build gira deta hai.
+
+  Baqi sab strings src/main/res/values/strings.xml se aati hain.
+-->
+<resources>
+    <!-- Notification channels (Android settings mein yehi naam dikhte hain) -->
+    <string name="dial_channel_watch">Call back service</string>
+    <string name="dial_channel_offer">Call back</string>
+
+    <!-- Khamosh, hamesha chalne wali line -->
+    <string name="dial_service_title">TaxNest Caller ID</string>
+    <string name="dial_service_text">Ready for call backs from the POS</string>
+
+    <!-- Tap-to-dial notification -->
+    <string name="dial_notif_title">Call back — POS</string>
+    <string name="dial_action">Open dialer</string>
+    <string name="dial_open_failed">Could not open the dialer — number:</string>
+
+    <!-- Notifications band hain: POS number copy karwa dega, magar phone par
+         bhi wajah batani chahiye -->
+    <string name="dial_notif_off_warn">Notifications are off for this app, so call backs sent from the POS cannot appear here. Turn them on in the phone\'s settings.</string>
+</resources>

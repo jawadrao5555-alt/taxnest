@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Task 1381 — call back ki strings, URDU script.
+  Har key values/ aur values-b+ur+Latn/ mein bhi honi chahiye.
+-->
+<resources>
+    <string name="dial_channel_watch">کال بیک سروس</string>
+    <string name="dial_channel_offer">واپس کال کریں</string>
+
+    <string name="dial_service_title">TaxNest Caller ID</string>
+    <string name="dial_service_text">POS سے آنے والی کال بیک کے لیے تیار</string>
+
+    <string name="dial_notif_title">واپس کال کریں — POS</string>
+    <string name="dial_action">نمبر ملائیں</string>
+    <string name="dial_open_failed">ڈائلر نہیں کھل سکا — نمبر:</string>
+
+    <string name="dial_notif_off_warn">اس ایپ کی اطلاعات بند ہیں، اس لیے POS سے بھیجی گئی کال بیک یہاں دکھائی نہیں دے سکتی۔ فون کی ترتیبات سے آن کریں۔</string>
+</resources>

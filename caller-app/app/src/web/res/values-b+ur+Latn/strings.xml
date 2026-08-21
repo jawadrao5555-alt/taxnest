@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Task 1381 — call back ki strings, ROMAN URDU (`ur-Latn`).
+  Har key values/ aur values-ur/ mein bhi honi chahiye.
+-->
+<resources>
+    <string name="dial_channel_watch">Call back service</string>
+    <string name="dial_channel_offer">Wapas call karein</string>
+
+    <string name="dial_service_title">TaxNest Caller ID</string>
+    <string name="dial_service_text">POS se aane wali call back ke liye tayyar</string>
+
+    <string name="dial_notif_title">Wapas call karein — POS</string>
+    <string name="dial_action">Number milayein</string>
+    <string name="dial_open_failed">Dialer nahi khul saka — number:</string>
+
+    <string name="dial_notif_off_warn">Is app ki notifications band hain, is liye POS se bheji gai call back yahan dikh nahi sakti. Phone ki settings se on karein.</string>
+</resources>

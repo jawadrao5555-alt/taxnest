@@ -928,6 +928,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/caller-recent', [\App\Http\Controllers\PosCallerIdController::class, 'recentCalls'])->name('pos.api.caller-recent');
     // Task 1380: handle ho chuki call(en) recent-calls list se hatana (shop-wide).
     Route::post('/api/caller-clear', [\App\Http\Controllers\PosCallerIdController::class, 'clearCalls'])->name('pos.api.caller-clear');
+    // Task 1381: "Call back" — paired counter-phone par tap-to-dial request bhejna.
+    Route::post('/api/caller-dial', [\App\Http\Controllers\PosCallerIdController::class, 'dialBack'])
+        ->middleware('throttle:60,1')->name('pos.api.caller-dial');
     Route::get('/api/caller-last-order', [\App\Http\Controllers\PosCallerIdController::class, 'lastOrder'])->name('pos.api.caller-last-order');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
     Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');
@@ -1795,6 +1798,16 @@ Route::prefix('api/caller-app/v1')->middleware(['throttle:120,1'])->withoutMiddl
     Route::get('/me', [\App\Http\Controllers\PosCallerIdController::class, 'appMe'])->name('callerapp.me');
     Route::get('/version', [\App\Http\Controllers\PosCallerIdController::class, 'appVersion'])->name('callerapp.version');
     Route::post('/logout', [\App\Http\Controllers\PosCallerIdController::class, 'appLogout'])->name('callerapp.logout');
+});
+
+// ── Caller ID call-back queue (Task 1381) — apna throttle group.
+// Paired phone in do routes ko har chand second par maarta hai (yehi uska
+// "main zinda hoon aur call back kar sakta hoon" heartbeat bhi hai). Upar wale
+// group ka throttle:120,1 IP par lagta hai — ek NAT ke peeche kai shops ke
+// phone mil kar use chhoo lete, is liye alag, khula group.
+Route::prefix('api/caller-app/v1')->middleware(['throttle:600,1'])->withoutMiddleware($statelessMachine)->group(function () {
+    Route::get('/dial-requests', [\App\Http\Controllers\PosCallerIdController::class, 'appDialRequests'])->name('callerapp.dial.requests');
+    Route::post('/dial-result', [\App\Http\Controllers\PosCallerIdController::class, 'appDialResult'])->name('callerapp.dial.result');
 });
 
 // ── DI invoice push API (Task 1231) — stateless Bearer-key JSON for third-party

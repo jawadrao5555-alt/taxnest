@@ -1512,6 +1512,17 @@ window.addEventListener('popstate', function() {
                          qatar mein, red) — aur yeh poora customer record hatata hai.
                          Card .tn-cart-main ke andar hai, is liye dono layouts (grid ON
                          aur products-OFF wide cart) mein wahin dikhta hai. --}}
+                    {{-- Task 1381: attached customer ko wahin se call back — cashier ko
+                         Haaliya calls kholne ki zaroorat nahi. Sirf Caller ID wali shops
+                         par, aur sirf jab number mojood ho. --}}
+                    @if($company->caller_id_enabled ?? false)
+                    <button type="button" x-show="selectedCustomer && selectedCustomer.phone" x-cloak
+                            @click="callerDialBack({ phone: selectedCustomer.phone, name: selectedCustomer.name }, { attach: false })" :disabled="callerDialBusy"
+                            title="{{ __('pos.ti_call_back') }}" aria-label="{{ __('pos.ti_call_back') }}"
+                            class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-300 bg-white/70 dark:bg-gray-900/40 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 disabled:opacity-60 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </button>
+                    @endif
                     <button type="button" @click="clearAttachedCustomer()" title="{{ __('pos.ti_remove_customer') }}" aria-label="{{ __('pos.ti_remove_customer') }}"
                             class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-blue-500 dark:text-blue-300 bg-white/70 dark:bg-gray-900/40 border border-blue-200 dark:border-blue-800 hover:bg-red-500 hover:text-white hover:border-red-500 transition">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -4031,8 +4042,16 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
                 <p x-show="callerPopup && !callerPopup.match" class="mt-1 text-[11px] text-gray-400">{{ __('pos.caller_new_customer') }}</p>
-                <div class="mt-3 flex gap-2">
+                <div class="mt-3 flex flex-wrap gap-2">
                     <button type="button" @click="callerStartBill()" class="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_make_bill') }}</button>
+                    {{-- Task 1381: "Call back" — counter ke paired phone par tap-to-dial
+                         request. Customer bill par attach bhi ho jata hai (Bill button
+                         jaisa) aur popup band ho jata hai, taake order likhna foran shuru. --}}
+                    <button type="button" x-show="callerPopup && callerNumberOf(callerPopup)" @click="callerDialBack(callerPopup, { attach: true, closePopup: true })" :disabled="callerDialBusy"
+                            class="flex items-center gap-1 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-extrabold transition" title="{{ __('pos.ti_call_back') }}">
+                        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        <span>{{ __('pos.caller_call_back') }}</span>
+                    </button>
                     {{-- v2: repeat last order (matched saved customer only) --}}
                     <button type="button" x-show="callerPopup && callerPopup.match && callerPopup.match.customer_id" @click="callerRepeatOrder(callerPopup)" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_repeat_order') }}</button>
                     {{-- v2: unknown caller → quick-save with phone/name prefilled --}}
@@ -4079,7 +4098,19 @@ window.addEventListener('popstate', function() {
                             <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                                 <span x-text="ev.at"></span><template x-if="ev.phone && ((ev.match && ev.match.name) || ev.name)"><span> · <span x-text="ev.phone"></span></span></template><template x-if="ev.match && (parseInt(ev.match.khata_balance, 10) || 0) > 0"><span class="font-bold text-amber-600 dark:text-amber-400"> · Rs <span x-text="(parseInt(ev.match.khata_balance, 10) || 0).toLocaleString()"></span></span></template>
                             </p>
+                            {{-- Task 1381: handled ka nishan — kaun si missed call abhi
+                                 baqi hai, ek nazar mein. --}}
+                            <p x-show="ev.called_back" x-cloak class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 truncate">
+                                ✔ <span x-text="window.TXT.caller_called_back"></span><template x-if="ev.called_back_at"><span> · <span x-text="ev.called_back_at"></span></span></template>
+                            </p>
                         </div>
+                        {{-- Task 1381: is missed call ka jawab — counter ke phone par
+                             tap-to-dial request. Customer bill par attach bhi ho jata hai;
+                             list khuli rehti hai taake "call back kiya" ka nishan dikh jaye. --}}
+                        <button type="button" x-show="callerNumberOf(ev)" @click="callerDialBack(ev, { attach: true })" :disabled="callerDialBusy" title="{{ __('pos.ti_call_back') }}" aria-label="{{ __('pos.ti_call_back') }}"
+                                class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white disabled:opacity-60 transition">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        </button>
                         <button type="button" @click="callerBillFrom(ev); showCallerLog = false" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold transition">{{ __('pos.caller_make_bill_short') }}</button>
                         {{-- Task 1380: handle ho chuki call ko list se hatao (server par
                              cleared mark — refresh aur doosre counter par bhi saaf). --}}
@@ -4088,6 +4119,35 @@ window.addEventListener('popstate', function() {
                         </button>
                     </div>
                 </template>
+            </div>
+        </div>
+    </div>
+
+    {{-- ── Task 1381: call-back ka dead-end tornay wala card.
+         Jab koi phone jura hua na ho (app purani ho, ya us par notification
+         band ho) to number bara kar ke copy button ke saath dikhta hai —
+         cashier phir bhi 2 second mein dial kar leta hai. Sirf buttons, koi
+         input nahi: Enter/guided flow bilkul nahi rukta
+         (pos-guided-keyboard-flow).
+         Wajah ka text server ke `reason` se banta hai, is liye teenon keys
+         zabardasti bake karwani hain: --}}
+    {{-- @posI18nExtra: caller_dial_no_device caller_dial_old_app caller_dial_notif_off --}}
+    <div x-show="callerDialFallback" x-cloak x-transition.opacity class="fixed top-20 right-4 z-[60]" style="width:330px; max-width:92vw;">
+        <div class="rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.35);">
+            <div class="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white">
+                <span class="text-xs font-extrabold">{{ __('pos.caller_dial_title') }}</span>
+                <button type="button" @click="callerDialFallback = null" class="ml-auto flex-shrink-0 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition" title="{{ __('pos.close') }}">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-4">
+                <p class="text-[11px] text-gray-500 dark:text-gray-400" x-text="callerDialFallback ? (window.TXT['caller_dial_' + callerDialFallback.reason] || window.TXT.caller_dial_no_device) : ''"></p>
+                <p class="mt-2 text-2xl font-extrabold tracking-wide text-gray-900 dark:text-white select-all" x-text="callerDialFallback ? callerDialFallback.phone : ''"></p>
+                <p class="text-[11px] text-gray-400 truncate" x-show="callerDialFallback && callerDialFallback.name" x-text="callerDialFallback ? (callerDialFallback.name || '') : ''"></p>
+                <div class="mt-3 flex gap-2">
+                    <button type="button" @click="copyCallerNumber()" class="flex-1 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition">{{ __('pos.caller_dial_copy') }}</button>
+                    <button type="button" @click="callerDialFallback = null" class="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition">{{ __('pos.close') }}</button>
+                </div>
             </div>
         </div>
     </div>
@@ -4474,6 +4534,9 @@ function restaurantPos() {
         callerSeenId: 0,          // max event id the cashier has SEEN (log open)
         _callerBeeped: [],        // event ids already beeped (no re-fire)
         _callerWarnedOffline: false,
+        // ── Task 1381 (call back) ──
+        callerDialBusy: false,    // double-tap guard on every Call back button
+        callerDialFallback: null, // {phone, dial, name, reason} — koi phone nahi mila
         activeCartIndex: -1,
         cartMode: false,
         get mode() { return this.cartMode ? 'cart' : 'search'; },
@@ -11300,6 +11363,98 @@ function restaurantPos() {
                 this.customerPhoneQuery = (name ? name : '') + (name && phone ? ' · ' : '') + (phone || '');
                 this.showToast(window.TXT.customer_prefix + (name || phone), 'success');
             }
+        },
+        // ── Task 1381: POS se hi call back ──────────────────────────────────
+        // Number nikalne ka ek hi rasta (popup, recent-calls row aur attached
+        // customer card teenon isi ko poochte hain).
+        callerNumberOf(ev) {
+            if (!ev) { return ''; }
+            const m = ev.match;
+            return String((m && m.phone) || ev.phone || '').trim();
+        },
+        /**
+         * Counter ke paired phone ko tap-to-dial request bhejta hai. Auto-dial
+         * kabhi nahi — phone par ek tap hamesha lagta hai (out of scope by design).
+         *
+         * opts.attach     → wohi customer bill par attach (Bill button jaisa)
+         * opts.closePopup → incoming-call popup band kar do
+         *
+         * Koi phone na mile (ya app purani ho) to dead end nahi: number bara
+         * kar ke copy button ke saath dikha dete hain.
+         */
+        callerDialBack(ev, opts) {
+            const o = opts || {};
+            const phone = this.callerNumberOf(ev);
+            if (!phone) { this.showToast(window.TXT.caller_dial_no_number, 'error'); return; }
+            if (this.callerDialBusy) { return; }
+            this.callerDialBusy = true;
+
+            const evId = parseInt((ev && ev.id) || 0, 10) || 0;
+            const name = (ev && ((ev.match && ev.match.name) || ev.name)) || '';
+            // Attach pehle: server jawab ka intezar kiye baghair order likhna
+            // shuru ho sake (Bill button jaisa foran).
+            if (o.attach) { this.callerBillFrom(ev); }
+            if (o.closePopup) { this.dismissCallerPopup(); }
+
+            fetch('{{ route('pos.api.caller-dial', [], false) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                body: JSON.stringify({ phone: phone, event_id: evId || null, name: name })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || !data.ok) { this.showToast(window.TXT.caller_dial_failed, 'error'); return; }
+                    // "Call back kiya" ka nishan foran list par (server ne bhi stamp kiya).
+                    if (evId) {
+                        const row = this.callerLog.find(c => (parseInt(c.id, 10) || 0) === evId);
+                        if (row) { row.called_back = true; row.called_back_at = data.called_back_at || ''; }
+                    }
+                    if (data.sent) {
+                        this.callerDialFallback = null;
+                        this.showToast(window.TXT.caller_dial_sent, 'success');
+                    } else {
+                        // Log panel band: fallback card usi jagah (top-right) khulta hai.
+                        this.showCallerLog = false;
+                        this.callerDialFallback = {
+                            phone: data.phone || phone,
+                            dial: data.dial || phone,
+                            name: name,
+                            // Sirf wohi reasons jin ke liye text mojood hai —
+                            // warna card khali wajah ke saath khul jata.
+                            reason: ['old_app', 'notif_off'].includes(data.reason) ? data.reason : 'no_device'
+                        };
+                    }
+                })
+                .catch(() => { this.showToast(window.TXT.caller_dial_failed, 'error'); })
+                .finally(() => { this.callerDialBusy = false; });
+        },
+        // Fallback card ka copy button — clipboard API https/localhost ke bahar
+        // nahi chalti, is liye purana execCommand rasta bhi rakha hai.
+        copyCallerNumber() {
+            const num = this.callerDialFallback ? (this.callerDialFallback.dial || this.callerDialFallback.phone || '') : '';
+            if (!num) { return; }
+            const done = () => this.showToast(window.TXT.caller_dial_copied, 'success');
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(num).then(done).catch(() => this.copyCallerNumberLegacy(num, done));
+                    return;
+                }
+            } catch (e) { /* fall through */ }
+            this.copyCallerNumberLegacy(num, done);
+        },
+        copyCallerNumberLegacy(num, done) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = num;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                done();
+            } catch (e) { this.showToast(window.TXT.caller_dial_failed, 'error'); }
         },
         // v2: unknown caller → open the existing quick-add customer panel with
         // the phone (and WhatsApp display name) prefilled so the address gets

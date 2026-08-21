@@ -54,6 +54,15 @@ class PosCallerIdController extends Controller
     // to avoid crying wolf on a quiet afternoon.
     public const OFFLINE_AFTER_MINUTES = 360;
 
+    // ── Call back (Task 1381) ───────────────────────────────────────────────
+    // Cashier POS par "Call back" dabata hai → paired counter-phone ek
+    // tap-to-dial notification dikhata hai. Request durable queue se guzarti
+    // hai (pos_caller_dial_requests), print-job claim pattern ki tarah.
+    private const DIAL_EXPIRY_SECONDS = 120;  // is ke baad request khud khatam
+    private const DIAL_READY_SECONDS = 75;    // itna taza poll = phone abhi le sakta hai
+    private const DIAL_CLAIM_LIMIT = 3;       // ek poll mein zyada se zyada requests
+    private const DIAL_POLL_MS = 5000;        // app ka poll waqfa (server se tunable)
+
     /** Device row (pos_caller_devices) the current bearer token matched, if any. */
     private ?object $authedDevice = null;
 
@@ -147,6 +156,85 @@ class PosCallerIdController extends Controller
             fn () => Schema::hasTable('pos_caller_events')
                 && Schema::hasColumn('pos_caller_events', 'cleared_at')
         );
+    }
+
+    /**
+     * Task 1381: is the call-back queue present in THIS database? Cached 5 min
+     * like the other schema probes. Missing table (prod schema drift) simply
+     * means "call back unavailable" — POS falls back to the copy-the-number
+     * card, nothing 500s.
+     */
+    private function dialSupported(): bool
+    {
+        return \Illuminate\Support\Facades\Cache::remember(
+            'caller_dial_requests_ready',
+            300,
+            fn () => Schema::hasTable('pos_caller_dial_requests')
+                && Schema::hasTable('pos_caller_devices')
+                && Schema::hasColumn('pos_caller_devices', 'supports_dial')
+                && Schema::hasColumn('pos_caller_devices', 'dial_seen_at')
+        );
+    }
+
+    /** Task 1381: does pos_caller_events carry the "call back kiya" stamp yet? */
+    private function calledBackSupported(): bool
+    {
+        return \Illuminate\Support\Facades\Cache::remember(
+            'caller_events_called_back_col',
+            300,
+            fn () => Schema::hasTable('pos_caller_events')
+                && Schema::hasColumn('pos_caller_events', 'called_back_at')
+        );
+    }
+
+    /**
+     * Number the PHONE should dial. displayPhone() is for humans (0300-1234567);
+     * the tel: URI wants clean digits — local form for PK numbers (shop ka SIM
+     * PK ka hai), plain +international for anything else.
+     */
+    private function dialDigits(string $norm): string
+    {
+        if (str_starts_with($norm, '92') && strlen($norm) === 12) {
+            return '0' . substr($norm, 2);
+        }
+        return '+' . $norm;
+    }
+
+    /**
+     * Abhi ke paired phones ki haalat — sirf woh device jo call-back wali app
+     * chala raha hai AUR abhi abhi poll kar chuka hai (last_seen_at ke 6 ghante
+     * is faisle ke liye bohat dheele hain). dial_seen_at = "nai app ne poll
+     * kiya"; supports_dial = "yeh phone abhi tap-to-dial DIKHA bhi sakta hai".
+     *
+     * Dono alag hain kyunke Android 13+ par POST_NOTIFICATIONS band ho to
+     * notification chupke se ghayab ho jati hai — notify() koi error nahi deta.
+     * Aisa phone poll to karta rahega magar cashier ko kuch nazar nahi aayega,
+     * is liye woh 'blocked' hai: POS us par bharosa nahi karta aur number copy
+     * karwa deta hai ("phone par notification band hai").
+     *
+     * @return array{ready:int,blocked:int}
+     */
+    private function dialDeviceState(int $companyId): array
+    {
+        if (!$this->dialSupported()) {
+            return ['ready' => 0, 'blocked' => 0];
+        }
+        // Ek shop par device 1-3 hi hote hain — flags PHP mein ginna sab se
+        // portable hai (sqlite + mysql par ek jaisa).
+        $flags = DB::table('pos_caller_devices')
+            ->where('company_id', $companyId)
+            ->where('dial_seen_at', '>', now()->subSeconds(self::DIAL_READY_SECONDS))
+            ->pluck('supports_dial');
+
+        $ready = $flags->filter(fn ($f) => (int) $f === 1)->count();
+
+        return ['ready' => $ready, 'blocked' => $flags->count() - $ready];
+    }
+
+    /** Kya abhi koi paired phone dial request LE (aur dikha) sakta hai? */
+    private function dialReadyCount(int $companyId): int
+    {
+        return $this->dialDeviceState($companyId)['ready'];
     }
 
     // ─── Caller app API (stateless) ─────────────────────────────────────────
@@ -322,6 +410,164 @@ class PosCallerIdController extends Controller
             'plan_locked' => $planLocked,
             'last_event_at' => $lastEvent ? Carbon::parse($lastEvent->created_at)->format('d M Y, h:i A') : null,
         ]);
+    }
+
+    /**
+     * GET /api/caller-app/v1/dial-requests — Task 1381, paired phone ka poll.
+     *
+     * Do kaam ek saath:
+     *  1. Device ki capability stamp karta hai. SIRF nai app yeh endpoint
+     *     maarti hai, is liye poll hi "app nai hai" ka sab se sacha signal hai
+     *     (dial_seen_at). Sath hi phone khud batata hai ke us par notification
+     *     dikh bhi sakti hai ya nahi (`notif=1|0`) — Android 13+ par permission
+     *     na ho to notify() khamoshi se ghayab ho jata hai, koi error nahi
+     *     aata. Woh flag supports_dial mein jata hai, aur POS isi par faisla
+     *     karta hai ke request bheji jaye ya number copy karwaya jaye.
+     *     `notif` bheja hi na gaya ho to hum capability MAAN nahi lete —
+     *     jhoota "bhej diya" cashier ko dead end par le jata hai.
+     *  2. Pending requests ko atomically claim karta hai (do-qadam claim_token,
+     *     print-job pattern) taake do phone ek hi request par call na lagayen.
+     *
+     * Expired requests deliver NAHI hotin — purani request phone par der se
+     * pohanch kar random call na laga de.
+     */
+    public function appDialRequests(Request $request)
+    {
+        $company = $this->companyFromToken($request);
+        $this->touchDevice($company);
+
+        $pollMs = self::DIAL_POLL_MS;
+        if (!$this->dialSupported()) {
+            // Schema drift / purana server: app khamoshi se poll karti rahe.
+            return response()->json(['ok' => true, 'requests' => [], 'poll_ms' => 30000]);
+        }
+
+        // Capability + fresh heartbeat. Legacy (companies-row) token wale phone
+        // ka koi device row nahi hota — un ke liye call back support nahi
+        // (POS "app purani hai" kehta hai), is liye stamp bhi nahi.
+        $deviceId = $this->authedDevice->id ?? null;
+        if ($deviceId) {
+            DB::table('pos_caller_devices')->where('id', $deviceId)->update([
+                // Poll = app nai hai; notif = us par offer DIKH bhi sakta hai.
+                'supports_dial' => $request->boolean('notif'),
+                'dial_seen_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        if ($this->planLocked($company) || !($company->caller_id_enabled ?? false)) {
+            return response()->json(['ok' => true, 'requests' => [], 'poll_ms' => 30000]);
+        }
+        if (!$deviceId) {
+            return response()->json(['ok' => true, 'requests' => [], 'poll_ms' => 30000]);
+        }
+
+        // Expire stale pendings (koi cron nahi — jo poll kare wohi safai kare).
+        DB::table('pos_caller_dial_requests')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->where('expires_at', '<=', now())
+            ->update(['status' => 'expired', 'updated_at' => now()]);
+
+        // Do-qadam claim: ids chuno → status guard ke saath token stamp karo →
+        // token se parho. UPDATE ... LIMIT se bacha gaya hai (sqlite portable).
+        $ids = DB::table('pos_caller_dial_requests')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->where('expires_at', '>', now())
+            ->orderBy('id')
+            ->limit(self::DIAL_CLAIM_LIMIT)
+            ->pluck('id');
+
+        $out = [];
+        if ($ids->isNotEmpty()) {
+            $claimToken = Str::random(32);
+            DB::table('pos_caller_dial_requests')
+                ->whereIn('id', $ids)
+                ->where('status', 'pending')          // race guard: ek row, ek phone
+                ->update([
+                    'status' => 'delivered',
+                    'claim_token' => $claimToken,
+                    'device_id' => $deviceId,
+                    'delivered_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            $rows = DB::table('pos_caller_dial_requests')
+                ->where('company_id', $company->id)
+                ->where('claim_token', $claimToken)
+                ->orderBy('id')
+                ->get();
+
+            foreach ($rows as $row) {
+                $out[] = [
+                    'id' => (int) $row->id,
+                    'dial' => (string) $row->dial_digits,
+                    'display' => $this->displayPhone($row->phone) ?: (string) $row->dial_digits,
+                    'name' => $row->caller_name,
+                    // App apni taraf se bhi budhi request giraati hai (phone ki
+                    // ghari server se thodi alag ho sakti hai, is liye seconds).
+                    // Whole seconds: the app reads this as an int (optInt) and
+                    // a fractional value would just be truncated anyway.
+                    'expires_in' => max(0, (int) floor(now()->diffInSeconds(Carbon::parse($row->expires_at), false))),
+                ];
+            }
+
+            // Opportunistic purge — queue rows ka koi cron nahi.
+            if (random_int(1, 10) === 1) {
+                DB::table('pos_caller_dial_requests')
+                    ->where('created_at', '<', now()->subHours(self::EVENT_RETENTION_HOURS))
+                    ->limit(500)->delete();
+            }
+        }
+
+        return response()->json(['ok' => true, 'requests' => $out, 'poll_ms' => $pollMs]);
+    }
+
+    /**
+     * POST /api/caller-app/v1/dial-result {id, status: dialed|failed, error?}
+     * Task 1381 — phone batata hai ke notification par tap hua (dialer khul
+     * gaya) ya request nakaam rahi. Sirf usi shop ki, usi device ko di gai row
+     * badalti hai.
+     */
+    public function appDialResult(Request $request)
+    {
+        $company = $this->companyFromToken($request);
+        $this->touchDevice($company);
+
+        $request->validate([
+            'id' => 'required|integer',
+            'status' => 'required|string|in:dialed,failed',
+            'error' => 'nullable|string|max:190',
+        ]);
+
+        if (!$this->dialSupported()) {
+            return response()->json(['ok' => true, 'updated' => 0]);
+        }
+
+        // Row usi device ki hai jis ne claim ki thi. Sirf company scoping kaafi
+        // nahi: ek hi shop ke do phone paired ho sakte hain, aur doosre phone ko
+        // yeh haq nahi ke pehle ki request "dialed" likh de. Legacy token (koi
+        // device row nahi) kabhi claim kar hi nahi sakta — us ke liye 0.
+        $deviceId = $this->authedDevice->id ?? null;
+        if (!$deviceId) {
+            return response()->json(['ok' => true, 'updated' => 0]);
+        }
+
+        $status = $request->input('status');
+        $updated = (int) DB::table('pos_caller_dial_requests')
+            ->where('company_id', $company->id)
+            ->where('id', (int) $request->input('id'))
+            ->where('device_id', $deviceId)
+            ->where('status', 'delivered')
+            ->update([
+                'status' => $status,
+                'dialed_at' => $status === 'dialed' ? now() : null,
+                'error' => $status === 'failed' ? mb_substr((string) $request->input('error', ''), 0, 190) : null,
+                'updated_at' => now(),
+            ]);
+
+        return response()->json(['ok' => true, 'updated' => $updated]);
     }
 
     /** GET /api/caller-app/v1/version — semver update check (SystemSetting-driven). */
@@ -508,17 +754,27 @@ class PosCallerIdController extends Controller
             ->get();
 
         $calls = $rows->map(function ($row) use ($companyId) {
+            // Task 1381: "call back kiya" ka nishan — missed vs handled ka farq.
+            $backAt = $row->called_back_at ?? null;
             return [
                 'id' => (int) $row->id,
                 'phone' => $this->displayPhone($row->phone),
                 'name' => $row->caller_name,
                 'source' => $row->source,
                 'at' => Carbon::parse($row->ring_at)->format('h:i A'),
+                'called_back' => (bool) $backAt,
+                'called_back_at' => $backAt ? Carbon::parse($backAt)->format('h:i A') : null,
                 'match' => $this->matchCustomer($companyId, $row->phone, $row->caller_name),
             ];
         })->values();
 
-        return response()->json(['enabled' => true, 'calls' => $calls]);
+        return response()->json([
+            'enabled' => true,
+            'calls' => $calls,
+            // Task 1381: kya abhi koi phone call-back request le sakta hai?
+            // (POS button phir bhi dikhta hai — nakaami par number + copy.)
+            'dial_ready' => $this->dialReadyCount($companyId) > 0,
+        ]);
     }
 
     /**
@@ -562,6 +818,115 @@ class PosCallerIdController extends Controller
         $cleared = (int) $query->update(['cleared_at' => now()]);
 
         return response()->json(['ok' => true, 'cleared' => $cleared]);
+    }
+
+    /**
+     * POST /pos/api/caller-dial {phone, event_id?, name?} — Task 1381.
+     *
+     * Counter ka phone hi call laga sakta hai: POS yahan ek dial request
+     * queue karta hai, paired phone use uthata hai aur tap-to-dial
+     * notification dikhata hai. Auto-dial kabhi nahi — phone par ek tap
+     * hamesha zaroori hai.
+     *
+     * Jawab chaar shakal ka:
+     *   sent=true               → phone par bhej diya
+     *   sent=false, no_device   → koi phone paired/online nahi
+     *   sent=false, old_app     → phone jura hua hai magar app purani hai
+     *   sent=false, notif_off   → nai app hai magar us par notification band
+     *                             hai, yani offer dikhega hi nahi
+     * Dono nakaam suraton mein number wapas jata hai taake POS bara kar ke
+     * copy button ke saath dikha de — cashier ka rasta band na ho.
+     *
+     * Boundary: koi bhi signed-in POS user (cashier hi counter par call
+     * handle karta hai), bilkul clearCalls ki tarah. Company scoping har
+     * query par — doosri shop ka number na dikhe, na jaye.
+     */
+    public function dialBack(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company || !($company->caller_id_enabled ?? false) || $this->planLocked($company)) {
+            return response()->json(['ok' => false, 'error' => 'disabled'], 403);
+        }
+
+        $request->validate([
+            'phone' => 'required|string|max:40',
+            'event_id' => 'nullable|integer',
+            'name' => 'nullable|string|max:120',
+        ]);
+
+        $phone = PkPhone::normalize($request->input('phone'));
+        if (!$phone) {
+            return response()->json(['ok' => false, 'error' => 'bad_phone'], 422);
+        }
+        $display = $this->displayPhone($phone) ?: $phone;
+        $digits = $this->dialDigits($phone);
+        $name = trim((string) $request->input('name', ''));
+        $name = $name !== '' ? mb_substr($name, 0, 120) : null;
+
+        // "Call back kiya" ka nishan: cashier ne is call par amal kar liya —
+        // phone se jaye ya cashier khud mobile se milaye, list mein handled
+        // dikhni chahiye. Sirf isi shop ki row (company scoping).
+        $eventId = (int) $request->input('event_id', 0);
+        $calledBackAt = now();
+        if ($eventId > 0 && $this->calledBackSupported()) {
+            DB::table('pos_caller_events')
+                ->where('company_id', $companyId)
+                ->where('id', $eventId)
+                ->update(['called_back_at' => $calledBackAt]);
+        }
+
+        $fallback = [
+            'ok' => true,
+            'sent' => false,
+            'phone' => $display,
+            'dial' => $digits,
+            'called_back_at' => $calledBackAt->format('h:i A'),
+        ];
+
+        if (!$this->dialSupported()) {
+            return response()->json($fallback + ['reason' => 'no_device']);
+        }
+        $state = $this->dialDeviceState($companyId);
+        if ($state['ready'] < 1) {
+            // Tarteeb ahem hai: nai app magar notification band (blocked) ki
+            // baat purani-app se zyada khaas hai — cashier ko theek wajah aur
+            // theek hal batana hai.
+            $reason = $state['blocked'] > 0
+                ? 'notif_off'
+                : (self::anyDeviceOnline($company) ? 'old_app' : 'no_device');
+            return response()->json($fallback + ['reason' => $reason]);
+        }
+
+        // Ek waqt mein ek hi zinda request: nai request aate hi purani pending
+        // expire. Warna der se jaagne wala phone qatar mein pari purani request
+        // par ghalat call laga deta.
+        DB::table('pos_caller_dial_requests')
+            ->where('company_id', $companyId)
+            ->where('status', 'pending')
+            ->update(['status' => 'expired', 'updated_at' => now()]);
+
+        $id = (int) DB::table('pos_caller_dial_requests')->insertGetId([
+            'company_id' => $companyId,
+            'event_id' => $eventId > 0 ? $eventId : null,
+            'phone' => $phone,
+            'dial_digits' => $digits,
+            'caller_name' => $name,
+            'status' => 'pending',
+            'requested_by' => optional(auth('pos')->user())->id,
+            'expires_at' => now()->addSeconds(self::DIAL_EXPIRY_SECONDS),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'sent' => true,
+            'id' => $id,
+            'phone' => $display,
+            'dial' => $digits,
+            'called_back_at' => $calledBackAt->format('h:i A'),
+        ]);
     }
 
     /**

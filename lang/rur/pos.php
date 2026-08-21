@@ -5026,6 +5026,20 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'caller_cleared' => 'Calls hata di gayin',
     'caller_clear_failed' => 'Hataya nahi ja saka — dobara koshish karein.',
 
+    // Task 1381 — POS se hi call back (counter ka paired phone call lagata hai)
+    'caller_call_back' => 'Call back',
+    'ti_call_back' => 'Is number par counter ke phone se call back karein',
+    'caller_dial_sent' => 'Counter ke phone par bhej diya — wahan notification par tap karein',
+    'caller_dial_failed' => 'Call back request nahi bheji ja saki — dobara koshish karein.',
+    'caller_dial_no_number' => 'Is call ka number nahi hai — call back mumkin nahi',
+    'caller_dial_title' => 'Yeh number milayein',
+    'caller_dial_no_device' => 'Abhi koi shop phone jura hua nahi — yeh number khud milayein.',
+    'caller_dial_old_app' => 'Phone ki app purani hai, update karein — filhal yeh number khud milayein.',
+    'caller_dial_notif_off' => 'Shop ke phone par notification band hain, is liye call wahan dikh nahi sakti — phone ki settings se on karein; filhal yeh number khud milayein.',
+    'caller_dial_copy' => 'Number copy karein',
+    'caller_dial_copied' => 'Number copy ho gaya',
+    'caller_called_back' => 'call back kiya',
+
     // Task 1036 — WhatsApp Bill (owner voice note 17 Aug 2026)
     'wa_bill_toggle' => 'WhatsApp Bill',
     'wa_bill_toggle_sub' => 'Receipt popup par WhatsApp button — customer ko bill aur receipt link aik tap mein bhejein.',

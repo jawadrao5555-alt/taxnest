@@ -1,6 +1,7 @@
 # TaxNest Caller ID APK — Build & Release Runbook
 
-Last updated: Aug 2026 (v1.3.0 — English / Roman Urdu / Urdu language switch, Task 1382)
+Last updated: Sep 2026 (v1.4.0 — call back from the POS, website builds only,
+Task 1381; v1.3.0 was the English / Roman Urdu / Urdu language switch, Task 1382)
 
 > **Play (AAB) ka hissa is file mein NAHI hai.** Play build banane, sign karne,
 > uske key ke faisle aur Console ke saare form: `docs/play/` — khaas tor par
@@ -59,7 +60,10 @@ Store, and **never hosted on the website**:
 Shared source sets keep the two notification builds identical — never fork them:
 
 ```
-src/web/java    → UpdateCheck + real Updater        (sim, plus)
+src/web/java    → UpdateCheck + real Updater,       (sim, plus)
+                  CallerApp + DialWatchService +
+                  DialActivity + DialBootReceiver
+src/web/res     → the call-back (dial) strings      (sim, plus)
 src/notif/java  → CallListenerService, Detector,
                   NotificationDisclosureActivity    (plus, play)
 src/notif/res   → the strings both notif builds use (plus, play)
@@ -71,6 +75,47 @@ from the shared sets — today just `build_badge`. The same key in two res dirs 
 one source set fails the build with *"Duplicate resources"*, so `build_badge`
 lives in `src/plus/res` + `src/play/res` and must never be added to
 `src/notif/res`.
+
+
+### Call back from the POS — website builds only (Task 1381)
+
+From v1.4.0 the counter phone can also **place** a call, not just report one.
+POS queues a dial request; the phone claims it and shows a high-priority
+notification; one tap opens the system dialer with the number in it.
+
+- **Website only.** All of it lives in `src/web/java` + `src/web/res`, and the
+  manifest half is duplicated in `src/sim/AndroidManifest.xml` and
+  `src/plus/AndroidManifest.xml`. **`src/play/` is untouched** — the Play build
+  compiles none of it and declares none of its permissions. Keep it that way
+  (call back in the Play build is its own future task); if you edit one website
+  manifest, edit the other.
+- **New permissions:** `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`,
+  `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`. **None** of them is on Play
+  Protect's blocked four, so the clean APK still sideloads without a block.
+- **No `CALL_PHONE`, ever.** `DialActivity` fires `ACTION_DIAL`, so the cashier
+  taps once more in the dialer. Auto-dial is deliberately out of scope; adding
+  `CALL_PHONE` would also change what the disclosure and the Play Data safety
+  answers have to say.
+- **Polling, not long-poll:** `GET /dial-requests?notif=1|0` every ~5 s. The
+  server sends `poll_ms` in every response, so the interval is tunable
+  **without an app release**. That poll is also the "this phone can take a call
+  back right now" heartbeat — a phone on an older app never polls it, so POS
+  shows the copy-the-number fallback instead of promising a call that will not
+  happen.
+- **`notif` is not decoration.** With notifications off (permission denied on
+  Android 13+, or the user switching the app/channel off later) `notify()`
+  fails **silently** — no exception, nothing on screen. So the phone reports
+  `areNotificationsEnabled()` **and** the offer channel's importance on every
+  poll; the server keeps `dial_seen_at` (the app IS new) but clears
+  `supports_dial`, and POS falls back with *"phone par notification band hai"*
+  instead of a lying "sent". The app also toasts the same thing once per launch
+  when it notices it is muted. **Any new way of surfacing the offer must feed
+  this flag** — an un-checked delivery path is exactly the dead end this task
+  exists to remove.
+- **Old app on the counter phone is not an error**: POS says *"phone ki app
+  purani hai, update karein"* and enlarges the number with a copy button.
+- **`/dial-result` is bound to the claiming device**, not just the shop: a
+  second paired phone cannot close a request delivered to the counter phone.
 
 ### Three languages (Task 1382)
 
@@ -214,7 +259,7 @@ $BT/aapt2 dump permissions $PLUS    # neither of those expected
 $BT/apksigner verify --print-certs $SIM  | grep "certificate DN"   # CN=TaxNest Rider
 $BT/apksigner verify --print-certs $PLUS | grep "certificate DN"
 $BT/aapt2 dump badging $SIM  | head -1
-$BT/aapt2 dump badging $PLUS | head -1   # both: versionCode='4' versionName='1.3.0'
+$BT/aapt2 dump badging $PLUS | head -1   # both: versionCode='5' versionName='1.4.0'
 
 # 3b. Language switch (Task 1382): each build's badge must exist in all three
 #     locales, and each build must show its OWN badge.
@@ -227,6 +272,16 @@ $BT/aapt2 dump resources $PLUS | grep -A3 "string/build_badge"   # WhatsApp word
 $BT/aapt2 dump badging $SIM  | grep targetSdkVersion    # '34'
 $BT/aapt2 dump badging $PLUS | grep targetSdkVersion    # '34'
 $BT/aapt2 dump permissions $SIM | grep REQUEST_INSTALL_PACKAGES   # must be present
+
+# 5. Call back (Task 1381) is IN both website builds…
+$BT/aapt2 dump permissions $SIM  | grep FOREGROUND_SERVICE_DATA_SYNC   # present
+$BT/aapt2 dump permissions $PLUS | grep FOREGROUND_SERVICE_DATA_SYNC   # present
+
+# …and NOT in the Play build. Build it only when you are shipping to Play;
+# this check must print nothing.
+PLAY=caller-app/app/build/outputs/apk/play/release/app-play-release.apk
+$BT/aapt2 dump permissions $PLAY | grep -E "FOREGROUND_SERVICE|POST_NOTIFICATIONS|RECEIVE_BOOT_COMPLETED" \
+  && echo "STOP — call back leaked into the Play build" || echo "play OK"
 ```
 
 Equal `versionCode` on both flavors is fine — Android only refuses a true
@@ -321,15 +376,22 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
      in another language.
    - On the **WhatsApp build**, open the notification-access disclosure in all
      three languages — all five points must be there in each.
+
+   From 1.4.0 also walk the **call back** checklist —
+   `docs/qa/task-1381-caller-id-call-back-qa.md`: ring, miss, call back from the
+   popup / the list / the customer card, phone offline, a phone still on the old
+   app, and the Play build untouched.
 7. Flip the two version settings in admin.
 8. What's New elaan (Roman Urdu, with the reason).
 
 ---
 
+
 ## Version history
 
 | Version | versionCode | Notes |
 |---------|-------------|-------|
+| 1.4.0 | 5 | **Call back from the POS** (Task 1381) — website builds only. New `CallerApp` + `DialWatchService` (foreground `dataSync`, ~5 s poll of `GET /dial-requests`, interval server-tunable via `poll_ms`) + `DialActivity` (tap → `ACTION_DIAL`, never `CALL_PHONE`) + `DialBootReceiver`, all in `src/web/`. Four new permissions, **none** on Play Protect's blocked list. The poll carries a `notif` flag (notifications enabled + offer channel not muted) — a muted phone stays `dial_seen_at`-fresh but loses `supports_dial`, so POS falls back to the copy-number card instead of a silent "sent", and the app toasts the reason once per launch. `/dial-result` is bound to the device that claimed the row. **`src/play/` untouched — the Play build gets no call back and no new permission.** Server side: `pos_caller_dial_requests` queue + `called_back_at` on ring events. Bump `caller_app_latest_version` **and** `caller_app_plus_latest_version` to `1.4.0` so signed-in website phones self-update — until then a phone on an older build makes POS show the "app purani hai" fallback, which is expected, not a bug. |
 | 1.3.0 | 4 | **Language switch** (Task 1382): the whole app is now English / Roman Urdu / Urdu, picked from a compact three-way selector on the login **and** main screens. **A fresh install opens in English** whatever the phone's language is; the choice is saved on the phone and survives app restarts, logout/login and updates. Every user-visible line is translated — login and its errors, status, battery and permission lines with their toasts, the test-ring button and toast, "Last call sent: …", the update prompts and their download toasts, log out, and the whole "how does this work" paragraph — plus the notification-access **disclosure screen** in both notification builds, saying exactly the same five things in all three languages. The two-line build badge became one translated line per build (the old Roman recap lines are gone — the user picks a language now). Detection, permissions and the POS payload are untouched. |
 | 1.0.0 | 1 | Initial release — notification listener only (SIM + WhatsApp). **Uninstallable from the website once Play Protect's enhanced fraud protection rolled out.** |
 | 1.2.0 | 3 | **Third flavor `play`** (Task 1346) for the Google Play Store: no self-update, no `REQUEST_INSTALL_PACKAGES`, no battery permission, `targetSdk 36`, edge-to-edge insets. Both notification builds (`plus` + `play`) gained the **prominent disclosure** screen before notification access. Website APKs unchanged in behaviour — same permissions, same `targetSdk 34`, same self-update. **Hosted website APKs are still the 1.1.0 files**; they only move to 1.2.0 when the owner rebuilds, re-hosts and flips the admin version settings. |

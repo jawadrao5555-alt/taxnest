@@ -103,14 +103,48 @@ class AiInvoiceReaderController extends Controller
         ]);
     }
 
-    public function bulk()
+    /**
+     * Task 1342: `?batch=` reopens a past batch. The workspace used to keep
+     * the batch id in the Alpine component only, so a refresh — or a
+     * colleague opening the page later — lost the results table, the retry
+     * buttons, and the review summary download.
+     */
+    public function bulk(Request $request, BulkAiImageImportService $service)
     {
         $company = Company::findOrFail(app('currentCompanyId'));
         $allowed = DiFeatureService::planAllows($company, 'ai_reader');
         $configured = AiInvoiceReaderService::enabled();
-        $quota = $allowed ? app(BulkAiImageImportService::class)->quotaState($company) : null;
+        $quota = $allowed ? $service->quotaState($company) : null;
 
-        return view('invoice.ai-reader-bulk', compact('company', 'allowed', 'configured', 'quota'));
+        $openBatchId = null;
+        if ($allowed && $request->filled('batch')) {
+            // Company-scoped exactly like the status endpoint: another
+            // company's batch id is a 404, never a silent empty workspace.
+            $batch = $service->batchForCompany((int) $request->query('batch'), (int) $company->id);
+            if (!$batch) {
+                abort(404);
+            }
+            $openBatchId = (int) $batch->id;
+        }
+
+        return view('invoice.ai-reader-bulk', compact('company', 'allowed', 'configured', 'quota', 'openBatchId'));
+    }
+
+    /**
+     * Task 1342: company-scoped list of past bulk photo batches so results
+     * stay reachable after the tab is closed. Batches whose private source
+     * photos were already pruned still list their stored review data.
+     */
+    public function bulkHistory(BulkAiImageImportService $service)
+    {
+        $company = Company::findOrFail(app('currentCompanyId'));
+        $allowed = DiFeatureService::planAllows($company, 'ai_reader');
+        $batches = $allowed
+            ? $service->historyForCompany((int) $company->id)
+            : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
+        $summaries = $allowed ? $service->historySummaries($batches->items()) : [];
+
+        return view('invoice.ai-reader-bulk-history', compact('company', 'allowed', 'batches', 'summaries'));
     }
 
     public function bulkStart(Request $request, BulkAiImageImportService $service)

@@ -11,7 +11,10 @@
                     <h1 class="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">Bulk AI Image Import</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Each photo is treated as one separate source invoice. Nothing in this workspace is sent to FBR automatically.</p>
                 </div>
-                <a href="{{ route('invoices.ai-reader') }}" class="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Single file reader</a>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="{{ route('invoices.ai-reader.bulk.history') }}" class="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Batch history</a>
+                    <a href="{{ route('invoices.ai-reader') }}" class="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Single file reader</a>
+                </div>
             </div>
 
             @if(!$allowed)
@@ -88,6 +91,15 @@
                                 </template>
                             </div>
                             <button @click="applyAnnexure()" :disabled="busy" class="mt-4 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50">Confirm mapping &amp; upload photos</button>
+                        </div>
+                        {{-- Task 1342: a reopened batch has no local files, so say plainly what can still be done with it. --}}
+                        <div x-show="reopened" x-cloak class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 dark:border-violet-800 dark:bg-violet-950/20">
+                            <p class="text-xs text-violet-800 dark:text-violet-200">
+                                <span class="font-extrabold">Batch #<span x-text="batchId"></span> reopened.</span>
+                                <span x-show="pendingUploads() > 0" x-text="' ' + pendingUploads() + ' photo(s) were never uploaded from the original tab — start a new batch to read those.'"></span>
+                                <span x-show="pendingUploads() === 0"> Its review results, draft links, and summary download are below.</span>
+                            </p>
+                            <a href="{{ route('invoices.ai-reader.bulk') }}" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-white hover:bg-violet-700">Start a new batch</a>
                         </div>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <h2 class="text-sm font-extrabold uppercase tracking-wider text-gray-800 dark:text-gray-100">Batch progress</h2>
@@ -223,9 +235,26 @@
             files: [], annexureFile: null, annexure: {status: 'none', headers: [], fields: [], mapping: {}, rows: []},
             batchId: null, batch: {items: []}, priceDecisions: {}, metadataFields: {}, metadataKeys: ['name','barcode','sku','hs_code','pct_code','uom','default_tax_rate','tax_type','schedule_type','sro_reference','serial_number','mrp'], busy: false, busyLabel: '', error: null,
             shareOpen: false, shareEmails: '', shareBusy: false, shareMessage: '', shareError: '',
+            reopened: false, timer: null,
             quota: @json($quota),
             csrf() { return document.querySelector('meta[name=csrf-token]')?.content || ''; },
-            init() {},
+            // Task 1342: ?batch= restores a past batch — the results table, the
+            // draft links, the per-photo retry, and the summary download.
+            init() {
+                const saved = {{ (int) ($openBatchId ?? 0) }};
+                if (!saved) return;
+                this.batchId = saved;
+                this.reopened = true;
+                this.reopen();
+            },
+            async reopen() {
+                this.busy = true; this.busyLabel = 'Loading this batch…';
+                await this.poll();
+                this.busy = false;
+                // A batch reopened while its photos are still being read keeps updating.
+                if (!this.timer && (this.batch.processed || 0) < (this.batch.total || 0)) this.timer = setInterval(() => this.poll(), 2500);
+            },
+            pendingUploads() { return (this.batch.items || []).filter(i => i.status === 'not_started' || i.status === 'uploading').length; },
             size(n) { return (n / 1024 / 1024).toFixed(2) + ' MB'; },
             choose(list) {
                 this.error = null;

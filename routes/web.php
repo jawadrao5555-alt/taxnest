@@ -426,6 +426,10 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         // keep flaky mobile connections from forcing the full batch to restart.
         Route::get('/invoices/ai-reader/bulk-images', [AiInvoiceReaderController::class, 'bulk'])
             ->name('invoices.ai-reader.bulk');
+        // Past batches stay reachable after the tab is closed: the list, and
+        // ?batch= on the workspace above to reopen one.
+        Route::get('/invoices/ai-reader/bulk-images/history', [AiInvoiceReaderController::class, 'bulkHistory'])
+            ->name('invoices.ai-reader.bulk.history');
         Route::post('/invoices/ai-reader/bulk-images/start', [AiInvoiceReaderController::class, 'bulkStart'])
             ->middleware('throttle:10,1')->name('invoices.ai-reader.bulk.start');
         Route::post('/invoices/ai-reader/bulk-images/{batchId}/annexure', [AiInvoiceReaderController::class, 'bulkAnnexureUpload'])

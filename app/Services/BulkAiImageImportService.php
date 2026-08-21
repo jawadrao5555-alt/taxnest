@@ -149,6 +149,75 @@ class BulkAiImageImportService
         return BulkAiImageBatch::where('company_id', $companyId)->find($batchId);
     }
 
+    /**
+     * Task 1342: this company's recent batches, newest first, for the history
+     * list. Review data outlives the private source photo, so a batch whose
+     * photos were already pruned is still listed and still openable.
+     */
+    public function historyForCompany(int $companyId, int $perPage = 20)
+    {
+        return BulkAiImageBatch::where('company_id', $companyId)
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Per-batch counts for the history list, in ONE grouped query.
+     *
+     * Deliberately recomputed from the stored items instead of read from the
+     * cached columns on the batch row: those columns are only refreshed while
+     * a browser polls the live status, so a batch whose tab was closed
+     * mid-run would otherwise list numbers that stopped at the last poll.
+     *
+     * @param  iterable<int,BulkAiImageBatch>  $batches
+     * @return array<int,array{total:int,processed:int,counts:array<string,int>,photos_removed:bool,state:string,state_label:string}>
+     */
+    public function historySummaries($batches): array
+    {
+        $ids = collect($batches)->pluck('id')->all();
+        $grouped = $ids
+            ? BulkAiImageItem::whereIn('batch_id', $ids)
+                ->selectRaw('batch_id, status, COUNT(*) as items, SUM(CASE WHEN source_deleted_at IS NULL THEN 0 ELSE 1 END) as pruned')
+                ->groupBy('batch_id', 'status')
+                ->get()
+                ->groupBy('batch_id')
+            : collect();
+
+        $summaries = [];
+        foreach ($batches as $batch) {
+            $rows = $grouped->get($batch->id, collect());
+            $counts = ['ready' => 0, 'needs_review' => 0, 'duplicate' => 0, 'failed' => 0, 'pending' => 0];
+            $running = 0;
+            $pruned = 0;
+            foreach ($rows as $row) {
+                $status = (string) $row->status;
+                $counts[array_key_exists($status, $counts) ? $status : 'pending'] += (int) $row->items;
+                $running += in_array($status, ['queued', 'processing'], true) ? (int) $row->items : 0;
+                $pruned += (int) $row->pruned;
+            }
+
+            $total = max((int) $batch->total_images, (int) $rows->sum('items'));
+            $processed = $counts['ready'] + $counts['needs_review'] + $counts['duplicate'] + $counts['failed'];
+            $state = match (true) {
+                $total > 0 && $processed >= $total => 'completed',
+                $running > 0 || $processed > 0 => 'in_progress',
+                default => 'unfinished',
+            };
+
+            $summaries[$batch->id] = [
+                'total' => $total,
+                'processed' => $processed,
+                'counts' => $counts,
+                'photos_removed' => $pruned > 0,
+                'state' => $state,
+                'state_label' => ['completed' => 'Completed', 'in_progress' => 'In progress', 'unfinished' => 'Never finished'][$state],
+            ];
+        }
+
+        return $summaries;
+    }
+
     public function itemForCompany(int $batchId, int $itemId, int $companyId): ?BulkAiImageItem
     {
         return BulkAiImageItem::where('company_id', $companyId)

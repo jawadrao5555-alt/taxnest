@@ -4371,9 +4371,32 @@ class PosController extends Controller
         // delivery provisional whose kitchen ticket hasn't fired yet shows a
         // "Send KOT" button in F10 — cashier fires it the moment payment confirms,
         // hours before the bill is made final at night.
-        $kotAfterPayment = (bool) (Company::find($companyId)?->delivery_kot_after_payment ?? false);
+        // Task 1368: whether that ticket REALLY fired is decided by the line
+        // stamps on the bill's restaurant order — the sale screen saves most
+        // delivery provisionals through the internal hold → pay pass-through, so
+        // they do have one, and its kot_sent_at is stamped at hold whether or not
+        // anything printed (see KotPrintService::deliveryPromoteKot). Only the
+        // linked ids are fetched here: one extra query for the whole page, and
+        // only for the unstamped delivery rows of a toggle-ON shop.
+        $kotCompany = Company::find($companyId);
+        $kotAfterPayment = (bool) ($kotCompany?->delivery_kot_after_payment ?? false);
+        $kotOrders = [];
+        if ($kotAfterPayment && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'pos_transaction_id')) {
+            $kotTxnIds = $bills->filter(fn ($b) => $b->order_type === 'delivery' && empty($b->kot_sent_at))
+                ->pluck('id')->all();
+            if ($kotTxnIds) {
+                $kotOrders = RestaurantOrder::where('company_id', $companyId)
+                    ->whereIn('pos_transaction_id', $kotTxnIds)
+                    ->where('status', '!=', 'cancelled')
+                    ->orderBy('id')
+                    ->get(['id', 'pos_transaction_id'])
+                    ->keyBy('pos_transaction_id')
+                    ->all();
+            }
+        }
 
-        $data = $bills->map(function ($b) use ($kotAfterPayment, $hasRiderCols, $hasBizDate, $riderNames, $riderOpen) {
+        $data = $bills->map(function ($b) use ($kotCompany, $kotOrders, $hasRiderCols, $hasBizDate, $riderNames, $riderOpen) {
+            $kot = \App\Services\KotPrintService::deliveryPromoteKot($kotCompany, $b, $kotOrders[$b->id] ?? null);
             return [
                 'id'               => $b->id,
                 'invoice_number'   => $b->invoice_number,
@@ -4387,7 +4410,11 @@ class PosController extends Controller
                 'created_human'    => $b->created_at?->diffForHumans(),
                 'created_at'       => $b->created_at?->toDateTimeString(),
                 'created_time'     => $b->created_at?->format('h:i A'),
-                'kot_pending'      => $kotAfterPayment && $b->order_type === 'delivery' && empty($b->kot_sent_at),
+                'kot_pending'      => $kot['pending'],
+                // Task 1368: delta target — the sale screen prints ONLY the lines
+                // the kitchen never saw off this order. null = order-less bill,
+                // whose ticket is rendered from the transaction instead.
+                'kot_order_id'     => $kot['order_id'],
                 // Pending Deliveries panel (Task 114): business_date so the badge
                 // counts only TODAY's business day; rider context for the warning.
                 'business_date'    => $hasBizDate ? ($b->business_date ? (string) $b->business_date : null) : null,

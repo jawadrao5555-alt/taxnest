@@ -10261,11 +10261,16 @@ function restaurantPos() {
         // phone, or delivery address. ALL list rendering + keyboard nav MUST go
         // through this (never raw localBills) or index-based actions hit the wrong bill.
         // "Payment First, Then KOT" v2 (Aug 2026): payment confirm hote hi cashier
-        // F10 se KOT bhej deta hai — raat ke Make Final ka intezar nahi. Server
-        // render par kot_sent_at stamp karta hai, is liye promote dobara nahi bhejta.
+        // F10 se KOT bhej deta hai — raat ke Make Final ka intezar nahi. Render
+        // par server stamp laga deta hai, is liye promote dobara nahi bhejta.
+        // Task 1368: jis provisional ka restaurant order hai (hold → pay wala
+        // andaruni raasta) us ki DELTA parchi nikalti hai — sirf wo lines jo
+        // kitchen ne dekhi hi nahi, poora reprint kabhi nahi. Order-less bill
+        // (manual cart) purani tarah TRANSACTION se chhapti hai.
         sendProvisionalKot(bill) {
             if (!bill || !bill.kot_pending) return;
-            bill.kot_pending = false; // optimistic — server stamps kot_sent_at on render
+            bill.kot_pending = false; // optimistic — the render stamps what it printed
+            if (bill.kot_order_id) { this.printKitchenTicket(bill.kot_order_id, null, true); return; }
             this.printTxnKitchenTicket(bill.id);
         },
         // Per-item note toggle (owner, 3 Aug 2026). Focus via document.querySelector —
@@ -10620,7 +10625,9 @@ function restaurantPos() {
                     this.showLocalBills = false;
                     this.lastInvoiceNumber = data.invoice_number || bill.invoice_number || '';
                     this.lastTransactionId = data.id || bill.id;
-                    this.lastOrderId = null; // provisional bills have no restaurant order
+                    // Task 1368: set below with the KOT release — a delivery
+                    // provisional CAN have a restaurant order behind it.
+                    this.lastOrderId = null;
                     this.lastOrderType = bill.order_type || null; // Task 1025: promote popup bhi bill ki apni type par
 
                     this.lastTotal = Math.round(parseFloat(data.total_amount ?? bill.total_amount) || 0);
@@ -10638,21 +10645,33 @@ function restaurantPos() {
                     this.scheduleReceiptAutoClose();
                     this.startPraPoll(); // Task 655: agent-queued promote → badge + receipt auto-flip
                     // "Payment pehle, KOT baad" (1 Aug 2026): held KOT ab release —
-                    // promote = payment confirm, isi waqt kitchen ticket (txn se) fire hoti hai.
+                    // promote = payment confirm, isi waqt kitchen ticket fire hoti hai.
                     // DIRECT fire (review catch): auto-print/auto-KOT master switches se
                     // AZAAD — warna un shops par KOT kabhi na nikalti jahan auto-print OFF hai.
-                    // printTxnKitchenTicket silent-first hai, warna print popup fallback.
+                    // Dono print helpers silent-first hain, warna print popup fallback.
                     // v2: agar cashier ne F10 se pehle hi KOT bhej di thi (kot_pending=false),
                     // promote par dobara NA bheji jaye — kitchen ke paas ticket already hai.
-                    const promoKotId = (!!this.kitchenSettings.delivery_kot_after_payment && bill.order_type === 'delivery' && bill.kot_pending !== false)
-                        ? (data.id || bill.id) : null;
+                    // Task 1368: kot_pending ab LINE stamps se banta hai (server —
+                    // KotPrintService::deliveryPromoteKot), order-level kot_sent_at se nahi
+                    // jo hold par yun hi lag jata hai. Jis bill ka restaurant order hai us
+                    // par sirf ANDEKHI lines ki DELTA parchi jati hai (poora reprint kabhi
+                    // nahi); order-less bill purani tarah TRANSACTION se chhapti hai.
+                    const kotLaneOpen = !!this.kitchenSettings.delivery_kot_after_payment
+                        && bill.order_type === 'delivery' && bill.kot_pending !== false;
+                    const promoKotOrderId = kotLaneOpen ? (bill.kot_order_id || null) : null;
+                    const promoKotId = (kotLaneOpen && !promoKotOrderId) ? (data.id || bill.id) : null;
                     this.lastTxnKotId = promoKotId; // receipt popup ka K button bhi isi se chalega
-                    // Task 1379: promoKotId only exists when the ticket is still UNSENT,
+                    this.lastOrderId = promoKotOrderId; // …ya us bill ke apne order se
+                    // Task 1379: either id only exists when the ticket is still UNSENT,
                     // so the popup button is a first send — until the direct fire below
                     // actually sends it (KDS-handled shops skip that fire, so there the
                     // popup stays the first-send release even for a blocked cashier).
-                    this.lastKotPending = !!promoKotId;
-                    if (promoKotId && !this.kdsHandlesKot()) { this.printTxnKitchenTicket(promoKotId); this.lastKotPending = false; }
+                    this.lastKotPending = !!(promoKotId || promoKotOrderId);
+                    if ((promoKotId || promoKotOrderId) && !this.kdsHandlesKot()) {
+                        if (promoKotOrderId) this.printKitchenTicket(promoKotOrderId, null, true);
+                        else this.printTxnKitchenTicket(promoKotId);
+                        this.lastKotPending = false;
+                    }
                     // "No receipt print" (Aug 2026): skip the receipt auto-print chain when the
                     // cashier ticked the box — delivery customer isn't present, paper saved.
                     // KOT release above is NEVER skipped (kitchen must still cook).

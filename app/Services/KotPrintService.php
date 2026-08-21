@@ -174,6 +174,71 @@ class KotPrintService
     }
 
     /**
+     * Task 1368 — the DELIVERY lane of "Payment First, Then KOT" ("bill final ho
+     * to kitchen ki parchi sach mein jaye").
+     *
+     * The F10 provisional row carries the flag the sale screen acts on when a
+     * delivery bill is made final. That flag used to be `empty($txn->kot_sent_at)`
+     * alone, which is only half the truth: most delivery provisionals DO have a
+     * restaurant order behind them (the sale screen saves them through the
+     * internal hold → payOrder pass-through), and hold stamps that order's
+     * kot_sent_at whether or not a ticket was ever printed. So the same lie Task
+     * 1356 removed from dine-in/counter finals was still driving this lane — a
+     * bill whose ticket had already fired got a SECOND full slip at final, and
+     * "kitchen ne dekh liya" was answered by a stamp that never meant that.
+     *
+     * The rule, in order:
+     *   • the shop toggle + delivery order type decide whether this lane runs at
+     *     all — unchanged, so a shop's configured behaviour stays exactly as is;
+     *   • a TRANSACTION-level stamp still means the order-less shim ticket has
+     *     already been rendered (isTransactionReprint) → nothing owed;
+     *   • with a linked order, LINE stamps decide (unseenLineCount, the same
+     *     single truth pendingForFinal uses): unseen lines → ticket owed, and it
+     *     is printed as a DELTA off that order, never a full reprint; every line
+     *     already seen → nothing owed, no second slip;
+     *   • an order carrying no lines at all is no signal — fall back to the
+     *     transaction ticket rather than leave a real bill uncooked.
+     *
+     * NOTE the shop switch here is delivery_kot_after_payment, NOT
+     * kot_on_final_if_unsent: this lane is the toggle's own promised behaviour
+     * (hold the ticket until payment), not the straight-to-pay safety net, so
+     * pendingForFinal's extra gates must not silence it.
+     *
+     * @return array{pending: bool, order_id: int|null} order_id != null =>
+     *         print the DELTA kitchen ticket of that restaurant order;
+     *         null with pending => order-less bill, print the transaction ticket.
+     */
+    public static function deliveryPromoteKot(?Company $company, $transaction, ?RestaurantOrder $order): array
+    {
+        $none = ['pending' => false, 'order_id' => null];
+
+        if (!$company || !$transaction) {
+            return $none;
+        }
+        if (!(bool) ($company->delivery_kot_after_payment ?? false)) {
+            return $none;
+        }
+        if (($transaction->order_type ?? null) !== 'delivery') {
+            return $none;
+        }
+        if (self::isTransactionReprint($transaction)) {
+            return $none;
+        }
+        if (!$order || !$order->id) {
+            return ['pending' => true, 'order_id' => null];
+        }
+        if (self::unseenLineCount($order) > 0) {
+            return ['pending' => true, 'order_id' => (int) $order->id];
+        }
+
+        // Zero unseen lines = either the kitchen has genuinely seen every line
+        // (isReprintRender true → no second slip, the bug this rule exists for)
+        // or the order has no lines to judge → transaction ticket stays the
+        // fallback.
+        return self::isReprintRender($order, false) ? $none : ['pending' => true, 'order_id' => null];
+    }
+
+    /**
      * @return array{printed: bool, reason?: string, job_ids?: array<int>}
      */
     public static function enqueueForOrder(Company $company, RestaurantOrder $order, ?int $userId, bool $delta = false): array

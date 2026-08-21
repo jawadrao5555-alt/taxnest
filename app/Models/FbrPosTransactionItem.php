@@ -11,6 +11,10 @@ class FbrPosTransactionItem extends Model
         'quantity', 'unit_price', 'cost_price', 'discount', 'item_discount', 'tax_rate',
         'tax_amount', 'subtotal', 'total', 'is_tax_exempt', 'is_third_schedule',
         'returned_quantity', 'parent_item_id', 'promotion_discount',
+        // Per-item Store note (Task 1403): typed in the cart, printed on the
+        // Store slip. Persisted so a slip REPRINTED after payment still carries
+        // the note — before this it was cart-only and silently became blank.
+        'special_notes',
         // FBR Deals (Task 1273): deal-grouping metadata on component rows —
         // NOT in $fillable ⇒ Eloquent silently drops the write (known trap).
         'deal_group', 'deal_id', 'deal_name', 'deal_quantity', 'deal_unit_price',

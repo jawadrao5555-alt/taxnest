@@ -3,6 +3,28 @@
         $fbrOn       = (bool) ($company->fbr_pos_enabled ?? false);
         $reportingOn = (bool) ($company->fbr_reporting_enabled ?? false);
 
+        // ── Task 1403: Desktop Agent + FBR-owned feature switches ────────────
+        $agentOnline = (bool) ($company->agentOnline() ?? false);
+
+        // Store Slip lives on the companies column; Delivery and the per-item
+        // Store note live in feature_flags. kitchen_notes must be read RAW —
+        // it is a RESTAURANT_FLAG and every fbrpos plan has restaurant_enabled
+        // = 0, so forCompany() would mask it to false forever. Delivery is read
+        // resolved, because that is exactly what the sale screen gates on.
+        $fbrStoreSlipOn  = (bool) ($company->kitchen_printer_enabled ?? false);
+        $fbrDeliveryOn   = (bool) (\App\Services\PosFeatureService::forCompany($company)->delivery ?? false);
+        $fbrStoreNoteOn  = \App\Services\PosFeatureService::rawFlag($company, 'kitchen_notes');
+        // Package gates: Store Slip + per-item note ride kot_enabled (same gate
+        // the FBR sale screen already applies), Delivery rides riders_enabled.
+        $fbrKotPlan      = \App\Services\PosFeatureService::planAllows($company, 'kot_enabled');
+        $fbrRidersPlan   = \App\Services\PosFeatureService::planAllows($company, 'riders_enabled');
+        // Downgrade case: package no longer covers a feature that is still ON.
+        // The endpoint always accepts OFF, so the card must keep a working switch
+        // (one-way: it can be turned off, not back on) instead of a dead padlock.
+        $fbrSlipLockedOn = !$fbrKotPlan    && $fbrStoreSlipOn;
+        $fbrDelivLockedOn= !$fbrRidersPlan && $fbrDeliveryOn;
+        $fbrNoteLockedOn = !$fbrKotPlan    && $fbrStoreNoteOn;
+
         // Card sections — every FBR POS setting reachable from this one hub.
         $sections = [
             [
@@ -12,6 +34,11 @@
                     ['label' => __('pos.business_profile'), 'desc' => __('pos.business_profile_card_desc'), 'url' => route('fbrpos.business-profile'), 'tone' => 'blue', 'badge' => __('pos.badge_identity'), 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
                     ['label' => __('pos.receipt_print_style'), 'desc' => __('pos.fbr_receipt_style_card_desc'), 'url' => route('fbrpos.receipt-settings'), 'tone' => 'blue', 'badge' => __('pos.badge_print'), 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
                     ['label' => __('pos.printer_settings'), 'desc' => __('pos.card_printer_settings_desc'), 'url' => route('fbrpos.printer-settings'), 'tone' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? 'emerald' : 'blue', 'badge' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? __('pos.badge_silent_on') : __('pos.badge_popup'), 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
+                    // Desktop Agent (Task 1403): FBR shops used to reach the agent only
+                    // through a card buried inside FBR Settings that rendered only in
+                    // fiscal-device mode. It has its own page now, reachable regardless
+                    // of the FBR connection mode.
+                    ['label' => __('pos.desktop_agent'), 'desc' => __('pos.fbr_card_agent_desc'), 'url' => route('fbrpos.agent'), 'tone' => $agentOnline ? 'emerald' : 'blue', 'badge' => $agentOnline ? __('pos.online') : __('pos.offline'), 'icon' => 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
                     ['label' => __('pos.fbr_settings'), 'desc' => __('pos.fbr_settings_card_desc'), 'url' => route('fbrpos.settings'), 'tone' => $fbrOn ? 'emerald' : 'amber', 'badge' => $fbrOn ? __('pos.fbr_on_badge') : __('pos.fbr_off_badge'), 'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
                     ['label' => __('pos.products_word'), 'desc' => __('pos.products_card_desc'), 'url' => route('fbrpos.products'), 'tone' => 'blue', 'badge' => __('pos.badge_catalog'), 'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
                     ['label' => __('pos.card_services'), 'desc' => __('pos.card_services_desc'), 'url' => route('fbrpos.services'), 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'icon' => 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'],
@@ -27,6 +54,10 @@
                     // 🍔 Deals (Task 1273): fixed-price combos. Plan-locked companies see the
                     // amber 🔒 badge; the page itself redirects to billing (fbrPlanGate).
                     ['label' => __('pos.deals_title'), 'desc' => __('pos.card_deals_desc'), 'url' => route('fbrpos.deals'), 'tone' => \App\Services\PosFeatureService::planAllows($company, 'deals_enabled') ? 'blue' : 'amber', 'badge' => \App\Services\PosFeatureService::planAllows($company, 'deals_enabled') ? 'Manage' : ('🔒 ' . __('pos.upgrade_plan_btn')), 'icon' => 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7'],
+                    // Team + Branches (Task 1403): both pages already existed but were
+                    // reachable only from the top nav — the hub never listed them.
+                    ['label' => __('pos.team_management'), 'desc' => __('pos.fbr_card_team_desc'), 'url' => route('fbrpos.team'), 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'icon' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'],
+                    ['label' => __('pos.branches_title'), 'desc' => __('pos.fbr_card_branches_desc'), 'url' => route('fbrpos.branches'), 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
                     ['label' => __('pos.loyalty_program'), 'desc' => __('pos.loyalty_card_desc'), 'url' => route('fbrpos.phase2.loyalty'), 'tone' => 'blue', 'badge' => 'Manage', 'icon' => 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z'],
                 ],
             ],
@@ -36,6 +67,10 @@
                 'items' => [
                     ['label' => __('pos.bio_setup_title'), 'desc' => __('pos.bio_setup_sub'), 'url' => route('fbrpos.bio-sync.setup'), 'tone' => 'blue', 'badge' => __('pos.staff_hazri'), 'icon' => 'M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 3.935m-3.778 3.44A7.962 7.962 0 004 11c0 4.418-1.105 7.02-2 8'],
                     ['label' => __('pos.day_close_z_short'), 'desc' => __('pos.day_close_card_desc'), 'url' => route('fbrpos.day-close'), 'tone' => 'blue', 'badge' => __('pos.badge_z_report'), 'icon' => 'M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 4h6a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v12a2 2 0 002 2z'],
+                    // Task 1403: the auto day-close + cutoff controls live on the Day
+                    // Close page (admin/manager gated). Deep-link to them instead of
+                    // cloning the toggles here — two copies of one setting drift.
+                    ['label' => __('pos.day_cutoff_title'), 'desc' => __('pos.fbr_card_dayclose_settings_desc'), 'url' => route('fbrpos.day-close') . '#dayclose-settings', 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
                     ['label' => __('pos.reports_word'), 'desc' => __('pos.reports_card_desc'), 'url' => route('fbrpos.reports'), 'tone' => 'blue', 'badge' => __('pos.badge_insights'), 'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
                     ['label' => __('pos.tax_reports'), 'desc' => __('pos.tax_reports_card_desc'), 'url' => route('fbrpos.tax-reports'), 'tone' => $reportingOn ? 'emerald' : 'blue', 'badge' => __('pos.badge_tax'), 'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
                     ['label' => __('pos.billing_plan'), 'desc' => __('pos.billing_card_desc'), 'url' => route('fbrpos.billing'), 'tone' => 'blue', 'badge' => __('pos.badge_plan'), 'icon' => 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z'],
@@ -82,6 +117,28 @@
             restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false,
             cashierDcOn: {{ ($company->pos_cashier_dayclose ?? false) ? 'true' : 'false' }}, savingCdc: false,
             rcSecs: {{ (int) ($company->pos_receipt_autoclose_seconds ?? 10) }}, savingRc: false,
+            {{-- Task 1403 — FBR-owned feature switches (Store Slip / Delivery / per-item Store note) --}}
+            storeSlipOn: {{ $fbrStoreSlipOn ? 'true' : 'false' }}, savingStoreSlip: false,
+            deliveryOn: {{ $fbrDeliveryOn ? 'true' : 'false' }}, savingDelivery: false,
+            storeNoteOn: {{ $fbrStoreNoteOn ? 'true' : 'false' }}, savingStoreNote: false,
+            featSave(feature, prop, savingProp) {
+                if (this[savingProp]) return;
+                const want = !this[prop];
+                this[prop] = want;
+                this[savingProp] = true;
+                fetch('/fbr-pos/settings/feature-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({feature:feature, enabled:want})})
+                    .then(r => r.json())
+                    .then(d => {
+                        if (!d || d.success !== true) { this[prop] = !want; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); return; }
+                        // Trust the server's answer, not the click — a dependency can
+                        // force a flag on, and turning Store Slip off also clears the
+                        // auto-print switch server-side.
+                        this[prop] = !!d.enabled;
+                        if (feature === 'store_slip' && !this[prop]) { this.autoKotOn = false; this.storeNoteOn = false; }
+                    })
+                    .catch(() => { this[prop] = !want; alert({{ Js::from(__('pos.setting_save_failed')) }}); })
+                    .finally(() => { this[savingProp] = false; });
+            },
             setRc(s) { if (this.rcSecs === s || this.savingRc) return; const prev = this.rcSecs; this.rcSecs = s; this.savingRc = true; fetch('/fbr-pos/settings/receipt-autoclose', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({seconds:s})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { this.rcSecs = prev; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ this.rcSecs = prev; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ this.savingRc = false; }); }
          }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
@@ -230,6 +287,149 @@
                         @endforeach
                     </div>
                 </div>
+
+                {{-- Shop default language (Task 1403). The endpoint existed since the
+                     three-language rollout but had no UI in the FBR panel — an admin
+                     could never set the shop-wide default. Plain form POST because the
+                     route answers with back()->with('success'), not JSON. --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.fbr_default_language_title') }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_default_language_sub') }}</p>
+                        </div>
+                    </div>
+                    @php $tnLang = $company->default_language ?? 'rur'; @endphp
+                    <form method="POST" action="{{ route('fbrpos.settings.default-language') }}" class="mt-3 flex flex-wrap gap-2">
+                        @csrf
+                        @foreach (['rur' => 'Roman Urdu', 'ur' => 'اردو', 'en' => 'English'] as $tnCode => $tnLabel)
+                        <button type="submit" name="default_language" value="{{ $tnCode }}"
+                            class="px-3.5 py-1.5 rounded-full text-xs font-bold border transition {{ $tnLang === $tnCode ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-indigo-400' }}">
+                            {{ $tnLabel }}
+                        </button>
+                        @endforeach
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        {{-- ═══════════ FEATURES (Task 1403) ═══════════
+             FBR-owned module switches. Before this the only writer of these flags
+             was PRA's restaurant Kitchen Settings / the super-admin panel, so an FBR
+             shop could never turn Store Slip or Delivery on for itself. --}}
+        <section>
+            <div class="px-1 mb-3">
+                <h2 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">{{ __('pos.fbr_features_section') }}</h2>
+                <p class="text-[12px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_features_section_sub') }}</p>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-4">
+
+                {{-- Store Slip — companies.kitchen_printer_enabled --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.fbr_feat_store_slip_title') }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_feat_store_slip_sub') }}</p>
+                        </div>
+                        @if($fbrKotPlan || $fbrSlipLockedOn)
+                        <button type="button" :disabled="savingStoreSlip @if($fbrSlipLockedOn) || !storeSlipOn @endif" @click="featSave('store_slip', 'storeSlipOn', 'savingStoreSlip')"
+                            class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="storeSlipOn ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'">
+                            <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="storeSlipOn && 'translate-x-6'"></span>
+                        </button>
+                        @else
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">🔒</span>
+                        @endif
+                    </div>
+                    @unless($fbrKotPlan)
+                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                        <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.plan_locked_feature') }}</p>
+                        @if($fbrSlipLockedOn)<p x-show="storeSlipOn" class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.plan_locked_off_only') }}</p>@endif
+                        <a href="{{ route('fbrpos.billing') }}" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                            <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                            {{ __('pos.upgrade_plan_btn') }}
+                        </a>
+                    </div>
+                    @else
+                    <div x-show="storeSlipOn" x-cloak class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                        <a href="{{ route('fbrpos.printer-settings') }}" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                            <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                            {{ __('pos.printer_settings') }}
+                        </a>
+                    </div>
+                    @endunless
+                </div>
+
+                {{-- Delivery & Riders — feature_flags.delivery (forces customer_profile on) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.fbr_feat_delivery_title') }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_feat_delivery_sub') }}</p>
+                        </div>
+                        @if($fbrRidersPlan || $fbrDelivLockedOn)
+                        <button type="button" :disabled="savingDelivery @if($fbrDelivLockedOn) || !deliveryOn @endif" @click="featSave('delivery', 'deliveryOn', 'savingDelivery')"
+                            class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="deliveryOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
+                            <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="deliveryOn && 'translate-x-6'"></span>
+                        </button>
+                        @else
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">🔒</span>
+                        @endif
+                    </div>
+                    @unless($fbrRidersPlan)
+                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                        <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.plan_locked_feature') }}</p>
+                        @if($fbrDelivLockedOn)<p x-show="deliveryOn" class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.plan_locked_off_only') }}</p>@endif
+                        <a href="{{ route('fbrpos.billing') }}" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                            <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                            {{ __('pos.upgrade_plan_btn') }}
+                        </a>
+                    </div>
+                    @endunless
+                </div>
+
+                {{-- Per-item Store note — feature_flags.kitchen_notes (needs the slip) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.fbr_feat_store_notes_title') }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_feat_store_notes_sub') }}</p>
+                        </div>
+                        @if($fbrKotPlan || $fbrNoteLockedOn)
+                        <button type="button" :disabled="savingStoreNote || !storeSlipOn @if($fbrNoteLockedOn) || !storeNoteOn @endif" @click="featSave('store_notes', 'storeNoteOn', 'savingStoreNote')"
+                            class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-40" :class="storeNoteOn ? 'bg-violet-500' : 'bg-gray-300 dark:bg-gray-600'">
+                            <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="storeNoteOn && 'translate-x-6'"></span>
+                        </button>
+                        @else
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">🔒</span>
+                        @endif
+                    </div>
+                    @unless($fbrKotPlan)
+                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                        <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.plan_locked_feature') }}</p>
+                        @if($fbrNoteLockedOn)<p x-show="storeNoteOn" class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.plan_locked_off_only') }}</p>@endif
+                        <a href="{{ route('fbrpos.billing') }}" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                            <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                            {{ __('pos.upgrade_plan_btn') }}
+                        </a>
+                    </div>
+                    @else
+                    <div x-show="!storeSlipOn" x-cloak class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                        <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.fbr_feat_needs_store_slip') }}</p>
+                    </div>
+                    @endunless
+                </div>
             </div>
         </section>
 
@@ -311,9 +511,13 @@
                     </button>
                 </div>
 
-                @if($company->kitchen_printer_enabled ?? false)
-                {{-- Auto Store Slip after payment (existing auto-KOT endpoint, Store-branded for FBR — Task 1285) --}}
-                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                @if($fbrKotPlan)
+                {{-- Auto Store Slip after payment (existing auto-KOT endpoint, Store-branded for FBR — Task 1285).
+                     Task 1403: was server-rendered behind @if($company->kitchen_printer_enabled) — now bound to the
+                     Alpine flag so flipping Store Slip in the Features card shows/hides these two cards live.
+                     The package gate stays server-side: the sale screen and both endpoints already refuse
+                     kot_enabled-less shops, so showing these switches there would be a lie. --}}
+                <div x-show="storeSlipOn" x-cloak class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     </div>
@@ -329,7 +533,7 @@
                 </div>
 
                 {{-- Store-slip reprint permission (kot_reprint_enabled column, Store-branded for FBR) --}}
-                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                <div x-show="storeSlipOn" x-cloak class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     </div>

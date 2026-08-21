@@ -163,6 +163,16 @@ class FbrPosAuthController extends Controller
 
         $posType = $request->pos_type ?? 'general';
 
+        // Store Slip ON by default for new FBR shops (Task 1403). Existing shops
+        // got the same through a one-time backfill migration. This only pre-sets
+        // the shop's own switch — auto printing still needs auto_print_kot and the
+        // package gate still decides whether the feature runs at all.
+        // hasColumn-guarded: signup must never 500 on a deployment (or a minimal
+        // test schema) where the column has not landed yet.
+        $storeSlipDefault = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'kitchen_printer_enabled')
+            ? ['kitchen_printer_enabled' => true]
+            : [];
+
         $company = Company::create([
             'name' => $request->company_name,
             'ntn' => $request->company_ntn,
@@ -179,7 +189,7 @@ class FbrPosAuthController extends Controller
             'fbr_pos_enabled' => true,
             'fbr_pos_environment' => 'sandbox',
             'fbr_reporting_enabled' => true,
-        ]);
+        ] + $storeSlipDefault);
 
         $userData = [
             'name' => $request->name,

@@ -1501,7 +1501,17 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/fail-queue/retry-all', [FbrPosController::class, 'failQueueRetryAll'])->name('fbrpos.failQueue.retryAll');
     Route::post('/fail-queue/{id}/retry', [FbrPosController::class, 'failQueueRetryOne'])->name('fbrpos.failQueue.retryOne');
     Route::match(['get', 'post'], '/settings', [FbrPosController::class, 'fbrSettings'])->name('fbrpos.settings');
-    Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('fbrpos.agent.download');
+    // 🖥 Desktop Agent — FBR-owned page (Task 1403). MODE-INDEPENDENT: the
+    // agent is what makes silent BILL + STORE SLIP printing work, so a cloud
+    // shop must be able to pair one too. Minting a key here never touches
+    // fbr_connection_mode / submission routing (that stays on FBR Settings).
+    // The download alias moved off AgentManagementController because that one
+    // resolves the company from the POS guard only — on FBR routes it found no
+    // user and skipped the plan gate entirely.
+    Route::get('/agent', [\App\Http\Controllers\FbrAgentController::class, 'show'])->name('fbrpos.agent');
+    Route::post('/agent/generate', [\App\Http\Controllers\FbrAgentController::class, 'generateKey'])->name('fbrpos.agent.generate');
+    Route::post('/agent/regenerate', [\App\Http\Controllers\FbrAgentController::class, 'regenerateKey'])->name('fbrpos.agent.regenerate');
+    Route::get('/agent/download', [\App\Http\Controllers\FbrAgentController::class, 'download'])->name('fbrpos.agent.download');
     Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
     // OFFLINE-FIRST BOOT (Aug 2026 — PRA port): freshness probe for the SW-cached sale screen.
@@ -1549,6 +1559,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
         }
         return back()->with('success', __('pos.language_saved'));
     })->name('fbrpos.settings.default-language');
+    // Task 1403 — FBR "Features" card on the Customize hub. One admin-only
+    // endpoint for the three FBR-owned feature switches (store slip, delivery,
+    // per-item store notes); each carries its own plan gate in-controller.
+    Route::post('/settings/feature-toggle', [FbrPosController::class, 'updateFbrFeatureToggle'])->name('fbrpos.settings.feature-toggle');
     Route::get('/customize', [FbrPosController::class, 'customize'])->name('fbrpos.customize');
     // Caller ID (Task 1353 — FBR twin of the PRA routes): admin toggle +
     // paired-phone revoke on the customize hub. PosCallerIdController resolves

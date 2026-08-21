@@ -1486,6 +1486,10 @@ class FbrPosController extends Controller
             'items.*.deal_id' => 'nullable|integer|min:1',
             'items.*.item_discount' => 'nullable|numeric|min:0',
             'items.*.value_input' => 'nullable|numeric|min:0.01',
+            // Per-item Store note (Task 1403) — printed on the store slip. max:190
+            // matches the column and the write-path trim, so an over-long note is
+            // rejected up front instead of being silently shortened on save.
+            'items.*.special_notes' => 'nullable|string|max:190',
             'customer_name' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:20',
             'customer_ntn' => 'nullable|string|max:30',
@@ -2006,6 +2010,12 @@ class FbrPosController extends Controller
                     ];
                     if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'is_third_schedule')) {
                         $itemDataRow['is_third_schedule'] = $fbrIsThirdSchedule;
+                    }
+                    // Per-item Store note (Task 1403). hasColumn-guarded: PROD has
+                    // drifted before, and a missing column here would 500 the sale.
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes')) {
+                        $note = trim((string) ($item['special_notes'] ?? ''));
+                        $itemDataRow['special_notes'] = $note === '' ? null : \Illuminate\Support\Str::limit($note, 190, '');
                     }
                     $itemsData[] = $itemDataRow;
                 }
@@ -3167,11 +3177,18 @@ class FbrPosController extends Controller
                 return back()->with('success', __('pos.fbr_dayclose_policy_saved'));
             }
 
-            // Regenerate the Desktop Sync Agent API key (Fiscal Device mode). Invalidates the old key,
+            // Regenerate the Desktop Sync Agent API key. Invalidates the old key,
             // so any agent using the previous key must be reconnected with the new one.
+            //
+            // Task 1403: this used to ALSO write fbr_connection_mode='fiscal_device'.
+            // Rotating a printing credential silently moved the whole shop onto the
+            // fiscal-device submission route — a different place for every invoice
+            // to go. Key minting and submission routing are now strictly separate:
+            // the mode changes only where the admin explicitly picks it (below).
+            // Kept as a compatibility handler for cached copies of the old form;
+            // the live page now links to the FBR Desktop Agent page instead.
             if ($request->has('regenerate_agent_key')) {
                 $company->update([
-                    'fbr_connection_mode' => 'fiscal_device',
                     'agent_enabled' => true,
                     'agent_api_key' => 'tnk_' . \Illuminate\Support\Str::random(48),
                 ]);
@@ -3463,12 +3480,16 @@ class FbrPosController extends Controller
             ? ($transaction->order_code ?: null)
             : null;
 
-        // Build a simple items array from the transaction lines (KOT only needs name+qty).
-        $items = $transaction->items->map(function ($it) {
+        // Build a simple items array from the transaction lines (KOT needs name+qty
+        // plus the per-item Store note). Task 1403: the note used to be hardcoded
+        // null here, so a slip reprinted after payment silently lost every note the
+        // cashier typed. hasColumn-guarded for PROD schema drift.
+        $hasNotes = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'special_notes');
+        $items = $transaction->items->map(function ($it) use ($hasNotes) {
             return [
                 'item_name'     => $it->item_name,
                 'quantity'      => (float) $it->quantity,
-                'special_notes' => null,
+                'special_notes' => $hasNotes ? ($it->special_notes ?: null) : null,
             ];
         })->all();
 
@@ -3807,6 +3828,107 @@ class FbrPosController extends Controller
             $company->update(['inventory_enabled' => $enabled, 'feature_flags' => $flags]);
         }
         return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /**
+     * FBR "Features" card on the Customize hub (Task 1403).
+     *
+     * Three FBR-owned switches that previously had NO panel UI at all — a
+     * shop could only get them by asking us to flip a column by hand:
+     *
+     *   store_slip   → companies.kitchen_printer_enabled (plan: kot_enabled)
+     *                  master gate for the whole Store-slip family: the
+     *                  Send-to-Store button, auto slip after payment, slip
+     *                  reprint, and the Store Printer picker.
+     *   delivery     → feature_flags.delivery (plan: riders_enabled)
+     *                  Delivery Board + Riders panel.
+     *   store_notes  → feature_flags.kitchen_notes (plan: kot_enabled)
+     *                  per-item note line in the cart, printed on the slip.
+     *
+     * Turning a feature OFF is always allowed even on a locked plan — a shop
+     * whose plan lapsed must still be able to switch off something it can no
+     * longer use (same rule as inventory disable).
+     */
+    public function updateFbrFeatureToggle(Request $request)
+    {
+        if ($resp = $this->fbrSettingGate()) return $resp;
+
+        $data = $request->validate([
+            'feature' => 'required|in:store_slip,delivery,store_notes',
+            'enabled' => 'required|boolean',
+        ]);
+        $feature = $data['feature'];
+        $enabled = (bool) $data['enabled'];
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!$company) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 404);
+        }
+
+        $planColumn = $feature === 'delivery' ? 'riders_enabled' : 'kot_enabled';
+        if ($enabled && !\App\Services\PosFeatureService::planAllows($company, $planColumn)) {
+            return response()->json(['success' => false, 'message' => __('pos.plan_locked_feature')], 403);
+        }
+
+        if ($feature === 'store_slip') {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kitchen_printer_enabled')) {
+                return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 503);
+            }
+            $update = ['kitchen_printer_enabled' => $enabled];
+            // Switching the slip OFF must also drop the auto-print-after-payment
+            // switch that rides on it. Otherwise auto_print_kot stays true in the
+            // DB (its own card is hidden, so nobody can see or clear it) and slips
+            // start printing again the moment the feature is re-enabled.
+            if (!$enabled && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'auto_print_kot')) {
+                $update['auto_print_kot'] = false;
+            }
+            $company->update($update);
+
+            // Per-item Store notes only exist to be printed ON the slip, so they
+            // die with it. Clearing the flag server-side keeps the DB agreeing
+            // with what the Customize card shows right after the flip — otherwise
+            // the note switch springs back to ON on the next page load.
+            // Written WITHOUT normalize() on purpose: kitchen_notes is a leaf (no
+            // flag depends on it), and normalize() walks the whole map — it would
+            // quietly switch off any other pair that happens to be inconsistent
+            // today. This click was about the slip; it must change nothing else.
+            if (!$enabled) {
+                $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
+                if (!empty($flags['kitchen_notes'])) {
+                    $flags['kitchen_notes'] = false;
+                    $company->update(['feature_flags' => $flags]);
+                }
+            }
+
+            return response()->json(['success' => true, 'enabled' => (bool) $company->kitchen_printer_enabled]);
+        }
+
+        // Store notes ride ON the slip: without it there is nothing to print the
+        // note on, so accepting the ON would be a success message for a feature
+        // that never runs. OFF stays free.
+        if ($feature === 'store_notes' && $enabled && !$company->kitchen_printer_enabled) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.fbr_feat_needs_store_slip'),
+            ], 422);
+        }
+
+        $flag  = $feature === 'delivery' ? 'delivery' : 'kitchen_notes';
+        $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
+        $flags[$flag] = $enabled;
+
+        // PosFeatureService::DEPENDENCIES — delivery requires customer_profile.
+        // Without this line normalize() switches delivery straight back off and
+        // the card would flip back on the next page load with no explanation.
+        if ($feature === 'delivery' && $enabled) {
+            $flags['customer_profile'] = true;
+        }
+
+        $flags = \App\Services\PosFeatureService::normalize($flags);
+        $company->update(['feature_flags' => $flags]);
+
+        // Report what actually STUCK after normalization, never what was asked for.
+        return response()->json(['success' => true, 'enabled' => (bool) ($flags[$flag] ?? false)]);
     }
 
     /** "Cashier bhi Day Close kar sake" — default OFF (admin/manager work). */

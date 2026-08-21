@@ -31,7 +31,15 @@
         'kot' => (bool)($company->kitchen_printer_enabled ?? false)
                  && \App\Services\PosFeatureService::planAllows($company, 'kot_enabled'),
         'kitchen' => false, 'recipes' => false, 'inventory' => false,
-        'kitchen_notes' => false,
+        // Task 1403: per-item Store note is now a real FBR switch (Customize →
+        // Features). It only makes sense when the Store slip itself exists, so
+        // it inherits the store-slip column AND the same package gate as $kot.
+        // rawFlag (not forCompany) because kitchen_notes is a RESTAURANT_FLAG and
+        // every fbrpos plan has restaurant_enabled = 0 — forCompany() would mask
+        // it to false forever. Shim pin stays: never delete the key.
+        'kitchen_notes' => \App\Services\PosFeatureService::rawFlag($company, 'kitchen_notes')
+            && (bool) ($company->kitchen_printer_enabled ?? false)
+            && \App\Services\PosFeatureService::planAllows($company, 'kot_enabled'),
     ];
     // Services (Task 1272): UNPINNED — create() bakes active PosService rows so
     // service items (repairs etc.) sell here as product_id-NULL lines carrying

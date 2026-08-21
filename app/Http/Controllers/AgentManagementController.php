@@ -268,8 +268,18 @@ class AgentManagementController extends Controller
             }
         }
 
-        $type = $request->query('type', 'exe');
+        return $this->serveAgentAsset($request->query('type', 'exe'));
+    }
 
+    /**
+     * Release-asset lookup + redirect, WITHOUT any panel/plan gate.
+     *
+     * Split out of downloadAgent() so FbrAgentController can apply the FBR
+     * panel's own company resolution + plan gate and still share one release
+     * source of truth (Task 1403).
+     */
+    public function serveAgentAsset(?string $type = 'exe')
+    {
         $assets = self::latestReleaseInfo();
 
         $needle = $type === 'zip' ? '.zip' : '.exe';

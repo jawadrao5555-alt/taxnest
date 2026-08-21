@@ -299,6 +299,30 @@ class PosFeatureService
     }
 
     /**
+     * Raw stored value of ONE feature flag — no restaurant masking, no
+     * dependency resolution.
+     *
+     * forCompany() masks every RESTAURANT_FLAG (kot/tables/kitchen/
+     * kitchen_notes/recipes) OFF unless the plan carries restaurant_enabled.
+     * FBR POS plans never do, yet the FBR panel legitimately owns a few of
+     * those switches under its own gates (Store Slip rides
+     * kitchen_printer_enabled + plan kot_enabled; per-item Store notes ride
+     * this raw flag + the same plan gate). Reading the raw flag keeps the FBR
+     * side independent of the PRA restaurant module instead of forcing
+     * restaurant_enabled onto FBR plans.
+     *
+     * PRA call sites must keep using forCompany() — masking is deliberate there.
+     */
+    public static function rawFlag(?Company $company, string $flag): bool
+    {
+        if (!$company) {
+            return false;
+        }
+        $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
+        return (bool) ($flags[$flag] ?? (self::baseDefaults()[$flag] ?? false));
+    }
+
+    /**
      * Does this company's plan include the Restaurant & Kitchen module?
      *  - Internal accounts: always yes.
      *  - Active admin override (lifetime / temporary): yes.

@@ -222,6 +222,13 @@
                         @endif
                     </div>
                     <p class="text-xs text-gray-400 mt-1">{!! __('pos.agent_install_hint') !!}</p>
+                    {{-- Task 1403: this card only renders in fiscal_device mode, but the agent
+                         itself is mode-independent (silent printing needs it either way).
+                         Send admins to the dedicated page that is always reachable. --}}
+                    <a href="{{ route('fbrpos.agent') }}" class="inline-flex items-center gap-1 mt-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                        <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                        {{ __('pos.fbr_printer_open_agent_page') }}
+                    </a>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 text-sm mb-4">

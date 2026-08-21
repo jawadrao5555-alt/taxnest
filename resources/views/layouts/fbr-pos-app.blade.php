@@ -586,6 +586,13 @@
                                         {{ __('pos.branches_title') }}
                                     </a>
                                     @endif
+                                    {{-- Desktop Agent (Task 1403) — admin-only, mode-independent. --}}
+                                    @if (auth('fbrpos')->user()->isPosAdmin())
+                                    <a href="{{ route('fbrpos.agent') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                        {{ __('pos.desktop_agent') }}
+                                    </a>
+                                    @endif
                                     {{-- Task 579: business profile now edits the company CNIC (a login
                                          identifier) — controller 403s non-admins, so hide the link too. --}}
                                     @if (auth('fbrpos')->user()->isPosAdmin())
@@ -850,6 +857,15 @@
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                             {{ __('pos.nav_customize_pos') }}
                         </a>
+                        {{-- Desktop Agent (Task 1403): FBR's own agent page. Admin-only, and
+                             deliberately NOT gated on fbr_connection_mode — silent printing
+                             needs the agent whether the shop submits via cloud or device. --}}
+                        @if (auth('fbrpos')->user()->isPosAdmin())
+                        <a href="{{ route('fbrpos.agent') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.agent') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            {{ __('pos.desktop_agent') }}
+                        </a>
+                        @endif
                         {{-- Task 579: admin-only (edits company CNIC login identifier). --}}
                         @if (auth('fbrpos')->user()->isPosAdmin())
                         <a href="{{ route('fbrpos.business-profile') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.business-profile') ? $sidebarActive : $sidebarInactive }}">

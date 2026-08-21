@@ -768,7 +768,9 @@
                     .then(r => r.json())
                     .then(d => { this.autoOk = !!(d && d.success); this.autoMsg = (d && d.message) || (this.autoOk ? @js(__('pos.saved_dot')) : @js(__('pos.setting_save_failed'))); if (!this.autoOk) { this.autoOn = !this.autoOn; } })
                     .catch(() => { this.autoOk = false; this.autoMsg = @js(__('pos.setting_save_failed')); this.autoOn = !this.autoOn; });
-            } }">
+            } }" id="dayclose-settings">
+        {{-- Task 1403: the Customize hub deep-links here (#dayclose-settings) instead of
+             cloning these two controls — one setting, one place, no drift. --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h3 class="font-semibold text-gray-900 dark:text-white">{{ __('pos.day_cutoff_title') }}</h3>

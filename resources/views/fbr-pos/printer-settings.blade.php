@@ -38,11 +38,21 @@
                     </p>
                 </div>
             </div>
-            <a href="{{ route('fbrpos.settings') }}" class="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">{{ __('pos.agent_setup_link') }}</a>
+            {{-- Task 1403: was route('fbrpos.settings') — a dead end, because the agent
+                 card there only rendered in fiscal_device mode. FBR has its own agent
+                 page now and it never depends on the connection mode. --}}
+            <a href="{{ route('fbrpos.agent') }}" class="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">{{ __('pos.agent_setup_link') }}</a>
         </div>
         @if(!$agentOnline)
         <div class="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
-            {{ __('pos.silent_print_needs_agent') }}
+            {{-- Never paired at all is a different problem from "paired but asleep": say
+                 which one it is instead of one vague line for both (Task 1403). --}}
+            @if(empty($company->agent_api_key))
+                {{ __('pos.fbr_printer_no_agent_note') }}
+            @else
+                {{ __('pos.silent_print_needs_agent') }}
+            @endif
+            <a href="{{ route('fbrpos.agent') }}" class="block mt-1 font-bold underline">{{ __('pos.fbr_printer_open_agent_page') }}</a>
         </div>
         @endif
     </div>
@@ -96,7 +106,9 @@
                 </p>
             @else
                 <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
-                    {!! __('pos.no_printers_reported_html', ['link' => '<a href="' . e(route('fbrpos.settings')) . '" class="font-semibold underline">' . e(__('pos.desktop_agent')) . '</a>']) !!}
+                    {{-- Task 1403: pointed at FBR Settings, where the agent card was hidden
+                         unless the shop ran in fiscal_device mode — the link led nowhere. --}}
+                    {!! __('pos.no_printers_reported_html', ['link' => '<a href="' . e(route('fbrpos.agent')) . '" class="font-semibold underline">' . e(__('pos.desktop_agent')) . '</a>']) !!}
                 </div>
             @endif
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -126,6 +138,14 @@
                             @endif
                         </select>
                         <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_store_printer_hint') }}</p>
+                        {{-- Task 1403: the pick saves fine but is never used while the Store
+                             Slip feature is off. Say so here — and keep the pick, don't drop it. --}}
+                        @unless($company->kitchen_printer_enabled ?? false)
+                        <div class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">
+                            {{ __('pos.fbr_printer_store_slip_off_note') }}
+                            <a href="{{ route('fbrpos.customize') }}" class="block mt-1 font-bold underline">{{ __('pos.customize_fbr_pos') }}</a>
+                        </div>
+                        @endunless
                         @if($kotIsTextOnly)
                         <div class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">{{ __('pos.printer_text_only_warn') }}</div>
                         @endif

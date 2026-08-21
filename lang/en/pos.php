@@ -262,6 +262,9 @@ return [
     'auth_pra_tagline' => 'Mall-Grade Retail & Restaurant POS',
     'auth_realtime_submit' => 'Real-time submit',
     'auth_register_business_fbr' => 'Register your business for FBR POS',
+    // Shown when the visitor arrived from a package column on the pricing table (Task 1483).
+    'auth_picked_package' => 'Package you picked',
+    'auth_picked_package_note' => 'Your free trial starts first — mention this package when you ask for approval.',
     'auth_register_business_pra' => 'Register your business for NestPOS',
     'auth_remember_me' => 'Remember me',
     'auth_resend_code' => 'Resend Code',
@@ -5351,6 +5354,13 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'pcmp_scroll_tip' => 'The features column stays in place — slide the packages left and right.',
     'pcmp_included_title' => 'Included in every package',
     'pcmp_included_sub' => 'These never depend on which package you pick.',
+    // Buying block in the column heading (Task 1483) — the table IS the
+    // package block on the landing page, so each column can be taken from here.
+    'pcmp_per_year' => 'Per year',
+    'pcmp_or_quarterly' => 'or Rs :price for 3 months',
+    'pcmp_sale_annual_only' => '(sale is on the yearly price only)',
+    'pcmp_choose' => 'Choose',
+    'pcmp_pick_package' => 'Pick a package',
     'pcmp_bills' => 'Bills per month',
     'pcmp_bills_hint' => 'PRA fiscal bills',
     'pcmp_team' => 'Team accounts',

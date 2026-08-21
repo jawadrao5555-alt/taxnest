@@ -20,7 +20,13 @@
      * like the PRA POS and Digital Invoice tables.
      */
     $fcmpPlans = $plans ?? \App\Services\FbrPosPlanComparisonService::plans();
-    $fcmpCols = \App\Services\FbrPosPlanComparisonService::planColumns($fcmpPlans, $currentPlanId ? (int) $currentPlanId : null);
+    // Task 1483: the landing heading also carries the yearly price and the
+    // signup link for that package; panel surfaces stay unchanged.
+    $fcmpCols = \App\Services\FbrPosPlanComparisonService::planColumns(
+        $fcmpPlans,
+        $currentPlanId ? (int) $currentPlanId : null,
+        $surface === 'landing'
+    );
     $fcmpSections = \App\Services\FbrPosPlanComparisonService::sections($fcmpPlans);
     $fcmpIncluded = \App\Services\FbrPosPlanComparisonService::includedItems();
 @endphp
@@ -40,6 +46,7 @@
     tip="Scroll sideways to see all packages."
     included-title="Included in every package"
     included-sub="These never depend on which package you pick."
+    picks-title="Pick a package"
     :surface="$surface"
     :show-heading="$showHeading"
 />

@@ -104,12 +104,16 @@ class PosPlanComparisonService
     public const POPULAR_PLAN = 'Business';
 
     /**
-     * The two POS surfaces that render package cards above this table
-     * (Task 1384). auditCards() scans them for hand-written claims, so a card
-     * can never grow its own copy again.
+     * The POS surfaces that render package cards (Task 1384). auditCards()
+     * scans them for hand-written claims, so a card can never grow its own
+     * copy again.
+     *
+     * The landing dropped out in Task 1483: its card stack was deleted and the
+     * comparison table became the buying surface, so the landing now prints
+     * plan numbers ON PURPOSE (the table's own limit rows) and scanning it for
+     * them would fail forever. The panel's upgrade cards stay guarded.
      */
     public const CARD_VIEWS = [
-        'resources/views/pos/landing.blade.php',
         'resources/views/pos/billing.blade.php',
     ];
 
@@ -154,16 +158,54 @@ class PosPlanComparisonService
         return PlanLimitService::teamAccountLimit($plan);
     }
 
-    /** Column header data for each package. */
-    public static function planColumns(Collection $plans, ?int $currentPlanId = null): array
+    /**
+     * Column header data for each package.
+     *
+     * $withSignup adds the landing-page buying block (Task 1483): PRA POS
+     * bills ANNUALLY, so the headline is the yearly price with the hand-set
+     * 3-month alternative underneath, and the button carries the package into
+     * /pos/register. Every number still comes from the pricing_plans columns
+     * the gates read — sale_price/price are accessors over the same row, never
+     * the display-only features JSON. The POS billing panel calls this without
+     * the flag and keeps rendering exactly as before.
+     */
+    public static function planColumns(Collection $plans, ?int $currentPlanId = null, bool $withSignup = false): array
     {
-        return $plans->map(fn (PricingPlan $plan) => [
-            'id'      => (int) $plan->id,
-            'name'    => $plan->name,
-            'price'   => 'Rs ' . number_format((float) $plan->sale_price),
-            'popular' => $plan->name === self::POPULAR_PLAN,
-            'current' => $currentPlanId !== null && (int) $plan->id === $currentPlanId,
-        ])->all();
+        return $plans->map(function (PricingPlan $plan) use ($currentPlanId, $withSignup) {
+            $col = [
+                'id'      => (int) $plan->id,
+                'name'    => $plan->name,
+                'price'   => 'Rs ' . number_format((float) $plan->sale_price),
+                'popular' => $plan->name === self::POPULAR_PLAN,
+                'current' => $currentPlanId !== null && (int) $plan->id === $currentPlanId,
+            ];
+
+            if (!$withSignup) {
+                return $col;
+            }
+
+            $col['price_period'] = __('pos.pcmp_per_year');
+
+            // Sale campaigns discount the ANNUAL price only (quarterly is
+            // already priced at a premium) — say so rather than let a shop
+            // read the badge onto the 3-month line.
+            $onSale = (float) $plan->sale_price < (float) $plan->price;
+            if ($onSale) {
+                $col['price_compare'] = 'Rs ' . number_format((float) $plan->price);
+                $col['sale_badge']    = $plan->sale_badge;
+            }
+
+            $quarterly = (float) ($plan->price_quarterly ?? 0);
+            if ($quarterly > 0) {
+                $col['price_note'] = __('pos.pcmp_or_quarterly', ['price' => number_format($quarterly)])
+                    . ($onSale ? ' ' . __('pos.pcmp_sale_annual_only') : '');
+            }
+
+            $col['cta_url']   = route('pos.register', ['plan' => $plan->name], false);
+            $col['cta_label'] = __('pos.pcmp_choose');
+
+            return $col;
+        })->all();
     }
 
     /**

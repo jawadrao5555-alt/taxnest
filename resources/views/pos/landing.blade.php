@@ -416,6 +416,10 @@
     </section>
 
     <!-- Pricing Section -->
+    {{-- Two anchors on purpose: this page's own nav has always linked
+         "#editions", while the main landing's "View Pricing" button (and the
+         other two product landings) use "#pricing". Both must land here. --}}
+    <span id="pricing" style="display:block;"></span>
     <section id="editions" class="py-24 bg-[#FDFBF7]">
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16">
@@ -423,100 +427,13 @@
                 <p class="text-gray-600 font-light text-lg">Full PRA compliance in every plan — pick the size that fits your shop.</p>
             </div>
 
-            <div class="grid grid-cols-1 gap-8 max-w-2xl mx-auto">
-                <!-- PRA Integrated Edition -->
-                <div class="bg-white border-t-4 border-purple-700 shadow-xl p-8 flex flex-col relative">
-                    <div class="inline-block px-3 py-1 bg-purple-50 text-purple-700 font-bold text-xs uppercase tracking-widest mb-6 self-start">
-                        PRA Integrated
-                    </div>
-                    <h4 class="text-2xl font-serif text-[#052730] mb-3">Full PRA Compliance</h4>
-                    <p class="text-sm text-gray-600 mb-8">The complete NestPOS with automatic Punjab Revenue Authority fiscal reporting built in.</p>
-                    
-                    <div class="flex-grow space-y-4">
-                        @if(isset($plans) && $plans->count())
-                            @foreach($plans as $plan)
-                                @php
-                                    $perMonth = round($plan->sale_price / 12);
-                                    $hasOffer = $plan->sale_percent > 0;
-                                    $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;
-                                    // Task 1384 — bullets come from the SAME plan columns the
-                                    // comparison table reads, never from hand-written copy, and
-                                    // never carry a number the table already prints.
-                                    $highlights = \App\Services\PosPlanComparisonService::cardHighlights($plan, $prevPlan);
-                                    $inherits   = \App\Services\PosPlanComparisonService::cardInherits($plan, $prevPlan);
-                                    $floorHolds = \App\Services\PosPlanComparisonService::cardIncludedFloorHolds($plans);
-                                    $isPopular = $plan->name === 'Business';
-                                @endphp
-                                <div class="p-5 border {{ $isPopular ? 'border-[#0A4D5C] ring-1 ring-[#0A4D5C]' : 'border-purple-700/20' }} bg-purple-50/30 relative overflow-hidden">
-                                    @if($hasOffer)
-                                        <div class="absolute top-0 right-0 bg-[#0A4D5C] text-white text-[10px] font-bold px-2 py-0.5">
-                                            {{ $plan->sale_badge }}
-                                        </div>
-                                    @endif
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div>
-                                            <h5 class="font-bold text-gray-900">{{ $plan->name }}</h5>
-                                            @if($isPopular)
-                                                <span class="inline-block mt-1 px-2 py-0.5 bg-[#0A4D5C] text-white text-[9px] font-bold uppercase tracking-widest">Most Popular</span>
-                                            @endif
-                                        </div>
-                                        <div class="text-right">
-                                            @if($hasOffer)
-                                                <div class="text-[10px] text-gray-400 line-through mb-0.5">PKR {{ number_format($plan->price) }}</div>
-                                            @endif
-                                            <div class="font-semibold text-xl text-[#0A4D5C]">PKR {{ number_format($plan->sale_price) }}<span class="text-sm text-gray-500 font-normal">/yr</span></div>
-                                            @if((float) ($plan->price_quarterly ?? 0) > 0)
-                                                {{-- NOTE: never glue @if directly after a word character ("months@if") —
-                                                     Blade's \B@ regex skips it but still compiles the closing @endif,
-                                                     producing an unmatched endif → ParseError 500 on the whole page. --}}
-                                                <div class="text-[10px] text-gray-500 mt-0.5">
-                                                    or PKR {{ number_format($plan->price_quarterly) }} / 3 months
-                                                    @if($hasOffer)
-                                                        <span class="text-amber-600 font-semibold">(sale sirf annual par)</span>
-                                                    @endif
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <p class="text-xs text-gray-500 mb-3">Effective: PKR {{ number_format($perMonth) }}/mo</p>
-                                    @if(!empty($highlights))
-                                        <div class="mt-4 border-t border-purple-700/10 pt-4">
-                                            <p class="text-[10px] font-bold uppercase tracking-widest text-[#0A4D5C] mb-2">
-                                                {{-- Only claim the package below (or the whole ladder) when the plan rows still back it up. --}}
-                                                {{ $inherits ? 'Everything in ' . $prevPlan->name . ', plus:' : (!$prevPlan && $floorHolds ? 'Every package includes:' : 'This package includes:') }}
-                                            </p>
-                                            <ul class="space-y-2">
-                                                @foreach($highlights as $highlight)
-                                                <li class="flex items-start text-sm text-gray-700">
-                                                    <span class="text-[#0A4D5C] mr-2 mt-0.5 text-xs">■</span>
-                                                    <span>
-                                                        {{ $highlight['label'] }}
-                                                        @if(!empty($highlight['hint']))
-                                                            <span class="block text-xs text-gray-500">{{ $highlight['hint'] }}</span>
-                                                        @endif
-                                                    </span>
-                                                </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    @endif
-                                    <p class="text-[11px] text-gray-500 mt-3">Bills, team accounts, branches &amp; counters — see the comparison table below.</p>
-                                </div>
-                            @endforeach
-                        @else
-                            <div class="p-6 border border-gray-200 text-center text-gray-500 text-sm">
-                                Plans loading...
-                            </div>
-                        @endif
-                    </div>
-                </div>
-
-            </div>
-
-            {{-- Package comparison (Task 1350). Sits UNDER the price cards, and is
-                 generated by PosPlanComparisonService from the same pricing_plans
-                 columns the gates read — a card and the table can never drift apart. --}}
-            <x-pos-plan-comparison :plans="$plans ?? null" surface="landing" class="mt-16" />
+            {{-- Task 1483 — the comparison table IS the package block now: the
+                 card stack that used to sit here said everything twice and could
+                 not be bought from. Every column heads with its own price and a
+                 button that starts signup on that exact package. Generated by
+                 PosPlanComparisonService from the same pricing_plans columns the
+                 gates read, so a price on screen and a gate can never disagree. --}}
+            <x-pos-plan-comparison :plans="$plans ?? null" surface="landing" />
 
             <div class="mt-16 text-center">
                 <a href="/pos/register" class="btn-solid bg-[#052730] text-white hover:bg-[#0A4D5C] px-8 py-4 text-base">

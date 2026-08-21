@@ -58,6 +58,19 @@
                         <p class="text-sm text-gray-500 mt-1">{{ __('pos.auth_register_business_fbr') }}</p>
                     </div>
 
+                    {{-- Task 1483: shown only when the visitor arrived from a package
+                         column on the landing table. The admin still assigns the plan
+                         at approval, so this only echoes what they picked. --}}
+                    @if(!empty($pickedPlanName))
+                    <div class="px-6 pt-2">
+                        <div class="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-center">
+                            <p class="text-[11px] font-semibold text-blue-600/70 uppercase tracking-wider">{{ __('pos.auth_picked_package') }}</p>
+                            <p class="text-sm font-bold text-gray-900 mt-0.5">{{ $pickedPlanName }}</p>
+                            <p class="text-[11px] text-gray-500 mt-0.5">{{ __('pos.auth_picked_package_note') }}</p>
+                        </div>
+                    </div>
+                    @endif
+
                     <form method="POST" action="/fbr-pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}' }">
                         @csrf
 

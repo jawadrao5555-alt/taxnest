@@ -21,7 +21,14 @@
      * like the PRA POS and FBR POS tables.
      */
     $dcmpPlans = $plans ?? \App\Services\DiPlanComparisonService::plans();
-    $dcmpCols = \App\Services\DiPlanComparisonService::planColumns($dcmpPlans, $currentPlanId ? (int) $currentPlanId : null);
+    // Task 1483: the landing heading carries the price (re-computed by the
+    // page's billing-cycle switch) and the signup link for that package;
+    // panel surfaces stay unchanged.
+    $dcmpCols = \App\Services\DiPlanComparisonService::planColumns(
+        $dcmpPlans,
+        $currentPlanId ? (int) $currentPlanId : null,
+        $surface === 'landing'
+    );
     $dcmpSections = \App\Services\DiPlanComparisonService::sections($dcmpPlans);
     $dcmpIncluded = \App\Services\DiPlanComparisonService::includedItems();
 @endphp
@@ -37,10 +44,11 @@
     popular-label="Most complete"
     current-label="Your plan"
     tick-label="Included"
-    note="Prices are shown per month. Yearly billing applies the discount on the cards above; the packages themselves do not change."
+    note="Prices follow the billing cycle you picked above; the packages themselves do not change."
     tip="Scroll sideways to see all packages."
     included-title="Included in every package"
     included-sub="These never depend on which package you pick."
+    picks-title="Pick a package"
     :surface="$surface"
     :show-heading="$showHeading"
 />

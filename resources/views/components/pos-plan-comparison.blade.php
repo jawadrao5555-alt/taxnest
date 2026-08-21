@@ -22,7 +22,14 @@
      * its translated chrome.
      */
     $pcmpPlans = $plans ?? \App\Services\PosPlanComparisonService::plans();
-    $pcmpCols = \App\Services\PosPlanComparisonService::planColumns($pcmpPlans, $currentPlanId ? (int) $currentPlanId : null);
+    // Task 1483: on the landing the column heading is the buying surface, so
+    // it also carries the price block and a signup link per package. The
+    // panel surface stays exactly as it was — name + price, no buttons.
+    $pcmpCols = \App\Services\PosPlanComparisonService::planColumns(
+        $pcmpPlans,
+        $currentPlanId ? (int) $currentPlanId : null,
+        $surface === 'landing'
+    );
     $pcmpSections = \App\Services\PosPlanComparisonService::sections($pcmpPlans);
     $pcmpIncluded = \App\Services\PosPlanComparisonService::includedItems();
     $pcmpBranchNote = __('pos.pcmp_branch_note', ['price' => number_format(\App\Services\BranchAddonService::PRICE_PER_YEAR)]);
@@ -43,6 +50,7 @@
     :tip="__('pos.pcmp_scroll_tip')"
     :included-title="__('pos.pcmp_included_title')"
     :included-sub="__('pos.pcmp_included_sub')"
+    :picks-title="__('pos.pcmp_pick_package')"
     :surface="$surface"
     :show-heading="$showHeading"
 />

@@ -145,7 +145,20 @@ class PosAuthController extends Controller
             ->where('is_trial', false)
             ->orderBy('price')
             ->get();
-        return view('pos.auth.register', ['plans' => $plans]);
+
+        // Task 1483: the landing's comparison table sends the shop here with
+        // ?plan=<package name>, so the column it clicked arrives already
+        // ticked. An unknown or missing name simply leaves the picker empty —
+        // register() still validates whatever is finally posted.
+        $requested = trim((string) request('plan'));
+        $preselected = $requested === ''
+            ? null
+            : $plans->first(fn ($plan) => mb_strtolower($plan->name) === mb_strtolower($requested));
+
+        return view('pos.auth.register', [
+            'plans' => $plans,
+            'preselectedPlanId' => $preselected?->id,
+        ]);
     }
 
     public function register(Request $request)

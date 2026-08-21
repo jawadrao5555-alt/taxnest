@@ -9,6 +9,17 @@
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Register your company and become its admin</p>
     </div>
 
+    {{-- Task 1483: shown only when the visitor arrived from a package column on
+         the pricing table. The admin still assigns the plan at approval, so this
+         only echoes what they picked. --}}
+    @if(!empty($pickedPlanName))
+    <div class="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-center">
+        <p class="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Package you picked</p>
+        <p class="text-sm font-bold text-gray-900 dark:text-gray-100 mt-0.5">{{ $pickedPlanName }}</p>
+        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Your free trial starts first — mention this package when you ask for approval.</p>
+    </div>
+    @endif
+
     <form method="POST" action="{{ route('register') }}">
         @csrf
 

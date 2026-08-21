@@ -637,83 +637,13 @@
             </div>
             
             @if(isset($plans) && $plans->count())
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto items-start">
-                @foreach($plans as $plan)
-                @php
-                    // Task 1383 — bullets, numbers and the yearly price all come
-                    // from FbrPosPlanComparisonService, which reads the same
-                    // pricing_plans columns the FBR gates read. The card used to
-                    // print the display-only features JSON, which is how
-                    // "2 Team Accounts" ended up above a plan granting 1.
-                    $isPopular = $plan->name === \App\Services\FbrPosPlanComparisonService::POPULAR_PLAN;
-                    $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;
-                    $highlights = \App\Services\FbrPosPlanComparisonService::cardHighlights($plan, $prevPlan);
-                    $inherits = \App\Services\FbrPosPlanComparisonService::cardInherits($plan, $prevPlan);
-                    $floorHolds = \App\Services\FbrPosPlanComparisonService::cardIncludedFloorHolds($plans);
-                    $annualSalePrice = \App\Services\FbrPosPlanComparisonService::annualPrice($plan);
-                    $annualComparePrice = \App\Services\FbrPosPlanComparisonService::annualPrice($plan, true);
-                @endphp
-                
-                <div class="bg-white border {{ $isPopular ? 'border-[#0A4D5C] shadow-xl' : 'border-gray-200 shadow-sm' }} p-8 flex flex-col h-full relative fade-in-up">
-                    
-                    @if($isPopular)
-                    <div class="absolute top-0 inset-x-0 h-1 bg-[#1d4ed8]"></div>
-                    @endif
-                    
-                    <h4 class="text-xl font-serif font-bold text-[#052730] mb-2">{{ $plan->name }}</h4>
-                    
-                    <div class="mb-6 flex items-baseline">
-                        <span class="text-sm font-semibold text-gray-500 mr-1">PKR</span>
-                        <span class="text-4xl font-bold text-gray-900 tracking-tight">{{ number_format($annualSalePrice) }}</span>
-                        <span class="text-sm text-gray-500 ml-1 font-medium">/ year</span>
-                    </div>
-                    
-                    @if($plan->price > $plan->sale_price)
-                    <div class="mb-4 text-sm flex items-center">
-                        <span class="line-through text-gray-400 font-medium">PKR {{ number_format($annualComparePrice) }}/yr</span>
-                        @if($plan->sale_badge)
-                        <span class="ml-3 inline-block px-2 py-0.5 text-xs font-bold text-[#052730] bg-gray-100">
-                            {{ $plan->sale_badge }}
-                        </span>
-                        @endif
-                    </div>
-                    @endif
-                    
-                    <a href="/fbr-pos/register" class="btn-solid w-full mb-8 {{ $isPopular ? 'btn-primary' : 'bg-white border border-gray-300 text-[#052730] hover:bg-gray-50' }}">
-                        Start Free Trial
-                    </a>
-                    
-                    <div class="flex-grow border-t border-gray-100 pt-6">
-                        @if(!empty($highlights))
-                        <p class="text-[10px] font-bold uppercase tracking-widest text-[#0A4D5C] mb-3">
-                            {{-- Only claim the package below (or the whole ladder) when the plan rows still back it up. --}}
-                            {{ $inherits ? 'Everything in ' . $prevPlan->name . ', plus:' : (!$prevPlan && $floorHolds ? 'Every package includes:' : 'This package includes:') }}
-                        </p>
-                        <ul class="space-y-4">
-                            @foreach($highlights as $highlight)
-                            <li class="flex text-sm text-gray-700 items-start">
-                                <span class="text-[#0A4D5C] mr-3 mt-0.5 text-xs">■</span>
-                                <span class="leading-relaxed">
-                                    {{ $highlight['label'] }}
-                                    @if(!empty($highlight['hint']))
-                                        <span class="block text-xs text-gray-500 mt-0.5">{{ $highlight['hint'] }}</span>
-                                    @endif
-                                </span>
-                            </li>
-                            @endforeach
-                        </ul>
-                        @endif
-                    </div>
-                    <p class="text-[11px] text-gray-500 mt-6">Bills, team accounts, branches, counters &amp; products — see the comparison table below.</p>
-                </div>
-                @endforeach
-            </div>
-
-            {{-- Package comparison (Task 1383). Sits UNDER the price cards and is
-                 generated by FbrPosPlanComparisonService from the same
-                 pricing_plans columns the FBR gates read — a card and the table
-                 can never drift apart. --}}
-            <x-fbr-plan-comparison :plans="$plans" surface="landing" class="mt-16" />
+            {{-- Task 1483 — the comparison table IS the package block now: the
+                 card stack that used to sit here repeated the table in prose and
+                 its buttons carried no package. Every column heads with its own
+                 yearly price and a button that starts signup on that exact
+                 package. Generated by FbrPosPlanComparisonService from the same
+                 pricing_plans columns the FBR gates read. --}}
+            <x-fbr-plan-comparison :plans="$plans" surface="landing" />
             @endif
         </div>
     </section>

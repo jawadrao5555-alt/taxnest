@@ -262,6 +262,9 @@ return [
     'auth_pra_tagline' => 'Mall-Grade Retail aur Restaurant POS',
     'auth_realtime_submit' => 'Real-time submit',
     'auth_register_business_fbr' => 'Apna karobar FBR POS par register karein',
+    // Shown when the visitor arrived from a package column on the pricing table (Task 1483).
+    'auth_picked_package' => 'Aap ka chuna hua package',
+    'auth_picked_package_note' => 'Pehle free trial shuru hoga — approval ke waqt yeh package bata dein.',
     'auth_register_business_pra' => 'Apna karobar NestPOS par register karein',
     'auth_remember_me' => 'Mujhe yaad rakhein',
     'auth_resend_code' => 'Code Dobara Bhejein',
@@ -5346,6 +5349,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pcmp_scroll_tip' => 'Features wala column apni jagah rehta hai — packages ko daayen-bayen slide karein.',
     'pcmp_included_title' => 'Sab packages mein shamil',
     'pcmp_included_sub' => 'Ye cheezein har package mein milti hain — package chunne se farq nahi parta.',
+    // Buying block in the column heading (Task 1483) — the table IS the
+    // package block on the landing page, so each column can be taken from here.
+    'pcmp_per_year' => 'Saalana',
+    'pcmp_or_quarterly' => 'ya Rs :price 3 maheene ke',
+    'pcmp_sale_annual_only' => '(sale sirf saalana qeemat par hai)',
+    'pcmp_choose' => 'Chunein',
+    'pcmp_pick_package' => 'Package chunein',
     'pcmp_bills' => 'Bills har maheene',
     'pcmp_bills_hint' => 'PRA fiscal bills',
     'pcmp_team' => 'Team accounts',

@@ -185,9 +185,15 @@ class FbrPosPlanComparisonService
     public const ANNUAL_DISCOUNT = 0.94;
 
     /** The single FBR POS surface that renders package cards above this table. */
-    public const CARD_VIEWS = [
-        'resources/views/fbr-pos/landing.blade.php',
-    ];
+    /**
+     * Empty since Task 1483: the FBR landing's package cards were deleted and
+     * the comparison table became the buying surface, so there is no card view
+     * left to scan. The ladder-integrity half of auditCards() (which is what
+     * scripts/plan-gate-check.php really leans on) still runs, and
+     * cardHighlights() still backs it. Add a view back here the day FBR grows
+     * package cards again.
+     */
+    public const CARD_VIEWS = [];
 
     /**
      * Patterns a package card may NOT contain: the display-only features JSON
@@ -238,16 +244,43 @@ class FbrPosPlanComparisonService
         return (int) round($monthly * self::ANNUAL_MONTHS * self::ANNUAL_DISCOUNT);
     }
 
-    /** Column header data for each package. */
-    public static function planColumns(Collection $plans, ?int $currentPlanId = null): array
+    /**
+     * Column header data for each package.
+     *
+     * $withSignup adds the landing-page buying block (Task 1483): FBR POS is
+     * licensed by the YEAR (monthly price × 12 with the 6% annual discount
+     * already baked in by annualPrice()), and the button carries the package
+     * into /fbr-pos/register. Panel surfaces call this without the flag.
+     */
+    public static function planColumns(Collection $plans, ?int $currentPlanId = null, bool $withSignup = false): array
     {
-        return $plans->map(fn (PricingPlan $plan) => [
-            'id'      => (int) $plan->id,
-            'name'    => $plan->name,
-            'price'   => 'Rs ' . number_format(self::annualPrice($plan)) . '/yr',
-            'popular' => $plan->name === self::POPULAR_PLAN,
-            'current' => $currentPlanId !== null && (int) $plan->id === $currentPlanId,
-        ])->all();
+        return $plans->map(function (PricingPlan $plan) use ($currentPlanId, $withSignup) {
+            $col = [
+                'id'      => (int) $plan->id,
+                'name'    => $plan->name,
+                'price'   => 'Rs ' . number_format(self::annualPrice($plan)) . '/yr',
+                'popular' => $plan->name === self::POPULAR_PLAN,
+                'current' => $currentPlanId !== null && (int) $plan->id === $currentPlanId,
+            ];
+
+            if (!$withSignup) {
+                return $col;
+            }
+
+            // Headline drops the "/yr" suffix — the unit gets its own line.
+            $col['price']        = 'Rs ' . number_format(self::annualPrice($plan));
+            $col['price_period'] = '/ year';
+
+            if ((float) $plan->sale_price < (float) $plan->price) {
+                $col['price_compare'] = 'Rs ' . number_format(self::annualPrice($plan, true));
+                $col['sale_badge']    = $plan->sale_badge;
+            }
+
+            $col['cta_url']   = route('fbrpos.register', ['plan' => $plan->name], false);
+            $col['cta_label'] = 'Choose';
+
+            return $col;
+        })->all();
     }
 
     /**

@@ -1,5 +1,16 @@
 @props([
-    /** planColumns() output: [['id','name','price','popular','current'], ...] */
+    /** planColumns() output: [['id','name','price','popular','current'], ...].
+     *  A LANDING column may also carry the buying block (Task 1483):
+     *    price_period    small unit line under the amount ("/ year")
+     *    price_compare   struck-through pre-sale amount
+     *    sale_badge      running-campaign badge text
+     *    price_note      secondary price line (PRA's 3-month alternative)
+     *    cta_url         signup link carrying this package
+     *    cta_label       button text
+     *    price_x / price_compare_x / price_note_x
+     *                    optional Alpine expressions that overwrite the three
+     *                    server-rendered strings (Digital Invoice's billing
+     *                    cycle switch drives its headings this way). */
     'cols' => [],
     /** sections() output: [['key','title','rows' => [...]], ...] */
     'sections' => [],
@@ -17,6 +28,8 @@
     'tip' => null,
     'includedTitle' => null,
     'includedSub' => null,
+    /** Heading of the phone-only one-tap package list (Task 1483). */
+    'picksTitle' => null,
     /** landing | panel — only changes the surrounding chrome, never the data. */
     'surface' => 'landing',
     'showHeading' => true,
@@ -31,8 +44,23 @@
      * own gates read (PosPlanComparisonService / FbrPosPlanComparisonService /
      * DiPlanComparisonService). One table = one look, so the three pricing
      * pages cannot drift apart visually either.
+     *
+     * Task 1483: on the LANDING surface the column heading is also the thing
+     * that sells — price, sale, and a button that starts signup on that exact
+     * package. The PANEL surface (POS billing) never grows a buy button, so
+     * the sell block only switches on when the caller supplies cta_url.
      */
     $tnpcCount = count($cols);
+
+    $tnpcSell = false;
+    if ($surface === 'landing') {
+        foreach ($cols as $tnpcCol) {
+            if (!empty($tnpcCol['cta_url'])) {
+                $tnpcSell = true;
+                break;
+            }
+        }
+    }
 @endphp
 
 @if($tnpcCount)
@@ -74,6 +102,39 @@
                         font-size:1.25rem; line-height:1.15; color:#FFFFFF; }
 .tnpc-plan .tnpc-price { display:block; margin-top:.25rem; font-family:'JetBrains Mono',ui-monospace,monospace;
                          font-size:.625rem; color:rgba(255,255,255,.6); }
+
+/* Landing surface only (Task 1483): the heading becomes the buying block. */
+/* Bottom-aligned on purpose: the POPULAR tag makes the flagged column taller,
+   and on a buying surface the BUTTONS are what must line up across columns. */
+.tnpc-plan--sell { vertical-align:bottom; width:172px; min-width:172px; padding-top:1rem; }
+.tnpc-plan--sell .tnpc-name { font-size:1.125rem; }
+.tnpc-plan .tnpc-was { display:block; margin-top:.375rem; font-family:'JetBrains Mono',ui-monospace,monospace;
+                       font-size:.625rem; color:rgba(255,255,255,.45); text-decoration:line-through; }
+.tnpc-plan .tnpc-amount { display:block; margin-top:.125rem; font-family:'JetBrains Mono',ui-monospace,monospace;
+                          font-size:1rem; font-weight:700; line-height:1.2; color:#FFFFFF; }
+.tnpc-plan .tnpc-per { display:block; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.5625rem;
+                       text-transform:uppercase; letter-spacing:.1em; color:rgba(255,255,255,.55); }
+.tnpc-plan .tnpc-sale { display:inline-block; margin-top:.375rem; padding:.0625rem .3125rem;
+                        background:var(--tnpc-gold); color:var(--tnpc-ink);
+                        font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.5rem; font-weight:700;
+                        text-transform:uppercase; letter-spacing:.06em; }
+.tnpc-plan .tnpc-second { display:block; margin-top:.375rem; font-size:.5625rem; line-height:1.35;
+                          color:rgba(255,255,255,.55); }
+/* Digital Invoice blanks this line on monthly billing (x-text -> ''), so an
+   empty secondary line must take no space at all. */
+.tnpc-plan .tnpc-second:empty { display:none; }
+.tnpc-cta { display:block; margin-top:.75rem; padding:.4375rem .375rem; border:1px solid #FFFFFF;
+            background:#FFFFFF; color:var(--tnpc-ink); text-decoration:none;
+            font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.5625rem; font-weight:700;
+            text-transform:uppercase; letter-spacing:.08em; text-align:center; }
+.tnpc-cta:hover, .tnpc-cta:focus { background:var(--tnpc-gold); border-color:var(--tnpc-gold); color:var(--tnpc-ink); }
+.tnpc-plan--popular .tnpc-cta { background:var(--tnpc-gold); border-color:var(--tnpc-gold); }
+.tnpc-plan--popular .tnpc-cta:hover, .tnpc-plan--popular .tnpc-cta:focus { background:#FFFFFF; border-color:#FFFFFF; }
+
+/* Phone-only one-tap package list — the in-table buttons sit behind a
+   sideways scroll on a 98px column, so every package also gets a full-width
+   row here. Desktop never sees it. */
+.tnpc-picks { display:none; }
 
 .tnpc-grouprow > td { background:rgba(15,97,113,.1); border-top:1px solid rgba(10,77,92,.2);
                       border-bottom:1px solid rgba(10,77,92,.2); }
@@ -128,14 +189,38 @@
     .tnpc-table th, .tnpc-table td { padding:.5rem; }
     .tnpc-corner, .tnpc-row > td.tnpc-rowhead { width:150px; min-width:150px; }
     .tnpc-plan { width:98px; min-width:98px; }
+    .tnpc-plan--sell { width:112px; min-width:112px; }
     .tnpc-plan .tnpc-name { font-size:.8125rem; }
+    .tnpc-plan--sell .tnpc-name { font-size:.8125rem; }
     .tnpc-plan .tnpc-price { font-size:.5rem; }
+    .tnpc-plan .tnpc-amount { font-size:.8125rem; }
+    .tnpc-plan .tnpc-was, .tnpc-plan .tnpc-second { font-size:.5rem; }
+    /* The buy button moves out of the sideways scroll into .tnpc-picks. */
+    .tnpc-plan .tnpc-cta { display:none; }
     .tnpc-label { font-size:.75rem; }
     .tnpc-hint { font-size:.625rem; }
     .tnpc-num { font-size:.6875rem; }
     .tnpc-tick, .tnpc-cross { width:1.25rem; height:1.25rem; }
     .tnpc-tick svg, .tnpc-cross svg { width:.75rem; height:.75rem; }
     .tnpc-included { padding:1.125rem; }
+
+    .tnpc-picks { display:block; margin-top:.875rem; border:1px solid rgba(10,77,92,.2);
+                  background:var(--tnpc-body); }
+    .tnpc-picks h4 { margin:0; padding:.625rem .875rem; background:var(--tnpc-ink); color:#FFFFFF;
+                     font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.625rem; font-weight:700;
+                     text-transform:uppercase; letter-spacing:.12em; }
+    .tnpc-pick { display:flex; align-items:center; gap:.625rem; padding:.6875rem .875rem;
+                 border-top:1px solid var(--tnpc-line); text-decoration:none; }
+    .tnpc-pick:first-child { border-top:0; }
+    .tnpc-pick-name { flex:1 1 auto; min-width:0; font-size:.8125rem; font-weight:600; color:var(--tnpc-label); }
+    .tnpc-pick-name em { display:inline-block; margin-left:.375rem; padding:.0625rem .25rem; background:var(--tnpc-gold);
+                         color:var(--tnpc-ink); font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.5rem;
+                         font-style:normal; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+    .tnpc-pick-price { flex:none; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.6875rem;
+                       color:var(--tnpc-muted); }
+    .tnpc-pick-go { flex:none; padding:.375rem .5rem; background:var(--tnpc-teal); color:#FFFFFF;
+                    font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.5625rem; font-weight:700;
+                    text-transform:uppercase; letter-spacing:.08em; }
 }
 
 /* POS panel dark mode (the marketing landings are always light). */
@@ -170,14 +255,33 @@
                     <tr>
                         <th class="tnpc-corner" scope="col"><span>{{ $colLabel }}</span></th>
                         @foreach($cols as $col)
-                        <th scope="col" class="tnpc-plan{{ $col['current'] ? ' tnpc-plan--current' : ($col['popular'] ? ' tnpc-plan--popular' : '') }}">
+                        <th scope="col" class="tnpc-plan{{ $col['current'] ? ' tnpc-plan--current' : ($col['popular'] ? ' tnpc-plan--popular' : '') }}{{ $tnpcSell ? ' tnpc-plan--sell' : '' }}">
                             @if($col['current'])
                                 <span class="tnpc-tag">{{ $currentLabel }}</span>
                             @elseif($col['popular'])
                                 <span class="tnpc-tag">{{ $popularLabel }}</span>
                             @endif
                             <span class="tnpc-name">{{ $col['name'] }}</span>
-                            <span class="tnpc-price">{{ $col['price'] }}</span>
+                            @if($tnpcSell)
+                                @if(!empty($col['price_compare']))
+                                    <span class="tnpc-was" @if(!empty($col['price_compare_x'])) x-text="{{ $col['price_compare_x'] }}" @endif>{{ $col['price_compare'] }}</span>
+                                @endif
+                                <span class="tnpc-amount" @if(!empty($col['price_x'])) x-text="{{ $col['price_x'] }}" @endif>{{ $col['price'] }}</span>
+                                @if(!empty($col['price_period']))
+                                    <span class="tnpc-per">{{ $col['price_period'] }}</span>
+                                @endif
+                                @if(!empty($col['sale_badge']))
+                                    <span class="tnpc-sale">{{ $col['sale_badge'] }}</span>
+                                @endif
+                                @if(!empty($col['price_note']) || !empty($col['price_note_x']))
+                                    <span class="tnpc-second" @if(!empty($col['price_note_x'])) x-text="{{ $col['price_note_x'] }}" @endif>{{ $col['price_note'] ?? '' }}</span>
+                                @endif
+                                @if(!empty($col['cta_url']))
+                                    <a class="tnpc-cta" href="{{ $col['cta_url'] }}">{{ $col['cta_label'] ?? $col['name'] }}</a>
+                                @endif
+                            @else
+                                <span class="tnpc-price">{{ $col['price'] }}</span>
+                            @endif
                         </th>
                         @endforeach
                     </tr>
@@ -218,6 +322,23 @@
             </table>
         </div>
     </div>
+
+    @if($tnpcSell)
+    {{-- Phone-only (CSS): one full-width row per package so a visitor never
+         has to scroll the table sideways to reach a buy button. --}}
+    <div class="tnpc-picks">
+        @if($picksTitle)<h4>{{ $picksTitle }}</h4>@endif
+        @foreach($cols as $col)
+            @if(!empty($col['cta_url']))
+            <a class="tnpc-pick" href="{{ $col['cta_url'] }}">
+                <span class="tnpc-pick-name">{{ $col['name'] }}@if($col['popular'])<em>{{ $popularLabel }}</em>@endif</span>
+                <span class="tnpc-pick-price"><span @if(!empty($col['price_x'])) x-text="{{ $col['price_x'] }}" @endif>{{ $col['price'] }}</span>@if(!empty($col['price_period'])) {{ $col['price_period'] }}@endif</span>
+                <span class="tnpc-pick-go">{{ $col['cta_label'] ?? $col['name'] }}</span>
+            </a>
+            @endif
+        @endforeach
+    </div>
+    @endif
 
     @if($note)<p class="tnpc-note"><i></i><span>{{ $note }}</span></p>@endif
     @if($tip)<p class="tnpc-tip">{{ $tip }}</p>@endif

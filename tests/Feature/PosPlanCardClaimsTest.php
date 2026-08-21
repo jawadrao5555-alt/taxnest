@@ -294,6 +294,11 @@ class PosPlanCardClaimsTest extends TestCase
 
     public function test_card_views_do_not_hand_write_plan_claims(): void
     {
+        $this->assertNotEmpty(
+            PosPlanComparisonService::CARD_VIEWS,
+            'The POS billing panel still renders package cards — it must stay in CARD_VIEWS.'
+        );
+
         foreach (PosPlanComparisonService::CARD_VIEWS as $relative) {
             $path = base_path($relative);
             $this->assertFileExists($path);
@@ -306,6 +311,35 @@ class PosPlanCardClaimsTest extends TestCase
                 );
             }
         }
+    }
+
+    /**
+     * Task 1483 — the landing's card stack is gone; the comparison table is the
+     * buying surface there. It must therefore NOT be scanned as a card view
+     * (the table legitimately prints the very limits CARD_FORBIDDEN bans), and
+     * it must not quietly grow a card stack back.
+     */
+    public function test_the_landing_is_no_longer_a_card_view(): void
+    {
+        $landing = 'resources/views/pos/landing.blade.php';
+
+        $this->assertNotContains(
+            $landing,
+            PosPlanComparisonService::CARD_VIEWS,
+            'The landing renders the comparison table, not package cards — scanning it for plan numbers would fail forever.'
+        );
+
+        $source = (string) file_get_contents(base_path($landing));
+        $this->assertStringNotContainsString(
+            'cardHighlights',
+            $source,
+            'The landing package cards were deleted in Task 1483 — put the view back in CARD_VIEWS if they ever return.'
+        );
+        $this->assertStringContainsString(
+            '<x-pos-plan-comparison',
+            $source,
+            'The landing must still render the comparison table — it is the only package block on the page.'
+        );
     }
 
     public function test_card_lines_exist_in_all_three_languages(): void

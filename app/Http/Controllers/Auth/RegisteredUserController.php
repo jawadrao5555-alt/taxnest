@@ -23,7 +23,20 @@ class RegisteredUserController extends Controller
 {
     public function create(): View
     {
-        return view('auth.register');
+        // Task 1483: the Digital Invoice landing's comparison table sends the
+        // visitor here with ?plan=<package name>, so the page can name the
+        // column they clicked. This form has no package picker — the admin
+        // assigns the plan at approval — so an unknown or missing name simply
+        // shows nothing.
+        $requested = trim((string) request('plan'));
+        $picked = $requested === ''
+            ? null
+            : \App\Models\PricingPlan::where('product_type', 'di')
+                ->where('is_trial', false)
+                ->get()
+                ->first(fn ($plan) => mb_strtolower($plan->name) === mb_strtolower($requested));
+
+        return view('auth.register', ['pickedPlanName' => $picked?->name]);
     }
 
     public function store(Request $request): RedirectResponse

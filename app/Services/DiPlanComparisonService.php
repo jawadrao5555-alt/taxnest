@@ -162,16 +162,55 @@ class DiPlanComparisonService
         return $caps === [] ? null : min($caps);
     }
 
-    /** Column header data for each package. */
-    public static function planColumns(Collection $plans, ?int $currentPlanId = null): array
+    /**
+     * Column header data for each package.
+     *
+     * $withSignup adds the landing-page buying block (Task 1483). Digital
+     * Invoice quotes a MONTHLY price and lets the visitor switch the billing
+     * cycle, so the three price strings also ship an Alpine expression that
+     * the landing's cycle switch re-evaluates (calcMonthly / calcPrice live in
+     * the x-data the table is rendered inside). The server-rendered string is
+     * the monthly default, so the heading is correct before Alpine boots and
+     * on the panel surface, which never passes the flag.
+     */
+    public static function planColumns(Collection $plans, ?int $currentPlanId = null, bool $withSignup = false): array
     {
-        return $plans->map(fn (PricingPlan $plan) => [
-            'id'      => (int) $plan->id,
-            'name'    => $plan->name,
-            'price'   => 'Rs ' . number_format((float) $plan->sale_price) . '/mo',
-            'popular' => $plan->name === self::POPULAR_PLAN,
-            'current' => $currentPlanId !== null && (int) $plan->id === $currentPlanId,
-        ])->all();
+        return $plans->map(function (PricingPlan $plan) use ($currentPlanId, $withSignup) {
+            $col = [
+                'id'      => (int) $plan->id,
+                'name'    => $plan->name,
+                'price'   => 'Rs ' . number_format((float) $plan->sale_price) . '/mo',
+                'popular' => $plan->name === self::POPULAR_PLAN,
+                'current' => $currentPlanId !== null && (int) $plan->id === $currentPlanId,
+            ];
+
+            if (!$withSignup) {
+                return $col;
+            }
+
+            $sale = (float) $plan->sale_price;
+            $full = (float) $plan->price;
+
+            $col['price']        = 'Rs ' . number_format($sale);
+            $col['price_period'] = '/ month';
+            $col['price_x']      = "'Rs ' + calcMonthly({$sale}).toLocaleString()";
+
+            if ($sale < $full) {
+                $col['price_compare']   = 'Rs ' . number_format($full);
+                $col['price_compare_x'] = "'Rs ' + calcMonthly({$full}).toLocaleString()";
+                $col['sale_badge']      = $plan->sale_badge;
+            }
+
+            // Monthly billing has nothing extra to say; the other three cycles
+            // show what actually leaves the bank each time.
+            $col['price_note']   = '';
+            $col['price_note_x'] = "cycle === 'monthly' ? '' : 'Billed Rs ' + calcPrice({$sale}).toLocaleString()";
+
+            $col['cta_url']   = route('register', ['plan' => $plan->name], false);
+            $col['cta_label'] = 'Choose';
+
+            return $col;
+        })->all();
     }
 
     /**

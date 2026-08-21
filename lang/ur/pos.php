@@ -262,6 +262,9 @@ return [
     'auth_pra_tagline' => 'مال گریڈ ریٹیل اور ریسٹورنٹ POS',
     'auth_realtime_submit' => 'ریئل ٹائم سبمٹ',
     'auth_register_business_fbr' => 'اپنا کاروبار FBR POS کے لیے رجسٹر کریں',
+    // Shown when the visitor arrived from a package column on the pricing table (Task 1483).
+    'auth_picked_package' => 'آپ کا منتخب کردہ پیکج',
+    'auth_picked_package_note' => 'پہلے مفت ٹرائل شروع ہوگا — منظوری کے وقت یہ پیکج بتا دیجیے۔',
     'auth_register_business_pra' => 'اپنا کاروبار NestPOS کے لیے رجسٹر کریں',
     'auth_remember_me' => 'مجھے یاد رکھیں',
     'auth_resend_code' => 'کوڈ دوبارہ بھیجیں',
@@ -5342,6 +5345,13 @@ return [
     'pcmp_scroll_tip' => 'خوبیوں والا کالم اپنی جگہ رہتا ہے — پیکجز کو دائیں بائیں سرکائیں۔',
     'pcmp_included_title' => 'ہر پیکج میں شامل',
     'pcmp_included_sub' => 'یہ چیزیں ہر پیکج میں ملتی ہیں — پیکج بدلنے سے فرق نہیں پڑتا۔',
+    // Buying block in the column heading (Task 1483) — the table IS the
+    // package block on the landing page, so each column can be taken from here.
+    'pcmp_per_year' => 'سالانہ',
+    'pcmp_or_quarterly' => 'یا Rs :price تین مہینے کے',
+    'pcmp_sale_annual_only' => '(رعایت صرف سالانہ قیمت پر ہے)',
+    'pcmp_choose' => 'منتخب کریں',
+    'pcmp_pick_package' => 'پیکج منتخب کریں',
     'pcmp_bills' => 'ہر مہینے بل',
     'pcmp_bills_hint' => 'PRA فسکل بل',
     'pcmp_team' => 'ٹیم اکاؤنٹس',

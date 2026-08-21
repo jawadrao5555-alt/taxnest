@@ -58,7 +58,7 @@
                         <p class="text-sm text-purple-200/50 mt-1">{{ __('pos.auth_register_business_pra') }}</p>
                     </div>
 
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', planId: '{{ old('pricing_plan_id', '') }}' }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}' }">
                         @csrf
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at

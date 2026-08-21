@@ -134,7 +134,20 @@ class FbrPosAuthController extends Controller
         if (Auth::guard('fbrpos')->check()) {
             return $this->redirectToPortal();
         }
-        return view('fbr-pos.auth.register');
+
+        // Task 1483: the landing's comparison table sends the shop here with
+        // ?plan=<package name>, so the page can name the column it clicked.
+        // This form has no package picker — the admin still assigns the plan at
+        // approval — so an unknown or missing name just shows nothing.
+        $requested = trim((string) request('plan'));
+        $picked = $requested === ''
+            ? null
+            : \App\Models\PricingPlan::where('product_type', 'fbrpos')
+                ->where('is_trial', false)
+                ->get()
+                ->first(fn ($plan) => mb_strtolower($plan->name) === mb_strtolower($requested));
+
+        return view('fbr-pos.auth.register', ['pickedPlanName' => $picked?->name]);
     }
 
     public function register(Request $request)

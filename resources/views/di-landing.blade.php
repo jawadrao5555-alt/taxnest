@@ -643,133 +643,17 @@
                 </div>
 
                 @if(isset($plans) && $plans->count())
-                @php
-                    // Task 135: Premium is featured on its own wide card below the
-                    // grid; if renamed it falls back into the normal grid.
-                    $premiumPlan = $plans->firstWhere('name', 'Premium');
-                    $gridPlans = $premiumPlan ? $plans->reject(fn ($p) => $p->id === $premiumPlan->id) : $plans;
-                @endphp
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-[1200px] mx-auto">
-                    @foreach($gridPlans as $plan)
-                    @php
-                        $isPopular = $plan->name === 'Business';
-                        $hasOffer = $plan->sale_percent > 0;
-                    @endphp
-                    <div class="card-solid rounded-lg overflow-hidden flex flex-col border border-gray-200 bg-white">
-                        <div class="p-8 flex-1 flex flex-col">
-                            @if($isPopular)
-                                <div class="text-[#0A4D5C] text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-[#E7BF3B]"></span> Recommended
-                                </div>
-                            @endif
-                            <h4 class="font-serif text-2xl text-[#052730]">{{ $plan->name }}</h4>
-                            
-                            <div class="mt-6 mb-8 border-b border-gray-100 pb-8">
-                                <div x-show="cycle === 'monthly'">
-                                    @if($hasOffer)<span class="text-sm text-gray-400 line-through block mb-1">PKR {{ number_format($plan->price, 0) }}</span>@endif
-                                    <div class="flex items-baseline gap-1">
-                                        <span class="text-4xl font-bold text-gray-900 tracking-tight">PKR {{ number_format($plan->sale_price, 0) }}</span>
-                                        <span class="text-gray-500 text-sm font-medium">/mo</span>
-                                    </div>
-                                </div>
-                                <div x-show="cycle !== 'monthly'" style="display:none;">
-                                    @if($hasOffer)<span class="text-sm text-gray-400 line-through block mb-1">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>@endif
-                                    <div class="flex items-baseline gap-1">
-                                        <span class="text-4xl font-bold text-gray-900 tracking-tight">PKR <span x-text="calcMonthly({{ $plan->sale_price }}).toLocaleString()"></span></span>
-                                        <span class="text-gray-500 text-sm font-medium">/mo</span>
-                                    </div>
-                                    <div class="mt-2 text-xs text-gray-500 font-medium">
-                                        Billed PKR <span x-text="calcPrice({{ $plan->sale_price }}).toLocaleString()"></span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            @php
-                                $diFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
-                            @endphp
-                            
-                            <ul class="space-y-4 mb-8 flex-1">
-                                @if(!empty($diFeatures))
-                                    @foreach($diFeatures as $feature)
-                                    <li class="flex items-start gap-3 text-sm text-gray-600">
-                                        <span class="text-gray-400 flex-shrink-0 mt-0.5">—</span>
-                                        {{ $feature }}
-                                    </li>
-                                    @endforeach
-                                @else
-                                    <li class="flex items-start gap-3 text-sm text-gray-600">
-                                        <span class="text-gray-400 flex-shrink-0 mt-0.5">—</span>
-                                        {{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) . ' invoices/mo' : 'Unlimited invoices' }}
-                                    </li>
-                                    <li class="flex items-start gap-3 text-sm text-gray-600">
-                                        <span class="text-gray-400 flex-shrink-0 mt-0.5">—</span>
-                                        FBR PRAL API Submission
-                                    </li>
-                                @endif
-                            </ul>
-
-                            <a href="/register" class="w-full btn-solid {{ $isPopular ? 'btn-dark' : 'btn-secondary border-gray-300' }}">
-                                Start Free Trial
-                            </a>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-
-                @if($premiumPlan)
-                @php
-                    $premiumFeats = $premiumPlan->features;
-                    if (is_string($premiumFeats)) $premiumFeats = json_decode($premiumFeats, true);
-                    if (is_string($premiumFeats)) $premiumFeats = json_decode($premiumFeats, true);
-                    if (!is_array($premiumFeats)) $premiumFeats = [];
-                @endphp
-                <div class="mt-6 max-w-[1200px] mx-auto rounded-lg overflow-hidden bg-[#052730] relative">
-                    <div class="absolute top-0 left-0 right-0 h-1 bg-[#E7BF3B]"></div>
-                    <div class="p-8 md:p-10 md:flex md:items-start md:justify-between md:gap-10">
-                        <div class="flex-1">
-                            <div class="text-[#E7BF3B] text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <span class="w-1.5 h-1.5 rounded-full bg-[#E7BF3B]"></span> Premium
-                            </div>
-                            <h4 class="font-serif text-3xl text-white">{{ $premiumPlan->name }}</h4>
-                            <p class="mt-2 text-sm text-white/70 font-light max-w-xl">The complete toolkit for firms that bill at scale — white-label branding, API integration, AI-assisted invoicing and automated billing.</p>
-                            <ul class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-                                @foreach($premiumFeats as $feature)
-                                <li class="flex items-start gap-3 text-sm text-white/80">
-                                    <span class="text-[#E7BF3B] flex-shrink-0 mt-0.5">—</span>
-                                    {{ $feature }}
-                                </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                        <div class="mt-8 md:mt-0 md:w-72 flex-shrink-0 md:text-right">
-                            <div x-show="cycle === 'monthly'">
-                                <div class="flex items-baseline gap-1 md:justify-end">
-                                    <span class="text-4xl font-bold text-white tracking-tight">PKR {{ number_format($premiumPlan->sale_price, 0) }}</span>
-                                    <span class="text-white/60 text-sm font-medium">/mo</span>
-                                </div>
-                            </div>
-                            <div x-show="cycle !== 'monthly'" style="display:none;">
-                                <div class="flex items-baseline gap-1 md:justify-end">
-                                    <span class="text-4xl font-bold text-white tracking-tight">PKR <span x-text="calcMonthly({{ $premiumPlan->sale_price }}).toLocaleString()"></span></span>
-                                    <span class="text-white/60 text-sm font-medium">/mo</span>
-                                </div>
-                                <div class="mt-2 text-xs text-white/60 font-medium">
-                                    Billed PKR <span x-text="calcPrice({{ $premiumPlan->sale_price }}).toLocaleString()"></span>
-                                </div>
-                            </div>
-                            <p class="text-xs text-white/60 mt-2">Unlimited invoices &middot; users &middot; branches</p>
-                            <a href="/register" class="btn-solid btn-gold w-full mt-6 font-bold">Start Free Trial</a>
-                        </div>
-                    </div>
-                </div>
-                @endif
-
-                {{-- Package comparison (Task 1383). Sits UNDER the price cards and is
-                     generated by DiPlanComparisonService: limit numbers from the
+                {{-- Task 1483 — the comparison table IS the package block now: the
+                     card grid (plus Premium's own wide card) that used to sit here
+                     repeated the table in prose and its buttons carried no package.
+                     Premium is an ordinary column like the rest, and the billing
+                     toggle above drives the prices in the column headings through
+                     the calcMonthly/calcPrice expressions this x-data exposes.
+                     Generated by DiPlanComparisonService: limit numbers from the
                      pricing_plans columns the DI middleware really reads, ticks from
                      DiFeatureService::planIncludes() — the same matrix lookup the
                      panel's gate ends on. Nothing here is hand-typed. --}}
-                <x-di-plan-comparison :plans="$plans" surface="landing" class="mt-16" />
+                <x-di-plan-comparison :plans="$plans" surface="landing" />
                 @endif
             </div>
         </div>

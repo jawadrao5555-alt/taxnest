@@ -60,6 +60,9 @@
         .card h1 { font-size: 17px; margin-bottom: 8px; }
         .card p { font-size: 13px; color: #6b7280; line-height: 1.6; }
         .stale, .last-seen { display: none; padding: 6px 16px; font-size: 11px; font-weight: 600; color: #92400e; background: #fef3c7; flex-shrink: 0; }
+        /* Task #1401: bilingual layer names must stay readable on a phone. */
+        .leaflet-control-layers { font-size: 12px; line-height: 1.6; }
+        .leaflet-control-layers-base label { white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -97,6 +100,15 @@
     <div id="last-seen-note" class="last-seen"></div>
     <div id="map"></div>
     <div class="note">{{ __('pos.rt_pub_note', [], 'rur') }} · {{ __('pos.rt_pub_note', [], 'en') }}</div>
+    @php
+        // Task #1401: page has no locale (bilingual by design) — Roman Urdu ·
+        // English, collapsed to one word when both languages read the same.
+        $bi = function (string $key) {
+            $rur = __('pos.' . $key, [], 'rur');
+            $en  = __('pos.' . $key, [], 'en');
+            return $rur === $en ? $rur : $rur . ' · ' . $en;
+        };
+    @endphp
     <script>
     (function () {
         var TOKEN = @js($token);
@@ -110,15 +122,89 @@
             delivered:  @js(__('pos.rt_pub_st_delivered', [], 'rur') . ' · ' . __('pos.rt_pub_st_delivered', [], 'en')),
             returned:   @js(__('pos.rt_pub_st_returned', [], 'rur') . ' · ' . __('pos.rt_pub_st_returned', [], 'en'))
         };
+        // Task #1401: same basemap switcher the shop map already runs — a small
+        // abadi has NO lanes on the street tiles, so the customer only sees his
+        // gali on the imagery.
+        var LAYER_LABELS = {
+            streets:   @js($bi('rt_layer_streets')),
+            satellite: @js($bi('rt_layer_satellite'))
+        };
+        var GMAPS_LABEL = @js($bi('rt_open_in_gmaps'));
+        var MARKER_LABELS = {
+            rider: @js($bi('rt_pub_marker_rider')),
+            dest:  @js($bi('rt_pub_marker_dest'))
+        };
         var map = L.map('map', {
             maxBounds: [[22.8, 60.4], [37.5, 77.6]],
             maxBoundsViscosity: 1.0,
-            minZoom: 5
+            minZoom: 5,
+            // Over-zoom past the providers' native zoom (tiles get scaled) so a
+            // 3-metre gali stays readable — same depth as the shop map.
+            maxZoom: 21
         });
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19,
+        // Carto Voyager — English/Latin place labels (owner rule: OSM's own
+        // tiles label Pakistani cities in Urdu script).
+        var streetsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxNativeZoom: 19,
+            maxZoom: 21,
+            subdomains: 'abcd',
             attribution: '&copy; OpenStreetMap &middot; &copy; CARTO'
-        }).addTo(map);
+        });
+        // Esri World Imagery = free, no API key, no paid tiles. English labels
+        // ride on top via the Carto labels-only overlay. Neither request fires
+        // until this layer is actually picked, so a streets-only visit stays
+        // exactly as fast as before.
+        var satelliteLayer = L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxNativeZoom: 18,
+                maxZoom: 21,
+                attribution: 'Imagery &copy; Esri'
+            }),
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+                maxNativeZoom: 19,
+                maxZoom: 21,
+                subdomains: 'abcd',
+                attribution: '&copy; OpenStreetMap &middot; &copy; CARTO'
+            })
+        ]);
+        streetsLayer.rtKey = 'streets';
+        satelliteLayer.rtKey = 'sat';
+        // Chosen layer is remembered in the customer's own browser.
+        var savedLayer = 'streets';
+        try { savedLayer = localStorage.getItem('rt_pub_basemap') || 'streets'; } catch (e) {}
+        (savedLayer === 'sat' ? satelliteLayer : streetsLayer).addTo(map);
+        var layerOptions = {};
+        layerOptions[LAYER_LABELS.streets] = streetsLayer;
+        layerOptions[LAYER_LABELS.satellite] = satelliteLayer;
+        L.control.layers(layerOptions, null, { position: 'topright', collapsed: false }).addTo(map);
+        map.on('baselayerchange', function (e) {
+            var key = (e.layer && e.layer.rtKey) === 'sat' ? 'sat' : 'streets';
+            try { localStorage.setItem('rt_pub_basemap', key); } catch (err) {}
+        });
+
+        function esc(s) {
+            return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+        // Free Google Maps deep link only — no API key, no Google tiles.
+        function gmapsPopup(title, lat, lng) {
+            var la = Number(lat), ln = Number(lng);
+            var head = '<div style="font-size:12px;font-weight:700;margin-bottom:4px">' + esc(title) + '</div>';
+            if (!isFinite(la) || !isFinite(ln)) return head;
+            var url = 'https://www.google.com/maps/search/?api=1&query='
+                + encodeURIComponent(la.toFixed(6) + ',' + ln.toFixed(6));
+            return head + '<a href="' + url + '" target="_blank" rel="noopener"'
+                + ' style="font-size:12px;font-weight:600;color:#0A4D5C;text-decoration:underline">'
+                + esc(GMAPS_LABEL) + '</a>';
+        }
+        function setPopup(marker, title, lat, lng) {
+            var html = gmapsPopup(title, lat, lng);
+            // setPopupContent keeps an already-open popup open (and its link
+            // pointing at the LATEST fix, not where the rider used to be).
+            if (marker.getPopup()) marker.setPopupContent(html);
+            else marker.bindPopup(html);
+        }
 
         var riderIcon = L.divIcon({ className: '', html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">🛵</div>', iconSize: [26, 26], iconAnchor: [13, 13] });
         var homeIcon  = L.divIcon({ className: '', html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">📍</div>', iconSize: [26, 26], iconAnchor: [13, 24] });
@@ -146,6 +232,7 @@
             }
             if (d.customer && !homeMarker) {
                 homeMarker = L.marker([d.customer.lat, d.customer.lng], { icon: homeIcon }).addTo(map);
+                setPopup(homeMarker, MARKER_LABELS.dest, d.customer.lat, d.customer.lng);
             }
             if (d.rider) {
                 stale.style.display = 'none';
@@ -155,6 +242,7 @@
                 lastSeen.textContent = riderIsStale ? lastSeenCaption(secondsAgo) : '';
                 if (!riderMarker) riderMarker = L.marker([d.rider.lat, d.rider.lng], { icon: riderIcon }).addTo(map);
                 else riderMarker.setLatLng([d.rider.lat, d.rider.lng]);
+                setPopup(riderMarker, MARKER_LABELS.rider, d.rider.lat, d.rider.lng);
                 riderMarker.setOpacity(riderIsStale ? 0.48 : 1);
                 if (d.customer) {
                     var pts = [[d.rider.lat, d.rider.lng], [d.customer.lat, d.customer.lng]];

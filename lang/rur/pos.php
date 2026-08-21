@@ -3355,6 +3355,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_pub_delivered_p' => 'Aap ka order pahunch chuka hai — shukriya!',
     'rt_pub_expired_h' => 'Link expire ho gaya',
     'rt_pub_expired_p' => 'Yeh tracking link ab kaam nahi kar raha.',
+    // Task #1401: map marker popups (Google Maps deep link) on the public page.
+    'rt_pub_marker_dest' => 'Aap ka pata',
+    'rt_pub_marker_rider' => 'Rider',
     'rt_pub_note' => 'Aap ka rider live map par — page khud refresh hota hai.',
     'rt_pub_returned_h' => 'Order wapas ho gaya',
     'rt_pub_returned_p' => 'Yeh order wapas kar diya gaya hai.',

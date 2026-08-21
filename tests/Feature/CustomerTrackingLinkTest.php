@@ -294,6 +294,44 @@ class CustomerTrackingLinkTest extends TestCase
         $this->assertStringContainsString('riderMarker.setOpacity', $html);
     }
 
+    public function test_public_page_offers_satellite_layer_and_google_maps_links(): void
+    {
+        // Task #1401: same street-level lane view the shop map already has —
+        // Streets/Satellite switcher (remembered), deeper zoom, and the free
+        // Google Maps deep link on the rider + destination markers.
+        $company = $this->makeCompany();
+        $rider = PosRider::create([
+            'company_id' => $company->id, 'name' => 'Bilal', 'on_duty' => true,
+            'last_lat' => 31.53, 'last_lng' => 74.35, 'last_located_at' => now(),
+        ]);
+        $bill = $this->makeBill($company, [
+            'rider_id' => $rider->id, 'delivery_status' => 'dispatched',
+            'customer_lat' => 31.5204, 'customer_lng' => 74.3587,
+            'track_token' => str_repeat('f', 48),
+        ]);
+
+        $html = app(PosRiderTrackingController::class)
+            ->publicTrackPage($bill->track_token)->render();
+
+        // Free imagery + English labels overlay, no API key / paid tiles.
+        $this->assertStringContainsString('World_Imagery', $html);
+        $this->assertStringContainsString('voyager_only_labels', $html);
+        $this->assertStringNotContainsString('maps.googleapis.com', $html);
+        // Satellite tiles are only built into a layer group — they load when
+        // that layer is picked, not on page open.
+        $this->assertStringContainsString('L.control.layers(layerOptions', $html);
+        $this->assertStringContainsString("localStorage.getItem('rt_pub_basemap')", $html);
+        $this->assertStringContainsString("localStorage.setItem('rt_pub_basemap'", $html);
+        // Deeper zoom than the old fixed 19.
+        $this->assertStringContainsString('maxZoom: 21', $html);
+        // Google Maps deep link wired to BOTH markers.
+        $this->assertStringContainsString('google.com/maps/search/?api=1&query=', $html);
+        $this->assertStringContainsString('setPopup(riderMarker, MARKER_LABELS.rider', $html);
+        $this->assertStringContainsString('setPopup(homeMarker, MARKER_LABELS.dest', $html);
+        // Public payload stays exactly as minimal as before.
+        $this->assertStringNotContainsString('INV-1', $html);
+    }
+
     public function test_public_poll_delivered_bill_is_done_without_rider(): void
     {
         $company = $this->makeCompany();

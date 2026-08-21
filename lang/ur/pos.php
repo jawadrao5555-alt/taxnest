@@ -3353,6 +3353,9 @@ return [
     'rt_pub_delivered_p' => 'آپ کا آرڈر پہنچ چکا ہے — شکریہ!',
     'rt_pub_expired_h' => 'لنک ختم ہو گیا',
     'rt_pub_expired_p' => 'یہ ٹریکنگ لنک اب فعال نہیں ہے۔',
+    // Task #1401: map marker popups (Google Maps deep link) on the public page.
+    'rt_pub_marker_dest' => 'آپ کا پتہ',
+    'rt_pub_marker_rider' => 'رائیڈر',
     'rt_pub_note' => 'آپ کا رائیڈر لائیو نقشے پر — صفحہ خود ریفریش ہوتا ہے۔',
     'rt_pub_returned_h' => 'آرڈر واپس ہو گیا',
     'rt_pub_returned_p' => 'یہ آرڈر واپس کر دیا گیا ہے۔',

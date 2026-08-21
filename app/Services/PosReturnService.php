@@ -85,7 +85,18 @@ class PosReturnService
         try {
             // whereDate: pos_day_close_reports is tiny (one row/day/company)
             // and the date-cast column may carry a time part on some drivers.
+            // Task 1360: the close is PER BRANCH — this bill is frozen only by
+            // its OWN branch's Z-report (plus any company-wide one, which is
+            // what a branch-less shop and all pre-branch history produce).
+            // Without this, Gulberg's close would block returns on Main Shop's
+            // still-open bills.
+            $branchKey = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'branch_id')
+                ? \App\Models\PosDayCloseReport::branchKey($txn->branch_id ? (int) $txn->branch_id : null)
+                : null;
+
             return \App\Models\PosDayCloseReport::where('company_id', $txn->company_id)
+                ->when($branchKey !== null && \Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'branch_id'),
+                    fn ($q) => $q->whereIn('branch_id', array_unique([$branchKey, \App\Models\PosDayCloseReport::NO_BRANCH])))
                 ->whereDate('report_date', $date)->exists();
         } catch (\Throwable $e) {
             // Prod schema drift — never block/500 the bills list over this.

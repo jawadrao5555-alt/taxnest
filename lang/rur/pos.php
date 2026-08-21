@@ -879,6 +879,11 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dayclose_bills_submitted' => ' :count bill FBR ko jama ho gaye.',
     'dayclose_bills_submitted_pra' => ' :count bill PRA ko jama ho gaye.',
     'dayclose_no_transactions' => 'Is date ke liye koi transaction nahi mili.',
+    // Per-branch day close (Task 1360)
+    'dayclose_branch_scope' => ':branch band ho rahi hai — neeche ke figures, save hone wali report aur local bills ki safai sab sirf isi branch ki hain.',
+    'dayclose_all_branches_hint' => 'Aap sab branches dekh rahe hain. Ye figures poori company ke hain — din band karne ke liye pehle koi branch chunein.',
+    'dayclose_pick_branch' => 'Pehle koi branch chunein — "Sab branches" sirf dekhne ka tareeqa hai, har branch apna din khud band karti hai.',
+    'dayclose_other_branch_report' => 'Ye Day Close Report doosri branch ki hai.',
     'dayclose_report_exists' => 'Is date ka Day Close Report pehle se majood hai.',
     'dayclose_report_generated' => 'Day Close Report :number generate ho gaya hai :date ke liye',
     'dayclose_report_generated_for' => 'Day Close Report :number kamyabi se generate ho gaya hai :date ke liye',

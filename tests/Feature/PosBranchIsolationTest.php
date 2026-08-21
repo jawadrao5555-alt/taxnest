@@ -8,6 +8,7 @@ use App\Services\BranchContextService;
 use App\Services\PlanLimitService;
 use App\Services\PosBusinessDay;
 use App\Services\PosFeatureService;
+use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -92,6 +93,8 @@ class PosBranchIsolationTest extends TestCase
             // Branch scoping is what's under test, not cashier isolation.
             $table->boolean('pos_cashier_own_sales_only')->nullable();
             $table->boolean('pos_setup_completed')->default(true);
+            // Opt-in 6 AM sweep (per-branch since Task 1360).
+            $table->boolean('pos_auto_dayclose_24h')->default(false);
             $table->text('feature_flags')->nullable();
             $table->softDeletes();
             $table->timestamps();
@@ -226,6 +229,8 @@ class PosBranchIsolationTest extends TestCase
         Schema::create('pos_day_close_reports', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');
+            // Task 1360: 0 = company-wide (branch-less shop / pre-branch history).
+            $table->unsignedBigInteger('branch_id')->default(0);
             $table->date('report_date');
             $table->string('report_number')->nullable();
             $table->integer('deleted_final_count')->default(0);
@@ -264,6 +269,7 @@ class PosBranchIsolationTest extends TestCase
         Schema::create('pos_day_openings', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('branch_id')->default(0); // Task 1360
             $table->date('business_date');
             $table->decimal('opening_cash', 14, 2)->default(0);
             $table->unsignedBigInteger('entered_by')->nullable();
@@ -511,6 +517,33 @@ class PosBranchIsolationTest extends TestCase
         return $id;
     }
 
+    /** A completed LOCAL (reporting-off) bill — the kind the day-close wash sweeps. */
+    private function makeLocalBill(int $companyId, string $number, float $subtotal, ?int $branchId): int
+    {
+        $tax = round($subtotal * 0.1, 2);
+
+        return (int) DB::table('pos_transactions')->insertGetId([
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'invoice_number' => $number,
+            'transaction_type' => 'sale',
+            'business_date' => PosBusinessDay::current($companyId),
+            'status' => 'completed',
+            // The "local" triple (completed + local + local) — anything else is
+            // a different stream and the wash must leave it alone.
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'is_archived' => false,
+            'subtotal' => $subtotal,
+            'discount_amount' => 0,
+            'tax_rate' => 10,
+            'tax_amount' => $tax,
+            'total_amount' => $subtotal + $tax,
+            'payment_method' => 'cash',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
     /**
      * The canonical two-branch shop:
      *   Main Shop  P-MAIN  1000 + 100 tax = 1100
@@ -605,6 +638,30 @@ class PosBranchIsolationTest extends TestCase
         $branch = DB::table('pos_transactions')->where('id', $response->json('transaction_id'))->value('branch_id');
 
         return $branch === null ? null : (int) $branch;
+    }
+
+    /** Close the open business day over real HTTP while standing on $branch. */
+    private function closeDayFrom(User $user, $branch, array $payload = [])
+    {
+        return $this->actingAs($user, 'pos')
+            ->withSession([BranchContextService::SESSION_KEY => $branch])
+            ->post('/pos/day-close', $payload);
+    }
+
+    /** The saved Z-report row for a branch (null branch = the company-wide row). */
+    private function savedReport(int $companyId, ?int $branchId)
+    {
+        return $this->reportOn($companyId, $branchId, PosBusinessDay::current($companyId));
+    }
+
+    /** The saved Z-report row for a branch on a given date. */
+    private function reportOn(int $companyId, ?int $branchId, string $date)
+    {
+        return DB::table('pos_day_close_reports')
+            ->where('company_id', $companyId)
+            ->where('branch_id', $branchId ?: 0)
+            ->whereDate('report_date', $date)
+            ->first();
     }
 
     /** Restaurant-featured company (RestaurantOnly middleware + plan module). */
@@ -716,6 +773,155 @@ class PosBranchIsolationTest extends TestCase
         $this->assertSame(2, (int) $stats->total_invoices);
         $this->assertSame(770.0, (float) $stats->total_amount);
         $this->assertSame(770.0, (float) $stats->cash_amount);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 1b. DAY CLOSE — what the branch previewed is what the branch freezes
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function test_saved_day_close_report_matches_the_branch_preview(): void
+    {
+        // THE bug (Task 1360): Gulberg's cashier previewed Rs 770 and the
+        // saved Z-report froze Rs 1,870 — both branches plus legacy history.
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->standOn($companyId, $owner, $cityId);
+        $preview = $this->dayCloseStats($companyId);
+
+        $this->closeDayFrom($owner, $cityId)->assertSessionHas('success');
+
+        $saved = $this->savedReport($companyId, $cityId);
+        $this->assertNotNull($saved, "Gulberg's close must save a report stamped with Gulberg");
+        $this->assertSame((float) $preview->total_amount, (float) $saved->total_amount,
+            'the frozen total must be the previewed total, never the company-wide one');
+        $this->assertSame(770.0, (float) $saved->total_amount);
+        $this->assertSame(770.0, (float) $saved->cash_amount, 'the drawer is reconciled against this branch only');
+        $this->assertSame(2, (int) $saved->total_invoices, 'Gulberg bill + legacy bill');
+        $this->assertNull($this->savedReport($companyId, null),
+            'a branch close must not also mint a company-wide report');
+    }
+
+    public function test_closing_one_branch_leaves_the_other_branch_open(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->closeDayFrom($owner, $cityId)->assertSessionHas('success');
+
+        // Main Shop's day is untouched: no report, page still shows its figures.
+        $this->assertNull($this->savedReport($companyId, $mainId));
+        $this->standOn($companyId, $owner, $mainId);
+        $data = (new PosController())->dayCloseReport(
+            Request::create('/pos/day-close', 'GET', ['date' => PosBusinessDay::current($companyId)])
+        )->getData();
+        $this->assertNull($data['existingReport'], "Gulberg's close must not close Main Shop's day");
+        $this->assertSame(1320.0, (float) $data['stats']->total_amount);
+
+        // ...and Main Shop can still close its own day afterwards.
+        $this->closeDayFrom($owner, $mainId)->assertSessionHas('success');
+        $this->assertSame(1320.0, (float) $this->savedReport($companyId, $mainId)->total_amount);
+    }
+
+    public function test_day_close_wash_only_touches_its_own_branchs_local_bills(): void
+    {
+        // Standing policy = archive local bills at close. One branch's close
+        // must not sweep the other branch's still-open local bills away.
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $owner = $this->makeUser($companyId);
+        $mainLocal = $this->makeLocalBill($companyId, 'L-MAIN', 300, $mainId);
+        $cityLocal = $this->makeLocalBill($companyId, 'L-CITY', 400, $cityId);
+
+        $this->closeDayFrom($owner, $cityId)->assertSessionHas('success');
+
+        $this->assertTrue((bool) DB::table('pos_transactions')->where('id', $cityLocal)->value('is_archived'),
+            "Gulberg's own local bill is washed by Gulberg's close");
+        $this->assertFalse((bool) DB::table('pos_transactions')->where('id', $mainLocal)->value('is_archived'),
+            "Main Shop's local bill must survive Gulberg's close — it is still a live, uncounted bill");
+    }
+
+    public function test_report_number_and_opening_cash_are_per_branch(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+        $owner = $this->makeUser($companyId);
+
+        // Each branch counts its own drawer float at day start.
+        $this->actingAs($owner, 'pos')->withSession([BranchContextService::SESSION_KEY => $mainId])
+            ->post('/pos/day-opening', ['opening_cash' => 5000])->assertSessionHas('success');
+        $this->actingAs($owner, 'pos')->withSession([BranchContextService::SESSION_KEY => $cityId])
+            ->post('/pos/day-opening', ['opening_cash' => 2000])->assertSessionHas('success');
+
+        $this->closeDayFrom($owner, $cityId)->assertSessionHas('success');
+        $this->closeDayFrom($owner, $mainId)->assertSessionHas('success');
+
+        $city = $this->savedReport($companyId, $cityId);
+        $main = $this->savedReport($companyId, $mainId);
+
+        $this->assertSame(2000.0, (float) $city->opening_float, "Gulberg's Z-report opens with Gulberg's float");
+        $this->assertSame(5000.0, (float) $main->opening_float);
+
+        // Each branch keeps its OWN Z sequence — Main Shop's first close is #1
+        // even though Gulberg closed first.
+        $this->assertSame('ZRPT-POS-B' . $cityId . '-00001', $city->report_number);
+        $this->assertSame('ZRPT-POS-B' . $mainId . '-00001', $main->report_number);
+    }
+
+    public function test_all_branches_view_cannot_close_the_day(): void
+    {
+        // Half-branch-aware is the dangerous state: a company-wide close from
+        // the reporting view would belong to no branch while every branch's
+        // own page still said "not closed".
+        [$companyId, , ] = $this->seedTwoBranchShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->closeDayFrom($owner, BranchContextService::ALL)->assertSessionHas('error');
+
+        $this->assertSame(0, DB::table('pos_day_close_reports')->where('company_id', $companyId)->count(),
+            'no report may be saved from the company-wide view');
+
+        // Opening cash has no single drawer there either.
+        $this->actingAs($owner, 'pos')->withSession([BranchContextService::SESSION_KEY => BranchContextService::ALL])
+            ->post('/pos/day-opening', ['opening_cash' => 1000])->assertSessionHas('error');
+        $this->assertSame(0, DB::table('pos_day_openings')->where('company_id', $companyId)->count());
+    }
+
+    public function test_a_branch_less_shop_still_closes_company_wide(): void
+    {
+        // Regression guard: the per-branch rule must be invisible to the
+        // (majority) single-branch shops — one report, old number format.
+        $companyId = $this->makeCompany();
+        $this->subscribe($companyId);
+        $this->makeBill($companyId, 'P-1', 1000, null);
+        $owner = $this->makeUser($companyId);
+
+        $this->actingAs($owner, 'pos')->post('/pos/day-close')->assertSessionHas('success');
+
+        $report = $this->savedReport($companyId, null);
+        $this->assertNotNull($report);
+        $this->assertSame('ZRPT-POS-00001', $report->report_number, 'branch-less shops keep the original numbering');
+        $this->assertSame(1100.0, (float) $report->total_amount);
+    }
+
+    public function test_auto_close_closes_each_branch_separately(): void
+    {
+        // The 6 AM sweep follows the same rule — one Z-report per branch, each
+        // with its own figures, instead of a single company-wide report.
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop(['pos_auto_dayclose_24h' => true]);
+        $this->makeUser($companyId); // the sweep records the company admin as closer
+        $yesterday = Carbon::parse(PosBusinessDay::current($companyId))->subDay()->toDateString();
+        DB::table('pos_transactions')->where('company_id', $companyId)
+            ->update(['business_date' => $yesterday, 'created_at' => Carbon::parse($yesterday)->setTime(13, 0)]);
+
+        $this->artisan('pos:auto-dayclose')->assertExitCode(0);
+
+        $main = $this->reportOn($companyId, $mainId, $yesterday);
+        $city = $this->reportOn($companyId, $cityId, $yesterday);
+        $this->assertNotNull($main, 'Main Shop gets its own auto-close report');
+        $this->assertNotNull($city, 'Gulberg gets its own auto-close report');
+        $this->assertSame(1320.0, (float) $main->total_amount);
+        $this->assertSame(770.0, (float) $city->total_amount);
+        $this->assertNull($this->reportOn($companyId, null, $yesterday),
+            'the sweep must not also write a company-wide report for a branched shop');
     }
 
     // ════════════════════════════════════════════════════════════════════════

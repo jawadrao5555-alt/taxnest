@@ -6,8 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class PosDayCloseReport extends Model
 {
+    /**
+     * Per-branch day close (Task 1360): branch_id 0 = "no branch" — a
+     * branch-less shop, the pre-branch history, and every report frozen before
+     * this feature. Never NULL, so the (company, branch, date) unique index
+     * keeps working on MySQL and SQLite alike (both treat NULLs as distinct).
+     */
+    public const NO_BRANCH = 0;
+
     protected $fillable = [
-        'company_id', 'report_date', 'report_number',
+        'company_id', 'branch_id', 'report_date', 'report_number',
         'total_invoices', 'pra_invoices', 'local_invoices', 'offline_invoices',
         'gross_sales', 'total_discount', 'net_sales', 'total_tax', 'total_amount',
         'cash_amount', 'card_amount', 'other_amount',
@@ -42,6 +50,31 @@ class PosDayCloseReport extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /** Normalise an active-branch id (null = company-wide) to the stored key. */
+    public static function branchKey(?int $branchId): int
+    {
+        return (int) ($branchId ?: self::NO_BRANCH);
+    }
+
+    /**
+     * Reports for ONE close scope (Task 1360). Schema-guarded: a box whose
+     * branch migration has not landed keeps its old company-wide behaviour
+     * instead of exploding on an unknown column (prod drift convention).
+     */
+    public function scopeForBranch($query, ?int $branchId)
+    {
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'branch_id')) {
+            $query->where('branch_id', self::branchKey($branchId));
+        }
+
+        return $query;
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function closedByUser()

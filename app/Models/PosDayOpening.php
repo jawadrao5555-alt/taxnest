@@ -15,6 +15,10 @@ class PosDayOpening extends Model
 
     protected $fillable = [
         'company_id',
+        // Per-branch day close (Task 1360): each branch counts its own drawer.
+        // 0 = no branch (branch-less shop / pre-branch history) — never NULL,
+        // see PosDayCloseReport::NO_BRANCH for why.
+        'branch_id',
         'business_date',
         'opening_cash',
         'entered_by',
@@ -31,13 +35,19 @@ class PosDayOpening extends Model
         return $this->belongsTo(User::class, 'entered_by');
     }
 
-    /** The recorded opening for a company + date, or null. */
-    public static function forDate(int $companyId, string $date): ?self
+    /**
+     * The recorded opening for a company + date, or null. Task 1360: scoped to
+     * the close's branch — schema-guarded so a box without the branch column
+     * keeps its old company-wide lookup.
+     */
+    public static function forDate(int $companyId, string $date, ?int $branchId = null): ?self
     {
         if (!\Illuminate\Support\Facades\Schema::hasTable('pos_day_openings')) {
             return null;
         }
         return static::where('company_id', $companyId)
+            ->when(\Illuminate\Support\Facades\Schema::hasColumn('pos_day_openings', 'branch_id'),
+                fn ($q) => $q->where('branch_id', PosDayCloseReport::branchKey($branchId)))
             ->whereDate('business_date', $date)
             ->first();
     }

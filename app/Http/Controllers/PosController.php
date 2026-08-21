@@ -1711,9 +1711,13 @@ class PosController extends Controller
         // dashboard prompts entry at day start; locked once today is closed.
         // Task 56: keys on the BUSINESS day (per-company cutoff) so at 2 AM a
         // late-night shop still sees/locks yesterday's drawer opening.
+        // Task 1360: day close is per branch — the card must show THIS branch's
+        // drawer and only call the day closed once this branch has closed it.
+        $dashBranchId = $this->dayCloseBranchId();
         $todayDate = $bizToday;
-        $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $todayDate);
+        $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $todayDate, $dashBranchId);
         $todayClosed = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($dashBranchId)
             ->where('report_date', $todayDate)
             ->exists();
 
@@ -1722,7 +1726,7 @@ class PosController extends Controller
         // that page. Compact echo on the dashboard — everyone lands here.
         // dayCloseAllowed decides whether the link is actionable (cashiers
         // without day-close rights get info-only text, not a dead-end link).
-        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId);
+        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, null, false, $dashBranchId);
         $canDayClose = \App\Services\PosAccessService::dayCloseAllowed(auth('pos')->user(), $company);
 
         // Task 1161: "Purane customer khamosh hain" — repeat customers whose
@@ -1758,7 +1762,7 @@ class PosController extends Controller
      * row. Keyed by business_date (created_at date on pre-migration schemas).
      * Returns an ascending collection of Y-m-d strings (max 30 days back).
      */
-    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null, bool $oldestFirst = false)
+    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null, bool $oldestFirst = false, ?int $branchId = null)
     {
         $bizToday = \App\Services\PosBusinessDay::current($companyId);
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
@@ -1769,11 +1773,15 @@ class PosController extends Controller
         // Normalized in PHP (no whereIn on report_date — drivers that store
         // DATE with a time part, e.g. sqlite tests, would miss every match
         // and resurrect closed days); a company has few report rows.
+        // Task 1360: a day is "closed" only for the branch that closed it —
+        // Main Shop's Z-report must not hide Gulberg's still-open day.
         $closedDates = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($branchId)
             ->pluck('report_date')
             ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
         $priorDates = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
+            ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
             ->when($hasBizDate,
                 fn ($q) => $q->where('business_date', '<', $bizToday)->selectRaw('business_date as d'),
                 fn ($q) => $q->whereDate('created_at', '<', $bizToday)->selectRaw('DATE(created_at) as d'))
@@ -1822,16 +1830,29 @@ class PosController extends Controller
             return back()->with('error', __('pos.opening_cash_feature_setup'));
         }
 
+        // Task 1360: opening cash belongs to the drawer of the branch on screen
+        // — the same scope the day close will reconcile it against. From the
+        // owner's "all branches" view there is no single drawer to open.
+        if ($this->dayCloseAllBranchesView()) {
+            return back()->with('error', __('pos.dayclose_pick_branch'));
+        }
+        $openingBranchId = $this->dayCloseBranchId();
+
         // Once the day is closed the Z-report is immutable — opening locks too.
         $closed = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($openingBranchId)
             ->where('report_date', $date)
             ->exists();
         if ($closed) {
             return back()->with('error', __('pos.day_closed_opening_cash_locked'));
         }
 
+        $openingKey = ['company_id' => $companyId, 'business_date' => $date];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_openings', 'branch_id')) {
+            $openingKey['branch_id'] = PosDayCloseReport::branchKey($openingBranchId);
+        }
         \App\Models\PosDayOpening::updateOrCreate(
-            ['company_id' => $companyId, 'business_date' => $date],
+            $openingKey,
             [
                 'opening_cash' => round((float) $request->input('opening_cash'), 2),
                 'entered_by' => $user?->id,
@@ -10709,6 +10730,95 @@ class PosController extends Controller
         return view('pos.user-profile', compact('user'));
     }
 
+    // ── Day-close branch scope (Task 1360) ───────────────────────────────────
+    //
+    // Day close is PER BRANCH once a shop has branches: the branch shown on
+    // screen is the branch whose bills get frozen, washed and archived. Before
+    // this, the preview was branch-filtered but performDayClose was
+    // company-wide — Gulberg's cashier previewed Rs 770 and saved Rs 1,870,
+    // and that close also archived Main Shop's local bills.
+    //
+    // The rule is one helper pair so preview and close can never drift again:
+    // dayCloseBranchId() answers "which scope", scopeToBranch() applies it.
+
+    /**
+     * The branch this day close belongs to — null = company-wide (a shop with
+     * no branches, and every pre-branch day). Mirrors the reporting context so
+     * the preview and the saved report always agree.
+     */
+    private function dayCloseBranchId(): ?int
+    {
+        return app(\App\Services\BranchContextService::class)->getActiveBranchId();
+    }
+
+    /**
+     * "All branches" is a REPORTING view, not a place to close a day from:
+     * whatever we saved there would belong to no branch while each branch's own
+     * page still said "not closed". The owner must stand in a branch first.
+     */
+    private function dayCloseAllBranchesView(): bool
+    {
+        $svc = app(\App\Services\BranchContextService::class);
+
+        return $svc->isAllBranches() && $svc->accessibleBranches()->isNotEmpty();
+    }
+
+    /**
+     * Narrow a bill/rider/return query to one close scope.
+     *
+     * Same semantics as BranchContextService::applyToQuery — the branch's own
+     * rows PLUS legacy rows stamped before branches existed (branch_id NULL),
+     * which belong to whoever closes the day. Column-guarded so a box without
+     * the branch migration keeps its old company-wide behaviour.
+     */
+    private function scopeToBranch($query, ?int $branchId, string $table = 'pos_transactions', string $column = 'branch_id')
+    {
+        if ($branchId && \Illuminate\Support\Facades\Schema::hasColumn($table, $column)) {
+            $query->where(function ($q) use ($branchId, $column) {
+                $q->where($column, $branchId)->orWhereNull($column);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * The scope a STORED Z-report was frozen in — null for company-wide reports
+     * (branch-less shops and every report from before Task 1360). Reading the
+     * report's own stamp, never the current session: a Z-report printed months
+     * later must still show the branch whose day it closed.
+     */
+    private function reportBranchId(PosDayCloseReport $report): ?int
+    {
+        return ((int) ($report->branch_id ?? 0)) ?: null;
+    }
+
+    /**
+     * A branch's frozen Z-report is that branch's document: a cashier welded to
+     * Gulberg must not print Main Shop's. Owners (who can stand in any branch,
+     * including the company-wide view) keep full access.
+     */
+    private function canSeeBranchReport(PosDayCloseReport $report): bool
+    {
+        $branchId = $this->reportBranchId($report);
+        if (!$branchId) {
+            return true; // company-wide report — nothing branch-specific in it
+        }
+        $svc = app(\App\Services\BranchContextService::class);
+
+        return $svc->isOwner() || $svc->canAccess($branchId);
+    }
+
+    /** Display name of a close scope ("Gulberg"), or null when company-wide. */
+    private function dayCloseBranchName(?int $branchId): ?string
+    {
+        if (!$branchId || !\Illuminate\Support\Facades\Schema::hasTable('branches')) {
+            return null;
+        }
+
+        return \App\Models\Branch::where('id', $branchId)->value('name');
+    }
+
     public function dayCloseReport(Request $request)
     {
         // Owner rule (5 Aug 2026): Day Close is admin/manager work by DEFAULT.
@@ -10725,7 +10835,16 @@ class PosController extends Controller
         // 6 AM, with yesterday still un-closed, the page must land on yesterday.
         $date = $request->get('date', \App\Services\PosBusinessDay::current($companyId));
 
+        // Task 1360: ONE scope drives this whole page and the close it launches
+        // — the branch on screen is the branch that gets closed. Company-wide
+        // (null) for a branch-less shop; the owner's "all branches" reporting
+        // view can preview but not close (see closeDayReport).
+        $dcBranchId = $this->dayCloseBranchId();
+        $dcBranchName = $this->dayCloseBranchName($dcBranchId);
+        $dcAllBranches = $this->dayCloseAllBranchesView();
+
         $existingReport = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($dcBranchId)
             ->whereDate('report_date', $date)
             ->first();
 
@@ -10759,11 +10878,12 @@ class PosController extends Controller
                 }
             })
             ->when($dayCloseIso, fn ($q) => $q->where('created_by', $dayCloseUser->id))
-            // Multi-branch v1 (Task 1347): the PREVIEW figures follow the active
-            // branch — same precedent as $dayCloseIso above. performDayClose()
-            // and the frozen Z-report stay COMPANY-WIDE on purpose (one close
-            // per business day); the owner's "all branches" view shows everything.
-            ->where(fn ($q) => app(\App\Services\BranchContextService::class)->applyToQuery($q, 'branch_id'))
+            // Multi-branch v1 (Task 1347) + per-branch close (Task 1360): the
+            // preview shows the active branch's bills, and performDayClose()
+            // now freezes exactly this set — both go through scopeToBranch(),
+            // so the screen and the saved Z-report can never disagree again.
+            // The owner's "all branches" view still previews everything.
+            ->where(fn ($q) => $this->scopeToBranch($q, $dcBranchId))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -10821,6 +10941,8 @@ class PosController extends Controller
                 ? PosTransaction::where('company_id', $companyId)
                     ->where('business_date', $date)
                     ->where('transaction_type', 'return')
+                    // Task 1360: audit list follows the close scope too.
+                    ->where(fn ($q) => $this->scopeToBranch($q, $dcBranchId))
                     ->with('creator')
                     ->orderBy('created_at')
                     // Task 1186: user-aware guard — derived viewers keep their
@@ -10891,7 +11013,10 @@ class PosController extends Controller
         // cashier gets no history list (the report views 403 them anyway).
         $previousReports = $dayCloseIso
             ? collect()
+            // Task 1360: this branch's own history — another branch's Z-report
+            // holds figures this page's viewer never saw.
             : PosDayCloseReport::where('company_id', $companyId)
+                ->forBranch($dcBranchId)
                 ->orderBy('report_date', 'desc')
                 ->limit(10)
                 ->get();
@@ -10906,7 +11031,11 @@ class PosController extends Controller
             ->whereNull('pra_invoice_number')
             // Task 1197: isolated cashier's wash preview (localWash figures +
             // bill-by-bill list) shows own pending bills only.
-            ->when($dayCloseIso, fn ($q) => $q->where('created_by', $dayCloseUser->id));
+            ->when($dayCloseIso, fn ($q) => $q->where('created_by', $dayCloseUser->id))
+            // Task 1360: the wash preview lists what THIS close will archive —
+            // performDayClose narrows to the same branch, so the list and the
+            // actual wash touch identical rows.
+            ->where(fn ($q) => $this->scopeToBranch($q, $dcBranchId));
         // Bill-by-bill list (Task 677): the page shows each pending bill with
         // its own action selector — fetch display columns too. Rider columns
         // are schema-guarded (prod drift self-heal convention).
@@ -10972,7 +11101,7 @@ class PosController extends Controller
             'final_backlog' => $pendingFinal->filter(fn ($t) => $t->business_date && $t->business_date < $date)->count(),
         ];
 
-        $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
+        $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company, $dcBranchId);
 
         // Per-stream split (Task 660): PRA vs Local vs Exempt boxes. For a
         // CLOSED day prefer the figures frozen on the report (the wash may
@@ -10982,7 +11111,7 @@ class PosController extends Controller
         // summary — their preview recomputes live from the own-bills set.
         $streamSplit = ($existingReport && is_array($existingReport->stream_summary ?? null) && !$dayCloseIso)
             ? $existingReport->stream_summary
-            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $dayCloseIso ? (int) $dayCloseUser->id : null));
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $dayCloseIso ? (int) $dayCloseUser->id : null, $dcBranchId));
 
         // Task 705: Z/X display mode-gating — normal mode = PRA section only;
         // khufia local-check mode ON = Local stream figures too. LOCAL-scoped
@@ -10991,11 +11120,12 @@ class PosController extends Controller
 
         // Delivery Riders (Jul 2026): live rider cash figures for the recon preview
         // (unsettled rider cash is OUT of the drawer; earlier-day settlements are IN).
-        $riderFigures = $this->buildRiderDayFigures($companyId, $date, $dayCloseIso ? (int) $dayCloseUser->id : null);
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date, $dayCloseIso ? (int) $dayCloseUser->id : null, $dcBranchId);
 
         // Opening Cash Balance (Jul 2026): day-start entry auto-fills the
-        // reconciliation's opening float for this date.
-        $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
+        // reconciliation's opening float for this date. Task 1360: each branch
+        // counts its own drawer, so the float follows the close scope.
+        $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $date, $dcBranchId);
 
         // Day-close warning (ZFC 28 Jul 2026, detailed 3 Aug 2026): open held
         // orders / occupied tables must be surfaced BEFORE closing — otherwise
@@ -11011,7 +11141,7 @@ class PosController extends Controller
         // prior trading day so staff close it BEFORE more bills pile onto today.
         // Same detection as pos:auto-dayclose: keyed by business_date, archived
         // rows included, closed = a PosDayCloseReport row exists for that date.
-        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date);
+        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date, false, $dcBranchId);
 
         // Pending checklist (Task 661, ZFC): undispatched delivery bills HARD-BLOCK
         // the close (ZFC closed a day while delivery orders never left the shop);
@@ -11022,7 +11152,7 @@ class PosController extends Controller
         // cash recon, local/rider summaries, Z print links) for isolated cashiers.
         $dcIso = $dayCloseIso;
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches'));
     }
 
     /**
@@ -11191,6 +11321,15 @@ class PosController extends Controller
         // Default = the OPEN trading day (business day) — same rule as the page.
         $date = $request->input('date', \App\Services\PosBusinessDay::current($companyId));
 
+        // Task 1360: close the branch that was previewed. "All branches" is a
+        // reporting view — a close launched from there would belong to no
+        // branch while every branch's own page still said "not closed", which
+        // is the half-branch-aware mess this task removes.
+        if ($this->dayCloseAllBranchesView()) {
+            return back()->with('error', __('pos.dayclose_pick_branch'));
+        }
+        $dcBranchId = $this->dayCloseBranchId();
+
         // HARD BLOCK (owner rule 10 Aug 2026): while ANY restaurant order is still
         // open (held/preparing/ready with items), manual day-close must refuse —
         // no "close anyway" escape hatch. Un-finalized orders can never be
@@ -11282,7 +11421,7 @@ class PosController extends Controller
         // fall back to the day-start recorded opening (performDayClose also
         // self-heals this, but doing it here keeps the request payload honest).
         if (($cashRecon['opening_float'] ?? null) === null) {
-            $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
+            $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date, $dcBranchId);
             if ($recordedOpening !== null) {
                 $cashRecon = $cashRecon ?? [];
                 $cashRecon['opening_float'] = (float) $recordedOpening->opening_cash;
@@ -11297,8 +11436,8 @@ class PosController extends Controller
         // archived included) — an arbitrary never-traded past date must NOT
         // mint a fabricated zero Z-report. Today's close stays strict too.
         $allowEmpty = $date < \App\Services\PosBusinessDay::current($companyId)
-            && $this->unclosedPriorBusinessDays($companyId)->contains($date);
-        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon, $allowEmpty, $actionOverride);
+            && $this->unclosedPriorBusinessDays($companyId, null, false, $dcBranchId)->contains($date);
+        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon, $allowEmpty, $actionOverride, $dcBranchId);
 
         if ($result['status'] === 'exists') {
             return back()->with('error', __('pos.dayclose_report_exists'));
@@ -11308,6 +11447,11 @@ class PosController extends Controller
         }
 
         $msg = __('pos.dayclose_report_generated', ['number' => $result['report_number'], 'date' => \Carbon\Carbon::parse($date)->format('d M Y')]);
+        // Task 1360: name the branch that was closed — with per-branch closes,
+        // "which day did I just freeze" now has two halves, date AND branch.
+        if ($dcBranchName = $this->dayCloseBranchName($dcBranchId)) {
+            $msg .= ' (' . $dcBranchName . ')';
+        }
         if ($result['archived'] > 0) {
             $msg .= __('pos.dayclose_bills_archived', ['count' => $result['archived']]);
         }
@@ -11361,7 +11505,7 @@ class PosController extends Controller
      * yesterday / last-week comparisons. Pure read — computed live from the
      * already-filtered PRA-mode transaction set (local bills stay excluded).
      */
-    private function buildDayCloseAnalytics(int $companyId, string $date, $transactions, ?Company $company): object
+    private function buildDayCloseAnalytics(int $companyId, string $date, $transactions, ?Company $company, ?int $branchId = null): object
     {
         $ids = $transactions->pluck('id')->all();
 
@@ -11476,13 +11620,16 @@ class PosController extends Controller
         // withoutGlobalScope('hide_archived'): the day-close wash ARCHIVES
         // reporting-OFF finals (invoice_mode 'pra' + NULL pra_status), so an
         // already-closed comparison day would undercount without it.
-        $compareFor = function (string $cmpDate) use ($companyId) {
+        // Task 1360: compare this branch's yesterday with this branch's today —
+        // a company-wide baseline would show a branch "down 60%" every day.
+        $compareFor = function (string $cmpDate) use ($companyId, $branchId) {
             $row = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('business_date', $cmpDate)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
                 })
+                ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
                 ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
                 ->first();
             return (object) [
@@ -11987,7 +12134,7 @@ class PosController extends Controller
      * cash_amount; the per-rider rows cover ALL rider bills of the day (operational
      * truth for the shop). Schema-guarded — returns inactive on prod mid-deploy.
      */
-    private function buildRiderDayFigures(int $companyId, string $date, ?int $onlyCreatedBy = null): array
+    private function buildRiderDayFigures(int $companyId, string $date, ?int $onlyCreatedBy = null, ?int $branchId = null): array
     {
         $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
         try {
@@ -12003,6 +12150,8 @@ class PosController extends Controller
                 ->where('business_date', $date)
                 ->whereNotNull('rider_id')
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
+                // Task 1360: rider cash reconciles against ONE branch's drawer.
+                ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
                 ->get();
 
             // rider_settled_at stays on the REAL calendar date (settlement
@@ -12025,7 +12174,8 @@ class PosController extends Controller
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
                 })
-                ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy));
+                ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
+                ->where(fn ($q) => $this->scopeToBranch($q, $branchId));
             if ($hasAllocation) {
                 $legacyCashInQ->whereNotIn('rider_settlement_id', function ($q) use ($companyId) {
                     $q->select('id')->from('pos_rider_settlements')
@@ -12122,7 +12272,7 @@ class PosController extends Controller
      *
      * @return array{finalized:int,finalized_amount:float,submitted:int,queued:int,offline:int,quota_blocked:int,skipped:int}
      */
-    private function finalizeProvisionalsAtDayClose(int $companyId, Company $company, string $date, ?array $onlyIds = null, array $excludeIds = []): array
+    private function finalizeProvisionalsAtDayClose(int $companyId, Company $company, string $date, ?array $onlyIds = null, array $excludeIds = [], ?int $branchId = null): array
     {
         $sweep = ['finalized' => 0, 'finalized_amount' => 0.0, 'submitted' => 0, 'queued' => 0, 'offline' => 0, 'quota_blocked' => 0, 'skipped' => 0];
 
@@ -12145,6 +12295,8 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->when($onlyIds !== null, fn ($q) => $q->whereIn('id', $onlyIds))
             ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
+            // Task 1360: a branch's close promotes only its OWN provisionals.
+            ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
             ->orderBy('id')
             ->get();
 
@@ -12222,6 +12374,14 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        // Task 1360: bulk close follows the SAME scope rule as the single one —
+        // a Z-report must belong to the branch it was previewed for, so the
+        // company-wide "All branches" view cannot run it either.
+        if ($this->dayCloseAllBranchesView()) {
+            return back()->with('error', __('pos.dayclose_pick_branch'));
+        }
+        $dcBranchId = $this->dayCloseBranchId();
+
         // Same hard block as the single close: open restaurant orders freeze
         // ALL manual closes (un-finalized orders can never be finalized after
         // a close whose backlog wash may sweep their day).
@@ -12233,7 +12393,7 @@ class PosController extends Controller
             ]));
         }
 
-        if ($this->unclosedPriorBusinessDays($companyId)->isEmpty()) {
+        if ($this->unclosedPriorBusinessDays($companyId, null, false, $dcBranchId)->isEmpty()) {
             return back()->with('success', __('pos.dc_bulk_none_pending'));
         }
 
@@ -12259,7 +12419,7 @@ class PosController extends Controller
         // own bills — a newer close would steal older days' local bills.
         // Guard caps the loop; each pass must make progress or we bail.
         for ($pass = 0; $pass < 30; $pass++) {
-            $pending = $this->unclosedPriorBusinessDays($companyId, null, true); // oldest 30, ascending
+            $pending = $this->unclosedPriorBusinessDays($companyId, null, true, $dcBranchId); // oldest 30, ascending
             if ($pending->isEmpty()) {
                 break;
             }
@@ -12284,7 +12444,7 @@ class PosController extends Controller
                 // allowEmpty: stranded days with only already-archived bills get
                 // a zero-figure Z-report so they finally leave the banner. Safe:
                 // every $day comes from the detector (has real bills).
-                $result = $this->performDayClose($companyId, $day, $user?->id, null, null, true);
+                $result = $this->performDayClose($companyId, $day, $user?->id, null, null, true, null, $dcBranchId);
                 if ($result['status'] === 'created') {
                     $closed++;
                     $closedThisPass++;
@@ -12326,7 +12486,7 @@ class PosController extends Controller
 
         // Honest "all": if anything is somehow still pending after the capped
         // passes (900 days) or a stalled pass, say so instead of implying done.
-        $remaining = $this->unclosedPriorBusinessDays($companyId, null, true)->count();
+        $remaining = $this->unclosedPriorBusinessDays($companyId, null, true, $dcBranchId)->count();
         if ($remaining > 0) {
             return redirect()->route('pos.day-close')
                 ->with('error', $msg . ' ' . __('pos.dc_bulk_partial', ['remaining' => $remaining]));
@@ -12341,12 +12501,14 @@ class PosController extends Controller
      * the list on the stored Z-report at close time — after the wash, local
      * return rows may be archived/deleted and a live query would lose them.
      */
-    private function buildDayCloseReturnsDetail(int $companyId, string $date): array
+    private function buildDayCloseReturnsDetail(int $companyId, string $date, ?int $branchId = null): array
     {
         $rows = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('business_date', $date)
             ->where('transaction_type', 'return')
+            // Task 1360: the snapshot belongs to ONE branch's Z-report.
+            ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -12372,9 +12534,20 @@ class PosController extends Controller
         ])->values()->all();
     }
 
-    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null): array
+    /**
+     * Freeze one business day into a Z-report and run the local-bill wash.
+     *
+     * Task 1360 — $branchId (LAST arg, push-scope convention) is the close
+     * SCOPE: null = the whole company (a branch-less shop, and every close from
+     * before branches existed), otherwise this branch's bills plus the legacy
+     * un-stamped ones. It must be the same scope the day-close page previewed;
+     * every query below funnels through scopeToBranch() so the frozen figures
+     * and the wash can never widen past what the cashier saw on screen.
+     */
+    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null, ?int $branchId = null): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($branchId)
             ->whereDate('report_date', $date)
             ->first();
 
@@ -12427,12 +12600,12 @@ class PosController extends Controller
             // Whole-set finalize — but bills the admin explicitly marked
             // save/delete (Task 677) must NOT be promoted first.
             $skipIds = array_keys(array_filter($billActions, fn ($a) => $a !== 'finalize'));
-            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date, null, $skipIds);
+            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date, null, $skipIds, $branchId);
         } elseif (in_array('finalize', $billActions, true)) {
             // Per-bill finalize (Task 677): promote ONLY the named bills; the
             // rest of the provisional set follows the standing/all-box action.
             $onlyIds = array_keys(array_filter($billActions, fn ($a) => $a === 'finalize'));
-            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date, $onlyIds);
+            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date, $onlyIds, [], $branchId);
         }
 
         // Local (non-PRA) bills stay OUT of the stored day-close figures — they are
@@ -12443,6 +12616,8 @@ class PosController extends Controller
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
+            // Task 1360: the frozen figures = exactly the preview's set.
+            ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -12456,6 +12631,9 @@ class PosController extends Controller
             ->where('business_date', '<=', $date)
             ->whereNull('pra_invoice_number')
             ->where('is_archived', false)
+            // Task 1360: another branch's pending locals must not make THIS
+            // branch's empty day look closeable (nor get washed by it).
+            ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
             ->where(function ($q) use ($date) {
                 $q->where(function ($qq) use ($date) {
                     $qq->where('invoice_mode', 'local')->where('pra_status', 'local')
@@ -12487,8 +12665,16 @@ class PosController extends Controller
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 
-        $reportCount = PosDayCloseReport::where('company_id', $companyId)->count();
-        $reportNumber = 'ZRPT-POS-' . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
+        // Report number: one sequence PER CLOSE SCOPE (Task 1360). A shared
+        // company sequence would make Gulberg's Z-numbers jump every time Main
+        // Shop closed a day; the branch id in the number keeps two shops'
+        // printed reports apart on the owner's desk. Branch-less shops keep the
+        // original ZRPT-POS-NNNNN format untouched.
+        $reportCount = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($branchId)
+            ->count();
+        $reportNumber = 'ZRPT-POS-' . ($branchId ? 'B' . $branchId . '-' : '')
+            . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
 
         // Return / credit-note netting (Task 570): returns live in the PRA set
         // ($transactions) but must NET the Z-report figures, not inflate them.
@@ -12511,6 +12697,12 @@ class PosController extends Controller
             'closed_by' => $closedBy,
             'notes' => $notes,
         ]);
+        // Task 1360: stamp the scope on the report itself — schema-guarded so a
+        // box mid-deploy writes the old shape instead of dropping the whole
+        // close (an unfillable/unknown column would silently lose the value).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'branch_id')) {
+            $data['branch_id'] = PosDayCloseReport::branchKey($branchId);
+        }
 
         // Per-stream split (Task 660, ZFC): PRA vs Local vs Exempt figures with
         // payment buckets + exempt item detail — STORED on the report because
@@ -12526,7 +12718,7 @@ class PosController extends Controller
             // stays computed from the PRA set, and PRA-reporting logic is
             // untouched (compliance boundary).
             $data['stream_summary'] = $this->buildDayCloseStreamSplit(
-                $this->withLocalStreamRows($transactions, $companyId, $date)
+                $this->withLocalStreamRows($transactions, $companyId, $date, null, $branchId)
             );
         }
 
@@ -12537,12 +12729,12 @@ class PosController extends Controller
         // Company-wide (BOTH streams) like the live Task-678 list; the page
         // filters by the viewer's billing scope via the stored 'stream' key.
         if ($typeReady && \Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'returns_detail')) {
-            $data['returns_detail'] = $this->buildDayCloseReturnsDetail($companyId, $date);
+            $data['returns_detail'] = $this->buildDayCloseReturnsDetail($companyId, $date, $branchId);
         }
 
         // Delivery Riders (Jul 2026): rider cash figures for this day — computed
         // BEFORE the wash so archived/deleted local bills still count.
-        $riderFigures = $this->buildRiderDayFigures($companyId, $date);
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date, null, $branchId);
 
         // Cash reconciliation (Z-report): expected = opening float + cash sales
         // − rider cash still out with riders (unsettled today's cash deliveries)
@@ -12557,7 +12749,7 @@ class PosController extends Controller
             $openingFloat = $cashRecon['opening_float'] ?? null;
             $countedCash = $cashRecon['counted_cash'] ?? null;
             if ($openingFloat === null) {
-                $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
+                $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date, $branchId);
                 if ($recordedOpening !== null) {
                     $openingFloat = (float) $recordedOpening->opening_cash;
                 }
@@ -12602,18 +12794,22 @@ class PosController extends Controller
         $deletedCount = 0;
         $report = null;
         $localSummary = [];
-        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
+        \DB::transaction(function () use ($data, $companyId, $date, $branchId, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
             $report = PosDayCloseReport::create($data);
 
             // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND
             // INCLUDING the close date, so local bills left over from earlier
             // un-closed dates finally get washed instead of lingering forever.
-            $baseQuery = function () use ($companyId, $date) {
+            // Task 1360: ...but only within the branch being closed. Before
+            // this, Gulberg's close archived (or permanently DELETED, under the
+            // delete policy) Main Shop's untouched local bills.
+            $baseQuery = function () use ($companyId, $date, $branchId) {
                 return PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->where('business_date', '<=', $date)
                     ->whereNull('pra_invoice_number')
-                    ->where('is_archived', false);
+                    ->where('is_archived', false)
+                    ->where(fn ($q) => $this->scopeToBranch($q, $branchId));
             };
 
             $sets = [
@@ -12872,6 +13068,11 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
+        // Task 1360: a branch's Z-report stays that branch's document.
+        if (!$this->canSeeBranchReport($report)) {
+            return redirect()->route('pos.day-close')->with('error', __('pos.dayclose_other_branch_report'));
+        }
+        $rptBranchId = $this->reportBranchId($report);
 
         // Day-Close PDF shows HISTORICAL truth — include archived bills so the
         // closed-day report stays consistent even after rows were archived.
@@ -12882,6 +13083,9 @@ class PosController extends Controller
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
+            // Task 1360: rebuild the SAME set the frozen figures came from —
+            // the report's own branch stamp, not whoever is printing it.
+            ->where(fn ($q) => $this->scopeToBranch($q, $rptBranchId))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -12900,7 +13104,7 @@ class PosController extends Controller
         // Task 1349: counter-wise (terminal) breakdown — same signed convention.
         $terminalBreakdown = $this->buildTerminalBreakdown($transactions, $companyId);
 
-        $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
+        $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company, $rptBranchId);
         // Plan gate: hazri section is Pro+ (views already @if(!empty($hazri))).
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
@@ -12919,7 +13123,7 @@ class PosController extends Controller
         // OLD reports = best-effort recompute from surviving historical rows.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
-            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString()));
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
 
         // Task 705: Z display mode-gating — Local stream section renders only
         // in khufia local-check mode (or for LOCAL-scoped viewers).
@@ -12953,6 +13157,11 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
+        // Task 1360: a branch's Z-report stays that branch's document.
+        if (!$this->canSeeBranchReport($report)) {
+            return redirect()->route('pos.day-close')->with('error', __('pos.dayclose_other_branch_report'));
+        }
+        $rptBranchId = $this->reportBranchId($report);
 
         $transactions = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
@@ -12960,6 +13169,8 @@ class PosController extends Controller
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
+            // Task 1360: same scope the report was frozen in (see the PDF path).
+            ->where(fn ($q) => $this->scopeToBranch($q, $rptBranchId))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -12978,7 +13189,7 @@ class PosController extends Controller
         // Task 1349: counter-wise (terminal) breakdown — same signed convention.
         $terminalBreakdown = $this->buildTerminalBreakdown($transactions, $companyId);
 
-        $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
+        $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company, $rptBranchId);
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
             : [];
@@ -12993,7 +13204,7 @@ class PosController extends Controller
         // Per-stream split (Task 660) — same frozen-first logic as the PDF.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
-            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString()));
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
 
         // Task 705: Z display mode-gating (same rule as the PDF).
         $showLocalStream = (bool) session('pos_local_check')
@@ -13101,7 +13312,7 @@ class PosController extends Controller
      * after the wash); dedupe by id (LOCAL-scoped viewers' set already
      * contains these rows).
      */
-    private function withLocalStreamRows($transactions, int $companyId, string $date, ?int $onlyCreatedBy = null)
+    private function withLocalStreamRows($transactions, int $companyId, string $date, ?int $onlyCreatedBy = null, ?int $branchId = null)
     {
         try {
             $locals = PosTransaction::withoutGlobalScope('hide_archived')
@@ -13113,6 +13324,8 @@ class PosController extends Controller
                 // own local rows — otherwise the streamSplit boxes would leak
                 // company-wide local counts/amounts around the filtered set.
                 ->when($onlyCreatedBy, fn ($q) => $q->where('created_by', $onlyCreatedBy))
+                // Task 1360: same for the branch being closed.
+                ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
                 ->orderBy('created_at')
                 ->get();
         } catch (\Throwable $e) {
@@ -13242,7 +13455,11 @@ class PosController extends Controller
         // whereDate, not where: the model's date cast writes 'Y-m-d H:i:s'
         // on drivers without a true DATE type (sqlite tests) — a strict
         // string match would silently let the guard through.
+        // Task 1360: "closed" is per close scope — Main Shop's Z-report must not
+        // block Gulberg's X-report (their day is still open).
+        $xBranchId = $this->dayCloseBranchId();
         $alreadyClosed = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($xBranchId)
             ->whereDate('report_date', $date)
             ->exists();
         if ($alreadyClosed) {
@@ -13263,6 +13480,8 @@ class PosController extends Controller
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
             ->when($xIso, fn ($q) => $q->where('created_by', $user->id))
+            // Task 1360: mid-day X must match the same drawer the Z will close.
+            ->where(fn ($q) => $this->scopeToBranch($q, $xBranchId))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -13295,12 +13514,12 @@ class PosController extends Controller
         // Live rider figures (informational — same shape the views read).
         // Task 1197: isolated cashier's X-report scopes rider figures + the
         // local-stream merge to their own bills, like the day-close preview.
-        $riderFigures = $this->buildRiderDayFigures($companyId, $date, $xIso ? (int) $user->id : null);
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date, $xIso ? (int) $user->id : null, $xBranchId);
         if (!empty($riderFigures['active'])) {
             $report->rider_summary = $riderFigures;
         }
 
-        $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null));
+        $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId));
 
         // Task 705: X display mode-gating (same rule as the Z page/PDF).
         $showLocalStream = (bool) session('pos_local_check')
@@ -13321,7 +13540,7 @@ class PosController extends Controller
         // Task 1349: counter-wise (terminal) breakdown — same signed convention.
         $terminalBreakdown = $this->buildTerminalBreakdown($transactions, $companyId);
 
-        $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
+        $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company, $xBranchId);
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildHazriRows($companyId, $date)
             : [];
@@ -13390,7 +13609,9 @@ class PosController extends Controller
 
         $rows = $this->buildHazriRows($companyId, $date);
         // loadMissing = explicit load (lazy access is FATAL under preventLazyLoading).
-        $opening = \App\Models\PosDayOpening::forDate($companyId, $date)?->loadMissing('enteredBy');
+        // Task 1360: opening cash is per branch now — show the drawer of the
+        // branch on screen (the "all branches" view has none, and shows blank).
+        $opening = \App\Models\PosDayOpening::forDate($companyId, $date, $this->dayCloseBranchId())?->loadMissing('enteredBy');
 
         // Biometric punches for this business day (4 Aug 2026).
         $bioPunches = $this->buildBiometricRows($companyId, $date);

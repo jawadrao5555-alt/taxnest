@@ -879,6 +879,11 @@ return [
     'dayclose_bills_submitted' => ' :count بل FBR کو جمع ہو گئے۔',
     'dayclose_bills_submitted_pra' => ' :count بل PRA کو جمع ہو گئے۔',
     'dayclose_no_transactions' => 'اس تاریخ کے لیے کوئی ٹرانزیکشن نہیں ملی۔',
+    // Per-branch day close (Task 1360)
+    'dayclose_branch_scope' => ':branch بند ہو رہی ہے — نیچے کے اعداد، محفوظ ہونے والی رپورٹ اور لوکل بلوں کی صفائی سب صرف اسی برانچ کے ہیں۔',
+    'dayclose_all_branches_hint' => 'آپ تمام برانچیں دیکھ رہے ہیں۔ یہ اعداد پوری کمپنی کے ہیں — دن بند کرنے کے لیے پہلے کوئی برانچ منتخب کریں۔',
+    'dayclose_pick_branch' => 'پہلے کوئی برانچ منتخب کریں — "تمام برانچیں" صرف دیکھنے کا انداز ہے، ہر برانچ اپنا دن خود بند کرتی ہے۔',
+    'dayclose_other_branch_report' => 'یہ ڈے کلوز رپورٹ دوسری برانچ کی ہے۔',
     'dayclose_report_exists' => 'اس تاریخ کی ڈے کلوز رپورٹ پہلے ہی موجود ہے۔',
     'dayclose_report_generated' => ':date کے لیے ڈے کلوز رپورٹ :number بن گئی',
     'dayclose_report_generated_for' => ':date کے لیے ڈے کلوز رپورٹ :number کامیابی سے بن گئی',

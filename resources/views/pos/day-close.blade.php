@@ -13,6 +13,21 @@
         </form>
     </div>
 
+    {{-- Per-branch day close (Task 1360): say WHOSE day this is. The preview,
+         the saved Z-report and the local-bill wash all follow the branch named
+         here — "All branches" is a viewing mode and cannot close a day. --}}
+    @if($dcAllBranches ?? false)
+    <div class="mb-6 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">{{ __('pos.dayclose_all_branches_hint') }}</p>
+    </div>
+    @elseif($dcBranchName ?? null)
+    <div class="mb-6 px-4 py-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 flex items-start gap-3">
+        <svg class="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <p class="text-sm font-semibold text-purple-800 dark:text-purple-300">{{ __('pos.dayclose_branch_scope', ['branch' => $dcBranchName]) }}</p>
+    </div>
+    @endif
+
     {{-- Stranded-day banner (Task 455): prior business day(s) never closed —
          auto-close skipped (open orders) or nobody closed manually. Surface
          them loudly before more bills pile onto today. --}}

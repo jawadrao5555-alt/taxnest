@@ -59,15 +59,7 @@ class AutoCloseDayPos extends Command
                 // re-open an already-closed day. Falls back to DATE(created_at)
                 // until the migration lands on PROD.
                 $hasBizDate = Schema::hasColumn('pos_transactions', 'business_date');
-                $dates = PosTransaction::withoutGlobalScope('hide_archived')
-                    ->where('company_id', $company->id)
-                    ->when($hasBizDate,
-                        fn ($q) => $q->where('business_date', '<', $graceCutoff)
-                            ->selectRaw('business_date as d'),
-                        fn ($q) => $q->whereDate('created_at', '<', $graceCutoff)
-                            ->selectRaw('DATE(created_at) as d'))
-                    ->groupBy('d')
-                    ->pluck('d');
+                $dates = $this->pendingDatesFor($company, $graceCutoff, $hasBizDate);
 
                 if ($dates->isEmpty()) {
                     continue;
@@ -124,38 +116,60 @@ class AutoCloseDayPos extends Command
                     ->whereIn('pos_role', ['pos_admin', 'company_admin'])
                     ->value('id');
 
-                // The local-bill wash inside performDayClose follows the STANDING
-                // company policy (Customize POS → Local Billing) — same as manual close.
-                foreach ($dates as $date) {
-                    if (PosDayCloseReport::where('company_id', $company->id)->where('report_date', $date)->exists()) {
-                        continue;
-                    }
+                // Task 1360: the 6 AM sweep follows the SAME rule as the manual
+                // close — one Z-report per BRANCH per day. A multi-branch shop
+                // gets one close per branch (each with its own figures, report
+                // number, opening cash and local-bill wash); a branch-less shop
+                // keeps exactly its old single company-wide close.
+                foreach ($this->closeScopesFor($company) as $branchId) {
+                    // Dates are re-detected per scope: a branch that did not
+                    // trade on some day must not get an empty Z-report for it.
+                    $scopeDates = $branchId === null
+                        ? $dates
+                        : $this->pendingDatesFor($company, $graceCutoff, $hasBizDate, $branchId);
 
-                    $result = $pos->performDayClose(
-                        $company->id,
-                        $date,
-                        $adminId,
-                        'Auto-closed by system (' . $cutoffTime . ' next day)'
-                    );
-
-                    if ($result['status'] === 'created') {
-                        $closedTotal++;
-                        $line = "Company {$company->id}: closed {$date} → {$result['report_number']} (archived {$result['archived']}, deleted {$result['deleted']}).";
-                        // Khud Final sweep surfacing (Task 165): the sweep result is
-                        // already stored durably on the Z-report row (local_summary →
-                        // day-close page + PDF), but the user-less auto close must
-                        // also LOG what it finalized so the trail exists even if the
-                        // report row is later purged. Zero-count sweeps stay quiet.
-                        $sweep = $result['finalize_sweep'] ?? null;
-                        if (is_array($sweep) && (($sweep['finalized'] ?? 0) > 0 || ($sweep['quota_blocked'] ?? 0) > 0 || ($sweep['offline'] ?? 0) > 0)) {
-                            $line .= " Khud Final sweep: finalized {$sweep['finalized']} (PKR {$sweep['finalized_amount']}) — submitted {$sweep['submitted']}, queued {$sweep['queued']}, offline {$sweep['offline']}, quota-blocked {$sweep['quota_blocked']}, skipped {$sweep['skipped']}.";
-                            Log::info('pos:auto-dayclose finalize sweep', [
-                                'company_id' => $company->id,
-                                'date' => $date,
-                                'report_number' => $result['report_number'],
-                            ] + $sweep);
+                    // The local-bill wash inside performDayClose follows the STANDING
+                    // company policy (Customize POS → Local Billing) — same as manual close.
+                    foreach ($scopeDates as $date) {
+                        if (PosDayCloseReport::where('company_id', $company->id)
+                            ->forBranch($branchId)
+                            ->where('report_date', $date)
+                            ->exists()) {
+                            continue;
                         }
-                        $this->info($line);
+
+                        $result = $pos->performDayClose(
+                            $company->id,
+                            $date,
+                            $adminId,
+                            'Auto-closed by system (' . $cutoffTime . ' next day)',
+                            null,
+                            false,
+                            null,
+                            $branchId
+                        );
+
+                        if ($result['status'] === 'created') {
+                            $closedTotal++;
+                            $scopeLabel = $branchId ? " branch {$branchId}:" : '';
+                            $line = "Company {$company->id}:{$scopeLabel} closed {$date} → {$result['report_number']} (archived {$result['archived']}, deleted {$result['deleted']}).";
+                            // Khud Final sweep surfacing (Task 165): the sweep result is
+                            // already stored durably on the Z-report row (local_summary →
+                            // day-close page + PDF), but the user-less auto close must
+                            // also LOG what it finalized so the trail exists even if the
+                            // report row is later purged. Zero-count sweeps stay quiet.
+                            $sweep = $result['finalize_sweep'] ?? null;
+                            if (is_array($sweep) && (($sweep['finalized'] ?? 0) > 0 || ($sweep['quota_blocked'] ?? 0) > 0 || ($sweep['offline'] ?? 0) > 0)) {
+                                $line .= " Khud Final sweep: finalized {$sweep['finalized']} (PKR {$sweep['finalized_amount']}) — submitted {$sweep['submitted']}, queued {$sweep['queued']}, offline {$sweep['offline']}, quota-blocked {$sweep['quota_blocked']}, skipped {$sweep['skipped']}.";
+                                Log::info('pos:auto-dayclose finalize sweep', [
+                                    'company_id' => $company->id,
+                                    'branch_id' => $branchId,
+                                    'date' => $date,
+                                    'report_number' => $result['report_number'],
+                                ] + $sweep);
+                            }
+                            $this->info($line);
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -166,6 +180,52 @@ class AutoCloseDayPos extends Command
 
         $this->info("Auto day-close complete — {$closedTotal} day(s) closed.");
         return self::SUCCESS;
+    }
+
+    /**
+     * Close scopes for one company (Task 1360): its branch ids, or [null] for a
+     * branch-less shop (unchanged company-wide close). The branches table may
+     * be absent on a drifted box or a lean test schema — that is simply a
+     * single-branch shop, never an error. Branch::withoutGlobalScope: the CLI
+     * has no bound tenant, so the company filter is explicit here.
+     */
+    private function closeScopesFor(Company $company): array
+    {
+        try {
+            if (! Schema::hasTable('branches') || ! Schema::hasColumn('pos_transactions', 'branch_id')) {
+                return [null];
+            }
+            $ids = \App\Models\Branch::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+                ->where('company_id', $company->id)
+                ->when(Schema::hasColumn('branches', 'is_active'), fn ($q) => $q->where('is_active', true))
+                ->orderBy('id')
+                ->pluck('id')
+                ->all();
+
+            return empty($ids) ? [null] : $ids;
+        } catch (\Throwable $e) {
+            return [null]; // never let branch detection break the nightly sweep
+        }
+    }
+
+    /**
+     * Un-closed trading dates before the cutoff, optionally narrowed to ONE
+     * branch. Scope semantics mirror the day-close page (branch rows + legacy
+     * un-stamped rows) so the sweep closes exactly what that branch would see.
+     */
+    private function pendingDatesFor(Company $company, string $graceCutoff, bool $hasBizDate, ?int $branchId = null)
+    {
+        return PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $company->id)
+            ->when($branchId && Schema::hasColumn('pos_transactions', 'branch_id'),
+                fn ($q) => $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
+            ->when($hasBizDate,
+                fn ($q) => $q->where('business_date', '<', $graceCutoff)
+                    ->selectRaw('business_date as d'),
+                fn ($q) => $q->whereDate('created_at', '<', $graceCutoff)
+                    ->selectRaw('DATE(created_at) as d'))
+            ->groupBy('d')
+            ->pluck('d');
     }
 
     /**

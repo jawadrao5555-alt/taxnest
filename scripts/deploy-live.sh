@@ -502,6 +502,10 @@ step "Preflight: multi-word product search check (cheese loaded half → Cheese 
 node scripts/pos-search-rank-test.mjs \
   || fail "pos-search check FAILED — nameMatchRank/searchTokens regressed or universal↔waiter blade sync broken (Task 1045); fix before deploying"
 
+step "Preflight: receipt-settings preview check (preview follows the open tab; Menu-QR gates the LOCAL bill only)"
+node scripts/receipt-preview-tab-check.mjs \
+  || fail "receipt-preview check FAILED — the Receipt Settings live preview no longer follows the open tab, or the Menu-QR toggle leaked onto the PRA fiscal QR (Task 1377); fix before deploying"
+
 step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Pro Max/Unlimited)"
 if [ "${SKIP_PLAN_GATE_CHECK:-0}" = "1" ]; then
   echo "SKIPPED (SKIP_PLAN_GATE_CHECK=1) — only skip for emergency hotfixes." >&2

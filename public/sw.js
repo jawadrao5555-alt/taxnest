@@ -257,7 +257,13 @@ self.addEventListener('fetch', e => {
     }
 
     // Never cache: auth, API, admin, agent, FBR submit, payment posting, livewire, debugbar
-    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/fbr-pos/receipt-settings', '/return', '/pos/restaurant/tables', '/track/'];
+    // '/pos/receipt-settings' (Task 1377): a runtime-cached copy of this page is
+    // served whenever the network blips, and its form then POSTs an OLD field set —
+    // toggles that did not exist when the copy was cached are silently ignored or
+    // wiped (owner 21 Aug 2026: "QR uncheck karne ke baad bhi QR chhap raha hai",
+    // local bill lost its tax line). '/fbr-pos/receipt-settings' was already skipped
+    // for the same reason; the PRA page was missed.
+    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/pos/receipt-settings', '/fbr-pos/receipt-settings', '/return', '/pos/restaurant/tables', '/track/'];
     if (skipPatterns.some(p => url.pathname.includes(p))) return;
 
     // HTML pages: network-first → cache → offline page

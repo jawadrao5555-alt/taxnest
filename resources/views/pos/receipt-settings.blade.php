@@ -73,6 +73,14 @@
              show_menu_qr, pdf_paper). A stale cached form that lacks this marker
              leaves those keys untouched — mirrors rp_verify_present on the FBR page. --}}
         <input type="hidden" name="rp_pos_style_present" value="1">
+        {{-- Task 1377: same idea, one marker per DISPLAY SET. Each block is a
+             wholesale rewrite from checkbox presence, so a stale cached copy of
+             this page (it used to be runtime-cached by the service worker) wiped
+             every toggle it did not carry — that is how a company's whole Local
+             set went false and its local bills stopped printing the tax line.
+             No marker + no fields of that set = leave the stored set untouched. --}}
+        <input type="hidden" name="rp_present" value="1">
+        <input type="hidden" name="lp_present" value="1">
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
             {{-- Tab switcher --}}

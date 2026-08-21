@@ -280,35 +280,62 @@ class PosController extends Controller
                 'rp_local_number_style' => 'nullable|in:serial,token',
             ]);
             $prefs = $company->invoice_display_prefs ?? [];
+            // Stale-form guard, per display set (Task 1377 — owner 21 Aug 2026).
+            // Each block below is a WHOLESALE rewrite driven by checkbox presence,
+            // so a POST from an outdated copy of this page (the service worker used
+            // to runtime-cache /pos/receipt-settings) silently wiped every toggle it
+            // did not carry: a form rendered before the Local tab shipped saved
+            // pos_local as all-false, and the local bill lost its tax line even
+            // though nobody had unticked it. Same class of bug the
+            // rp_pos_style_present marker already fixed for pos_style.
+            // A set is rewritten only when THIS request actually carries it — the
+            // hidden marker (fresh form) or any of that set's own fields (scripted
+            // and legacy POSTs keep working). Otherwise the stored set is left
+            // exactly as it is; wiping is never the safe default.
+            $rpPresent = $request->has('rp_present') || $request->hasAny([
+                'rp_footer_text', 'rp_show_address', 'rp_show_ntn', 'rp_show_email',
+                'rp_show_mobile', 'rp_show_cashier', 'rp_show_footer',
+                'rp_show_business_name', 'rp_show_developed_by', 'rp_show_verify_line',
+                'rp_show_tax',
+            ]);
+            $lpPresent = $request->has('lp_present') || $request->hasAny([
+                'lp_footer_text', 'lp_show_address', 'lp_show_ntn', 'lp_show_email',
+                'lp_show_mobile', 'lp_show_cashier', 'lp_show_footer',
+                'lp_show_business_name', 'lp_show_developed_by', 'lp_show_tax',
+            ]);
             // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
-            $prefs['pos'] = [
-                'show_address' => $request->has('rp_show_address'),
-                'show_ntn' => $request->has('rp_show_ntn'),
-                'show_email' => $request->has('rp_show_email'),
-                'show_mobile' => $request->has('rp_show_mobile'),
-                'show_cashier' => $request->has('rp_show_cashier'),
-                'show_footer' => $request->has('rp_show_footer'),
-                'show_business_name' => $request->has('rp_show_business_name'),
-                'show_developed_by' => $request->has('rp_show_developed_by'),
-                'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
-                // show_verify_line (Aug 2026): "Scan with PRA Sahulat App" under the QR.
-                // Checkbox present = ON; absent = OFF. Default ON matches legacy behaviour.
-                'show_verify_line' => $request->has('rp_show_verify_line'),
-            ];
+            if ($rpPresent) {
+                $prefs['pos'] = [
+                    'show_address' => $request->has('rp_show_address'),
+                    'show_ntn' => $request->has('rp_show_ntn'),
+                    'show_email' => $request->has('rp_show_email'),
+                    'show_mobile' => $request->has('rp_show_mobile'),
+                    'show_cashier' => $request->has('rp_show_cashier'),
+                    'show_footer' => $request->has('rp_show_footer'),
+                    'show_business_name' => $request->has('rp_show_business_name'),
+                    'show_developed_by' => $request->has('rp_show_developed_by'),
+                    'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
+                    // show_verify_line (Aug 2026): "Scan with PRA Sahulat App" under the QR.
+                    // Checkbox present = ON; absent = OFF. Default ON matches legacy behaviour.
+                    'show_verify_line' => $request->has('rp_show_verify_line'),
+                ];
+            }
             // Local (L-series) receipt set — owner request Jul 2026: PRA and Local
             // bills each get their OWN full display set (incl. its own show_tax).
-            $prefs['pos_local'] = [
-                'show_address' => $request->has('lp_show_address'),
-                'show_ntn' => $request->has('lp_show_ntn'),
-                'show_email' => $request->has('lp_show_email'),
-                'show_mobile' => $request->has('lp_show_mobile'),
-                'show_cashier' => $request->has('lp_show_cashier'),
-                'show_footer' => $request->has('lp_show_footer'),
-                'show_business_name' => $request->has('lp_show_business_name'),
-                'show_developed_by' => $request->has('lp_show_developed_by'),
-                'show_tax' => $request->has('lp_show_tax'),
-                'footer_text' => trim((string) $request->input('lp_footer_text', '')) ?: null,
-            ];
+            if ($lpPresent) {
+                $prefs['pos_local'] = [
+                    'show_address' => $request->has('lp_show_address'),
+                    'show_ntn' => $request->has('lp_show_ntn'),
+                    'show_email' => $request->has('lp_show_email'),
+                    'show_mobile' => $request->has('lp_show_mobile'),
+                    'show_cashier' => $request->has('lp_show_cashier'),
+                    'show_footer' => $request->has('lp_show_footer'),
+                    'show_business_name' => $request->has('lp_show_business_name'),
+                    'show_developed_by' => $request->has('lp_show_developed_by'),
+                    'show_tax' => $request->has('lp_show_tax'),
+                    'footer_text' => trim((string) $request->input('lp_footer_text', '')) ?: null,
+                ];
+            }
             // Print Style (Pizza Master Jul 2026): GLOBAL like paper size — bold
             // whole-receipt font + logo size/placement. Applies to both bill types.
             // Receipt Themes (Task 712): the form now submits a named theme
@@ -373,15 +400,20 @@ class PosController extends Controller
             }
             $companyUpdates = [
                 'invoice_display_prefs' => $prefs,
-                // Owner decision (Jul 2026): tax display toggle lives HERE (receipt
-                // customization), not on the Features page. OFF = customer copy
-                // shows grand TOTAL only; tax is always submitted to PRA in full.
-                // Since the PRA/Local split this column is the PRA-receipt tax toggle.
-                'pos_receipt_show_tax' => $request->has('rp_show_tax'),
                 // Paper size (owner request Jul 2026): same column PRA Settings writes —
                 // last save from either page wins. Missing/invalid input keeps 80mm default.
                 'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
             ];
+            // Owner decision (Jul 2026): tax display toggle lives HERE (receipt
+            // customization), not on the Features page. OFF = customer copy
+            // shows grand TOTAL only; tax is always submitted to PRA in full.
+            // Since the PRA/Local split this column is the PRA-receipt tax toggle.
+            // Task 1377: it belongs to the PRA set, so it follows the same
+            // stale-form guard — a POST that never carried the PRA panel must not
+            // silently switch the fiscal receipt's tax lines off.
+            if ($rpPresent) {
+                $companyUpdates['pos_receipt_show_tax'] = $request->has('rp_show_tax');
+            }
             // Print Position + Left Margin (Pizza Master, 11 Aug 2026): receipts now
             // have their OWN columns (receipt_align_center / receipt_left_margin_mm),
             // separate from the KOT's kot_* pair — fixing one printer no longer

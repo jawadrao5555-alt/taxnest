@@ -474,4 +474,133 @@ class PosReceiptContentChecklistTest extends TestCase
         $this->assertEquals($prefsBefore, $prefsAfter,
             'Cashier must not be able to modify invoice_display_prefs');
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 11–13: Stale-form guard, one marker per display set (Task 1377)
+    //
+    // The Receipt Settings page used to be runtime-cached by the service worker,
+    // so a shop could save an OUTDATED copy of the form. Every display block is
+    // a wholesale rewrite driven by checkbox presence, so such a POST silently
+    // wiped the toggles it did not carry — that is how a company ended up with
+    // its whole Local set false and local bills stopped printing the tax line
+    // (owner voice note, 21 Aug 2026).
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function actAsAdmin(): void
+    {
+        $this->actingAs(\App\Models\User::find($this->adminUserId), 'pos');
+        app()->instance('currentCompanyId', $this->companyId);
+    }
+
+    private function storedPrefs(): array
+    {
+        return json_decode(
+            (string) DB::table('companies')->where('id', $this->companyId)->value('invoice_display_prefs'),
+            true
+        ) ?: [];
+    }
+
+    /** 11. A POST that carries no lp_* fields at all must NOT wipe the stored Local set. */
+    public function test_stale_form_without_local_fields_does_not_wipe_the_local_set(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'invoice_display_prefs' => json_encode([
+                'pos_local' => ['show_tax' => true, 'show_cashier' => true, 'footer_text' => 'Shukriya'],
+            ]),
+        ]);
+
+        $this->actAsAdmin();
+        // Pre-Local-tab form: rp_* only, not a single lp_* field.
+        $this->post('/pos/receipt-settings', [
+            '_token'               => csrf_token(),
+            'rp_pos_style_present' => '1',
+            'rp_show_address'      => '1',
+            'rp_show_menu_qr'      => '1',
+            'rp_footer_text'       => '',
+        ]);
+
+        $local = $this->storedPrefs()['pos_local'] ?? [];
+        $this->assertTrue((bool) ($local['show_tax'] ?? false),
+            'A form that never carried the Local tab must leave its show_tax alone');
+        $this->assertTrue((bool) ($local['show_cashier'] ?? false));
+        $this->assertSame('Shukriya', $local['footer_text'] ?? null);
+    }
+
+    /** 12. Likewise for the PRA set + its tax column — a stale POST must not blank them. */
+    public function test_stale_form_without_pra_fields_does_not_wipe_the_pra_set(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'pos_receipt_show_tax'  => true,
+            'invoice_display_prefs' => json_encode([
+                'pos' => ['show_ntn' => true, 'show_email' => true],
+            ]),
+        ]);
+
+        $this->actAsAdmin();
+        // Only the global style block — no rp_* content fields at all.
+        $this->post('/pos/receipt-settings', [
+            '_token'               => csrf_token(),
+            'rp_pos_style_present' => '1',
+            'rp_show_logo'         => '1',
+        ]);
+
+        $pra = $this->storedPrefs()['pos'] ?? [];
+        $this->assertTrue((bool) ($pra['show_ntn'] ?? false), 'PRA set must survive a POST that never carried it');
+        $this->assertTrue((bool) ($pra['show_email'] ?? false));
+        $this->assertTrue(
+            (bool) DB::table('companies')->where('id', $this->companyId)->value('pos_receipt_show_tax'),
+            'The PRA tax column belongs to the PRA set and must follow the same guard'
+        );
+    }
+
+    /** 13. The real form saves both complaints' settings in one go: QR off + Local tax on. */
+    public function test_fresh_form_persists_menu_qr_off_together_with_local_tax_on(): void
+    {
+        $this->actAsAdmin();
+        $this->post('/pos/receipt-settings', [
+            '_token'               => csrf_token(),
+            'rp_pos_style_present' => '1',
+            'rp_present'           => '1',
+            'lp_present'           => '1',
+            // rp_show_menu_qr absent = unticked
+            'rp_show_tax'          => '1',
+            'lp_show_tax'          => '1',
+            'rp_footer_text'       => '',
+            'lp_footer_text'       => '',
+            'rp_style_bold'        => '1',
+            'rp_logo_style'        => 'center',
+        ]);
+
+        $prefs = $this->storedPrefs();
+        $this->assertFalse((bool) ($prefs['pos_style']['show_menu_qr'] ?? true),
+            'Unticking Print Menu QR Code must persist');
+        $this->assertTrue((bool) ($prefs['pos_local']['show_tax'] ?? false),
+            'Local tab show_tax must persist in the same save');
+
+        $company = Company::find($this->companyId);
+        $this->assertFalse($company->posReceiptStyle()['show_menu_qr']);
+        $this->assertTrue($company->posReceiptPrefs('local')['show_tax']);
+        $this->assertTrue($company->posReceiptPrefs('pra')['show_tax']);
+    }
+
+    /** 13b. And unticking the Local tax on a fresh form still turns it off. */
+    public function test_fresh_form_can_turn_the_local_tax_off_again(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'invoice_display_prefs' => json_encode(['pos_local' => ['show_tax' => true]]),
+        ]);
+
+        $this->actAsAdmin();
+        $this->post('/pos/receipt-settings', [
+            '_token'               => csrf_token(),
+            'rp_pos_style_present' => '1',
+            'rp_present'           => '1',
+            'lp_present'           => '1',
+            'rp_footer_text'       => '',
+            'lp_footer_text'       => '',
+        ]);
+
+        $this->assertFalse((bool) ($this->storedPrefs()['pos_local']['show_tax'] ?? true),
+            'Unticking the Local tax on a freshly rendered form must store false');
+    }
 }

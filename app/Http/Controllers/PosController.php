@@ -1713,9 +1713,15 @@ class PosController extends Controller
         // late-night shop still sees/locks yesterday's drawer opening.
         // Task 1360: day close is per branch — the card must show THIS branch's
         // drawer and only call the day closed once this branch has closed it.
+        // Task 1375: with counters the card records one float PER counter, so
+        // it shows the drawers and their sum; $dayOpening stays the shop-drawer
+        // row (a counter-less shop's only row, exactly as before).
         $dashBranchId = $this->dayCloseBranchId();
         $todayDate = $bizToday;
         $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $todayDate, $dashBranchId);
+        $openingDrawers = \App\Models\PosDayOpening::drawersForDate($companyId, $todayDate, $dashBranchId);
+        $dayOpeningTotal = $openingDrawers->isEmpty() ? null : round((float) $openingDrawers->sum(), 2);
+        $openingCounters = \App\Services\PosCounterDrawer::counters($companyId);
         $todayClosed = PosDayCloseReport::where('company_id', $companyId)
             ->forBranch($dashBranchId)
             ->where('report_date', $todayDate)
@@ -1749,7 +1755,8 @@ class PosController extends Controller
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
-            'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
+            'dayOpening', 'dayOpeningTotal', 'openingDrawers', 'openingCounters',
+            'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
             'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata',
             'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
             'inactiveRegulars', 'dashTeamMembers', 'dashCashierId'
@@ -1819,6 +1826,9 @@ class PosController extends Controller
         $request->validate([
             'opening_cash' => 'required|numeric|min:0|max:99999999',
             'notes' => 'nullable|string|max:500',
+            // Task 1375: which DRAWER this float belongs to. 0 / absent = the
+            // shop drawer, i.e. exactly what every counter-less shop sends.
+            'terminal_id' => 'nullable|integer|min:0',
         ]);
         // Opening cash is a TODAY-only entry — the UI never sends a date, and
         // accepting one would let a raw POST seed arbitrary future/past days.
@@ -1847,9 +1857,34 @@ class PosController extends Controller
             return back()->with('error', __('pos.day_closed_opening_cash_locked'));
         }
 
+        // Task 1375: per-counter drawer. A crafted id from another company (or a
+        // retired counter) silently falls back to the shop drawer — same
+        // convention the sale screen uses for counter attribution.
+        $openingTerminalId = 0;
+        $terminalName = null;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_openings', 'terminal_id')
+            && (int) $request->input('terminal_id', 0) > 0) {
+            $terminal = \App\Models\PosTerminal::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->find((int) $request->input('terminal_id'));
+            if ($terminal) {
+                $openingTerminalId = (int) $terminal->id;
+                $terminalName = $terminal->terminal_name;
+            }
+        }
+        // A counter's drawer locks the moment THAT counter closes — the money
+        // has already been counted against this float.
+        if ($openingTerminalId > 0
+            && \App\Services\PosCounterDrawer::isClosed($companyId, $openingTerminalId, $date)) {
+            return back()->with('error', __('pos.counter_already_closed'));
+        }
+
         $openingKey = ['company_id' => $companyId, 'business_date' => $date];
         if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_openings', 'branch_id')) {
             $openingKey['branch_id'] = PosDayCloseReport::branchKey($openingBranchId);
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_openings', 'terminal_id')) {
+            $openingKey['terminal_id'] = $openingTerminalId;
         }
         \App\Models\PosDayOpening::updateOrCreate(
             $openingKey,
@@ -1860,7 +1895,11 @@ class PosController extends Controller
             ]
         );
 
-        return back()->with('success', __('pos.opening_cash_saved', ['amount' => number_format((float) $request->input('opening_cash'), 2)]));
+        $amount = number_format((float) $request->input('opening_cash'), 2);
+
+        return back()->with('success', $terminalName
+            ? __('pos.counter_opening_saved', ['counter' => $terminalName, 'amount' => $amount])
+            : __('pos.opening_cash_saved', ['amount' => $amount]));
     }
 
     /**
@@ -2670,6 +2709,23 @@ class PosController extends Controller
                 ->where('id', (int) $request->input('terminal_id'))
                 ->where('is_active', true)
                 ->value('id');
+        }
+
+        // Task 1375: a counter whose drawer has already been counted and closed
+        // takes no more bills today — otherwise its frozen difference would be a
+        // lie the moment the next sale lands. The OTHER counters are untouched,
+        // which is the whole point of a per-counter close. An offline replay is
+        // let through on purpose: it was billed while the counter was still
+        // open, and refusing it would lose a real sale.
+        if ($terminalId && !$request->filled('offline_queued_at')
+            && \App\Services\PosCounterDrawer::isClosed($companyId, (int) $terminalId, \App\Services\PosBusinessDay::current((int) $companyId))) {
+            $counterName = PosTerminal::where('company_id', $companyId)->where('id', (int) $terminalId)->value('terminal_name');
+            $closedMsg = __('pos.counter_sale_blocked', ['counter' => $counterName ?: (__('pos.counter_word') . ' #' . $terminalId)]);
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'error' => $closedMsg, 'message' => $closedMsg], 422);
+            }
+
+            return back()->withInput()->with('error', $closedMsg);
         }
 
         // PROVISIONAL BILL FLOW — when cashier explicitly saves as provisional, the bill is
@@ -11219,7 +11275,28 @@ class PosController extends Controller
         // Opening Cash Balance (Jul 2026): day-start entry auto-fills the
         // reconciliation's opening float for this date. Task 1360: each branch
         // counts its own drawer, so the float follows the close scope.
+        // Task 1375: with counters the shop's float is the SUM of the counters'
+        // floats — $dayOpening stays the shop-drawer row (the "recorded at day
+        // start" hint), $dayOpeningTotal is what the recon prefills with.
         $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $date, $dcBranchId);
+        $dayOpeningTotal = \App\Models\PosDayOpening::totalForDate($companyId, $date, $dcBranchId);
+
+        // Task 1375: per-counter cash drawers. For a CLOSED day prefer the
+        // snapshot frozen on the Z-report (same reason as stream_summary: the
+        // wash can delete rows a live rebuild would miss); otherwise build live.
+        // Counter-less shops get an empty collection and the card never renders.
+        $counterCash = ($existingReport && is_array($existingReport->counter_summary ?? null) && !$dayCloseIso)
+            ? collect($existingReport->counter_summary)
+            : \App\Services\PosCounterDrawer::rows(
+                $companyId, $dcBranchId, $date, $transactions, $riderFigures,
+                $dayCloseIso ? (int) $dayCloseUser->id : null
+            );
+        $counterCashTotals = $counterCash->isEmpty() ? null : \App\Services\PosCounterDrawer::totals($counterCash);
+        // Live actions (close/reopen a counter) only make sense on the OPEN
+        // business day of a single branch — never on history, never on the
+        // merged all-branches view.
+        $counterCashLive = !$existingReport && !$dcAllBranches
+            && $date === \App\Services\PosBusinessDay::current($companyId);
 
         // Day-close warning (ZFC 28 Jul 2026, detailed 3 Aug 2026): open held
         // orders / occupied tables must be surfaced BEFORE closing — otherwise
@@ -11246,7 +11323,7 @@ class PosController extends Controller
         // cash recon, local/rider summaries, Z print links) for isolated cashiers.
         $dcIso = $dayCloseIso;
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
     }
 
     /**
@@ -11514,11 +11591,13 @@ class PosController extends Controller
         // Opening Cash Balance (Jul 2026): if the cashier left the opening blank,
         // fall back to the day-start recorded opening (performDayClose also
         // self-heals this, but doing it here keeps the request payload honest).
+        // Task 1375: the shop float is the SUM of the day's drawers — a
+        // two-counter shop records two openings and both are in the till.
         if (($cashRecon['opening_float'] ?? null) === null) {
-            $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date, $dcBranchId);
+            $recordedOpening = \App\Models\PosDayOpening::totalForDate($companyId, $date, $dcBranchId);
             if ($recordedOpening !== null) {
                 $cashRecon = $cashRecon ?? [];
-                $cashRecon['opening_float'] = (float) $recordedOpening->opening_cash;
+                $cashRecon['opening_float'] = $recordedOpening;
                 $cashRecon['counted_cash'] = $cashRecon['counted_cash'] ?? null;
             }
         }
@@ -11589,6 +11668,218 @@ class PosController extends Controller
             $msg .= __('pos.dayclose_bills_quota_blocked', ['count' => $sweep['quota_blocked']]);
         }
         return back()->with('success', $msg);
+    }
+
+    /**
+     * The day's bill set for ONE close scope — the exact set performDayClose
+     * freezes its figures from (PRA-set only, branch-scoped). Task 1375: a
+     * per-counter close must reconcile against the same rupees the Z-report
+     * will, or a counter's difference would disagree with the shop's.
+     */
+    private function dayCloseTransactionSet(int $companyId, string $date, ?int $branchId)
+    {
+        return PosTransaction::where('company_id', $companyId)
+            ->where('business_date', $date)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
+            ->where(fn ($q) => $this->scopeToBranch($q, $branchId))
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
+     * CLOSE ONE COUNTER (Task 1375).
+     *
+     * A two/three-counter shop keeps separate cash at every counter, so the
+     * evening count happens counter by counter: this freezes ONE drawer's
+     * opening / cash sales / expected / counted / difference and touches no
+     * bill — the other counters keep billing exactly as before. Only the closed
+     * counter stops (see the sale guard in store()).
+     *
+     * The SHOP's day closes automatically once every drawer that took a bill
+     * today has been closed; if a hard blocker (open orders, undispatched
+     * deliveries) is in the way, the counter close still stands and the message
+     * says why the day did not end.
+     */
+    public function closeCounter(Request $request)
+    {
+        // Same authority as the shop day-close (owner rule 5 Aug 2026).
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (!\App\Services\PosCounterDrawer::ready()) {
+            return back()->with('error', __('pos.opening_cash_feature_setup'));
+        }
+        // A close belongs to ONE branch's drawer — same rule as the day close.
+        if ($this->dayCloseAllBranchesView()) {
+            return back()->with('error', __('pos.dayclose_pick_branch'));
+        }
+        $branchId = $this->dayCloseBranchId();
+        // Counting a drawer is a LIVE action: always the open trading day.
+        $date = \App\Services\PosBusinessDay::current($companyId);
+
+        $request->validate([
+            'terminal_id' => 'required|integer|min:0',
+            'opening_float' => 'nullable|numeric|min:0|max:99999999',
+            'counted_cash' => 'nullable|numeric|min:0|max:99999999',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        // Once the Z-report exists the day is frozen — nothing more to close.
+        $alreadyClosed = PosDayCloseReport::where('company_id', $companyId)
+            ->forBranch($branchId)
+            ->where('report_date', $date)
+            ->exists();
+        if ($alreadyClosed) {
+            return back()->with('error', __('pos.dayclose_report_exists'));
+        }
+
+        $terminalId = (int) $request->input('terminal_id');
+        if ($terminalId > 0 && !\App\Models\PosTerminal::where('company_id', $companyId)->where('id', $terminalId)->exists()) {
+            return back()->with('error', __('pos.counter_invalid'));
+        }
+        if (\App\Services\PosCounterDrawer::isClosed($companyId, $terminalId, $date)) {
+            return back()->with('error', __('pos.counter_already_closed'));
+        }
+
+        $transactions = $this->dayCloseTransactionSet($companyId, $date, $branchId);
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date, null, $branchId);
+        $rows = \App\Services\PosCounterDrawer::rows($companyId, $branchId, $date, $transactions, $riderFigures);
+        $row = $rows->firstWhere('terminal_id', $terminalId);
+        if (!$row) {
+            return back()->with('error', __('pos.counter_invalid'));
+        }
+
+        // An on-screen correction of the morning float wins; otherwise the
+        // drawer's recorded opening. Counted stays NULL when nobody counted —
+        // NULL is "not counted", never zero.
+        $opening = $request->filled('opening_float')
+            ? round((float) $request->input('opening_float'), 2)
+            : $row['opening'];
+        $counted = $request->filled('counted_cash') ? round((float) $request->input('counted_cash'), 2) : null;
+        $expected = round((float) ($opening ?? 0) + (float) $row['cash_sales']
+            - (float) $row['rider_out'] + (float) $row['rider_in'], 2);
+
+        \App\Models\PosCounterClose::updateOrCreate(
+            [
+                'company_id' => $companyId,
+                'branch_id' => PosDayCloseReport::branchKey($branchId),
+                'terminal_id' => $terminalId,
+                'business_date' => $date,
+            ],
+            [
+                'opening_float' => $opening,
+                'cash_sales' => $row['cash_sales'],
+                'expected_cash' => $expected,
+                'counted_cash' => $counted,
+                'cash_variance' => $counted === null ? null : round($counted - $expected, 2),
+                'bills_count' => $row['bills'],
+                'total_sales' => $row['total'],
+                'closed_by' => $user?->id,
+                'notes' => $request->input('notes'),
+                'closed_at' => now(),
+            ]
+        );
+
+        $msg = __('pos.counter_closed_success', ['counter' => $row['name']]);
+
+        // Every drawer counted → the shop's day can end. Rebuilt from scratch so
+        // a counter closed a second earlier on another screen counts too.
+        $freshRows = \App\Services\PosCounterDrawer::rows($companyId, $branchId, $date, $transactions, $riderFigures);
+        if (!\App\Services\PosCounterDrawer::allDrawersClosed($freshRows)) {
+            $pending = \App\Services\PosCounterDrawer::pendingDrawers($freshRows);
+
+            return back()->with('success', $msg . ' ' . __('pos.counter_day_not_closed_yet', [
+                'count' => $pending->count(),
+                'counters' => $pending->pluck('name')->implode(', '),
+            ]));
+        }
+
+        // The same hard blocks the manual shop close obeys — a counter's cash
+        // count can never wave an open table or an undispatched delivery through.
+        $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
+        if ($openAtClose->count > 0) {
+            return back()->with('success', $msg . ' ' . __('pos.dayclose_blocked_open_orders', [
+                'count' => $openAtClose->count,
+                'tables' => $openAtClose->tableNumbers !== '' ? ' (' . __('pos.dc_open_tables_list', ['tables' => $openAtClose->tableNumbers]) . ')' : '',
+            ]));
+        }
+        $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $date);
+        if ($pendingDel->count > 0) {
+            return back()->with('success', $msg . ' ' . __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
+        }
+
+        // Shop figures come from the counters' own counts, so the Z-report's
+        // opening/counted/difference is exactly the sum of the drawers.
+        $result = $this->performDayClose(
+            $companyId, $date, $user?->id, $request->input('notes'),
+            \App\Services\PosCounterDrawer::shopReconFromCloses($freshRows),
+            false, null, $branchId
+        );
+        if (($result['status'] ?? '') !== 'created') {
+            return back()->with('success', $msg);
+        }
+
+        return back()->with('success', $msg . ' ' . __('pos.counter_all_closed_day_closed', [
+            'number' => $result['report_number'],
+        ]));
+    }
+
+    /**
+     * REOPEN A COUNTER (Task 1375) — admin/manager only, and only while the
+     * shop's day is still open. Miscounted drawer, or a late bill that must go
+     * through that counter: deleting the close row puts the counter back on the
+     * floor. Once the Z-report exists the day is frozen and this refuses.
+     */
+    public function reopenCounter(Request $request)
+    {
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        // Undoing a cash count is an authority decision, not a counting one —
+        // a cashier with day-close access still may not reopen (same rule as
+        // the wash override).
+        if ($user && $user->isPosCashier()) {
+            return back()->with('error', __('pos.only_admin_change_setting'));
+        }
+        $companyId = app('currentCompanyId');
+
+        if (!\App\Services\PosCounterDrawer::ready()) {
+            return back()->with('error', __('pos.opening_cash_feature_setup'));
+        }
+        if ($this->dayCloseAllBranchesView()) {
+            return back()->with('error', __('pos.dayclose_pick_branch'));
+        }
+        $branchId = $this->dayCloseBranchId();
+        $date = \App\Services\PosBusinessDay::current($companyId);
+
+        $request->validate(['terminal_id' => 'required|integer|min:0']);
+
+        if (PosDayCloseReport::where('company_id', $companyId)->forBranch($branchId)->where('report_date', $date)->exists()) {
+            return back()->with('error', __('pos.dayclose_report_exists'));
+        }
+
+        $close = \App\Models\PosCounterClose::where('company_id', $companyId)
+            ->forBranch($branchId)
+            ->where('terminal_id', (int) $request->input('terminal_id'))
+            ->whereDate('business_date', $date)
+            ->first();
+        if (!$close) {
+            return back()->with('error', __('pos.counter_not_closed'));
+        }
+
+        $name = (int) $close->terminal_id === 0
+            ? __('pos.counter_not_set')
+            : (\App\Services\PosCounterDrawer::names($companyId)[(int) $close->terminal_id] ?? (__('pos.counter_word') . ' #' . $close->terminal_id));
+        $close->delete();
+
+        return back()->with('success', __('pos.counter_reopened', ['counter' => $name]));
     }
 
     /**
@@ -12842,11 +13133,10 @@ class PosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'opening_float')) {
             $openingFloat = $cashRecon['opening_float'] ?? null;
             $countedCash = $cashRecon['counted_cash'] ?? null;
+            // Task 1375: SUM of the day's drawers — a counter shop records one
+            // float per counter and every one of them sits in the shop's till.
             if ($openingFloat === null) {
-                $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date, $branchId);
-                if ($recordedOpening !== null) {
-                    $openingFloat = (float) $recordedOpening->opening_cash;
-                }
+                $openingFloat = \App\Models\PosDayOpening::totalForDate($companyId, $date, $branchId);
             }
             if ($openingFloat !== null || $countedCash !== null) {
                 $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
@@ -12855,6 +13145,22 @@ class PosController extends Controller
                 $data['counted_cash'] = $countedCash;
                 $data['expected_cash'] = $expectedCash;
                 $data['cash_variance'] = $countedCash !== null ? round((float) $countedCash - $expectedCash, 2) : null;
+            }
+        }
+
+        // Counter-wise cash reconciliation (Task 1375): frozen on the Z-report
+        // BEFORE the hash, same reason stream_summary is — the wash below can
+        // archive/delete rows, so a later recompute would undercount a counter's
+        // drawer. Counter-less shops write nothing and their report is byte-for-
+        // byte what it always was. Schema-guarded (prod drift self-heal).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_day_close_reports', 'counter_summary')) {
+            try {
+                $counterRows = \App\Services\PosCounterDrawer::rows($companyId, $branchId, $date, $transactions, $riderFigures);
+                if ($counterRows->isNotEmpty()) {
+                    $data['counter_summary'] = $counterRows->all();
+                }
+            } catch (\Throwable $e) {
+                // Counter recon is reporting sugar — never block a day close.
             }
         }
 
@@ -13224,9 +13530,16 @@ class PosController extends Controller
         $showLocalStream = (bool) session('pos_local_check')
             || ((\Illuminate\Support\Facades\Auth::guard('pos')->user()?->posBillingScope() ?? 'both') === 'local');
 
+        // Counter-wise cash reconciliation (Task 1375): frozen-first, same rule
+        // as the stream split — an OLD report (or a box whose column has not
+        // landed) falls back to a best-effort rebuild, and a counter-less shop
+        // gets nothing so its PDF is byte-for-byte what it always was.
+        $counterCash = $this->dayCloseCounterCash($report, $transactions, $rptBranchId);
+        $counterCashTotals = $counterCash->isEmpty() ? null : \App\Services\PosCounterDrawer::totals($counterCash);
+
         return $this->renderReportPdf(
             'pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'counterCash', 'counterCashTotals'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -13304,7 +13617,36 @@ class PosController extends Controller
         $showLocalStream = (bool) session('pos_local_check')
             || ((\Illuminate\Support\Facades\Auth::guard('pos')->user()?->posBillingScope() ?? 'both') === 'local');
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'));
+        // Counter-wise cash reconciliation (Task 1375) — same frozen-first rule.
+        $counterCash = $this->dayCloseCounterCash($report, $transactions, $rptBranchId);
+        $counterCashTotals = $counterCash->isEmpty() ? null : \App\Services\PosCounterDrawer::totals($counterCash);
+
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'counterCash', 'counterCashTotals'));
+    }
+
+    /**
+     * The counter-wise cash reconciliation of a CLOSED day for the printed
+     * outputs (Task 1375). Prefers the snapshot frozen at close time — the wash
+     * may have archived/deleted rows a live rebuild would miss — and falls back
+     * to a best-effort rebuild for reports closed before this feature existed.
+     */
+    private function dayCloseCounterCash(PosDayCloseReport $report, $transactions, ?int $branchId): \Illuminate\Support\Collection
+    {
+        if (is_array($report->counter_summary ?? null)) {
+            return collect($report->counter_summary);
+        }
+
+        try {
+            return \App\Services\PosCounterDrawer::rows(
+                (int) $report->company_id,
+                $branchId,
+                $report->report_date->toDateString(),
+                $transactions,
+                $this->buildRiderDayFigures((int) $report->company_id, $report->report_date->toDateString(), null, $branchId)
+            );
+        } catch (\Throwable $e) {
+            return collect();
+        }
     }
 
     /**

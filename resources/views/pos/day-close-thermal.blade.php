@@ -186,6 +186,32 @@
     <div class="hr"></div>
     @endif
 
+    {{-- COUNTER-WISE CASH DRAWER (Task 1375): har counter ki apni ginti aur
+         apna farq — counters wali shops par hi chhapta hai. --}}
+    @if(!empty($counterCash) && $counterCash->isNotEmpty())
+    <div class="sec">{{ __('pos.counter_cash_title') }}</div>
+    <table>
+        @foreach($counterCash as $cc)
+        @php $ccVar = $cc['variance'] === null ? null : (float) $cc['variance']; @endphp
+        <tr><td class="b" colspan="2">{{ \Illuminate\Support\Str::limit((int) $cc['terminal_id'] === 0 ? __('pos.counter_not_set') : $cc['name'], 22) }}</td></tr>
+        <tr><td class="sm">{{ __('pos.dc_opening_float') }}</td><td class="r sm">{{ $cc['opening'] === null ? '-' : number_format((float) $cc['opening'], 2) }}</td></tr>
+        <tr><td class="sm">{{ __('pos.dc_cash_sales') }}</td><td class="r sm">{{ number_format((float) $cc['cash_sales'], 2) }}</td></tr>
+        <tr><td class="sm">{{ __('pos.dc_expected_drawer') }}</td><td class="r sm">{{ number_format((float) $cc['expected'], 2) }}</td></tr>
+        <tr><td class="sm">{{ __('pos.dc_counted_cash') }}</td><td class="r sm">{{ $cc['counted'] === null ? '-' : number_format((float) $cc['counted'], 2) }}</td></tr>
+        @if($ccVar !== null)
+        <tr><td class="sm b">{{ __('pos.counter_difference') }}</td><td class="r sm b">{{ $ccVar > 0 ? '+' : '' }}{{ number_format($ccVar, 2) }}</td></tr>
+        @endif
+        @endforeach
+        @if($counterCashTotals ?? null)
+        <tr><td class="b">{{ __('pos.counter_totals_word') }}</td><td class="r b">{{ number_format($counterCashTotals['expected'], 2) }}</td></tr>
+        @if($counterCashTotals['variance'] !== null)
+        <tr><td class="b">{{ __('pos.counter_difference') }}</td><td class="r b">{{ $counterCashTotals['variance'] > 0 ? '+' : '' }}{{ number_format($counterCashTotals['variance'], 2) }}</td></tr>
+        @endif
+        @endif
+    </table>
+    <div class="hr"></div>
+    @endif
+
     @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
     <div class="sec">{{ __('pos.dc_delivery_riders') }}</div>
     <table>

@@ -26,6 +26,10 @@ class PosDayCloseReport extends Model
         // Per-stream figures (Task 660): PRA vs Local vs Exempt split with
         // payment buckets + exempt item detail, frozen at close time.
         'stream_summary',
+        // Counter-wise cash reconciliation (Task 1375): every counter's own
+        // opening / cash sales / expected / counted / difference, frozen at
+        // close time. Empty for shops that run no counters.
+        'counter_summary',
         'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
         'rider_summary',
         // Returns audit snapshot (Task 682): per-return detail frozen at close
@@ -43,6 +47,7 @@ class PosDayCloseReport extends Model
         'last_invoice_time' => 'datetime',
         'local_summary' => 'array',
         'stream_summary' => 'array',
+        'counter_summary' => 'array',
         'rider_summary' => 'array',
         'returns_detail' => 'array',
     ];

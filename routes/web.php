@@ -920,6 +920,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Task 516: bulk-close every stranded prior business day in one click.
     Route::post('/day-close/close-all-prior', [PosController::class, 'closeAllPriorDays'])->name('pos.close-all-days');
     Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
+    // Task 1375: per-counter cash drawer — close ONE counter's drawer (the
+    // other counters keep billing; the shop's day closes once every used
+    // drawer is closed). Reopen is admin/manager-only, enforced in-controller.
+    Route::post('/day-close/counter', [PosController::class, 'closeCounter'])->name('pos.counter-close');
+    Route::post('/day-close/counter/reopen', [PosController::class, 'reopenCounter'])->name('pos.counter-reopen');
     // Task 660: X-Report — read-only "abhi tak ki report" WITHOUT closing the
     // day (no wash, no hash, no report row). Literal paths registered BEFORE
     // the /day-close/{id}/... routes so {id} never swallows 'x-report'.

@@ -387,6 +387,51 @@
     </table>
     @endif
 
+    {{-- COUNTER-WISE CASH DRAWER (Task 1375): har counter ka apna opening,
+         apni ginti aur apna farq — shop ka grand total upar hai. Counter-less
+         shops ke liye ye section bilkul nahi aata. --}}
+    @if(!empty($counterCash) && $counterCash->isNotEmpty())
+    <div class="section-title">{{ __('pos.counter_cash_title') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.counter_word') }}</th>
+                <th class="c">{{ __('pos.dc_th_count') }}</th>
+                <th class="r">{{ __('pos.opening_float') }}</th>
+                <th class="r">{{ __('pos.cash_sales') }}</th>
+                <th class="r">{{ __('pos.expected_in_drawer') }}</th>
+                <th class="r">{{ __('pos.counted_cash') }}</th>
+                <th class="r">{{ __('pos.counter_difference') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($counterCash as $cc)
+            @php $ccVar = $cc['variance'] === null ? null : (float) $cc['variance']; @endphp
+            <tr>
+                <td>{{ (int) $cc['terminal_id'] === 0 ? __('pos.counter_not_set') : $cc['name'] }}</td>
+                <td class="c">{{ $cc['bills'] }}</td>
+                <td class="r">{{ $cc['opening'] === null ? '&mdash;' : number_format((float) $cc['opening'], 2) }}</td>
+                <td class="r">{{ number_format((float) $cc['cash_sales'], 2) }}</td>
+                <td class="r">{{ number_format((float) $cc['expected'], 2) }}</td>
+                <td class="r">{{ $cc['counted'] === null ? '&mdash;' : number_format((float) $cc['counted'], 2) }}</td>
+                <td class="r" style="{{ $ccVar !== null && abs($ccVar) >= 0.01 ? 'color:#dc2626;' : '' }}">{{ $ccVar === null ? '&mdash;' : ($ccVar > 0 ? '+' : '') . number_format($ccVar, 2) }}</td>
+            </tr>
+            @endforeach
+            @if($counterCashTotals ?? null)
+            <tr>
+                <td style="font-weight:bold;">{{ __('pos.counter_totals_word') }}</td>
+                <td class="c" style="font-weight:bold;">{{ $counterCashTotals['bills'] }}</td>
+                <td class="r" style="font-weight:bold;">{{ number_format($counterCashTotals['opening'], 2) }}</td>
+                <td class="r" style="font-weight:bold;">{{ number_format($counterCashTotals['cash_sales'], 2) }}</td>
+                <td class="r" style="font-weight:bold;">{{ number_format($counterCashTotals['expected'], 2) }}</td>
+                <td class="r" style="font-weight:bold;">{{ $counterCashTotals['counted'] === null ? '&mdash;' : number_format($counterCashTotals['counted'], 2) }}</td>
+                <td class="r" style="font-weight:bold;{{ $counterCashTotals['variance'] !== null && abs($counterCashTotals['variance']) >= 0.01 ? 'color:#dc2626;' : '' }}">{{ $counterCashTotals['variance'] === null ? '&mdash;' : ($counterCashTotals['variance'] > 0 ? '+' : '') . number_format($counterCashTotals['variance'], 2) }}</td>
+            </tr>
+            @endif
+        </tbody>
+    </table>
+    @endif
+
     {{-- Local-bill wash detail (comprehensive Z-report, Jul 2026): what the close
          did with non-PRA local bills, incl. backlog swept from earlier dates. --}}
     @if(is_array($report->local_summary) && (collect($report->local_summary)->sum('count') > 0 || collect($report->local_summary)->sum('finalized') > 0))

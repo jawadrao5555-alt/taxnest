@@ -477,6 +477,118 @@
             </div>
             @endif
 
+    {{-- ═══ COUNTER-WISE CASH DRAWER (Task 1375) ═══
+         Do ya teen counters wali shop mein har counter par alag cash rakhi hoti
+         hai. Har counter apna opening, apni ginti aur apna farq dikhata hai —
+         shop ka grand total upar pehle ki tarah rehta hai. Jin shops ne koi
+         counter nahi banaya, un ke liye ye card bilkul nahi aata. --}}
+    @if(!empty($counterCash) && $counterCash->isNotEmpty() && !($dcIso ?? false))
+    @php $ccLive = ($counterCashLive ?? false) && auth('pos')->user(); @endphp
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 7l1 12a1 1 0 001 1h12a1 1 0 001-1l1-12M4 7l1.2-2.4A1 1 0 016.1 4h11.8a1 1 0 01.9.6L20 7M9 11h6"/></svg>
+            {{ __('pos.counter_cash_title') }}
+        </h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ $ccLive ? __('pos.counter_cash_hint') : __('pos.counter_cash_frozen_hint') }}</p>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
+                <thead>
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.counter_word') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.opening_float') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.cash_sales') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.expected_in_drawer') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.counted_cash') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.counter_difference') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.counter_status') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    @foreach($counterCash as $cc)
+                    @php $ccVar = $cc['variance'] === null ? null : (float) $cc['variance']; @endphp
+                    <tr>
+                        <td class="px-3 py-2 text-sm font-medium text-gray-900 dark:text-white">
+                            {{ (int) $cc['terminal_id'] === 0 ? __('pos.counter_not_set') : $cc['name'] }}
+                            <span class="block text-[11px] font-normal text-gray-500">{{ $cc['bills'] }} {{ __('pos.bills_word') }}</span>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">{{ $cc['opening'] === null ? '—' : number_format((float) $cc['opening'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">{{ number_format((float) $cc['cash_sales'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-semibold text-gray-900 dark:text-white">{{ number_format((float) $cc['expected'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">{{ $cc['counted'] === null ? __('pos.not_counted_dash') : number_format((float) $cc['counted'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-bold {{ $ccVar === null ? 'text-gray-400' : (abs($ccVar) < 0.01 ? 'text-emerald-600' : ($ccVar < 0 ? 'text-red-600' : 'text-amber-600')) }}">
+                            {{ $ccVar === null ? '—' : ($ccVar > 0 ? '+' : '') . number_format($ccVar, 2) }}
+                        </td>
+                        <td class="px-3 py-2 text-sm text-right">
+                            @if($cc['closed'])
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">{{ __('pos.counter_closed_badge') }}</span>
+                            @if(!empty($cc['closed_at']))
+                            <span class="block text-[11px] text-gray-500 mt-0.5">{{ __('pos.counter_closed_at', ['time' => $cc['closed_at'], 'name' => $cc['closed_by'] ?? '—']) }}</span>
+                            @endif
+                            @if($ccLive && !auth('pos')->user()->isPosCashier())
+                            <form method="POST" action="{{ route('pos.counter-reopen') }}" class="mt-1" onsubmit="return confirm(@js(__('pos.counter_reopen_confirm')))">
+                                @csrf
+                                <input type="hidden" name="terminal_id" value="{{ $cc['terminal_id'] }}">
+                                <button type="submit" class="text-[11px] underline font-semibold text-gray-600 dark:text-gray-400">{{ __('pos.counter_reopen_btn') }}</button>
+                            </form>
+                            @endif
+                            @else
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ __('pos.counter_open_badge') }}</span>
+                            @endif
+                        </td>
+                    </tr>
+                    {{-- Counting row: one form per counter — closing this drawer
+                         freezes ONLY this counter; baaqi counters billing karte
+                         rehte hain. --}}
+                    @if($ccLive && !$cc['closed'])
+                    <tr>
+                        <td colspan="7" class="px-3 pb-3 pt-0">
+                            <form method="POST" action="{{ route('pos.counter-close') }}" class="flex flex-wrap items-end gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                @csrf
+                                <input type="hidden" name="terminal_id" value="{{ $cc['terminal_id'] }}">
+                                <div>
+                                    <label class="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_opening_float') }}</label>
+                                    <input type="number" name="opening_float" step="0.01" min="0" placeholder="0.00" value="{{ $cc['opening'] === null ? '' : (float) $cc['opening'] }}"
+                                        class="w-32 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_counted_cash') }}</label>
+                                    <input type="number" name="counted_cash" step="0.01" min="0" placeholder="0.00"
+                                        class="w-32 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <div class="flex-1 min-w-[160px]">
+                                    <label class="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_notes_optional') }}</label>
+                                    <input type="text" name="notes" maxlength="500" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                                </div>
+                                <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition"
+                                        onclick="return confirm(@js(__('pos.counter_close_confirm')))">{{ __('pos.counter_close_btn') }}</button>
+                            </form>
+                        </td>
+                    </tr>
+                    @endif
+                    @endforeach
+                    @if($counterCashTotals ?? null)
+                    <tr class="bg-gray-50 dark:bg-gray-800">
+                        <td class="px-3 py-2 text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.counter_totals_word') }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-bold text-gray-900 dark:text-white">{{ number_format($counterCashTotals['opening'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-bold text-gray-900 dark:text-white">{{ number_format($counterCashTotals['cash_sales'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-bold text-gray-900 dark:text-white">{{ number_format($counterCashTotals['expected'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-bold text-gray-900 dark:text-white">{{ $counterCashTotals['counted'] === null ? __('pos.not_counted_dash') : number_format($counterCashTotals['counted'], 2) }}</td>
+                        <td class="px-3 py-2 text-sm text-right font-bold {{ $counterCashTotals['variance'] === null ? 'text-gray-400' : (abs($counterCashTotals['variance']) < 0.01 ? 'text-emerald-600' : ($counterCashTotals['variance'] < 0 ? 'text-red-600' : 'text-amber-600')) }}">
+                            {{ $counterCashTotals['variance'] === null ? '—' : ($counterCashTotals['variance'] > 0 ? '+' : '') . number_format($counterCashTotals['variance'], 2) }}
+                        </td>
+                        <td class="px-3 py-2 text-sm text-right text-gray-500">{{ __('pos.counter_closed_of_total', ['closed' => $counterCashTotals['closed'], 'total' => $counterCashTotals['closed'] + $counterCashTotals['open']]) }}</td>
+                    </tr>
+                    @endif
+                </tbody>
+            </table>
+        </div>
+        @if($ccLive && $counterCashTotals && $counterCashTotals['open'] > 0)
+        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-3">{{ __('pos.counter_close_all_note') }}</p>
+        @endif
+    </div>
+    @endif
+
     {{-- Local / provisional bills — comprehensive wash preview (owner request Jul 2026).
          Shows exactly what the day-close wash will touch, INCLUDING backlog bills
          left over from earlier un-closed dates. --}}
@@ -629,7 +741,10 @@
                  Rider adjustment (Jul 2026): unsettled rider cash is OUT of the drawer;
                  settlements received today for earlier days' bills are IN. --}}
             @php $rf = $riderFigures ?? ['active' => false, 'cash_out' => 0, 'cash_in' => 0, 'riders' => []]; @endphp
-            @php $openingFromDayStart = ($dayOpening ?? null) !== null ? (float) $dayOpening->opening_cash : null; @endphp
+            {{-- Task 1375: with counters the shop float is the SUM of the
+                 counters' floats — dayOpeningTotal already adds them up; a
+                 counter-less shop has exactly one drawer, so nothing changes. --}}
+            @php $openingFromDayStart = ($dayOpeningTotal ?? null) !== null ? (float) $dayOpeningTotal : (($dayOpening ?? null) !== null ? (float) $dayOpening->opening_cash : null); @endphp
             <div class="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
                  x-data="{ float: '{{ $openingFromDayStart !== null ? $openingFromDayStart : '' }}', counted: '', cashSales: {{ (float) $stats->cash_amount }},
                            riderOut: {{ (float) ($rf['cash_out'] ?? 0) }}, riderIn: {{ (float) ($rf['cash_in'] ?? 0) }},

@@ -37,6 +37,11 @@
     $saafDeltaPct = ($saafYesterday !== null && $saafYesterday > 0)
         ? round((($saafToday - $saafYesterday) / $saafYesterday) * 100)
         : null;
+    // Task 1375: a counter shop keeps one float PER counter, so the tile must
+    // show their SUM — the shop-drawer row alone is empty there and the tile
+    // would read "—" while thousands sat in the counters' drawers. Counter-less
+    // shops have exactly one row, so this is their old value.
+    $saafOpening = $dayOpeningTotal ?? ((isset($dayOpening) && $dayOpening) ? (float) $dayOpening->opening_cash : null);
 @endphp
 
 <div class="space-y-5 w-full">
@@ -131,7 +136,7 @@
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">{{ $occupiedTables ?? 0 }}<span class="text-sm text-gray-400">/{{ $totalTables ?? 0 }}</span></p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __("pos.abhi_occupied_hain") }}</p>
         </div>
-        @elseif(isset($dayOpening) && $dayOpening)
+        @elseif($saafOpening !== null)
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
@@ -139,7 +144,7 @@
                 </span>
                 <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">{{ __("pos.opening_cash") }}</p>
             </div>
-            <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">Rs. {{ number_format(round((float) $dayOpening->opening_cash)) }}</p>
+            <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">Rs. {{ number_format(round((float) $saafOpening)) }}</p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __("pos.day_close_par_hisaab") }}</p>
         </div>
         @else

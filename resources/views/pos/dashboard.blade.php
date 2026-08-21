@@ -88,16 +88,29 @@
 
         {{-- ━━━ Opening Cash Balance (Jul 2026) — day-start drawer entry; auto-fills day-close reconciliation.
              Saaf style: KPI card shows the saved value, so this block appears only while entry is still needed. ━━━ --}}
-        @if((isset($dayOpening) || isset($todayClosed)) && (($dashboardStyle ?? 'default') !== 'saaf' || (empty($dayOpening) && empty($todayClosed))))
+        {{-- Task 1375: counters wali shop mein har counter ka apna drawer hota
+             hai — card ab counter chun kar float save karta hai aur sab drawers
+             ka total dikhata hai. Counter-less shop ke liye bilkul pehle jaisa. --}}
+        @php
+            $ocList = collect($openingCounters ?? []);
+            $ocDrawers = collect($openingDrawers ?? []);
+            $ocTotal = $dayOpeningTotal ?? (($dayOpening ?? null) ? (float) $dayOpening->opening_cash : null);
+            // Counters wali shop: jab tak kisi counter ka float baaqi hai, entry
+            // form chhupna nahi chahiye — warna pehle counter ke baad doosre ka
+            // float darj karne ki jagah hi nahi bachti (Saaf style ka KPI tile
+            // sirf saved total dikhata hai).
+            $ocPending = $ocList->isNotEmpty() && $ocList->keys()->contains(fn ($id) => !$ocDrawers->has($id));
+        @endphp
+        @if((isset($dayOpening) || isset($todayClosed)) && (($dashboardStyle ?? 'default') !== 'saaf' || (empty($todayClosed) && ($ocTotal === null || $ocPending))))
         <div class="mb-4" x-data="{ editing: false }">
             @if(!empty($todayClosed))
-                @if($dayOpening)
+                @if($ocTotal !== null)
                 <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3 shadow-sm">
                     <div class="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.opening_cash') }}: Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.opening_cash') }}: Rs {{ number_format((float) $ocTotal, 2) }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.day_closed_opening_locked') }}</p>
                     </div>
                 </div>
@@ -112,23 +125,41 @@
                     </div>
                 </div>
                 @endif
-            @elseif($dayOpening)
+            @elseif($ocTotal !== null)
             <div class="rounded-2xl bg-white dark:bg-gray-900 border border-teal-200 dark:border-teal-800 p-4 shadow-sm">
                 <div class="flex flex-wrap items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.todays_opening_cash') }}: <span class="text-teal-700 dark:text-teal-400">Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</span></p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ $dayOpening->enteredBy?->name ? __('pos.entered_by_name', ['name' => $dayOpening->enteredBy->name]) : __('pos.entered_at_day_start') }} · {{ __('pos.used_at_day_close') }}</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.todays_opening_cash') }}: <span class="text-teal-700 dark:text-teal-400">Rs {{ number_format((float) $ocTotal, 2) }}</span></p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ ($dayOpening?->enteredBy?->name) ? __('pos.entered_by_name', ['name' => $dayOpening->enteredBy->name]) : __('pos.entered_at_day_start') }} · {{ __('pos.used_at_day_close') }}</p>
+                        @if($ocList->isNotEmpty())
+                        {{-- Har counter ka apna float, aur upar sab ka total. --}}
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                            @foreach($ocList as $ocId => $ocC)@if($ocDrawers->has($ocId)){{ $ocC->terminal_name }}: Rs {{ number_format((float) $ocDrawers[$ocId], 2) }}@if(!$loop->last) · @endif @endif @endforeach
+                            @if($ocDrawers->has(0)){{ __('pos.counter_not_set') }}: Rs {{ number_format((float) $ocDrawers[0], 2) }}@endif
+                        </p>
+                        @endif
                     </div>
                     <button type="button" @click="editing = !editing" class="px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition">{{ __('pos.change_word') }}</button>
                 </div>
                 <form method="POST" action="{{ route('pos.day-opening.save') }}" x-show="editing" x-cloak class="mt-3 flex flex-wrap items-end gap-2">
                     @csrf
+                    @if($ocList->isNotEmpty())
+                    <div class="flex-1 min-w-[160px]">
+                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.counter_pick_drawer') }}</label>
+                        <select name="terminal_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-teal-500 focus:border-teal-500">
+                            @foreach($ocList as $ocId => $ocC)
+                            <option value="{{ $ocId }}">{{ $ocC->terminal_name }}@if($ocDrawers->has($ocId)) — Rs {{ number_format((float) $ocDrawers[$ocId], 2) }}@endif</option>
+                            @endforeach
+                            <option value="0">{{ __('pos.counter_not_set') }}@if($ocDrawers->has(0)) — Rs {{ number_format((float) $ocDrawers[0], 2) }}@endif</option>
+                        </select>
+                    </div>
+                    @endif
                     <div class="flex-1 min-w-[160px]">
                         <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.new_opening_cash_rs') }}</label>
-                        <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required value="{{ (float) $dayOpening->opening_cash }}"
+                        <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required value="{{ $ocList->isNotEmpty() ? '' : (float) $ocTotal }}"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-teal-500 focus:border-teal-500">
                     </div>
                     <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition">{{ __('pos.update_word') }}</button>
@@ -147,6 +178,20 @@
                 </div>
                 <form method="POST" action="{{ route('pos.day-opening.save') }}" class="mt-3 flex flex-wrap items-end gap-2">
                     @csrf
+                    @if($ocList->isNotEmpty())
+                    {{-- Counters wali shop: har counter ka float alag darj hota
+                         hai (ek ke baad doosra), day-close par ek-ek counter ka
+                         farq isi se nikalta hai. --}}
+                    <div class="flex-1 min-w-[160px]">
+                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.counter_pick_drawer') }}</label>
+                        <select name="terminal_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-teal-500 focus:border-teal-500">
+                            @foreach($ocList as $ocId => $ocC)
+                            <option value="{{ $ocId }}">{{ $ocC->terminal_name }}</option>
+                            @endforeach
+                            <option value="0">{{ __('pos.counter_not_set') }}</option>
+                        </select>
+                    </div>
+                    @endif
                     <div class="flex-1 min-w-[160px]">
                         <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.opening_cash_rs') }}</label>
                         <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required placeholder="{{ __('pos.ph_eg_5000') }}"

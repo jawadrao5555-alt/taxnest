@@ -106,6 +106,13 @@
             </label>
             <textarea name="features_text" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">{{ $plan->features && is_array($plan->features) ? implode("\n", $plan->features) : '' }}</textarea>
         </div>
+        {{-- Task 1455: the save is refused when it would break the package
+             ladder (a costlier package losing a tick, a tightened cap, a
+             reprice that reorders it). This is the deliberate way past it. --}}
+        <label class="flex items-start gap-1.5 text-[11px] text-amber-300/90">
+            <input type="checkbox" name="ladder_override" value="1" class="mt-0.5 rounded bg-gray-800 border-gray-600 text-amber-500">
+            <span>Save anyway (breaks the ladder) — only tick this if the warning is expected.</span>
+        </label>
         <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save Changes</button>
     </form>
 </div>

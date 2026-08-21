@@ -11,6 +11,28 @@
     <div class="bg-emerald-900/30 border border-emerald-700 rounded-lg p-3 mb-6 text-sm text-emerald-300">{{ session('success') }}</div>
     @endif
 
+    {{-- Task 1455: a ladder that is already broken must not be invisible. The
+         editor only refuses NEW breakage, so anything standing is shown here. --}}
+    @if(!empty($ladderWarnings))
+    <div class="bg-amber-900/30 border border-amber-700 rounded-lg p-4 mb-6">
+        <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            <h3 class="text-sm font-semibold text-amber-200">Package ladder needs attention</h3>
+        </div>
+        <p class="text-xs text-amber-300/80 mb-2">These packages already contradict each other, so the public cards and the comparison table are quietly dropping claims. Fix them here — the deploy gate checks the same thing.</p>
+        <ul class="space-y-1 text-xs text-amber-100/90">
+            @foreach($ladderWarnings as $productType => $problems)
+                @foreach($problems as $problem)
+                <li class="flex gap-1.5">
+                    <span class="text-amber-400 font-semibold shrink-0">{{ \App\Services\PlanLadderGuard::LABELS[$productType] ?? $productType }}:</span>
+                    <span>{{ $problem }}</span>
+                </li>
+                @endforeach
+            @endforeach
+        </ul>
+    </div>
+    @endif
+
     <div class="flex flex-wrap items-center gap-2 mb-6">
         <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
         <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
@@ -47,6 +69,10 @@
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1 block">Features (one per line — shown on landing page)</label>
                 <textarea name="features_text" rows="4" placeholder="e.g. POS Billing&#10;Thermal Receipt&#10;PRA Integration" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></textarea>
             </div>
+            <label class="flex items-start gap-1.5 text-[11px] text-amber-300/90">
+                <input type="checkbox" name="ladder_override" value="1" class="mt-0.5 rounded bg-gray-800 border-gray-600 text-amber-500">
+                <span>Save anyway (breaks the ladder) — only tick this if the warning is expected.</span>
+            </label>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Create Plan</button>
         </form>
     </div>

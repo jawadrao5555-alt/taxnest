@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SaasAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
+use App\Services\PlanLadderGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Collection;
@@ -26,7 +27,54 @@ class AdminPlanController extends Controller
             $fbrposPlans = new Collection();
         }
 
-        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans'));
+        // A ladder that is ALREADY broken must not be invisible — the editor
+        // only blocks NEW breakage, so an old one would otherwise sit there
+        // silently until the next deploy gate run (Task 1455).
+        $ladderWarnings = PlanLadderGuard::allCurrentProblems();
+
+        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'ladderWarnings'));
+    }
+
+    /**
+     * The row exactly as it would be written, for the ladder guard to audit.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function ladderAttributes(Request $request, array $data): array
+    {
+        return [
+            'name'              => $data['name'],
+            'product_type'      => $data['product_type'],
+            'price'             => $data['price'],
+            'invoice_limit'     => $data['invoice_limit'],
+            'max_terminals'     => $request->input('max_terminals'),
+            'max_users'         => $request->input('max_users'),
+            'max_products'      => $request->input('max_products'),
+            'inventory_enabled' => $request->boolean('inventory_enabled'),
+            'reports_enabled'   => $request->boolean('reports_enabled'),
+        ];
+    }
+
+    /**
+     * Refuse a save that would break the package ladder, unless the admin has
+     * ticked "save anyway" — then let it through but record the override.
+     *
+     * @param  array<int, string>  $problems
+     */
+    private function ladderBlock(Request $request, array $problems, string $planName)
+    {
+        if (!$problems || $request->boolean('ladder_override')) {
+            return null;
+        }
+
+        return back()->withInput()->withErrors([
+            'ladder' => array_merge(
+                ["This change to '{$planName}' would break the package ladder, so it was not saved:"],
+                array_map(fn ($p) => '• ' . $p, $problems),
+                ['Tick "Save anyway (breaks the ladder)" on the form if you really mean it.'],
+            ),
+        ]);
     }
 
     public function store(Request $request)
@@ -47,6 +95,14 @@ class AdminPlanController extends Controller
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
 
+        // Ladder check BEFORE the write (Task 1455) — a new half-configured
+        // package dropped into the middle of a ladder is the classic way a
+        // card silently stops saying "Everything in <previous>, plus:".
+        $ladderProblems = PlanLadderGuard::newProblems($this->ladderAttributes($request, $data));
+        if ($blocked = $this->ladderBlock($request, $ladderProblems, $data['name'])) {
+            return $blocked;
+        }
+
         // Explicit field list (never mass-assign the whole request) so sensitive
         // columns like is_trial can't be injected via crafted POST data.
         $plan = PricingPlan::create([
@@ -64,8 +120,13 @@ class AdminPlanController extends Controller
             'features' => $features,
         ]);
 
-        AdminAuditLog::log(auth('admin')->id(), 'Plan created', 'PricingPlan', $plan->id, ['name' => $plan->name, 'product_type' => $plan->product_type]);
-        return back()->with('success', "Plan '{$plan->name}' created.");
+        AdminAuditLog::log(auth('admin')->id(), 'Plan created', 'PricingPlan', $plan->id, array_filter([
+            'name' => $plan->name,
+            'product_type' => $plan->product_type,
+            'ladder_override' => $ladderProblems ?: null,
+        ]));
+        return back()->with('success', "Plan '{$plan->name}' created."
+            . ($ladderProblems ? ' Saved with a ladder warning — see the banner on this page.' : ''));
     }
 
     public function update(Request $request, $id)
@@ -86,6 +147,14 @@ class AdminPlanController extends Controller
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
 
+        // Ladder check BEFORE the write (Task 1455) — reports switched off on a
+        // costlier package, a tightened cap or a reprice that reorders the
+        // ladder all land silently otherwise.
+        $ladderProblems = PlanLadderGuard::newProblems($this->ladderAttributes($request, $data), (int) $plan->id);
+        if ($blocked = $this->ladderBlock($request, $ladderProblems, $data['name'])) {
+            return $blocked;
+        }
+
         // Explicit field list (never mass-assign the whole request) so sensitive
         // columns like is_trial can't be injected via crafted POST data.
         $plan->update([
@@ -103,7 +172,12 @@ class AdminPlanController extends Controller
             'features' => $features,
         ]);
 
-        AdminAuditLog::log(auth('admin')->id(), 'Plan updated', 'PricingPlan', $plan->id, ['name' => $plan->name, 'product_type' => $plan->product_type]);
-        return back()->with('success', "Plan '{$plan->name}' updated.");
+        AdminAuditLog::log(auth('admin')->id(), 'Plan updated', 'PricingPlan', $plan->id, array_filter([
+            'name' => $plan->name,
+            'product_type' => $plan->product_type,
+            'ladder_override' => $ladderProblems ?: null,
+        ]));
+        return back()->with('success', "Plan '{$plan->name}' updated."
+            . ($ladderProblems ? ' Saved with a ladder warning — see the banner on this page.' : ''));
     }
 }

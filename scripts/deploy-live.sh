@@ -534,6 +534,26 @@ else
   fi
 fi
 
+# Every other POS check above is HTML/JS-level. This one drives a REAL browser
+# and actually CLICKS "Call back" on the sale screen, because that button lives
+# in universal.blade.php — a file edited constantly for unrelated work — and a
+# renamed method or a broken x-data leaves the whole PHP suite green while the
+# cashier gets a button that does nothing mid-rush (Task 1396). It also proves
+# the button never swallows the keyboard (guided Enter + plain-letter shortcuts)
+# and that a shop with no phone paired gets the amber number card, not an error.
+step "Preflight: Caller ID call-back check (real click: dials, attaches customer, amber fallback, keyboard intact)"
+if [ "${SKIP_CALLER_DIAL_CHECK:-0}" = "1" ]; then
+  echo "SKIPPED (SKIP_CALLER_DIAL_CHECK=1) — only skip for emergency hotfixes." >&2
+else
+  node scripts/pos-caller-dial-check.mjs
+  CD_RC=$?
+  if [ $CD_RC -eq 2 ]; then
+    fail "call-back check could not run (dev server/MySQL/chromium missing?) — start the Laravel Server + MySQL Staging workflows, or SKIP_CALLER_DIAL_CHECK=1 to bypass"
+  elif [ $CD_RC -ne 0 ]; then
+    fail "call-back check FAILED — the sale screen's Call back button regressed; fix before deploying"
+  fi
+fi
+
 step "Preflight: SSH connectivity + live HEAD"
 LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
   || fail "cannot reach live server over SSH (or live git repo broken)"

@@ -48,6 +48,11 @@
         .totals .grand td { font-weight: bold; font-size: 16px; border-top: 2px solid #000; padding-top: 4px; }
         /* Slim single-line marker — no reversed block, no boxed banner (thermal rules). */
         .proof-line { text-align: center; font-weight: 900; font-size: 15px; letter-spacing: 1px; margin: 4px 0; }
+        /* Task 1386: the table line must never break mid-name on an 80mm roll —
+           same rule the kitchen slip uses (Task 1378). nowrap + a length-based
+           font step set inline from PHP keeps even the longest stored name (the
+           column caps at 20 chars, plus the label) on ONE piece. */
+        .proof-table-line { white-space: nowrap; }
         /* PRINT: margin MUST be 0 (not auto) — auto centers the 80mm body on the
            driver's wider canvas and the thermal head prints only the left slice,
            so the bill came out as a thin right-edge strip (ZFC photo 28 Jul 2026).
@@ -95,9 +100,47 @@
     <div class="text-center bold" style="font-size:18px; letter-spacing:1px;">
         {{ __('pos.proof_bill_no') }} {{ $order->order_number }}
     </div>
+    @php
+        // Task 1386: the customer copy carried the same "T-" bug the kitchen slip
+        // shed in Task 1378 — a shop that names its tables "Table No 01" handed
+        // out a slip reading "TABLE NO: T-Table No 01". The name now prints
+        // exactly as the shop stored it; the localized TABLE NO: label is added
+        // ONLY when the name doesn't already read as a table (so a bare "01"
+        // still reads as one). Same self-label detection + font stepping as
+        // kitchen-ticket.blade.php.
+        $proofTableName = trim((string) ($order->table->table_number ?? ''));
+        $proofTableText = '';
+        if ($proofTableName !== '') {
+            $proofTableLabel = trim((string) __('pos.proof_table_no'));
+            // Detection ignores the label's trailing punctuation ("TABLE NO:")
+            // and also accepts the shorter KOT wording, so an Urdu-named table
+            // is recognised on both slips.
+            $proofLabelStem = trim((string) preg_replace('/[\s:\-\.،؛]+$/u', '', $proofTableLabel));
+            $proofKotLabel = trim((string) __('pos.kot_table_label'));
+            $proofTableSelfLabelled = preg_match('/^(table|tbl)/iu', $proofTableName) === 1
+                // "T1" / "T-1" / "T 1" shorthand already reads as a table.
+                || preg_match('/^t[\s\-\._]?\d/i', $proofTableName) === 1
+                || ($proofLabelStem !== '' && mb_stripos($proofTableName, $proofLabelStem) === 0)
+                || ($proofKotLabel !== '' && mb_stripos($proofTableName, $proofKotLabel) === 0);
+            $proofTableText = $proofTableSelfLabelled ? $proofTableName : trim($proofTableLabel . ' ' . $proofTableName);
+        }
+        // Printable width is 72mm − 4mm padding each side ≈ 64mm; these steps
+        // keep the longest possible line — label + the 20-char column — on ONE
+        // line instead of wrapping mid-name. Same ladder as the kitchen slip,
+        // except the widest bucket stays at 12px (measured: the widest line this
+        // bill can print, "TABLE NO:" + 20 chars, still clears the 64mm at 12px):
+        // the KOT's 10px is a heavier 900-weight line, and on the customer copy
+        // it printed smaller than the body text.
+        $proofTableLen = mb_strlen($proofTableText);
+        $proofTableFont = $proofTableLen <= 12 ? 20 : ($proofTableLen <= 16 ? 18 : ($proofTableLen <= 20 ? 15 : ($proofTableLen <= 26 ? 13 : 12)));
+    @endphp
+    @if($proofTableText !== '')
+    <div class="text-center bold proof-table-line" style="font-size:{{ $proofTableFont }}px; margin-top:2px;">{{ $proofTableText }}</div>
+    @else
     <div class="text-center bold" style="font-size:20px; margin-top:2px;">
-        @if($order->table){{ __('pos.proof_table_no') }} T-{{ $order->table->table_number }}@else{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_',' ',$order->order_type)) }}@endif
+        {{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_',' ',$order->order_type)) }}
     </div>
+    @endif
     <div class="flex text-sm mt-1">
         <span>{{ $order->created_at->format('d-M-Y') }}</span>
         <span>{{ $order->created_at->format('g:i A') }}</span>

@@ -31,8 +31,11 @@
             </intent-filter>
         </activity>
 
+        <!-- singleTop: the watchdog's tap-to-resume notification must land on
+             the SAME instance so onNewIntent can restart tracking (v1.7.0). -->
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:exported="false" />
 
         <service

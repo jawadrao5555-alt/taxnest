@@ -7,6 +7,7 @@ use App\Models\PosRider;
 use App\Models\PosTransaction;
 use App\Models\User;
 use App\Services\PosFeatureService;
+use App\Services\RiderPushService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -850,6 +851,22 @@ class PosRiderTrackingController extends Controller
             'low_battery' => $hasBattery && (bool) $r->on_duty
                 && $r->last_battery_pct !== null && (int) $r->last_battery_pct <= 20,
         ])->values();
+
+        // Task #1359: a silent rider gets a direct, data-only "sync now" nudge
+        // — no cron in the loop. The push wakes a frozen app, which then drains
+        // its GPS buffer and restarts duty tracking. RiderPushService throttles
+        // per rider (5 min), so the map's few-second poll cannot spam it, and
+        // the whole call is fire-and-forget: the map must render even if FCM
+        // is unconfigured or down.
+        try {
+            foreach ($rows as $r) {
+                if ($isSilent($r)) {
+                    RiderPushService::queueSyncPush((int) $r->id);
+                }
+            }
+        } catch (\Throwable $e) {
+            // never let a push concern break the live map response
+        }
 
         return response()->json(['ok' => true, 'riders' => $riders, 'server_time' => now()->toIso8601String()]);
     }

@@ -64,4 +64,28 @@
     <string name="notif_deliveries_channel">نئے آرڈر کی اطلاع</string>
     <string name="notif_new_delivery_one">نیا آرڈر آیا ہے — ڈیلیوری کے لیے!</string>
     <string name="notif_new_delivery_many">%1$d نئے آرڈر آئے ہیں — ڈیلیوری کے لیے!</string>
+
+    <!-- Sync health + watchdog (v1.7.0, Task #1359) -->
+    <string name="ago_just_now">ابھی ابھی</string>
+    <string name="ago_minutes">%1$d منٹ پہلے</string>
+    <string name="ago_hours">%1$d گھنٹے پہلے</string>
+    <string name="sync_ok">✓ لوکیشن دکان تک پہنچ رہی ہے — آخری سنک: %1$s</string>
+    <string name="sync_late">⚠ لوکیشن دکان تک نہیں پہنچ رہی — آخری سنک: %1$s</string>
+    <string name="reason_net">وجہ: انٹرنیٹ نہیں چل رہا۔ ڈیٹا یا وائی فائی آن کریں۔</string>
+    <string name="reason_perm">وجہ: لوکیشن کی اجازت یا GPS بند ہے۔ اسے آن کریں۔</string>
+    <string name="reason_battery">وجہ: فون کی بیٹری سیٹنگ ایپ کو پیچھے چلنے نہیں دے رہی۔</string>
+    <string name="reason_unknown">وجہ معلوم نہیں — ایپ کھلی رکھ کر انٹرنیٹ چیک کریں۔</string>
+    <string name="notif_text_synced">لوکیشن دکان کو جا رہی ہے — آخری سنک: %1$s</string>
+    <string name="notif_text_late">⚠ لوکیشن نہیں جا رہی — آخری سنک: %1$s</string>
+    <string name="notif_watchdog_channel">ٹریکنگ بحالی</string>
+    <string name="notif_watchdog_title">ٹریکنگ رک گئی ہے</string>
+    <string name="notif_watchdog_text">ڈیوٹی آن ہے مگر فون نے لوکیشن بھیجنا روک دیا ہے۔ یہاں ٹیپ کر کے دوبارہ چالو کریں۔</string>
+    <string name="tracking_resumed">ٹریکنگ دوبارہ چالو ہو گئی</string>
+
+    <!-- Battery / autostart gate (v1.7.0, Task #1359) -->
+    <string name="battery_chip">⚠ بیٹری سیٹنگ کی وجہ سے ٹریکنگ رک سکتی ہے — ٹھیک کرنے کے لیے ٹیپ کریں</string>
+    <string name="battery_dialog_title">ٹریکنگ چلتی رکھنے کے لیے</string>
+    <string name="battery_dialog_msg">فون کی بیٹری بچت ایپ کو پیچھے بند کر دیتی ہے، جس سے آپ کا راستہ نقشے پر نہیں آتا۔\n\n1) «بیٹری سیٹنگ» دبا کر اس ایپ کو Unrestricted / بلا پابندی کریں۔\n2) «آٹو اسٹارٹ» دبا کر TaxNest Rider کو آن کریں۔</string>
+    <string name="battery_btn">بیٹری سیٹنگ</string>
+    <string name="autostart_btn">آٹو اسٹارٹ</string>
 </resources>

@@ -55,6 +55,40 @@ object PointQueue {
         }
     }
 
+    /**
+     * Acknowledge the first [n] points of an uploaded [batch] (v1.7.0).
+     *
+     * Why not plain [removeFirst]: the upload happens OUTSIDE the queue lock,
+     * so live GPS points keep arriving meanwhile.  If the buffer is at [CAP],
+     * every new point drops an old one off the front — the positions shift
+     * under the uploader, and a count-based trim would then delete newer,
+     * never-uploaded points.  Anchoring on the capture time of point [n]
+     * removes exactly the acknowledged span, however much the front moved.
+     */
+    fun ackBatch(c: Context, batch: JSONArray, n: Int) {
+        if (n <= 0 || batch.length() == 0) return
+        val anchor = batch.optJSONObject(minOf(n, batch.length()) - 1)?.optLong("at", 0L) ?: 0L
+        if (anchor > 0L) removeUpTo(c, anchor) else removeFirst(c, n)
+    }
+
+    /**
+     * Drop every queued point captured at or before [atMs].  Points are
+     * appended in capture order, so this is a front-trim that survives a
+     * concurrent cap-trim.  Entries with no usable `at` are dropped too — the
+     * server can never accept them, and keeping them would loop forever.
+     */
+    fun removeUpTo(c: Context, atMs: Long) {
+        synchronized(lock) {
+            val arr = load(c)
+            val out = JSONArray()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (o.optLong("at", 0L) > atMs) out.put(o)
+            }
+            Prefs.setQueueJson(c, out.toString())
+        }
+    }
+
     fun clear(c: Context) = synchronized(lock) { Prefs.setQueueJson(c, "[]") }
 
     private fun load(c: Context): JSONArray =

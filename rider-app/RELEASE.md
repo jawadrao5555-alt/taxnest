@@ -1,6 +1,6 @@
 # TaxNest Rider APK — Build & Release Runbook
 
-Last updated: Aug 2026 (v1.5.0 FCM push + battery reporting)
+Last updated: Aug 2026 (v1.7.0 live-tracking reliability)
 
 ---
 
@@ -146,4 +146,5 @@ rider-app/app/build/outputs/apk/release/app-release.apk
 | 1.3.0   | 4           | **Offline buffering hardened** — drain outside duty (onResume + login + NetworkCallback); offline end-duty queued + reconciled on reconnect; server accepts past-timestamp buffered points when duty=OFF (per-point gate); removeFirst(stored) precise trim; regression guard restricted to live (non-offline) points only |
 | 1.4.x   | 5–7         | **New-delivery notifications** — 15-min DeliveryCheckWorker poll + DeliveryNotifier dedupe (Touseef case); in-app APK update download |
 | 1.5.0   | 8           | **Instant push (FCM)** — data-only push through the same DeliveryNotifier dedupe (poll stays as fallback); FCM token rotates with login/logout; **battery %** on location points → admin map "battery kam hai" badge. Needs the Firebase prerequisite above; builds/runs fine without it |
+| 1.7.0   | 10          | **Live tracking reliability** (Task #1359) — 15-min network-constrained `SyncWorker` (drains the buffer even when the app is closed / the duty service was killed), `DutyWatchdog` restart + ongoing tap-to-resume notification when Android blocks a background FGS start, 2-min stationary heartbeat, last-sync line on the home screen and in the duty notification (red + reason when late), battery-optimisation / autostart gate at duty-on with a warning chip, and a server-sent data-only `sync_now` push the moment the live map sees a rider go silent (throttled 5 min/rider, no cron). Queue acknowledgement is now timestamp-anchored (`PointQueue.ackBatch`) so a cap-trim during an upload cannot delete un-uploaded points |
 | 1.6.0   | 9           | **Delivered button** (Task #1160) — rider marks his own assigned/dispatched bill delivered from the delivery card (confirm dialog, Urdu/English). Additive `POST /deliveries/{id}/delivered` returns the refreshed `/me` payload (shared `applyMePayload` re-render); 404 also carries the payload so a reassigned bill resyncs the list instead of error-looping |

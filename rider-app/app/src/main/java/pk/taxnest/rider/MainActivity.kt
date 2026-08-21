@@ -42,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dutyBtn: Button
     private lateinit var statusText: TextView
     private lateinit var pendingText: TextView
+    private lateinit var syncStatusText: TextView
+    private lateinit var batteryChip: TextView
     private lateinit var welcomeText: TextView
     private lateinit var summaryText: TextView
     private lateinit var updateRow: View
@@ -91,6 +93,8 @@ class MainActivity : AppCompatActivity() {
         dutyBtn            = findViewById(R.id.dutyBtn)
         statusText         = findViewById(R.id.statusText)
         pendingText        = findViewById(R.id.pendingText)
+        syncStatusText     = findViewById(R.id.syncStatusText)
+        batteryChip        = findViewById(R.id.batteryChip)
         welcomeText        = findViewById(R.id.welcomeText)
         summaryText        = findViewById(R.id.summaryText)
         updateRow          = findViewById(R.id.updateRow)
@@ -101,6 +105,10 @@ class MainActivity : AppCompatActivity() {
 
         dutyBtn.setOnClickListener { if (Prefs.duty(this)) endDuty() else beginDutyChain() }
 
+        // v1.7.0 (Task #1359): the chip is the standing reminder for a rider
+        // who skipped the battery dialog — tapping it reopens the same gate.
+        batteryChip.setOnClickListener { showBatterySetupDialog(null) }
+
         findViewById<Button>(R.id.logoutBtn).setOnClickListener {
             thread { ApiClient.post("/logout", JSONObject(), Prefs.token(this)) }
             // v1.5.0 (Task #1106): kill push locally too — the /logout call
@@ -108,6 +116,8 @@ class MainActivity : AppCompatActivity() {
             Fcm.clear()
             stopService(Intent(this, TrackingService::class.java))
             DeliveryCheckWorker.cancel(this)
+            SyncWorker.cancel(this)
+            DutyWatchdog.clearNotification(this)
             Prefs.clearSession(this)
             startActivity(Intent(this, LoginActivity::class.java)); finish()
         }
@@ -121,6 +131,12 @@ class MainActivity : AppCompatActivity() {
         // v1.4.0: background delivery check — notification even when the app
         // is closed / duty off (Touseef case). KEEP policy = idempotent.
         DeliveryCheckWorker.schedule(this)
+        // v1.7.0 (Task #1359): background point-sync + duty watchdog. Also
+        // KEEP/idempotent — this is the safety net that keeps the route
+        // flowing when the phone freezes the app mid-shift.
+        SyncWorker.schedule(this)
+
+        handleResumeIntent(intent)
 
         // Ask for notification permission on open (Android 13+) so alerts work
         // even for riders who never start duty from this screen.
@@ -147,9 +163,36 @@ class MainActivity : AppCompatActivity() {
         // Drain any buffered offline points left from previous duty sessions.
         QueueDrain.drainAsync(this)
 
+        // v1.7.0: duty ON but the phone killed the service while we were away
+        // → bring tracking back now that we are in the foreground (a start
+        // from here is always allowed, even on Android 12+).
+        if (Prefs.duty(this)) DutyWatchdog.ensureRunning(this)
+
         // Register connectivity callback so drain fires immediately when
         // signal returns, not just on the next 30s /me poll.
         registerConnectivityCallback()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleResumeIntent(intent)
+    }
+
+    /**
+     * Rider tapped the watchdog's "tracking has stopped" notification
+     * (v1.7.0, Task #1359). We are in the foreground now, so the foreground
+     * service start that Android refused in the background will succeed.
+     */
+    private fun handleResumeIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(DutyWatchdog.EXTRA_RESUME, false) != true) return
+        intent.removeExtra(DutyWatchdog.EXTRA_RESUME)
+        if (Prefs.token(this) == null || !Prefs.duty(this)) {
+            DutyWatchdog.clearNotification(this)
+            return
+        }
+        if (DutyWatchdog.ensureRunning(this)) showMsg(getString(R.string.tracking_resumed))
+        SyncWorker.runNow(this)
     }
 
     override fun onPause() {
@@ -222,24 +265,49 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun askBatteryThenStart() {
-        val pm = getSystemService(POWER_SERVICE) as PowerManager
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            AlertDialog.Builder(this)
-                .setMessage(R.string.perm_battery)
-                .setPositiveButton(R.string.open_settings) { _, _ ->
-                    try {
-                        startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                            Uri.parse("package:$packageName")))
-                    } catch (e: Exception) {
-                        try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (e2: Exception) {}
-                    }
-                    startDutyOnServer()
-                }
-                .setNegativeButton(R.string.skip) { _, _ -> startDutyOnServer() }
-                .show()
+        if (!SyncStatus.isBatteryUnrestricted(this)) {
+            showBatterySetupDialog { startDutyOnServer() }
             return
         }
         startDutyOnServer()
+    }
+
+    /**
+     * Battery + autostart setup gate (v1.7.0, Task #1359).
+     *
+     * The standard battery-optimisation switch is only half the fix on the
+     * phones our riders carry: Infinix/Tecno, Xiaomi, Oppo and Vivo also keep a
+     * vendor-only "autostart / background run" list, and an app missing from it
+     * gets frozen the moment the screen goes off. So the dialog offers both
+     * doors, and whichever the rider takes, duty still starts (via [onDone]) —
+     * a rider must never be blocked from working. If he skips it, the warning
+     * chip on the duty screen keeps the fix one tap away.
+     *
+     * @param onDone continuation for the duty-on chain; null when the dialog
+     *               was opened from the standing warning chip.
+     */
+    private fun showBatterySetupDialog(onDone: (() -> Unit)?) {
+        val builder = AlertDialog.Builder(this)
+            .setTitle(R.string.battery_dialog_title)
+            .setMessage(R.string.battery_dialog_msg)
+            .setPositiveButton(R.string.battery_btn) { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:$packageName")))
+                } catch (e: Exception) {
+                    try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (e2: Exception) {}
+                }
+                onDone?.invoke()
+            }
+            .setNegativeButton(R.string.skip) { _, _ -> onDone?.invoke() }
+            .setOnCancelListener { onDone?.invoke() }
+        if (AutoStartHelper.isSupported(this)) {
+            builder.setNeutralButton(R.string.autostart_btn) { _, _ ->
+                AutoStartHelper.open(this)
+                onDone?.invoke()
+            }
+        }
+        builder.show()
     }
 
     private fun startDutyOnServer() {
@@ -312,6 +380,31 @@ class MainActivity : AppCompatActivity() {
         val lastStr = if (last == 0L) getString(R.string.never)
             else SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(last))
         pendingText.text = getString(R.string.points_pending, pending) + "  ·  " + getString(R.string.last_sync, lastStr)
+
+        renderSyncHealth(onDuty)
+    }
+
+    /**
+     * "Is my location actually reaching the shop?" — answered on the home
+     * screen in the rider's own words (v1.7.0, Task #1359), so he can fix
+     * internet / GPS / battery on the road instead of finding out at the shop.
+     */
+    private fun renderSyncHealth(onDuty: Boolean) {
+        if (!onDuty) {
+            syncStatusText.visibility = View.GONE
+        } else {
+            syncStatusText.visibility = View.VISIBLE
+            val ago = SyncStatus.lastSyncLabel(this)
+            if (SyncStatus.isLate(this)) {
+                syncStatusText.text = getString(R.string.sync_late, ago) + "\n" + SyncStatus.reasonText(this)
+                syncStatusText.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+            } else {
+                syncStatusText.text = getString(R.string.sync_ok, ago)
+                syncStatusText.setTextColor(0xFF067647.toInt())
+            }
+        }
+        batteryChip.visibility =
+            if (SyncStatus.isBatteryUnrestricted(this)) View.GONE else View.VISIBLE
     }
 
     private fun refreshMe() {
@@ -547,6 +640,8 @@ class MainActivity : AppCompatActivity() {
         Fcm.clear()
         stopService(Intent(this, TrackingService::class.java))
         DeliveryCheckWorker.cancel(this)
+        SyncWorker.cancel(this)
+        DutyWatchdog.clearNotification(this)
         Prefs.clearSession(this)
         showMsg(getString(R.string.session_expired))
         startActivity(Intent(this, LoginActivity::class.java)); finish()

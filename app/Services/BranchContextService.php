@@ -28,6 +28,20 @@ class BranchContextService
      */
     public const ALL = 'all';
 
+    /**
+     * The two isolated read-only portals (Archive + Local Bills). Their logins
+     * are provisioned as COMPANY-level audit accounts — no branch is assigned,
+     * and PosAuth confines them to their own portal, so there is no other panel
+     * from which they could ever change branch.
+     *
+     * Task 1361 scopes both portals by branch. A branch-less audit login must
+     * therefore stay company-wide (see autoSelectBranch) and keep owner-style
+     * branch rights (see effectiveRole) — otherwise switching the filter on
+     * would silently pin the shop's only archive window to head office. Assign
+     * such an account a default branch and it is welded to it, like a cashier.
+     */
+    public const PORTAL_AUDIT_ROLES = ['archive_viewer', 'local_viewer'];
+
     /** Per-request memo of accessibleBranches() — the switcher + guards ask repeatedly. */
     private $branchMemo = null;
 
@@ -252,6 +266,14 @@ class BranchContextService
     {
         $role = $user->pos_role ?: ($user->role ?: 'employee');
 
+        // Read-only portal audit logins (Task 1361): company-wide by default —
+        // they may look at any branch AND at the company-wide view, because
+        // their portal is the only page they can open. Given an explicit branch
+        // they drop to the cashier tier and stay welded to it.
+        if (in_array($role, self::PORTAL_AUDIT_ROLES, true)) {
+            return ($user->default_branch_id ?? null) ? 'cashier' : 'company_admin';
+        }
+
         return match ($role) {
             'pos_admin', 'admin' => 'company_admin',
             'pos_manager' => 'manager',
@@ -290,6 +312,17 @@ class BranchContextService
     private function autoSelectBranch($user): ?int
     {
         if (!$this->branchesReady()) {
+            return null;
+        }
+
+        // Task 1361: a branch-less portal audit login is NOT auto-pinned to head
+        // office. Its portal is the only page it can open, so a silent pin would
+        // hide the rest of the company's archived / local history behind a
+        // switcher nobody told them about. NULL = company-wide, which is exactly
+        // what these accounts are provisioned for; they can still narrow down to
+        // one branch from the portal's switcher.
+        if (!($user->default_branch_id ?? null)
+            && in_array($user->pos_role ?? '', self::PORTAL_AUDIT_ROLES, true)) {
             return null;
         }
 

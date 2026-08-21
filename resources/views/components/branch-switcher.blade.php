@@ -7,6 +7,9 @@
     // Owner-only "All branches" entry (Task 1347, PRA POS): lets the owner see
     // company-wide figures again after branches exist. Opt-in per panel.
     'allowAll' => false,
+    // Read-only portals (Archive / Local Bills) have no branch admin page to
+    // link to — PosAuth bounces them straight back (Task 1361).
+    'showManage' => true,
 ])
 @php
     $svc = app(\App\Services\BranchContextService::class);
@@ -14,7 +17,11 @@
     $current = $currentBranch ?? null;
     $canSwitch = $svc->canSwitch();
     $allOn = $allowAll && $svc->isOwner();
-    $allActive = $allOn && $svc->isAllBranches();
+    // "All branches" is also the RESTING state of an account that has branch
+    // rights but no active branch at all (a company-wide portal audit login,
+    // Task 1361) — labelling that "Select Branch" would misdescribe a screen
+    // that is already showing every branch.
+    $allActive = $allOn && ($svc->isAllBranches() || $svc->getActiveBranchId() === null);
     // With "All branches" available, a single-branch owner still needs the
     // dropdown (branch ↔ all), so the switcher must not render as locked.
     $canSwitch = $canSwitch || $allOn;
@@ -94,7 +101,7 @@
                 </form>
             @endforeach
         </div>
-        @if($svc->isOwner())
+        @if($showManage && $svc->isOwner())
             <a href="{{ $manageUrl }}" class="block px-4 py-2 text-center text-xs font-bold {{ $c['text'] }} bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 hover:{{ $c['bg'] }}">
                 {{ __('pos.branch_manage_link') }}
             </a>

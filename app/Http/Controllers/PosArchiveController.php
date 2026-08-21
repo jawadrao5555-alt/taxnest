@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PosTransaction;
 use App\Models\PosDayCloseReport;
 use App\Models\User;
+use App\Services\BranchContextService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,28 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PosArchiveController extends Controller
 {
+    /**
+     * Every archived bill this portal may show — the SINGLE choke point for the
+     * list, its totals, the bill page and the CSV export, so the screen and the
+     * export can never disagree (Task 1361).
+     *
+     * Branch scoping rides here too: an archived bill carries real money, so a
+     * branch's audit login must not see (or export) another branch's history.
+     * applyToQuery is a no-op for a single-branch shop and for the company-wide
+     * view, and legacy pre-branch rows (branch_id NULL) always stay visible.
+     */
+    private function baseQuery(int $companyId)
+    {
+        $query = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('is_archived', true)
+            ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+
+        app(BranchContextService::class)->applyToQuery($query, 'branch_id');
+
+        return $query;
+    }
+
     /**
      * Archive Portal — only accessible by users with pos_role = 'archive_viewer'.
      * Shows archived local/provisional bills that were moved here at day-close.
@@ -21,10 +44,7 @@ class PosArchiveController extends Controller
     {
         $companyId = app('currentCompanyId');
 
-        $query = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('is_archived', true)
-            ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+        $query = $this->baseQuery($companyId);
 
         if ($q = trim((string) $request->input('q', ''))) {
             $query->where(function ($w) use ($q) {
@@ -76,10 +96,7 @@ class PosArchiveController extends Controller
     public function show($id)
     {
         $companyId = app('currentCompanyId');
-        $bill = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('is_archived', true)
-            ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); })
+        $bill = $this->baseQuery($companyId)
             ->with(['items', 'creator', 'company'])
             ->findOrFail($id);
 
@@ -89,10 +106,7 @@ class PosArchiveController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $companyId = app('currentCompanyId');
-        $query = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('is_archived', true)
-            ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+        $query = $this->baseQuery($companyId);
 
         if ($from = $request->input('from')) {
             $query->where('business_date', '>=', $from);

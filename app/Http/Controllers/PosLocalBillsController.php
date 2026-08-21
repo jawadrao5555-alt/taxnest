@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PosTransaction;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\BranchContextService;
 use App\Services\LocalViewerService;
 use App\Services\ViewablePasswordService;
 use Illuminate\Http\Request;
@@ -19,12 +20,27 @@ class PosLocalBillsController extends Controller
      * archived at day-close / Local Final. Cashiers cannot see this data
      * (PosAuth confines access).
      */
+    /**
+     * Every local bill this portal may show — the SINGLE choke point for the
+     * list, its totals (including the "Aaj" figures), the bill page and the CSV
+     * export, so the screen and the export can never disagree (Task 1361).
+     *
+     * Branch scoping rides here too: a local bill is real money that never
+     * reaches PRA, so a branch's audit login must not see (or export) another
+     * branch's takings. applyToQuery is a no-op for a single-branch shop and for
+     * the company-wide view, and legacy pre-branch rows (branch_id NULL) always
+     * stay visible.
+     */
     private function baseQuery(int $companyId)
     {
-        return PosTransaction::withoutGlobalScope('hide_archived')
+        $query = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('invoice_mode', 'local')
             ->where('status', 'completed');
+
+        app(BranchContextService::class)->applyToQuery($query, 'branch_id');
+
+        return $query;
     }
 
     public function index(Request $request)

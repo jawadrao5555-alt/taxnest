@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\PosArchiveController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\PosLocalBillsController;
 use App\Models\User;
 use App\Services\BranchContextService;
 use App\Services\PlanLimitService;
@@ -14,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Tests\TestCase;
 
 /**
@@ -60,6 +63,9 @@ class PosBranchIsolationTest extends TestCase
         // planAllows/restaurantAllowed cache per company id statically — ids
         // restart at 1 after dropAllTables, so stale verdicts would leak.
         PosFeatureService::flushGateCaches();
+        // Same trap for the branch-stock memos (branch list + "already healed"
+        // flags, both keyed by the recycled company id).
+        \App\Services\BranchStockService::flushMemo();
 
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
@@ -132,6 +138,32 @@ class PosBranchIsolationTest extends TestCase
             $table->id();
             $table->unsignedBigInteger('branch_id');
             $table->unsignedBigInteger('user_id');
+            $table->timestamps();
+        });
+
+        // Creating a branch adopts any pre-branch stock onto head office, and
+        // that housekeeping query is NOT schema-guarded — the two inventory
+        // tables must exist even though this suite never puts stock in them.
+        Schema::create('inventory_stocks', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->decimal('quantity', 15, 2)->default(0);
+            $table->decimal('min_stock_level', 15, 2)->default(0);
+            $table->decimal('max_stock_level', 15, 2)->nullable();
+            $table->decimal('avg_purchase_price', 15, 2)->default(0);
+            $table->decimal('last_purchase_price', 15, 2)->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('inventory_movements', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->string('type', 30)->nullable();
+            $table->decimal('quantity', 15, 2)->default(0);
             $table->timestamps();
         });
 
@@ -607,6 +639,104 @@ class PosBranchIsolationTest extends TestCase
         $request = Request::create('/pos/day-close', 'GET', ['date' => PosBusinessDay::current($companyId)]);
 
         return (new PosController())->dayCloseReport($request)->getData()['stats'];
+    }
+
+    // ── surface helpers (the two isolated portals) ───────────────────────────
+
+    /** A day-close-washed (archived) bill on $branchId — what the Archive portal shows. */
+    private function makeArchivedBill(int $companyId, string $number, float $subtotal, ?int $branchId): int
+    {
+        $id = $this->makeBill($companyId, $number, $subtotal, $branchId);
+        DB::table('pos_transactions')->where('id', $id)->update([
+            'is_archived' => true,
+            'archived_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    /** A completed LOCAL (never-reported) bill on $branchId — what the Local Bills portal shows. */
+    private function makeLocalBill(int $companyId, string $number, float $subtotal, ?int $branchId): int
+    {
+        $id = $this->makeBill($companyId, $number, $subtotal, $branchId);
+        DB::table('pos_transactions')->where('id', $id)->update([
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'pra_invoice_number' => null,
+        ]);
+
+        return $id;
+    }
+
+    /**
+     * The canonical two-branch shop PLUS the money the two portals show:
+     * an archived and a local bill on each branch, and one of each from
+     * before branches existed.
+     *
+     * @return array{0:int,1:int,2:int} [companyId, mainBranchId, cityBranchId]
+     */
+    private function seedTwoBranchPortalShop(): array
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchShop();
+
+        $this->makeArchivedBill($companyId, 'A-MAIN', 1000, $mainId);
+        $this->makeArchivedBill($companyId, 'A-CITY', 500, $cityId);
+        $this->makeArchivedBill($companyId, 'A-OLD', 200, null);
+
+        $this->makeLocalBill($companyId, 'L-MAIN', 1000, $mainId);
+        $this->makeLocalBill($companyId, 'L-CITY', 500, $cityId);
+        $this->makeLocalBill($companyId, 'L-OLD', 200, null);
+
+        return [$companyId, $mainId, $cityId];
+    }
+
+    /** Archive portal screen: paginated invoice numbers (sorted) + its headline stats. */
+    private function archiveScreen(): array
+    {
+        $data = (new PosArchiveController())->index(Request::create('/pos/archive', 'GET'))->getData();
+
+        return [
+            'numbers' => collect($data['bills']->items())->pluck('invoice_number')->sort()->values()->all(),
+            'stats' => $data['stats'],
+        ];
+    }
+
+    /** Local Bills portal screen: paginated invoice numbers (sorted) + its headline stats. */
+    private function localScreen(): array
+    {
+        $data = (new PosLocalBillsController())->index(Request::create('/pos/local-bills', 'GET'))->getData();
+
+        return [
+            'numbers' => collect($data['bills']->items())->pluck('invoice_number')->sort()->values()->all(),
+            'stats' => $data['stats'],
+        ];
+    }
+
+    /**
+     * Drain a streamed CSV export into ['numbers' => [...], 'total' => float]
+     * — the same two things the screen states, so the two can be compared.
+     */
+    private function csvRows(StreamedResponse $response): array
+    {
+        ob_start();
+        $response->sendContent();
+        $csv = (string) ob_get_clean();
+
+        $handle = fopen('php://memory', 'r+');
+        fwrite($handle, $csv);
+        rewind($handle);
+        $rows = [];
+        while (($row = fgetcsv($handle)) !== false) {
+            $rows[] = $row;
+        }
+        fclose($handle);
+
+        array_shift($rows); // header
+
+        return [
+            'numbers' => collect($rows)->pluck(0)->sort()->values()->all(),
+            'total' => (float) collect($rows)->sum(fn ($r) => (float) $r[8]), // 'Total' column
+        ];
     }
 
     // ── surface helpers (writes) ─────────────────────────────────────────────
@@ -1134,5 +1264,167 @@ class PosBranchIsolationTest extends TestCase
         $this->assertSame(3, DB::table('branches')->where('company_id', $companyId)->count());
         $this->assertTrue((bool) DB::table('branches')
             ->where('company_id', $companyId)->where('name', 'Johar Town')->value('is_active'));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 5. THE TWO ISOLATED PORTALS (Task 1361)
+    //
+    // Archive (day-close-washed bills) and Local Bills (never-reported bills)
+    // live outside the main POS reports — they are the other two places where
+    // real bills and real amounts are listed, and both can be exported. The
+    // export must always agree with the screen; a CSV that carries rows the
+    // page refuses to show is the same leak, one click further away.
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function test_archive_portal_hides_the_other_branch(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchPortalShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->standOn($companyId, $owner, $mainId);
+        $screen = $this->archiveScreen();
+        $this->assertSame(['A-MAIN', 'A-OLD'], $screen['numbers'],
+            "Gulberg's archived bill must never appear in Main Shop's archive");
+        $this->assertSame(2, (int) $screen['stats']['total']);
+        $this->assertSame(1320.0, (float) $screen['stats']['sum'], '1100 + 220 legacy — never Gulberg 550');
+
+        $this->standOn($companyId, $owner, $cityId);
+        $screen = $this->archiveScreen();
+        $this->assertSame(['A-CITY', 'A-OLD'], $screen['numbers']);
+        $this->assertSame(770.0, (float) $screen['stats']['sum'], '550 + 220 legacy — never Main Shop 1100');
+    }
+
+    public function test_archive_csv_export_carries_exactly_what_the_screen_shows(): void
+    {
+        [$companyId, , $cityId] = $this->seedTwoBranchPortalShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->standOn($companyId, $owner, $cityId);
+        $csv = $this->csvRows((new PosArchiveController())->exportCsv(Request::create('/pos/archive/export', 'GET')));
+
+        $this->assertSame(['A-CITY', 'A-OLD'], $csv['numbers'],
+            'the export must not hand over rows the archive page refuses to show');
+        $this->assertSame(770.0, $csv['total'], 'exported money = the branch\'s own money');
+    }
+
+    public function test_archive_bill_page_refuses_another_branch_bill(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchPortalShop();
+        $owner = $this->makeUser($companyId);
+        $mainBillId = DB::table('pos_transactions')->where('invoice_number', 'A-MAIN')->value('id');
+
+        // Hiding a row from the list is worthless if its id still opens.
+        $this->standOn($companyId, $owner, $cityId);
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        (new PosArchiveController())->show($mainBillId);
+    }
+
+    public function test_local_bills_portal_hides_the_other_branch(): void
+    {
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchPortalShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->standOn($companyId, $owner, $mainId);
+        $screen = $this->localScreen();
+        $this->assertSame(['L-MAIN', 'L-OLD'], $screen['numbers'],
+            "Gulberg's local bill must never appear in Main Shop's local portal");
+        $this->assertSame(1320.0, (float) $screen['stats']['sum']);
+        $this->assertSame(2, (int) $screen['stats']['today'], "today's counter is per branch too");
+        $this->assertSame(1320.0, (float) $screen['stats']['today_sum']);
+
+        $this->standOn($companyId, $owner, $cityId);
+        $screen = $this->localScreen();
+        $this->assertSame(['L-CITY', 'L-OLD'], $screen['numbers']);
+        $this->assertSame(770.0, (float) $screen['stats']['sum']);
+        $this->assertSame(770.0, (float) $screen['stats']['today_sum']);
+    }
+
+    public function test_local_bills_csv_export_carries_exactly_what_the_screen_shows(): void
+    {
+        [$companyId, , $cityId] = $this->seedTwoBranchPortalShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->standOn($companyId, $owner, $cityId);
+        $csv = $this->csvRows((new PosLocalBillsController())->exportCsv(Request::create('/pos/local-bills/export', 'GET')));
+
+        $this->assertSame(['L-CITY', 'L-OLD'], $csv['numbers']);
+        $this->assertSame(770.0, $csv['total']);
+    }
+
+    public function test_local_bill_page_refuses_another_branch_bill(): void
+    {
+        [$companyId, , $cityId] = $this->seedTwoBranchPortalShop();
+        $owner = $this->makeUser($companyId);
+        $mainBillId = DB::table('pos_transactions')->where('invoice_number', 'L-MAIN')->value('id');
+
+        $this->standOn($companyId, $owner, $cityId);
+        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        (new PosLocalBillsController())->show($mainBillId);
+    }
+
+    public function test_owner_all_branches_view_shows_every_branch_in_both_portals(): void
+    {
+        [$companyId, , ] = $this->seedTwoBranchPortalShop();
+        $owner = $this->makeUser($companyId);
+
+        $this->standOn($companyId, $owner, BranchContextService::ALL);
+
+        $archive = $this->archiveScreen();
+        $this->assertSame(['A-CITY', 'A-MAIN', 'A-OLD'], $archive['numbers']);
+        $this->assertSame(1870.0, (float) $archive['stats']['sum'], '1100 + 550 + 220');
+
+        $local = $this->localScreen();
+        $this->assertSame(['L-CITY', 'L-MAIN', 'L-OLD'], $local['numbers']);
+        $this->assertSame(1870.0, (float) $local['stats']['sum']);
+
+        $csv = $this->csvRows((new PosArchiveController())->exportCsv(Request::create('/pos/archive/export', 'GET')));
+        $this->assertSame(['A-CITY', 'A-MAIN', 'A-OLD'], $csv['numbers']);
+        $this->assertSame(1870.0, $csv['total']);
+    }
+
+    public function test_company_wide_portal_login_still_sees_every_branch(): void
+    {
+        // The super-admin provisions these portal logins WITHOUT a branch, and
+        // they can open nothing else — pinning such an account to head office
+        // would look like the shop's archived / local history had vanished.
+        [$companyId, , ] = $this->seedTwoBranchPortalShop();
+
+        $archiveViewer = $this->makeUser($companyId, ['role' => 'employee', 'pos_role' => 'archive_viewer']);
+        Auth::guard('pos')->setUser($archiveViewer);
+        app()->instance('currentCompanyId', $companyId);
+        session()->forget(BranchContextService::SESSION_KEY);
+
+        $this->assertNull(app(BranchContextService::class)->getActiveBranchId(),
+            'a branch-less audit login is company-wide, not silently pinned to head office');
+        $this->assertSame(['A-CITY', 'A-MAIN', 'A-OLD'], $this->archiveScreen()['numbers']);
+
+        $localViewer = $this->makeUser($companyId, ['role' => 'employee', 'pos_role' => 'local_viewer']);
+        Auth::guard('pos')->setUser($localViewer);
+        session()->forget(BranchContextService::SESSION_KEY);
+
+        $this->assertSame(['L-CITY', 'L-MAIN', 'L-OLD'], $this->localScreen()['numbers']);
+    }
+
+    public function test_portal_login_assigned_to_a_branch_is_welded_to_it(): void
+    {
+        // Give a portal login a branch and it becomes that branch's viewer:
+        // one branch's money only, and a hand-edited session cannot move it.
+        [$companyId, $mainId, $cityId] = $this->seedTwoBranchPortalShop();
+
+        $branchViewer = $this->makeUser($companyId, [
+            'role' => 'employee',
+            'pos_role' => 'archive_viewer',
+            'default_branch_id' => $cityId,
+        ]);
+        $this->standOn($companyId, $branchViewer, $mainId);
+
+        $svc = app(BranchContextService::class);
+        $this->assertSame($cityId, $svc->getActiveBranchId());
+        $this->assertFalse($svc->setActiveBranch(BranchContextService::ALL),
+            'a branch-locked portal login must not reach the company-wide view');
+        $this->assertSame(['A-CITY', 'A-OLD'], $this->archiveScreen()['numbers']);
+
+        $csv = $this->csvRows((new PosArchiveController())->exportCsv(Request::create('/pos/archive/export', 'GET')));
+        $this->assertSame(['A-CITY', 'A-OLD'], $csv['numbers']);
     }
 }

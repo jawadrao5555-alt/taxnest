@@ -442,6 +442,11 @@ class FbrPosController extends Controller
         if (!in_array($theme, $allowed)) {
             return response()->json(['success' => false, 'message' => __('pos.invalid_theme')], 422);
         }
+        // Prod schema drift guard — never answer "saved" for a column the live
+        // database never got; the Customize switch now believes this answer.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_theme')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
+        }
         $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_theme' => $theme]);
         return response()->json(['success' => true, 'theme' => $theme]);
@@ -456,6 +461,9 @@ class FbrPosController extends Controller
         $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         if (!in_array($style, $allowed)) {
             return response()->json(['success' => false, 'message' => __('pos.invalid_style')], 422);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_dashboard_style')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
         }
         $companyId = app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_dashboard_style' => $style]);
@@ -3392,7 +3400,17 @@ class FbrPosController extends Controller
             // 'carry' = leave provisionals untouched (default) | 'finalize' = auto-promote at day close.
             if ($request->has('dayclose_pending_update')) {
                 $request->validate(['pending_policy' => 'required|in:carry,finalize']);
-                $company->update(['pos_dayclose_provisional_action' => $request->pending_policy]);
+                // Prod schema drift guard — never pretend to save into a missing column.
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_dayclose_provisional_action')) {
+                    return back()->with('error', __('pos.setting_not_available_yet'));
+                }
+                // Direct assignment, NOT $company->update([...]): this column is shared
+                // with the PRA day-close vocabulary and is deliberately absent from
+                // Company::$fillable, so a mass-assignment write is SILENTLY DROPPED —
+                // the page reported "saved" while the value never changed (Aug 2026).
+                // PosController::updateLocalBilling writes it the same direct way.
+                $company->pos_dayclose_provisional_action = $request->pending_policy;
+                $company->save();
                 return back()->with('success', __('pos.fbr_dayclose_policy_saved'));
             }
 
@@ -4263,6 +4281,9 @@ class FbrPosController extends Controller
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
             return response()->json(['success' => false, 'message' => __('pos.only_company_admin_change_setting')], 403);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_guided_flow_enabled')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
         }
         $enabled = $request->boolean('enabled');
         $companyId = app('currentCompanyId');

@@ -1587,4 +1587,126 @@ class AgentController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    /**
+     * POST /api/agent/caller-events — LAN Mode ring replay.
+     *
+     * Internet down: the Caller ID phone posts its rings to the agent's LAN
+     * server, which shows them on the counter PC. This endpoint is where those
+     * rings land once the line is back, purely for HISTORY — the bell list,
+     * customer matching and call-back marks.
+     *
+     * Two rules make it safe to call repeatedly:
+     *  1. offline_uuid is the ring's identity, so a retried batch stores nothing
+     *     new (the agent only clears its buffer once we acknowledge).
+     *  2. A replayed ring is stamped with the time it ACTUALLY rang, not now.
+     *     The sale-screen poll only surfaces rings from the last two minutes, so
+     *     a reconnect can never make an hour-old call pop up on the counter.
+     */
+    public function callerEvents(Request $request)
+    {
+        $company = $request->attributes->get('agent_company');
+
+        $validated = $request->validate([
+            'events' => 'required|array|max:200',
+            'events.*.uuid' => 'required|string|max:64',
+            'events.*.number' => 'nullable|string|max:40',
+            'events.*.phone' => 'nullable|string|max:40',
+            'events.*.name' => 'nullable|string|max:120',
+            'events.*.source' => 'nullable|string|in:sim,whatsapp',
+            'events.*.at' => 'nullable|numeric',
+        ]);
+
+        // The agent must always learn which uuids it may drop, otherwise its
+        // buffer grows forever on a shop whose Caller ID is switched off.
+        $accepted = collect($validated['events'])->pluck('uuid')
+            ->filter()->map(fn ($u) => (string) $u)->unique()->values()->all();
+
+        $ready = \Illuminate\Support\Facades\Schema::hasTable('pos_caller_events')
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_caller_events', 'offline_uuid');
+        if (!$ready || !\App\Services\PosFeatureService::callerIdLive($company)) {
+            return response()->json([
+                'ok' => true,
+                'accepted' => $accepted,
+                'stored' => 0,
+                'reason' => $ready ? 'disabled' : 'unsupported',
+            ]);
+        }
+
+        $hasCleared = \Illuminate\Support\Facades\Schema::hasColumn('pos_caller_events', 'cleared_at');
+        $stored = 0;
+
+        foreach ($validated['events'] as $event) {
+            $uuid = trim((string) ($event['uuid'] ?? ''));
+            if ($uuid === '') {
+                continue;
+            }
+
+            $phone = \App\Services\PkPhone::normalize($event['phone'] ?? $event['number'] ?? null);
+            $name = trim((string) ($event['name'] ?? ''));
+            $name = $name !== '' ? mb_substr($name, 0, 120) : null;
+            if (!$phone && !$name) {
+                continue; // nothing to show a cashier
+            }
+
+            // Ring time: epoch ms from the phone → app TZ (the rider-app 5h
+            // trap). A wrong device clock must not post-date the row, and a
+            // week-old ring is history nobody needs.
+            $ringAt = now();
+            if (!empty($event['at'])) {
+                try {
+                    $candidate = \Carbon\Carbon::createFromTimestampMs((float) $event['at'])
+                        ->setTimezone(config('app.timezone'));
+                    if ($candidate->lt(now()) && $candidate->gt(now()->subDays(7))) {
+                        $ringAt = $candidate;
+                    }
+                } catch (\Throwable $e) {
+                    // keep now()
+                }
+            }
+
+            // Same ring, second delivery: the unique index would refuse it, but
+            // checking first keeps the response clean for the agent.
+            $exists = DB::table('pos_caller_events')
+                ->where('company_id', $company->id)
+                ->where('offline_uuid', $uuid)
+                ->exists();
+            if ($exists) {
+                continue;
+            }
+
+            // The phone may have reached BOTH lanes during a flaky patch —
+            // collapse a cloud ring and its LAN twin the same way repeated
+            // rings collapse at ingest.
+            $twin = DB::table('pos_caller_events')
+                ->where('company_id', $company->id)
+                ->whereBetween('ring_at', [$ringAt->copy()->subSeconds(20), $ringAt->copy()->addSeconds(20)])
+                ->when($phone, fn ($q) => $q->where('phone', $phone))
+                ->when(!$phone, fn ($q) => $q->whereNull('phone')->where('caller_name', $name))
+                ->exists();
+            if ($twin) {
+                continue;
+            }
+
+            try {
+                DB::table('pos_caller_events')->insert(array_merge([
+                    'company_id' => $company->id,
+                    'offline_uuid' => $uuid,
+                    'phone' => $phone,
+                    'caller_name' => $name,
+                    'source' => ($event['source'] ?? 'sim') === 'whatsapp' ? 'whatsapp' : 'sim',
+                    'ring_at' => $ringAt,
+                    // Deliberately the ring time, NOT now(): keeps old calls out
+                    // of the fresh-popup window on the counter.
+                    'created_at' => $ringAt,
+                ], $hasCleared ? ['cleared_at' => null] : []));
+                $stored++;
+            } catch (\Throwable $e) {
+                // Unique index race with a parallel batch = already stored.
+                Log::debug('caller replay skipped: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json(['ok' => true, 'accepted' => $accepted, 'stored' => $stored]);
+    }
 }

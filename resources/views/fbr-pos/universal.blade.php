@@ -3547,6 +3547,14 @@ function restaurantPos() {
         callerPending: 0,
         _callerBeeped: [],        // event ids already beeped (no re-fire)
         _callerWarnedOffline: false,
+        // ── LAN Mode fallback ──
+        // Internet down: the Caller ID phone can only reach the shop's own PC,
+        // where the Desktop Agent's LAN server holds the rings. This counter
+        // asks that server directly — but ONLY after the cloud poll has failed,
+        // so a healthy shop never spends a request on it.
+        _callerLanLastId: 0,      // cursor into the agent's ring buffer
+        _callerLanNextTry: 0,     // backoff: no agent here = stop knocking
+        _callerLanFails: 0,
         callerDialBusy: false,    // double-tap guard on every Call back button
         callerDialFallback: null, // {phone, dial, name, reason} — koi phone nahi mila
         activeCartIndex: -1,
@@ -8369,14 +8377,76 @@ function restaurantPos() {
                         this.callerPending = 0;
                         this._callerFast = false;
                     }
+                } else {
+                    // Cloud answered, but not with a usable payload.
+                    await this.pollCallerLan();
                 }
-            } catch (e) {} finally {
+            } catch (e) {
+                // Cloud unreachable = exactly the case LAN Mode exists for.
+                await this.pollCallerLan();
+            } finally {
                 // Single owner of the re-arm: runs on success, error AND abort.
                 clearTimeout(_acKill);
                 this._callerBusy = false;
                 this.scheduleCallerPoll();
             }
             this.maybeShowCallerPopup();
+        },
+        // LAN Mode: ask the shop's OWN PC for rings the phone could not get to
+        // the cloud. Loopback counts as a secure origin, so the https sale
+        // screen is allowed to call it, and the agent answers this PC only.
+        // Runs ONLY after the cloud poll failed — a healthy shop never pays for it.
+        async pollCallerLan() {
+            if (!this.callerIdOn) { return false; }
+            if (Date.now() < (this._callerLanNextTry || 0)) { return false; }
+            const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const kill = setTimeout(() => { try { if (ac) ac.abort(); } catch (e) {} }, 2500);
+            try {
+                const res = await fetch('http://127.0.0.1:8531/lan/caller/events?after=' + (this._callerLanLastId || 0),
+                    { headers: { 'Accept': 'application/json' }, signal: ac ? ac.signal : undefined });
+                if (!res.ok) { throw new Error('lan ' + res.status); }
+                const data = await res.json();
+                this._callerLanFails = 0;
+                this._callerLanNextTry = 0;
+                (Array.isArray(data.events) ? data.events : []).forEach(ev => {
+                    // Own id space ('L…') so a local ring can never be confused
+                    // with a cloud one by the cursor or the beep guard.
+                    this.callerQueue.push({
+                        id: 'L' + ev.id,
+                        phone: ev.number || '',
+                        name: ev.name || null,
+                        source: ev.source === 'whatsapp' ? 'whatsapp' : 'sim',
+                        at: this.callerLocalTime(ev.at),
+                        match: null,   // customer history lives in the cloud
+                        local: true,
+                    });
+                    this.callerUnseen++;
+                });
+                const lid = parseInt(data.last_id, 10) || 0;
+                if (lid > this._callerLanLastId) { this._callerLanLastId = lid; }
+                // Rings ARE arriving, just locally — keep the fast cadence so
+                // the popup still feels instant while the line is down.
+                this._callerFast = true;
+                return true;
+            } catch (e) {
+                // No agent on this PC (the normal case) — back off, or an
+                // offline counter knocks on 127.0.0.1 every single tick.
+                this._callerLanFails = (this._callerLanFails || 0) + 1;
+                if (this._callerLanFails >= 3) {
+                    this._callerLanNextTry = Date.now() + 60000;
+                    this._callerLanFails = 0;
+                }
+                return false;
+            } finally {
+                clearTimeout(kill);
+            }
+        },
+        callerLocalTime(iso) {
+            try {
+                const d = new Date(iso);
+                if (isNaN(d.getTime())) { return ''; }
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } catch (e) { return ''; }
         },
         // Arms the next caller poll: 1.5 s while a paired phone is online, 7 s
         // otherwise. clearTimeout first — a manual call must never leave two

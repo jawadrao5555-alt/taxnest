@@ -34,6 +34,67 @@ function setHeartbeatExtraProvider(fn) {
   heartbeatExtraProvider = typeof fn === 'function' ? fn : null;
 }
 
+// LAN Mode bridge (set by main.js): returns the running LAN server, or null.
+// While the shop's internet is down the Caller ID phone can only reach that
+// server, so the rings it collected are pushed here once a beat gets through.
+let lanBridgeProvider = null;
+
+function setLanBridge(fn) {
+  lanBridgeProvider = typeof fn === 'function' ? fn : null;
+}
+
+let lanFlushInFlight = false;
+
+async function flushLanCallerEvents() {
+  if (!currentConfig || !lanBridgeProvider) return;
+  if (lanFlushInFlight) return; // one pusher — a retry must not double-post
+  let lan = null;
+  try { lan = lanBridgeProvider(); } catch (e) { return; }
+  if (!lan || typeof lan.pendingEvents !== 'function') return;
+
+  let pending = [];
+  try { pending = lan.pendingEvents() || []; } catch (e) { return; }
+  if (pending.length === 0) return;
+
+  lanFlushInFlight = true;
+  try {
+    // 100 at a time — the server caps a batch at 200, and a shop that was off
+    // the line all day must not send one giant request.
+    const batch = pending.slice(0, 100);
+    const res = await axios.post(
+      `${currentConfig.serverUrl}/caller-events`,
+      {
+        events: batch.map((e) => ({
+          // Identity of the ring. The phone's own uuid when it sent one;
+          // otherwise a stable local one — the ring id ALONE would collide if
+          // the buffer file were ever reset, so the ring time rides along.
+          uuid: e.uuid || `lan-${e.id}-${e.at_ms}`,
+          number: e.number,
+          name: e.name,
+          source: e.source,
+          at: e.at_ms,
+        })),
+      },
+      {
+        headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
+        timeout: 15000,
+      }
+    );
+    if (res.data && res.data.ok) {
+      // Clear ONLY what the server acknowledged — anything else stays queued
+      // for the next beat.
+      lan.markSynced(batch.map((e) => e.id));
+      log(`LAN caller rings synced: ${batch.length} sent, ${res.data.stored ?? 0} new`);
+    }
+  } catch (e) {
+    // Line still bad / server unhappy — the rings stay in the LAN buffer and
+    // the next successful beat tries again. Never noisy, never fatal.
+    log('LAN caller sync deferred:', e.message);
+  } finally {
+    lanFlushInFlight = false;
+  }
+}
+
 const status = {
   running: false,
   connected: false,
@@ -227,6 +288,11 @@ async function heartbeat() {
     // POSTs must never sit inside the heartbeat's critical path, or one bad
     // patch of connectivity starves the beats and the badge flaps offline.
     flushCallbackQueue().catch(() => {});
+
+    // LAN Mode: the line is clearly up (this beat landed), so hand the cloud
+    // any caller rings that could only reach the shop's own PC. Background,
+    // never inside the beat's critical path.
+    flushLanCallerEvents().catch(() => {});
 
     // Phase 5 — if server reports stuck rows, trigger an immediate sync sweep
     if (stuck > 0 || repromoted > 0) {
@@ -445,4 +511,4 @@ function stopAgent() {
   log('Agent stopped');
 }
 
-module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, wakeAgent };
+module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, wakeAgent };

@@ -17,6 +17,11 @@ contextBridge.exposeInMainWorld('agentAPI', {
   installFbrIms: () => ipcRenderer.invoke('install-fbr-ims'),
   onImsProgress: (callback) =>
     ipcRenderer.on('ims-progress', (event, p) => callback(p)),
+  // LAN Mode (this PC as the shop's local server for tablets / caller phone).
+  getLanSettings: () => ipcRenderer.invoke('get-lan-settings'),
+  saveLanSettings: (s) => ipcRenderer.invoke('save-lan-settings', s),
+  getLanStatus: () => ipcRenderer.invoke('get-lan-status'),
+  lanForgetDevices: () => ipcRenderer.invoke('lan-forget-devices'),
   getPosSettings: () => ipcRenderer.invoke('get-pos-settings'),
   savePosSettings: (s) => ipcRenderer.invoke('save-pos-settings', s),
   openPosWindow: () => ipcRenderer.invoke('open-pos-window'),

@@ -1912,6 +1912,9 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($state
     Route::get('/print-jobs', [\App\Http\Controllers\AgentController::class, 'claimPrintJobs']);
     Route::get('/print-jobs/{id}/content', [\App\Http\Controllers\AgentController::class, 'printJobContent']);
     Route::post('/print-jobs/{id}/result', [\App\Http\Controllers\AgentController::class, 'printJobResult']);
+    // LAN Mode: rings the phone could only deliver to the shop's own PC while
+    // the internet was down, forwarded once it is back (history only).
+    Route::post('/caller-events', [\App\Http\Controllers\AgentController::class, 'callerEvents']);
 });
 
 // === Public business profile + menu (F8) — slug-only, throttled, 404 on unknown ===

@@ -248,6 +248,26 @@
   </div>
 
   <div class="card">
+    <h3>LAN Mode (Beta) — shop ka apna local server</h3>
+    <p style="font-size:12px; color:#c4b5fd; margin-bottom:12px; line-height:1.6;">
+      Internet band ho jaye tab bhi waiter tablet aur Caller ID phone isi PC se juday rehte hain —
+      wohi WiFi, sirf IP ke zariye. Net wapas aate hi sab kuch khud-ba-khud cloud par chala jata hai.
+      Yeh switch band ho to agent bilkul pehle jaisa chalta hai.
+    </p>
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:10px; font-size:13px; color:#fff;">
+      <input type="checkbox" id="lanEnabled" style="width:auto; margin:0;">
+      LAN Mode chalu karein (yeh PC shop ka local server ban jayega)
+    </label>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+      <label style="font-size:12px; color:#c4b5fd; margin:0;">Port</label>
+      <input type="number" id="lanPort" value="8531" min="1" max="65535" style="width:110px; margin:0;">
+      <button id="lanForgetBtn" class="btn btn-secondary" style="margin-left:auto;">Saray devices bhool jayein</button>
+    </div>
+    <div id="lanStatus" style="font-size:12px; color:#c4b5fd; line-height:1.7;"></div>
+    <div id="lanSaved" style="display:none; margin-top:8px; font-size:12px; color:#10b981;">Saved</div>
+  </div>
+
+  <div class="card">
     <h3>FBR IMS Fiscal Service (Fiscal Device Mode)</h3>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
       <span id="imsBadge" class="badge offline"><span class="dot"></span> Checking…</span>
@@ -592,6 +612,54 @@
   $('posOffline').addEventListener('change', savePosSettings);
   $('openPosBtn').addEventListener('click', () => window.agentAPI.openPosWindow());
   loadPosSettings();
+
+  // ─── LAN Mode (shop's own local server) ───
+  function renderLanStatus(st) {
+    if (!st) return;
+    const box = $('lanStatus');
+    if (!st.enabled) {
+      box.innerHTML = '<span style="color:#c4b5fd;">LAN Mode band hai — sab kuch cloud par chal raha hai.</span>';
+      return;
+    }
+    if (!st.running) {
+      box.innerHTML = '<span style="color:#fca5a5;">Local server start nahi ho saka' +
+        (st.error ? ' (' + st.error + ')' : '') + ' — koi doosra program yeh port istemal kar raha ho sakta hai.</span>';
+      return;
+    }
+    const urls = (st.urls || []).map((u) => '<b>' + u + '</b>').join('<br>') || '<b>(is PC ka koi network address nahi mila)</b>';
+    box.innerHTML =
+      '<span style="color:#10b981;">Local server chal raha hai.</span><br>' +
+      'Tablet par yeh address kholein:<br>' + urls + '<br>' +
+      'Pairing code: <b style="font-size:15px; letter-spacing:2px;">' + (st.pair_code || '------') + '</b> ' +
+      '<span style="color:#c4b5fd;">(har device ke liye naya code banta hai)</span><br>' +
+      'Juday huay devices: <b>' + (st.devices || 0) + '</b>';
+  }
+
+  async function loadLanSettings() {
+    const s = await window.agentAPI.getLanSettings();
+    $('lanEnabled').checked = !!s.enabled;
+    $('lanPort').value = s.port || 8531;
+    renderLanStatus(await window.agentAPI.getLanStatus());
+  }
+  async function saveLanSettings() {
+    await window.agentAPI.saveLanSettings({
+      enabled: $('lanEnabled').checked,
+      port: parseInt($('lanPort').value, 10) || 8531,
+    });
+    $('lanSaved').style.display = 'block';
+    setTimeout(() => { $('lanSaved').style.display = 'none'; }, 2000);
+    renderLanStatus(await window.agentAPI.getLanStatus());
+  }
+  $('lanEnabled').addEventListener('change', saveLanSettings);
+  $('lanPort').addEventListener('change', saveLanSettings);
+  $('lanForgetBtn').addEventListener('click', async () => {
+    renderLanStatus({ ...(await window.agentAPI.lanForgetDevices()), enabled: $('lanEnabled').checked });
+  });
+  loadLanSettings();
+  // Pairing code rotates and devices come and go — keep the card honest.
+  setInterval(async () => {
+    if ($('lanEnabled').checked) renderLanStatus(await window.agentAPI.getLanStatus());
+  }, 5000);
 
   checkIms();
   setInterval(checkIms, 60000);

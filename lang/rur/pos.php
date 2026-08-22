@@ -3915,6 +3915,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'tables_board' => 'Tables board',
     'tables_caps' => 'TABLES',
     'tables_loading_js' => 'Tables load ho rahe hain…',
+    'tables_offline' => 'Tables load nahi ho sake — server se rabta nahi ho raha.',
+    'tables_offline_retry' => 'Dobara koshish karein',
     'tables_overview' => 'Tables overview',
     'tables_word' => 'Tables',
     'take_away' => 'Take Away',

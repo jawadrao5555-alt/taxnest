@@ -1924,7 +1924,7 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="p-3 overflow-y-auto">
                         <template x-if="tableFloors.length === 0">
-                            <p class="text-xs text-gray-400 text-center py-6" x-text="tablesLoading ? window.TXT.tables_loading_js : window.TXT.no_tables_set"></p>
+                            <p class="text-xs text-center py-6" :class="(tablesError && !tablesLoading) ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-gray-400'" x-text="tablesLoading ? window.TXT.tables_loading_js : (tablesError ? window.TXT.tables_offline : window.TXT.no_tables_set)"></p>
                         </template>
                         <template x-for="floor in tableFloors" :key="'bf' + floor.name">
                             <div>
@@ -2093,8 +2093,15 @@ window.addEventListener('popstate', function() {
                 <template x-if="tablesLoading && tableFloors.length === 0">
                     <p class="text-center text-sm text-gray-400 py-6">{{ __('pos.loading_tables') }}</p>
                 </template>
-                <template x-if="!tablesLoading && tableFloors.length === 0">
+                <template x-if="!tablesLoading && tableFloors.length === 0 && !tablesError">
                     <p class="text-center text-sm text-gray-400 py-6">{{ __('pos.no_tables_configured') }}</p>
+                </template>
+                {{-- Rabta toot jaye to sach: tables "configure nahi" nahi hain, load nahi ho sakeen. --}}
+                <template x-if="!tablesLoading && tablesError">
+                    <div class="text-center py-6">
+                        <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
+                        <button type="button" @click="loadTableStatus()" class="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold">{{ __('pos.tables_offline_retry') }}</button>
+                    </div>
                 </template>
                 <template x-for="floor in tableFloors" :key="floor.name">
                     <div class="mb-3">
@@ -4554,6 +4561,14 @@ function restaurantPos() {
         callerPending: 0,
         _callerBeeped: [],        // event ids already beeped (no re-fire)
         _callerWarnedOffline: false,
+        // ── LAN Mode fallback ──
+        // Internet down: the Caller ID phone can only reach the shop's own PC,
+        // where the Desktop Agent's LAN server holds the rings. This counter
+        // asks that server directly — but ONLY after the cloud poll has failed,
+        // so a healthy shop never spends a request on it.
+        _callerLanLastId: 0,      // cursor into the agent's ring buffer
+        _callerLanNextTry: 0,     // backoff: no agent here = stop knocking
+        _callerLanFails: 0,
         // ── Task 1381 (call back) ──
         callerDialBusy: false,    // double-tap guard on every Call back button
         callerDialFallback: null, // {phone, dial, name, reason} — koi phone nahi mila
@@ -4602,6 +4617,9 @@ function restaurantPos() {
         // Dine-In Select-Table picker — live floors/tables (fetched on open).
         tableFloors: [],
         tablesLoading: false,
+        // Table-status fetch nakaam (net/server down) — tab "no tables configured"
+        // dikhana JHOOT hai; picker aur board dono sach batate hain.
+        tablesError: false,
         // Occupied-timer tick — bumped every 30s so elapsed labels re-render live.
         nowTick: Date.now(),
         showPayModal: false,
@@ -7666,8 +7684,8 @@ function restaurantPos() {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
                 const res = await fetch('/pos/restaurant/api/table-status', { headers: hdrs });
-                if (res.status === 304) { this.tablesLoading = false; return; }
-                if (!res.ok) { this.tablesLoading = false; return; }
+                if (res.status === 304) { this.tablesError = false; this.tablesLoading = false; return; }
+                if (!res.ok) { this.tablesError = true; this.tablesLoading = false; return; }
                 const etag = res.headers.get('ETag');
                 if (etag) this._tableEtag = etag;
                 const list = await res.json();
@@ -7677,7 +7695,8 @@ function restaurantPos() {
                     (groups[f] = groups[f] || []).push(t);
                 });
                 this.tableFloors = Object.keys(groups).map(name => ({ name, tables: groups[name] }));
-            } catch (e) { console.error('[tables] status load failed', e); }
+                this.tablesError = false;
+            } catch (e) { this.tablesError = true; console.error('[tables] status load failed', e); }
             this.tablesLoading = false;
         },
         // Task 899 / 935: cross-terminal held-orders sync — refreshes this.heldOrders from
@@ -11405,14 +11424,76 @@ function restaurantPos() {
                         this.callerPending = 0;
                         this._callerFast = false;
                     }
+                } else {
+                    // Cloud answered, but not with a usable payload.
+                    await this.pollCallerLan();
                 }
-            } catch (e) {} finally {
+            } catch (e) {
+                // Cloud unreachable = exactly the case LAN Mode exists for.
+                await this.pollCallerLan();
+            } finally {
                 // Single owner of the re-arm: runs on success, error AND abort.
                 clearTimeout(_acKill);
                 this._callerBusy = false;
                 this.scheduleCallerPoll();
             }
             this.maybeShowCallerPopup();
+        },
+        // LAN Mode: ask the shop's OWN PC for rings the phone could not get to
+        // the cloud. Loopback counts as a secure origin, so the https sale
+        // screen is allowed to call it, and the agent answers this PC only.
+        // Runs ONLY after the cloud poll failed — a healthy shop never pays for it.
+        async pollCallerLan() {
+            if (!this.callerIdOn) { return false; }
+            if (Date.now() < (this._callerLanNextTry || 0)) { return false; }
+            const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const kill = setTimeout(() => { try { if (ac) ac.abort(); } catch (e) {} }, 2500);
+            try {
+                const res = await fetch('http://127.0.0.1:8531/lan/caller/events?after=' + (this._callerLanLastId || 0),
+                    { headers: { 'Accept': 'application/json' }, signal: ac ? ac.signal : undefined });
+                if (!res.ok) { throw new Error('lan ' + res.status); }
+                const data = await res.json();
+                this._callerLanFails = 0;
+                this._callerLanNextTry = 0;
+                (Array.isArray(data.events) ? data.events : []).forEach(ev => {
+                    // Own id space ('L…') so a local ring can never be confused
+                    // with a cloud one by the cursor or the beep guard.
+                    this.callerQueue.push({
+                        id: 'L' + ev.id,
+                        phone: ev.number || '',
+                        name: ev.name || null,
+                        source: ev.source === 'whatsapp' ? 'whatsapp' : 'sim',
+                        at: this.callerLocalTime(ev.at),
+                        match: null,   // customer history lives in the cloud
+                        local: true,
+                    });
+                    this.callerUnseen++;
+                });
+                const lid = parseInt(data.last_id, 10) || 0;
+                if (lid > this._callerLanLastId) { this._callerLanLastId = lid; }
+                // Rings ARE arriving, just locally — keep the fast cadence so
+                // the popup still feels instant while the line is down.
+                this._callerFast = true;
+                return true;
+            } catch (e) {
+                // No agent on this PC (the normal case) — back off, or an
+                // offline counter knocks on 127.0.0.1 every single tick.
+                this._callerLanFails = (this._callerLanFails || 0) + 1;
+                if (this._callerLanFails >= 3) {
+                    this._callerLanNextTry = Date.now() + 60000;
+                    this._callerLanFails = 0;
+                }
+                return false;
+            } finally {
+                clearTimeout(kill);
+            }
+        },
+        callerLocalTime(iso) {
+            try {
+                const d = new Date(iso);
+                if (isNaN(d.getTime())) { return ''; }
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } catch (e) { return ''; }
         },
         // Arms the next caller poll: 1.5 s while a paired phone is online, 7 s
         // otherwise. clearTimeout first — a manual call must never leave two

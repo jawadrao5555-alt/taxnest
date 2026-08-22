@@ -314,7 +314,7 @@ class PosCounterCashDrawerTest extends TestCase
             'company_id' => $companyId,
             'invoice_number' => $number,
             'transaction_type' => 'sale',
-            'business_date' => now()->toDateString(),
+            'business_date' => $this->bizDate($companyId),
             'status' => 'completed',
             'invoice_mode' => 'pra',
             'pra_status' => 'submitted',
@@ -341,9 +341,22 @@ class PosCounterCashDrawerTest extends TestCase
         return $request;
     }
 
+    /**
+     * The company's BUSINESS date — never now()->toDateString().
+     *
+     * A POS day runs to the 6 AM cutoff (PosBusinessDay), so between midnight
+     * and 6 AM the shop is still trading YESTERDAY. The controller stamps and
+     * reads that date; a test that used the wall-clock date instead passed all
+     * day and failed every night.
+     */
+    private function bizDate(int $companyId): string
+    {
+        return \App\Services\PosBusinessDay::current($companyId);
+    }
+
     private function rows(int $companyId)
     {
-        $date = now()->toDateString();
+        $date = $this->bizDate($companyId);
         $txns = \App\Models\PosTransaction::where('company_id', $companyId)
             ->where('business_date', $date)->get();
 
@@ -390,12 +403,12 @@ class PosCounterCashDrawerTest extends TestCase
         $controller->saveDayOpening($this->req(['opening_cash' => 3000, 'terminal_id' => $c1]));
         $controller->saveDayOpening($this->req(['opening_cash' => 2000, 'terminal_id' => $c2]));
 
-        $drawers = PosDayOpening::drawersForDate($companyId, now()->toDateString());
+        $drawers = PosDayOpening::drawersForDate($companyId, $this->bizDate($companyId));
         $this->assertSame(3000.0, (float) $drawers[$c1]);
         $this->assertSame(2000.0, (float) $drawers[$c2]);
 
         // The shop's float = the sum; reading one row would lose Rs 2000.
-        $this->assertSame(5000.0, PosDayOpening::totalForDate($companyId, now()->toDateString()));
+        $this->assertSame(5000.0, PosDayOpening::totalForDate($companyId, $this->bizDate($companyId)));
 
         // Two counters = two drawer rows: the second float must NOT overwrite
         // the first (it would if the upsert key forgot the counter).
@@ -426,8 +439,8 @@ class PosCounterCashDrawerTest extends TestCase
         $this->assertSame(-50.0, (float) $close->cash_variance);
 
         // The OTHER counter is untouched — no day close, no lock.
-        $this->assertTrue(PosCounterDrawer::isClosed($companyId, $c1, now()->toDateString()));
-        $this->assertFalse(PosCounterDrawer::isClosed($companyId, $c2, now()->toDateString()));
+        $this->assertTrue(PosCounterDrawer::isClosed($companyId, $c1, $this->bizDate($companyId)));
+        $this->assertFalse(PosCounterDrawer::isClosed($companyId, $c2, $this->bizDate($companyId)));
         $this->assertSame(0, DB::table('pos_day_close_reports')->where('company_id', $companyId)->count(),
             'the shop day must NOT close while another counter is still open');
 
@@ -493,7 +506,7 @@ class PosCounterCashDrawerTest extends TestCase
         $this->assertFalse(PosCounterDrawer::enabled($companyId));
 
         // And the plain day close still works exactly as before.
-        $result = (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+        $result = (new PosController())->performDayClose($companyId, $this->bizDate($companyId), null);
         $this->assertSame('created', $result['status']);
         $report = DB::table('pos_day_close_reports')->where('company_id', $companyId)->first();
         $this->assertNull($report->counter_summary, 'nothing frozen for a counter-less shop');
@@ -514,10 +527,10 @@ class PosCounterCashDrawerTest extends TestCase
 
         $controller = new PosController();
         $controller->closeCounter($this->req(['terminal_id' => $c1, 'counted_cash' => 1000]));
-        $this->assertTrue(PosCounterDrawer::isClosed($companyId, $c1, now()->toDateString()));
+        $this->assertTrue(PosCounterDrawer::isClosed($companyId, $c1, $this->bizDate($companyId)));
 
         $controller->reopenCounter($this->req(['terminal_id' => $c1]));
-        $this->assertFalse(PosCounterDrawer::isClosed($companyId, $c1, now()->toDateString()));
+        $this->assertFalse(PosCounterDrawer::isClosed($companyId, $c1, $this->bizDate($companyId)));
         $this->assertSame(0, PosCounterClose::where('company_id', $companyId)->count());
 
         // A counter that was never closed cannot be reopened.

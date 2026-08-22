@@ -134,10 +134,16 @@
                 </template>
 
                 {{-- No tables note (shown once loading is done and list is empty) --}}
-                <p x-show="!tablesLoading && tables.length === 0"
+                <p x-show="!tablesLoading && tables.length === 0 && !tablesError"
                    class="text-center text-sm text-gray-400 py-4">
                     {{ __('pos.waiter_buttons_free_note') }}
                 </p>
+
+                {{-- Net/server down — parcel ka rasta khula rehta hai, magar message sach bole. --}}
+                <div x-show="!tablesLoading && tablesError" class="text-center py-4 px-3">
+                    <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
+                    <button type="button" @click="retryTables()" class="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold active:scale-95">{{ __('pos.tables_offline_retry') }}</button>
+                </div>
 
                 {{-- Parcel button — amber, badge = my open takeaway/delivery orders.
                      Task #342 (Aug 2026): tap = inline sub-list of open parcel orders
@@ -433,7 +439,12 @@
                         </button>
                     </template>
                 </div>
-                <div x-show="!tablesLoading && tables.length === 0" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_tables_configured_dot') }}</div>
+                <div x-show="!tablesLoading && tables.length === 0 && !tablesError" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_tables_configured_dot') }}</div>
+                {{-- Rabta na ho to sach batao (tables "gayab" nahi hain, sirf load nahi hui). --}}
+                <div x-show="!tablesLoading && tablesError" class="text-center py-6 px-4">
+                    <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
+                    <button type="button" @click="openTables()" class="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold active:scale-95">{{ __('pos.tables_offline_retry') }}</button>
+                </div>
             </div>
         </div>
     </div>
@@ -724,6 +735,9 @@ function waiterApp() {
         showTables: false,
         tables: [],
         tablesLoading: false,
+        // Server/net se list na aa sake to TRUE. Iske bina waiter ko "koi table
+        // configure nahi hai" dikhta tha jabke tables mojood hoti hain.
+        tablesError: false,
         _tableEtag: null,
         // Buttons style (Task #340, Aug 2026): home button list vs product grid.
         // true = show the home button list; false = show the product grid.
@@ -1031,18 +1045,22 @@ function waiterApp() {
                 const res = await fetch('/pos/waiter/api/tables', { headers });
                 if (res.status !== 304) {
                     if (!res.ok) {
-                        this.tables = [];
-                        this._tableEtag = null;
+                        // Net/server down: purani list ZINDA rakho aur saaf batao ke
+                        // rabta nahi ho raha. List khali karna jhoot tha — waiter ko
+                        // "koi table configure nahi hai" nazar aata tha.
+                        this.tablesError = true;
                     }
                     else {
                         const etag = res.headers.get('ETag');
                         if (etag) this._tableEtag = etag;
                         this.tables = await res.json();
+                        this.tablesError = false;
                     }
+                } else {
+                    this.tablesError = false;
                 }
             } catch (e) {
-                this.tables = [];
-                this._tableEtag = null;
+                this.tablesError = true;
             }
             this.tablesLoading = false;
         },
@@ -1390,12 +1408,20 @@ function waiterApp() {
                 const headers = { 'Accept': 'application/json' };
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
                 const res = await fetch('/pos/waiter/api/tables', { headers });
-                if (res.status === 304) return;
-                if (!res.ok) return;
+                if (res.status === 304) { this.tablesError = false; return; }
+                if (!res.ok) { this.tablesError = true; return; }
                 const etag = res.headers.get('ETag');
                 if (etag) this._tableEtag = etag;
                 this.tables = await res.json();
-            } catch (e) { /* network blip — stale data stays until next poll */ }
+                this.tablesError = false;
+            } catch (e) { this.tablesError = true; /* stale data stays until next poll */ }
+        },
+
+        // Buttons-view ka "dobara koshish karein" — modal khole baghair list refresh.
+        async retryTables() {
+            this.tablesLoading = true;
+            await this.reloadTablesQuiet();
+            this.tablesLoading = false;
         },
 
         showToast(msg, type = 'success') {

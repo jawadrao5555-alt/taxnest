@@ -13,8 +13,9 @@ const os = require('os');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
-const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, wakeAgent } = require('./src/agent');
+const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, wakeAgent } = require('./src/agent');
 const offlineSnapshot = require('./src/offline-snapshot');
+const { createLanServer } = require('./src/lan-server');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
@@ -306,6 +307,53 @@ function setPosSettings(next) {
     kiosk: !!next.kiosk,
     offlineMode: !!next.offlineMode,
   });
+}
+
+// ─── NestPOS LAN Mode (this PC becomes the shop's local server) ─────────────
+// Opt-in. OFF = nothing listens and the agent behaves exactly as before.
+// ON = waiter tablets and the Caller ID phone can reach this PC by IP, so the
+// shop keeps working through an internet cut. See src/lan-server.js.
+let lanServer = null;
+
+function getLanSettings() {
+  const s = store.get('lanSettings') || {};
+  const port = Number(s.port);
+  return {
+    enabled: !!s.enabled,
+    port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 8531,
+  };
+}
+
+function setLanSettings(next) {
+  const port = Number(next && next.port);
+  store.set('lanSettings', {
+    enabled: !!(next && next.enabled),
+    port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 8531,
+  });
+}
+
+function lanInstance() {
+  if (!lanServer) {
+    lanServer = createLanServer({
+      dataDir: app.getPath('userData'),
+      port: getLanSettings().port,
+      version: app.getVersion(),
+      log: (m) => console.log('[lan]', m),
+    });
+  }
+  return lanServer;
+}
+
+// Restart the listener to match the saved settings. Always stop first so a
+// port change actually moves the server instead of leaving the old one up.
+async function applyLanSettings() {
+  const s = getLanSettings();
+  const srv = lanInstance();
+  try { await srv.stop(); } catch (e) {}
+  if (s.enabled) {
+    try { await srv.start(s.port); } catch (e) { console.log('[lan] start failed:', e && e.message); }
+  }
+  return srv.status();
 }
 
 // Zero-config default (v1.5.0): the POS window can open BEFORE the agent is
@@ -642,6 +690,12 @@ if (!gotInstanceLock) {
       return out;
     });
 
+    // LAN Mode: hand the agent a way to reach the local server, so rings the
+    // Caller ID phone could only deliver here (internet down) are forwarded to
+    // the cloud on the first beat that gets through. Lazy — creating the
+    // instance does NOT start a listener; LAN mode still has to be switched on.
+    setLanBridge(() => (lanServer ? lanServer : null));
+
     // Wake triggers (Task 1062): after PC sleep/resume or a Wi-Fi drop the
     // agent used to sit "Offline" until the next timer tick happened to
     // succeed. Fire an immediate beat + sync on power resume, screen unlock
@@ -696,6 +750,18 @@ if (!gotInstanceLock) {
     } catch (e) {
       console.log('[pos-window] startup open failed:', e && e.message);
     }
+
+    // LAN Mode: bring the shop's local server up if the owner switched it on.
+    // Additive + guarded — a LAN failure must never disturb PRA sync.
+    try {
+      if (getLanSettings().enabled) {
+        applyLanSettings().then((st) => {
+          console.log('[lan] ' + (st.running ? 'ready on ' + st.urls.join(', ') : 'NOT running: ' + (st.error || 'unknown')));
+        });
+      }
+    } catch (e) {
+      console.log('[lan] startup failed:', e && e.message);
+    }
   });
 }
 
@@ -736,6 +802,8 @@ app.on('window-all-closed', (e) => {
 app.on('before-quit', () => {
   isQuitting = true;
   stopAgent();
+  // Free the LAN port so a restart (or an update swap) can bind it again.
+  try { if (lanServer) lanServer.stop(); } catch (e) {}
 });
 
 function sendStatusUpdate(status) {
@@ -846,6 +914,24 @@ ipcMain.handle('save-pos-settings', (event, s) => {
 });
 
 ipcMain.handle('open-pos-window', () => ({ ok: openPos() }));
+
+// ─── NestPOS LAN Mode IPC ───────────────────────────────────────────────────
+ipcMain.handle('get-lan-settings', () => getLanSettings());
+
+ipcMain.handle('save-lan-settings', async (event, s) => {
+  setLanSettings(s || {});
+  return await applyLanSettings();
+});
+
+ipcMain.handle('get-lan-status', () => {
+  const st = lanInstance().status();
+  return { ...st, enabled: getLanSettings().enabled };
+});
+
+ipcMain.handle('lan-forget-devices', () => {
+  lanInstance().forgetDevices();
+  return lanInstance().status();
+});
 
 // Silent-print bridge for the POS window (window.nestposDesktop.printHtml).
 // Accepts calls ONLY from the POS window itself — a stray/child page can

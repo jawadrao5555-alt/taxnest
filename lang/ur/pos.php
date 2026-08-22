@@ -3914,6 +3914,8 @@ return [
     'tables_board' => 'ٹیبلز بورڈ',
     'tables_caps' => 'ٹیبلز',
     'tables_loading_js' => 'ٹیبلز لوڈ ہو رہی ہیں…',
+    'tables_offline' => 'ٹیبلز لوڈ نہیں ہو سکیں — سرور سے رابطہ نہیں ہو رہا۔',
+    'tables_offline_retry' => 'دوبارہ کوشش کریں',
     'tables_overview' => 'ٹیبلز کا جائزہ',
     'tables_word' => 'ٹیبلز',
     'take_away' => 'ٹیک اوے',

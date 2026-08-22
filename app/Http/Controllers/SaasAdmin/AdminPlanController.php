@@ -9,6 +9,7 @@ use App\Services\PlanLadderGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Collection;
+use App\Services\PosAddonPricingService;
 
 class AdminPlanController extends Controller
 {
@@ -32,7 +33,34 @@ class AdminPlanController extends Controller
         // silently until the next deploy gate run (Task 1455).
         $ladderWarnings = PlanLadderGuard::allCurrentProblems();
 
-        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'ladderWarnings'));
+        $posAddons = PosAddonPricingService::catalog();
+
+        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'ladderWarnings', 'posAddons'));
+    }
+
+    public function updateAddonPricing(Request $request)
+    {
+        $rules = ['addons' => ['required', 'array']];
+        foreach (array_keys(PosAddonPricingService::ADDONS) as $code) {
+            $rules["addons.{$code}.annual"] = ['required', 'numeric', 'min:0', 'max:999999999'];
+            $rules["addons.{$code}.quarterly"] = ['required', 'numeric', 'min:0', 'max:999999999'];
+        }
+
+        $data = $request->validate($rules);
+        $before = PosAddonPricingService::catalog();
+        PosAddonPricingService::save($data['addons']);
+        $after = PosAddonPricingService::catalog();
+
+        AdminAuditLog::log(auth('admin')->id(), 'PRA POS add-on pricing updated', 'SystemSetting', null, [
+            'old' => collect($before)->mapWithKeys(fn ($row, $code) => [
+                $code => ['annual' => $row['annual_price'], 'quarterly' => $row['quarterly_price']],
+            ])->all(),
+            'new' => collect($after)->mapWithKeys(fn ($row, $code) => [
+                $code => ['annual' => $row['annual_price'], 'quarterly' => $row['quarterly_price']],
+            ])->all(),
+        ]);
+
+        return back()->with('success', 'PRA POS add-on rates saved successfully.');
     }
 
     /**

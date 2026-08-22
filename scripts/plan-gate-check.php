@@ -5,7 +5,7 @@
  * Asserts the Starter/Business/Pro/Pro Max/Unlimited plan-gate matrix
  * (PosFeatureService::PLAN_GATES) against live code paths, plus the two
  * derived gates that ride on it:
- *   - PosAccessService::customSet()      (Team Custom Access — Unlimited only)
+ *   - PosAccessService::customSet()      (Team Custom Access — Business and above)
  *   - PublicProfileController::publicUrlFor() (QR Menu — Pro and above)
  *
  * Ladder restructure (owner-approved Aug 2, 2026, see the
@@ -68,6 +68,8 @@ $EXPECTED_GATE_ORDER = [
 ];
 $MATRIX = [
     // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id, whatsapp]
+    // 22 Aug 2026 (owner): Custom Access is included in Business, Pro, Pro Max
+    // and Unlimited; it is not a paid add-on and is unavailable on Starter.
     // 17 Aug 2026 (owner): Caller ID (Android app + sale-screen popup) = Unlimited ONLY.
     // 17 Aug 2026 (owner): WhatsApp Bill (receipt share + auto-open) = Pro and above.
     // 9 Aug 2026 (owner): rider LIVE tracking moved back UP — Unlimited ONLY.
@@ -80,9 +82,9 @@ $MATRIX = [
     // 13 Aug 2026 (owner, market-capture move): Business gains Kitchen mode
     // (restaurant_enabled — asserted separately below) + Analytics.
     'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false],
-    'Business'  => [true,  false, false, true,  true,  false, false, false, true,  true,  true, true, true, false, false],
-    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true,  true,  true, true, true, false, true],
-    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true,  true, true, true, false, true],
+    'Business'  => [true,  false, false, true,  true,  false, true,  false, true,  true,  true, true, true, false, false],
+    'Pro'       => [true,  true,  false, true,  true,  false, true,  true,  true,  true,  true, true, true, false, true],
+    'Pro Max'   => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, true],
     'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true, true,  true],
 ];
 // Branch ladder (owner-approved 21 Aug 2026): har package apne card wali
@@ -93,7 +95,7 @@ $MATRIX = [
 $BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Pro' => 2, 'Pro Max' => 3, 'Unlimited' => 5];
 
 // Derived-surface expectations per plan:
-$CUSTOM_SET_PLANS = ['Unlimited'];                   // customSet() honored only here
+$CUSTOM_SET_PLANS = ['Business', 'Pro', 'Pro Max', 'Unlimited']; // included Business+
 $QR_URL_PLANS     = ['Pro', 'Pro Max', 'Unlimited']; // publicUrlFor() non-null only here
 // Restaurant module (pricing_plans.restaurant_enabled → restaurantAllowed()):
 // Business+ since 13 Aug 2026 (Kitchen mode opened up for Business).

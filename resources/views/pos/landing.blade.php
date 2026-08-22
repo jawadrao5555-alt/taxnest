@@ -355,7 +355,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">6</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">The manager's cockpit</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Unlimited plan), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Business plan and above), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
                 </div>
 
                 <!-- Feature 7 -->
@@ -475,7 +475,7 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month. Pro adds delivery riders with rider khata and a public QR menu, with 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts, 3 branches and unlimited bills. Unlimited unlocks everything — Rider Live Tracking on a map, unlimited team accounts, unlimited billing, every feature (including Team Custom Access) unlocked, 5 branches and priority support. Need more branches than your package includes? Extra branches are Rs 10,000 per branch per year on any package.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month, plus Team Custom Access. Pro adds 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts and 3 branches. Unlimited adds Rider Live Tracking on a map, unlimited team accounts and unlimited billing. Six optional paid add-ons are available to Business and above: Delivery Riders, QR Menu, WhatsApp Bill, Staff Attendance, Rider Live Tracking and Caller ID. Need more branches than your package includes? Extra branches are Rs 10,000 per branch per year on any package.</div>
                 </div>
                 <div class="border-b border-gray-200">
                     <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left">

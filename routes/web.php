@@ -1400,6 +1400,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::delete('/bin/{id}/destroy', [AdminCompanyController::class, 'forceDelete'])->name('saas.admin.companies.destroy');
     Route::get('/plans', [AdminPlanController::class, 'index'])->name('saas.admin.plans');
     Route::post('/plans', [AdminPlanController::class, 'store'])->name('saas.admin.plans.store');
+    Route::post('/plans/addons', [AdminPlanController::class, 'updateAddonPricing'])->name('saas.admin.plans.addons.update');
     Route::put('/plans/{id}', [AdminPlanController::class, 'update'])->name('saas.admin.plans.update');
     Route::get('/sales', [AdminSaleController::class, 'index'])->name('saas.admin.sales');
     Route::post('/sales', [AdminSaleController::class, 'store'])->name('saas.admin.sales.store');

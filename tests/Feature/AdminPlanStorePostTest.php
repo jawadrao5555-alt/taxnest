@@ -75,6 +75,14 @@ class AdminPlanStorePostTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('system_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('key')->unique();
+            $table->text('value')->nullable();
+            $table->string('description')->nullable();
+            $table->timestamps();
+        });
+
         DB::table('admin_users')->insert([
             'name' => 'Post Admin',
             'email' => 'post-admin@taxnest.test',
@@ -217,6 +225,36 @@ class AdminPlanStorePostTest extends TestCase
 
         $plan = DB::table('pricing_plans')->find($id);
         $this->assertNull($plan->price_monthly);
+    }
+
+    /** Admin can change every PRA POS add-on rate without changing plan rows. */
+    public function test_admin_can_update_pos_addon_rates(): void
+    {
+        $addons = [];
+        foreach (\App\Services\PosAddonPricingService::ADDONS as $code => $_addon) {
+            $addons[$code] = ['annual' => 13500, 'quarterly' => 3600];
+        }
+
+        $this->actingAsAdmin()
+            ->from('/admin/plans')
+            ->post('/admin/plans/addons', ['addons' => $addons])
+            ->assertRedirect('/admin/plans')
+            ->assertSessionHas('success');
+
+        foreach (array_keys(\App\Services\PosAddonPricingService::ADDONS) as $code) {
+            $this->assertSame(
+                '13500',
+                DB::table('system_settings')
+                    ->where('key', "pos_addon_{$code}_annual_price")
+                    ->value('value')
+            );
+            $this->assertSame(
+                '3600',
+                DB::table('system_settings')
+                    ->where('key', "pos_addon_{$code}_quarterly_price")
+                    ->value('value')
+            );
+        }
     }
 
     /** Guests can never hit the write paths. */

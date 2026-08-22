@@ -33,6 +33,46 @@
     </div>
     @endif
 
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
+        <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+                <h2 class="text-sm font-semibold text-white">PRA POS Paid Add-ons</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Set each add-on's annual and quarterly price. Defaults are Rs 12,000/year and Rs 3,000/quarter.</p>
+            </div>
+            <span class="text-[10px] uppercase tracking-wide text-amber-300 bg-amber-900/30 border border-amber-700/50 rounded px-2 py-1 whitespace-nowrap">Admin editable</span>
+        </div>
+
+        <form method="POST" action="{{ route('saas.admin.plans.addons.update') }}" class="space-y-4">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                @foreach($posAddons as $code => $addon)
+                <div class="rounded-lg border border-gray-800 bg-gray-800/40 p-3">
+                    <div class="mb-2">
+                        <p class="text-sm font-semibold text-white">{{ $addon['label'] }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $addon['description'] }}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="text-[10px] text-gray-500 uppercase">
+                            Annual (PKR)
+                            <input type="number" name="addons[{{ $code }}][annual]" value="{{ old("addons.{$code}.annual", $addon['annual_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                        </label>
+                        <label class="text-[10px] text-gray-500 uppercase">
+                            Quarterly (PKR)
+                            <input type="number" name="addons[{{ $code }}][quarterly]" value="{{ old("addons.{$code}.quarterly", $addon['quarterly_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                        </label>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
+            <div class="flex items-start gap-2 rounded-lg border border-indigo-800/50 bg-indigo-900/20 px-3 py-2 text-[11px] text-indigo-200">
+                <span class="font-semibold shrink-0">Custom Access:</span>
+                <span>Not a paid add-on. It is included in Business, Pro, Pro Max and Unlimited; Starter does not include it.</span>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save Add-on Rates</button>
+        </form>
+    </div>
+
     <div class="flex flex-wrap items-center gap-2 mb-6">
         <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
         <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>

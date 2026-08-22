@@ -296,4 +296,25 @@ class PosQuickCreatePlanLimitTest extends TestCase
         PosProduct::where('name', 'C')->update(['is_active' => false]);
         $this->assertFalse(PlanLimitService::productLimitStatus($this->companyId, 'pos')['over']);
     }
+
+    public function test_package_scoped_grant_keeps_product_cap_but_trial_grant_is_blanket(): void
+    {
+        $this->makePlan(1);
+        PosProduct::create(['company_id' => $this->companyId, 'name' => 'Already Here', 'price' => 1]);
+
+        // A grant pays for the package; it does not erase that package's cap.
+        Subscription::first()->update([
+            'override_type' => 'temporary',
+            'override_until' => now()->addDay(),
+        ]);
+        $this->assertSame(
+            ['limit' => 1, 'used' => 1, 'over' => false],
+            PlanLimitService::productLimitStatus($this->companyId, 'pos')
+        );
+
+        // Trial/plan-less grant carriers have no real package to read, so they
+        // deliberately retain the historical fully-open behavior.
+        PricingPlan::first()->update(['is_trial' => true]);
+        $this->assertNull(PlanLimitService::productLimitStatus($this->companyId, 'pos'));
+    }
 }

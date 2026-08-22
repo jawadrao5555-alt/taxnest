@@ -95,6 +95,13 @@ class FbrPosPlanGatingTest extends TestCase
             $table->decimal('total_amount', 12, 2)->default(0);
             $table->timestamps();
         });
+
+        Schema::create('fbr_pos_terminals', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
     }
 
     // ── fixtures ────────────────────────────────────────────────────────────
@@ -250,6 +257,70 @@ class FbrPosPlanGatingTest extends TestCase
         // controller's replay guard (never a quota error for a saved bill).
         $response = $this->runMiddleware($companyId, 'invoices', ['offline_uuid' => 'uuid-already-saved']);
         $this->assertSame(200, $response->getStatusCode());
+    }
+
+    public function test_package_scoped_grant_keeps_fbr_monthly_bill_cap(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->subscribe($companyId, ['invoice_limit' => 1]);
+        $this->addBill($companyId);
+
+        DB::table('subscriptions')->where('company_id', $companyId)->update([
+            'override_type' => 'temporary',
+            'override_until' => now()->addDay(),
+        ]);
+
+        // The service covers controller-side checks and the middleware covers
+        // routes that previously skipped every cap for an active grant.
+        $this->assertFalse(PlanLimitService::canCreateFbrPosBill($companyId)['allowed']);
+        $this->assertSame(403, $this->runMiddleware($companyId, 'invoices')->getStatusCode());
+    }
+
+    public function test_package_scoped_grant_keeps_fbr_counter_cap(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->subscribe($companyId, ['max_terminals' => 1]);
+        DB::table('fbr_pos_terminals')->insert([
+            'company_id' => $companyId,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('subscriptions')->where('company_id', $companyId)->update([
+            'override_type' => 'temporary',
+            'override_until' => now()->addDay(),
+        ]);
+
+        // Toggle/reactivation uses the direct service; new-counter creation
+        // passes through the middleware. Both must retain the package cap.
+        $this->assertFalse(PlanLimitService::canAddFbrTerminal($companyId)['allowed']);
+        $this->assertSame(403, $this->runMiddleware($companyId, 'terminals')->getStatusCode());
+    }
+
+    public function test_trial_and_planless_grants_keep_the_blanket_escape_hatch(): void
+    {
+        $trialCompany = $this->makeCompany();
+        $this->subscribe($trialCompany, ['is_trial' => true, 'invoice_limit' => 1]);
+        DB::table('subscriptions')->where('company_id', $trialCompany)->update([
+            'override_type' => 'temporary',
+            'override_until' => now()->addDay(),
+        ]);
+        $trialSub = PlanLimitService::getActiveSubscription($trialCompany);
+        $this->assertTrue(PlanLimitService::grantWaivesPackageLimits($trialSub));
+
+        $planlessCompany = $this->makeCompany(['name' => 'Plan-less Partner']);
+        DB::table('subscriptions')->insert([
+            'company_id' => $planlessCompany,
+            'pricing_plan_id' => null,
+            'active' => true,
+            'override_type' => 'temporary',
+            'override_until' => now()->addDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $planlessSub = PlanLimitService::getActiveSubscription($planlessCompany);
+        $this->assertTrue(PlanLimitService::grantWaivesPackageLimits($planlessSub));
+        $this->assertSame(200, $this->runMiddleware($planlessCompany, 'invoices')->getStatusCode());
     }
 
     // ── 5: middleware 'inventory' case ──────────────────────────────────────

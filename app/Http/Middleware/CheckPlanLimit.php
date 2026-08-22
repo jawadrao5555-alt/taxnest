@@ -39,6 +39,7 @@ class CheckPlanLimit
 
         // Step 1: Override + access gate — runs BEFORE per-resource limit check.
         $company = Company::find($companyId);
+        $subscription = null;
         if ($company) {
             $access = SubscriptionAccessService::hasAccess($company);
             if (!$access['allowed']) {
@@ -49,15 +50,16 @@ class CheckPlanLimit
                 return back()->with('error', $reason);
             }
 
-            // Lifetime + active temporary/grace bypass per-resource limits entirely.
-            if (in_array($access['override'], ['lifetime', 'temporary', 'grace'], true)) {
+            // A grant waives payment, not the package it runs on. Only the
+            // legacy escape hatch (a Trial or plan-less carrier row) remains
+            // fully open because there is no real package whose caps can apply.
+            $subscription = PlanLimitService::getActiveSubscription($companyId);
+            if (PlanLimitService::grantWaivesPackageLimits($subscription)) {
                 return $next($request);
             }
-            // usage_free continues to the per-resource check below (no plan caps apply,
-            // but we still want products/users/terminals counts capped by plan if set).
         }
 
-        $subscription = Subscription::where('company_id', $companyId)
+        $subscription ??= Subscription::where('company_id', $companyId)
             ->where('active', true)
             ->with('pricingPlan')
             ->first();

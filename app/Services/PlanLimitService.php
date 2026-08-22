@@ -17,6 +17,25 @@ class PlanLimitService
             ->first();
     }
 
+    /**
+     * A free-access grant waives payment, not its package's numeric limits.
+     *
+     * There is one deliberate historical escape hatch: grants carried by a
+     * Trial row or a plan-less row have no real package to read. Those remain
+     * fully open, matching PosFeatureService::planAllows(), so existing partner
+     * and payment-proof grants do not lose access overnight.
+     */
+    public static function grantWaivesPackageLimits(?Subscription $subscription): bool
+    {
+        if (!$subscription || !$subscription->hasActiveOverride()) {
+            return false;
+        }
+
+        $plan = $subscription->pricingPlan;
+
+        return !$plan || (bool) $plan->is_trial;
+    }
+
     public static function canCreateInvoice(int $companyId): array
     {
         $company = \App\Models\Company::find($companyId);
@@ -37,6 +56,10 @@ class PlanLimitService
         }
 
         $sub = self::getActiveSubscription($companyId);
+
+        if (self::grantWaivesPackageLimits($sub)) {
+            return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
+        }
 
         if (!$sub) {
             return ['allowed' => false, 'reason' => 'No active subscription. Please subscribe to a plan.'];
@@ -160,6 +183,9 @@ class PlanLimitService
         }
 
         $sub = self::getActiveSubscription($companyId);
+        if (self::grantWaivesPackageLimits($sub)) {
+            return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
+        }
         if (!$sub || !$sub->pricingPlan) {
             // Access/subscription gating is owned by SubscriptionAccessService —
             // don't double-block here.
@@ -221,6 +247,9 @@ class PlanLimitService
         }
 
         $sub = self::getActiveSubscription($companyId);
+        if (self::grantWaivesPackageLimits($sub)) {
+            return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
+        }
         if (!$sub || !$sub->pricingPlan) {
             // Access/subscription gating is owned by SubscriptionAccessService —
             // don't double-block here.
@@ -304,6 +333,9 @@ class PlanLimitService
         }
 
         $sub = self::getActiveSubscription($companyId);
+        if (self::grantWaivesPackageLimits($sub)) {
+            return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
+        }
         if (!$sub || !$sub->pricingPlan) {
             return ['allowed' => true];
         }
@@ -341,6 +373,10 @@ class PlanLimitService
 
         $sub = self::getActiveSubscription($companyId);
 
+        if (self::grantWaivesPackageLimits($sub)) {
+            return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
+        }
+
         if (!$sub) {
             return ['allowed' => false, 'reason' => 'No active subscription.'];
         }
@@ -376,8 +412,8 @@ class PlanLimitService
         if (!$sub || !$sub->pricingPlan) {
             return ['allowed' => true];
         }
-        if ($sub->hasActiveOverride()) {
-            return ['allowed' => true, 'override' => true];
+        if (self::grantWaivesPackageLimits($sub)) {
+            return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
         }
 
         $limit = $sub->pricingPlan->max_terminals;
@@ -413,6 +449,10 @@ class PlanLimitService
         }
 
         $sub = self::getActiveSubscription($companyId);
+
+        if (self::grantWaivesPackageLimits($sub)) {
+            return ['allowed' => true, 'unlimited' => true, 'blanket_grant' => true];
+        }
 
         if (!$sub) {
             return ['allowed' => false, 'reason' => 'No active subscription.'];
@@ -495,15 +535,10 @@ class PlanLimitService
             return null;
         }
 
-        $company = \App\Models\Company::find($companyId);
-        if ($company) {
-            $access = \App\Services\SubscriptionAccessService::hasAccess($company);
-            if (in_array($access['override'] ?? null, ['lifetime', 'temporary', 'grace'], true)) {
-                return null;
-            }
-        }
-
         $sub = self::getActiveSubscription($companyId);
+        if (self::grantWaivesPackageLimits($sub)) {
+            return null;
+        }
         $plan = $sub?->pricingPlan;
         if (!$plan || $plan->max_products === null || (int) $plan->max_products < 0) {
             return null;
@@ -525,9 +560,12 @@ class PlanLimitService
         $company = \App\Models\Company::find($companyId);
         $sub = self::getActiveSubscription($companyId);
         $plan = $sub?->pricingPlan;
+        $blanketGrant = self::grantWaivesPackageLimits($sub);
 
-        $invoiceLimit = $company?->invoice_limit_override ?? $plan?->invoice_limit ?? 0;
-        $userLimit = $company?->user_limit_override ?? $plan?->user_limit ?? 0;
+        $invoiceLimit = $company?->invoice_limit_override
+            ?? ($blanketGrant ? -1 : $plan?->invoice_limit ?? 0);
+        $userLimit = $company?->user_limit_override
+            ?? ($blanketGrant ? -1 : $plan?->user_limit ?? 0);
 
         // Branch limit = package ki shamil branches + khareede hue paid slots
         // (admin override, jaisa hamesha, sab par bhaari). Reported limit must
@@ -536,7 +574,7 @@ class PlanLimitService
         $branchSlots = \App\Services\BranchAddonService::applicableSlots($company, $sub);
         $planBranches = $plan?->branch_limit ?? 0;
         $branchLimit = $company?->branch_limit_override
-            ?? (((int) $planBranches === -1) ? -1 : (int) $planBranches + $branchSlots);
+            ?? ($blanketGrant ? -1 : (((int) $planBranches === -1) ? -1 : (int) $planBranches + $branchSlots));
 
         $invoiceCount = Invoice::where('company_id', $companyId)->count();
         $userCount = User::where('company_id', $companyId)->where('is_active', true)->count();
@@ -546,19 +584,19 @@ class PlanLimitService
             'invoice' => [
                 'limit' => $invoiceLimit,
                 'used' => $invoiceCount,
-                'source' => $company?->invoice_limit_override !== null ? 'admin_override' : 'plan',
+                'source' => $company?->invoice_limit_override !== null ? 'admin_override' : ($blanketGrant ? 'blanket_grant' : 'plan'),
                 'display' => $invoiceLimit === -1 ? 'Unlimited' : $invoiceLimit,
             ],
             'user' => [
                 'limit' => $userLimit,
                 'used' => $userCount,
-                'source' => $company?->user_limit_override !== null ? 'admin_override' : 'plan',
+                'source' => $company?->user_limit_override !== null ? 'admin_override' : ($blanketGrant ? 'blanket_grant' : 'plan'),
                 'display' => $userLimit === -1 ? 'Unlimited' : $userLimit,
             ],
             'branch' => [
                 'limit' => $branchLimit,
                 'used' => $branchCount,
-                'source' => $company?->branch_limit_override !== null ? 'admin_override' : 'plan',
+                'source' => $company?->branch_limit_override !== null ? 'admin_override' : ($blanketGrant ? 'blanket_grant' : 'plan'),
                 'display' => $branchLimit === -1 ? 'Unlimited' : $branchLimit,
                 'extra_slots' => $branchSlots,
             ],

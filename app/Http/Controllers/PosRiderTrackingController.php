@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\PosCustomer;
+use App\Models\PosCustomerPlace;
+use App\Models\PosDeliveryCompletion;
 use App\Models\PosRider;
 use App\Models\PosTransaction;
 use App\Models\User;
@@ -39,6 +42,10 @@ class PosRiderTrackingController extends Controller
     private const RETENTION_DAYS = 30;       // history kept for trails
     private const GAP_THRESHOLD_MINUTES = 5; // default gap detection threshold
     private const OFFLINE_HEURISTIC_MINUTES = 5; // created_at - recorded_at delta for offline tag
+    private const ARRIVAL_RADIUS_M = 150;
+    private const COMPLETION_GPS_MAX_ACCURACY_M = 150;
+    private const COMPLETION_FIX_WINDOW_MINUTES = 3;
+    private const COMPLETION_CLIENT_MAX_AGE_MINUTES = 10;
 
     // Task #1102: live-map warnings + auto duty-off.
     private const IDLE_MINUTES = 15;    // stationary-with-open-deliveries warning window
@@ -611,6 +618,88 @@ class PosRiderTrackingController extends Controller
     }
 
     /**
+     * The phone treats this as an opaque assignment token. New assignments use
+     * a stored UUID; pre-migration open deliveries receive a keyed digest so no
+     * predictable transaction/rider/timestamp tuple is exposed.
+     */
+    private function assignmentRevision(PosTransaction $txn, PosRider $rider): string
+    {
+        if (Schema::hasColumn('pos_transactions', 'rider_assignment_revision')
+            && filled($txn->rider_assignment_revision)) {
+            return (string) $txn->rider_assignment_revision;
+        }
+
+        $assignedAt = $txn->rider_assigned_at?->getTimestamp()
+            ?? $txn->created_at?->getTimestamp()
+            ?? 0;
+        return hash_hmac(
+            'sha256',
+            implode('|', [(int) $txn->id, (int) $rider->id, $assignedAt]),
+            (string) config('app.key')
+        );
+    }
+
+    /**
+     * Resolve the authoritative destination used by both navigation and rich
+     * completion. A bill pin wins; otherwise use its linked verified place, or
+     * the same most-recent customer place /me suggests.
+     *
+     * @return array{lat:?float,lng:?float,place:?PosCustomerPlace}
+     */
+    private function deliveryDestination(PosTransaction $txn, int $companyId): array
+    {
+        if ($txn->customer_lat !== null && $txn->customer_lng !== null) {
+            return [
+                'lat' => (float) $txn->customer_lat,
+                'lng' => (float) $txn->customer_lng,
+                'place' => null,
+            ];
+        }
+        if (!Schema::hasTable('pos_customer_places')) {
+            return ['lat' => null, 'lng' => null, 'place' => null];
+        }
+
+        $customerId = $txn->customer_id ? (int) $txn->customer_id : null;
+        $phone = trim((string) $txn->customer_phone);
+        if (!$customerId && $phone === '') {
+            return ['lat' => null, 'lng' => null, 'place' => null];
+        }
+
+        // Preserve /me's identity priority exactly: customer-linked places win
+        // as a set. Phone-only history is a fallback only when that customer
+        // has no verified place yet.
+        $places = collect();
+        if ($customerId) {
+            $places = PosCustomerPlace::where('company_id', $companyId)
+                ->where('is_verified', true)
+                ->where('customer_id', $customerId)
+                ->orderByDesc('last_used_at')
+                ->orderByDesc('usage_count')
+                ->get();
+        }
+        if ($places->isEmpty() && $phone !== '') {
+            $places = PosCustomerPlace::where('company_id', $companyId)
+                ->where('is_verified', true)
+                ->where('customer_phone', $phone)
+                ->orderByDesc('last_used_at')
+                ->orderByDesc('usage_count')
+                ->get();
+        }
+
+        $place = null;
+        if (Schema::hasColumn('pos_transactions', 'customer_place_id') && $txn->customer_place_id) {
+            $place = $places->firstWhere('id', (int) $txn->customer_place_id);
+        }
+        $place ??= $places->first();
+
+        return [
+            'lat' => $place ? (float) $place->lat : null,
+            'lng' => $place ? (float) $place->lng : null,
+            'place' => $place,
+        ];
+    }
+
+    /**
      * Shared /me-shaped payload — used by appMe AND appMarkDelivered (Task
      * #1160) so the app can re-render its whole home screen from either
      * response with the same code path.
@@ -622,18 +711,80 @@ class PosRiderTrackingController extends Controller
         // kitni der se assign hai. Purane APK is extra field ko ignore karte
         // hain (backward compatible).
         $hasAssignedAt = Schema::hasColumn('pos_transactions', 'rider_assigned_at');
+        $hasCustomerId = Schema::hasColumn('pos_transactions', 'customer_id');
+        $hasDestination = Schema::hasColumn('pos_transactions', 'customer_lat')
+            && Schema::hasColumn('pos_transactions', 'customer_lng');
+        $hasPlaceLink = Schema::hasColumn('pos_transactions', 'customer_place_id');
+        $hasAssignmentRevision = Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
         $openBills = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $rider->company_id)
             ->where('rider_id', $rider->id)
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->orderBy('id')
             ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'delivery_address', 'total_amount', 'payment_method', 'delivery_status', 'created_at',
-                   ...($hasAssignedAt ? ['rider_assigned_at'] : [])]);
+                   ...($hasAssignedAt ? ['rider_assigned_at'] : []),
+                   ...($hasCustomerId ? ['customer_id'] : []),
+                   ...($hasDestination ? ['customer_lat', 'customer_lng'] : []),
+                   ...($hasPlaceLink ? ['customer_place_id'] : []),
+                   ...($hasAssignmentRevision ? ['rider_assignment_revision'] : [])]);
 
-        $deliveries = $openBills->map(function ($b) use ($hasAssignedAt) {
+        // Verified customer places are private, company-scoped suggestions.
+        // They are never copied into the public tracking payload.
+        $placesByCustomer = collect();
+        $placesByPhone = collect();
+        if (Schema::hasTable('pos_customer_places') && $openBills->isNotEmpty()) {
+            $customerIds = $hasCustomerId
+                ? $openBills->pluck('customer_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()
+                : collect();
+            $phones = $openBills->pluck('customer_phone')->filter()->map(fn ($p) => trim((string) $p))->unique()->values();
+            if ($customerIds->isNotEmpty() || $phones->isNotEmpty()) {
+                $places = PosCustomerPlace::where('company_id', $rider->company_id)
+                    ->where('is_verified', true)
+                    ->where(function ($q) use ($customerIds, $phones) {
+                        if ($customerIds->isNotEmpty()) $q->whereIn('customer_id', $customerIds);
+                        if ($phones->isNotEmpty()) {
+                            $method = $customerIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                            $q->{$method}('customer_phone', $phones);
+                        }
+                    })
+                    ->orderByDesc('last_used_at')->orderByDesc('usage_count')->get();
+                $placesByCustomer = $places->filter(fn ($p) => $p->customer_id !== null)->groupBy('customer_id');
+                $placesByPhone = $places->filter(fn ($p) => filled($p->customer_phone))->groupBy('customer_phone');
+            }
+        }
+
+        $deliveries = $openBills->map(function ($b) use ($hasAssignedAt, $hasCustomerId, $hasDestination, $hasPlaceLink, $placesByCustomer, $placesByPhone, $rider) {
             $assignedAt = $hasAssignedAt && $b->rider_assigned_at
                 ? Carbon::parse($b->rider_assigned_at)
                 : null;
+            $savedPlaces = collect();
+            if ($hasCustomerId && $b->customer_id) {
+                $savedPlaces = $placesByCustomer->get((int) $b->customer_id, collect());
+            }
+            if ($savedPlaces->isEmpty() && filled($b->customer_phone)) {
+                $savedPlaces = $placesByPhone->get(trim((string) $b->customer_phone), collect());
+            }
+            $suggested = $hasPlaceLink && $b->customer_place_id
+                ? $savedPlaces->firstWhere('id', (int) $b->customer_place_id)
+                : null;
+            $suggested ??= $savedPlaces->first();
+            $billHasPin = $hasDestination && $b->customer_lat !== null && $b->customer_lng !== null;
+            $destinationLat = $billHasPin ? (float) $b->customer_lat : ($suggested ? (float) $suggested->lat : null);
+            $destinationLng = $billHasPin ? (float) $b->customer_lng : ($suggested ? (float) $suggested->lng : null);
+            $distanceM = null;
+            $arrivalState = 'unknown';
+            if ($destinationLat !== null && $destinationLng !== null
+                && $rider->last_lat !== null && $rider->last_lng !== null
+                && $rider->last_located_at
+                && abs(now()->diffInMinutes(Carbon::parse($rider->last_located_at))) <= self::COMPLETION_FIX_WINDOW_MINUTES) {
+                $distanceM = (int) round(PosRider::haversineKm(
+                    (float) $rider->last_lat,
+                    (float) $rider->last_lng,
+                    $destinationLat,
+                    $destinationLng
+                ) * 1000);
+                $arrivalState = $distanceM <= self::ARRIVAL_RADIUS_M ? 'arrived' : 'en_route';
+            }
             // Task 285: is_prepaid = customer pre-paid online; rider should NOT
             // collect cash. Non-cash payment_method is the signal.
             $isPrepaid = $b->payment_method !== 'cash';
@@ -649,9 +800,29 @@ class PosRiderTrackingController extends Controller
                 'status'         => $b->delivery_status,
                 'assigned_at'    => $assignedAt?->toIso8601String(),
                 'assigned_mins'  => $assignedAt ? (int) $assignedAt->diffInMinutes(now()) : null,
-                'maps_url'       => filled($b->delivery_address)
-                    ? 'https://www.google.com/maps/search/?api=1&query=' . urlencode($b->delivery_address)
-                    : null,
+                'assignment_revision' => $this->assignmentRevision($b, $rider),
+                'destination_lat' => $destinationLat,
+                'destination_lng' => $destinationLng,
+                'destination_source' => $billHasPin ? 'bill' : ($suggested ? 'saved' : 'none'),
+                'saved_place_id' => $suggested ? (int) $suggested->id : null,
+                'place_type' => $suggested?->place_type,
+                'place_label' => $suggested?->label,
+                'saved_places' => $savedPlaces->take(10)->map(fn ($p) => [
+                    'id' => (int) $p->id,
+                    'type' => $p->place_type,
+                    'label' => $p->label,
+                    'lat' => (float) $p->lat,
+                    'lng' => (float) $p->lng,
+                    'uses' => (int) $p->usage_count,
+                ])->values(),
+                'arrival_radius_m' => self::ARRIVAL_RADIUS_M,
+                'distance_m' => $distanceM,
+                'arrival_state' => $arrivalState,
+                'maps_url' => $destinationLat !== null && $destinationLng !== null
+                    ? 'https://www.google.com/maps/dir/?api=1&destination=' . $destinationLat . ',' . $destinationLng
+                    : (filled($b->delivery_address)
+                        ? 'https://www.google.com/maps/search/?api=1&query=' . urlencode($b->delivery_address)
+                        : null),
             ];
         });
 
@@ -688,14 +859,34 @@ class PosRiderTrackingController extends Controller
     {
         $rider = $this->riderFromToken($request);
 
-        $txn = PosTransaction::withoutGlobalScope('hide_archived')
+        $hasEvidenceSchema = Schema::hasTable('pos_delivery_completions')
+            && Schema::hasTable('pos_customer_places');
+        $clientEventId = trim((string) $request->input('client_event_id', ''));
+
+        // Durable phone outbox retries the same UUID until acknowledged. Return
+        // success before looking at terminal bill state so a lost 200 response
+        // can never turn into an endless 404 retry.
+        if ($hasEvidenceSchema && $clientEventId !== '') {
+            $prior = PosDeliveryCompletion::where('company_id', $rider->company_id)
+                ->where('rider_id', $rider->id)
+                ->where('client_event_id', $clientEventId)
+                ->first();
+            if ($prior) {
+                if ((int) $prior->transaction_id !== (int) $txnId) {
+                    return response()->json(['ok' => false, 'error' => 'event_conflict'], 409);
+                }
+                return response()->json(['ok' => true, 'duplicate' => true] + $this->mePayload($rider));
+            }
+        }
+
+        $baseTxn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $rider->company_id)
             ->where('rider_id', $rider->id)
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->whereNull('rider_settlement_id')
             ->find($txnId);
 
-        if (!$txn) {
+        if (!$baseTxn) {
             // Array union keeps LEFT keys — ok:false wins over payload's ok:true.
             return response()->json(
                 ['ok' => false, 'error' => 'not_found'] + $this->mePayload($rider),
@@ -703,13 +894,282 @@ class PosRiderTrackingController extends Controller
             );
         }
 
-        $upd = ['delivery_status' => 'delivered'];
-        if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
-            $upd['delivered_at'] = now();
-        }
-        $txn->update($upd);
+        $evidence = null;
+        $hasNewEvidence = $clientEventId !== '' || $request->hasAny([
+            'lat', 'lng', 'accuracy_m', 'captured_at', 'place_type', 'place_label',
+        ]);
+        if ($hasNewEvidence) {
+            if (!$hasEvidenceSchema) {
+                return response()->json(['ok' => false, 'error' => 'schema_not_ready'], 503);
+            }
+            $data = $request->validate([
+                'client_event_id' => 'required|uuid',
+                'assignment_revision' => 'required|string|max:100',
+                'place_type' => 'required|in:home,business,other',
+                'place_label' => 'nullable|string|max:80',
+                'lat' => 'required|numeric|between:22.8,37.5',
+                'lng' => 'required|numeric|between:60.4,77.6',
+                'accuracy_m' => 'required|numeric|min:0|max:' . self::COMPLETION_GPS_MAX_ACCURACY_M,
+                'captured_at' => 'required|integer|min:1',
+            ]);
 
-        return response()->json($this->mePayload($rider));
+            try {
+                $capturedAt = Carbon::createFromTimestampMs((int) $data['captured_at'])
+                    ->setTimezone(config('app.timezone'));
+            } catch (\Throwable $e) {
+                return response()->json(['ok' => false, 'error' => 'bad_gps_time'], 422);
+            }
+            if ($capturedAt->gt(now()->addMinutes(2))
+                || $capturedAt->lt(now()->subMinutes(self::COMPLETION_CLIENT_MAX_AGE_MINUTES))) {
+                return response()->json(['ok' => false, 'error' => 'stale_gps'], 422);
+            }
+
+            $lat = (float) $data['lat'];
+            $lng = (float) $data['lng'];
+            $accuracyM = (int) round((float) $data['accuracy_m']);
+            $fix = null;
+            if (Schema::hasTable('pos_rider_locations')) {
+                $fixes = DB::table('pos_rider_locations')
+                    ->where('company_id', $rider->company_id)
+                    ->where('rider_id', $rider->id)
+                    ->whereBetween('recorded_at', [
+                        $capturedAt->copy()->subMinutes(self::COMPLETION_FIX_WINDOW_MINUTES),
+                        $capturedAt->copy()->addMinutes(self::COMPLETION_FIX_WINDOW_MINUTES),
+                    ])
+                    ->get(['lat', 'lng', 'accuracy_m', 'recorded_at']);
+                $fix = $fixes->sortBy(fn ($p) => abs(
+                    Carbon::parse($p->recorded_at)->getTimestamp() - $capturedAt->getTimestamp()
+                ))->first();
+            }
+            if (!$fix && $rider->last_located_at
+                && abs(Carbon::parse($rider->last_located_at)->diffInMinutes($capturedAt)) <= self::COMPLETION_FIX_WINDOW_MINUTES) {
+                $fix = (object) ['lat' => $rider->last_lat, 'lng' => $rider->last_lng, 'accuracy_m' => null];
+            }
+            if (!$fix || $fix->lat === null || $fix->lng === null) {
+                return response()->json(['ok' => false, 'error' => 'gps_not_synced'], 409);
+            }
+            if ($fix->accuracy_m !== null
+                && (int) $fix->accuracy_m > self::COMPLETION_GPS_MAX_ACCURACY_M) {
+                return response()->json(['ok' => false, 'error' => 'inaccurate_gps'], 422);
+            }
+            $submittedVsFixM = PosRider::haversineKm($lat, $lng, (float) $fix->lat, (float) $fix->lng) * 1000;
+            if ($submittedVsFixM > max(100, $accuracyM + 50)) {
+                return response()->json(['ok' => false, 'error' => 'gps_mismatch'], 422);
+            }
+
+            $evidence = [
+                'client_event_id' => $data['client_event_id'],
+                'submitted_assignment_revision' => (string) $data['assignment_revision'],
+                'place_type' => $data['place_type'],
+                'place_label' => trim((string) ($data['place_label'] ?? '')) ?: null,
+                'completed_lat' => round($lat, 7),
+                'completed_lng' => round($lng, 7),
+                'accuracy_m' => $accuracyM,
+                'captured_at' => $capturedAt,
+            ];
+        }
+
+        try {
+            $result = DB::transaction(function () use ($rider, $txnId, $evidence, $hasEvidenceSchema) {
+                $txn = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $rider->company_id)
+                    ->where('rider_id', $rider->id)
+                    ->whereIn('delivery_status', ['assigned', 'dispatched'])
+                    ->whereNull('rider_settlement_id')
+                    ->lockForUpdate()
+                    ->find($txnId);
+                if (!$txn) return null;
+
+                // Assignment and destination must be checked from the locked
+                // row. A reassignment or pin correction racing this request
+                // therefore cannot complete the stale assignment.
+                $lockedEvidence = $evidence;
+                if ($lockedEvidence) {
+                    $expectedRevision = $this->assignmentRevision($txn, $rider);
+                    if (!hash_equals(
+                        $expectedRevision,
+                        (string) $lockedEvidence['submitted_assignment_revision']
+                    )) {
+                        return ['error' => 'assignment_changed', 'status' => 409];
+                    }
+
+                    $destination = $this->deliveryDestination($txn, (int) $rider->company_id);
+                    $destinationLat = $destination['lat'];
+                    $destinationLng = $destination['lng'];
+                    $distanceM = null;
+                    $proximityVerified = false;
+                    if ($destinationLat !== null && $destinationLng !== null) {
+                        $distanceM = (int) round(PosRider::haversineKm(
+                            (float) $lockedEvidence['completed_lat'],
+                            (float) $lockedEvidence['completed_lng'],
+                            $destinationLat,
+                            $destinationLng
+                        ) * 1000);
+                        $allowedRadius = self::ARRIVAL_RADIUS_M
+                            + min(100, (int) $lockedEvidence['accuracy_m']);
+                        if ($distanceM > $allowedRadius) {
+                            return [
+                                'error' => 'too_far',
+                                'status' => 422,
+                                'distance_m' => $distanceM,
+                                'allowed_m' => $allowedRadius,
+                            ];
+                        }
+                        $proximityVerified = true;
+                    }
+
+                    unset($lockedEvidence['submitted_assignment_revision']);
+                    $lockedEvidence['assignment_revision'] = $expectedRevision;
+                    $lockedEvidence['destination_lat'] = $destinationLat;
+                    $lockedEvidence['destination_lng'] = $destinationLng;
+                    $lockedEvidence['distance_m'] = $distanceM;
+                    $lockedEvidence['proximity_verified'] = $proximityVerified;
+                    $lockedEvidence['evidence_source'] = $destinationLat === null
+                        ? 'current_place'
+                        : 'gps';
+                }
+
+                $place = null;
+                if ($lockedEvidence) {
+                    $customerId = $txn->customer_id ? (int) $txn->customer_id : null;
+                    if (!$customerId && filled($txn->customer_phone)) {
+                        $customerId = PosCustomer::where('company_id', $rider->company_id)
+                            ->where('phone', $txn->customer_phone)->value('id');
+                    }
+                    if ($customerId || filled($txn->customer_phone)) {
+                        $candidates = PosCustomerPlace::where('company_id', $rider->company_id)
+                            ->where('place_type', $lockedEvidence['place_type'])
+                            ->where(function ($q) use ($customerId, $txn) {
+                                if ($customerId) $q->where('customer_id', $customerId);
+                                if (filled($txn->customer_phone)) {
+                                    $method = $customerId ? 'orWhere' : 'where';
+                                    $q->{$method}('customer_phone', $txn->customer_phone);
+                                }
+                            })->get();
+                        $place = $candidates->first(fn ($p) => PosRider::haversineKm(
+                            (float) $p->lat, (float) $p->lng,
+                            (float) $lockedEvidence['completed_lat'],
+                            (float) $lockedEvidence['completed_lng']
+                        ) * 1000 <= 75);
+
+                        if ($place) {
+                            $place->update([
+                                'label' => $lockedEvidence['place_label'] ?: $place->label,
+                                'accuracy_m' => $lockedEvidence['accuracy_m'],
+                                'is_verified' => true,
+                                'verified_at' => $lockedEvidence['captured_at'],
+                                'last_used_at' => $lockedEvidence['captured_at'],
+                                'usage_count' => (int) $place->usage_count + 1,
+                            ]);
+                        } else {
+                            $place = PosCustomerPlace::create([
+                                'company_id' => $rider->company_id,
+                                'customer_id' => $customerId,
+                                'customer_phone' => trim((string) $txn->customer_phone) ?: null,
+                                'place_type' => $lockedEvidence['place_type'],
+                                'label' => $lockedEvidence['place_label'],
+                                'address' => $txn->delivery_address,
+                                'lat' => $lockedEvidence['completed_lat'],
+                                'lng' => $lockedEvidence['completed_lng'],
+                                'accuracy_m' => $lockedEvidence['accuracy_m'],
+                                'is_verified' => true,
+                                'verified_at' => $lockedEvidence['captured_at'],
+                                'last_used_at' => $lockedEvidence['captured_at'],
+                                'usage_count' => 1,
+                                'created_from' => 'rider',
+                            ]);
+                        }
+                    }
+                }
+
+                $upd = ['delivery_status' => 'delivered'];
+                if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
+                    $upd['delivered_at'] = $lockedEvidence['captured_at'] ?? now();
+                }
+                if ($place && Schema::hasColumn('pos_transactions', 'customer_place_id')) {
+                    $upd['customer_place_id'] = $place->id;
+                }
+                if ($lockedEvidence && $txn->customer_lat === null && $txn->customer_lng === null) {
+                    // Snapshot the authoritative saved destination when one
+                    // existed; otherwise the verified completion point becomes
+                    // the bill's private actual-delivery pin.
+                    $upd['customer_lat'] = $lockedEvidence['destination_lat']
+                        ?? $lockedEvidence['completed_lat'];
+                    $upd['customer_lng'] = $lockedEvidence['destination_lng']
+                        ?? $lockedEvidence['completed_lng'];
+                }
+                $txn->update($upd);
+
+                if ($hasEvidenceSchema) {
+                    PosDeliveryCompletion::create([
+                        'company_id' => $rider->company_id,
+                        'transaction_id' => $txn->id,
+                        'rider_id' => $rider->id,
+                        'customer_place_id' => $place?->id,
+                        ...($lockedEvidence ?: [
+                            'place_type' => 'other',
+                            'captured_at' => $txn->delivered_at ?: now(),
+                            'evidence_source' => 'legacy',
+                        ]),
+                    ]);
+                }
+
+                return ['txn' => $txn, 'evidence' => $lockedEvidence];
+            });
+        } catch (\Illuminate\Database\QueryException $exception) {
+            // Concurrent first attempts can both miss the fast replay check.
+            // The unique event constraint is the final claim; after rollback,
+            // resolve it deterministically as duplicate or cross-bill conflict.
+            $sqlState = (string) $exception->getCode();
+            if ($evidence && in_array($sqlState, ['23000', '23505'], true)) {
+                $prior = PosDeliveryCompletion::where('company_id', $rider->company_id)
+                    ->where('rider_id', $rider->id)
+                    ->where('client_event_id', $clientEventId)
+                    ->first();
+                if ($prior) {
+                    if ((int) $prior->transaction_id !== (int) $txnId) {
+                        return response()->json(['ok' => false, 'error' => 'event_conflict'], 409);
+                    }
+                    return response()->json(['ok' => true, 'duplicate' => true] + $this->mePayload($rider));
+                }
+            }
+            throw $exception;
+        }
+
+        if (!$result) {
+            // A concurrent same-event attempt may have delivered the locked row
+            // while this request waited. Resolve after the lock instead of
+            // turning a lost-success retry into 404.
+            if ($evidence) {
+                $prior = PosDeliveryCompletion::where('company_id', $rider->company_id)
+                    ->where('rider_id', $rider->id)
+                    ->where('client_event_id', $clientEventId)
+                    ->first();
+                if ($prior) {
+                    if ((int) $prior->transaction_id !== (int) $txnId) {
+                        return response()->json(['ok' => false, 'error' => 'event_conflict'], 409);
+                    }
+                    return response()->json(['ok' => true, 'duplicate' => true] + $this->mePayload($rider));
+                }
+            }
+            return response()->json(
+                ['ok' => false, 'error' => 'not_found'] + $this->mePayload($rider),
+                404
+            );
+        }
+        if (isset($result['error'])) {
+            $details = collect($result)->except(['status'])->all();
+            if ($result['error'] === 'assignment_changed') {
+                $details += $this->mePayload($rider);
+            }
+            return response()->json(['ok' => false] + $details, (int) $result['status']);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'delivery_completed' => true,
+            'proximity_verified' => (bool) ($result['evidence']['proximity_verified'] ?? false),
+        ] + $this->mePayload($rider));
     }
 
     /** GET /api/rider-app/v1/version — app self-update check (public). */

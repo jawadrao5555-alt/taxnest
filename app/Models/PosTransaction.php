@@ -24,7 +24,7 @@ class PosTransaction extends Model
         'is_archived', 'archived_at', 'archived_by_report_id',
         'rider_id', 'order_type', 'delivery_status', 'rider_settlement_id', 'rider_settled_at', 'rider_partial_paid',
         // Delivery duration stamps (3 Aug 2026) — fillable warna update() chupke se drop kar deta hai.
-        'rider_assigned_at', 'delivered_at', 'returned_at',
+        'rider_assigned_at', 'rider_assignment_revision', 'delivered_at', 'returned_at',
         // Task 786: who closed an unassigned delivery bill (pos user id).
         'delivered_by',
         // Prepaid conversion audit (Task 285, Aug 2026) — cash→qr_payment correction on deliveries board.
@@ -35,6 +35,8 @@ class PosTransaction extends Model
         'is_wastage',
         // Customer live tracking (Task 1105) — delivery pin + public track token.
         'customer_lat', 'customer_lng', 'track_token',
+        // Private repeat-delivery place selected/confirmed for this bill.
+        'customer_place_id',
     ];
 
     /**
@@ -171,6 +173,11 @@ class PosTransaction extends Model
     public function rider()
     {
         return $this->belongsTo(PosRider::class, 'rider_id');
+    }
+
+    public function customerPlace()
+    {
+        return $this->belongsTo(PosCustomerPlace::class, 'customer_place_id')->withTrashed();
     }
 
     public function items()

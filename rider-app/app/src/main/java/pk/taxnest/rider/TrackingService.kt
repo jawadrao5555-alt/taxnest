@@ -214,6 +214,36 @@ class TrackingService : Service(), LocationListener {
         if (PointQueue.size(this) >= FLUSH_AT_POINTS) {
             netHandler.post { flush() }
         }
+        // Task #1508: check proximity to each delivery destination and fire
+        // arrival notification (deduped) when the rider is near.  Runs on the
+        // GPS callback thread — ArrivalNotifier is thread-safe.
+        val accM = if (location.hasAccuracy()) location.accuracy else null
+        checkArrivalNotifications(location.latitude, location.longitude, accM)
+    }
+
+    /**
+     * Iterates the last-known deliveries stored in DeliveryArrivalCache and
+     * fires a deduped notification for any delivery whose destination the rider
+     * has just entered.  Safe to call from a non-main thread.
+     */
+    private fun checkArrivalNotifications(lat: Double, lng: Double, accM: Float?) {
+        try {
+            val arr = DeliveryArrivalCache.get(this)
+            for (i in 0 until arr.length()) {
+                val item = arr.optJSONObject(i) ?: continue
+                val meta = DestinationMeta.from(item)
+                if (!meta.hasCoords) continue
+                val txnId = item.optInt("id", 0)
+                if (txnId <= 0) continue
+                val inv = item.optString("invoice_number").ifBlank { "#$txnId" }
+                ArrivalNotifier.checkAndNotify(
+                    this, txnId, meta.assignmentRevision, inv,
+                    lat, lng, accM, meta
+                )
+            }
+        } catch (e: Exception) {
+            // Never let arrival check crash the GPS loop.
+        }
     }
 
     /**

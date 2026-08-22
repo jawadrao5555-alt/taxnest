@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\PosCustomerPlace;
 use App\Models\PosRider;
 use App\Models\PosRiderSettlement;
 use App\Models\PosTransaction;
@@ -766,6 +767,7 @@ class PosRiderController extends Controller
             && Schema::hasColumn('pos_transactions', 'track_token');
         $billEtas = [];
         $rememberedLoc = [];
+        $savedPlacesByBill = [];
         $shopPin = null;
         if ($custLocReady) {
             if ($hasShopLocation) {
@@ -800,9 +802,40 @@ class PosRiderController extends Controller
                     }
                 }
             }
+            if (Schema::hasTable('pos_customer_places')) {
+                $customerIds = $openBillsFresh->pluck('customer_id')->filter()->map(fn ($id) => (int) $id)->unique()->values();
+                $phones = $openBillsFresh->pluck('customer_phone')->filter()->map(fn ($p) => trim((string) $p))->unique()->values();
+                if ($customerIds->isNotEmpty() || $phones->isNotEmpty()) {
+                    $places = PosCustomerPlace::where('company_id', $companyId)
+                        ->where('is_verified', true)
+                        ->where(function ($q) use ($customerIds, $phones) {
+                            if ($customerIds->isNotEmpty()) $q->whereIn('customer_id', $customerIds);
+                            if ($phones->isNotEmpty()) {
+                                $method = $customerIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                                $q->{$method}('customer_phone', $phones);
+                            }
+                        })
+                        ->orderByDesc('last_used_at')->orderByDesc('usage_count')->get();
+                    foreach ($openBillsFresh as $b) {
+                        $matched = $b->customer_id
+                            ? $places->where('customer_id', (int) $b->customer_id)
+                            : collect();
+                        if ($matched->isEmpty() && filled($b->customer_phone)) {
+                            $matched = $places->where('customer_phone', trim((string) $b->customer_phone));
+                        }
+                        $savedPlacesByBill[$b->id] = $matched->take(10)->map(fn ($p) => [
+                            'id' => (int) $p->id,
+                            'type' => $p->place_type,
+                            'label' => $p->label,
+                            'lat' => (float) $p->lat,
+                            'lng' => (float) $p->lng,
+                        ])->values()->all();
+                    }
+                }
+            }
         }
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix', 'custLocReady', 'billEtas', 'rememberedLoc', 'shopPin'));
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers', 'trackingHints', 'hasShopLocation', 'riderHints', 'suggestedRiderId', 'ridersPicker', 'riderOptionSuffix', 'custLocReady', 'billEtas', 'rememberedLoc', 'savedPlacesByBill', 'shopPin'));
     }
 
     // ─── Task 1105: customer pin, public track link & ETA poll ─────────────
@@ -841,7 +874,23 @@ class PosRiderController extends Controller
             return response()->json(['ok' => false, 'error' => 'already_closed'], 422);
         }
 
-        if ($request->filled('url')) {
+        $placeType = $request->validate([
+            'place_type' => 'nullable|in:home,business,other',
+            'place_label' => 'nullable|string|max:80',
+            'saved_place_id' => 'nullable|integer',
+        ]);
+        $placeType['place_type'] = $placeType['place_type'] ?? 'home';
+
+        $savedPlace = null;
+        if ($request->filled('saved_place_id') && Schema::hasTable('pos_customer_places')) {
+            $savedPlace = PosCustomerPlace::where('company_id', $companyId)
+                ->findOrFail((int) $request->input('saved_place_id'));
+            $sameCustomer = ($txn->customer_id && (int) $savedPlace->customer_id === (int) $txn->customer_id)
+                || (filled($txn->customer_phone) && $savedPlace->customer_phone === trim((string) $txn->customer_phone));
+            if (!$sameCustomer) abort(403);
+            $lat = (float) $savedPlace->lat;
+            $lng = (float) $savedPlace->lng;
+        } elseif ($request->filled('url')) {
             $data = $request->validate(['url' => 'required|string|max:600']);
             if (!\App\Services\GoogleMapsLinkResolver::isResolvableUrl($data['url'])) {
                 return response()->json(['ok' => false, 'error' => 'not_a_maps_link'], 422);
@@ -870,7 +919,55 @@ class PosRiderController extends Controller
             $lng = (float) $data['lng'];
         }
 
-        $txn->update(['customer_lat' => round($lat, 7), 'customer_lng' => round($lng, 7)]);
+        $place = $savedPlace;
+        if (!$place && Schema::hasTable('pos_customer_places')
+            && ($txn->customer_id || filled($txn->customer_phone))) {
+            $customerId = $txn->customer_id ? (int) $txn->customer_id : null;
+            if (!$customerId && filled($txn->customer_phone) && Schema::hasTable('pos_customers')) {
+                $customerId = \App\Models\PosCustomer::where('company_id', $companyId)
+                    ->where('phone', trim((string) $txn->customer_phone))
+                    ->value('id');
+                $customerId = $customerId ? (int) $customerId : null;
+            }
+            $candidates = PosCustomerPlace::where('company_id', $companyId)
+                ->where('place_type', $placeType['place_type'])
+                ->where(function ($q) use ($customerId, $txn) {
+                    if ($customerId) $q->where('customer_id', $customerId);
+                    if (filled($txn->customer_phone)) {
+                        $method = $customerId ? 'orWhere' : 'where';
+                        $q->{$method}('customer_phone', $txn->customer_phone);
+                    }
+                })->get();
+            $place = $candidates->first(fn ($p) => PosRider::haversineKm(
+                (float) $p->lat, (float) $p->lng, $lat, $lng
+            ) * 1000 <= 75);
+            $placeData = [
+                'label' => trim((string) ($placeType['place_label'] ?? '')) ?: null,
+                'lat' => round($lat, 7),
+                'lng' => round($lng, 7),
+                'is_verified' => true,
+                'verified_at' => now(),
+                'updated_by' => auth('pos')->id(),
+            ];
+            if ($place) {
+                $place->update($placeData);
+            } else {
+                $place = PosCustomerPlace::create($placeData + [
+                    'company_id' => $companyId,
+                    'customer_id' => $customerId,
+                    'customer_phone' => trim((string) $txn->customer_phone) ?: null,
+                    'place_type' => $placeType['place_type'],
+                    'address' => $txn->delivery_address,
+                    'created_from' => 'manager',
+                ]);
+            }
+        }
+
+        $txnUpdate = ['customer_lat' => round($lat, 7), 'customer_lng' => round($lng, 7)];
+        if ($place && Schema::hasColumn('pos_transactions', 'customer_place_id')) {
+            $txnUpdate['customer_place_id'] = $place->id;
+        }
+        $txn->update($txnUpdate);
 
         // Remember per phone — best-effort only, never blocks the bill save.
         if ($txn->customer_phone && Schema::hasColumn('pos_customers', 'geo_lat')) {
@@ -883,7 +980,12 @@ class PosRiderController extends Controller
             }
         }
 
-        return response()->json(['ok' => true, 'lat' => round($lat, 7), 'lng' => round($lng, 7)]);
+        return response()->json([
+            'ok' => true,
+            'lat' => round($lat, 7),
+            'lng' => round($lng, 7),
+            'saved_place_id' => $place?->id,
+        ]);
     }
 
     /**
@@ -1010,6 +1112,14 @@ class PosRiderController extends Controller
                 $upd['rider_assigned_at'] = null;
             } elseif ((int) $txn->rider_id !== (int) $riderId || !$txn->rider_assigned_at) {
                 $upd['rider_assigned_at'] = now();
+            }
+        }
+        if (Schema::hasColumn('pos_transactions', 'rider_assignment_revision')) {
+            if (!$riderId) {
+                $upd['rider_assignment_revision'] = null;
+            } elseif ((int) $txn->rider_id !== (int) $riderId
+                || !$txn->rider_assignment_revision) {
+                $upd['rider_assignment_revision'] = (string) Str::uuid();
             }
         }
         $txn->update($upd);

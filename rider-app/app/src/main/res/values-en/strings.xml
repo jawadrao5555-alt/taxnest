@@ -87,4 +87,32 @@
     <string name="battery_dialog_msg">The phone\'s battery saver shuts this app down in the background, so your route never reaches the map.\n\n1) Tap "Battery settings" and set this app to Unrestricted.\n2) Tap "Autostart" and switch TaxNest Rider on.</string>
     <string name="battery_btn">Battery settings</string>
     <string name="autostart_btn">Autostart</string>
+
+    <!-- Navigation + destination (Task #1508) -->
+    <string name="navigate_btn">🗺 Start navigation</string>
+    <string name="navigate_no_maps">Google Maps not found — please install a maps app</string>
+
+    <!-- Proximity chip (Task #1508) -->
+    <string name="proximity_m">%1$d m away</string>
+    <string name="proximity_km">%1$.1f km away</string>
+    <string name="proximity_unknown">Distance unknown</string>
+
+    <!-- Arrival banner (Task #1508) -->
+    <string name="arrival_banner">📍 You are near the destination — deliver now!</string>
+
+    <!-- Arrival notification (Task #1508) -->
+    <string name="notif_arrival_channel">Arrival alerts</string>
+    <string name="notif_arrival_title">Near destination!</string>
+    <string name="notif_arrival_text">%1$s — you are near the delivery point</string>
+
+    <!-- Delivery confirmation dialog (Task #1508) — extended with place type -->
+    <string name="confirm_place_title">Choose place type</string>
+    <string name="confirm_place_home">🏠 Home</string>
+    <string name="confirm_place_business">🏢 Business / Office</string>
+    <string name="confirm_place_other">📦 Other</string>
+    <string name="confirm_label_hint">Place name (optional, e.g. Gate 2)</string>
+    <string name="confirm_label_too_long">Label must be 80 characters or fewer</string>
+    <string name="delivered_queued">No internet — delivery saved, will be sent when connected</string>
+    <string name="delivery_gps_waiting">Waiting for a fresh, accurate GPS fix. Keep this screen open and try again.</string>
+    <string name="delivery_too_far">You are not close enough to the saved delivery point yet.</string>
 </resources>

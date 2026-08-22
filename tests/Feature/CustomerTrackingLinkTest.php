@@ -92,6 +92,8 @@ class CustomerTrackingLinkTest extends TestCase
         Schema::create('pos_transactions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('customer_id')->nullable();
+            $table->unsignedBigInteger('customer_place_id')->nullable();
             $table->string('invoice_number')->nullable();
             $table->string('customer_phone')->nullable();
             $table->string('status')->default('completed');
@@ -114,6 +116,30 @@ class CustomerTrackingLinkTest extends TestCase
             $table->decimal('geo_lat', 10, 7)->nullable();
             $table->decimal('geo_lng', 10, 7)->nullable();
             $table->timestamps();
+        });
+
+        Schema::create('pos_customer_places', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('customer_id')->nullable();
+            $table->string('customer_phone', 40)->nullable();
+            $table->string('place_type', 20)->default('other');
+            $table->string('label', 80)->nullable();
+            $table->text('address')->nullable();
+            $table->decimal('lat', 10, 7);
+            $table->decimal('lng', 10, 7);
+            $table->unsignedSmallInteger('accuracy_m')->nullable();
+            $table->boolean('is_verified')->default(false);
+            $table->timestamp('verified_at')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->unsignedInteger('usage_count')->default(0);
+            $table->string('created_from', 20)->default('rider');
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->unsignedBigInteger('deleted_by')->nullable();
+            $table->unsignedBigInteger('merged_into_id')->nullable();
+            $table->unsignedBigInteger('merged_by')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 
@@ -170,7 +196,12 @@ class CustomerTrackingLinkTest extends TestCase
             'company_id' => $company->id, 'name' => 'Ahmed', 'phone' => '03001234567',
         ]);
 
-        $res = $this->callSaveLocation($company, $bill, ['lat' => 31.5204001, 'lng' => 74.3587002]);
+        $res = $this->callSaveLocation($company, $bill, [
+            'lat' => 31.5204001,
+            'lng' => 74.3587002,
+            'place_type' => 'business',
+            'place_label' => 'Back office',
+        ]);
 
         $this->assertSame(200, $res->getStatusCode());
         $bill->refresh();
@@ -179,6 +210,30 @@ class CustomerTrackingLinkTest extends TestCase
         $customer->refresh();
         $this->assertEqualsWithDelta(31.5204001, (float) $customer->geo_lat, 0.0000001);
         $this->assertEqualsWithDelta(74.3587002, (float) $customer->geo_lng, 0.0000001);
+        $place = \App\Models\PosCustomerPlace::first();
+        $this->assertNotNull($place);
+        $this->assertSame((int) $customer->id, (int) $place->customer_id);
+        $this->assertSame('business', $place->place_type);
+        $this->assertSame('Back office', $place->label);
+        $this->assertTrue($place->is_verified);
+        $this->assertSame((int) $place->id, (int) $bill->customer_place_id);
+
+        // A future bill may select the private saved place by id; coordinates
+        // are resolved from the company-scoped server row, not trusted from JS.
+        $next = $this->makeBill($company, [
+            'customer_id' => $customer->id,
+            'invoice_number' => 'INV-REPEAT',
+        ]);
+        $repeat = $this->callSaveLocation($company, $next, [
+            'saved_place_id' => $place->id,
+            'lat' => 35.0,
+            'lng' => 70.0,
+        ]);
+        $this->assertSame(200, $repeat->getStatusCode());
+        $next->refresh();
+        $this->assertEqualsWithDelta(31.5204001, (float) $next->customer_lat, 0.0000001);
+        $this->assertEqualsWithDelta(74.3587002, (float) $next->customer_lng, 0.0000001);
+        $this->assertSame((int) $place->id, (int) $next->customer_place_id);
     }
 
     public function test_out_of_pakistan_bounds_rejected(): void
@@ -262,6 +317,12 @@ class CustomerTrackingLinkTest extends TestCase
         // Payload stays minimal — no invoice/amount/phone leakage.
         $this->assertArrayNotHasKey('invoice_number', $d);
         $this->assertArrayNotHasKey('phone', $d);
+        $this->assertArrayNotHasKey('saved_places', $d);
+        $this->assertArrayNotHasKey('customer_place_id', $d);
+        $this->assertArrayNotHasKey('arrival_history', $d);
+        $this->assertArrayNotHasKey('delivery_completions', $d);
+        $this->assertArrayNotHasKey('route_history', $d);
+        $this->assertArrayNotHasKey('name', $d['rider']);
     }
 
     public function test_public_page_marks_a_delayed_rider_fix_with_last_seen_context(): void

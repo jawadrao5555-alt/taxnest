@@ -60,11 +60,18 @@
             </button>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.deliveries') }}</h1>
         </div>
-        <form method="GET" action="{{ route('pos.deliveries') }}" class="flex items-center gap-2">
-            <input type="hidden" name="tab" value="{{ $activeTab }}">
-            <input type="date" name="date" value="{{ $day->format('Y-m-d') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
-            <button type="submit" class="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition">{{ __('pos.go_btn') }}</button>
-        </form>
+        <div class="flex items-center gap-2">
+            @if($trackingHints && $isAdminOrManager && \Illuminate\Support\Facades\Schema::hasTable('pos_customer_places'))
+            <a href="{{ route('pos.riders.tracking.places') }}" class="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-gray-700">
+                📍 {{ __('pos.places_manage_link') }}
+            </a>
+            @endif
+            <form method="GET" action="{{ route('pos.deliveries') }}" class="flex items-center gap-2">
+                <input type="hidden" name="tab" value="{{ $activeTab }}">
+                <input type="date" name="date" value="{{ $day->format('Y-m-d') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                <button type="submit" class="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition">{{ __('pos.go_btn') }}</button>
+            </form>
+        </div>
     </div>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ __('pos.deliveries_page_intro') }}</p>
 
@@ -370,7 +377,7 @@
                             <div class="mt-1 flex items-center gap-1 flex-wrap">
                                 <button type="button"
                                         class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold {{ $hasPin ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300' }} hover:opacity-75 transition"
-                                        @click="$dispatch('tn-loc-open', { id: {{ (int) $b->id }}, invoice: {{ Js::from($b->invoice_number ?: ('#' . $b->id)) }}, lat: {{ $hasPin ? (float) $b->customer_lat : 'null' }}, lng: {{ $hasPin ? (float) $b->customer_lng : 'null' }}, rlat: {{ isset($rememberedLoc[$b->id]) ? (float) $rememberedLoc[$b->id]['lat'] : 'null' }}, rlng: {{ isset($rememberedLoc[$b->id]) ? (float) $rememberedLoc[$b->id]['lng'] : 'null' }} })">📍 {{ $hasPin ? __('pos.cl_located_chip') : __('pos.cl_locate_btn') }}</button>
+                                        @click="$dispatch('tn-loc-open', { id: {{ (int) $b->id }}, invoice: {{ Js::from($b->invoice_number ?: ('#' . $b->id)) }}, lat: {{ $hasPin ? (float) $b->customer_lat : 'null' }}, lng: {{ $hasPin ? (float) $b->customer_lng : 'null' }}, rlat: {{ isset($rememberedLoc[$b->id]) ? (float) $rememberedLoc[$b->id]['lat'] : 'null' }}, rlng: {{ isset($rememberedLoc[$b->id]) ? (float) $rememberedLoc[$b->id]['lng'] : 'null' }}, places: {{ Js::from($savedPlacesByBill[$b->id] ?? []) }} })">📍 {{ $hasPin ? __('pos.cl_located_chip') : __('pos.cl_locate_btn') }}</button>
                                 @if($hasPin)
                                 <span data-eta-bill="{{ $b->id }}" class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 {{ isset($billEtas[$b->id]) ? '' : 'hidden' }}">{{ isset($billEtas[$b->id]) ? __('pos.cl_eta_chip', ['km' => $billEtas[$b->id]['km'], 'min' => $billEtas[$b->id]['min']]) : '' }}</span>
                                 <button type="button"
@@ -724,6 +731,17 @@
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1" x-text="{{ Js::from(__('pos.cl_modal_title', ['invoice' => ':invoice'])) }}.replace(':invoice', locInvoice)"></h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.cl_paste_hint') }}</p>
                 <p x-show="remembered" x-cloak class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-2">{{ __('pos.cl_remembered_note') }}</p>
+                <div x-show="savedPlaces.length" x-cloak class="mb-2">
+                    <div class="text-[11px] font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.cl_saved_places') }}</div>
+                    <div class="flex gap-1.5 overflow-x-auto pb-1">
+                        <template x-for="place in savedPlaces" :key="place.id">
+                            <button type="button" @click="chooseSavedPlace(place)"
+                                    class="flex-shrink-0 px-2 py-1 rounded-lg border text-[11px] font-semibold"
+                                    :class="selectedPlaceId === place.id ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'"
+                                    x-text="place.label || placeTypeLabel(place.type)"></button>
+                        </template>
+                    </div>
+                </div>
                 <div class="flex gap-2 mb-2">
                     <input type="text" x-model="pasteText" @keydown.enter.prevent="resolvePaste()"
                            placeholder="{{ __('pos.cl_paste_ph') }}"
@@ -734,6 +752,16 @@
                             x-text="resolving ? '…' : {{ Js::from(__('pos.cl_resolve_btn')) }}"></button>
                 </div>
                 <div id="cl-map" style="height: 260px;" class="rounded-lg border border-gray-200 dark:border-gray-700 mb-2 z-0"></div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <select x-model="placeType" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5">
+                        <option value="home">{{ __('pos.place_type_home') }}</option>
+                        <option value="business">{{ __('pos.place_type_business') }}</option>
+                        <option value="other">{{ __('pos.place_type_other') }}</option>
+                    </select>
+                    <input type="text" x-model="placeLabel" maxlength="80" placeholder="{{ __('pos.place_label') }}"
+                           autocomplete="off" name="cl_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5">
+                </div>
                 <p class="text-[11px] mb-3 min-h-[14px]" :class="msgErr ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'" x-text="msg"></p>
                 <div class="flex gap-2 justify-end">
                     <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="locOpen = false">{{ __('pos.cancel') }}</button>
@@ -813,6 +841,7 @@ function tnCustLoc() {
         locOpen: false, shareOpen: false, billId: null, locInvoice: '',
         pasteText: '', resolving: false, saving: false, msg: '', msgErr: false,
         remembered: false, pin: null, map: null, marker: null,
+        savedPlaces: [], selectedPlaceId: null, placeType: 'home', placeLabel: '',
         shareUrl: '', shareWaText: '', sharePhone: '', shareLoading: false, shareMsg: '', shareErr: false,
 
         csrf() {
@@ -826,8 +855,26 @@ function tnCustLoc() {
             this.pasteText = '';
             this.msg = ''; this.msgErr = false;
             this.remembered = (d.lat == null && d.rlat != null);
+            this.savedPlaces = Array.isArray(d.places) ? d.places : [];
+            this.selectedPlaceId = null;
+            this.placeType = 'home';
+            this.placeLabel = '';
             this.locOpen = true;
             this.$nextTick(() => this.initMap(d));
+        },
+
+        placeTypeLabel(type) {
+            if (type === 'home') return @js(__('pos.place_type_home'));
+            if (type === 'business') return @js(__('pos.place_type_business'));
+            return @js(__('pos.place_type_other'));
+        },
+
+        chooseSavedPlace(place) {
+            this.selectedPlaceId = place.id;
+            this.placeType = place.type || 'other';
+            this.placeLabel = place.label || '';
+            this.setPin(place.lat, place.lng, true);
+            this.map.setView([place.lat, place.lng], 17);
         },
 
         initMap(d) {
@@ -845,24 +892,26 @@ function tnCustLoc() {
                     maxZoom: 19,
                     attribution: '&copy; OpenStreetMap &middot; &copy; CARTO'
                 }).addTo(this.map);
-                this.map.on('click', (e) => this.setPin(e.latlng.lat, e.latlng.lng));
+                this.map.on('click', (e) => this.setPin(e.latlng.lat, e.latlng.lng, false));
             }
             if (this.marker) { this.map.removeLayer(this.marker); this.marker = null; }
             this.pin = null;
             this.map.setView(start, (d.lat != null || d.rlat != null) ? 16 : (shopPin ? 14 : 12));
             // Modal was display:none at L.map() time — recalc tiles once visible.
             setTimeout(() => this.map.invalidateSize(), 150);
-            if (d.lat != null) this.setPin(d.lat, d.lng);
-            else if (d.rlat != null) this.setPin(d.rlat, d.rlng);
+            if (d.lat != null) this.setPin(d.lat, d.lng, false);
+            else if (d.rlat != null) this.setPin(d.rlat, d.rlng, false);
         },
 
-        setPin(lat, lng) {
+        setPin(lat, lng, fromSaved) {
+            if (!fromSaved) this.selectedPlaceId = null;
             this.pin = { lat: lat, lng: lng };
             if (!this.marker) {
                 this.marker = L.marker([lat, lng], { draggable: true }).addTo(this.map);
                 this.marker.on('dragend', () => {
                     var p = this.marker.getLatLng();
                     this.pin = { lat: p.lat, lng: p.lng };
+                    this.selectedPlaceId = null;
                 });
             } else {
                 this.marker.setLatLng([lat, lng]);
@@ -884,7 +933,7 @@ function tnCustLoc() {
             this.msg = ''; this.msgErr = false;
             var ll = this.parseLatLng(t);
             if (ll) {
-                this.setPin(ll.lat, ll.lng);
+                this.setPin(ll.lat, ll.lng, false);
                 this.map.setView([ll.lat, ll.lng], 16);
                 return;
             }
@@ -897,7 +946,7 @@ function tnCustLoc() {
                 });
                 var data = await resp.json().catch(() => ({}));
                 if (resp.ok && data.ok) {
-                    this.setPin(data.lat, data.lng);
+                    this.setPin(data.lat, data.lng, false);
                     this.map.setView([data.lat, data.lng], 16);
                 } else {
                     this.msg = data.message || @js(__('pos.cl_resolve_fail'));
@@ -918,7 +967,13 @@ function tnCustLoc() {
                 var resp = await fetch('/pos/deliveries/' + this.billId + '/customer-location', {
                     method: 'POST',
                     headers: { 'X-CSRF-TOKEN': this.csrf(), 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lat: this.pin.lat, lng: this.pin.lng })
+                    body: JSON.stringify({
+                        lat: this.pin.lat,
+                        lng: this.pin.lng,
+                        saved_place_id: this.selectedPlaceId,
+                        place_type: this.placeType,
+                        place_label: this.placeLabel
+                    })
                 });
                 var data = await resp.json().catch(() => ({}));
                 if (resp.ok && data.ok) {

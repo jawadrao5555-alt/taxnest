@@ -1,6 +1,9 @@
 package pk.taxnest.rider
 
 import android.content.Intent
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -9,12 +12,13 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -28,6 +32,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -52,6 +57,37 @@ class MainActivity : AppCompatActivity() {
 
     private val ui = Handler(Looper.getMainLooper())
 
+    // ── GPS for proximity display on delivery cards (Task #1508) ─────────
+    // We maintain a lightweight foreground-only listener here so the cards can
+    // show live distance-to-destination without starting a full tracking session.
+    // Only active while the activity is resumed and there are deliveries.
+    private var locationManager: LocationManager? = null
+    @Volatile private var lastRiderLat: Double? = null
+    @Volatile private var lastRiderLng: Double? = null
+    @Volatile private var lastRiderAccM: Float? = null
+    @Volatile private var lastRiderCapturedAtMs: Long? = null
+
+    private val gpsListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            // Ignore fixes with terrible accuracy (same threshold as TrackingService).
+            if (location.hasAccuracy() && location.accuracy > 150f) return
+            lastRiderLat = location.latitude
+            lastRiderLng = location.longitude
+            lastRiderAccM = if (location.hasAccuracy()) location.accuracy else null
+            lastRiderCapturedAtMs = location.time.takeIf { it > 0L } ?: System.currentTimeMillis()
+            // Refresh card proximity chips on the main thread.
+            ui.post { refreshProximityChips() }
+        }
+        @Deprecated("Deprecated in Java")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+        override fun onProviderEnabled(provider: String) {}
+        override fun onProviderDisabled(provider: String) {}
+    }
+
+    // Holds the current deliveries JSONArray so proximity chips can be
+    // refreshed from GPS callbacks without another /me call.
+    private var currentDeliveries = JSONArray()
+
     // 5-second loop — local Prefs only (duty bool, pending queue, last sync).
     // Never touches the network.
     private val localStateLoop = object : Runnable {
@@ -75,10 +111,12 @@ class MainActivity : AppCompatActivity() {
     private var connectivityManager: ConnectivityManager? = null
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            // Reconcile pending duty-off first (idempotent), then drain queue.
+            // Reconcile pending duty-off first (idempotent), then drain queues.
             thread(name = "connectivity-restore") {
                 reconcilePendingDutyOff()
                 QueueDrain.drainAsync(this@MainActivity)
+                // Task #1508: drain delivery completion outbox on reconnect.
+                OutboxDrain.drainBlocking(this@MainActivity)
             }
         }
     }
@@ -117,7 +155,9 @@ class MainActivity : AppCompatActivity() {
             stopService(Intent(this, TrackingService::class.java))
             DeliveryCheckWorker.cancel(this)
             SyncWorker.cancel(this)
+            OutboxWorker.cancel(this)
             DutyWatchdog.clearNotification(this)
+            DeliveryArrivalCache.clear(this)
             Prefs.clearSession(this)
             startActivity(Intent(this, LoginActivity::class.java)); finish()
         }
@@ -162,6 +202,8 @@ class MainActivity : AppCompatActivity() {
 
         // Drain any buffered offline points left from previous duty sessions.
         QueueDrain.drainAsync(this)
+        // Task #1508: drain delivery completion outbox on resume.
+        thread(name = "outbox-resume") { OutboxDrain.drainBlocking(this) }
 
         // v1.7.0: duty ON but the phone killed the service while we were away
         // → bring tracking back now that we are in the foreground (a start
@@ -171,6 +213,9 @@ class MainActivity : AppCompatActivity() {
         // Register connectivity callback so drain fires immediately when
         // signal returns, not just on the next 30s /me poll.
         registerConnectivityCallback()
+
+        // Task #1508: start a lightweight GPS listener for proximity display.
+        startProximityGps()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -200,6 +245,7 @@ class MainActivity : AppCompatActivity() {
         ui.removeCallbacks(localStateLoop)
         ui.removeCallbacks(meRefreshLoop)
         unregisterConnectivityCallback()
+        stopProximityGps()
     }
 
     // ── Connectivity callback ──────────────────────────────────────────────
@@ -222,6 +268,93 @@ class MainActivity : AppCompatActivity() {
             connectivityManager?.unregisterNetworkCallback(networkCallback)
         } catch (e: Exception) {}
         connectivityManager = null
+    }
+
+    // ── Lightweight GPS for proximity display (Task #1508) ────────────────
+
+    private fun startProximityGps() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) return
+        try {
+            val lm = getSystemService(LOCATION_SERVICE) as? LocationManager ?: return
+            locationManager = lm
+            val minTime = 10_000L  // 10s — enough for fresh display, gentle on battery
+            val minDist = 10f      // 10 m
+            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, minDist, gpsListener)
+            }
+            if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, minTime * 3, minDist * 3, gpsListener)
+            }
+            // Seed from last known fix so chips are populated immediately on open.
+            val seed = try { lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) } catch (e: Exception) { null }
+                ?: try { lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) } catch (e: Exception) { null }
+            if (seed != null && (!seed.hasAccuracy() || seed.accuracy <= 150f)) {
+                lastRiderLat = seed.latitude
+                lastRiderLng = seed.longitude
+                lastRiderAccM = if (seed.hasAccuracy()) seed.accuracy else null
+                refreshProximityChips()
+            }
+        } catch (e: Exception) {}
+    }
+
+    private fun stopProximityGps() {
+        try { locationManager?.removeUpdates(gpsListener) } catch (e: Exception) {}
+        locationManager = null
+    }
+
+    /** Iterates every visible delivery card and refreshes its proximity chip. */
+    private fun refreshProximityChips() {
+        val arr = currentDeliveries
+        for (i in 0 until deliveriesContainer.childCount) {
+            val row = deliveriesContainer.getChildAt(i) ?: continue
+            val item = arr.optJSONObject(i) ?: continue
+            val meta = DestinationMeta.from(item)
+            if (!meta.hasCoords) continue
+            updateCardProximity(row, item, meta)
+        }
+    }
+
+    private fun updateCardProximity(row: View, item: JSONObject, meta: DestinationMeta) {
+        val chip = row.findViewById<TextView>(R.id.proximityChip) ?: return
+        val banner = row.findViewById<TextView>(R.id.arrivalBanner) ?: return
+        val deliveredBtn = row.findViewById<Button>(R.id.deliveredBtn) ?: return
+
+        val dist = ArrivalDetector.distanceTo(lastRiderLat, lastRiderLng, meta)
+        val isNear = ArrivalDetector.isNearArrival(lastRiderLat, lastRiderLng, lastRiderAccM, meta)
+
+        if (dist != null) {
+            chip.visibility = View.VISIBLE
+            chip.text = if (dist < 1000f) {
+                getString(R.string.proximity_m, dist.toInt())
+            } else {
+                getString(R.string.proximity_km, dist / 1000f)
+            }
+        } else {
+            chip.visibility = View.GONE
+        }
+
+        // Prominent arrival banner.
+        if (isNear) {
+            banner.visibility = View.VISIBLE
+            banner.text = getString(R.string.arrival_banner)
+            // Pull the delivered button up visually by making it more prominent.
+            deliveredBtn.textSize = 16f
+            // Also fire arrival notification (deduped).
+            val txnId = item.optInt("id", 0)
+            val rev = meta.assignmentRevision
+            val inv = item.optString("invoice_number").ifBlank { "#$txnId" }
+            thread(name = "arrival-notif") {
+                ArrivalNotifier.checkAndNotify(
+                    this, txnId, rev, inv,
+                    lastRiderLat, lastRiderLng, lastRiderAccM, meta
+                )
+            }
+        } else {
+            banner.visibility = View.GONE
+        }
     }
 
     // ── Duty ON: permission chain → server → service ──────────────────────
@@ -435,6 +568,9 @@ class MainActivity : AppCompatActivity() {
         // Nayi assigned delivery → phone par awaz ke saath ittila
         // (background thread — notifications are thread-safe).
         DeliveryNotifier.process(this, deliveriesArr)
+        // Task #1508: update the arrival cache so TrackingService can check
+        // proximity on GPS callbacks even when the app is in the background.
+        DeliveryArrivalCache.set(this, deliveriesArr)
         runOnUiThread {
             // Server is the boss for duty state.
             if (Prefs.duty(this) != serverDuty) {
@@ -475,6 +611,7 @@ class MainActivity : AppCompatActivity() {
      * Must be called on the main thread.
      */
     private fun updateDeliveriesList(arr: JSONArray) {
+        currentDeliveries = arr
         deliveriesContainer.removeAllViews()
 
         if (arr.length() == 0) {
@@ -515,21 +652,27 @@ class MainActivity : AppCompatActivity() {
                 phoneView.visibility = View.GONE
             }
 
-            // Address — tap to open maps_url
+            // ── Navigation (Task #1508) ─────────────────────────────────────
+            val meta = DestinationMeta.from(item)
             val mapsUrl = item.optString("maps_url")
             val address = item.optString("address")
             val addrView = row.findViewById<TextView>(R.id.address)
             if (address.isNotBlank()) {
                 addrView.text = getString(R.string.address_prefix, address)
                 addrView.visibility = View.VISIBLE
-                if (mapsUrl.isNotBlank()) {
-                    addrView.setOnClickListener {
-                        try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl))) }
-                        catch (e: Exception) { showMsg(getString(R.string.no_maps)) }
-                    }
-                }
+                // Address tap: prefer exact-coord nav, fall back to mapsUrl, then text search.
+                addrView.setOnClickListener { openNavigation(meta, mapsUrl, address) }
             } else {
                 addrView.visibility = View.GONE
+            }
+
+            // Navigate button — shown when we have exact coordinates or a maps_url.
+            val navBtn = row.findViewById<Button>(R.id.navigateBtn)
+            if (meta.hasCoords || mapsUrl.isNotBlank() || address.isNotBlank()) {
+                navBtn.visibility = View.VISIBLE
+                navBtn.setOnClickListener { openNavigation(meta, mapsUrl, address) }
+            } else {
+                navBtn.visibility = View.GONE
             }
 
             // Assigned X min ago
@@ -538,6 +681,11 @@ class MainActivity : AppCompatActivity() {
             minsView.text = if (mins >= 0) getString(R.string.assigned_mins_ago, mins)
                             else getString(R.string.assigned_just_now)
 
+            // Proximity chip + arrival banner (Task #1508)
+            if (meta.hasCoords) {
+                updateCardProximity(row, item, meta)
+            }
+
             // Delivered button (v1.6.0, Task #1160) — /me only lists
             // assigned/dispatched bills, but gate on status anyway so a future
             // payload change can't show the button on a terminal-state bill.
@@ -545,7 +693,7 @@ class MainActivity : AppCompatActivity() {
             val deliveredBtn = row.findViewById<Button>(R.id.deliveredBtn)
             if (status == "assigned" || status == "dispatched") {
                 deliveredBtn.visibility = View.VISIBLE
-                deliveredBtn.setOnClickListener { confirmDelivered(item, deliveredBtn) }
+                deliveredBtn.setOnClickListener { showDeliveryConfirmDialog(item, deliveredBtn) }
             } else {
                 deliveredBtn.visibility = View.GONE
             }
@@ -554,46 +702,216 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ── Delivered button (v1.6.0, Task #1160) ──────────────────────────────
+    // ── Navigation (Task #1508) ────────────────────────────────────────────
 
-    /** Confirm dialog before marking a bill delivered — mis-taps are cheap here. */
-    private fun confirmDelivered(item: JSONObject, btn: Button) {
+    /**
+     * Opens Google Maps turn-by-turn navigation.
+     *
+     * Priority:
+     *  1. Exact coordinates (destination_lat/lng from /me) → most accurate.
+     *  2. maps_url from server (pre-built Google Maps link) → fallback.
+     *  3. Address text search → last resort.
+     */
+    private fun openNavigation(meta: DestinationMeta, mapsUrl: String, address: String) {
+        val uri: Uri = when {
+            meta.hasCoords -> {
+                // google.navigation:q=lat,lng  — opens turn-by-turn directly.
+                Uri.parse("google.navigation:q=${meta.lat},${meta.lng}")
+            }
+            mapsUrl.isNotBlank() -> Uri.parse(mapsUrl)
+            address.isNotBlank() -> {
+                // Text search fallback — works with any maps app.
+                Uri.parse("geo:0,0?q=${Uri.encode(address)}")
+            }
+            else -> return
+        }
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        // Prefer Google Maps for coordinate nav so the app:// scheme is handled.
+        intent.setPackage("com.google.android.apps.maps")
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            // Google Maps not installed — try any maps app (remove package constraint).
+            intent.setPackage(null)
+            try {
+                startActivity(intent)
+            } catch (e2: Exception) {
+                // Last resort: open address in browser if we have a maps_url.
+                if (mapsUrl.isNotBlank()) {
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl))) }
+                    catch (e3: Exception) { showMsg(getString(R.string.navigate_no_maps)) }
+                } else {
+                    showMsg(getString(R.string.navigate_no_maps))
+                }
+            }
+        }
+    }
+
+    // ── Delivered button (Task #1508 extended, v1.6.0 original) ──────────
+
+    /**
+     * Extended delivery confirmation dialog (Task #1508):
+     * — place type: Home / Business / Other
+     * — optional free-text label (≤80 chars)
+     * — captures current GPS position as evidence
+     * Replaces the old simple confirm dialog.
+     */
+    private fun showDeliveryConfirmDialog(item: JSONObject, btn: Button) {
         val billNo = item.optString("invoice_number").ifBlank { "#${item.optInt("id")}" }
         val customer = item.optString("customer_name").ifBlank { getString(R.string.unknown_customer) }
+        val meta = DestinationMeta.from(item)
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_delivery_confirm, null)
+        dialogView.findViewById<TextView>(R.id.dialogBillInfo).text =
+            getString(R.string.delivered_confirm_msg, "$billNo · $customer")
+        val placeGroup = dialogView.findViewById<RadioGroup>(R.id.placeTypeGroup)
+        val labelEdit = dialogView.findViewById<EditText>(R.id.placeLabel)
+
+        // Pre-select place type from server metadata if available.
+        when (meta.placeType) {
+            "home" -> placeGroup.check(R.id.placeHome)
+            "business" -> placeGroup.check(R.id.placeBusiness)
+            "other" -> placeGroup.check(R.id.placeOther)
+            else -> placeGroup.check(R.id.placeHome)
+        }
+        if (!meta.placeLabel.isNullOrBlank()) {
+            labelEdit.setText(meta.placeLabel)
+        }
+
         AlertDialog.Builder(this)
             .setTitle(R.string.delivered_confirm_title)
-            .setMessage(getString(R.string.delivered_confirm_msg, "$billNo · $customer"))
-            .setPositiveButton(R.string.delivered_yes) { _, _ -> markDelivered(item.optInt("id"), btn) }
+            .setView(dialogView)
+            .setPositiveButton(R.string.delivered_yes) { _, _ ->
+                val label = labelEdit.text.toString().trim()
+                if (label.length > 80) {
+                    showMsg(getString(R.string.confirm_label_too_long))
+                    return@setPositiveButton
+                }
+                val placeType = when (placeGroup.checkedRadioButtonId) {
+                    R.id.placeHome -> "home"
+                    R.id.placeBusiness -> "business"
+                    else -> "other"
+                }
+                submitDelivery(item, btn, placeType, label, meta)
+            }
             .setNegativeButton(R.string.delivered_no, null)
             .show()
     }
 
-    private fun markDelivered(txnId: Int, btn: Button) {
+    /**
+     * Builds the outbox entry, enqueues it durably, then tries an immediate
+     * upload.  If the upload succeeds the outbox entry is removed inline and
+     * the /me payload re-renders the screen.  If it fails (offline / transient)
+     * the entry stays in the outbox and WorkManager will retry.
+     */
+    private fun submitDelivery(
+        item: JSONObject,
+        btn: Button,
+        placeType: String,
+        placeLabel: String,
+        meta: DestinationMeta
+    ) {
+        val txnId = item.optInt("id")
+        val clientEventId = UUID.randomUUID().toString()
+
+        // Snapshot GPS at the moment the rider confirmed.
+        val capLat = lastRiderLat
+        val capLng = lastRiderLng
+        val capAcc = lastRiderAccM
+        val capAt = lastRiderCapturedAtMs
+        val gpsIsFresh = capAt != null && System.currentTimeMillis() - capAt in 0..120_000
+        if (capLat == null || capLng == null || capAcc == null || capAcc > 150f || !gpsIsFresh) {
+            btn.isEnabled = true
+            showMsg(getString(R.string.delivery_gps_waiting))
+            return
+        }
+
+        val entry = JSONObject().apply {
+            put("txn_id", txnId)
+            put("client_event_id", clientEventId)
+            put("place_type", placeType)
+            put("place_label", placeLabel)
+            put("lat", capLat)
+            put("lng", capLng)
+            put("accuracy_m", capAcc.toDouble())
+            put("captured_at", capAt)
+            put("assignment_revision", meta.assignmentRevision)
+        }
+
+        // Persist to outbox BEFORE network call.
+        DeliveryOutbox.enqueue(this, entry)
+        // Schedule WorkManager retry in case this attempt fails.
+        OutboxWorker.schedule(this)
+
         btn.isEnabled = false
         thread {
-            val (code, body) = ApiClient.post("/deliveries/$txnId/delivered", JSONObject(), Prefs.token(this))
+            val payload = OutboxDrain.buildDeliveryPayload(entry)
+            val (code, body) = ApiClient.post("/deliveries/$txnId/delivered", payload, Prefs.token(this))
             when {
-                code in 200..299 && body?.optBoolean("ok") == true -> {
-                    // Response is the refreshed /me payload — one-shot re-render
-                    // (the delivered card drops out, counts update).
-                    applyMePayload(body)
+                code in 200..299 -> {
+                    // Remove from outbox — delivered successfully.
+                    DeliveryOutbox.remove(this, txnId)
+                    // Current servers return the refreshed /me payload. Keep
+                    // 2xx itself as the protocol success signal so harmless
+                    // response-shape changes cannot leave a delivered event
+                    // stuck in the retry queue.
+                    if (body != null && body.has("deliveries")) applyMePayload(body) else refreshMe()
                     runOnUiThread { showMsg(getString(R.string.delivered_done)) }
+                }
+                code == 409 && body?.optString("error") == "gps_not_synced" -> {
+                    // Completion GPS is valid but its location batch has not
+                    // reached the server yet. Keep the exact event for retry.
+                    runOnUiThread {
+                        btn.isEnabled = true
+                        showMsg(getString(R.string.delivered_queued))
+                    }
+                }
+                code == 409 || code == 410 -> {
+                    // Assignment changed / bill gone. Never report this as a
+                    // successful delivery; remove the stale event and resync.
+                    DeliveryOutbox.remove(this, txnId)
+                    if (body != null && body.has("deliveries")) applyMePayload(body) else refreshMe()
+                    runOnUiThread { showMsg(getString(R.string.delivered_gone)) }
                 }
                 code == 404 && body != null -> {
                     // Bill no longer ours (reassigned / delivered elsewhere) —
                     // payload rides on the 404 too, so resync instead of erroring.
+                    DeliveryOutbox.remove(this, txnId)
                     applyMePayload(body)
                     runOnUiThread { showMsg(getString(R.string.delivered_gone)) }
                 }
                 code == 401 -> runOnUiThread { sessionExpired() }
-                code == 403 -> runOnUiThread {
-                    btn.isEnabled = true
-                    showMsg(body?.optString("message")?.ifBlank { null } ?: getString(R.string.plan_locked))
+                code == 403 -> {
+                    // Permanent plan error — remove from outbox, show message.
+                    DeliveryOutbox.remove(this, txnId)
+                    runOnUiThread {
+                        btn.isEnabled = true
+                        showMsg(body?.optString("message")?.ifBlank { null } ?: getString(R.string.plan_locked))
+                    }
                 }
-                else -> runOnUiThread {
-                    // Offline / transient failure — re-enable so the rider can retry.
-                    btn.isEnabled = true
-                    showMsg(getString(R.string.delivered_failed))
+                code == 422 -> {
+                    // This captured event cannot become valid later. Remove it
+                    // so the rider can try again with a fresh fix/place.
+                    DeliveryOutbox.remove(this, txnId)
+                    val error = body?.optString("error")
+                    runOnUiThread {
+                        btn.isEnabled = true
+                        showMsg(
+                            when (error) {
+                                "too_far" -> getString(R.string.delivery_too_far)
+                                "stale_gps", "gps_mismatch", "bad_gps_time" ->
+                                    getString(R.string.delivery_gps_waiting)
+                                else -> getString(R.string.delivered_failed)
+                            }
+                        )
+                    }
+                }
+                else -> {
+                    // Offline / transient failure — entry stays in outbox, WorkManager retries.
+                    runOnUiThread {
+                        btn.isEnabled = true
+                        showMsg(getString(R.string.delivered_queued))
+                    }
                 }
             }
         }
@@ -641,7 +959,9 @@ class MainActivity : AppCompatActivity() {
         stopService(Intent(this, TrackingService::class.java))
         DeliveryCheckWorker.cancel(this)
         SyncWorker.cancel(this)
+        OutboxWorker.cancel(this)
         DutyWatchdog.clearNotification(this)
+        DeliveryArrivalCache.clear(this)
         Prefs.clearSession(this)
         showMsg(getString(R.string.session_expired))
         startActivity(Intent(this, LoginActivity::class.java)); finish()

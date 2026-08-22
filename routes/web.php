@@ -1202,6 +1202,15 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         // Rider LIVE Tracking (Aug 2026) — Unlimited exclusive; map + poll + trail
         Route::get('/riders/tracking', [\App\Http\Controllers\PosRiderTrackingController::class, 'trackingPage'])->name('pos.riders.tracking');
         Route::get('/riders/tracking/data', [\App\Http\Controllers\PosRiderTrackingController::class, 'trackingData'])->name('pos.riders.tracking.data');
+        // Private customer-place memory + confirmed arrival history. These
+        // routes deliberately stay under /pos/riders so custom-access mapping,
+        // PosAdminOnly and tracking plan gates all apply.
+        Route::get('/riders/tracking/places', [\App\Http\Controllers\PosCustomerPlaceController::class, 'index'])->name('pos.riders.tracking.places');
+        Route::get('/riders/tracking/places/data', [\App\Http\Controllers\PosCustomerPlaceController::class, 'data'])->name('pos.riders.tracking.places.data');
+        Route::post('/riders/tracking/places', [\App\Http\Controllers\PosCustomerPlaceController::class, 'store'])->name('pos.riders.tracking.places.store');
+        Route::patch('/riders/tracking/places/{place}', [\App\Http\Controllers\PosCustomerPlaceController::class, 'update'])->name('pos.riders.tracking.places.update');
+        Route::post('/riders/tracking/places/{place}/merge', [\App\Http\Controllers\PosCustomerPlaceController::class, 'merge'])->name('pos.riders.tracking.places.merge');
+        Route::delete('/riders/tracking/places/{place}', [\App\Http\Controllers\PosCustomerPlaceController::class, 'destroy'])->name('pos.riders.tracking.places.destroy');
         Route::get('/riders/tracking/trail/{rider}', [\App\Http\Controllers\PosRiderTrackingController::class, 'trail'])->name('pos.riders.tracking.trail');
         // Task #320 (ZFC): dukan ki location pin — map par shop marker + default center
         Route::post('/riders/tracking/shop-location', [\App\Http\Controllers\PosRiderTrackingController::class, 'saveShopLocation'])->name('pos.riders.tracking.shop');

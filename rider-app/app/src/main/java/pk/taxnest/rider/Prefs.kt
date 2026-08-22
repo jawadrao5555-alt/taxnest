@@ -54,6 +54,13 @@ object Prefs {
     fun setSeenDeliveryIds(c: Context, v: Set<String>) =
         sp(c).edit().putStringSet("seen_deliveries", HashSet(v)).apply()
 
+    // ── Seen arrival ids (arrival notification dedupe, Task #1508) ────────
+    // Key format: "txnId:assignmentRevision" — fires again on re-assignment.
+    fun seenArrivalIds(c: Context): Set<String> =
+        sp(c).getStringSet("seen_arrivals", emptySet()) ?: emptySet()
+    fun setSeenArrivalIds(c: Context, v: Set<String>) =
+        sp(c).edit().putStringSet("seen_arrivals", HashSet(v)).apply()
+
     // ── Pending duty-off flag ──────────────────────────────────────────────
     // Set before the /duty {on:false} network call; cleared only on success.
     // Survives process death so that an offline end-duty is reconciled with
@@ -72,6 +79,7 @@ object Prefs {
         sp(c).edit()
             .remove("token").remove("rider_name").remove("company_name")
             .remove("seen_deliveries") // fresh login must re-alert still-open bills
+            .remove("seen_arrivals")   // fresh login clears arrival notification dedupe
             .putBoolean("duty", false)
             .apply()
 
@@ -84,6 +92,7 @@ object Prefs {
         sp(c).edit()
             .remove("token").remove("rider_name").remove("company_name")
             .remove("seen_deliveries")
+            .remove("seen_arrivals")
             .putBoolean("duty", false).putString("queue", "[]")
             .apply()
 }

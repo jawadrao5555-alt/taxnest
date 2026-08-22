@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Delivery confirmation dialog (Task #1508) — place type + optional label -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- Bill info header -->
+    <TextView
+        android:id="@+id/dialogBillInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textColor="#344054"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Place type section label -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/confirm_place_title"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:textColor="#101828"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Place type radio buttons -->
+    <RadioGroup
+        android:id="@+id/placeTypeGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/placeHome"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="@string/confirm_place_home"
+            android:textSize="14sp"
+            android:textColor="#344054"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/placeBusiness"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="@string/confirm_place_business"
+            android:textSize="14sp"
+            android:textColor="#344054" />
+
+        <RadioButton
+            android:id="@+id/placeOther"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="@string/confirm_place_other"
+            android:textSize="14sp"
+            android:textColor="#344054" />
+
+    </RadioGroup>
+
+    <!-- Optional label input -->
+    <EditText
+        android:id="@+id/placeLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="@string/confirm_label_hint"
+        android:textSize="13sp"
+        android:textColor="#101828"
+        android:inputType="textCapSentences"
+        android:maxLines="2"
+        android:maxLength="80"
+        android:background="@android:drawable/edit_text"
+        android:padding="8dp" />
+
+</LinearLayout>

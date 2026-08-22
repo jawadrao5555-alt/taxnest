@@ -88,4 +88,32 @@
     <string name="battery_dialog_msg">فون کی بیٹری بچت ایپ کو پیچھے بند کر دیتی ہے، جس سے آپ کا راستہ نقشے پر نہیں آتا۔\n\n1) «بیٹری سیٹنگ» دبا کر اس ایپ کو Unrestricted / بلا پابندی کریں۔\n2) «آٹو اسٹارٹ» دبا کر TaxNest Rider کو آن کریں۔</string>
     <string name="battery_btn">بیٹری سیٹنگ</string>
     <string name="autostart_btn">آٹو اسٹارٹ</string>
+
+    <!-- Navigation + destination (Task #1508) -->
+    <string name="navigate_btn">🗺 نیویگیشن شروع کریں</string>
+    <string name="navigate_no_maps">گوگل میپس نہیں ملا — میپس ایپ انسٹال کریں</string>
+
+    <!-- Proximity chip (Task #1508) -->
+    <string name="proximity_m">%1$d میٹر دور</string>
+    <string name="proximity_km">%1$.1f کلومیٹر دور</string>
+    <string name="proximity_unknown">دوری معلوم نہیں</string>
+
+    <!-- Arrival banner (Task #1508) -->
+    <string name="arrival_banner">📍 آپ منزل کے قریب ہیں — ڈیلیوری کریں!</string>
+
+    <!-- Arrival notification (Task #1508) -->
+    <string name="notif_arrival_channel">منزل پہنچنے کی اطلاع</string>
+    <string name="notif_arrival_title">منزل قریب ہے!</string>
+    <string name="notif_arrival_text">%1$s — آپ ڈیلیوری پوائنٹ کے قریب ہیں</string>
+
+    <!-- Delivery confirmation dialog (Task #1508) — extended with place type -->
+    <string name="confirm_place_title">جگہ کی قسم چنیں</string>
+    <string name="confirm_place_home">🏠 گھر</string>
+    <string name="confirm_place_business">🏢 دکان / دفتر</string>
+    <string name="confirm_place_other">📦 دوسری جگہ</string>
+    <string name="confirm_label_hint">جگہ کا نام (اختیاری، مثلاً: گیٹ نمبر ۲)</string>
+    <string name="confirm_label_too_long">نام زیادہ سے زیادہ ۸۰ حروف کا ہونا چاہیے</string>
+    <string name="delivered_queued">انٹرنیٹ نہیں — ڈیلیوری محفوظ کر لی گئی، بھیجی جائے گی</string>
+    <string name="delivery_gps_waiting">تازہ اور درست جی پی ایس لوکیشن کا انتظار ہے۔ یہ اسکرین کھلی رکھیں اور دوبارہ کوشش کریں۔</string>
+    <string name="delivery_too_far">آپ ابھی محفوظ ڈیلیوری جگہ کے کافی قریب نہیں ہیں۔</string>
 </resources>

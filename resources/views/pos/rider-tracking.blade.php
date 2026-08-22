@@ -75,6 +75,7 @@
              :5000 port behind the dev proxy → cross-origin fetch = CORS death.
              Relative = same-origin everywhere (dev + live). --}}
         'dataUrl' => route('pos.riders.tracking.data', [], false),
+        'placesDataUrl' => route('pos.riders.tracking.places.data', [], false),
         'trailUrlBase' => '/pos/riders/tracking/trail',
         'companyCity' => $companyCity ?? '',
         'shopLat' => $shopLat,
@@ -112,6 +113,8 @@
             {{-- Task #1357: satellite/galiyan, Google link, late-sync --}}
             'layer_streets' => __('pos.rt_layer_streets'),
             'layer_satellite' => __('pos.rt_layer_satellite'),
+            'layer_known_places' => __('pos.places_saved_layer'),
+            'layer_arrivals' => __('pos.places_arrivals_layer'),
             'open_in_gmaps' => __('pos.rt_open_in_gmaps'),
             'gap_offline_at' => __('pos.rt_gap_offline_sync_at'),
             'late_legend' => __('pos.rt_late_legend'),
@@ -136,6 +139,10 @@
                 <p class="text-[11px] text-gray-500 dark:text-gray-400" x-text="statusLine"></p>
             </div>
             <div class="flex items-center gap-2">
+                <a href="{{ route('pos.riders.tracking.places') }}"
+                   class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
+                    📍 {{ __('pos.places_manage_link') }}
+                </a>
                 {{-- Task #1103: rider performance report link --}}
                 <a href="{{ route('pos.riders.report') }}"
                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
@@ -292,6 +299,7 @@
     function riderTracking(cfg) {
         return {
             dataUrl: cfg.dataUrl,
+            placesDataUrl: cfg.placesDataUrl,
             trailUrlBase: cfg.trailUrlBase,
             i18n: cfg.i18n,
             riders: [],
@@ -299,6 +307,8 @@
             statusLine: '',
             map: null,
             markers: {},
+            placeLayer: null,
+            arrivalLayer: null,
             warnBadges: {},   // Task #1102: rider-id → warning pill marker
             polyline: null,
             gapLayers: [],
@@ -369,9 +379,14 @@
                 const layerOptions = {};
                 layerOptions[this.i18n.layer_streets] = streetsLayer;
                 layerOptions[this.i18n.layer_satellite] = satelliteLayer;
+                this.placeLayer = L.layerGroup().addTo(this.map);
+                this.arrivalLayer = L.layerGroup();
+                const overlays = {};
+                overlays[this.i18n.layer_known_places] = this.placeLayer;
+                overlays[this.i18n.layer_arrivals] = this.arrivalLayer;
                 // collapsed:false — dukandar ko dono naam saaf nazar aayein (collapsed
                 // control sirf ek chhota sa icon dikhata hai).
-                L.control.layers(layerOptions, null, { position: 'topright', collapsed: false }).addTo(this.map);
+                L.control.layers(layerOptions, overlays, { position: 'topright', collapsed: false }).addTo(this.map);
                 this.map.on('baselayerchange', (e) => {
                     const key = (e.layer && e.layer.rtKey) === 'sat' ? 'sat' : 'streets';
                     try { localStorage.setItem('rt_basemap', key); } catch (err) {}
@@ -383,6 +398,7 @@
                     this.renderShopMarker(this.pendingShop.lat, this.pendingShop.lng, true);
                 });
                 this.load();
+                this.loadPlaces();
                 // Dukan set ho to map SIDHA dukan par khule (ZFC request) —
                 // city/IP centering ki zaroorat hi nahi.
                 if (this.shopLat !== null && this.shopLng !== null) {
@@ -409,6 +425,44 @@
                         this.statusLine = onDuty + ' / ' + this.riders.length + ' ' + this.i18n.on_duty.toLowerCase();
                     })
                     .catch(() => {});
+            },
+            loadPlaces() {
+                if (!this.placesDataUrl || !this.placeLayer || !this.arrivalLayer) return;
+                fetch(this.placesDataUrl, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(j => {
+                        if (!j || !j.ok) return;
+                        this.placeLayer.clearLayers();
+                        this.arrivalLayer.clearLayers();
+                        (j.places || []).forEach(p => {
+                            if (!isFinite(p.lat) || !isFinite(p.lng)) return;
+                            const emoji = p.type === 'home' ? '🏠' : (p.type === 'business' ? '🏢' : '📍');
+                            const icon = L.divIcon({
+                                className: '',
+                                html: '<div style="font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))">' + emoji + '</div>',
+                                iconSize: [24, 24], iconAnchor: [12, 22]
+                            });
+                            L.marker([p.lat, p.lng], { icon, zIndexOffset: 200 })
+                                .addTo(this.placeLayer)
+                                .bindPopup('<b>' + this.esc(p.label || p.type) + '</b>'
+                                    + (p.address ? '<br>' + this.esc(p.address) : '')
+                                    + '<br>' + this.gmapsLink(p.lat, p.lng));
+                        });
+                        (j.arrivals || []).forEach(a => {
+                            if (!isFinite(a.lat) || !isFinite(a.lng)) return;
+                            L.circleMarker([a.lat, a.lng], {
+                                radius: 5,
+                                color: a.verified ? '#10b981' : '#f59e0b',
+                                fillColor: a.verified ? '#10b981' : '#f59e0b',
+                                fillOpacity: .65,
+                            }).addTo(this.arrivalLayer).bindPopup(
+                                '<b>' + this.esc(a.label || a.type) + '</b>'
+                                + (a.rider ? '<br>' + this.esc(a.rider) : '')
+                                + (a.captured_at ? '<br>' + this.esc(new Date(a.captured_at).toLocaleString()) : '')
+                                + '<br>' + this.gmapsLink(a.lat, a.lng)
+                            );
+                        });
+                    }).catch(() => {});
             },
             dotColor(r) {
                 if (!r.on_duty) return '#9ca3af';

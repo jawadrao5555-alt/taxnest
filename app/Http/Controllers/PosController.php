@@ -2948,6 +2948,12 @@ class PosController extends Controller
             'rider_id' => $riderId,
             'delivery_status' => $riderId ? 'assigned' : null,
         ] : [];
+        if ($riderId && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assigned_at')) {
+            $riderFields['rider_assigned_at'] = now();
+        }
+        if ($riderId && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision')) {
+            $riderFields['rider_assignment_revision'] = (string) \Illuminate\Support\Str::uuid();
+        }
 
         // Offline Desktop Mode Phase 2 (Jul 2026): honor the ORIGINAL sale moment
         // and cashier for offline-queued bills. Only trusted when the request also

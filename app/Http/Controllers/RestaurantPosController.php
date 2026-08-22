@@ -1377,6 +1377,12 @@ class RestaurantPosController extends Controller
                 $transactionData['order_type'] = $order->order_type;
                 $transactionData['rider_id'] = $payRiderId;
                 $transactionData['delivery_status'] = $payRiderId ? 'assigned' : null;
+                if ($payRiderId && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assigned_at')) {
+                    $transactionData['rider_assigned_at'] = now();
+                }
+                if ($payRiderId && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision')) {
+                    $transactionData['rider_assignment_revision'] = (string) \Illuminate\Support\Str::uuid();
+                }
             }
             $transaction = PosTransaction::create($transactionData);
 

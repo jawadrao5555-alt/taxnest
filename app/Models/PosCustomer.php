@@ -73,4 +73,9 @@ class PosCustomer extends Model
     {
         return $this->belongsTo(Company::class);
     }
+
+    public function deliveryPlaces()
+    {
+        return $this->hasMany(PosCustomerPlace::class, 'customer_id');
+    }
 }

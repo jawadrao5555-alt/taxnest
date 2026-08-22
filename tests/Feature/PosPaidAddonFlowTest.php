@@ -722,6 +722,22 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertSame(0, PaymentProof::count(), 'A cashier must never be able to commit the shop to a payment');
     }
 
+    public function test_shop_cannot_submit_a_new_subscription_proof_for_retired_pro_max(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $retired = $this->makePlan('Pro Max');
+
+        $this->actingAs($this->posUser($company), 'pos')
+            ->post('/pos/payment-proof', [
+                'pricing_plan_id' => $retired->id,
+                'billing_cycle' => 'annual',
+                'proof' => UploadedFile::fake()->image('retired-plan.jpg'),
+            ])
+            ->assertSessionHasErrors('pricing_plan_id');
+
+        $this->assertSame(0, PaymentProof::count());
+    }
+
     public function test_the_billing_page_hides_the_purchase_box_from_a_cashier(): void
     {
         $company = $this->makeShop($this->makePlan('Business'));

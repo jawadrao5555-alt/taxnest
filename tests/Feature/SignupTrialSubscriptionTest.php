@@ -233,7 +233,7 @@ class SignupTrialSubscriptionTest extends TestCase
     {
         $this->seedTrialPlans();
         $paid = PricingPlan::create([
-            'name' => 'POS Basic',
+            'name' => 'Starter',
             'product_type' => 'pos',
             'price' => 30000,
             'is_trial' => false,
@@ -261,7 +261,7 @@ class SignupTrialSubscriptionTest extends TestCase
     {
         // Only the (required) paid plan exists — no trial plan seed.
         $paid = PricingPlan::create([
-            'name' => 'POS Basic',
+            'name' => 'Starter',
             'product_type' => 'pos',
             'price' => 30000,
             'is_trial' => false,

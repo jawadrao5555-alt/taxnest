@@ -37,10 +37,16 @@ class RequestedPackageService
             return null;
         }
 
-        return PricingPlan::where('product_type', $productType)
+        $plan = PricingPlan::where('product_type', $productType)
             ->where('is_trial', false)
             ->get()
             ->first(fn (PricingPlan $plan) => mb_strtolower($plan->name) === mb_strtolower($name));
+
+        if ($productType === 'pos' && !PosPlanComparisonService::isSellablePlan($plan)) {
+            return null;
+        }
+
+        return $plan;
     }
 
     /**
@@ -110,7 +116,8 @@ class RequestedPackageService
         $plan = $company->relationLoaded('requestedPlan')
             ? $company->getRelation('requestedPlan')
             : PricingPlan::find($company->requested_plan_id ?? null);
-        if (!$plan || $plan->is_trial) {
+        if (!$plan || $plan->is_trial
+            || ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan))) {
             return null;
         }
 

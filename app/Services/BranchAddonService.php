@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
  * Paid extra-branch add-on — SINGLE source of truth (owner-approved, 21 Aug 2026).
  *
  * Owner ka faisla: har package apne card par likhi branches MUFT deta hai
- * (Starter 1, Business 1, Pro 2, Pro Max 3, Unlimited 5). Us se ooper jitni
+ * (Starter 1, Business 1, Pro 3, Unlimited 5). Us se ooper jitni
  * branches shop chahe, har branch Rs 10,000 SAALANA.
  *
  * Har wo jagah jo ye paisa dikhati ya check karti hai — Branches page, POS

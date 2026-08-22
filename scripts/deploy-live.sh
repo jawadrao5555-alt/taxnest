@@ -520,7 +520,7 @@ step "Preflight: receipt-settings preview check (preview follows the open tab; M
 node scripts/receipt-preview-tab-check.mjs \
   || fail "receipt-preview check FAILED — the Receipt Settings live preview no longer follows the open tab, or the Menu-QR toggle leaked onto the PRA fiscal QR (Task 1377); fix before deploying"
 
-step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Pro Max/Unlimited)"
+step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Unlimited)"
 if [ "${SKIP_PLAN_GATE_CHECK:-0}" = "1" ]; then
   echo "SKIPPED (SKIP_PLAN_GATE_CHECK=1) — only skip for emergency hotfixes." >&2
 else

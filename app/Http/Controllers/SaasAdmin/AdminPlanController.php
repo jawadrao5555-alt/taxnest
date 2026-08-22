@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Collection;
 use App\Services\PosAddonPricingService;
+use App\Services\PosPlanComparisonService;
 
 class AdminPlanController extends Controller
 {
@@ -20,7 +21,13 @@ class AdminPlanController extends Controller
         // instead of crashing with a 500 (the safety migration adds the column).
         if (Schema::hasColumn('pricing_plans', 'product_type')) {
             $diPlans = PricingPlan::where('product_type', 'di')->orderBy('price')->get();
-            $posPlans = PricingPlan::where('product_type', 'pos')->orderBy('price')->get();
+            $posPlans = PricingPlan::where('product_type', 'pos')
+                ->where(function ($query) {
+                    $query->where('is_trial', true)
+                        ->orWhereIn('name', PosPlanComparisonService::SELLABLE_PLAN_NAMES);
+                })
+                ->orderBy('price')
+                ->get();
             $fbrposPlans = PricingPlan::where('product_type', 'fbrpos')->orderBy('price')->get();
         } else {
             $diPlans = PricingPlan::orderBy('price')->get();

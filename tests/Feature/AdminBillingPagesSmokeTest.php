@@ -115,7 +115,7 @@ class AdminBillingPagesSmokeTest extends TestCase
 
     private function seedPlans(bool $withProductType = true): void
     {
-        foreach (['di' => 'DI Basic', 'pos' => 'POS Standard', 'fbrpos' => 'FBR POS Lite'] as $type => $name) {
+        foreach (['di' => 'DI Basic', 'pos' => 'Starter', 'fbrpos' => 'FBR POS Lite'] as $type => $name) {
             $row = [
                 'name' => $name,
                 'price' => 1000,
@@ -147,10 +147,10 @@ class AdminBillingPagesSmokeTest extends TestCase
         $response->assertStatus(200);
         // Each product tab exists and each seeded plan is rendered in its bucket.
         $response->assertSee('DI Basic');
-        $response->assertSee('POS Standard');
+        $response->assertSee('Starter');
         $response->assertSee('FBR POS Lite');
         $response->assertViewHas('diPlans', fn ($p) => $p->count() === 1 && $p->first()->name === 'DI Basic');
-        $response->assertViewHas('posPlans', fn ($p) => $p->count() === 1 && $p->first()->name === 'POS Standard');
+        $response->assertViewHas('posPlans', fn ($p) => $p->count() === 1 && $p->first()->name === 'Starter');
         $response->assertViewHas('fbrposPlans', fn ($p) => $p->count() === 1 && $p->first()->name === 'FBR POS Lite');
     }
 

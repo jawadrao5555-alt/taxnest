@@ -239,7 +239,7 @@ class AdminActionPostsSmokeTest extends TestCase
 
     public function test_company_approve_activates_requested_plan_for_one_year(): void
     {
-        $planId = $this->makePlan(['product_type' => 'pos', 'price' => 12000]);
+        $planId = $this->makePlan(['name' => 'Starter', 'product_type' => 'pos', 'price' => 12000]);
         $id = $this->makeCompany(['product_type' => 'pos', 'requested_plan_id' => $planId]);
 
         $this->actingAsAdmin()
@@ -252,6 +252,69 @@ class AdminActionPostsSmokeTest extends TestCase
         $this->assertNotNull($sub, 'Approval must activate the requested plan');
         $this->assertEquals($planId, $sub->pricing_plan_id);
         $this->assertSame('annual', $sub->billing_cycle);
+    }
+
+    public function test_retired_pos_plan_cannot_be_assigned_from_either_admin_route(): void
+    {
+        $retiredId = $this->makePlan([
+            'name' => 'Pro Max',
+            'product_type' => 'pos',
+            'price' => 50000,
+        ]);
+        $companyId = $this->makeCompany([
+            'product_type' => 'pos',
+            'status' => 'approved',
+            'company_status' => 'active',
+        ]);
+
+        $this->actingAsAdmin()
+            ->from("/admin/company/{$companyId}")
+            ->post("/admin/company/{$companyId}/change-plan", [
+                'pricing_plan_id' => $retiredId,
+            ])
+            ->assertSessionHas('error');
+
+        $this->actingAsAdmin()
+            ->from('/admin/subscriptions')
+            ->post('/admin/subscriptions/assign', [
+                'company_id' => $companyId,
+                'pricing_plan_id' => $retiredId,
+                'billing_cycle' => 'annual',
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, DB::table('subscriptions')->where('company_id', $companyId)->count());
+    }
+
+    public function test_inactive_historical_pro_max_subscription_cannot_be_reactivated(): void
+    {
+        $retiredId = $this->makePlan([
+            'name' => 'Pro Max',
+            'product_type' => 'pos',
+            'price' => 50000,
+        ]);
+        $companyId = $this->makeCompany([
+            'product_type' => 'pos',
+            'status' => 'approved',
+            'company_status' => 'active',
+        ]);
+        $subscriptionId = DB::table('subscriptions')->insertGetId([
+            'company_id' => $companyId,
+            'pricing_plan_id' => $retiredId,
+            'billing_cycle' => 'annual',
+            'start_date' => '2025-01-01',
+            'end_date' => '2026-01-01',
+            'active' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAsAdmin()
+            ->from('/admin/subscriptions')
+            ->post("/admin/subscriptions/{$subscriptionId}/toggle")
+            ->assertSessionHas('error');
+
+        $this->assertFalse((bool) DB::table('subscriptions')->where('id', $subscriptionId)->value('active'));
     }
 
     public function test_company_reject_flips_both_status_columns(): void

@@ -2,7 +2,7 @@
 /**
  * POS package gate-matrix check — run BEFORE every live deploy.
  *
- * Asserts the Starter/Business/Pro/Pro Max/Unlimited plan-gate matrix
+ * Asserts the Starter/Business/Pro/Unlimited plan-gate matrix
  * (PosFeatureService::PLAN_GATES) against live code paths, plus the two
  * derived gates that ride on it:
  *   - PosAccessService::customSet()      (Team Custom Access — Business and above)
@@ -71,8 +71,8 @@ $MATRIX = [
     // Business upward; Staff Hazri is included from Pro upward. WhatsApp Bill,
     // Rider Live Tracking and Caller ID remain paid add-ons only. Active trials
     // still unlock everything by rule; admin override and internal accounts too.
-    // 22 Aug 2026 (owner): Custom Access is included in Business, Pro, Pro Max
-    // and Unlimited; it is not a paid add-on and is unavailable on Starter.
+    // 22 Aug 2026 (owner): Custom Access is included in Business, Pro and
+    // Unlimited; it is not a paid add-on and is unavailable on Starter.
     // 9 Aug 2026 strict binding: reports_enabled gates CSV/PDF exports only —
     // Starter card promises basic report PAGES (ungated) but NOT exports, so
     // Starter reports=false; excel_enabled (product import/export) = Business+.
@@ -84,7 +84,6 @@ $MATRIX = [
     'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false],
     'Business'  => [true,  true,  false, true,  true,  false, true,  true,  true,  true,  true, true, true, false, false],
     'Pro'       => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, false],
-    'Pro Max'   => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, false],
     'Unlimited' => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, false],
 ];
 // Branch ladder (owner-approved 21 Aug 2026): har package apne card wali
@@ -92,14 +91,14 @@ $MATRIX = [
 // (BranchAddonService + companies.extra_branch_slots). Unlimited ki hadd -1 se
 // 5 hui — warna branch feature live hote hi wo shop bila hisaab branches bana
 // leti. Ye qatar aur pricing formula lockstep mein rehni chahiye.
-$BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Pro' => 2, 'Pro Max' => 3, 'Unlimited' => 5];
+$BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Pro' => 3, 'Unlimited' => 5];
 
 // Derived-surface expectations per plan:
-$CUSTOM_SET_PLANS = ['Business', 'Pro', 'Pro Max', 'Unlimited']; // included Business+
-$QR_URL_PLANS     = ['Business', 'Pro', 'Pro Max', 'Unlimited'];
+$CUSTOM_SET_PLANS = ['Business', 'Pro', 'Unlimited']; // included Business+
+$QR_URL_PLANS     = ['Business', 'Pro', 'Unlimited'];
 // Restaurant module (pricing_plans.restaurant_enabled → restaurantAllowed()):
 // Business+ since 13 Aug 2026 (Kitchen mode opened up for Business).
-$RESTAURANT_PLANS = ['Business', 'Pro', 'Pro Max', 'Unlimited'];
+$RESTAURANT_PLANS = ['Business', 'Pro', 'Unlimited'];
 
 $fail = 0;
 $pass = 0;
@@ -166,7 +165,7 @@ try {
         }
     };
 
-    // ── 1. The five paid plans ─────────────────────────────────────────
+    // ── 1. The four paid plans ─────────────────────────────────────────
     foreach ($MATRIX as $planName => $expected) {
         $c = $mkCompany($planName);
         $mkSub($c, $plans[$planName]->id);
@@ -242,21 +241,22 @@ try {
     //   included branches free → hadd par ruke → khareede hue slots se aage
     //   khule → renewal ka total base + slots×10,000 bane. Admin override aur
     //   trial ke rules waise ke waise.
-    $ebPlan = $plans['Pro'];                    // 2 included branches
+    $ebPlan = $plans['Pro'];                    // 3 included branches
     $c = $mkCompany('BranchAddon');
     $mkSub($c, $ebPlan->id);
     $mkBranch = function (Company $co, string $nm) {
         Branch::create(['company_id' => $co->id, 'name' => $nm, 'is_active' => true, 'is_head_office' => false]);
     };
-    check(PlanLimitService::canAddBranch($c->id)['allowed'] === true, 'add-on: included branches must be free (0/2)');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === true, 'add-on: included branches must be free (0/3)');
     $mkBranch($c, 'B1');
     $mkBranch($c, 'B2');
-    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop at the package limit (2/2)');
+    $mkBranch($c, 'B3');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop at the package limit (3/3)');
     $c->extra_branch_slots = 1;
     $c->save();
-    check(PlanLimitService::canAddBranch($c->fresh()->id)['allowed'] === true, 'add-on: a paid slot must open the next branch (2/3)');
-    $mkBranch($c, 'B3');
-    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop again once the paid slot is used (3/3)');
+    check(PlanLimitService::canAddBranch($c->fresh()->id)['allowed'] === true, 'add-on: a paid slot must open the next branch (3/4)');
+    $mkBranch($c, 'B4');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop again once the paid slot is used (4/4)');
 
     // Pricing formula — one source of truth for every surface.
     check(BranchAddonService::priceForMonths(1, 12) === 10000.0, 'add-on: 1 slot / 12 months must be Rs 10,000');
@@ -325,9 +325,9 @@ try {
     // service, so a hand-edited plan row, a renamed column or a new
     // unnamed gate blocks the deploy instead of quietly publishing a
     // promise the gates do not keep.
-    $BILL_LADDER    = ['Starter' => 2000, 'Business' => 5000, 'Pro' => 10000, 'Pro Max' => 'Unlimited', 'Unlimited' => 'Unlimited'];
-    $TEAM_LADDER    = ['Starter' => 2, 'Business' => 5, 'Pro' => 10, 'Pro Max' => 20, 'Unlimited' => 'Unlimited'];
-    $COUNTER_LADDER = ['Starter' => 1, 'Business' => 3, 'Pro' => 'Unlimited', 'Pro Max' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+    $BILL_LADDER    = ['Starter' => 2000, 'Business' => 'Unlimited', 'Pro' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+    $TEAM_LADDER    = ['Starter' => 2, 'Business' => 5, 'Pro' => 20, 'Unlimited' => 'Unlimited'];
+    $COUNTER_LADDER = ['Starter' => 1, 'Business' => 3, 'Pro' => 'Unlimited', 'Unlimited' => 'Unlimited'];
 
     $expectedLimits = [];
     $expectedFeatures = [];
@@ -403,7 +403,7 @@ try {
     // ...and the DI column must never be tightened to a POS seat count either:
     // on a POS row max_users stays unlimited or at least as generous as the
     // advertised team-account number, so nothing can refuse a seat the table
-    // offers. (Pro / Pro Max / Unlimited are unlimited here by design.)
+    // offers. (Pro / Unlimited are unlimited here by design.)
     foreach ($comparisonPlans as $p) {
         $seats = PlanLimitService::teamAccountLimit(\App\Models\PricingPlan::find($p->id));
         $diCap = ($p->max_users === null || (int) $p->max_users < 0) ? null : (int) $p->max_users;
@@ -640,5 +640,5 @@ if ($fail) {
     fwrite(STDERR, "PLAN GATE MATRIX REGRESSION — fix before deploying.\n");
     exit(1);
 }
-echo "Package gate matrix intact (Starter/Business/Pro/Pro Max/Unlimited + trial/override/internal rules).\n";
+echo "Package gate matrix intact (Starter/Business/Pro/Unlimited + trial/override/internal rules).\n";
 exit(0);

@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Notification;
 use App\Models\PaymentProof;
 use App\Models\PricingPlan;
+use App\Services\PosPlanComparisonService;
 use App\Services\SubscriptionAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,10 @@ class AdminPaymentProofController extends Controller
         }
 
         $proofs = $query->paginate(20)->appends($request->all());
-        $plans = PricingPlan::where('is_trial', false)->orderBy('price')->get();
+        $plans = PricingPlan::where('is_trial', false)->orderBy('price')->get()
+            ->reject(fn (PricingPlan $plan) => $plan->product_type === 'pos'
+                && !PosPlanComparisonService::isSellablePlan($plan))
+            ->values();
 
         return view('saas-admin.payment-proofs', [
             'proofs' => $proofs,
@@ -76,6 +80,9 @@ class AdminPaymentProofController extends Controller
         $plan = PricingPlan::findOrFail((int) $request->pricing_plan_id);
         if ($plan->is_trial) {
             return back()->with('error', 'Trial plans cannot be assigned from payment approval.');
+        }
+        if ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan)) {
+            return back()->with('error', 'That retired POS package can no longer be assigned.');
         }
 
         // Product-line guard: the approved plan must stay on the same product

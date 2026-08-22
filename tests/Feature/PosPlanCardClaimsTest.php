@@ -63,21 +63,16 @@ class PosPlanCardClaimsTest extends TestCase
 
         // Current package policy: Riders + QR Menu are Business+, Staff Hazri
         // is Pro+, and the remaining optional features stay paid add-ons.
+        // Pro Max is retired — sellable plans are Starter, Business, Pro, Unlimited.
         return collect([
             $make(['name' => 'Starter', 'invoice_limit' => 2000, 'user_limit' => 2,
                    'branch_limit' => 1, 'max_terminals' => 1]),
-            $make(['name' => 'Business', 'invoice_limit' => 5000, 'user_limit' => 5,
+            $make(['name' => 'Business', 'invoice_limit' => -1, 'user_limit' => 5,
                    'branch_limit' => 1, 'max_terminals' => 3,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
                     'custom_access_enabled' => true, 'riders_enabled' => true, 'qr_menu_enabled' => true]),
-            $make(['name' => 'Pro', 'invoice_limit' => 10000, 'user_limit' => 10,
-                   'branch_limit' => 2, 'max_terminals' => -1,
-                   'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
-                   'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                    'custom_access_enabled' => true, 'riders_enabled' => true, 'qr_menu_enabled' => true,
-                    'hazri_enabled' => true]),
-            $make(['name' => 'Pro Max', 'invoice_limit' => -1, 'user_limit' => 20,
+            $make(['name' => 'Pro', 'invoice_limit' => -1, 'user_limit' => 20,
                    'branch_limit' => 3, 'max_terminals' => -1,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
@@ -126,12 +121,19 @@ class PosPlanCardClaimsTest extends TestCase
         $this->assertNotContains('custom_access', $pro);
         $this->assertContains('hazri', $pro);
 
-        // A cap that lifts is a real gain, spelled out in words.
+        // Pro inherits Business and gains hazri; team and branches lift (both
+        // are now higher than Business), counters was already unlimited.
+        // Business now has unlimited invoices so bills does NOT lift at Pro.
+        $this->assertNotContains('bills', $pro);
         $this->assertContains('counters', $pro);
-        $proMax = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Pro Max'], $ladder['Pro']));
-        $this->assertContains('bills', $proMax);
-        $unlimited = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Unlimited'], $ladder['Pro Max']));
+
+        // Unlimited sits above Pro; team becomes unlimited (the only cap that lifts to ∞).
+        // branches goes from 3 to 5 but stays finite so no card limit row is emitted —
+        // the table's own limit cell shows the number.
+        $unlimited = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Unlimited'], $ladder['Pro']));
         $this->assertContains('team', $unlimited);
+        $this->assertNotContains('branches', $unlimited,
+            'branches stays finite on Unlimited (5) so no limit card row is emitted.');
     }
 
     /**
@@ -185,13 +187,13 @@ class PosPlanCardClaimsTest extends TestCase
     public function test_card_stops_claiming_the_package_below_when_a_feature_is_lost(): void
     {
         $ladder = $this->ladder()->keyBy('name');
-        $this->assertTrue(PosPlanComparisonService::cardInherits($ladder['Pro Max'], $ladder['Pro']));
+        $this->assertTrue(PosPlanComparisonService::cardInherits($ladder['Unlimited'], $ladder['Pro']));
 
-        $ladder['Pro Max']->analytics_enabled = false;
-        $this->assertFalse(PosPlanComparisonService::cardInherits($ladder['Pro Max'], $ladder['Pro']));
+        $ladder['Unlimited']->analytics_enabled = false;
+        $this->assertFalse(PosPlanComparisonService::cardInherits($ladder['Unlimited'], $ladder['Pro']));
 
-        // Falls back to a standalone list of what Pro Max itself really gives.
-        $rows = PosPlanComparisonService::cardHighlights($ladder['Pro Max'], $ladder['Pro']);
+        // Falls back to a standalone list of what Unlimited itself really gives.
+        $rows = PosPlanComparisonService::cardHighlights($ladder['Unlimited'], $ladder['Pro']);
         $keys = $this->keys($rows);
         $this->assertNotContains('analytics', $keys, 'A switched-off gate may never be listed.');
         $this->assertContains('restaurant', $keys);
@@ -199,7 +201,7 @@ class PosPlanCardClaimsTest extends TestCase
         $this->assertContains('khata', $keys, 'A standalone card still lists what every package includes.');
         foreach ($rows as $row) {
             if ($row['source'] === 'feature') {
-                $this->assertTrue((bool) $ladder['Pro Max']->{$row['column']});
+                $this->assertTrue((bool) $ladder['Unlimited']->{$row['column']});
             }
         }
     }
@@ -207,17 +209,18 @@ class PosPlanCardClaimsTest extends TestCase
     public function test_card_stops_claiming_the_package_below_when_a_limit_tightens(): void
     {
         $ladder = $this->ladder()->keyBy('name');
-        $ladder['Pro']->branch_limit = 1;
+        // Pro has 3 branches, Business has 1 — Pro inherits Business cleanly.
         $this->assertTrue(PosPlanComparisonService::cardInherits($ladder['Pro'], $ladder['Business']));
 
-        // Business allows 1 branch, Pro now allows 1 too — still fine. Tighten it below.
+        // Tighten Pro branches below Business to break the ladder.
+        $ladder['Pro']->branch_limit = 1;
         $ladder['Business']->branch_limit = 3;
         $this->assertFalse(PosPlanComparisonService::cardInherits($ladder['Pro'], $ladder['Business']));
 
         // An uncapped package below that becomes capped above is also a break.
         $ladder2 = $this->ladder()->keyBy('name');
         $ladder2['Unlimited']->invoice_limit = 5000;
-        $this->assertFalse(PosPlanComparisonService::cardInherits($ladder2['Unlimited'], $ladder2['Pro Max']));
+        $this->assertFalse(PosPlanComparisonService::cardInherits($ladder2['Unlimited'], $ladder2['Pro']));
     }
 
     public function test_a_new_package_dropped_into_the_ladder_cannot_inherit_a_broken_floor(): void
@@ -294,17 +297,17 @@ class PosPlanCardClaimsTest extends TestCase
     public function test_audit_fails_when_a_higher_package_loses_a_feature(): void
     {
         $ladder = $this->ladder();
-        $ladder->firstWhere('name', 'Pro Max')->analytics_enabled = false;
+        $ladder->firstWhere('name', 'Unlimited')->analytics_enabled = false;
 
         $problems = implode("\n", PosPlanComparisonService::auditCards($ladder));
-        $this->assertStringContainsString('Pro Max', $problems);
+        $this->assertStringContainsString('Unlimited', $problems);
         $this->assertStringContainsString('analytics_enabled', $problems);
     }
 
     public function test_audit_fails_when_a_higher_package_tightens_a_limit(): void
     {
         $ladder = $this->ladder();
-        $ladder->firstWhere('name', 'Pro Max')->branch_limit = 1;
+        $ladder->firstWhere('name', 'Unlimited')->branch_limit = 1;
 
         $problems = implode("\n", PosPlanComparisonService::auditCards($ladder));
         $this->assertStringContainsString('branch_limit', $problems);

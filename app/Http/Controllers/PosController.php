@@ -23,6 +23,7 @@ use App\Models\Ingredient;
 use App\Services\AuditLogService;
 use App\Services\PraIntegrationService;
 use App\Services\PosFeatureService;
+use App\Services\PosPlanComparisonService;
 use App\Support\PosPaymentBuckets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10826,7 +10827,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Standalone edition retired (Jul 2026) — everyone sees the PRA POS plans.
-        $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
+        $plans = PosPlanComparisonService::plans();
         $currentSubscription = \App\Models\Subscription::where('company_id', $companyId)
             ->where('active', true)
             ->with('pricingPlan')

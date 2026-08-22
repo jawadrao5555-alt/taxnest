@@ -255,7 +255,7 @@ class PosExtraBranchPurchaseFlowTest extends TestCase
     private function makePlan(string $productType = 'pos', float $price = 24999, ?int $branches = 2, array $attrs = []): PricingPlan
     {
         return PricingPlan::create(array_merge([
-            'name' => strtoupper($productType) . ' Pro',
+            'name' => $productType === 'pos' ? 'Business' : strtoupper($productType) . ' Pro',
             'product_type' => $productType,
             'is_trial' => false,
             'price' => $price,

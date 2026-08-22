@@ -107,11 +107,13 @@ class AdminPlanLadderGuardTest extends TestCase
         $rows = [
             // Riders + QR Menu are Business+, Staff Hazri is Pro+, and the
             // remaining optional feature gates stay paid add-ons.
-            ['Starter',   6000,  2000,  2,  1, 1, []],
-            ['Business',  12000, 5000,  5,  1, 3, ['restaurant', 'deals', 'riders', 'qr_menu', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
-            ['Pro',       24000, 10000, 10, 2, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
-            ['Pro Max',   36000, -1,    20, 3, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
-            ['Unlimited', 60000, -1,    -1, 5, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
+            // Pro Max is retired — sellable plans are Starter, Business, Pro, Unlimited.
+            // Business invoice_limit is unlimited (-1).
+            // Pro carries former Pro Max capacity: unlimited invoices, 20 team, 3 branches.
+            ['Starter',   6000,  2000, 2,  1, 1,  []],
+            ['Business',  12000, -1,   5,  1, 3,  ['restaurant', 'deals', 'riders', 'qr_menu', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
+            ['Pro',       24000, -1,   20, 3, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
+            ['Unlimited', 60000, -1,   -1, 5, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
         ];
 
         foreach ($rows as [$name, $price, $bills, $team, $branches, $counters, $on]) {
@@ -246,9 +248,9 @@ class AdminPlanLadderGuardTest extends TestCase
 
     public function test_a_pre_existing_break_does_not_block_an_unrelated_save(): void
     {
-        // Somebody already switched khata off on Pro Max (the ladder is broken
+        // Somebody already switched khata off on Unlimited (the ladder is broken
         // before this request even starts).
-        DB::table('pricing_plans')->where('name', 'Pro Max')->update(['khata_enabled' => false]);
+        DB::table('pricing_plans')->where('name', 'Unlimited')->update(['khata_enabled' => false]);
 
         $response = $this->actingAsAdmin()->from('/admin/plans')->put(
             '/admin/plans/' . $this->planId('Starter'),
@@ -265,7 +267,7 @@ class AdminPlanLadderGuardTest extends TestCase
         $clean->assertStatus(200);
         $clean->assertDontSee('Package ladder needs attention');
 
-        DB::table('pricing_plans')->where('name', 'Pro Max')->update(['khata_enabled' => false]);
+        DB::table('pricing_plans')->where('name', 'Unlimited')->update(['khata_enabled' => false]);
 
         $broken = $this->actingAsAdmin()->get('/admin/plans');
         $broken->assertStatus(200);

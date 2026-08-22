@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use App\Services\CredentialLedgerService;
+use App\Services\PosPlanComparisonService;
 
 class PosAuthController extends Controller
 {
@@ -141,10 +142,7 @@ class PosAuthController extends Controller
         }
         // Package picker (owner rule Jul 2026): the shop chooses its plan at
         // sign-up; the admin sees it at approval and approves exactly that plan.
-        $plans = \App\Models\PricingPlan::where('product_type', 'pos')
-            ->where('is_trial', false)
-            ->orderBy('price')
-            ->get();
+        $plans = PosPlanComparisonService::plans();
 
         // Task 1483: the landing's comparison table sends the shop here with
         // ?plan=<package name>, so the column it clicked arrives already
@@ -193,10 +191,8 @@ class PosAuthController extends Controller
 
         // The selected package must be a real, non-trial POS plan — the admin
         // approves exactly this plan for 1 year (owner rule Jul 2026).
-        $selectedPlan = \App\Models\PricingPlan::where('id', $request->pricing_plan_id)
-            ->where('product_type', 'pos')
-            ->where('is_trial', false)
-            ->first();
+        $selectedPlan = PosPlanComparisonService::plans()
+            ->first(fn ($plan) => (int) $plan->id === (int) $request->pricing_plan_id);
         if (!$selectedPlan) {
             throw ValidationException::withMessages([
                 'pricing_plan_id' => 'Please select a valid NestPOS package.',

@@ -7,6 +7,7 @@ use App\Models\Subscription;
 use App\Models\Company;
 use App\Models\PricingPlan;
 use App\Models\AdminAuditLog;
+use App\Services\PosPlanComparisonService;
 use App\Services\SubscriptionAssignmentService;
 use Illuminate\Http\Request;
 
@@ -22,7 +23,10 @@ class AdminSubscriptionController extends Controller
 
         $subscriptions = $query->paginate(20)->appends($request->all());
         $companies = Company::orderBy('name')->get();
-        $plans = PricingPlan::orderBy('price')->get();
+        $plans = PricingPlan::orderBy('price')->get()
+            ->reject(fn (PricingPlan $plan) => $plan->product_type === 'pos' && !$plan->is_trial
+                && !PosPlanComparisonService::isSellablePlan($plan))
+            ->values();
 
         return view('saas-admin.subscriptions', compact('subscriptions', 'companies', 'plans'));
     }
@@ -36,6 +40,10 @@ class AdminSubscriptionController extends Controller
         ]);
 
         $plan = PricingPlan::findOrFail($request->pricing_plan_id);
+        if ($plan->product_type === 'pos' && !$plan->is_trial
+            && !PosPlanComparisonService::isSellablePlan($plan)) {
+            return back()->with('error', 'That retired POS package can no longer be assigned.');
+        }
 
         $sub = SubscriptionAssignmentService::assign(
             (int) $request->company_id,
@@ -53,7 +61,13 @@ class AdminSubscriptionController extends Controller
 
     public function toggle($id)
     {
-        $sub = Subscription::findOrFail($id);
+        $sub = Subscription::with('pricingPlan')->findOrFail($id);
+        $plan = $sub->pricingPlan;
+        if (!$sub->active && $plan && $plan->product_type === 'pos' && !$plan->is_trial
+            && !PosPlanComparisonService::isSellablePlan($plan)) {
+            return back()->with('error', 'That retired POS package is historical and cannot be reactivated.');
+        }
+
         $sub->update(['active' => !$sub->active]);
 
         $action = $sub->active ? 'activated' : 'deactivated';

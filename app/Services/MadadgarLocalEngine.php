@@ -276,13 +276,13 @@ class MadadgarLocalEngine
              'a' => "Tables /pos/restaurant/table-management par banti hain: \"+ Add Floor\" se floor banayen (jaise Ground Floor), phir \"+ Add Table\" se table (number jaise T1, seats 1-50). Table delete card ke × button se. Iske liye Table Management feature ON hona chahiye (/pos/features; Pro/Unlimited package ya trial)."],
 
             ['p' => [['rider']],
-             'a' => "Riders /pos/riders par bante hain — naam, phone, CNIC, vehicle number; \"Create Login\" se rider ka login banayen (rider sirf /pos/rider portal dekhta hai, team limit mein nahi ginta). Rider assign bill banne ke BAAD hota hai — sale screen ke GREEN \"Deliveries\" button (Delivery Board) ya /pos/deliveries se. Wahin se Dispatch/Delivered mark aur \"Settle Cash\" bhi hota hai. Riders feature Business, Pro, Pro Max aur Unlimited packages mein shamil hai."],
+             'a' => "Riders /pos/riders par bante hain — naam, phone, CNIC, vehicle number; \"Create Login\" se rider ka login banayen (rider sirf /pos/rider portal dekhta hai, team limit mein nahi ginta). Rider assign bill banne ke BAAD hota hai — sale screen ke GREEN \"Deliveries\" button (Delivery Board) ya /pos/deliveries se. Wahin se Dispatch/Delivered mark aur \"Settle Cash\" bhi hota hai. Riders feature Business, Pro aur Unlimited packages mein shamil hai."],
 
             ['p' => [['team']],
              'a' => "Naya team member /pos/team par add hota hai — naam, email, phone, password aur role chun kar save karein. Roles: Manager (admin jaisa) aur Cashier (sirf billing) package ki account limit mein ginte hain; Kitchen, Waiter, Rider aur Delivery Manager FREE hain (limit mein nahi ginte). Cashier ON/OFF toggle aur per-cashier PRA reporting toggle bhi isi page par hain."],
 
             ['p' => [['package'], ['upgrade']],
-             'a' => "Packages (saalana): Starter basic package hai; Business se Restaurant, Delivery Riders aur QR Menu milte hain; Pro se Staff Hazri bhi milti hai; Pro Max aur Unlimited mein ye sab shamil rehta hai aur limits barhti hain. WhatsApp Bill, Rider Live Tracking aur Caller ID alag paid add-ons hain. Tafseel aur payment /pos/billing par dekhein."],
+             'a' => "Packages (saalana): Starter basic package hai; Business se Restaurant, Delivery Riders, QR Menu aur unlimited final bills milte hain; Pro se Staff Hazri, 20 team accounts aur 3 branches bhi milti hain; Unlimited mein team accounts unlimited aur 5 branches hoti hain. WhatsApp Bill, Rider Live Tracking aur Caller ID alag paid add-ons hain. Tafseel aur payment /pos/billing par dekhein."],
 
             ['p' => [['limit', 'khatam'], ['limit', 'poori'], ['limit', 'bill'], ['limit']],
              'a' => "Sirf FINAL bills monthly quota mein ginte hain — provisional (F9) bills FREE hain jab tak promote na hon. Bills ki limit khatam ho jaye to filhal provisional bills banayen (baad mein promote karein) ya /pos/billing se package upgrade karein. Quota har mahine reset hota hai. Team accounts ki limit poori ho to bhi upgrade hi rasta hai."],
@@ -333,10 +333,10 @@ class MadadgarLocalEngine
              'a' => "Quick Type Mode (F7): \"chai 2, samosa 1\" jaisi line likhein — pura order khud cart mein aa jata hai. Default BAND hota hai — admin /pos/customize se ON kare, phir sale screen par F7 se modal khulta hai."],
 
             ['p' => [['qr', 'menu'], ['public', 'menu']],
-             'a' => "QR Menu ke liye /pos/business-profile kholein → \"Public Page Enabled\" ON + \"Menu\" visible ON → menu builder mein products tick karein → QR code customer ko dikhayen. Kya kya public dikhe (Phone, Email, Address waghera) har cheez ka apna toggle hai. \"Regenerate Link\" se naya link banta hai. Yeh feature Business, Pro, Pro Max aur Unlimited packages mein hai."],
+             'a' => "QR Menu ke liye /pos/business-profile kholein → \"Public Page Enabled\" ON + \"Menu\" visible ON → menu builder mein products tick karein → QR code customer ko dikhayen. Kya kya public dikhe (Phone, Email, Address waghera) har cheez ka apna toggle hai. \"Regenerate Link\" se naya link banta hai. Yeh feature Business, Pro aur Unlimited packages mein hai."],
 
             ['p' => [['hazri'], ['attendance']],
-             'a' => "Staff Hazri /pos/reports par \"Staff Hazri\" button se milti hai (sirf admin/manager): kaun kab login hua (First In), kab tak kaam kiya (Last Out), kitne bills banaye — business day (subah 6 → subah 6) ke hisab se, date picker se purane din bhi. Yehi hazri Day-Close Z-report mein bhi shamil hoti hai. Yeh feature Pro, Pro Max aur Unlimited packages mein hai."],
+             'a' => "Staff Hazri /pos/reports par \"Staff Hazri\" button se milti hai (sirf admin/manager): kaun kab login hua (First In), kab tak kaam kiya (Last Out), kitne bills banaye — business day (subah 6 → subah 6) ke hisab se, date picker se purane din bhi. Yehi hazri Day-Close Z-report mein bhi shamil hoti hai. Yeh feature Pro aur Unlimited packages mein hai."],
 
             // --- generic catch-alls: hamesha aakhir mein (specific pehle jeet chuke hote hain) ---
             ['p' => [['customer', 'history'], ['customer', 'purana']],

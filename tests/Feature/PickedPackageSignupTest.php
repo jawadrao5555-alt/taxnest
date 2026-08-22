@@ -54,7 +54,7 @@ class PickedPackageSignupTest extends TestCase
 
         $rows = [
             ['name' => 'Business',  'product_type' => 'pos',    'price' => 24999, 'price_quarterly' => 7199],
-            ['name' => 'Pro Max',   'product_type' => 'pos',    'price' => 49999, 'price_quarterly' => 14399],
+            ['name' => 'Pro',       'product_type' => 'pos',    'price' => 49999, 'price_quarterly' => 14399],
             ['name' => 'FBR Growth', 'product_type' => 'fbrpos', 'price' => 22549],
             ['name' => 'DI Premium', 'product_type' => 'di',     'price' => 3499],
             // A trial row must never be pickable on any surface.
@@ -83,12 +83,12 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_pra_signup_ticks_the_package_the_shop_clicked(): void
     {
-        $response = $this->get('/pos/register?plan=Pro+Max');
+        $response = $this->get('/pos/register?plan=Pro');
 
         $response->assertOk();
-        $this->assertSame($this->planId('Pro Max'), (int) $response->viewData('preselectedPlanId'));
+        $this->assertSame($this->planId('Pro'), (int) $response->viewData('preselectedPlanId'));
         // The picker's Alpine state boots on that id, so the column arrives ticked.
-        $response->assertSee("planId: '" . $this->planId('Pro Max') . "'", false);
+        $response->assertSee("planId: '" . $this->planId('Pro') . "'", false);
     }
 
     public function test_pra_signup_matches_the_package_name_case_insensitively(): void
@@ -110,7 +110,8 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_pra_signup_ignores_an_unknown_or_tampered_package(): void
     {
-        foreach (['Platinum Deluxe', '999', '<script>alert(1)</script>', 'Free Trial'] as $bogus) {
+        // Pro Max is retired — it must not preselect even though a DB row may exist.
+        foreach (['Platinum Deluxe', '999', '<script>alert(1)</script>', 'Free Trial', 'Pro Max'] as $bogus) {
             $response = $this->get('/pos/register?plan=' . urlencode($bogus));
 
             $response->assertOk();

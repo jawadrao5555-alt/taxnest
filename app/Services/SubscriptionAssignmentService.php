@@ -115,6 +115,12 @@ class SubscriptionAssignmentService
     public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly'): Subscription
     {
         $plan = PricingPlan::findOrFail($pricingPlanId);
+        if ($plan->product_type === 'pos' && !$plan->is_trial
+            && !PosPlanComparisonService::isSellablePlan($plan)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'pricing_plan_id' => 'That retired POS package can no longer be assigned.',
+            ]);
+        }
 
         // Product-type-aware pricing also normalizes/forces the correct cycle
         // (e.g. POS is annual-only), so the expiry below always matches the charge.
@@ -171,7 +177,8 @@ class SubscriptionAssignmentService
         }
 
         $plan = PricingPlan::find($planId);
-        if (!$plan || $plan->is_trial) {
+        if (!$plan || $plan->is_trial
+            || ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan))) {
             return null;
         }
 

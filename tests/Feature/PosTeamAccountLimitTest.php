@@ -279,7 +279,7 @@ class PosTeamAccountLimitTest extends TestCase
     {
         auth('pos')->setUser($this->owner());
 
-        foreach ([['Starter', 2], ['Business', 5], ['Pro', 10], ['Pro Max', 20], ['Unlimited', -1]] as [$name, $limit]) {
+        foreach ([['Starter', 2], ['Business', 5], ['Pro', 20], ['Unlimited', -1]] as [$name, $limit]) {
             Subscription::where('company_id', $this->companyId)->delete();
             User::where('company_id', $this->companyId)->whereIn('pos_role', ['pos_manager', 'pos_cashier'])->delete();
             $plan = $this->makePlan($name, $limit);

@@ -71,6 +71,12 @@ class PaymentProofController extends Controller
                 ->withInput()
                 ->with('payment_proof', 'error');
         }
+        if ($productType === 'pos' && !\App\Services\PosPlanComparisonService::isSellablePlan($plan)) {
+            return back()
+                ->withErrors(['pricing_plan_id' => 'Please select a current PRA POS package.'])
+                ->withInput()
+                ->with('payment_proof', 'error');
+        }
 
         // One pending PACKAGE proof at a time — avoid duplicate review queue
         // entries. Extra-branch requests live in their own lane (see the

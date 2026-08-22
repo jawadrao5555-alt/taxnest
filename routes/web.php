@@ -248,7 +248,7 @@ Route::get('/digital-invoice', function () {
 Route::redirect('/di', '/digital-invoice', 301);
 
 Route::get('/pos', function () {
-    $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
+    $plans = \App\Services\PosPlanComparisonService::plans();
     return view('pos.landing', ['plans' => $plans]);
 })->name('pos.landing');
 Route::get('/pos/login', [PosAuthController::class, 'showLogin'])->name('pos.login');

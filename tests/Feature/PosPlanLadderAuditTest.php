@@ -37,18 +37,22 @@ class PosPlanLadderAuditTest extends TestCase
      * The expected ladders, copied from scripts/plan-gate-check.php on purpose.
      * Written independently of the service so a renamed column or a silently
      * changed default fails here instead of shipping.
+     *
+     * Pro Max is retired — sellable plans are Starter, Business, Pro, Unlimited.
+     * Business invoice_limit is now unlimited (-1).
+     * Pro now carries former Pro Max capacity: unlimited invoices, 20 team accounts,
+     * 3 branches, unlimited counters; Pro retains its Pro+ gates (hazri etc.).
      */
-    private const BILL_LADDER    = ['Starter' => 2000, 'Business' => 5000, 'Pro' => 10000, 'Pro Max' => 'Unlimited', 'Unlimited' => 'Unlimited'];
-    private const TEAM_LADDER    = ['Starter' => 2, 'Business' => 5, 'Pro' => 10, 'Pro Max' => 20, 'Unlimited' => 'Unlimited'];
-    private const BRANCH_LADDER  = ['Starter' => 1, 'Business' => 1, 'Pro' => 2, 'Pro Max' => 3, 'Unlimited' => 5];
-    private const COUNTER_LADDER = ['Starter' => 1, 'Business' => 3, 'Pro' => 'Unlimited', 'Pro Max' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+    private const BILL_LADDER    = ['Starter' => 2000, 'Business' => 'Unlimited', 'Pro' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+    private const TEAM_LADDER    = ['Starter' => 2, 'Business' => 5, 'Pro' => 20, 'Unlimited' => 'Unlimited'];
+    private const BRANCH_LADDER  = ['Starter' => 1, 'Business' => 1, 'Pro' => 3, 'Unlimited' => 5];
+    private const COUNTER_LADDER = ['Starter' => 1, 'Business' => 3, 'Pro' => 'Unlimited', 'Unlimited' => 'Unlimited'];
 
     /** plan name => the tick/cross row keys that must be ON. Everything else is a cross. */
     private const FEATURES_ON = [
         'Starter'   => [],
         'Business'  => ['restaurant', 'deals', 'riders', 'qr_menu', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
         'Pro'       => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
-        'Pro Max'   => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
         'Unlimited' => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
     ];
 
@@ -129,11 +133,11 @@ class PosPlanLadderAuditTest extends TestCase
 
     public function test_a_column_that_contradicts_the_expected_matrix_fails(): void
     {
-        // Pro Max quietly capped at 8000 bills while the matrix says Unlimited.
-        $problems = $this->audit($this->ladder(['Pro Max' => ['invoice_limit' => 8000]]));
+        // Pro quietly capped at 8000 bills while the matrix says Unlimited.
+        $problems = $this->audit($this->ladder(['Pro' => ['invoice_limit' => 8000]]));
 
         $this->assertNotEmpty($problems, 'A capped bills column must not pass as Unlimited.');
-        $this->assertStringContainsString('Pro Max', implode("\n", $problems));
+        $this->assertStringContainsString('Pro', implode("\n", $problems));
         $this->assertStringContainsString('bills', implode("\n", $problems));
     }
 
@@ -156,7 +160,7 @@ class PosPlanLadderAuditTest extends TestCase
 
     public function test_a_feature_lost_going_up_the_ladder_fails(): void
     {
-        $problems = $this->audit($this->ladder(['Pro Max' => ['reports_enabled' => false]]));
+        $problems = $this->audit($this->ladder(['Unlimited' => ['reports_enabled' => false]]));
 
         $this->assertNotEmpty($problems, 'A costlier package may never lose a tick.');
         $this->assertStringContainsString('reports', implode("\n", $problems));

@@ -242,15 +242,14 @@ Sale screen ki mazeed cheezein:
 - Custom Access OFF (default) = role ka aam rawaiya, bilkul pehle jaisa. Kisi member par set na karein to kuch nahi badalta.
 - Cashier ko aam tor par band cheez (misal Customize ya Team) tick karne se woh us page tak pahunch jata hai; Manager ki koi cheez untick karne se woh us se chhin jati hai.
 - Kitchen, Waiter, Rider, Delivery Manager par Custom Access LAGOO NAHI hota — yeh roles apne mehdood ilaqe mein hi rehte hain (custom grant se admin pages nahi milte; zaroorat ho to role badlein). Company admin (owner) kabhi mehdood nahi ho sakta.
-- Custom Access sirf Unlimited package mein hai (ya active trial). Package mein na ho to /pos/team par lock-card dikhta hai; pehle se saved sets ghair-moassar (inert) ho jate hain — member aam role ki tarah chalta hai, koi lock out nahi hota.
+- Custom Access Business, Pro aur Unlimited packages mein hai (ya active trial). Package mein na ho to /pos/team par lock-card dikhta hai; pehle se saved sets ghair-moassar (inert) ho jate hain — member aam role ki tarah chalta hai, koi lock out nahi hota.
 
 ## Packages aur Billing (/pos/billing)
-- Starter Rs 9,999/saal: 1 team account, 500 final bills/mahina.
-- Business Rs 14,999/saal: 5 accounts, 2,000 bills/mahina.
-- Pro Rs 24,999/saal: 10 accounts, 3,000 bills/mahina, 2 branches, Restaurant module + analytics.
-- Pro Max Rs 34,999/saal: 15 accounts, 5,000 bills/mahina, 3 branches — Pro + Delivery Riders & khata, Staff Hazri, public QR Menu.
-- Unlimited Rs 39,999/saal: sab unlimited + Team Custom Access + Priority Support.
-- Billing sirf saalana hai (6% discount pehle se shamil). Plans ki tafseel /pos/billing par.
+- Starter: 2 team accounts aur 2,000 final bills/mahina.
+- Business: 5 team accounts, 1 branch aur unlimited final bills; Restaurant, Delivery Riders, QR Menu aur Custom Access shamil.
+- Pro: 20 team accounts, 3 branches aur unlimited final bills; Business ke sab features + Staff Hazri.
+- Unlimited: unlimited team accounts, 5 branches, unlimited final bills aur Priority Support.
+- Packages ki current saalana aur 3-mahina prices /pos/billing par dekhein.
 - Payment ka tareeqa: plan chunein → di gayi bank details (Bank, Title, IBAN) par raqam bhejein → payment proof form bharein: Package, Amount Paid (PKR), Reference/TID, aur proof upload (JPG/PNG/PDF) → admin verify kar ke package activate karta hai. Jaldi ho to "Send on WhatsApp" button se proof WhatsApp par bhi bhej sakte hain.
 - Sirf FINAL bills quota mein ginte hain — provisional FREE hain jab tak promote na hon; offline retry dobara nahi ginta. Quota har mahine reset hota hai.
 
@@ -426,9 +425,8 @@ Sale screen ki mazeed cheezein:
 
 ## Subscription packages — kis package mein kya hai (2 Aug 2026)
 - Starter: bunyadi billing — PRA receipts, barcode, thermal print, customers/khata, inventory, basic reports + day close. Delivery Riders, public QR Menu aur Staff Hazri ismein NAHI.
-- Business: Starter + poora Restaurant module, offline billing/desktop app, Deals & combos, analytics, advanced reports/exports, Team Custom Access, Delivery Riders aur public QR Menu.
-- Pro: Business ke sab features + Staff Hazri report, 10 team accounts, 2 branches aur 10,000 final bills/mahina.
-- Pro Max: Pro ke sab features + 20 team accounts, 3 branches aur unlimited final bills.
-- Unlimited: Pro Max ke sab features + unlimited team accounts, 5 branches, unlimited billing aur Priority Support.
+- Business: Starter + poora Restaurant module, offline billing/desktop app, Deals & combos, analytics, advanced reports/exports, Team Custom Access, Delivery Riders, public QR Menu, 5 team accounts aur unlimited final bills.
+- Pro: Business ke sab features + Staff Hazri report, 20 team accounts, 3 branches aur unlimited final bills.
+- Unlimited: Pro ke sab features + unlimited team accounts, 5 branches, unlimited billing aur Priority Support.
 - Sirf teen optional paid add-ons hain: WhatsApp Bill, Rider Live Tracking aur Caller ID. Delivery Riders, QR Menu aur Staff Hazri add-ons nahi rahe.
 - Trial ke dauran SAB features milte hain. Agar koi feature package mein na ho to us ka page Billing par le jata hai — upgrade kar ke khul jata hai.

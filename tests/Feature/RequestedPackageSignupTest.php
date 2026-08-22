@@ -170,7 +170,8 @@ class RequestedPackageSignupTest extends TestCase
         PricingPlan::create(['name' => 'FBR Trial', 'product_type' => 'fbrpos', 'price' => 0, 'is_trial' => true]);
 
         // PRA POS: price is ALREADY the annual total.
-        PricingPlan::create(['name' => 'POS Basic', 'product_type' => 'pos', 'price' => 30000, 'is_trial' => false]);
+        PricingPlan::create(['name' => 'Starter', 'product_type' => 'pos', 'price' => 30000, 'is_trial' => false]);
+        PricingPlan::create(['name' => 'Pro Max', 'product_type' => 'pos', 'price' => 50000, 'is_trial' => false]);
         PricingPlan::create(['name' => 'POS Trial', 'product_type' => 'pos', 'price' => 0, 'is_trial' => true]);
     }
 
@@ -234,7 +235,7 @@ class RequestedPackageSignupTest extends TestCase
             'password' => 'secret-pass-123',
             'password_confirmation' => 'secret-pass-123',
             'pos_type' => 'retail',
-            'pricing_plan_id' => $this->plan('POS Basic', 'pos')->id,
+            'pricing_plan_id' => $this->plan('Starter', 'pos')->id,
             'requested_addons' => $addons,
             'requested_addon_cycle' => $cycle,
         ];
@@ -295,8 +296,8 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_a_package_belonging_to_another_product_is_ignored(): void
     {
-        // 'POS Basic' is a real paid package — just not an FBR POS one.
-        $fbr = $this->fbrSignup('Cross Product Mart', 'cross@example.com', 'POS Basic');
+        // 'Starter' is a real paid package — just not an FBR POS one.
+        $fbr = $this->fbrSignup('Cross Product Mart', 'cross@example.com', 'Starter');
         $this->assertNull($fbr->requested_plan_id, 'An FBR shop must never be recorded against a PRA POS package');
 
         $di = $this->diSignup('Cross Product Traders', 'cross2@example.com', 'Pro', 'annual');
@@ -341,7 +342,7 @@ class RequestedPackageSignupTest extends TestCase
 
         // A trial / wrong-product name in the link is not echoed back either.
         $this->get('/register?plan=DI+Trial')->assertOk()->assertDontSee('name="requested_plan"', false);
-        $this->get('/fbr-pos/register?plan=POS+Basic')->assertOk()->assertDontSee('name="requested_plan"', false);
+        $this->get('/fbr-pos/register?plan=Starter')->assertOk()->assertDontSee('name="requested_plan"', false);
     }
 
     public function test_pos_signup_page_carries_only_allow_listed_addons_into_the_form(): void
@@ -452,7 +453,7 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_pra_pos_approval_is_unchanged(): void
     {
-        $plan = $this->plan('POS Basic', 'pos');
+        $plan = $this->plan('Starter', 'pos');
         $company = $this->pendingCompany('pos', $plan, 'monthly');
 
         $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
@@ -460,6 +461,20 @@ class RequestedPackageSignupTest extends TestCase
         $this->assertSame('annual', $sub->billing_cycle, 'PRA POS approval must still be a full year');
         $this->assertSame(30000.0, (float) $sub->final_price);
         $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date));
+    }
+
+    public function test_retired_pos_plan_cannot_be_requested_or_assigned_through_a_service_bypass(): void
+    {
+        $retired = $this->plan('Pro Max', 'pos');
+
+        $this->assertNull(RequestedPackageService::resolvePlan('Pro Max', 'pos'));
+
+        $company = $this->pendingCompany('pos', $retired, 'annual');
+        $this->assertNull(SubscriptionAssignmentService::assignRequestedPlanOnApproval($company));
+        $this->assertSame(0, Subscription::where('company_id', $company->id)->count());
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        SubscriptionAssignmentService::assign($company->id, $retired->id, 'annual');
     }
 
     public function test_approval_activates_nothing_without_a_requested_package(): void

@@ -572,4 +572,30 @@ class PaymentProofInstantAccessTest extends TestCase
         $this->assertSame('pending', $proof->status, 'Cross-product-line approval must be refused');
         $this->assertNull($proof->subscription_id);
     }
+
+    public function test_approve_rejects_retired_pro_max_even_when_the_proof_already_points_to_it(): void
+    {
+        $company = $this->makeLockedCompany(['product_type' => 'pos']);
+        $retired = \App\Models\PricingPlan::create([
+            'name' => 'Pro Max',
+            'product_type' => 'pos',
+            'price' => 49999,
+            'is_trial' => false,
+        ]);
+        $proof = $this->makeProof($company, [
+            'pricing_plan_id' => $retired->id,
+            'billing_cycle' => 'annual',
+        ]);
+
+        $this->actingAs($this->makeAdmin(), 'admin')
+            ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
+                'pricing_plan_id' => $retired->id,
+                'billing_cycle' => 'annual',
+            ])
+            ->assertSessionHas('error');
+
+        $proof->refresh();
+        $this->assertSame('pending', $proof->status);
+        $this->assertNull($proof->subscription_id);
+    }
 }

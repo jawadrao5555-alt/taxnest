@@ -392,11 +392,17 @@ class AdminController extends Controller
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
         ]);
 
+        $plan = PricingPlan::findOrFail((int) $request->pricing_plan_id);
+        if ($plan->product_type === 'pos' && !$plan->is_trial
+            && !\App\Services\PosPlanComparisonService::isSellablePlan($plan)) {
+            return back()->with('error', 'That retired POS package can no longer be assigned.');
+        }
+
         Subscription::where('company_id', $company->id)->where('active', true)->update(['active' => false]);
 
         Subscription::create([
             'company_id' => $company->id,
-            'pricing_plan_id' => $request->pricing_plan_id,
+            'pricing_plan_id' => $plan->id,
             'start_date' => now(),
             'end_date' => now()->addMonth(),
             'active' => true,

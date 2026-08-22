@@ -117,6 +117,13 @@ class PosPlanComparisonService
     public const POPULAR_PLAN = 'Business';
 
     /**
+     * Strict current-selling allowlist. Retired/legacy POS rows stay in
+     * pricing_plans for history but cannot become sellable merely because a
+     * new row name appears in the database.
+     */
+    public const SELLABLE_PLAN_NAMES = ['Starter', 'Business', 'Pro', 'Unlimited'];
+
+    /**
      * The POS surfaces that render package cards (Task 1384). auditCards()
      * scans them for hand-written claims, so a card can never grow its own
      * copy again.
@@ -152,8 +159,18 @@ class PosPlanComparisonService
     {
         return PricingPlan::where('is_trial', false)
             ->where('product_type', 'pos')
+            ->whereIn('name', self::SELLABLE_PLAN_NAMES)
             ->orderBy('price')
             ->get();
+    }
+
+    /** Whether a row may be sold or assigned as a current PRA POS package. */
+    public static function isSellablePlan(?PricingPlan $plan): bool
+    {
+        return $plan !== null
+            && !$plan->is_trial
+            && $plan->product_type === 'pos'
+            && in_array($plan->name, self::SELLABLE_PLAN_NAMES, true);
     }
 
     /** null / any negative value means "no cap" everywhere in the codebase. */

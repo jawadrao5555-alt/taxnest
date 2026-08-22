@@ -101,7 +101,7 @@ class MadadgarLocalEngineTest extends TestCase
 
         $this->assertIsString($knowledge);
         $this->assertStringContainsString('Business: Starter + poora Restaurant module', $knowledge);
-        $this->assertStringContainsString('Delivery Riders aur public QR Menu', $knowledge);
+        $this->assertStringContainsString('Delivery Riders, public QR Menu', $knowledge);
         $this->assertStringContainsString('Pro: Business ke sab features + Staff Hazri', $knowledge);
         $this->assertStringContainsString('Sirf teen optional paid add-ons hain: WhatsApp Bill, Rider Live Tracking aur Caller ID', $knowledge);
         $this->assertStringNotContainsString('Riders, Hazri aur public QR Menu ismein NAHI', $knowledge);

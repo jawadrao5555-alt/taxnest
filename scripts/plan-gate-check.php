@@ -68,11 +68,15 @@ $EXPECTED_GATE_ORDER = [
 ];
 $MATRIX = [
     // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id, whatsapp]
+    // 22 Aug 2026 (owner): the six optional features — riders, hazri, rider
+    // tracking, qr_menu, caller_id, whatsapp — are PAID ADD-ONS only
+    // (pos_addons lane, PosAddonService). NO package includes them: their
+    // plan columns are OFF on every row and entitlement comes exclusively
+    // from an active pos_addons row (asserted in section 6c below). Active
+    // trials still unlock everything by rule; admin override and internal
+    // accounts too.
     // 22 Aug 2026 (owner): Custom Access is included in Business, Pro, Pro Max
     // and Unlimited; it is not a paid add-on and is unavailable on Starter.
-    // 17 Aug 2026 (owner): Caller ID (Android app + sale-screen popup) = Unlimited ONLY.
-    // 17 Aug 2026 (owner): WhatsApp Bill (receipt share + auto-open) = Pro and above.
-    // 9 Aug 2026 (owner): rider LIVE tracking moved back UP — Unlimited ONLY.
     // 9 Aug 2026 strict binding: reports_enabled gates CSV/PDF exports only —
     // Starter card promises basic report PAGES (ungated) but NOT exports, so
     // Starter reports=false; excel_enabled (product import/export) = Business+.
@@ -83,9 +87,9 @@ $MATRIX = [
     // (restaurant_enabled — asserted separately below) + Analytics.
     'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false],
     'Business'  => [true,  false, false, true,  true,  false, true,  false, true,  true,  true, true, true, false, false],
-    'Pro'       => [true,  true,  false, true,  true,  false, true,  true,  true,  true,  true, true, true, false, true],
-    'Pro Max'   => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, true],
-    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true, true,  true],
+    'Pro'       => [true,  false, false, true,  true,  false, true,  false, true,  true,  true, true, true, false, false],
+    'Pro Max'   => [true,  false, false, true,  true,  false, true,  false, true,  true,  true, true, true, false, false],
+    'Unlimited' => [true,  false, false, true,  true,  false, true,  false, true,  true,  true, true, true, false, false],
 ];
 // Branch ladder (owner-approved 21 Aug 2026): har package apne card wali
 // branches MUFT deta hai; us se ooper har branch Rs 10,000 SAALANA paid add-on
@@ -96,7 +100,7 @@ $BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Pro' => 2, 'Pro Max' => 3, '
 
 // Derived-surface expectations per plan:
 $CUSTOM_SET_PLANS = ['Business', 'Pro', 'Pro Max', 'Unlimited']; // included Business+
-$QR_URL_PLANS     = ['Pro', 'Pro Max', 'Unlimited']; // publicUrlFor() non-null only here
+$QR_URL_PLANS     = []; // 22 Aug 2026: QR Menu is add-on-only — no plan grants the public URL
 // Restaurant module (pricing_plans.restaurant_enabled → restaurantAllowed()):
 // Business+ since 13 Aug 2026 (Kitchen mode opened up for Business).
 $RESTAURANT_PLANS = ['Business', 'Pro', 'Pro Max', 'Unlimited'];
@@ -286,6 +290,40 @@ try {
         'add-on: admin branch override must disable the purchase path');
     check(PlanLimitService::canAddBranch($co->id)['allowed'] === true,
         'add-on: admin branch override must still win over plan+slots');
+
+    // ── 6c. Paid FEATURE add-ons (22 Aug 2026): no package includes the six
+    //   optional features — the ONLY way to a gate is an active pos_addons
+    //   row, it must die with its expiry, and every catalogue column must be
+    //   OFF on every plan row (audit() rule 3b re-checks the same thing).
+    foreach (array_keys(\App\Services\PosAddonPricingService::ADDONS) as $adCode) {
+        check(\App\Services\PosAddonPricingService::price($adCode, 'annual') > 0,
+            "feature add-on: {$adCode} must carry a non-zero annual price");
+        check(\App\Services\PosAddonPricingService::price($adCode, 'quarterly') > 0,
+            "feature add-on: {$adCode} must carry a non-zero quarterly price");
+    }
+    $c = $mkCompany('FeatureAddon');
+    $mkSub($c, $plans['Business']->id);
+    \App\Services\PosAddonService::flushCache();
+    PosFeatureService::flushGateCaches();
+    check(PosFeatureService::planAllows($c, 'riders_enabled') === false,
+        'feature add-on: Business alone must not grant riders');
+    DB::table('pos_addons')->insert([
+        'company_id' => $c->id, 'addon_code' => 'delivery_riders', 'active' => 1,
+        'billing_cycle' => 'annual', 'amount' => 12000,
+        'starts_at' => now()->subDay()->toDateString(), 'ends_at' => now()->addYear()->toDateString(),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    \App\Services\PosAddonService::flushCache();
+    PosFeatureService::flushGateCaches();
+    check(PosFeatureService::planAllows($c, 'riders_enabled') === true,
+        'feature add-on: an active pos_addons row must open the gate');
+    check(PosFeatureService::planAllows($c, 'caller_id_enabled') === false,
+        'feature add-on: one add-on must not open a different gate');
+    DB::table('pos_addons')->where('company_id', $c->id)->update(['ends_at' => now()->subDay()->toDateString()]);
+    \App\Services\PosAddonService::flushCache();
+    PosFeatureService::flushGateCaches();
+    check(PosFeatureService::planAllows($c, 'riders_enabled') === false,
+        'feature add-on: an expired pos_addons row must close the gate again');
 
     // ── 6b. Package comparison table (Task 1350) ───────────────────────
     // The landing + billing comparison table is GENERATED from the plan

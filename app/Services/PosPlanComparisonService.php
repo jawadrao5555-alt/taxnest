@@ -57,13 +57,7 @@ class PosPlanComparisonService
         'reports'        => ['column' => 'reports_enabled',        'hint' => true],
         'excel'          => ['column' => 'excel_enabled',          'hint' => true],
         'offline'        => ['column' => 'offline_enabled',        'hint' => true],
-        'riders'         => ['column' => 'riders_enabled',         'hint' => true],
-        'qr_menu'        => ['column' => 'qr_menu_enabled',        'hint' => true],
-        'whatsapp'       => ['column' => 'whatsapp_enabled',       'hint' => false],
-        'hazri'          => ['column' => 'hazri_enabled',          'hint' => true],
-        'rider_tracking' => ['column' => 'rider_tracking_enabled', 'hint' => true],
         'custom_access'  => ['column' => 'custom_access_enabled',  'hint' => true],
-        'caller_id'      => ['column' => 'caller_id_enabled',      'hint' => true],
     ];
 
     /**
@@ -98,6 +92,27 @@ class PosPlanComparisonService
      */
     public const COVERED_BY = [
         'kot_enabled' => 'restaurant',
+    ];
+
+    /**
+     * Gate columns sold as PAID ADD-ONS (22 Aug 2026, owner): no POS package
+     * includes them, so they have no tick/cross row — their customer-facing
+     * name lives in the add-on catalogue (PosAddonPricingService::ADDONS,
+     * pos.addon_label_* / pos.addon_desc_* lang lines) shown in the billing
+     * purchase box and the <x-pos-addon-strip> under the comparison table.
+     *
+     * Map: pricing_plans gate column => add-on code. auditNames() verifies
+     * the code exists in the catalogue and reads in all three languages;
+     * audit() fails the deploy if any POS plan row still has one of these
+     * columns ON (a package would silently include a paid add-on).
+     */
+    public const ADDON_COLUMNS = [
+        'riders_enabled'         => 'delivery_riders',
+        'qr_menu_enabled'        => 'qr_menu',
+        'whatsapp_enabled'       => 'whatsapp_bill',
+        'hazri_enabled'          => 'staff_attendance',
+        'rider_tracking_enabled' => 'rider_tracking',
+        'caller_id_enabled'      => 'caller_id',
     ];
 
     /** Business is the flagged column on both the cards and the table. */
@@ -615,8 +630,26 @@ class PosPlanComparisonService
             if (in_array($column, $named, true) || isset(self::COVERED_BY[$column])) {
                 continue;
             }
+            // Add-on-sold gates: the customer-facing name is the add-on
+            // catalogue entry, so demand THAT name in all three languages
+            // instead of a pcmp_* row.
+            if (isset(self::ADDON_COLUMNS[$column])) {
+                $code = self::ADDON_COLUMNS[$column];
+                if (!isset(PosAddonPricingService::ADDONS[$code])) {
+                    $problems[] = "ADDON_COLUMNS maps '{$column}' to unknown add-on '{$code}' — "
+                        . 'it must exist in PosAddonPricingService::ADDONS.';
+                }
+                foreach (['en', 'rur', 'ur'] as $locale) {
+                    foreach (['addon_label_' . $code, 'addon_desc_' . $code] as $key) {
+                        if (self::langLineMissing('pos.' . $key, $locale)) {
+                            $problems[] = "Missing lang key pos.{$key} in [{$locale}] — every paid add-on needs a name in all three languages.";
+                        }
+                    }
+                }
+                continue;
+            }
             $problems[] = "Gate column '{$column}' has no customer-facing row in PosPlanComparisonService "
-                . '(add it to FEATURE_ROWS / INCLUDED_ROWS, or declare it in COVERED_BY).';
+                . '(add it to FEATURE_ROWS / INCLUDED_ROWS, declare it in COVERED_BY, or sell it via ADDON_COLUMNS).';
         }
         foreach (self::COVERED_BY as $column => $rowKey) {
             if (!isset(self::FEATURE_ROWS[$rowKey]) && !isset(self::INCLUDED_ROWS[$rowKey])) {
@@ -699,6 +732,19 @@ class PosPlanComparisonService
                 }
                 if (isset($spec['unlimited']) && !self::isUnlimited($plan->{$spec['unlimited']})) {
                     $problems[] = "'{$key}' is listed as unlimited in every package but {$plan->name} caps {$spec['unlimited']} at {$plan->{$spec['unlimited']}}.";
+                }
+            }
+        }
+
+        // 3b. Add-on-sold features may never ride a package: the table has no
+        //     row for them, so a plan column left ON would grant a paid add-on
+        //     silently — the shop pays for a package that includes something
+        //     no surface admits to.
+        foreach (self::ADDON_COLUMNS as $column => $code) {
+            foreach ($plans as $plan) {
+                if (!empty($plan->{$column})) {
+                    $problems[] = "'{$code}' is sold as a paid add-on but {$plan->name} has {$column} ON — "
+                        . 'switch it off on the plan row (add-ons never ride a package) or move it back into FEATURE_ROWS.';
                 }
             }
         }

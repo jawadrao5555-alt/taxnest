@@ -147,7 +147,7 @@
                 "name": "What do the NestPOS plans include?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month. Pro adds delivery riders with rider khata and a public QR menu, with 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts, 3 branches and unlimited bills. Unlimited is fully unrestricted — Rider Live Tracking on a map, unlimited team accounts, unlimited branches, unlimited billing, every feature unlocked, with priority support."
+                    "text": "Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month, plus Team Custom Access. Pro adds 10 team accounts, 2 branches and 10,000 bills per month. Pro Max lifts you to 20 team accounts, 3 branches and unlimited bills. Unlimited gives unlimited team accounts, 5 branches, unlimited billing and priority support. Six optional paid add-ons are available to Business and above: Delivery Riders, QR Menu, WhatsApp Bill, Staff Attendance, Rider Live Tracking and Caller ID."
                 }
             },
             {
@@ -341,13 +341,13 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">4</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Restaurant ready</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Kitchen order tickets (KOT), dine-in table board, kitchen display screen, waiter tablets and a scan-to-order QR menu — with cancel protection that records exactly which items were already made, so kitchen waste never hides.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Kitchen order tickets (KOT), dine-in table board, kitchen display screen, waiter tablets and a scan-to-order QR menu (optional add-on) — with cancel protection that records exactly which items were already made, so kitchen waste never hides.</p>
                 </div>
 
                 <!-- Feature 5 -->
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">5</div>
-                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Delivery riders <span class="align-middle ml-2 inline-block px-2 py-0.5 bg-[#0F6171]/10 text-[#0A4D5C] font-mono text-[10px] font-bold uppercase tracking-widest">Pro +</span></h3>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Delivery riders <span class="align-middle ml-2 inline-block px-2 py-0.5 bg-[#0F6171]/10 text-[#0A4D5C] font-mono text-[10px] font-bold uppercase tracking-widest">Add-on</span></h3>
                     <p class="text-gray-600 text-lg leading-relaxed relative z-10">Assign every delivery to a rider, track the cash each rider owes, settle bills the moment they return — and a live pending-bills tile on the dashboard so nothing is forgotten at closing time.</p>
                 </div>
 
@@ -355,7 +355,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">6</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">The manager's cockpit</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Business plan and above), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri, optional add-on), cancelled-orders and waste reports, analytics dashboards with PDF export, per-member Custom Access permissions (Business plan and above), and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
                 </div>
 
                 <!-- Feature 7 -->
@@ -383,7 +383,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">10</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Mobile apps</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">A lightweight Android app (~600&nbsp;KB) puts the full POS in every team member's pocket — owner, manager, waiter or cashier. Riders get their own app, and on the Unlimited plan you watch them move on a live map.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">A lightweight Android app (~600&nbsp;KB) puts the full POS in every team member's pocket — owner, manager, waiter or cashier. Riders get their own app, and with the Rider Live Tracking add-on you watch them move on a live map.</p>
                 </div>
 
                 <!-- Feature 11 -->
@@ -397,7 +397,7 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">12</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Counter essentials</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Order tokens printed on receipt and KOT so orders never get mixed up, customer khata and loyalty points, product Excel import/export for bulk catalogs (Business plan onwards), caller-ID customer lookup on the Unlimited plan, tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Order tokens printed on receipt and KOT so orders never get mixed up, customer khata and loyalty points, product Excel import/export for bulk catalogs (Business plan onwards), an optional caller-ID customer lookup add-on, tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
                 </div>
             </div>
         </div>
@@ -432,6 +432,11 @@
                  PosPlanComparisonService from the same pricing_plans columns the
                  gates read, so a price on screen and a gate can never disagree. --}}
             <x-pos-plan-comparison :plans="$plans ?? null" surface="landing" />
+
+            {{-- The six optional features are paid add-ons (22 Aug 2026) — no
+                 package includes them, so they live in their own strip with
+                 their own prices instead of rows in the table above. --}}
+            <x-pos-addon-strip />
 
             <div class="mt-16 text-center">
                 <a href="/pos/register" class="btn-solid bg-[#052730] text-white hover:bg-[#0A4D5C] px-8 py-4 text-base">
@@ -475,7 +480,7 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month, plus Team Custom Access. Pro adds 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts and 3 branches. Unlimited adds Rider Live Tracking on a map, unlimited team accounts and unlimited billing. Six optional paid add-ons are available to Business and above: Delivery Riders, QR Menu, WhatsApp Bill, Staff Attendance, Rider Live Tracking and Caller ID. Need more branches than your package includes? Extra branches are Rs 10,000 per branch per year on any package.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 2 team accounts with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month, plus Team Custom Access. Pro adds 10 team accounts, 2 branches and 10,000 bills per month. Pro Max lifts you to 20 team accounts, 3 branches and unlimited bills. Unlimited gives unlimited team accounts, 5 branches, unlimited billing and priority support. Six optional paid add-ons are available to Business and above: Delivery Riders, QR Menu, WhatsApp Bill, Staff Attendance, Rider Live Tracking and Caller ID. Need more branches than your package includes? Extra branches are Rs 10,000 per branch per year on any package.</div>
                 </div>
                 <div class="border-b border-gray-200">
                     <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left">

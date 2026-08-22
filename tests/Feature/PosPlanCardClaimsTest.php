@@ -61,31 +61,33 @@ class PosPlanCardClaimsTest extends TestCase
             return $plan;
         };
 
+        // 22 Aug 2026: riders / qr_menu / whatsapp / hazri / rider_tracking /
+        // caller_id are PAID ADD-ONS — no plan row carries them (their columns
+        // stay false on every package), so the ladder differs by limits and by
+        // custom_access (Business+) only.
         return collect([
             $make(['name' => 'Starter', 'invoice_limit' => 2000, 'user_limit' => 2,
                    'branch_limit' => 1, 'max_terminals' => 1]),
             $make(['name' => 'Business', 'invoice_limit' => 5000, 'user_limit' => 5,
                    'branch_limit' => 1, 'max_terminals' => 3,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
-                   'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true]),
+                   'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
+                   'custom_access_enabled' => true]),
             $make(['name' => 'Pro', 'invoice_limit' => 10000, 'user_limit' => 10,
                    'branch_limit' => 2, 'max_terminals' => -1,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                   'riders_enabled' => true, 'qr_menu_enabled' => true, 'whatsapp_enabled' => true]),
+                   'custom_access_enabled' => true]),
             $make(['name' => 'Pro Max', 'invoice_limit' => -1, 'user_limit' => 20,
                    'branch_limit' => 3, 'max_terminals' => -1,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                   'riders_enabled' => true, 'qr_menu_enabled' => true, 'whatsapp_enabled' => true,
-                   'hazri_enabled' => true]),
+                   'custom_access_enabled' => true]),
             $make(['name' => 'Unlimited', 'invoice_limit' => -1, 'user_limit' => -1,
                    'branch_limit' => 5, 'max_terminals' => -1,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                   'riders_enabled' => true, 'qr_menu_enabled' => true, 'whatsapp_enabled' => true,
-                   'hazri_enabled' => true, 'rider_tracking_enabled' => true,
-                   'custom_access_enabled' => true, 'caller_id_enabled' => true]),
+                   'custom_access_enabled' => true]),
         ]);
     }
 
@@ -111,16 +113,16 @@ class PosPlanCardClaimsTest extends TestCase
         $business = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Business'], $ladder['Starter']));
         $this->assertContains('restaurant', $business);
         $this->assertContains('analytics', $business);
-        // Pro-only features must NOT appear on the Business card.
+        $this->assertContains('custom_access', $business);
+        // Add-on-sold features must NOT appear on any card.
         $this->assertNotContains('riders', $business);
         $this->assertNotContains('caller_id', $business);
 
         $pro = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Pro'], $ladder['Business']));
-        $this->assertContains('riders', $pro);
-        $this->assertContains('qr_menu', $pro);
         // Already granted one step below — never repeated as a new gain.
         $this->assertNotContains('analytics', $pro);
         $this->assertNotContains('restaurant', $pro);
+        $this->assertNotContains('custom_access', $pro);
 
         // A cap that lifts is a real gain, spelled out in words.
         $this->assertContains('counters', $pro);
@@ -128,16 +130,41 @@ class PosPlanCardClaimsTest extends TestCase
         $this->assertContains('bills', $proMax);
         $unlimited = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Unlimited'], $ladder['Pro Max']));
         $this->assertContains('team', $unlimited);
-        $this->assertContains('caller_id', $unlimited);
+    }
+
+    /**
+     * 22 Aug 2026: the six optional features are paid add-ons. FEATURE_ROWS
+     * no longer knows them, so NO card on the whole ladder may ever emit one
+     * of their keys — a card claiming "Delivery Riders included" would
+     * contradict the add-on catalogue sold right under it.
+     */
+    public function test_addon_sold_features_never_appear_on_any_card(): void
+    {
+        $ladder = $this->ladder()->values();
+        $addonKeys = ['riders', 'qr_menu', 'whatsapp', 'hazri', 'rider_tracking', 'caller_id'];
+
+        foreach ($ladder as $index => $plan) {
+            $prev = $index > 0 ? $ladder[$index - 1] : null;
+            $keys = $this->keys(PosPlanComparisonService::cardHighlights($plan, $prev));
+            foreach ($addonKeys as $key) {
+                $this->assertNotContains($key, $keys, "{$plan->name} card may not claim add-on-sold '{$key}'.");
+            }
+        }
+
+        // And the row maps themselves must not quietly re-adopt an add-on column.
+        foreach (PosPlanComparisonService::ADDON_COLUMNS as $column => $code) {
+            $this->assertArrayNotHasKey($column, array_flip(array_column(PosPlanComparisonService::FEATURE_ROWS, 'column')),
+                "Gate column {$column} is sold as add-on '{$code}' and may not also be a FEATURE_ROWS row.");
+        }
     }
 
     public function test_a_bullet_disappears_when_the_plan_column_is_off(): void
     {
         $ladder = $this->ladder()->keyBy('name');
-        $ladder['Pro']->riders_enabled = false;
+        $ladder['Business']->deals_enabled = false;
 
-        $pro = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Pro'], $ladder['Business']));
-        $this->assertNotContains('riders', $pro, 'A card may never advertise a gate the plan row has switched off.');
+        $business = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Business'], $ladder['Starter']));
+        $this->assertNotContains('deals', $business, 'A card may never advertise a gate the plan row has switched off.');
     }
 
     public function test_an_included_bullet_disappears_when_its_column_is_off(): void
@@ -168,7 +195,7 @@ class PosPlanCardClaimsTest extends TestCase
         $keys = $this->keys($rows);
         $this->assertNotContains('analytics', $keys, 'A switched-off gate may never be listed.');
         $this->assertContains('restaurant', $keys);
-        $this->assertContains('hazri', $keys);
+        $this->assertContains('custom_access', $keys);
         $this->assertContains('khata', $keys, 'A standalone card still lists what every package includes.');
         foreach ($rows as $row) {
             if ($row['source'] === 'feature') {

@@ -3473,6 +3473,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'places_map_hint' => 'Saved jaghein pehle se nazar aati hain. Rider ki pichhle 30 din ki asal delivery points dekhne ke liye Confirmed arrivals on karein.',
     'places_saved_layer' => 'Saved customer jaghein',
     'places_arrivals_layer' => 'Confirmed arrivals (30 din)',
+    'places_learned_approach' => 'Confirmed delivery se seekha hua private rasta',
     'places_empty' => 'Abhi koi delivery jagah saved nahi. Rider delivery confirm karega to jagah yahan aa jayegi, ya upar se add karein.',
     'place_add_title' => 'Delivery jagah add karein',
     'place_customer_phone' => 'Customer phone',

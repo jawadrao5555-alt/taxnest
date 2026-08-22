@@ -22,7 +22,7 @@
          the delivery maps no longer use raster tiles (English label rule). --}}
     <script src="{{ asset('vendor/maplibre/maplibre-gl-csp.js') }}?v=1"></script>
     <script src="{{ asset('vendor/maplibre/leaflet-maplibre-gl.js') }}?v=1"></script>
-    <script src="{{ asset('vendor/maps/nestpos-basemaps.js') }}?v=1"></script>
+    <script src="{{ asset('vendor/maps/nestpos-basemaps.js') }}?v=2"></script>
     <style>
         .rt-map { height: calc(100vh - 170px); min-height: 420px; border-radius: 1rem; z-index: 0; }
         .rt-dot { width: 10px; height: 10px; border-radius: 9999px; display: inline-block; }
@@ -115,6 +115,7 @@
             'layer_satellite' => __('pos.rt_layer_satellite'),
             'layer_known_places' => __('pos.places_saved_layer'),
             'layer_arrivals' => __('pos.places_arrivals_layer'),
+            'learned_approach' => __('pos.places_learned_approach'),
             'open_in_gmaps' => __('pos.rt_open_in_gmaps'),
             'gap_offline_at' => __('pos.rt_gap_offline_sync_at'),
             'late_legend' => __('pos.rt_late_legend'),
@@ -291,6 +292,11 @@
                         </span>
                     </template>
                 </p>
+                <p class="mt-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+                   x-show="approachCount > 0" x-cloak>
+                    <span style="display:inline-block;width:22px;border-top:2px dashed #d97706;vertical-align:middle;margin-right:4px"></span>
+                    <span x-text="i18n.learned_approach"></span>
+                </p>
             </div>
         </div>
     </div>
@@ -309,6 +315,7 @@
             markers: {},
             placeLayer: null,
             arrivalLayer: null,
+            approachCount: 0,
             warnBadges: {},   // Task #1102: rider-id → warning pill marker
             polyline: null,
             gapLayers: [],
@@ -434,6 +441,18 @@
                         if (!j || !j.ok) return;
                         this.placeLayer.clearLayers();
                         this.arrivalLayer.clearLayers();
+                        this.approachCount = 0;
+                        (j.approaches || []).forEach(a => {
+                            const points = (a.points || [])
+                                .map(p => [Number(p[0]), Number(p[1])])
+                                .filter(p => isFinite(p[0]) && isFinite(p[1]));
+                            if (points.length < 2) return;
+                            NestPosBasemaps.deliveryTrail(points, {
+                                learned: true,
+                                color: '#d97706',
+                            }).addTo(this.placeLayer);
+                            this.approachCount++;
+                        });
                         (j.places || []).forEach(p => {
                             if (!isFinite(p.lat) || !isFinite(p.lng)) return;
                             const emoji = p.type === 'home' ? '🏠' : (p.type === 'business' ? '🏢' : '📍');
@@ -706,9 +725,10 @@
                                 const isOffline = s.gapAfter.is_offline_after;
                                 const gapColor = isOffline ? '#6366f1' : '#f59e0b';
 
-                                const dash = L.polyline([fromPt, toPt], {
-                                    color: gapColor, weight: 2.5,
-                                    dashArray: '7 11', opacity: 0.85
+                                const dash = NestPosBasemaps.deliveryTrail([fromPt, toPt], {
+                                    late: isOffline,
+                                    dashed: true,
+                                    color: gapColor,
                                 }).addTo(this.map);
                                 this.gapLayers.push(dash);
 
@@ -776,11 +796,12 @@
                         // Task #1357: jo hissa baad mein (offline buffer se) aaya
                         // woh dashed indigo — offline gap pill wale rang mein, taake
                         // owner ko saaf dikhe ke yeh live nahi tha.
-                        const style = runLate
-                            ? { color: '#6366f1', weight: 4, opacity: 0.9, dashArray: '6 8' }
-                            : { color: runColor || '#4f46e5', weight: 4, opacity: 0.8 };
-                        const line = L.polyline(run.map(p => [p[0], p[1]]), style).addTo(this.map);
-                        this.attachTrailPopup(line, run.slice());
+                        const popupPts = run.slice();
+                        const line = NestPosBasemaps.deliveryTrail(run.map(p => [p[0], p[1]]), {
+                            late: runLate,
+                            color: runColor || '#009b8a',
+                            onClick: (e) => this.showTrailPopup(e, popupPts),
+                        }).addTo(this.map);
                         this.gapLayers.push(line);
                     }
                 };
@@ -801,21 +822,19 @@
             // Task #1357: trail par kahin bhi click → qareeb tareen point, uska
             // waqt, live tha ya baad mein sync hua, aur "Google Maps mein kholen"
             // (gali ka naam wahin se milta hai).
-            attachTrailPopup(layer, pts) {
-                layer.on('click', (e) => {
-                    let best = pts[0], bestD = Infinity;
-                    const here = [e.latlng.lat, e.latlng.lng];
-                    pts.forEach(p => {
-                        const d = this.distM(here, p);
-                        if (d < bestD) { bestD = d; best = p; }
-                    });
-                    if (!best) return;
-                    const html = '<b>' + this.esc(best[2] || '') + '</b>'
-                        + (this.isLate(best) ? '<br><span style="color:#4f46e5;font-weight:600">'
-                            + this.esc(this.i18n.late_point.replace(':time', best[5] || '')) + '</span>' : '')
-                        + '<br>' + this.gmapsLink(best[0], best[1]);
-                    L.popup().setLatLng([best[0], best[1]]).setContent(html).openOn(this.map);
+            showTrailPopup(e, pts) {
+                let best = pts[0], bestD = Infinity;
+                const here = [e.latlng.lat, e.latlng.lng];
+                pts.forEach(p => {
+                    const d = this.distM(here, p);
+                    if (d < bestD) { bestD = d; best = p; }
                 });
+                if (!best) return;
+                const html = '<b>' + this.esc(best[2] || '') + '</b>'
+                    + (this.isLate(best) ? '<br><span style="color:#4f46e5;font-weight:600">'
+                        + this.esc(this.i18n.late_point.replace(':time', best[5] || '')) + '</span>' : '')
+                    + '<br>' + this.gmapsLink(best[0], best[1]);
+                L.popup().setLatLng([best[0], best[1]]).setContent(html).openOn(this.map);
             },
             // Cluster consecutive points within ~45 m; ≥3 min inside = a stop dot.
             markStops(pts) {

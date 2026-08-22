@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PosCustomer;
 use App\Models\PosCustomerPlace;
 use App\Models\PosDeliveryCompletion;
+use App\Models\PosRider;
 use App\Models\PosTransaction;
 use App\Services\PosFeatureService;
 use Illuminate\Http\Request;
@@ -82,7 +83,10 @@ class PosCustomerPlaceController extends Controller
         $companyId = $this->companyId();
 
         $places = PosCustomerPlace::where('company_id', $companyId)
-            ->orderByDesc('last_used_at')->limit(1000)
+            // Map context, not the management archive: cap recent pins so an
+            // established shop does not create 1,000 Leaflet DOM markers at
+            // startup. The management page still exposes the full collection.
+            ->orderByDesc('last_used_at')->limit(300)
             ->get(['id', 'place_type', 'label', 'address', 'lat', 'lng', 'is_verified', 'usage_count', 'last_used_at'])
             ->map(fn ($p) => [
                 'id' => (int) $p->id,
@@ -96,13 +100,14 @@ class PosCustomerPlaceController extends Controller
                 'last_used_at' => $p->last_used_at?->toIso8601String(),
             ])->values();
 
-        $arrivals = PosDeliveryCompletion::where('company_id', $companyId)
+        $completionRows = PosDeliveryCompletion::where('company_id', $companyId)
             ->whereNotNull('completed_lat')
             ->where('captured_at', '>=', now()->subDays(30))
             ->with('rider:id,name')
             ->orderByDesc('captured_at')->limit(500)
-            ->get()
-            ->map(fn ($c) => [
+            ->get();
+
+        $arrivals = $completionRows->map(fn ($c) => [
                 'id' => (int) $c->id,
                 'place_id' => $c->customer_place_id ? (int) $c->customer_place_id : null,
                 'type' => $c->place_type,
@@ -115,7 +120,80 @@ class PosCustomerPlaceController extends Controller
                 'verified' => (bool) $c->proximity_verified,
             ])->values();
 
-        return response()->json(['ok' => true, 'places' => $places, 'arrivals' => $arrivals])
+        // Private learned approaches: reconstruct the final recorded stretch
+        // before the newest confirmed arrival at each place. This uses the
+        // company's own rider fixes only; it adds no third-party road data and
+        // never enters the public tracking payload.
+        $approaches = collect();
+        if (Schema::hasTable('pos_rider_locations')) {
+            $seenPlaces = [];
+            $attempts = 0;
+            foreach ($completionRows as $completion) {
+                $placeId = (int) ($completion->customer_place_id ?? 0);
+                if (!$placeId || isset($seenPlaces[$placeId])
+                    || !$completion->proximity_verified || !$completion->captured_at) {
+                    continue;
+                }
+                if (++$attempts > 60 || $approaches->count() >= 24) break;
+
+                $fixes = DB::table('pos_rider_locations')
+                    ->where('company_id', $companyId)
+                    ->where('rider_id', $completion->rider_id)
+                    ->whereBetween('recorded_at', [
+                        $completion->captured_at->copy()->subMinutes(12),
+                        $completion->captured_at->copy()->addMinute(),
+                    ])
+                    ->orderBy('recorded_at')
+                    ->limit(300)
+                    ->get(['lat', 'lng'])
+                    ->filter(function ($point) use ($completion) {
+                        return PosRider::haversineKm(
+                            (float) $point->lat,
+                            (float) $point->lng,
+                            (float) $completion->completed_lat,
+                            (float) $completion->completed_lng
+                        ) <= 2.0;
+                    })
+                    ->map(fn ($point) => [(float) $point->lat, (float) $point->lng])
+                    ->values();
+
+                if ($fixes->count() < 2) continue;
+                $stride = max(1, (int) ceil($fixes->count() / 40));
+                $points = $fixes->filter(fn ($point, $index) => $index % $stride === 0)->values();
+                $lastFix = $fixes->last();
+                if ($points->last() !== $lastFix) $points->push($lastFix);
+
+                // The completion point is trusted evidence, but only connect it
+                // when the final rider fix was already close. Never invent a
+                // long straight "lane" across missing GPS.
+                $finalDistanceKm = PosRider::haversineKm(
+                    (float) $lastFix[0],
+                    (float) $lastFix[1],
+                    (float) $completion->completed_lat,
+                    (float) $completion->completed_lng
+                );
+                if ($finalDistanceKm > 0.003 && $finalDistanceKm <= 0.25) {
+                    $points->push([
+                        (float) $completion->completed_lat,
+                        (float) $completion->completed_lng,
+                    ]);
+                }
+
+                $approaches->push([
+                    'place_id' => $placeId,
+                    'captured_at' => $completion->captured_at->toIso8601String(),
+                    'points' => $points,
+                ]);
+                $seenPlaces[$placeId] = true;
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'places' => $places,
+            'arrivals' => $arrivals,
+            'approaches' => $approaches,
+        ])
             ->header('Cache-Control', 'private, no-store');
     }
 

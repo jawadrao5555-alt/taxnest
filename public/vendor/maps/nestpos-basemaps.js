@@ -35,7 +35,10 @@
     var BASE = self && self.src
         ? self.src.replace(/[?#].*$/, '').replace(/[^/]*$/, '')
         : '/vendor/maps/';
-    var STYLE_URL = BASE + 'nestpos-en.json?v=1';
+    // Increment this cache version whenever the generated delivery style or this
+    // renderer changes. Vector tiles themselves remain upstream-hosted, so OSM /
+    // OpenFreeMap edits keep arriving normally without us baking tile data.
+    var STYLE_URL = BASE + 'nestpos-en.json?v=2';
 
     // MapLibre's CSP build refuses to start until it is told where its worker
     // lives (a real same-origin file, not a blob: URL the CSP would block).
@@ -248,9 +251,57 @@
         return group;
     }
 
+    /*
+     * Draw a delivery line with a broad neutral underlay and a narrow coloured
+     * centre. The underlay is the important bit: it preserves contrast on both
+     * pale Streets and dark / busy Satellite imagery, while its transparency
+     * leaves MapLibre road labels readable. Callers receive a LayerGroup so
+     * their existing cleanup logic continues to work unchanged.
+     *
+     * `late` is intentionally a separate visual vocabulary from `live`: a
+     * dashed purple centre says "recorded on the phone, synced later"; it never
+     * looks like the teal line that arrived in real time.
+     */
+    function deliveryTrail(points, opts) {
+        opts = opts || {};
+        var late = !!opts.late;
+        var learned = !!opts.learned;
+        var dashed = late || learned || !!opts.dashed;
+        var opacity = typeof opts.opacity === 'number' ? opts.opacity : 1;
+        var group = L.layerGroup();
+        var outer = L.polyline(points, {
+            color: late ? '#312e81' : (learned ? '#422006' : '#083344'),
+            weight: learned ? 5 : (late ? 7 : 8),
+            opacity: (learned ? 0.24 : (late ? 0.36 : 0.30)) * opacity,
+            dashArray: learned ? '4 8' : (dashed ? '9 9' : null),
+            lineCap: 'round',
+            lineJoin: 'round'
+        });
+        var inner = L.polyline(points, {
+            color: late ? '#7c3aed' : (opts.color || (learned ? '#d97706' : '#009b8a')),
+            weight: learned ? 2.5 : (late ? 3.5 : 4),
+            opacity: (learned ? 0.88 : (late ? 0.96 : 0.94)) * opacity,
+            dashArray: learned ? '3 9' : (dashed ? '7 11' : null),
+            lineCap: 'round',
+            lineJoin: 'round'
+        });
+        group.addLayer(outer);
+        group.addLayer(inner);
+        // Trail clicks belong to the visible centre line. Leaflet events do not
+        // bubble across sibling layers, so proxy them to the group API callers
+        // already use for a single legacy polyline.
+        if (typeof opts.onClick === 'function') {
+            inner.on('click', opts.onClick);
+            outer.on('click', opts.onClick);
+        }
+        return group;
+    }
+
     window.NestPosBasemaps = {
         isVector: vectorOk,
         streets: streets,
-        satellite: satellite
+        satellite: satellite,
+        deliveryTrail: deliveryTrail,
+        styleVersion: 2
     };
 })(window, document);

@@ -20,7 +20,7 @@
          the delivery maps no longer use raster tiles (English label rule). --}}
     <script src="{{ asset('vendor/maplibre/maplibre-gl-csp.js') }}?v=1"></script>
     <script src="{{ asset('vendor/maplibre/leaflet-maplibre-gl.js') }}?v=1"></script>
-    <script src="{{ asset('vendor/maps/nestpos-basemaps.js') }}?v=1"></script>
+    <script src="{{ asset('vendor/maps/nestpos-basemaps.js') }}?v=2"></script>
     @endif
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -235,10 +235,17 @@
                 riderMarker.setOpacity(riderIsStale ? 0.48 : 1);
                 if (d.customer) {
                     var pts = [[d.rider.lat, d.rider.lng], [d.customer.lat, d.customer.lng]];
-                    if (!line) line = L.polyline(pts, { color: '#0A4D5C', weight: 3, dashArray: '6 8', opacity: riderIsStale ? .35 : .7 }).addTo(map);
+                    if (!line) line = NestPosBasemaps.deliveryTrail(pts, {
+                        late: riderIsStale, dashed: true, opacity: riderIsStale ? .65 : 1, color: '#0A4D5C'
+                    }).addTo(map);
                     else {
-                        line.setLatLngs(pts);
-                        line.setStyle({ opacity: riderIsStale ? .35 : .7 });
+                        // This is an advisory distance guide, not a recorded
+                        // route, so it stays dashed. Recreate it to switch fresh
+                        // teal to delayed purple (stale must not imply motion).
+                        map.removeLayer(line);
+                        line = NestPosBasemaps.deliveryTrail(pts, {
+                            late: riderIsStale, dashed: true, opacity: riderIsStale ? .65 : 1, color: '#0A4D5C'
+                        }).addTo(map);
                     }
                     if (firstFit) { map.fitBounds(pts, { padding: [40, 40] }); firstFit = false; }
                 } else if (firstFit) {
@@ -250,7 +257,10 @@
                 lastSeen.style.display = 'none';
                 lastSeen.textContent = '';
                 if (riderMarker) riderMarker.setOpacity(1);
-                if (line) line.setStyle({ opacity: .7 });
+                if (line) {
+                    map.removeLayer(line);
+                    line = null;
+                }
                 if (firstFit) {
                     if (d.customer) map.setView([d.customer.lat, d.customer.lng], 15);
                     else map.setView([30.3753, 69.3451], 5);

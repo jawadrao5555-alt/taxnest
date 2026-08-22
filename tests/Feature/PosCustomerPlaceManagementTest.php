@@ -90,6 +90,7 @@ class PosCustomerPlaceManagementTest extends TestCase
         $ownRider = PosRider::create(['company_id' => $shop->id, 'name' => 'Own Rider', 'is_active' => true]);
         $otherRider = PosRider::create(['company_id' => $other->id, 'name' => 'Other Rider', 'is_active' => true]);
 
+        $ownCapturedAt = now()->subHour();
         PosDeliveryCompletion::create([
             'company_id' => $shop->id,
             'transaction_id' => 101,
@@ -98,10 +99,11 @@ class PosCustomerPlaceManagementTest extends TestCase
             'place_type' => 'home',
             'completed_lat' => 31.52041,
             'completed_lng' => 74.35871,
-            'captured_at' => now()->subHour(),
+            'captured_at' => $ownCapturedAt,
             'proximity_verified' => true,
             'evidence_source' => 'gps',
         ]);
+        $otherCapturedAt = now()->subHour();
         PosDeliveryCompletion::create([
             'company_id' => $other->id,
             'transaction_id' => 202,
@@ -110,9 +112,43 @@ class PosCustomerPlaceManagementTest extends TestCase
             'place_type' => 'business',
             'completed_lat' => 33.0,
             'completed_lng' => 73.0,
-            'captured_at' => now()->subHour(),
+            'captured_at' => $otherCapturedAt,
             'proximity_verified' => true,
             'evidence_source' => 'gps',
+        ]);
+        DB::table('pos_rider_locations')->insert([
+            [
+                'company_id' => $shop->id,
+                'rider_id' => $ownRider->id,
+                'lat' => 31.5198,
+                'lng' => 74.3581,
+                'recorded_at' => $ownCapturedAt->copy()->subMinutes(2),
+                'created_at' => $ownCapturedAt->copy()->subMinutes(2),
+            ],
+            [
+                'company_id' => $shop->id,
+                'rider_id' => $ownRider->id,
+                'lat' => 31.5203,
+                'lng' => 74.3586,
+                'recorded_at' => $ownCapturedAt->copy()->subMinute(),
+                'created_at' => $ownCapturedAt->copy()->subMinute(),
+            ],
+            [
+                'company_id' => $other->id,
+                'rider_id' => $otherRider->id,
+                'lat' => 33.0005,
+                'lng' => 73.0005,
+                'recorded_at' => $otherCapturedAt->copy()->subMinutes(2),
+                'created_at' => $otherCapturedAt->copy()->subMinutes(2),
+            ],
+            [
+                'company_id' => $other->id,
+                'rider_id' => $otherRider->id,
+                'lat' => 33.0002,
+                'lng' => 73.0002,
+                'recorded_at' => $otherCapturedAt->copy()->subMinute(),
+                'created_at' => $otherCapturedAt->copy()->subMinute(),
+            ],
         ]);
 
         $response = $this->actingAs($owner, 'pos')
@@ -122,12 +158,15 @@ class PosCustomerPlaceManagementTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private')
             ->assertJsonCount(1, 'places')
             ->assertJsonCount(1, 'arrivals')
+            ->assertJsonCount(1, 'approaches')
             ->assertJsonPath('places.0.id', $ownPlace->id)
-            ->assertJsonPath('arrivals.0.rider', 'Own Rider');
+            ->assertJsonPath('arrivals.0.rider', 'Own Rider')
+            ->assertJsonPath('approaches.0.place_id', $ownPlace->id);
         $body = $response->getContent();
         $this->assertStringNotContainsString('03001111111', $body);
         $this->assertStringNotContainsString('03002222222', $body);
         $this->assertStringNotContainsString('Other Rider', $body);
+        $this->assertStringNotContainsString('33.0005', $body);
         $this->assertStringNotContainsString((string) $otherPlace->id . ',"type":"business"', $body);
     }
 

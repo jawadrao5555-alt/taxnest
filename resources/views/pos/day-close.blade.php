@@ -858,7 +858,7 @@
                                     </td>
                                     <td class="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($wb->total_amount) }}</td>
                                     <td class="px-3 py-2">
-                                        <select name="bill_actions[{{ $wb->id }}]" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs focus:ring-purple-500 focus:border-purple-500 py-1">
+                                        <select name="bill_actions[{{ $wb->id }}]" data-dc-bill-action data-kind="{{ $wb->kind }}" data-amount="{{ (float) $wb->total_amount }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs focus:ring-purple-500 focus:border-purple-500 py-1">
                                             <option value="standing" selected>{{ __('pos.dc_bill_action_default') }}</option>
                                             @if($wb->kind === 'provisional' && !$wb->is_draft)
                                             <option value="finalize">{{ __('pos.wash_override_finalize') }}</option>
@@ -927,13 +927,125 @@
                 {{ __('pos.close_day_generate_z') }}
             </button>
             @else
-            <button type="submit" onclick="return confirm({{ Js::from(__('pos.confirm_close_day')) }})"
+            {{-- Pending local/provisional confirmation (mandatory): when local
+                 bills are still un-finalized, the close button opens an EXPLICIT
+                 confirmation showing the exact count, total amount and the
+                 effective action(s) — the standing policy plus any all-box
+                 (wash_override) or per-bill override the admin picked above.
+                 The server (closeDayReport → performDayClose) remains the sole
+                 authority: it recomputes and validates the wash regardless. --}}
+            @php $dcPendingLocalTotal = ($localWash->prov_count ?? 0) + ($localWash->final_count ?? 0); @endphp
+            <button type="submit"
+                @if($dcPendingLocalTotal > 0)
+                data-dc-pending-confirm
+                data-standing-prov="{{ $lbProv }}"
+                data-standing-final="{{ $lbFinal }}"
+                data-label-finalize="{{ __('pos.dc_confirm_action_finalize') }}"
+                data-label-save="{{ __('pos.dc_confirm_action_save') }}"
+                data-label-delete="{{ __('pos.dc_confirm_action_delete') }}"
+                data-label-carry="{{ __('pos.dc_confirm_action_carry') }}"
+                data-label-heading="{{ __('pos.dc_confirm_pending_heading') }}"
+                data-label-bills-word="{{ __('pos.bills_word') }}"
+                data-label-total="{{ __('pos.dc_confirm_pending_total') }}"
+                data-label-actions="{{ __('pos.dc_confirm_pending_actions') }}"
+                data-label-proceed="{{ __('pos.dc_confirm_pending_proceed') }}"
+                data-fallback-count="{{ $dcPendingLocalTotal }}"
+                data-fallback-amount="{{ (float) (($localWash->prov_amount ?? 0) + ($localWash->final_amount ?? 0)) }}"
+                data-fallback-prov-count="{{ (int) ($localWash->prov_count ?? 0) }}"
+                data-fallback-prov-amount="{{ (float) ($localWash->prov_amount ?? 0) }}"
+                data-fallback-final-count="{{ (int) ($localWash->final_count ?? 0) }}"
+                data-fallback-final-amount="{{ (float) ($localWash->final_amount ?? 0) }}"
+                onclick="return dcConfirmPendingLocal(this)"
+                @else
+                onclick="return confirm({{ Js::from(__('pos.confirm_close_day')) }})"
+                @endif
                 class="px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 {{ __('pos.close_day_generate_z') }}
             </button>
             @endif
         </form>
+        @if(($localWash->prov_count ?? 0) + ($localWash->final_count ?? 0) > 0)
+        {{-- Effective-action confirmation builder. Reads the LIVE form state:
+             the all-box (wash_override) covers bills left on "default"; a per-row
+             pick beats it for exactly that bill; anything else follows the
+             standing company policy. Number formatting matches PKR grouping.
+             This is a pre-submit courtesy — the server recomputes/validates. --}}
+        <script>
+        function dcConfirmPendingLocal(btn) {
+            // Day-close/report money is two-decimal precision. Never round the
+            // confirmation to whole rupees: PKR 100.50 must not be shown as 101.
+            var fmt = function (n) {
+                return 'PKR ' + Number(n).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            };
+            var standingProv = btn.getAttribute('data-standing-prov') || 'save';
+            var standingFinal = btn.getAttribute('data-standing-final') || 'save';
+            var labels = {
+                finalize: btn.getAttribute('data-label-finalize'),
+                save: btn.getAttribute('data-label-save'),
+                delete: btn.getAttribute('data-label-delete'),
+                carry: btn.getAttribute('data-label-carry')
+            };
+            var form = btn.closest('form');
+            var allBox = form ? form.querySelector('select[name="wash_override"]') : null;
+            var override = (allBox && allBox.value && allBox.value !== 'standing') ? allBox.value : null;
+            var rows = form ? form.querySelectorAll('select[data-dc-bill-action]') : [];
+            // Aggregate {count, amount} per EFFECTIVE action.
+            var agg = {}, totalCount = 0, totalAmount = 0;
+            var add = function (action, count, amount) {
+                if (!count) { return; }
+                if (!agg[action]) { agg[action] = { count: 0, amount: 0 }; }
+                agg[action].count += count; agg[action].amount += amount;
+                totalCount += count; totalAmount += amount;
+            };
+            if (rows && rows.length) {
+                rows.forEach(function (sel) {
+                    var kind = sel.getAttribute('data-kind');
+                    var amount = parseFloat(sel.getAttribute('data-amount')) || 0;
+                    var pick = sel.value;
+                    var action;
+                    if (pick && pick !== 'standing') {
+                        action = pick; // per-bill override wins
+                    } else if (override) {
+                        // Reporting-OFF finals cannot be finalized — they follow
+                        // the all-box only for save/delete (mirrors the server).
+                        action = (kind === 'final_local' && override === 'finalize') ? standingFinal : override;
+                    } else {
+                        action = (kind === 'provisional') ? standingProv : standingFinal;
+                    }
+                    add(action, 1, amount);
+                });
+            } else {
+                // No per-bill table (cashier view): use the exact provisional
+                // and final aggregates separately because their standing actions
+                // can differ. Do not pre-fill totals before add() (that would
+                // double the amount/count in the confirmation).
+                var provCount = parseInt(btn.getAttribute('data-fallback-prov-count'), 10) || 0;
+                var provAmount = parseFloat(btn.getAttribute('data-fallback-prov-amount')) || 0;
+                var finalCount = parseInt(btn.getAttribute('data-fallback-final-count'), 10) || 0;
+                var finalAmount = parseFloat(btn.getAttribute('data-fallback-final-amount')) || 0;
+                add(override || standingProv, provCount, provAmount);
+                add((override && override !== 'finalize') ? override : standingFinal, finalCount, finalAmount);
+            }
+            var lines = [];
+            lines.push(btn.getAttribute('data-label-heading'));
+            lines.push('');
+            lines.push(totalCount + ' ' + btn.getAttribute('data-label-bills-word') + ' — ' + btn.getAttribute('data-label-total') + ' ' + fmt(totalAmount));
+            lines.push('');
+            lines.push(btn.getAttribute('data-label-actions'));
+            Object.keys(agg).forEach(function (action) {
+                var lbl = labels[action] || action;
+                lines.push('  • ' + lbl + ': ' + agg[action].count + ' ' + btn.getAttribute('data-label-bills-word') + ' (' + fmt(agg[action].amount) + ')');
+            });
+            lines.push('');
+            lines.push(btn.getAttribute('data-label-proceed'));
+            return confirm(lines.join('\n'));
+        }
+        </script>
+        @endif
     </div>
     @endif
 

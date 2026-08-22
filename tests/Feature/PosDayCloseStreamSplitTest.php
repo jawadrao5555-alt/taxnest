@@ -495,10 +495,11 @@ class PosDayCloseStreamSplitTest extends TestCase
         // PRA/exempt streams recompute exactly (never washed).
         $this->assertSame(1872.0, (float) $split['pra']['sales']);
         $this->assertSame(400.0, (float) $split['exempt']['sales']);
-        // KNOWN LIMITATION (the very reason Task 660 freezes stream_summary):
-        // the wash archived the reporting-OFF final, and the recompute set is
-        // hide_archived-scoped — a pre-660 report undercounts the Local box.
-        // The page must still render (no 500), just with the reduced figure.
-        $this->assertSame(0.0, (float) $split['local']['sales'], 'washed local final invisible to live recompute');
+        // HISTORICAL VIEW FIX: the closed-day page now rebuilds the transaction
+        // set WITHOUT the hide_archived scope (mirrors the PDF), so a wash-
+        // archived reporting-OFF local final is recovered even on a pre-660
+        // report that has no frozen stream_summary. The Local box no longer
+        // silently undercounts to 0 just because the row was archived.
+        $this->assertSame(300.0, (float) $split['local']['sales'], 'historical view recovers the wash-archived local final');
     }
 }

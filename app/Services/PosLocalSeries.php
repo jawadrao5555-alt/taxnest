@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\PosTransaction;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * PRA POS local bill series "L-NNN" — the ONE place the numbering rule lives
@@ -12,19 +14,14 @@ use App\Models\PosTransaction;
  * naturally past 999). Distinct from the "POS-{year}-NNNNN" fiscal serials so
  * cashiers can spot non-PRA bills at a glance in lists / receipts / PDFs.
  *
- * Owner rule (22 Jul 2026) — SMALLEST FREE NUMBER, not max+1: a new local bill
- * takes the lowest L-number not held by ANY existing row. Two effects the owner
- * asked for: (a) when day-close DELETES local bills, the series restarts from
- * L-001 the next day; (b) when bills are kept, a mid-series deletion frees its
- * number and the next new bill fills that gap, then the series continues
- * upward. Existing bills are NEVER renumbered — only NEW bills take free
- * numbers.
+ * Owner rule (22 Aug 2026) — MONOTONIC, never smallest-free: once a company has
+ * reached L-832, every later local bill is L-833 or higher even if older local
+ * rows are archived, promoted to fiscal, or permanently cleared. Existing bills
+ * are NEVER renumbered.
  *
- * Which rows hold a number:
- *   - the company's own rows only, INCLUDING day-close ARCHIVED ones
- *     (withoutGlobalScope('hide_archived')) — they stay in the table and in the
- *     UNIQUE(company_id, invoice_number) index, so their numbers are NOT free;
- *     re-issuing one 500s the next sale on insert.
+ * The durable high-water mark lives in pos_local_series_counters. Existing rows
+ * (including archived ones) are also inspected as a safety floor so imported or
+ * legacy data can only move the sequence forward, never backward.
  *   - legacy "LOCAL-YYYY-NNNNN" bills are NOT part of this series (the coarse
  *     `like 'L-%'` prefilter would otherwise match them and corrupt the
  *     counter), and neither is any other stray "L-…" text: ONLY an exact
@@ -37,11 +34,9 @@ use App\Models\PosTransaction;
  *   - the restaurant pay path     (RestaurantPosController::generateLocalInvoiceNumber)
  *   - the read-only preview shown on the Customize POS → Local Billing card and
  *     its clear-confirmation modal (PosController::previewNextLocalNumber)
- * They differ in ONE thing only, and that difference is deliberate: the sale
- * paths issueNext() (FOR UPDATE row lock inside their own transaction,
- * serialising concurrent cashiers — UNIQUE(company_id, invoice_number) is the
- * final guard), while the preview previewNext() takes no lock because nothing
- * is being issued.
+ * Sale paths call issueNext() inside their transaction. It locks the company's
+ * row before advancing the counter, serialising concurrent cashiers even when
+ * the counter has not yet been initialized. Preview never advances the counter.
  */
 class PosLocalSeries
 {
@@ -52,24 +47,54 @@ class PosLocalSeries
     public const PAD = 3;
 
     /**
-     * Issue the next number for a bill being created — SMALLEST FREE, with the
-     * candidate rows locked FOR UPDATE. Call INSIDE the sale transaction.
+     * Issue and reserve the next monotonic number. Call INSIDE the sale
+     * transaction so a failed bill rolls the counter advance back with it.
      */
     public static function issueNext(int $companyId): string
     {
-        return self::resolveNext($companyId, true, []);
+        $last = self::lockAndSyncHighWater($companyId);
+
+        $next = $last + 1;
+        if (Schema::hasTable('pos_local_series_counters')) {
+            DB::table('pos_local_series_counters')
+                ->where('company_id', $companyId)
+                ->update(['last_number' => $next, 'updated_at' => now()]);
+        }
+
+        return self::format($next);
     }
 
     /**
-     * Read-only preview of the next number — same rule, no lock (nothing is
-     * being issued). $excludeIds lets the UI answer "and what will it be AFTER
-     * the archived bills are cleared?".
+     * Persist every currently visible L-reference before a destructive cleanup.
+     * This protects imported/pre-migration rows even if they are deleted before
+     * the first new sale has a chance to advance the counter.
+     */
+    public static function preserveHighWaterMark(int $companyId): void
+    {
+        self::lockAndSyncHighWater($companyId);
+    }
+
+    /**
+     * Read-only preview of the next number. $excludeIds remains in the signature
+     * for compatibility with the Customize screen, but deletion can no longer
+     * lower the sequence so exclusions intentionally do not affect the result.
      *
      * @param  array<int,int>  $excludeIds
      */
     public static function previewNext(int $companyId, array $excludeIds = []): string
     {
-        return self::resolveNext($companyId, false, $excludeIds);
+        $last = self::highestRecordedNumber($companyId);
+
+        if (Schema::hasTable('pos_local_series_counters')) {
+            $last = max(
+                $last,
+                (int) (DB::table('pos_local_series_counters')
+                    ->where('company_id', $companyId)
+                    ->value('last_number') ?? 0)
+            );
+        }
+
+        return self::format($last + 1);
     }
 
     /**
@@ -121,43 +146,61 @@ class PosLocalSeries
         return self::PREFIX . str_pad((string) $number, self::PAD, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * The rule itself — kept private so the lock decision can only be made via
-     * issueNext() / previewNext().
-     *
-     * @param  array<int,int>  $excludeIds
-     */
-    private static function resolveNext(int $companyId, bool $lock, array $excludeIds): string
+    /** Highest exact L-NNN number still present, archived rows included. */
+    private static function highestRecordedNumber(int $companyId): int
     {
-        $taken = self::takenQuery($companyId, $lock, $excludeIds)->pluck('invoice_number');
-
-        $used = [];
-        foreach ($taken as $serial) {
+        $highest = 0;
+        foreach (self::query($companyId)->pluck('invoice_number') as $serial) {
             $number = self::serialOf($serial);
             if ($number !== null) {
-                $used[$number] = true;
+                $highest = max($highest, $number);
             }
         }
 
-        $next = 1;
-        while (isset($used[$next])) {
-            $next++;
-        }
-
-        return self::format($next);
+        return $highest;
     }
 
     /**
-     * The rows to read the taken numbers from. The ONLY difference between
-     * issuing and previewing: issuing locks them FOR UPDATE (inside the sale
-     * transaction), previewing does not touch them.
-     *
-     * @param  array<int,int>  $excludeIds
+     * Lock the company sequence and raise its durable high-water mark to every
+     * exact L-reference currently present. Returns the locked current maximum.
      */
-    private static function takenQuery(int $companyId, bool $lock, array $excludeIds)
+    private static function lockAndSyncHighWater(int $companyId): int
     {
-        return self::query($companyId)
-            ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
-            ->when($lock, fn ($q) => $q->lockForUpdate());
+        // Serialize first allocation as well as later increments. Locking only
+        // the counter row is insufficient when that row does not exist yet.
+        DB::table('companies')->where('id', $companyId)->lockForUpdate()->value('id');
+
+        $floor = self::highestRecordedNumber($companyId);
+
+        // Deployment compatibility: code can briefly run before the migration
+        // creates the counter table. Still use max+1 (never gap-fill) meanwhile.
+        if (!Schema::hasTable('pos_local_series_counters')) {
+            return $floor;
+        }
+
+        $counter = DB::table('pos_local_series_counters')
+            ->where('company_id', $companyId)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$counter) {
+            DB::table('pos_local_series_counters')->insert([
+                'company_id' => $companyId,
+                'last_number' => $floor,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $floor;
+        }
+
+        $last = max((int) $counter->last_number, $floor);
+        if ($last !== (int) $counter->last_number) {
+            DB::table('pos_local_series_counters')
+                ->where('company_id', $companyId)
+                ->update(['last_number' => $last, 'updated_at' => now()]);
+        }
+
+        return $last;
     }
 }

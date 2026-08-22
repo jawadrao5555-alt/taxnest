@@ -7327,12 +7327,11 @@ class PosController extends Controller
     }
 
     /**
-     * ARCHIVED local bills that still hold an L-number (Task 1358).
+     * ARCHIVED local bills eligible for permanent cleanup.
      *
-     * generateLocalInvoiceNumber hands out the SMALLEST FREE number, and day-close
-     * ARCHIVED rows are NOT free (they stay in the table + the unique index). So a
-     * shop that archived 149 local bills and only later switched the policy to
-     * "delete" never restarts at L-001 — every day begins at L-150.
+     * L-references are monotonic and remain consumed in the durable company
+     * counter after these rows are deleted. This selector now controls records
+     * only; it never controls whether an old reference can be reused.
      *
      * This is the single selector behind BOTH the Customize POS status line and the
      * clear action, so the count the owner confirms is exactly what gets deleted.
@@ -7414,10 +7413,8 @@ class PosController extends Controller
      * Exactly the complement of the rider guard above — i.e. the live khata
      * predicate (PosRider::openCashBills): rider set + cash + not settled + not
      * returned — narrowed to real /^L-\d+$/ serials, because only those actually
-     * reserve a number. Without this figure the owner clears and sees numbering
-     * restart at L-006 instead of L-001 with no explanation, which reads as a
-     * broken feature. Schema-guarded like every other rider read: a prod box
-     * mid-deploy (or any throw) reports 0 and the card simply says nothing.
+     * identify an exact L-series bill. The figure explains why those archived
+     * records remain after a clear; it no longer affects the next L-reference.
      */
     private function riderHeldLocalSeriesCount(int $companyId): int
     {
@@ -7469,9 +7466,8 @@ class PosController extends Controller
     /**
      * Read-only preview of the next L-number (Task 1358) — the SAME helper the two
      * sale paths issue from (\App\Services\PosLocalSeries), so the number promised on
-     * the Customize POS card is the number the sale screen actually prints
-     * (Task 1373). previewNext() is the unlocked entry point: nothing is issued here.
-     * $excludeIds lets the UI answer "and what will it be AFTER the clear?".
+     * the Customize POS card is the number the sale screen actually prints.
+     * Exclusions remain for caller compatibility but no longer rewind numbering.
      */
     private function previewNextLocalNumber(int $companyId, array $excludeIds = []): string
     {
@@ -7480,8 +7476,8 @@ class PosController extends Controller
 
     /**
      * Status figures for the Customize POS → Local Billing card (Task 1358):
-     * how many archived local bills are holding the series, over which dates, what
-     * the next number is today and what it would become after a clear.
+     * how many archived local bills can be cleared, over which dates, and the
+     * monotonic next number (which stays unchanged by the clear).
      * Fully schema-guarded — a prod box mid-deploy just gets count 0 (card hides).
      */
     private function localSeriesStatus(int $companyId): array
@@ -7514,9 +7510,9 @@ class PosController extends Controller
     }
 
     /**
-     * Customize POS → Local Billing — "clear archived local bills, restart at L-001"
-     * (Task 1358). ADMIN/OWNER only and never automatic: the owner confirms a count
-     * + date range first (deletion is permanent).
+     * Customize POS → Local Billing — permanently clear archived local records.
+     * ADMIN/OWNER only and never automatic: the owner confirms a count + date
+     * range first. The durable L-series high-water mark is preserved.
      *
      * Deletes exactly what archivedLocalSeriesRows() selects, following the
      * day-close DELETE policy step for step: customer spend snapshots FIRST (when
@@ -7564,6 +7560,10 @@ class PosController extends Controller
 
         $deleted = 0;
         \DB::transaction(function () use ($companyId, $spendPersist, $inThisMonth, $isProvisional, $user, &$deleted) {
+            // Lock and preserve the highest reference BEFORE selecting/deleting
+            // rows. This also protects manually imported or pre-migration bills.
+            \App\Services\PosLocalSeries::preserveHighWaterMark($companyId);
+
             // Candidates are selected INSIDE the transaction and locked (SELECT ...
             // FOR UPDATE). A second admin — or a double-clicked / replayed POST —
             // blocks here until this commit and then reads an empty set, so the
@@ -7624,11 +7624,8 @@ class PosController extends Controller
 
         $next = $this->previewNextLocalNumber($companyId);
 
-        // Task 1374 — why the series may still not restart at L-001: the bills the
-        // rider guard above deliberately spared keep their numbers. Reported on BOTH
-        // branches (a "nothing to clear" run with khata bills left is exactly the
-        // case that looks broken), and always AFTER the transaction so a settlement
-        // done meanwhile is reflected. 0 = the card stays quiet.
+        // Explain which archived records were deliberately spared because rider
+        // cash is unsettled. Numbering itself remains monotonic either way.
         $riderHeld = $this->riderHeldLocalSeriesCount($companyId);
         $riderKeptMessage = $riderHeld > 0
             ? __('pos.local_series_rider_kept', ['count' => $riderHeld])
@@ -10813,8 +10810,8 @@ class PosController extends Controller
     /**
      * Retail sale path — the next local bill number (L-001, L-002, …).
      *
-     * The rule (which serials count, which legacy formats are excluded, how the
-     * lowest free number is picked) lives in ONE place: \App\Services\PosLocalSeries.
+     * The rule (exact serial grammar plus the durable company high-water mark)
+     * lives in ONE place: \App\Services\PosLocalSeries.
      * The restaurant pay path and the read-only Customize POS preview call the
      * same helper, so all three can never drift apart (Task 1373).
      * issueNext() takes the FOR UPDATE lock — call inside the sale transaction.
@@ -11147,7 +11144,19 @@ class PosController extends Controller
         // stored Z-report stay COMPANY-WIDE — this filter touches the preview
         // page figures only, never the frozen report.
         $dayCloseIso = (bool) ($dayCloseUser?->posSalesIsolated() ?? false);
-        $transactions = PosTransaction::where('company_id', $companyId)
+        // HISTORICAL VIEW: when this page renders an already-closed report, the
+        // day-close wash may have ARCHIVED the very rows the frozen figures were
+        // built from — the default hide_archived scope would drop them and the
+        // summary/table would look empty on a past day. Bypass it here exactly
+        // like the PDF (dayCloseReportPdf) so the historical view stays truthful.
+        // An OPEN/current day (no report yet) keeps the normal hide_archived
+        // scope — this must never broaden ordinary open-day access. An isolated
+        // cashier never sees the frozen company-wide document, so they stay on
+        // the live hide_archived scope too (their preview recomputes own-bills).
+        $dcHistorical = $existingReport && !$dayCloseIso;
+        $transactions = PosTransaction::query()
+            ->when($dcHistorical, fn ($q) => $q->withoutGlobalScope('hide_archived'))
+            ->where('company_id', $companyId)
             ->where('business_date', $date)
             ->where(function ($q) use ($dayCloseScope, $dayCloseDerived, $dayCloseUser) {
                 if ($dayCloseScope === 'local') {
@@ -11222,7 +11231,12 @@ class PosController extends Controller
                 ->pluck('parent_invoice', 'parent_transaction_id');
         } else {
             $dcReturnDetail = $dcTypeReady
-                ? PosTransaction::where('company_id', $companyId)
+                ? PosTransaction::query()
+                    // Historical view: an OLD report without a returns_detail
+                    // snapshot rebuilds the audit list live — bypass hide_archived
+                    // so wash-archived return rows still show on the closed day.
+                    ->when($dcHistorical, fn ($q) => $q->withoutGlobalScope('hide_archived'))
+                    ->where('company_id', $companyId)
                     ->where('business_date', $date)
                     ->where('transaction_type', 'return')
                     // Task 1360: audit list follows the close scope too.
@@ -11278,6 +11292,29 @@ class PosController extends Controller
             'wastage_count' => $dcReturnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false))->count(),
             'wastage_amount' => round((float) $dcReturnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false))->sum('total_amount'), 2),
         ];
+
+        // HISTORICAL VIEW: prefer the FROZEN report totals for the headline
+        // summary cards on a closed day. Even with hide_archived bypassed above,
+        // the wash can DELETE (not merely archive) reporting-OFF/local rows a
+        // live rebuild can never recover — the frozen figures are the truth the
+        // Z-report was hashed on, so the summary never looks empty on a past
+        // day. Counts/tables still come from the surviving un-archived rows.
+        if ($dcHistorical) {
+            $stats->total_invoices = (int) $existingReport->total_invoices;
+            $stats->pra_invoices = (int) $existingReport->pra_invoices;
+            $stats->local_invoices = (int) $existingReport->local_invoices;
+            $stats->offline_invoices = (int) $existingReport->offline_invoices;
+            $stats->gross_sales = (float) $existingReport->gross_sales;
+            $stats->total_discount = (float) $existingReport->total_discount;
+            $stats->net_sales = (float) $existingReport->net_sales;
+            $stats->total_tax = (float) $existingReport->total_tax;
+            $stats->total_amount = (float) $existingReport->total_amount;
+            $stats->cash_amount = (float) $existingReport->cash_amount;
+            $stats->card_amount = (float) $existingReport->card_amount;
+            $stats->other_amount = (float) $existingReport->other_amount;
+            $stats->returns_count = (int) $existingReport->returns_count;
+            $stats->returns_amount = (float) $existingReport->returns_amount;
+        }
 
         // Cashier figures are SIGNED (Task 570): refunds net revenue/tax;
         // counts stay sales-only.
@@ -13329,6 +13366,11 @@ class PosController extends Controller
         $report = null;
         $localSummary = [];
         \DB::transaction(function () use ($data, $companyId, $date, $branchId, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
+            // Preserve every existing L-reference before the wash can archive or
+            // permanently delete its row. This is a no-op on old schemas during
+            // the migration window; the migration backfills the same high-water.
+            \App\Services\PosLocalSeries::preserveHighWaterMark($companyId);
+
             $report = PosDayCloseReport::create($data);
 
             // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND

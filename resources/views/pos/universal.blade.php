@@ -1821,7 +1821,7 @@ window.addEventListener('popstate', function() {
                          The PAY (F8) button below keeps the Pay modal (method choice + note).
                          Failures surface via showToast (modal-independent). --}}
                     <div class="grid grid-cols-2 gap-2">
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; payPrintReceipt = billPrintDefault(orderType); processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="quickCashPay()" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('cash')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
                         </button>
@@ -4613,6 +4613,12 @@ function restaurantPos() {
         // resets payMethodIndex to 0 on every open, so a preselect must ride in
         // via this flag — consumed (and nulled) by the x-effect itself.
         payPreselect: null,
+        // Cash Received / Wapsi opt-in (owner, Aug 2026): mirrors
+        // companies.pos_cash_received_enabled. When true, the prominent CASH
+        // shortcut + Alt+1 no longer finalize directly — instead they open the
+        // Pay modal preselected to Cash so the Cash Received / Change fields are
+        // shown before the cashier confirms. See quickCashPay().
+        cashReceivedEnabled: {{ !empty($company->pos_cash_received_enabled) ? 'true' : 'false' }},
         // Cash Received / Wapsi (owner request, Jul 2026): optional cashier input
         // in the Pay modal (CASH only). Wapsi = cashReceived - payModalTotal.
         // Reset on every modal open; lastCashReceived rides to the success popup.
@@ -6983,13 +6989,17 @@ function restaurantPos() {
                 if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 if (this.cart.length === 0 || this.submitting) return;
                 const oneTapCard = (e.code === 'Digit2' || e.key === '2');
+                // Alt+1 (Cash) shares the CASH button's init point: when the Cash
+                // Received box is ON it opens the Pay modal preselected to cash,
+                // else it finalizes directly. Alt+2 (Card) stays direct one-tap.
+                if (!oneTapCard) { this.quickCashPay(); return; }
                 this.payingHeldOrderId = null;
                 this.saveAsProvisional = false;
-                this.payMethodIndex = oneTapCard ? 1 : 0;
+                this.payMethodIndex = 1;
                 // Task 514: one-tap = no checkbox choice — company default, kabhi
                 // pichhle (cancel kiye) Pay modal ka stale untick inherit na ho.
                 this.payPrintReceipt = this.billPrintDefault(this.orderType);
-                this.processPayment(oneTapCard ? 'card' : 'cash');
+                this.processPayment('card');
                 return;
             }
             @if($features->kot ?? false)
@@ -9122,6 +9132,36 @@ function restaurantPos() {
             // default use karo, stale per-bill untick inherit na ho.
             this.payPrintReceipt = this.billPrintDefault(this.orderType);
             await this.processPayment('cash');
+        },
+
+        // QUICK CASH PAY (owner, Aug 2026) — single init point for the prominent
+        // on-screen CASH shortcut and the Alt+1 chord. Both start a FRESH normal
+        // checkout (never a held/provisional/restaurant flow):
+        //   • cashReceivedEnabled ON  → open the existing Pay modal preselected to
+        //     Cash so the Cash Received / Change (Wapsi) fields are shown; the
+        //     cashier confirms there. processPayment stays untouched.
+        //   • cashReceivedEnabled OFF → preserve today's direct one-tap finalize.
+        // Guards mirror the CASH button's :disabled (empty cart / submitting).
+        quickCashPay() {
+            if (this.cart.length === 0 || this.submitting) return;
+            // Fresh normal checkout — clear any stale held/provisional routing so
+            // processPayment (which checks payingHeldOrderId first) can never
+            // divert this cart to a held-order pay.
+            this.payingHeldOrderId = null;
+            this.saveAsProvisional = false;
+            this.payMethodIndex = 0;
+            this.payPrintReceipt = this.billPrintDefault(this.orderType);
+            if (this.cashReceivedEnabled) {
+                // Ride the Cash preselect into the pay-modal x-effect (it resets
+                // payMethodIndex to 0 unless payPreselect === 1), then open it so
+                // the Cash Received / Change fields render before confirm.
+                this.payPreselect = 0;
+                this.submitting = false;
+                this.showPayModal = true;
+                return;
+            }
+            // Direct one-tap finalize (unchanged behaviour when the box is OFF).
+            this.processPayment('cash');
         },
 
         async processPayment(method) {

@@ -777,9 +777,9 @@
                             </button>
                         </div>
 
-                        {{-- Task 1358 — WHY the L-series never restarts: a new local bill takes
-                             the smallest FREE number, and day-close ARCHIVED bills keep theirs
-                             reserved. Shown only when such bills actually exist. The clear is
+                        {{-- Archived local-record housekeeping. L-references are now
+                             monotonic and never reused, so this clear removes old rows
+                             without resetting the company's next number. The clear is
                              owner-confirmed and permanent (never automatic). --}}
                         @if(($localSeries['count'] ?? 0) > 0)
                         <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
@@ -801,11 +801,10 @@
                             </div>
                             <div x-show="lsDone" x-cloak class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700">
                                 <p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300" x-text="lsMsg"></p>
-                                {{-- Task 1374 — WHY numbering can still start at, say, L-006 after a
-                                     clear: bills whose rider cash is still unsettled are deliberately
-                                     spared (same rule as the day-close wash). Say how many were kept
-                                     and where to settle them, otherwise the owner reads the honest
-                                     recomputed number as a failed clear. --}}
+                                {{-- Bills whose rider cash is still unsettled are deliberately
+                                     spared (same rule as the day-close wash). Say how many records
+                                     were kept and where to settle them; numbering stays monotonic
+                                     regardless of whether these rows are later removed. --}}
                                 <div x-show="lsKept > 0" x-cloak class="mt-2 pt-2 border-t border-emerald-200 dark:border-emerald-800">
                                     <p class="text-[11px] font-semibold text-amber-800 dark:text-amber-300" x-text="lsKeptMsg"></p>
                                     <a href="{{ route('pos.deliveries', [], false) }}"

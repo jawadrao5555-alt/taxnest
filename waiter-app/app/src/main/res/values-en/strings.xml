@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TaxNest Waiter</string>
-    <string name="offline_title">Internet not found</string>
-    <string name="offline_body">Check your WiFi or mobile data, then try again.</string>
-    <string name="offline_retry">Try Again</string>
+    <!-- Blank-screen recovery (Task #1491) — keep these keys in sync across
+         pos-app, fbr-pos-app, di-app and waiter-app. -->
+    <string name="boot_loading">Loading…</string>
+    <string name="recover_title">The app could not open</string>
+    <string name="recover_body">Check your internet and tap Try Again. If it still does not open, tap Reset App — all your data is safe on the server.</string>
+    <string name="recover_retry">Try Again</string>
+    <string name="recover_reset">Reset App</string>
+    <string name="recover_reason_label">Technical reason</string>
     <string name="download_started">Download started — check notification</string>
 </resources>

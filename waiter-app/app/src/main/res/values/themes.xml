@@ -4,6 +4,9 @@
     <style name="Theme.TaxNestWaiter" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:colorPrimary">#0A4D5C</item>
         <item name="android:statusBarColor">#0A4D5C</item>
-        <item name="android:windowBackground">#FFFFFF</item>
+        <!-- Brand colour, NOT white (Task #1491): the window background is what
+             a shop sees while the WebView has painted nothing, and a plain white
+             window is indistinguishable from a dead app. -->
+        <item name="android:windowBackground">#0A4D5C</item>
     </style>
 </resources>

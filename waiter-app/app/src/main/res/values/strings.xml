@@ -2,8 +2,13 @@
 <!-- Default locale = Urdu (waiter audience); values-en carries English. -->
 <resources>
     <string name="app_name">ٹیکس نیسٹ ویٹر</string>
-    <string name="offline_title">انٹرنیٹ نہیں مل رہا</string>
-    <string name="offline_body">اپنا وائی فائی یا موبائل ڈیٹا چیک کریں، پھر دوبارہ کوشش کریں۔</string>
-    <string name="offline_retry">دوبارہ کوشش</string>
+    <!-- Blank-screen recovery (Task #1491) — keep these keys in sync across
+         pos-app, fbr-pos-app, di-app and waiter-app. -->
+    <string name="boot_loading">کھل رہی ہے…</string>
+    <string name="recover_title">ایپ نہیں کھل سکی</string>
+    <string name="recover_body">انٹرنیٹ چیک کریں اور دوبارہ کوشش کا بٹن دبائیں۔ پھر بھی نہ کھلے تو ایپ ری سیٹ کریں — آپ کا سارا ڈیٹا سرور پر محفوظ ہے۔</string>
+    <string name="recover_retry">دوبارہ کوشش</string>
+    <string name="recover_reset">ایپ ری سیٹ کریں</string>
+    <string name="recover_reason_label">ٹیکنیکل وجہ</string>
     <string name="download_started">ڈاؤن لوڈ شروع ہو گیا — نوٹیفیکیشن دیکھیں</string>
 </resources>

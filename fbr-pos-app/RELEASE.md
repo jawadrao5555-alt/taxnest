@@ -106,4 +106,5 @@ Output APK: `fbr-pos-app/app/build/outputs/apk/release/app-release.apk`
 | 1.0.0   | 1           | Initial WebView shell (clone of pos-app) |
 | 1.0.1   | 2           | Download cookie rule |
 | 1.0.2   | 3           | Fullscreen video + update check |
+| 1.1.1   | 5           | **Blank-screen recovery** — branded boot screen, paint watchdog, empty-document probe, 5xx + renderer-death handling, recovery card (retry / reset app data / reason line), retry on resume. Shared contract for all four shells: `docs/android-shell-recovery.md` |
 | 1.1.0   | 4           | **FCM push wiring** (Task #1283) — fail-queue alert / day-close reminder; token register on login / clear on logout; needs the Firebase prerequisite above, builds fine without it. Beta at `/downloads/taxnest-fbr-pos-1.1.0.apk` (built WITHOUT google-services.json — push dormant until owner's Firebase drop-in + rebuild). |

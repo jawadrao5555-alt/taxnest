@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TaxNest DI</string>
-    <string name="offline_title">Internet nahi mil raha</string>
-    <string name="offline_body">Apna WiFi ya mobile data check karein, phir dobara koshish karein.</string>
-    <string name="offline_retry">Dobara Koshish</string>
+    <!-- Blank-screen recovery (Task #1491) — keep these keys in sync across
+         pos-app, fbr-pos-app, di-app and waiter-app. -->
+    <string name="boot_loading">Khul rahi hai…</string>
+    <string name="recover_title">App khul nahi saki</string>
+    <string name="recover_body">Internet check karein aur Dobara Koshish dabayein. Phir bhi na khule to App Reset karein — aap ka saara data server par mehfooz hai.</string>
+    <string name="recover_retry">Dobara Koshish</string>
+    <string name="recover_reset">App Reset karein</string>
+    <string name="recover_reason_label">Technical wajah</string>
     <string name="download_started">Download shuru ho gaya — notification dekhein</string>
 </resources>

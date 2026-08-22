@@ -127,6 +127,7 @@ breaks in-place updates for everything. NEVER commit it (public repo).
 | 1.0.3   | 4           | Fullscreen video (onShowCustomView/onHideCustomView) |
 | 1.0.4   | 5           | Shell polish |
 | 1.1.0   | 6           | **Instant push (FCM)** — naya order → cashiers, order tayyar → waiter, day-close summary → owner/manager; token upload on login / clear on logout; needs the Firebase prerequisite above, builds fine without it |
+| 1.1.1   | 7           | **Blank-screen recovery** — branded boot screen, paint watchdog, empty-document probe, 5xx + renderer-death handling, recovery card (retry / reset app data / reason line), retry on resume. Shared contract for all four shells: `docs/android-shell-recovery.md` |
 
 ---
 

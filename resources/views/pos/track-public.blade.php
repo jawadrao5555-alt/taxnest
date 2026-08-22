@@ -16,6 +16,11 @@
     @if($state === 'live')
     <link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}?v=1">
     <script src="{{ asset('vendor/leaflet/leaflet.js') }}?v=1"></script>
+    {{-- Vector basemap stack — see public/vendor/maps/nestpos-basemaps.js for why
+         the delivery maps no longer use raster tiles (English label rule). --}}
+    <script src="{{ asset('vendor/maplibre/maplibre-gl-csp.js') }}?v=1"></script>
+    <script src="{{ asset('vendor/maplibre/leaflet-maplibre-gl.js') }}?v=1"></script>
+    <script src="{{ asset('vendor/maps/nestpos-basemaps.js') }}?v=1"></script>
     @endif
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -142,31 +147,15 @@
             // 3-metre gali stays readable — same depth as the shop map.
             maxZoom: 21
         });
-        // Carto Voyager — English/Latin place labels (owner rule: OSM's own
-        // tiles label Pakistani cities in Urdu script).
-        var streetsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            maxNativeZoom: 19,
-            maxZoom: 21,
-            subdomains: 'abcd',
-            attribution: '&copy; OpenStreetMap &middot; &copy; CARTO'
-        });
-        // Esri World Imagery = free, no API key, no paid tiles. English labels
-        // ride on top via the Carto labels-only overlay. Neither request fires
-        // until this layer is actually picked, so a streets-only visit stays
-        // exactly as fast as before.
-        var satelliteLayer = L.layerGroup([
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxNativeZoom: 18,
-                maxZoom: 21,
-                attribution: 'Imagery &copy; Esri'
-            }),
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
-                maxNativeZoom: 19,
-                maxZoom: 21,
-                subdomains: 'abcd',
-                attribution: '&copy; OpenStreetMap &middot; &copy; CARTO'
-            })
-        ]);
+        // Same shared helper as the shop's rider map — the customer must never
+        // see a different basemap or a different label language than the shop.
+        // Streets = OpenFreeMap vector tiles with every label forced to
+        // name:en -> name:latin -> name (owner rule: raster tiles label Pakistani
+        // roads in Urdu script). Satellite = free Esri World Imagery with the
+        // same labels on top; nothing for it loads until the customer actually
+        // picks it, so a streets-only visit stays exactly as fast as before.
+        var streetsLayer = NestPosBasemaps.streets({ maxZoom: 21 });
+        var satelliteLayer = NestPosBasemaps.satellite({ maxZoom: 21 });
         streetsLayer.rtKey = 'streets';
         satelliteLayer.rtKey = 'sat';
         // Chosen layer is remembered in the customer's own browser.

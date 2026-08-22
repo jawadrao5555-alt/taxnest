@@ -313,10 +313,37 @@ class CustomerTrackingLinkTest extends TestCase
         $html = app(PosRiderTrackingController::class)
             ->publicTrackPage($bill->track_token)->render();
 
-        // Free imagery + English labels overlay, no API key / paid tiles.
-        $this->assertStringContainsString('World_Imagery', $html);
-        $this->assertStringContainsString('voyager_only_labels', $html);
+        // Task #1478: both basemaps come from the ONE shared helper, so the
+        // customer's map can never drift from the shop's rider map.
+        $this->assertStringContainsString('vendor/maps/nestpos-basemaps.js', $html);
+        $this->assertStringContainsString('NestPosBasemaps.streets(', $html);
+        $this->assertStringContainsString('NestPosBasemaps.satellite(', $html);
         $this->assertStringNotContainsString('maps.googleapis.com', $html);
+
+        // Free imagery + English labels, no API key / paid tiles. The helper and
+        // its style file hold the actual sources now.
+        $helper = file_get_contents(public_path('vendor/maps/nestpos-basemaps.js'));
+        $this->assertStringContainsString('World_Imagery', $helper);
+        $this->assertStringContainsString('tiles.openfreemap.org', file_get_contents(public_path('vendor/maps/nestpos-en.json')));
+        $this->assertStringNotContainsString('api_key', $helper);
+        $this->assertStringNotContainsString('access_token', $helper);
+        // Owner rule: Pakistani roads must read in English, not Urdu script —
+        // every label prefers name:en, then a Latin transliteration.
+        $style = json_decode(file_get_contents(public_path('vendor/maps/nestpos-en.json')), true);
+        $labelled = array_values(array_filter(
+            $style['layers'],
+            // Motorway shields print `ref` (M-2, N-5) — already Latin, not a name.
+            fn ($l) => isset($l['layout']['text-field'])
+                && str_contains(json_encode($l['layout']['text-field']), '"name')
+        ));
+        $this->assertGreaterThanOrEqual(15, count($labelled));
+        foreach ($labelled as $layer) {
+            $this->assertSame(
+                ['coalesce', ['get', 'name:en'], ['get', 'name:latin'], ['get', 'name']],
+                $layer['layout']['text-field'],
+                'label layer ' . $layer['id'] . ' must read English names first'
+            );
+        }
         // Satellite tiles are only built into a layer group — they load when
         // that layer is picked, not on page open.
         $this->assertStringContainsString('L.control.layers(layerOptions', $html);

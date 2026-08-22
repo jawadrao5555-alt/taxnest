@@ -18,6 +18,11 @@
 @else
     <link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}?v=1">
     <script src="{{ asset('vendor/leaflet/leaflet.js') }}?v=1"></script>
+    {{-- Vector basemap stack — see public/vendor/maps/nestpos-basemaps.js for why
+         the delivery maps no longer use raster tiles (English label rule). --}}
+    <script src="{{ asset('vendor/maplibre/maplibre-gl-csp.js') }}?v=1"></script>
+    <script src="{{ asset('vendor/maplibre/leaflet-maplibre-gl.js') }}?v=1"></script>
+    <script src="{{ asset('vendor/maps/nestpos-basemaps.js') }}?v=1"></script>
     <style>
         .rt-map { height: calc(100vh - 170px); min-height: 420px; border-radius: 1rem; z-index: 0; }
         .rt-dot { width: 10px; height: 10px; border-radius: 9999px; display: inline-block; }
@@ -343,32 +348,16 @@
                     // get scaled) so a trail inside a 3-metre gali stays readable.
                     maxZoom: 21,
                 }).setView([31.5204, 74.3587], 12);
-                // Carto Voyager basemap — English/Latin place labels (owner rule Aug 2026:
-                // OSM default tiles label Pakistani cities in Urdu script; owner wants English).
-                const streetsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    maxNativeZoom: 19,
-                    maxZoom: 21,
-                    subdomains: 'abcd',
-                    attribution: '© OpenStreetMap © CARTO'
-                });
-                // Task #1357: SATELLITE. Free street data has no lanes for small
-                // abadis ("Doctor Amir Ali Gali") — imagery shows the real gali
-                // and the houses. Esri World Imagery = free, no API key. Place
-                // labels stay ENGLISH via the Carto labels-only overlay on top
-                // (same owner rule as the streets basemap).
-                const satelliteLayer = L.layerGroup([
-                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                        maxNativeZoom: 18,
-                        maxZoom: 21,
-                        attribution: 'Imagery © Esri'
-                    }),
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
-                        maxNativeZoom: 19,
-                        maxZoom: 21,
-                        subdomains: 'abcd',
-                        attribution: '© OpenStreetMap © CARTO'
-                    }),
-                ]);
+                // Both basemaps come from the shared helper so this map and the
+                // customer's tracking link can never drift apart. Streets =
+                // OpenFreeMap vector tiles with every label forced to
+                // name:en -> name:latin -> name (owner rule Aug 2026: raster tiles
+                // print Pakistani roads in Urdu script). Satellite = Esri World
+                // Imagery (free, no API key — free street data has no lanes for
+                // small abadis like "Doctor Amir Ali Gali") with the SAME labels
+                // painted on top, so switching layers never switches language.
+                const streetsLayer = NestPosBasemaps.streets({ maxZoom: 21 });
+                const satelliteLayer = NestPosBasemaps.satellite({ maxZoom: 21 });
                 streetsLayer.rtKey = 'streets';
                 satelliteLayer.rtKey = 'sat';
                 // Chuni hui layer browser mein yaad rehti hai. Satellite tiles

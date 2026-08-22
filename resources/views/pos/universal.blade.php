@@ -11319,8 +11319,13 @@ function restaurantPos() {
             }
             this._callerBusy = true;
             this._callerBusyAt = Date.now();
+            // Hard deadline: a request that never settles would leave NO timer
+            // behind (the 20 s busy release only fires if something calls us
+            // again), so the chain would die for the whole shift. Abort at 20 s.
+            const _ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const _acKill = setTimeout(() => { try { if (_ac) _ac.abort(); } catch (e) {} }, 20000);
             try {
-                const res = await fetch('/pos/api/caller-events?after=' + (this.callerLastId || 0), { headers: { 'Accept': 'application/json' } });
+                const res = await fetch('/pos/api/caller-events?after=' + (this.callerLastId || 0), { headers: { 'Accept': 'application/json' }, signal: _ac ? _ac.signal : undefined });
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.enabled) {
@@ -11358,9 +11363,12 @@ function restaurantPos() {
                         this._callerFast = false;
                     }
                 }
-            } catch (e) {}
-            this._callerBusy = false;
-            this.scheduleCallerPoll();
+            } catch (e) {} finally {
+                // Single owner of the re-arm: runs on success, error AND abort.
+                clearTimeout(_acKill);
+                this._callerBusy = false;
+                this.scheduleCallerPoll();
+            }
             this.maybeShowCallerPopup();
         },
         // Arms the next caller poll: 1.5 s while a paired phone is online, 7 s

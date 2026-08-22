@@ -1216,6 +1216,16 @@ class AdminCompanyController extends Controller
         // picker must never wipe a paying company's real package.
         if ($plan) {
             $changes['pricing_plan_id'] = $plan->id;
+            // The free package must DIE WITH THE GRANT. Grant rows are often
+            // plan-less carriers with no end date; pinning a package on one
+            // without an end date would keep the company running free for ever
+            // once the override lapses (hasAccess() only fails closed while the
+            // row has no plan). Never shorten access a company already has.
+            $until = \Illuminate\Support\Carbon::parse($request->input('until'))->endOfDay();
+            $currentEnd = $sub->end_date ? \Illuminate\Support\Carbon::parse($sub->end_date) : null;
+            if (!$currentEnd || $currentEnd->lt($until)) {
+                $changes['end_date'] = $until->toDateString();
+            }
         }
         $sub->update($changes);
         $this->activateForGrant($company);

@@ -132,6 +132,7 @@ try {
     $mkCompany = function (string $suffix): Company {
         $c = new Company();
         $c->name = 'GateCheck ' . $suffix . ' ' . uniqid();
+        $c->product_type = 'pos'; // this whole script is the PRA POS matrix
         $c->save();
         return $c->fresh();
     };
@@ -228,16 +229,28 @@ try {
     // admin picks which one while granting. Only a grant with no real package
     // behind it (Trial row, or no plan at all) still opens everything, so
     // legacy partner/internal grants never lose access overnight.
+    // Add-on-only gates (Caller ID / WhatsApp Bill / Rider Tracking) sit in NO
+    // package, so free access keeps them open — same as a trial.
+    $addonGates = array_column(\App\Services\PosAddonPricingService::ADDONS, 'gate');
+    $withAddons = function (array $expected) use ($EXPECTED_GATE_ORDER, $addonGates): array {
+        foreach ($EXPECTED_GATE_ORDER as $i => $gate) {
+            if (in_array($gate, $addonGates, true)) {
+                $expected[$i] = true;
+            }
+        }
+        return $expected;
+    };
+
     $ovrExtra = ['override_type' => 'temporary', 'override_until' => now()->addDays(10)];
     $c = $mkCompany('OverrideStarter');
     $mkSub($c, $plans['Starter']->id, $ovrExtra);
-    $assertGates($c, $MATRIX['Starter'], 'override on Starter');
+    $assertGates($c, $withAddons($MATRIX['Starter']), 'override on Starter');
     check(PosFeatureService::restaurantAllowed($c) === false,
         'override on Starter: Restaurant module must stay closed (Starter has none)');
 
     $c = $mkCompany('OverridePro');
     $mkSub($c, $plans['Pro']->id, $ovrExtra);
-    $assertGates($c, $MATRIX['Pro'], 'override on Pro');
+    $assertGates($c, $withAddons($MATRIX['Pro']), 'override on Pro');
     check(PosFeatureService::restaurantAllowed($c) === true,
         'override on Pro: Restaurant module must be open');
 

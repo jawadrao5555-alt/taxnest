@@ -447,6 +447,18 @@ class PosFeatureService
         return !$plan || (bool) $plan->is_trial;
     }
 
+    /** Is this gate sold ONLY as a paid add-on, i.e. in no package at all? */
+    private static function isAddonOnlyGate(string $planColumn): bool
+    {
+        foreach (\App\Services\PosAddonPricingService::ADDONS as $addon) {
+            if (($addon['gate'] ?? null) === $planColumn) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Clear per-request gate caches (tests / admin plan flips mid-request). */
     public static function flushGateCaches(): void
     {
@@ -493,7 +505,17 @@ class PosFeatureService
                         // no plan at all) keeps the old blanket access: there
                         // is nothing to read, and legacy partner/internal
                         // grants must never lose access overnight.
+                        // Add-on-only features (Caller ID, WhatsApp Bill, Rider
+                        // Tracking) belong to NO PRA package, so package-scoping
+                        // them would just switch them off for every granted
+                        // shop with no admin way to hand them back — free
+                        // access keeps them open, exactly like a trial does.
+                        // PRA POS only: the catalogue is PRA's, and other
+                        // products' packages own these columns themselves.
                         $allowed = self::overrideGrantsEverything($sub)
+                            // (null product_type = a legacy PRA row; FBR/DI
+                            // companies always carry their own type)
+                            || (($company->product_type ?? 'pos') === 'pos' && self::isAddonOnlyGate($planColumn))
                             || !\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)
                             || !empty($sub->pricingPlan->{$planColumn});
                     } elseif ($sub->pricingPlan) {

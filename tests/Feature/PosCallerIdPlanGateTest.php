@@ -322,6 +322,20 @@ class PosCallerIdPlanGateTest extends TestCase
         $this->assertTrue(PosFeatureService::planAllows($company, 'caller_id_enabled'));
     }
 
+    /**
+     * The add-on exception is PRA's alone: an FBR POS grant reads the FBR
+     * package, which owns this column itself.
+     */
+    public function test_override_on_a_real_package_does_not_open_caller_id_for_fbr_pos(): void
+    {
+        $company = $this->makeCompany(
+            ['name' => 'FBR Business', 'product_type' => 'fbrpos', 'caller_id_enabled' => false],
+            ['override_type' => 'lifetime'],
+            ['product_type' => 'fbrpos']
+        );
+        $this->assertFalse(PosFeatureService::planAllows($company, 'caller_id_enabled'));
+    }
+
     public function test_expired_temporary_override_is_blocked(): void
     {
         $company = $this->makeCompany(

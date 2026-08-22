@@ -149,8 +149,10 @@ class SubscriptionAccessService
             return ['allowed' => false, 'reason' => 'No active subscription. Please subscribe to a plan.', 'override' => null];
         }
 
-        // Free-trial invoice cap (3-day OR 20-invoice — whichever comes first).
-        // Applies to DI / PRA POS / FBR POS trial subscriptions uniformly.
+        // Free-trial invoice cap: days OR bills, whichever comes first. The
+        // Trial plan row owns the bill number; -1 / 0 = no cap, only the day
+        // limit (PRA POS runs uncapped since Aug 2026 — owner's call: a shop
+        // that cannot bill freely never converts). DI / FBR POS keep theirs.
         $plan = $subscription->pricingPlan ?? $subscription->loadMissing('pricingPlan')->pricingPlan;
         if ($plan && $plan->is_trial) {
             $limit = (int) ($plan->invoice_limit ?? 0);

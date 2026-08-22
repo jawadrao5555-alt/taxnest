@@ -459,6 +459,19 @@ class AdminCompanyFormPostsSmokeTest extends TestCase
 
     // ── Subscription overrides: lifetime / temporary / remove ───────────
 
+    private function makePlan(string $name, string $productType = 'di', array $overrides = []): int
+    {
+        return DB::table('pricing_plans')->insertGetId(array_merge([
+            'name' => $name,
+            'product_type' => $productType,
+            'price' => 9999,
+            'invoice_limit' => -1,
+            'is_trial' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $overrides));
+    }
+
     private function makeSubscription(int $companyId, array $overrides = []): int
     {
         return DB::table('subscriptions')->insertGetId(array_merge([
@@ -543,6 +556,118 @@ class AdminCompanyFormPostsSmokeTest extends TestCase
         $this->assertEquals(500, (int) $sub->free_invoice_limit);
         $this->assertSame('Payment on the way', $sub->override_reason);
         $this->assertCompanyStatus($id, 'approved', 'active');
+    }
+
+    /**
+     * Temporary access is granted ON a package (Aug 2026): the admin picks
+     * which one, and that is what the shop runs on while the grant lasts.
+     */
+    public function test_grant_temporary_puts_the_company_on_the_chosen_package(): void
+    {
+        $id = $this->makeCompany(['product_type' => 'di']);
+        $subId = $this->makeSubscription($id, ['pricing_plan_id' => $this->makePlan('Retail', 'di')]);
+        $wanted = $this->makePlan('Enterprise', 'di');
+
+        $this->actingAsAdmin()
+            ->from("/admin/companies/{$id}")
+            ->post("/admin/companies/{$id}/override/temporary", [
+                'until' => now()->addDays(10)->toDateString(),
+                'pricing_plan_id' => $wanted,
+            ])
+            ->assertRedirect("/admin/companies/{$id}")
+            ->assertSessionHas('success');
+
+        $sub = DB::table('subscriptions')->where('id', $subId)->first();
+        $this->assertSame('temporary', $sub->override_type);
+        $this->assertEquals($wanted, (int) $sub->pricing_plan_id, 'The picked package must be written to the subscription');
+    }
+
+    /**
+     * A picked package must expire WITH the grant. Grant rows are often
+     * plan-less carriers with no end date; without one, the free package would
+     * keep the shop running for ever the day the override lapses.
+     */
+    public function test_grant_temporary_ends_the_picked_package_with_the_grant(): void
+    {
+        $id = $this->makeCompany(['product_type' => 'di']);
+        $subId = $this->makeSubscription($id, ['pricing_plan_id' => null, 'end_date' => null]);
+        $until = now()->addDays(10)->toDateString();
+
+        $this->actingAsAdmin()
+            ->from("/admin/companies/{$id}")
+            ->post("/admin/companies/{$id}/override/temporary", [
+                'until' => $until,
+                'pricing_plan_id' => $this->makePlan('Retail', 'di'),
+            ])
+            ->assertSessionHas('success');
+
+        $sub = DB::table('subscriptions')->where('id', $subId)->first();
+        $this->assertSame($until, substr((string) $sub->end_date, 0, 10), 'Free package must end on the grant date');
+    }
+
+    /** ...but a grant must never SHORTEN access the company already paid for. */
+    public function test_grant_temporary_never_shortens_a_longer_paid_period(): void
+    {
+        $id = $this->makeCompany(['product_type' => 'di']);
+        $paidEnd = now()->addMonths(6)->toDateString();
+        $subId = $this->makeSubscription($id, [
+            'pricing_plan_id' => $this->makePlan('Retail', 'di'),
+            'end_date' => $paidEnd,
+        ]);
+
+        $this->actingAsAdmin()
+            ->from("/admin/companies/{$id}")
+            ->post("/admin/companies/{$id}/override/temporary", [
+                'until' => now()->addDays(10)->toDateString(),
+                'pricing_plan_id' => $this->makePlan('Enterprise', 'di'),
+            ])
+            ->assertSessionHas('success');
+
+        $sub = DB::table('subscriptions')->where('id', $subId)->first();
+        $this->assertSame($paidEnd, substr((string) $sub->end_date, 0, 10), 'Paid period must stand');
+    }
+
+    /** No package picked = the one the company already had stays untouched. */
+    public function test_grant_temporary_without_a_package_keeps_the_existing_one(): void
+    {
+        $id = $this->makeCompany(['product_type' => 'di']);
+        $existing = $this->makePlan('Retail', 'di');
+        $subId = $this->makeSubscription($id, ['pricing_plan_id' => $existing]);
+
+        $this->actingAsAdmin()
+            ->from("/admin/companies/{$id}")
+            ->post("/admin/companies/{$id}/override/temporary", [
+                'until' => now()->addDays(10)->toDateString(),
+                'pricing_plan_id' => '',
+            ])
+            ->assertRedirect("/admin/companies/{$id}")
+            ->assertSessionHas('success');
+
+        $sub = DB::table('subscriptions')->where('id', $subId)->first();
+        $this->assertSame('temporary', $sub->override_type);
+        $this->assertEquals($existing, (int) $sub->pricing_plan_id, 'An empty picker must never wipe the real package');
+    }
+
+    /** A package from another product must never be pinned on this company. */
+    public function test_grant_temporary_rejects_a_package_from_another_product(): void
+    {
+        $id = $this->makeCompany(['product_type' => 'di']);
+        $existing = $this->makePlan('Retail', 'di');
+        $subId = $this->makeSubscription($id, ['pricing_plan_id' => $existing]);
+        $foreign = $this->makePlan('Pro', 'pos');
+
+        $this->actingAsAdmin()
+            ->from("/admin/companies/{$id}")
+            ->post("/admin/companies/{$id}/override/temporary", [
+                'until' => now()->addDays(10)->toDateString(),
+                'pricing_plan_id' => $foreign,
+            ])
+            ->assertRedirect("/admin/companies/{$id}")
+            ->assertSessionHas('error');
+
+        $sub = DB::table('subscriptions')->where('id', $subId)->first();
+        $this->assertEquals($existing, (int) $sub->pricing_plan_id, 'Cross-product package must be refused');
+        $this->assertNull($sub->override_type, 'A refused grant must not half-apply');
     }
 
     public function test_grant_temporary_invalid_data_bounces_and_leaves_subscription_unchanged(): void

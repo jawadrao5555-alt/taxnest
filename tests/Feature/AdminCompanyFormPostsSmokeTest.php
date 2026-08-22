@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\AdminUser;
+use App\Models\Company;
+use App\Services\SubscriptionAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -625,6 +627,113 @@ class AdminCompanyFormPostsSmokeTest extends TestCase
 
         $sub = DB::table('subscriptions')->where('id', $subId)->first();
         $this->assertSame($paidEnd, substr((string) $sub->end_date, 0, 10), 'Paid period must stand');
+    }
+
+    /**
+     * The grant must actually DIE on its date. Writing the end date is only
+     * half the promise — this drives the clock past the grant and proves the
+     * shop is really locked out, on all three shapes of row an admin meets:
+     *   1. plan-less carrier (no plan, no end date, no trial)
+     *   2. trial row
+     *   3. paying row with a longer period — must NOT be locked out early
+     * ...and that the reconciler demotes exactly the first two back to
+     * pending (view-only) while the paying shop keeps working.
+     */
+    public function test_temporary_grant_expires_and_locks_out_every_granted_shape_but_not_a_paying_one(): void
+    {
+        $freePackage = $this->makePlan('Retail', 'di');
+        $until = now()->addDays(10)->toDateString();
+
+        // 1. Plan-less carrier row: nothing but the grant keeps it alive.
+        $carrierId = $this->makeCompany([
+            'name' => 'Carrier Co', 'status' => 'pending', 'company_status' => 'pending',
+        ]);
+        $carrierSub = $this->makeSubscription($carrierId, [
+            'pricing_plan_id' => null, 'end_date' => null, 'trial_ends_at' => null,
+        ]);
+
+        // 2. Trial row: trial itself runs out before the grant does.
+        $trialId = $this->makeCompany(['name' => 'Trial Co']);
+        $trialSub = $this->makeSubscription($trialId, [
+            'pricing_plan_id' => $this->makePlan('Free Trial', 'di', ['is_trial' => true, 'price' => 0]),
+            'trial_ends_at' => now()->addDays(3),
+            'end_date' => null,
+        ]);
+
+        // 3. Paying row: six months already paid for.
+        $paidId = $this->makeCompany(['name' => 'Paid Co']);
+        $paidEnd = now()->addMonths(6)->toDateString();
+        $paidSub = $this->makeSubscription($paidId, [
+            'pricing_plan_id' => $this->makePlan('Paid Retail', 'di'),
+            'end_date' => $paidEnd,
+        ]);
+
+        // Same admin grant, on the free package, for all three.
+        foreach ([$carrierId, $trialId, $paidId] as $companyId) {
+            $this->actingAsAdmin()
+                ->from("/admin/companies/{$companyId}")
+                ->post("/admin/companies/{$companyId}/override/temporary", [
+                    'until' => $until,
+                    'pricing_plan_id' => $freePackage,
+                    'reason' => 'Payment on the way',
+                ])
+                ->assertRedirect("/admin/companies/{$companyId}")
+                ->assertSessionMissing('errors')
+                ->assertSessionHas('success');
+
+            $this->assertTrue(
+                SubscriptionAccessService::hasAccess(Company::findOrFail($companyId))['allowed'],
+                "Company {$companyId} must be running while the grant is live"
+            );
+            $this->assertCompanyStatus($companyId, 'approved', 'active');
+        }
+
+        // ── The day AFTER the grant runs out ─────────────────────────────
+        $this->travelTo(now()->addDays(11)->startOfDay()->addHours(9));
+
+        $carrierAccess = SubscriptionAccessService::hasAccess(Company::findOrFail($carrierId));
+        $this->assertFalse(
+            $carrierAccess['allowed'],
+            'A plan-less carrier row must not keep the shop running free once the grant lapses'
+        );
+
+        $trialAccess = SubscriptionAccessService::hasAccess(Company::findOrFail($trialId));
+        $this->assertFalse(
+            $trialAccess['allowed'],
+            'A grant written onto a trial row must not outlive its own date'
+        );
+
+        $paidAccess = SubscriptionAccessService::hasAccess(Company::findOrFail($paidId));
+        $this->assertTrue(
+            $paidAccess['allowed'],
+            'A paying shop with a longer period must never be locked out by a shorter grant'
+        );
+        $this->assertSame(
+            $paidEnd,
+            substr((string) DB::table('subscriptions')->where('id', $paidSub)->value('end_date'), 0, 10),
+            'The paid period must still stand after the grant lapses'
+        );
+
+        // ── The reconciler demotes exactly the shops the grant carried ────
+        $flipped = SubscriptionAccessService::reconcileExpiredGrants();
+
+        $this->assertSame(2, $flipped, 'Only the two grant-carried shops may be demoted');
+        $this->assertCompanyStatus($carrierId, 'pending', 'pending');
+        $this->assertCompanyStatus($trialId, 'pending', 'pending');
+        $this->assertCompanyStatus($paidId, 'approved', 'active');
+
+        // Spent grants are cleared everywhere so they can never re-trigger.
+        foreach ([$carrierSub, $trialSub, $paidSub] as $subId) {
+            $row = DB::table('subscriptions')->where('id', $subId)->first();
+            $this->assertSame('none', $row->override_type, "Spent grant on subscription {$subId} must be cleared");
+            $this->assertNull($row->override_until);
+            $this->assertNull($row->override_granted_at);
+        }
+
+        // Still locked after the reconcile pass (and still open for the payer).
+        $this->assertFalse(SubscriptionAccessService::hasAccess(Company::findOrFail($carrierId))['allowed']);
+        $this->assertFalse(SubscriptionAccessService::hasAccess(Company::findOrFail($trialId))['allowed']);
+        $this->assertTrue(SubscriptionAccessService::hasAccess(Company::findOrFail($paidId))['allowed']);
     }
 
     /** No package picked = the one the company already had stays untouched. */

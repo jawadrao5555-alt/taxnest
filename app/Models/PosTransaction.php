@@ -74,6 +74,50 @@ class PosTransaction extends Model
                 // repairs any missing stamps.
             }
         });
+
+        // Task 1475 — "reported to PRA" must never be a lie.
+        //
+        // pra_status='submitted' with an empty pra_invoice_number is an impossible
+        // state that live data proved is reachable: 8 real bills (PIZZA MASTER +
+        // QA) carried it, with no pra_logs row at all — i.e. PRA had never even
+        // been contacted. Both thermal receipts gate the Sahulat QR on
+        // 'submitted' AND a number, so those bills silently printed the MENU QR
+        // while the shop's reports counted them as reported revenue.
+        //
+        // The individual write paths are fixed (PraIntegrationService::storePraResponse
+        // + the RestaurantPosController settle mirror); this is the backstop that
+        // makes the invariant hold for every present and future Eloquent path.
+        // It degrades rather than throws — a half-written status must never blow
+        // up a live sale mid-settle — and it screams in the log so the real cause
+        // is findable. Query-builder writes bypass model events by design; the two
+        // DB::table lanes that stamp 'submitted' (AgentController heartbeat
+        // self-heal + submitResult) already require a non-empty number themselves.
+        static::saving(function (self $t) {
+            try {
+                if ($t->pra_status !== 'submitted' || trim((string) $t->pra_invoice_number) !== '') {
+                    return;
+                }
+
+                $t->pra_status = 'failed';
+                if (\Schema::hasColumn('pos_transactions', 'pra_error_message') && empty($t->pra_error_message)) {
+                    $t->pra_error_message = 'Bill "submitted" mark hua magar PRA fiscal number nahi mila — report nahi hua. Retry karein.';
+                }
+                // No number means no fiscal QR was ever possible; drop any stale one
+                // so the receipt cannot show a fiscal QR beside a non-fiscal status.
+                if (\Schema::hasColumn('pos_transactions', 'pra_qr_code')) {
+                    $t->pra_qr_code = null;
+                }
+
+                \Illuminate\Support\Facades\Log::error('Blocked half-submitted PRA bill (no fiscal number)', [
+                    'transaction_id' => $t->id,
+                    'company_id' => $t->company_id,
+                    'invoice_number' => $t->invoice_number,
+                    'pra_response_code' => $t->pra_response_code,
+                ]);
+            } catch (\Throwable $e) {
+                // Never block a sale on the guard itself.
+            }
+        });
     }
 
     protected $casts = [

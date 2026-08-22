@@ -105,6 +105,9 @@ class RiderAppMarkDeliveredTest extends TestCase
             $table->unsignedBigInteger('rider_settlement_id')->nullable();
             $table->string('invoice_mode')->nullable();
             $table->string('pra_status')->nullable();
+            // A 'submitted' bill is only legitimate WITH its fiscal number
+            // (Task 1475) — the fixture below models a real fiscalised sale.
+            $table->string('pra_invoice_number')->nullable();
             $table->timestamps();
         });
 
@@ -145,8 +148,9 @@ class RiderAppMarkDeliveredTest extends TestCase
             'total_amount'    => 1500,
             'payment_method'  => 'cash',
             'delivery_status' => 'dispatched',
-            'invoice_mode'    => 'pra',
-            'pra_status'      => 'submitted',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'pra_invoice_number' => '250813ABCDE1234',
             'created_at'      => now(),
             'updated_at'      => now(),
         ], $attrs));
@@ -282,6 +286,8 @@ class RiderAppMarkDeliveredTest extends TestCase
         $row = DB::table('pos_transactions')->find($id);
         $this->assertEquals('pra', $row->invoice_mode);
         $this->assertEquals('submitted', $row->pra_status);
+        $this->assertEquals('250813ABCDE1234', $row->pra_invoice_number,
+            'a delivery must never disturb a bill fiscalised with PRA');
         $this->assertEquals(1500.0, (float) $row->total_amount);
     }
 }

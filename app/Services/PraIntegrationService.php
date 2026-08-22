@@ -522,6 +522,31 @@ class PraIntegrationService
 
     public function storePraResponse(PraLog $praLog, PosTransaction $transaction, ?array $responseData, string $responseCode, bool $success, ?string $praInvoiceNumber, ?string $errorMessage = null): void
     {
+        // Task 1475: 'submitted' is a PROMISE that PRA holds this bill under a fiscal
+        // number. A "success" carrying no number cannot keep that promise — and it is
+        // unrenderable: both thermal receipts gate the Sahulat QR on
+        // pra_status === 'submitted' AND pra_invoice_number, so the bill falls through
+        // to the local/menu-QR branch. The customer then walks out with a receipt that
+        // claims PRA reporting but carries a menu QR, and nothing on screen says so.
+        // Downgrade to a plain failure instead: honest, and retryable from F11.
+        // Incoming number wins ONLY when it is actually a number. `??` guards null
+        // but not '   ', so a blank value in the response would otherwise overwrite —
+        // and then wipe — the fiscal number of a bill PRA has already accepted.
+        $incomingNumber = trim((string) ($praInvoiceNumber ?? ''));
+        $storedNumber = trim((string) ($transaction->pra_invoice_number ?? ''));
+        $effectiveNumber = $incomingNumber !== '' ? $incomingNumber : $storedNumber;
+
+        if ($success && $effectiveNumber === '') {
+            $success = false;
+            $errorMessage = 'PRA ne success (code ' . $responseCode . ') diya magar fiscal invoice number nahi bheja — bill report nahi hua. Retry karein.';
+            Log::error('PRA reported success without a fiscal invoice number', [
+                'transaction_id' => $transaction->id,
+                'company_id' => $this->company->id ?? null,
+                'response_code' => $responseCode,
+                'response' => $responseData,
+            ]);
+        }
+
         $praLog->update([
             'response_payload' => $responseData,
             'response_code' => $responseCode,
@@ -531,7 +556,7 @@ class PraIntegrationService
         $updateData = [
             'pra_response_code' => $responseCode,
             'pra_status' => $success ? 'submitted' : 'failed',
-            'pra_invoice_number' => $praInvoiceNumber ?? $transaction->pra_invoice_number,
+            'pra_invoice_number' => $effectiveNumber !== '' ? $effectiveNumber : null,
         ];
 
         // Task 624: persist the failure reason for the F11 modal; clear it on success.
@@ -540,8 +565,10 @@ class PraIntegrationService
             $updateData['pra_error_message'] = $success ? null : mb_substr((string) ($errorMessage ?? 'PRA submission failed'), 0, 1000);
         }
 
-        if ($success && $praInvoiceNumber) {
-            $updateData['pra_qr_code'] = $this->generateQrCode($praInvoiceNumber);
+        // Task 1475: keyed off the SAME value that decides the status, so
+        // "submitted" always ships with both its number and its Sahulat QR.
+        if ($success && $effectiveNumber !== '') {
+            $updateData['pra_qr_code'] = $this->generateQrCode($effectiveNumber);
         }
 
         $transaction->update($updateData);

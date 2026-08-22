@@ -1469,10 +1469,17 @@ class RestaurantPosController extends Controller
                         // safety: success without a real submission must never be
                         // stamped 'submitted' with an empty fiscal number — live
                         // bug precedent: ZFC bills 1787/1791, 13 Aug 2026).
-                        if ($praResult && !empty($praResult['success']) && empty($praResult['exempt_only'])) {
+                        // Task 1475: the `?? null` here was the live bug — a success
+                        // without a fiscal number re-stamped the row 'submitted' with an
+                        // empty number, which prints a menu QR on a bill the shop
+                        // believes was reported. sendInvoice() has already written the
+                        // correct status/number via storePraResponse(); only mirror it
+                        // when a real fiscal number actually came back.
+                        $praFiscalNumber = trim((string) ($praResult['pra_invoice_number'] ?? ''));
+                        if ($praResult && !empty($praResult['success']) && empty($praResult['exempt_only']) && $praFiscalNumber !== '') {
                             $transaction->update([
                                 'pra_status' => 'submitted',
-                                'pra_invoice_number' => $praResult['pra_invoice_number'] ?? null,
+                                'pra_invoice_number' => $praFiscalNumber,
                                 'pra_response_code' => $praResult['response_code'] ?? null,
                             ]);
                         }

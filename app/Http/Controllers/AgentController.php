@@ -266,6 +266,9 @@ class AgentController extends Controller
             ->where('company_id', $company->id)
             ->whereNotNull('pra_invoice_number')
             ->where('pra_invoice_number', '!=', '')
+            // Task 1475: a whitespace-only number is no number — self-healing on it
+            // would promote the row to 'submitted' with nothing to print a QR from.
+            ->whereRaw("TRIM(pra_invoice_number) <> ''")
             ->whereIn('pra_status', ['offline', 'pending', 'failed'])
             ->update([
                 'pra_status' => 'submitted',
@@ -276,7 +279,11 @@ class AgentController extends Controller
         $repromoted = DB::table('pos_transactions')
             ->where('company_id', $company->id)
             ->where('pra_status', 'offline')
-            ->whereNull('pra_invoice_number')
+            // Same rule as the self-heal above: whitespace counts as "no number", so
+            // such a row is still eligible to be re-queued instead of sitting stuck.
+            ->where(function ($q) {
+                $q->whereNull('pra_invoice_number')->orWhereRaw("TRIM(pra_invoice_number) = ''");
+            })
             ->update([
                 'pra_status' => 'pending',
                 'updated_at' => now(),
@@ -555,10 +562,14 @@ class AgentController extends Controller
             return response()->json(['error' => 'Transaction not found'], 404);
         }
 
-        $praInvoiceNumber = $request->input('pra_invoice_number');
-        $treatAsSuccess = $request->boolean('success') || (!empty($praInvoiceNumber) && preg_match('/^\d{6}[A-Z]{4,6}\d{4,}$/', $praInvoiceNumber));
+        // Task 1475: whitespace is NOT a fiscal number. !empty('   ') is true, so a
+        // blank number from the agent would have stamped pra_status='submitted' with
+        // an unusable number — and this is a query-builder write, so the model's
+        // saving() backstop never sees it. Normalise once, here.
+        $praInvoiceNumber = trim((string) $request->input('pra_invoice_number', ''));
+        $treatAsSuccess = $request->boolean('success') || ($praInvoiceNumber !== '' && preg_match('/^\d{6}[A-Z]{4,6}\d{4,}$/', $praInvoiceNumber));
 
-        if ($treatAsSuccess && !empty($praInvoiceNumber)) {
+        if ($treatAsSuccess && $praInvoiceNumber !== '') {
             $response = $request->input('response');
             $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
 
@@ -577,11 +588,18 @@ class AgentController extends Controller
             Log::info('Agent: PRA submission success', [
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,
-                'pra_invoice' => $request->input('pra_invoice_number'),
+                'pra_invoice' => $praInvoiceNumber,
                 'full_response' => $response,
             ]);
         } else {
             $errMsg = (string) $request->input('error', 'PRA submission failed');
+
+            // Task 1475: the agent claimed success but sent no usable fiscal number.
+            // Route it through the ordinary failure handling with a reason the cashier
+            // can act on, rather than recording a submission that never happened.
+            if ($request->boolean('success') && $praInvoiceNumber === '') {
+                $errMsg = 'Agent ne success bheja magar PRA fiscal invoice number nahi diya — bill report nahi hua. Retry karein.';
+            }
 
             // IMS-contact-optional (owner rule Jul 2026): transport-level failures
             // (IMS Fiscal Device service down, no internet, timeout) are NOT PRA

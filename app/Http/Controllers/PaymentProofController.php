@@ -234,7 +234,6 @@ class PaymentProofController extends Controller
             'addon_codes' => 'required|array|min:1',
             'addon_codes.*' => 'required|string|in:' . implode(',', array_keys(\App\Services\PosAddonPricingService::ADDONS)),
             'addon_cycle' => 'required|in:annual,quarterly',
-            'amount' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
             'reference' => 'nullable|string|max:120',
             'payment_date' => 'nullable|date',
@@ -298,7 +297,10 @@ class PaymentProofController extends Controller
             'billing_cycle' => $quote['cycle'],
             'request_type' => 'pos_addon',
             'addon_codes' => json_encode($quote['codes']),
-            'amount' => $validated['amount'] ?? $quote['total'],
+            // Displayed browser totals are a convenience only. Never accept an
+            // amount from the request for paid features; current admin-managed
+            // catalogue prices are the sole source of truth.
+            'amount' => $quote['total'],
             'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
             'reference' => $validated['reference'] ?? null,
             'payment_date' => $validated['payment_date'] ?? null,
@@ -308,6 +310,7 @@ class PaymentProofController extends Controller
         ]);
 
         $this->alertAdminsPosAddon($company, $proof, $quote);
+        $request->session()->forget(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
 
         return back()->with('success', __('pos.addons_submitted'))
             ->with('payment_proof', 'submitted');

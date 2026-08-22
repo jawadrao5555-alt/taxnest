@@ -369,6 +369,52 @@ class PosPlanCardClaimsTest extends TestCase
         );
     }
 
+    public function test_pricing_comes_before_long_feature_copy_on_all_three_product_landings(): void
+    {
+        $pages = [
+            'resources/views/pos/landing.blade.php' => ['<!-- Pricing Section -->', '<!-- Editorial Features -->'],
+            'resources/views/di-landing.blade.php' => ['<!-- Pricing Section -->', '<!-- Editorial How it Works -->'],
+            'resources/views/fbr-pos/landing.blade.php' => ['<!-- Pricing -->', '<!-- Concrete Features: Asymmetrical Left-Aligned -->'],
+        ];
+
+        foreach ($pages as $relative => [$pricingMarker, $featureMarker]) {
+            $source = (string) file_get_contents(base_path($relative));
+            $pricingAt = strpos($source, $pricingMarker);
+            $featuresAt = strpos($source, $featureMarker);
+
+            $this->assertNotFalse($pricingAt, "{$relative} has lost its pricing marker.");
+            $this->assertNotFalse($featuresAt, "{$relative} has lost its feature marker.");
+            $this->assertLessThan(
+                $featuresAt,
+                $pricingAt,
+                "{$relative} must show pricing before the long English feature detail."
+            );
+        }
+    }
+
+    public function test_pos_addon_strip_is_a_real_selectable_quote_not_a_static_price_list(): void
+    {
+        $source = (string) file_get_contents(base_path('resources/views/components/pos-addon-strip.blade.php'));
+
+        $this->assertStringContainsString('type="checkbox"', $source);
+        $this->assertStringContainsString('x-model="picked"', $source);
+        $this->assertStringContainsString('signupUrl()', $source);
+        $this->assertStringContainsString("params.append('addons[]', code)", $source);
+        $this->assertStringContainsString('PosAddonPricingService::catalog()', $source);
+    }
+
+    public function test_pra_paid_addon_picker_does_not_leak_onto_di_or_fbr_landings(): void
+    {
+        $this->assertStringNotContainsString(
+            '<x-pos-addon-strip',
+            (string) file_get_contents(base_path('resources/views/di-landing.blade.php'))
+        );
+        $this->assertStringNotContainsString(
+            '<x-pos-addon-strip',
+            (string) file_get_contents(base_path('resources/views/fbr-pos/landing.blade.php'))
+        );
+    }
+
     public function test_card_lines_exist_in_all_three_languages(): void
     {
         foreach (array_keys(PosPlanComparisonService::LIMIT_ROWS) as $key) {

@@ -160,7 +160,9 @@
                 $adActive = $addons['active'] ?? [];
                 $adPending = $addons['pending'] ?? [];
                 $adCanBuy = $addons['can_buy'] ?? true;
-                $adForceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('addon_codes');
+                $adPreselected = array_values(array_intersect((array) ($addons['preselected'] ?? []), $adPurchasable));
+                $adPreselectedCycle = ($addons['preselected_cycle'] ?? 'annual') === 'quarterly' ? 'quarterly' : 'annual';
+                $adForceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('addon_codes') || !empty($adPreselected);
                 $adPrices = [];
                 foreach ($adPurchasable as $adCode) {
                     $adPrices[$adCode] = [
@@ -211,8 +213,8 @@
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-md p-5"
                      x-data="{
                         open: {{ $adForceOpen ? 'true' : 'false' }},
-                        cycle: {{ \Illuminate\Support\Js::from(old('addon_cycle', 'annual')) }},
-                        picked: {{ \Illuminate\Support\Js::from(array_values(array_intersect((array) old('addon_codes', []), $adPurchasable))) }},
+                        cycle: {{ \Illuminate\Support\Js::from(old('addon_cycle', $adPreselectedCycle)) }},
+                        picked: {{ \Illuminate\Support\Js::from(array_values(array_intersect((array) old('addon_codes', $adPreselected), $adPurchasable))) }},
                         prices: {{ \Illuminate\Support\Js::from($adPrices) }},
                         toggle(code) {
                             const i = this.picked.indexOf(code);

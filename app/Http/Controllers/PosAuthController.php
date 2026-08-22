@@ -155,9 +155,18 @@ class PosAuthController extends Controller
             ? null
             : $plans->first(fn ($plan) => mb_strtolower($plan->name) === mb_strtolower($requested));
 
+        // The public add-on picker carries only allow-listed feature codes and
+        // a cycle. Amounts are deliberately absent: the billing/proof flow
+        // quotes current server-managed prices after the shop becomes eligible.
+        $requestedAddonQuote = \App\Services\PosAddonService::quote(
+            (array) request()->query('addons', []),
+            (string) request()->query('addon_cycle', 'annual')
+        );
+
         return view('pos.auth.register', [
             'plans' => $plans,
             'preselectedPlanId' => $preselected?->id,
+            'requestedAddonQuote' => $requestedAddonQuote,
         ]);
     }
 
@@ -174,6 +183,12 @@ class PosAuthController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
             'pricing_plan_id' => 'required|integer|exists:pricing_plans,id',
+            // Unknown public codes/cycles are harmlessly dropped/normalised by
+            // PosAddonService::quote() below. Validate shape and size here, but
+            // do not make a tampered optional field block account creation.
+            'requested_addons' => 'nullable|array|max:12',
+            'requested_addons.*' => 'required|string|max:64',
+            'requested_addon_cycle' => 'nullable|string|max:20',
         ], \App\Services\LoginIdentifierResolver::cnicMessages('company_cnic'));
 
         // The selected package must be a real, non-trial POS plan — the admin
@@ -257,6 +272,22 @@ class PosAuthController extends Controller
         $this->startTrial($company->id, 'pos');
 
         Auth::guard('pos')->login($user);
+
+        // Keep the visitor's add-on quote ready for the real authenticated
+        // purchase box. A trial/Starter account cannot buy yet; once Business+
+        // is active, billing() intersects this with the live purchasable list.
+        $requestedAddonQuote = \App\Services\PosAddonService::quote(
+            (array) $request->input('requested_addons', []),
+            (string) $request->input('requested_addon_cycle', 'annual')
+        );
+        if (!empty($requestedAddonQuote['codes'])) {
+            $request->session()->put(\App\Services\PosAddonService::SIGNUP_SESSION_KEY, [
+                'codes' => $requestedAddonQuote['codes'],
+                'cycle' => $requestedAddonQuote['cycle'],
+            ]);
+        } else {
+            $request->session()->forget(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
+        }
 
         return $this->redirectToPortal($user);
     }

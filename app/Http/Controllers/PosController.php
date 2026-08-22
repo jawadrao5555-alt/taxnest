@@ -10832,12 +10832,20 @@ class PosController extends Controller
         // Paid feature add-ons (Aug 2026). Prices and the purchasable list come
         // from the services so this page always quotes exactly what the approval
         // will activate — no client-side arithmetic, no hand-written catalogue.
+        $addonPurchasable = \App\Services\PosAddonService::purchasableCodes($company);
+        $rememberedAddonSelection = session(\App\Services\PosAddonService::SIGNUP_SESSION_KEY, []);
+        $rememberedAddonQuote = \App\Services\PosAddonService::quote(
+            (array) ($rememberedAddonSelection['codes'] ?? []),
+            (string) ($rememberedAddonSelection['cycle'] ?? 'annual')
+        );
         $addons = [
             'eligibility' => \App\Services\PosAddonService::purchaseEligibility($company),
             'catalog' => \App\Services\PosAddonPricingService::catalog(),
-            'purchasable' => \App\Services\PosAddonService::purchasableCodes($company),
+            'purchasable' => $addonPurchasable,
             'active' => \App\Services\PosAddonService::activeCodes($company),
             'pending' => \App\Services\PosAddonService::pendingCodes($company),
+            'preselected' => array_values(array_intersect($rememberedAddonQuote['codes'], $addonPurchasable)),
+            'preselected_cycle' => $rememberedAddonQuote['cycle'],
             // Spending the shop's money is an owner/manager decision. A cashier
             // may still SEE what is active; the POST is guarded server-side.
             'can_buy' => !(auth('pos')->user()?->isPosCashier() ?? false),

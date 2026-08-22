@@ -223,6 +223,27 @@ class RequestedPackageSignupTest extends TestCase
         return Company::where('name', $company)->firstOrFail();
     }
 
+    /** Post a PRA POS signup with an optional public add-on selection. */
+    private function posSignup(string $company, string $email, array $addons = [], string $cycle = 'annual'): Company
+    {
+        $payload = [
+            'company_name' => $company,
+            'company_ntn' => (string) random_int(1000000, 9999999),
+            'name' => 'Owner Sahib',
+            'email' => $email,
+            'password' => 'secret-pass-123',
+            'password_confirmation' => 'secret-pass-123',
+            'pos_type' => 'retail',
+            'pricing_plan_id' => $this->plan('POS Basic', 'pos')->id,
+            'requested_addons' => $addons,
+            'requested_addon_cycle' => $cycle,
+        ];
+
+        $this->post('/pos/register', $payload)->assertSessionHasNoErrors();
+
+        return Company::where('name', $company)->firstOrFail();
+    }
+
     // ── Recording the request at signup ───────────────────────────────
 
     public function test_fbr_signup_records_the_clicked_package(): void
@@ -321,6 +342,45 @@ class RequestedPackageSignupTest extends TestCase
         // A trial / wrong-product name in the link is not echoed back either.
         $this->get('/register?plan=DI+Trial')->assertOk()->assertDontSee('name="requested_plan"', false);
         $this->get('/fbr-pos/register?plan=POS+Basic')->assertOk()->assertDontSee('name="requested_plan"', false);
+    }
+
+    public function test_pos_signup_page_carries_only_allow_listed_addons_into_the_form(): void
+    {
+        $this->get('/pos/register?addons[]=delivery_riders&addons[]=not-a-real-feature&addon_cycle=quarterly')
+            ->assertOk()
+            ->assertSee('name="requested_addons[]" value="delivery_riders"', false)
+            ->assertDontSee('name="requested_addons[]" value="not-a-real-feature"', false)
+            ->assertSee('name="requested_addon_cycle" value="quarterly"', false);
+    }
+
+    public function test_pos_signup_remembers_the_valid_addon_quote_for_authenticated_billing(): void
+    {
+        $this->posSignup(
+            'Addon Selection Mart',
+            'addon-selection@example.com',
+            ['caller_id', 'qr_menu'],
+            'quarterly'
+        );
+
+        $selection = session(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
+        $this->assertSame(['caller_id', 'qr_menu'], $selection['codes']);
+        $this->assertSame('quarterly', $selection['cycle']);
+        $this->assertSame(['codes', 'cycle'], array_keys($selection));
+    }
+
+    public function test_tampered_pos_addon_values_do_not_block_signup_or_enter_the_session(): void
+    {
+        $this->posSignup(
+            'Tampered Addon Mart',
+            'tampered-addon@example.com',
+            ['caller_id', 'free_ferrari'],
+            'fortnightly'
+        );
+
+        $selection = session(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
+        $this->assertSame(['caller_id'], $selection['codes']);
+        $this->assertSame('annual', $selection['cycle']);
+        $this->assertSame(['codes', 'cycle'], array_keys($selection));
     }
 
     // ── Approval charges the period the product actually sells ────────

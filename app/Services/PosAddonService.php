@@ -20,6 +20,13 @@ use Illuminate\Support\Facades\Schema;
  */
 class PosAddonService
 {
+    /**
+     * A public landing selection survives registration in the browser session
+     * until the paid Business+ shop opens the authenticated billing page.
+     * Only catalogue codes + cycle live here; every price is quoted afresh.
+     */
+    public const SIGNUP_SESSION_KEY = 'pos.requested_addons';
+
     /** company_id => [addon_code, ...] — one query per company per request. */
     protected static array $activeCache = [];
 

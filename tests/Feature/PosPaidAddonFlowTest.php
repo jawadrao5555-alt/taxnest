@@ -441,6 +441,19 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertEquals($expected, (float) $proof->amount);
     }
 
+    public function test_a_forged_browser_amount_cannot_change_the_server_quote(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+
+        $this->buy($company, ['caller_id'], 'annual', ['amount' => 1]);
+
+        $proof = PaymentProof::firstOrFail();
+        $this->assertEquals(
+            PosAddonPricingService::price('caller_id', 'annual'),
+            (float) $proof->amount
+        );
+    }
+
     public function test_addon_request_never_grants_instant_access_or_touches_the_subscription(): void
     {
         $company = $this->makeShop($this->makePlan('Business'), ['company_status' => 'locked']);
@@ -712,6 +725,64 @@ class PosPaidAddonFlowTest extends TestCase
 
         $html = $this->actingAs($cashier, 'pos')->get('/pos/billing')->getContent();
         $this->assertStringNotContainsString('value="pos_addon"', $html);
+    }
+
+    public function test_billing_preselects_only_remembered_codes_that_are_still_purchasable(): void
+    {
+        $plan = $this->makePlan('Business', ['riders_enabled' => true]);
+        $company = $this->makeShop($plan);
+        $owner = $this->posUser($company);
+        $remembered = [
+            'codes' => ['delivery_riders', 'caller_id'],
+            'cycle' => 'quarterly',
+        ];
+
+        $response = $this->withSession([PosAddonService::SIGNUP_SESSION_KEY => $remembered])
+            ->actingAs($owner, 'pos')
+            ->get('/pos/billing');
+
+        $response->assertOk();
+        $addons = $response->viewData('addons');
+        $this->assertSame(['caller_id'], $addons['preselected']);
+        $this->assertSame('quarterly', $addons['preselected_cycle']);
+    }
+
+    public function test_successful_addon_proof_clears_the_signup_selection(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $remembered = [
+            'codes' => ['caller_id'],
+            'cycle' => 'annual',
+        ];
+
+        $this->withSession([PosAddonService::SIGNUP_SESSION_KEY => $remembered]);
+        $this->buy($company, ['caller_id'])->assertSessionHasNoErrors();
+
+        $this->assertFalse(session()->has(PosAddonService::SIGNUP_SESSION_KEY));
+        $this->assertSame(1, PaymentProof::where('request_type', 'pos_addon')->count());
+    }
+
+    public function test_failed_addon_proof_keeps_the_signup_selection_for_retry(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $owner = $this->posUser($company);
+        $remembered = [
+            'codes' => ['caller_id'],
+            'cycle' => 'annual',
+        ];
+
+        $this->withSession([PosAddonService::SIGNUP_SESSION_KEY => $remembered])
+            ->actingAs($owner, 'pos')
+            ->post('/pos/payment-proof', [
+                'request_type' => 'pos_addon',
+                'addon_codes' => ['caller_id'],
+                'addon_cycle' => 'annual',
+                // Deliberately no proof upload.
+            ])
+            ->assertSessionHasErrors('proof');
+
+        $this->assertSame($remembered, session(PosAddonService::SIGNUP_SESSION_KEY));
+        $this->assertSame(0, PaymentProof::count());
     }
 
     // ─── 7. the queue is not a time machine ──────────────────────────────

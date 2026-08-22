@@ -58,6 +58,12 @@
                         <p class="text-sm text-purple-200/50 mt-1">{{ __('pos.auth_register_business_pra') }}</p>
                     </div>
 
+                    @php
+                        $signupAddonQuote = \App\Services\PosAddonService::quote(
+                            (array) old('requested_addons', $requestedAddonQuote['codes'] ?? []),
+                            (string) old('requested_addon_cycle', $requestedAddonQuote['cycle'] ?? 'annual')
+                        );
+                    @endphp
                     <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}' }">
                         @csrf
 
@@ -86,6 +92,30 @@
                             @endforeach
                         </div>
                         <p class="text-[10px] text-purple-300/40 leading-snug">{{ __('pos.auth_trial_note') }}</p>
+
+                        @if(!empty($signupAddonQuote['codes']))
+                        <div class="rounded-xl px-3 py-3" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-xs font-bold text-white">{{ __('pos.addons_signup_title') }}</p>
+                                    <p class="text-[10px] text-purple-100/60 mt-0.5">
+                                        {{ $signupAddonQuote['cycle'] === 'quarterly' ? __('pos.addons_cycle_quarterly') : __('pos.addons_cycle_annual') }}
+                                    </p>
+                                </div>
+                                <p class="text-sm font-bold text-amber-300">PKR {{ number_format($signupAddonQuote['total']) }}</p>
+                            </div>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                @foreach($signupAddonQuote['codes'] as $signupAddonCode)
+                                    <span class="rounded px-2 py-1 text-[10px] font-medium text-purple-50" style="background: rgba(255,255,255,0.08);">
+                                        {{ __('pos.addon_label_' . $signupAddonCode) }}
+                                    </span>
+                                    <input type="hidden" name="requested_addons[]" value="{{ $signupAddonCode }}">
+                                @endforeach
+                                <input type="hidden" name="requested_addon_cycle" value="{{ $signupAddonQuote['cycle'] }}">
+                            </div>
+                            <a href="/pos#pricing" class="inline-block mt-2 text-[10px] font-semibold text-cyan-200 hover:text-white">{{ __('pos.addons_signup_change') }}</a>
+                        </div>
+                        @endif
 
                         <div class="pt-1 pb-2" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 12px;">
                             <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">{{ __('pos.auth_select_business_type') }}</p>

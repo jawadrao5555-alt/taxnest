@@ -19,10 +19,11 @@ class PaymentProof extends Model
         'status',
         'pricing_plan_id',
         'billing_cycle',
-        // Extra-branch add-on (Aug 2026): 'subscription' (default) ya
-        // 'extra_branch' + kitne slots maange gaye.
+        // Add-on lanes (Aug 2026): 'subscription' (default), 'extra_branch'
+        // + kitne slots maange gaye, ya 'pos_addon' + kaun se feature codes.
         'request_type',
         'extra_branch_qty',
+        'addon_codes',
         'subscription_id',
         'notes',
         'verified_by',
@@ -40,8 +41,13 @@ class PaymentProof extends Model
         'extra_branch_qty' => 'integer',
     ];
 
+    /** Non-package request lanes. Anything NOT listed here is a renewal proof. */
+    public const ADDON_KINDS = ['extra_branch', 'pos_addon'];
+
     /** hasColumn() per call = DB round trip; per-request memo. */
     private static ?bool $kindColumn = null;
+
+    private static ?bool $addonCodesColumn = null;
 
     public static function kindColumnExists(): bool
     {
@@ -56,12 +62,28 @@ class PaymentProof extends Model
         return self::$kindColumn;
     }
 
-    /** 'subscription' | 'extra_branch' — pre-migration rows = subscription. */
+    public static function addonCodesColumnExists(): bool
+    {
+        if (self::$addonCodesColumn === null) {
+            try {
+                self::$addonCodesColumn = self::kindColumnExists()
+                    && Schema::hasColumn('payment_proofs', 'addon_codes');
+            } catch (\Throwable $e) {
+                self::$addonCodesColumn = false;
+            }
+        }
+
+        return self::$addonCodesColumn;
+    }
+
+    /** 'subscription' | 'extra_branch' | 'pos_addon' — pre-migration rows = subscription. */
     public function kind(): string
     {
-        return self::kindColumnExists() && $this->request_type === 'extra_branch'
-            ? 'extra_branch'
-            : 'subscription';
+        if (self::kindColumnExists() && in_array($this->request_type, self::ADDON_KINDS, true)) {
+            return $this->request_type;
+        }
+
+        return 'subscription';
     }
 
     public function isExtraBranch(): bool
@@ -69,10 +91,33 @@ class PaymentProof extends Model
         return $this->kind() === 'extra_branch';
     }
 
+    public function isPosAddon(): bool
+    {
+        return $this->kind() === 'pos_addon';
+    }
+
+    /** Feature codes requested on a pos_addon proof (JSON column → clean list). */
+    public function addonCodeList(): array
+    {
+        if (!$this->isPosAddon()) {
+            return [];
+        }
+
+        $decoded = json_decode((string) $this->addon_codes, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            $decoded,
+            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::ADDONS[$code])
+        )));
+    }
+
     /**
      * Package/renewal proofs only. Har wo jagah jahan "pending proof" ka matlab
      * "renewal review mein hai" hai (lock modal, expiry popup, one-pending rule)
-     * ko is scope se guzarna chahiye — warna ek extra-branch request renewal ka
+     * ko is scope se guzarna chahiye — warna ek add-on request renewal ka
      * form chhupa deti hai.
      */
     public function scopeSubscriptionKind(Builder $q): Builder
@@ -82,7 +127,7 @@ class PaymentProof extends Model
         }
 
         return $q->where(function ($w) {
-            $w->whereNull('request_type')->orWhere('request_type', '!=', 'extra_branch');
+            $w->whereNull('request_type')->orWhereNotIn('request_type', self::ADDON_KINDS);
         });
     }
 
@@ -94,6 +139,16 @@ class PaymentProof extends Model
         }
 
         return $q->where('request_type', 'extra_branch');
+    }
+
+    public function scopePosAddonKind(Builder $q): Builder
+    {
+        if (!self::addonCodesColumnExists()) {
+            // Lane abhi migrate nahi hui — koi pos_addon row ho hi nahi sakti.
+            return $q->whereRaw('1 = 0');
+        }
+
+        return $q->where('request_type', 'pos_addon');
     }
 
     public function company()

@@ -1364,6 +1364,10 @@ class FbrPosController extends Controller
             // the offline-cached copy, or a cached screen keeps showing (and
             // firing) buttons the server now refuses.
             (bool) \App\Services\PosAccessService::kotReprintAllowed($user, $company),
+            // Caller ID is BAKED as "switch AND plan/add-on gate" (PRA twin rule).
+            // The switch alone rides posConfigRev, but a plan change or an add-on
+            // purchase moves the verdict WITHOUT touching the column.
+            (bool) \App\Services\PosFeatureService::callerIdLive($company),
         ]));
 
         $screenPath = resource_path('views/fbr-pos/universal.blade.php');

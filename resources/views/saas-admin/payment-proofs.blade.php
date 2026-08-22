@@ -49,7 +49,25 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-gray-300">
-                                @if($proof->isExtraBranch())
+                                @if($proof->isPosAddon())
+                                    {{-- Paid feature add-on request — no package, no cycle change. --}}
+                                    @php
+                                        $paCodes = $proof->addonCodeList();
+                                        $paCycle = \App\Services\PosAddonService::cycleForProof($proof) ?? 'annual';
+                                        $paCatalog = \App\Services\PosAddonPricingService::ADDONS;
+                                        $paQuote = \App\Services\PosAddonService::quote($paCodes, $paCycle);
+                                    @endphp
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-violet-900/40 text-violet-300 border border-violet-700/60">Feature add-on &times; {{ count($paCodes) }}</span>
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                        {{ $paCycle === 'quarterly' ? 'Quarterly' : 'Annual' }} · quoted PKR {{ number_format($paQuote['total']) }}
+                                        @if($proof->pricingPlan)
+                                            · on {{ $proof->pricingPlan->name }}
+                                        @endif
+                                    </span>
+                                    <span class="block text-[11px] text-gray-400 mt-1 max-w-[240px]">
+                                        {{ implode(', ', array_map(fn ($c) => $paCatalog[$c]['label'] ?? $c, $paCodes)) ?: '—' }}
+                                    </span>
+                                @elseif($proof->isExtraBranch())
                                     {{-- Extra-branch add-on request — no package, no cycle. --}}
                                     @php $ebQty = max(1, (int) ($proof->extra_branch_qty ?? 1)); @endphp
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-sky-900/40 text-sky-300 border border-sky-700/60">Extra branch &times; {{ $ebQty }}</span>
@@ -129,7 +147,59 @@
                                     <button @click="panel = (panel === 'approve' ? null : 'approve')" class="text-xs text-emerald-400 hover:text-emerald-300 mr-2">Approve</button>
                                     <button @click="panel = (panel === 'reject' ? null : 'reject')" class="text-xs text-red-400 hover:text-red-300">Reject</button>
 
-                                    @if($proof->isExtraBranch())
+                                    @if($proof->isPosAddon())
+                                    {{-- Feature add-on approval: SIRF chune hue features khulte
+                                         hain. Koi plan/cycle select nahi — subscription row,
+                                         miyaad aur qeemat bilkul waise hi rehte hain. Admin
+                                         sirf ghata sakta hai (shop ne kam paisa bheja ho). --}}
+                                    <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[260px] max-w-[300px]">
+                                        @php
+                                            $paCodesSel = $proof->addonCodeList();
+                                            $paCycleSel = \App\Services\PosAddonService::cycleForProof($proof) ?? 'annual';
+                                            $paCatalogSel = \App\Services\PosAddonPricingService::ADDONS;
+                                            $paQuoteSel = \App\Services\PosAddonService::quote($paCodesSel, $paCycleSel);
+                                            $paPaid = $proof->amount !== null ? (float) $proof->amount : null;
+                                            $paShort = $paPaid !== null ? max(0, $paQuoteSel['total'] - $paPaid) : 0;
+                                        @endphp
+                                        <p class="text-[11px] text-gray-400 mb-1">Feature add-on. Approving switches ON <span class="text-gray-200 font-medium">only the ticked features</span> — the package, its expiry and the subscription row are not touched.</p>
+                                        <div class="rounded-lg border px-2.5 py-2 text-[11px] leading-relaxed {{ $paShort > 0 ? 'border-red-700/70 bg-red-900/25' : 'border-emerald-800/60 bg-emerald-900/15' }}">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-gray-400">Quoted total</span>
+                                                <span class="text-white font-semibold">PKR {{ number_format($paQuoteSel['total']) }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-gray-700/60">
+                                                <span class="text-gray-400">Shop says paid</span>
+                                                <span class="font-semibold {{ $paShort > 0 ? 'text-red-300' : 'text-emerald-300' }}">
+                                                    {{ $paPaid !== null ? 'PKR ' . number_format($paPaid) : 'Not stated' }}
+                                                </span>
+                                            </div>
+                                            @if($paShort > 0)
+                                                <p class="mt-1 font-bold text-red-300">SHORT by PKR {{ number_format($paShort) }} — untick a feature or reject.</p>
+                                            @endif
+                                        </div>
+                                        <form method="POST" action="{{ route('saas.admin.payment-proofs.approve', $proof->id) }}" class="space-y-2">
+                                            @csrf
+                                            <label class="block text-[11px] text-gray-400">Features to activate</label>
+                                            <div class="space-y-1.5">
+                                                @foreach($paCodesSel as $paCode)
+                                                <label class="flex items-start gap-2 text-[11px] text-gray-300">
+                                                    <input type="checkbox" name="addon_codes[]" value="{{ $paCode }}" checked class="mt-0.5 rounded bg-gray-900 border-gray-700">
+                                                    <span>
+                                                        {{ $paCatalogSel[$paCode]['label'] ?? $paCode }}
+                                                        <span class="block text-gray-500">PKR {{ number_format($paQuoteSel['lines'][$paCode] ?? 0) }}</span>
+                                                    </span>
+                                                </label>
+                                                @endforeach
+                                            </div>
+                                            <label class="block text-[11px] text-gray-400 pt-1">Billing</label>
+                                            <select name="addon_cycle" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                                <option value="annual" @selected($paCycleSel === 'annual')>Annual</option>
+                                                <option value="quarterly" @selected($paCycleSel === 'quarterly')>Quarterly</option>
+                                            </select>
+                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Add-on</button>
+                                        </form>
+                                    </div>
+                                    @elseif($proof->isExtraBranch())
                                     {{-- Add-on approval: SIRF slots barhte hain. Koi plan/cycle
                                          select nahi — subscription row, miyaad aur qeemat
                                          bilkul waise hi rehte hain. --}}

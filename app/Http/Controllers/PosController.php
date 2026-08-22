@@ -2356,6 +2356,11 @@ class PosController extends Controller
             // the offline-cached copy, or a cached screen keeps showing (and
             // firing) buttons the server now refuses.
             (bool) \App\Services\PosAccessService::kotReprintAllowed($user, $company),
+            // Caller ID is BAKED as "switch AND plan/add-on gate". The switch
+            // alone rides posConfigRev, but a plan change or an add-on purchase
+            // moves the verdict WITHOUT touching the column — fold the resolved
+            // answer in, or a cached screen keeps the stale one.
+            (bool) \App\Services\PosFeatureService::callerIdLive($company),
             // Task 657: restaurant flags (KOT/tables buttons) are BAKED into the
             // sale screen after the restaurantAllowed() mask — a plan flip
             // (e.g. Starter→Business now unlocks Kitchen mode) must refresh the
@@ -10824,7 +10829,28 @@ class PosController extends Controller
             ->with('pricingPlan')
             ->first();
 
-        return view('pos.billing', compact('company', 'plans', 'currentSubscription'));
+        // Paid feature add-ons (Aug 2026). Prices and the purchasable list come
+        // from the services so this page always quotes exactly what the approval
+        // will activate — no client-side arithmetic, no hand-written catalogue.
+        $addons = [
+            'eligibility' => \App\Services\PosAddonService::purchaseEligibility($company),
+            'catalog' => \App\Services\PosAddonPricingService::catalog(),
+            'purchasable' => \App\Services\PosAddonService::purchasableCodes($company),
+            'active' => \App\Services\PosAddonService::activeCodes($company),
+            'pending' => \App\Services\PosAddonService::pendingCodes($company),
+            // Spending the shop's money is an owner/manager decision. A cashier
+            // may still SEE what is active; the POST is guarded server-side.
+            'can_buy' => !(auth('pos')->user()?->isPosCashier() ?? false),
+        ];
+        $bank = [
+            'bank_name' => \App\Models\SystemSetting::get('payment_bank_name', ''),
+            'account_title' => \App\Models\SystemSetting::get('payment_account_title', ''),
+            'account_number' => \App\Models\SystemSetting::get('payment_account_number', ''),
+            'iban' => \App\Models\SystemSetting::get('payment_iban', ''),
+            'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
+        ];
+
+        return view('pos.billing', compact('company', 'plans', 'currentSubscription', 'addons', 'bank'));
     }
 
     public function businessProfile(Request $request)

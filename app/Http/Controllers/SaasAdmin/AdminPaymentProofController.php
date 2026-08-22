@@ -59,6 +59,12 @@ class AdminPaymentProofController extends Controller
             return $this->approveExtraBranch($request, $proof);
         }
 
+        // Paid feature add-on: sirf chune hue feature khulte hain. Package,
+        // uski miyaad aur subscription row bilkul waise hi rehte hain.
+        if ($proof->isPosAddon()) {
+            return $this->approvePosAddon($request, $proof);
+        }
+
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
@@ -306,6 +312,125 @@ class AdminPaymentProofController extends Controller
         return back()->with('success', "Extra branch approved — {$result['company']->name} now has {$result['after']} paid branch slot(s). The package and its expiry were not changed.");
     }
 
+    /**
+     * Paid feature add-on approval (PRA POS, Aug 2026).
+     *
+     * Sirf pos_addons rows bante hain — subscription row, plan, miyaad, qeemat
+     * aur company status ko haath nahi lagaya jata. Admin approve karte waqt
+     * features ki list theek kar sakta hai (agar shop ne kam/zyada paisa bheja
+     * ho), lekin sirf usi list mein se jo shop ne maangi thi.
+     */
+    private function approvePosAddon(Request $request, PaymentProof $proof)
+    {
+        $requested = $proof->addonCodeList();
+        if (empty($requested)) {
+            return back()->with('error', 'This add-on request has no valid features on it — reject it and ask the shop to resubmit.');
+        }
+
+        $request->validate([
+            'addon_codes' => 'nullable|array',
+            'addon_codes.*' => 'string',
+            'addon_cycle' => 'nullable|in:annual,quarterly',
+        ]);
+
+        if (!Schema::hasTable('pos_addons')) {
+            return back()->with('error', 'The pos_addons table is missing — run php artisan migrate --force first.');
+        }
+
+        // Admin sirf ghata sakta hai: jo shop ne maanga tha usi se intikhab.
+        $chosen = $request->input('addon_codes');
+        $codes = is_array($chosen) && !empty($chosen)
+            ? array_values(array_intersect($requested, $chosen))
+            : $requested;
+        if (empty($codes)) {
+            return back()->with('error', 'Select at least one feature to approve, or reject the request instead.');
+        }
+
+        $cycle = $request->input('addon_cycle')
+            ?: (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
+        $quote = \App\Services\PosAddonService::quote($codes, $cycle);
+
+        $result = DB::transaction(function () use ($proof, $quote) {
+            $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
+            if (!$locked || $locked->status !== 'pending') {
+                return ['outcome' => 'already_processed'];
+            }
+
+            $company = Company::where('id', $locked->company_id)->lockForUpdate()->first();
+            if (!$company) {
+                return ['outcome' => 'already_processed'];
+            }
+
+            // Re-check eligibility HERE, not just at submission. A request can
+            // sit in the queue for days: in that window the shop may have
+            // downgraded to Starter, switched to FBR, or let the package lapse.
+            // Approving any of those would mint an entitlement the shop is not
+            // entitled to — and, with no live package to date it against, one
+            // with an invented expiry.
+            \App\Services\PosAddonService::flushCache();
+            $eligibility = \App\Services\PosAddonService::purchaseEligibility($company);
+            if (!($eligibility['allowed'] ?? false)) {
+                return ['outcome' => 'not_eligible'];
+            }
+
+            // Miyaad chalte hue package ke sath: add-on package se aage nahi jata.
+            $sub = $eligibility['subscription'] ?? null;
+            if (!$sub || !$sub->end_date) {
+                return ['outcome' => 'no_expiry'];
+            }
+
+            \App\Services\PosAddonService::activate(
+                $company,
+                $quote['codes'],
+                $quote['cycle'],
+                $quote['total'],
+                $locked->id,
+                $sub
+            );
+
+            $locked->update([
+                'status' => 'verified',
+                'addon_codes' => json_encode($quote['codes']),
+                'subscription_id' => $sub?->id,
+                'verified_by' => auth('admin')->id(),
+                'verified_at' => now(),
+                'reject_reason' => null,
+            ]);
+
+            return ['outcome' => 'approved', 'company' => $company, 'subscription' => $sub];
+        });
+
+        if (($result['outcome'] ?? null) !== 'approved') {
+            return back()->with('error', match ($result['outcome'] ?? '') {
+                'not_eligible' => 'This shop is no longer eligible for paid add-ons (it must be on a live, paid Business-or-higher PRA POS package). Sort the package out first, or reject this request and refund the shop.',
+                'no_expiry' => 'This shop has no dated active package to attach the add-on to. Renew or fix the package first — an add-on must always expire with it.',
+                default => 'This payment proof was already processed.',
+            });
+        }
+
+        // A freshly bought feature must be visible on the very next request.
+        \App\Services\PosFeatureService::flushGateCaches();
+
+        AdminAuditLog::log(auth('admin')->id(), 'POS feature add-on approved', 'PaymentProof', $proof->id, [
+            'company_id' => $proof->company_id,
+            'addon_codes' => $quote['codes'],
+            'billing_cycle' => $quote['cycle'],
+            'quoted_total' => $quote['total'],
+            'amount_claimed' => $proof->amount,
+            'ends_at' => (string) ($result['subscription']->end_date ?? ''),
+        ]);
+
+        $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
+
+        $labels = array_map(
+            fn ($code) => \App\Services\PosAddonPricingService::ADDONS[$code]['label'] ?? $code,
+            $quote['codes']
+        );
+
+        return back()->with('success', 'Feature add-on approved — ' . ($result['company']->name ?? 'the shop')
+            . ' now has: ' . implode(', ', $labels) . '. The package and its expiry were not changed.');
+    }
+
     public function reject(Request $request, $id)
     {
         $request->validate([
@@ -451,6 +576,92 @@ class AdminPaymentProofController extends Controller
                 'fbrpos' => ['Nest FBR POS', url('/fbr-pos/login')],
                 default => ['Digital Invoicing', url('/login')],
             };
+
+            // Paid feature add-on: package ki baat hi nahi — sirf chune hue features.
+            if ($proof->isPosAddon()) {
+                $codes = $proof->addonCodeList();
+                $labels = array_map(
+                    fn ($code) => \App\Services\PosAddonPricingService::ADDONS[$code]['label'] ?? $code,
+                    $codes
+                );
+                $featureList = $labels ? implode(', ', $labels) : 'the requested features';
+
+                if ($decision === 'approved') {
+                    $endsAt = \App\Models\PosAddon::where('company_id', $company->id)
+                        ->whereIn('addon_code', $codes ?: ['__none__'])
+                        ->orderByDesc('ends_at')
+                        ->value('ends_at');
+
+                    $title = 'Feature add-on activated';
+                    $message = "Your feature add-on is active: {$featureList}. Your package and its expiry date have not changed.";
+                    $subject = 'Feature add-on activated — you can use it now';
+                    $headline = 'Your new features are switched on.';
+                    $paragraphs = array_values(array_filter([
+                        "We have verified your payment for {$company->name}.",
+                        "Features activated: {$featureList}.",
+                        $endsAt ? 'Active until ' . \Carbon\Carbon::parse($endsAt)->format('d M Y') . ' — they renew with your package.' : null,
+                        'Log in to your NestPOS panel to start using them. Your package, its expiry date and its price stay exactly the same.',
+                    ]));
+                    $ctaLabel = 'Open My Panel';
+                } else {
+                    $reason = trim((string) $proof->reject_reason);
+                    $reasonLine = $reason !== '' ? $reason : 'No reason specified — please contact support.';
+                    if (!str_ends_with($reasonLine, '.')) {
+                        $reasonLine .= '.';
+                    }
+                    $title = 'Feature add-on request rejected';
+                    $message = 'Your feature add-on request was rejected: ' . $reasonLine . ' No features were switched on.';
+                    $subject = 'Feature add-on request rejected — action required';
+                    $headline = 'Your feature add-on request could not be verified.';
+                    $paragraphs = [
+                        "The add-on payment you submitted for {$company->name} could not be verified.",
+                        "Reason: {$reasonLine}",
+                        'No features were switched on. Please submit a new payment proof from the Billing page, or contact our support team on WhatsApp.',
+                    ];
+                    $ctaLabel = 'Log In & Resubmit';
+                }
+
+                Notification::create([
+                    'company_id' => $company->id,
+                    'type' => $decision === 'approved' ? 'pos_addon_approved' : 'pos_addon_rejected',
+                    'title' => $title,
+                    'message' => $message,
+                    'read' => false,
+                    'metadata' => [
+                        'payment_proof_id' => $proof->id,
+                        'product_type' => $plan?->product_type ?? 'pos',
+                        'addon_codes' => $codes,
+                    ],
+                ]);
+
+                $email = $this->companyRecipientEmail($company);
+                if ($email) {
+                    try {
+                        Mail::to($email)->send(new \App\Mail\TrialReminderMail(
+                            subjectLine: $subject,
+                            companyName: $company->name ?? 'your company',
+                            headline: $headline,
+                            paragraphs: $paragraphs,
+                            ctaUrl: $ctaUrl,
+                            ctaLabel: $ctaLabel,
+                            panelName: $panelName,
+                        ));
+
+                        \App\Services\MailHealth::recordSuccess();
+                    } catch (\Throwable $e) {
+                        Log::warning('POS add-on decision email failed', [
+                            'payment_proof_id' => $proof->id,
+                            'company_id' => $company->id,
+                            'decision' => $decision,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        \App\Services\MailHealth::recordFailure('POS add-on decision email', $e);
+                    }
+                }
+
+                return;
+            }
 
             // Extra-branch add-on: package ki baat hi nahi — sirf branch slots.
             if ($proof->isExtraBranch()) {

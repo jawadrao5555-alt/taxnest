@@ -349,6 +349,22 @@ class PosFeatureService
         return self::fbrStoreSlipOn($company) && self::rawFlag($company, 'kitchen_notes');
     }
 
+    /**
+     * Caller ID popup live on the sale screen RIGHT NOW.
+     *
+     * Two things must both be true: the shop's own switch (companies.caller_id_enabled)
+     * AND the plan/add-on gate. The APIs already refuse a plan-locked shop
+     * (PosCallerIdController::planLocked), but the sale screens used to bake the
+     * raw column — so a downgraded shop still saw a dead call-back button and a
+     * popup poller that could only ever get 403s. One resolver, used by both
+     * universal screens and by their boot fingerprints.
+     */
+    public static function callerIdLive(?Company $company): bool
+    {
+        return (bool) ($company?->caller_id_enabled ?? false)
+            && self::planAllows($company, 'caller_id_enabled');
+    }
+
     public static function rawFlag(?Company $company, string $flag): bool
     {
         if (!$company) {
@@ -415,13 +431,18 @@ class PosFeatureService
     {
         self::$planGateCache = [];
         self::$restaurantAllowedCache = [];
+        \App\Services\PosAddonService::flushCache();
     }
 
     /**
      * Does this company's plan include the given premium feature column?
      * Same source hierarchy as the Restaurant module: internal → override →
-     * plan column → active trial. Missing column (pre-migration PROD window)
-     * fails OPEN so a lagging migrate never locks paying users out.
+     * plan column → active trial → PAID ADD-ON. Missing column (pre-migration
+     * PROD window) fails OPEN so a lagging migrate never locks paying users out.
+     *
+     * The paid add-on grant (Aug 2026) is resolved HERE, inside the one gate the
+     * whole app already calls, so a bought feature can never need a second —
+     * and therefore bypassable — entitlement check at the call site.
      */
     public static function planAllows(?Company $company, string $planColumn): bool
     {
@@ -478,7 +499,36 @@ class PosFeatureService
             }
         }
 
+        // Paid add-on: a Business+ PRA shop can BUY one of the six optional
+        // features instead of upgrading its package. Checked last — it only
+        // ever ADDS access, never removes what the package already grants.
+        if (!$allowed) {
+            $allowed = self::addonAllows($company, $planColumn);
+        }
+
         return self::$planGateCache[$company->id][$planColumn] = $allowed;
+    }
+
+    /**
+     * Verified, unexpired paid add-on for this gate?
+     *
+     * Deliberately fails CLOSED (unlike the plan-column branch above): a
+     * missing pos_addons table means nobody has bought anything yet, so the
+     * package answer already stands. Never let an add-on lookup fault break a
+     * gate that the plan itself was about to decide.
+     */
+    protected static function addonAllows(?Company $company, string $planColumn): bool
+    {
+        try {
+            return \App\Services\PosAddonService::allowsGate($company, $planColumn);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('POS add-on gate lookup failed', [
+                'company_id' => $company?->id,
+                'column' => $planColumn,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
     }
 
     /**

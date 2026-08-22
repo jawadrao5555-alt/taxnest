@@ -38,6 +38,12 @@ class PaymentProofController extends Controller
             return $this->storeExtraBranchRequest($request, $company);
         }
 
+        // Paid feature add-on (PRA POS, Aug 2026) — teesri lane: approve par
+        // sirf chune hue feature khulte hain, package bilkul waisa hi rehta hai.
+        if ($request->input('request_type') === 'pos_addon') {
+            return $this->storePosAddonRequest($request, $company);
+        }
+
         $productType = $this->resolveProductType($company);
         $allowedCycles = match ($productType) {
             'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
@@ -187,6 +193,169 @@ class PaymentProofController extends Controller
 
         return back()->with('success', __('pos.eb_submitted'))
             ->with('payment_proof', 'submitted');
+    }
+
+    /**
+     * Paid feature add-on request (owner-approved, Aug 2026).
+     *
+     * Chhe optional features — Delivery Riders, QR Menu, WhatsApp Bill, Staff
+     * Attendance, Rider Live Tracking, Caller ID — Business se ooper ke PRA POS
+     * shops alag khareed sakte hain. Yahan sirf REQUEST banti hai; feature admin
+     * ke approve karne par khulta hai. Extra-branch ki tarah: NO instant access
+     * grant aur subscription row ko bilkul haath nahi lagta.
+     */
+    private function storePosAddonRequest(Request $request, ?\App\Models\Company $company)
+    {
+        // Sirf PRA POS panel ka feature hai — baqi panels par raasta hi nahi.
+        if (!$company || !auth('pos')->check() || $this->resolveProductType($company) !== 'pos') {
+            return back()->with('error', __('pos.addons_not_available'))
+                ->with('payment_proof', 'error');
+        }
+
+        // Paisay ka faisla sirf malik/manager ka. A cashier must never be able
+        // to file a purchase request for the shop — the billing page hides the
+        // box from them, but the POST is the only guard that actually counts.
+        if (auth('pos')->user()?->posCashierBlocked()) {
+            abort(403);
+        }
+
+        if (!Schema::hasTable('pos_addons') || !PaymentProof::addonCodesColumnExists()) {
+            return back()->with('error', __('pos.addons_not_available'))
+                ->with('payment_proof', 'error');
+        }
+
+        $eligibility = \App\Services\PosAddonService::purchaseEligibility($company);
+        if (!$eligibility['allowed']) {
+            return back()->with('error', __($eligibility['reason_key'] ?? 'pos.addons_not_available'))
+                ->with('payment_proof', 'error');
+        }
+
+        $validated = $request->validate([
+            'addon_codes' => 'required|array|min:1',
+            'addon_codes.*' => 'required|string|in:' . implode(',', array_keys(\App\Services\PosAddonPricingService::ADDONS)),
+            'addon_cycle' => 'required|in:annual,quarterly',
+            'amount' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
+            'reference' => 'nullable|string|max:120',
+            'payment_date' => 'nullable|date',
+            'notes' => 'nullable|string|max:500',
+            'proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+        ]);
+
+        // Store the receipt before the lock so the transaction stays short —
+        // an orphan file is harmless, a long-held row lock is not.
+        $path = $request->file('proof')->store('payment-proofs/' . $company->id, 'local');
+
+        // The "one pending request" rule and the purchasable list are BOTH
+        // read-then-write. Two tabs (or a double-tap on a slow connection)
+        // would otherwise file two requests for the same features and the shop
+        // could be charged twice. Every writer in this lane locks the same
+        // company row first, so the second one sees the first one's proof.
+        $outcome = \Illuminate\Support\Facades\DB::transaction(function () use ($company, $validated) {
+            \App\Models\Company::where('id', $company->id)->lockForUpdate()->first();
+
+            $pending = PaymentProof::posAddonKind()
+                ->where('company_id', $company->id)
+                ->where('status', 'pending')
+                ->exists();
+            if ($pending) {
+                return ['status' => 'pending'];
+            }
+
+            // Never sell what the shop already has: drop anything its package
+            // (or an earlier purchase) already grants. Server-side — the form
+            // is only a hint. Re-read INSIDE the lock so a purchase approved a
+            // moment ago cannot be bought a second time.
+            \App\Services\PosAddonService::flushCache();
+            $purchasable = \App\Services\PosAddonService::purchasableCodes($company);
+            $codes = array_values(array_intersect($validated['addon_codes'], $purchasable));
+            if (empty($codes)) {
+                return ['status' => 'nothing_to_buy'];
+            }
+
+            return ['status' => 'ok', 'codes' => $codes];
+        });
+
+        if ($outcome['status'] === 'pending') {
+            return back()->with('success', __('pos.addons_already_pending'))
+                ->with('payment_proof', 'pending');
+        }
+        if ($outcome['status'] === 'nothing_to_buy') {
+            return back()->with('error', __('pos.addons_nothing_to_buy'))
+                ->with('payment_proof', 'error');
+        }
+
+        $quote = \App\Services\PosAddonService::quote($outcome['codes'], $validated['addon_cycle']);
+        $sub = $eligibility['subscription'] ?? null;
+
+        $proof = PaymentProof::create([
+            'company_id' => $company->id,
+            // Context only — approval never reads it for pricing.
+            'pricing_plan_id' => $sub?->pricing_plan_id,
+            // The add-on's OWN cycle (annual/quarterly). Safe to reuse this
+            // column: the subscriptionKind scope keeps pos_addon rows out of
+            // every renewal query, so it can never be read as a package cycle.
+            'billing_cycle' => $quote['cycle'],
+            'request_type' => 'pos_addon',
+            'addon_codes' => json_encode($quote['codes']),
+            'amount' => $validated['amount'] ?? $quote['total'],
+            'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
+            'reference' => $validated['reference'] ?? null,
+            'payment_date' => $validated['payment_date'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'proof_path' => $path,
+            'status' => 'pending',
+        ]);
+
+        $this->alertAdminsPosAddon($company, $proof, $quote);
+
+        return back()->with('success', __('pos.addons_submitted'))
+            ->with('payment_proof', 'submitted');
+    }
+
+    /** Admins ko feature add-on request ki ittila (best-effort, kabhi submission na toray). */
+    private function alertAdminsPosAddon(\App\Models\Company $company, PaymentProof $proof, array $quote): void
+    {
+        try {
+            $emails = \App\Models\AdminUser::whereNotNull('email')
+                ->where('email', '!=', '')
+                ->pluck('email')->unique()->values();
+            if ($emails->isEmpty()) {
+                return;
+            }
+
+            $catalog = \App\Services\PosAddonPricingService::ADDONS;
+            $lines = [];
+            foreach ($quote['codes'] as $code) {
+                $lines[] = '  - ' . ($catalog[$code]['label'] ?? $code)
+                    . ': PKR ' . number_format($quote['lines'][$code] ?? 0);
+            }
+
+            $amount = $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : 'Not specified';
+            $body = "A PAID FEATURE ADD-ON request is waiting for review.\n\n"
+                . 'Company: ' . ($company->name ?? ('Company #' . $proof->company_id)) . "\n"
+                . 'Panel: NestPOS (PRA)' . "\n"
+                . 'Billing: ' . ($quote['cycle'] === 'quarterly' ? 'Quarterly' : 'Annual') . "\n"
+                . "Features requested:\n" . implode("\n", $lines) . "\n"
+                . 'Quoted total: PKR ' . number_format($quote['total']) . "\n"
+                . "Amount paid: {$amount}\n"
+                . ($proof->reference ? 'Reference: ' . $proof->reference . "\n" : '')
+                . "\nApproving switches ON only the selected features until the current package expires. The package, its price and its expiry stay untouched.\n"
+                . 'Review: ' . route('saas.admin.payment-proofs') . "\n\nTaxNest";
+
+            Mail::raw($body, function ($m) use ($emails, $company) {
+                $m->to($emails->all())->subject('Feature add-on request — ' . ($company->name ?? 'Company'));
+            });
+
+            \App\Services\MailHealth::recordSuccess();
+        } catch (\Throwable $e) {
+            Log::warning('POS add-on request admin alert failed', [
+                'proof_id' => $proof->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            \App\Services\MailHealth::recordFailure('POS add-on request admin alert', $e);
+        }
     }
 
     /** Admins ko extra-branch request ki ittila (best-effort, kabhi submission na toray). */

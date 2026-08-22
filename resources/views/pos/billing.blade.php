@@ -147,6 +147,188 @@
                 @endforeach
             </div>
 
+            {{-- ── Optional paid features (Aug 2026) ──
+                 Six add-ons a Business+ shop can buy instead of upgrading. Every
+                 price and the purchasable list come from PosAddonService /
+                 PosAddonPricingService, so this box can never quote something the
+                 approval will not activate. Features the package already grants are
+                 filtered out server-side. --}}
+            @php
+                $adCatalog = $addons['catalog'] ?? [];
+                $adEligible = $addons['eligibility']['allowed'] ?? false;
+                $adPurchasable = $addons['purchasable'] ?? [];
+                $adActive = $addons['active'] ?? [];
+                $adPending = $addons['pending'] ?? [];
+                $adCanBuy = $addons['can_buy'] ?? true;
+                $adForceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('addon_codes');
+                $adPrices = [];
+                foreach ($adPurchasable as $adCode) {
+                    $adPrices[$adCode] = [
+                        'annual' => (int) ($adCatalog[$adCode]['annual_price'] ?? 0),
+                        'quarterly' => (int) ($adCatalog[$adCode]['quarterly_price'] ?? 0),
+                    ];
+                }
+            @endphp
+
+            <div class="mt-10">
+                <div class="text-center mb-5">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ __('pos.addons_title') }}</h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">{{ __('pos.addons_subtitle') }}</p>
+                </div>
+
+                @if(!empty($adActive))
+                <div class="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+                    <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{{ __('pos.addons_active_title') }}</p>
+                    <p class="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
+                        {{ implode(', ', array_map(fn ($c) => __('pos.addon_label_' . $c), $adActive)) }}
+                    </p>
+                </div>
+                @endif
+
+                @if(!empty($adPending))
+                <div class="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">{{ __('pos.addons_pending_title') }}</p>
+                    <p class="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                        {{ __('pos.addons_pending_desc') }}
+                        <span class="block mt-0.5 font-medium">{{ implode(', ', array_map(fn ($c) => __('pos.addon_label_' . $c), $adPending)) }}</span>
+                    </p>
+                </div>
+                @endif
+
+                @if(!$adEligible)
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5 text-center">
+                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ __($addons['eligibility']['reason_key'] ?? 'pos.addons_not_available') }}</p>
+                </div>
+                @elseif(empty($adPurchasable))
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5 text-center">
+                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('pos.addons_none_left') }}</p>
+                </div>
+                @elseif(!$adCanBuy)
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm p-5 text-center">
+                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('pos.addons_owner_only') }}</p>
+                </div>
+                @else
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-md p-5"
+                     x-data="{
+                        open: {{ $adForceOpen ? 'true' : 'false' }},
+                        cycle: {{ \Illuminate\Support\Js::from(old('addon_cycle', 'annual')) }},
+                        picked: {{ \Illuminate\Support\Js::from(array_values(array_intersect((array) old('addon_codes', []), $adPurchasable))) }},
+                        prices: {{ \Illuminate\Support\Js::from($adPrices) }},
+                        toggle(code) {
+                            const i = this.picked.indexOf(code);
+                            if (i === -1) { this.picked.push(code); } else { this.picked.splice(i, 1); }
+                        },
+                        priceOf(code) {
+                            const row = this.prices[code];
+                            return row ? Number(row[this.cycle] || 0) : 0;
+                        },
+                        total() {
+                            return this.picked.reduce((sum, code) => sum + this.priceOf(code), 0);
+                        },
+                        fmt(v) { return Number(v || 0).toLocaleString('en-US'); }
+                     }">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <div class="inline-flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+                            <button type="button" @click="cycle = 'annual'"
+                                    class="px-3 py-1.5 rounded-md text-xs font-semibold transition"
+                                    :class="cycle === 'annual' ? 'bg-purple-600 text-white' : 'text-gray-500 dark:text-gray-400'">
+                                {{ __('pos.addons_cycle_annual') }}
+                            </button>
+                            <button type="button" @click="cycle = 'quarterly'"
+                                    class="px-3 py-1.5 rounded-md text-xs font-semibold transition"
+                                    :class="cycle === 'quarterly' ? 'bg-purple-600 text-white' : 'text-gray-500 dark:text-gray-400'">
+                                {{ __('pos.addons_cycle_quarterly') }}
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('pos.addons_included_note') }}</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach($adPurchasable as $adCode)
+                        <label class="relative flex flex-col gap-1 rounded-xl border p-4 cursor-pointer transition"
+                               :class="picked.includes({{ \Illuminate\Support\Js::from($adCode) }})
+                                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500'
+                                    : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'">
+                            <div class="flex items-start gap-2">
+                                <input type="checkbox" class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                       :checked="picked.includes({{ \Illuminate\Support\Js::from($adCode) }})"
+                                       @change="toggle({{ \Illuminate\Support\Js::from($adCode) }})">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ __('pos.addon_label_' . $adCode) }}</p>
+                                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.addon_desc_' . $adCode) }}</p>
+                                </div>
+                            </div>
+                            <p class="text-sm font-bold text-purple-700 dark:text-purple-300 mt-1">
+                                PKR <span x-text="fmt(priceOf({{ \Illuminate\Support\Js::from($adCode) }}))"></span>
+                                <span class="text-[11px] font-medium text-gray-400"
+                                      x-text="cycle === 'quarterly' ? {{ \Illuminate\Support\Js::from('/ ' . __('pos.addons_per_quarter')) }} : {{ \Illuminate\Support\Js::from('/ ' . __('pos.addons_per_year')) }}"></span>
+                            </p>
+                        </label>
+                        @endforeach
+                    </div>
+
+                    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-800 pt-4">
+                        <p class="text-sm text-gray-600 dark:text-gray-300">
+                            {{ __('pos.addons_total_label') }}
+                            <span class="font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="fmt(total())"></span></span>
+                        </p>
+                        <button type="button" @click="open = !open" :disabled="picked.length === 0"
+                                class="bg-purple-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                            {{ __('pos.addons_buy_cta') }}
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-2">{{ __('pos.addons_renewal_note') }}</p>
+
+                    <div x-show="open && picked.length > 0" x-cloak class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <form method="POST" action="{{ route('pos.payment-proof.store') }}" enctype="multipart/form-data" class="space-y-3">
+                            @csrf
+                            <input type="hidden" name="request_type" value="pos_addon">
+                            <input type="hidden" name="addon_cycle" :value="cycle">
+                            <template x-for="code in picked" :key="code">
+                                <input type="hidden" name="addon_codes[]" :value="code">
+                            </template>
+
+                            @error('addon_codes')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+
+                            @if($bank['bank_name'] || $bank['account_number'] || $bank['iban'])
+                            <div class="rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
+                                <p class="font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.pp_bank_details') }}</p>
+                                @if($bank['bank_name'])<p>{{ $bank['bank_name'] }}</p>@endif
+                                @if($bank['account_title'])<p>{{ $bank['account_title'] }}</p>@endif
+                                @if($bank['account_number'])<p class="font-mono">{{ $bank['account_number'] }}</p>@endif
+                                @if($bank['iban'])<p class="font-mono">{{ $bank['iban'] }}</p>@endif
+                                @if($bank['instructions'])<p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $bank['instructions'] }}</p>@endif
+                            </div>
+                            @endif
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="{{ __('pos.pp_amount_paid') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                       class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                                <select name="payment_method"
+                                        class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                                    <option value="">{{ __('pos.pp_payment_method') }}</option>
+                                    <option value="bank" @selected(old('payment_method') === 'bank')>{{ __('pos.pp_method_bank') }}</option>
+                                    <option value="jazzcash" @selected(old('payment_method') === 'jazzcash')>JazzCash</option>
+                                    <option value="easypaisa" @selected(old('payment_method') === 'easypaisa')>EasyPaisa</option>
+                                    <option value="other" @selected(old('payment_method') === 'other')>{{ __('pos.pp_method_other') }}</option>
+                                </select>
+                            </div>
+                            <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="{{ __('pos.pp_reference') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                   class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                            <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" required
+                                   class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500">
+                            @error('proof')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+                            <p class="text-[11px] text-gray-400">{{ __('pos.pp_accepted_formats') }}</p>
+
+                            <button type="submit" class="w-full sm:w-auto bg-purple-600 text-white rounded-lg px-5 py-2.5 text-sm font-semibold hover:bg-purple-700">
+                                {{ __('pos.addons_submit_cta') }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                @endif
+            </div>
+
             {{-- Same comparison table the landing page shows (Task 1350), with the
                  customer's own package highlighted so an upgrade is a glance away. --}}
             <x-pos-plan-comparison

@@ -1275,7 +1275,7 @@ window.addEventListener('popstate', function() {
                     {{-- Caller ID (Task 1353 — PRA port): attached customer ko wahin se
                          call back, cashier ko Haaliya calls kholne ki zaroorat nahi.
                          Sirf Caller ID wali shops par, aur sirf jab number mojood ho. --}}
-                    @if($company->caller_id_enabled ?? false)
+                    @if(\App\Services\PosFeatureService::callerIdLive($company))
                     <button type="button" x-show="selectedCustomer && selectedCustomer.phone" x-cloak
                             @click="callerDialBack({ phone: selectedCustomer.phone, name: selectedCustomer.name }, { attach: false })" :disabled="callerDialBusy"
                             title="{{ __('pos.ti_call_back') }}" aria-label="{{ __('pos.ti_call_back') }}"
@@ -3521,9 +3521,12 @@ function restaurantPos() {
         newCustomerAddress: '',
         highlightIndex: 0,
         // ── Caller ID (Task 1353 — PRA port): incoming-call popup ───────────
-        // Baked flag — caller_id_enabled sits in the posConfigRev whitelist so
-        // a settings toggle refreshes offline-cached sale screens.
-        callerIdOn: {{ ($company->caller_id_enabled ?? false) ? 'true' : 'false' }},
+        // Baked flag — the shop's own switch AND the plan/add-on gate (PRA twin
+        // rule), so a plan-locked shop never gets a popup poller that can only
+        // earn 403s. caller_id_enabled sits in the posConfigRev whitelist and the
+        // resolved verdict rides the boot fingerprint, so BOTH a settings toggle
+        // and a plan/add-on change refresh offline-cached sale screens.
+        callerIdOn: {{ \App\Services\PosFeatureService::callerIdLive($company) ? 'true' : 'false' }},
         callerPopup: null,   // the ring event currently on screen
         callerQueue: [],     // rings deferred while a blocking modal is open
         callerLastId: 0,     // server cursor (max event id already fetched)

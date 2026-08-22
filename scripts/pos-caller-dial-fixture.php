@@ -42,6 +42,7 @@ use App\Models\PricingPlan;
 use App\Models\User;
 use App\Services\PkPhone;
 use App\Services\PlanLimitService;
+use App\Services\PosAddonService;
 use App\Services\PosFeatureService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -187,27 +188,54 @@ switch ($cmd) {
             'orig_caller_id_enabled' => (int) $company->caller_id_enabled,
             'subscription_id' => null,
             'orig_pricing_plan_id' => null,
+            'addon_row_id' => null,
+            'addon_created' => false,
+            'addon_orig' => null,
             'customer_id' => null,
             'created_customer' => false,
             'event_id' => null,
             'device_id' => null,
         ];
 
-        // 1. Plan gate. Caller ID is Unlimited-only, so borrow a POS plan that
-        //    genuinely carries the column (never an internal-account bypass —
-        //    the check must exercise the real gate the shops hit).
+        // 1. Entitlement. 22 Aug 2026: Caller ID is a paid ADD-ON — no plan
+        //    column carries it any more. Grant the shop a real pos_addons row
+        //    (never an internal-account bypass — the check must exercise the
+        //    exact add-on gate the shops hit). Teardown restores it.
         if (!PosFeatureService::planAllows($company, 'caller_id_enabled')) {
-            $sub = PlanLimitService::getActiveSubscription($company->id);
-            if (!$sub) {
-                bail("company {$company->id} has no active subscription — cannot grant the Caller ID plan gate.");
+            $existing = DB::table('pos_addons')
+                ->where('company_id', $company->id)->where('addon_code', 'caller_id')->first();
+            if ($existing) {
+                $state['addon_row_id'] = (int) $existing->id;
+                $state['addon_orig'] = [
+                    'active' => (int) $existing->active,
+                    'starts_at' => $existing->starts_at,
+                    'ends_at' => $existing->ends_at,
+                ];
+                DB::table('pos_addons')->where('id', $existing->id)->update([
+                    'active' => 1,
+                    'starts_at' => now()->subMinute()->toDateTimeString(),
+                    'ends_at' => now()->addDay()->toDateTimeString(),
+                    'updated_at' => now()->toDateTimeString(),
+                ]);
+            } else {
+                $state['addon_row_id'] = (int) DB::table('pos_addons')->insertGetId([
+                    'company_id' => (int) $company->id,
+                    'addon_code' => 'caller_id',
+                    'active' => 1,
+                    'billing_cycle' => 'annual',
+                    'amount' => 0,
+                    'starts_at' => now()->subMinute()->toDateTimeString(),
+                    'ends_at' => now()->addDay()->toDateTimeString(),
+                    'created_at' => now()->toDateTimeString(),
+                    'updated_at' => now()->toDateTimeString(),
+                ]);
+                $state['addon_created'] = true;
             }
-            $plan = PricingPlan::where('product_type', 'pos')->where('caller_id_enabled', 1)->orderBy('id')->first();
-            if (!$plan) {
-                bail('no POS pricing plan carries caller_id_enabled — the gate matrix changed.');
+            PosAddonService::flushCache();
+            PosFeatureService::flushGateCaches();
+            if (!PosFeatureService::planAllows($company, 'caller_id_enabled')) {
+                bail('caller_id pos_addons row granted but the gate still refuses — add-on gate wiring changed.');
             }
-            $state['subscription_id'] = (int) $sub->id;
-            $state['orig_pricing_plan_id'] = $sub->pricing_plan_id;
-            DB::table('subscriptions')->where('id', $sub->id)->update(['pricing_plan_id' => $plan->id]);
         }
 
         // 2. Company toggle. DB::table so updated_at (the sale-screen boot
@@ -313,8 +341,19 @@ switch ($cmd) {
             PosCustomer::where('id', $state['customer_id'])->where('company_id', $cid)->delete();
         }
         if (!empty($state['subscription_id'])) {
+            // Stale state file from the pre-add-on fixture (plan swap) — still honoured.
             DB::table('subscriptions')->where('id', $state['subscription_id'])
                 ->update(['pricing_plan_id' => $state['orig_pricing_plan_id']]);
+        }
+        if (!empty($state['addon_created']) && !empty($state['addon_row_id'])) {
+            DB::table('pos_addons')->where('id', $state['addon_row_id'])->delete();
+        } elseif (!empty($state['addon_row_id']) && !empty($state['addon_orig'])) {
+            DB::table('pos_addons')->where('id', $state['addon_row_id'])->update([
+                'active' => (int) $state['addon_orig']['active'],
+                'starts_at' => $state['addon_orig']['starts_at'],
+                'ends_at' => $state['addon_orig']['ends_at'],
+                'updated_at' => now()->toDateTimeString(),
+            ]);
         }
         DB::table('companies')->where('id', $cid)
             ->update(['caller_id_enabled' => (int) $state['orig_caller_id_enabled']]);

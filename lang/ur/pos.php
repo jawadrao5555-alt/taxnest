@@ -5419,6 +5419,8 @@ return [
     'khata_reminder_sent_word' => 'بھیج دیا',
     'khata_reminder_send_word' => 'بھیجیں',
     'khata_last_reminder' => 'آخری یاد دہانی: :n دن پہلے',
+    'khata_reminder_not_sent' => 'یاد دہانی ابھی نہیں بھیجی گئی۔',
+    'khata_reminder_send_failed' => 'یاد دہانی نہیں بھیجی جا سکی۔ دوبارہ کوشش کریں۔',
     'khata_age_0_15' => '0-15 دن',
     'khata_age_16_30' => '16-30 دن',
     'khata_age_31_60' => '31-60 دن',

@@ -5423,6 +5423,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'khata_reminder_sent_word' => 'Bhej diya',
     'khata_reminder_send_word' => 'Bhejein',
     'khata_last_reminder' => 'Aakhri yaad dehani: :n din pehle',
+    'khata_reminder_not_sent' => 'Reminder abhi nahi bheja gaya.',
+    'khata_reminder_send_failed' => 'Reminder send nahi ho saka. Dobara koshish karein.',
     'khata_age_0_15' => '0-15 din',
     'khata_age_16_30' => '16-30 din',
     'khata_age_31_60' => '31-60 din',

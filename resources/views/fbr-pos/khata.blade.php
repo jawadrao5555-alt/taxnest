@@ -268,7 +268,7 @@ function khataPage() {
                 const data = await res.json();
                 if (!res.ok || !data.success) {
                     popup?.close();
-                    alert(data.message || 'Reminder abhi nahi bheja gaya.');
+                    alert(data.message || @js(__('pos.khata_reminder_not_sent')));
                     return;
                 }
                 if (popup) popup.location.href = url;
@@ -276,7 +276,7 @@ function khataPage() {
                 if (!this.sentReminders.includes(id)) this.sentReminders.push(id);
             } catch (e) {
                 popup?.close();
-                alert('Reminder send nahi ho saka. Dobara koshish karein.');
+                alert(@js(__('pos.khata_reminder_send_failed')));
             }
         },
         openWasooli(id, name, balance) {

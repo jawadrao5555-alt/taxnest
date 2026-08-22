@@ -1232,6 +1232,12 @@ window.addEventListener('popstate', function() {
                         <p x-show="(selectedCustomer.khata_balance || 0) > 0" x-cloak class="text-[10px] font-black text-red-600 dark:text-red-400">
                             Udhaar: Rs <span x-text="Number(selectedCustomer.khata_balance || 0).toLocaleString()"></span>
                         </p>
+                        @if($canManageKhata)
+                            <a :href="'{{ route('fbrpos.khata', [], false) }}?wasooli_customer=' + encodeURIComponent(selectedCustomer.id)"
+                               class="inline-flex mt-1 items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-black text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                                {{ __('pos.wasooli_direct_from_sale') }}
+                            </a>
+                        @endif
                         <template x-if="selectedCustomer.address">
                             <p class="text-[10px] text-purple-500 dark:text-purple-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
                         </template>

@@ -15,7 +15,7 @@ class FbrCustomerLedger extends Model
 {
     protected $fillable = [
         'company_id', 'customer_id', 'entry_type', 'amount', 'balance_after',
-        'transaction_id', 'note', 'created_by',
+        'transaction_id', 'request_uuid', 'note', 'created_by',
     ];
 
     protected $casts = [
@@ -37,5 +37,10 @@ class FbrCustomerLedger extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function allocations()
+    {
+        return $this->hasMany(FbrKhataSettlement::class, 'settlement_ledger_id');
     }
 }

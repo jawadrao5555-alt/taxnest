@@ -105,6 +105,10 @@
             <td class="info-value">Rs {{ number_format($amount, 2) }}</td>
         </tr>
         <tr>
+            <td class="info-label" style="padding-top:5px;">{{ __('pos.wasooli_receipt_previous_balance') }}:</td>
+            <td class="info-value" style="padding-top:5px;">Rs {{ number_format((float) $entry->balance_after + $amount, 2) }}</td>
+        </tr>
+        <tr>
             <td class="info-label" style="padding-top:5px;">{{ __('pos.wasooli_receipt_balance_now') }}:</td>
             <td class="info-value" style="padding-top:5px;">Rs {{ number_format((float) $entry->balance_after, 2) }}</td>
         </tr>

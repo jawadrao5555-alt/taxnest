@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Company;
 use App\Models\FbrCustomerLedger;
 use App\Models\PosCustomer;
+use App\Services\FbrKhataService;
 use App\Services\PkPhone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * FBR POS Udhaar/Khata (Aug 2026 — Retail Core).
@@ -88,12 +89,28 @@ class FbrPosKhataController extends Controller
             }
         }
 
+        // Sale-screen shortcut: only a company-scoped customer with a current
+        // outstanding balance may pre-open the existing Wasooli modal. The
+        // manager gate above remains the authorization source.
+        $directWasooliCustomer = null;
+        if ($request->filled('wasooli_customer')) {
+            $directWasooliCustomer = $customers->firstWhere(
+                'id',
+                (int) $request->query('wasooli_customer')
+            );
+        }
+
         return view('fbr-pos.khata', [
             'customers' => $customers,
             'totalOutstanding' => $totalOutstanding,
             'recentWasooli' => abs($recentWasooli),
             'bucketTotals' => $bucketTotals,
             'shopName' => Company::find($companyId)->name ?? '',
+            // One idempotency key is rendered per payment form. A retry of the
+            // same submit carries it back to the service and returns its original
+            // receipt instead of charging the customer's balance twice.
+            'wasooliRequestUuid' => (string) Str::uuid(),
+            'directWasooliCustomer' => $directWasooliCustomer,
         ]);
     }
 
@@ -226,54 +243,35 @@ class FbrPosKhataController extends Controller
     {
         if ($resp = $this->fbrPlanGate('khata_enabled')) return $resp;
         $this->assertNotCashier();
-        $request->validate([
+        $rules = [
             'customer_id' => 'required|integer',
             'amount' => 'required|numeric|min:0.01',
             'note' => 'nullable|string|max:300',
-        ]);
+        ];
+        if (PosCustomer::khataColumnExists('khata_balance')
+            && \Illuminate\Support\Facades\Schema::hasColumn('fbr_customer_ledgers', 'request_uuid')) {
+            $rules['request_uuid'] = 'required|uuid';
+        }
+        $request->validate($rules);
 
         $companyId = $this->companyId();
+        $result = app(FbrKhataService::class)->recordWasooli(
+            $companyId,
+            (int) $request->customer_id,
+            (float) $request->amount,
+            $request->note,
+            $this->user(),
+            $request->input('request_uuid'),
+        );
 
-        return DB::transaction(function () use ($request, $companyId) {
-            $customer = PosCustomer::lockForUpdate()
-                ->where('company_id', $companyId)
-                ->findOrFail($request->customer_id);
+        $entry = $result['entry'];
+        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($entry->customer_id);
 
-            $amount = round((float) $request->amount, 2);
-            $outstanding = round((float) $customer->khata_balance, 2);
-
-            // Overpay guard: wasooli can never exceed the outstanding balance —
-            // otherwise the khata goes negative and the ledger loses meaning.
-            if ($outstanding <= 0) {
-                return redirect()->route('fbrpos.khata')
-                    ->with('error', "{$customer->name} par koi udhaar baqi nahi.");
-            }
-            if ($amount > $outstanding) {
-                return redirect()->route('fbrpos.khata')
-                    ->with('error', "Wasooli Rs " . number_format($amount, 2) . " outstanding Rs " . number_format($outstanding, 2) . " se zyada hai — pehle amount theek karein.");
-            }
-
-            $newBalance = round($outstanding - $amount, 2);
-
-            $entry = FbrCustomerLedger::create([
-                'company_id' => $companyId,
-                'customer_id' => $customer->id,
-                'entry_type' => 'wasooli',
-                'amount' => -1 * $amount,
-                'balance_after' => $newBalance,
-                'transaction_id' => null,
-                'note' => $request->note ?: 'Wasooli received',
-                'created_by' => $this->user()->id,
-            ]);
-
-            $customer->update(['khata_balance' => $newBalance]);
-
-            // (Khata upgrade Aug 2026) hand the fresh wasooli entry id back so the
-            // khata page can offer "Rasid print" for the payment just recorded.
-            return redirect()->route('fbrpos.khata')
-                ->with('success', "Wasooli Rs " . number_format($amount, 2) . " — {$customer->name} ka naya balance Rs " . number_format($newBalance, 2))
-                ->with('wasooli_receipt_id', $entry->id);
-        });
+        return redirect()->route('fbrpos.khata')
+            ->with('success', $result['replayed']
+                ? "Wasooli pehle hi record ho chuki hai — {$customer->name} ka balance Rs " . number_format((float) $entry->balance_after, 2)
+                : "Wasooli Rs " . number_format(abs((float) $entry->amount), 2) . " — {$customer->name} ka naya balance Rs " . number_format((float) $entry->balance_after, 2))
+            ->with('wasooli_receipt_id', $entry->id);
     }
 
     /**
@@ -302,9 +300,9 @@ class FbrPosKhataController extends Controller
     }
 
     /**
-     * (Khata upgrade Aug 2026) Stamp khata_last_reminder_at after a WhatsApp
-     * yaad-dehani is sent (the browser navigates to wa.me, then pings this).
-     * Manager-only, company-scoped. Returns JSON for the AJAX caller.
+     * Reserve a WhatsApp reminder before the browser opens wa.me. The short
+     * cooldown prevents a refreshed page, double click or concurrent manager
+     * from pestering the same customer again.
      */
     public function markReminderSent(Request $request, $customerId)
     {
@@ -312,20 +310,32 @@ class FbrPosKhataController extends Controller
         $this->assertNotCashier();
         $companyId = $this->companyId();
 
-        $customer = PosCustomer::where('company_id', $companyId)->findOrFail($customerId);
-
         // (Khata upgrade Aug 2026) Only stamp when the column exists. On a drifted
         // PROD DB (prod-schema-drift-selfheal.md) that lags the migration the
         // reminder still opens WhatsApp — we just skip the stamp instead of 500ing.
-        if (PosCustomer::khataColumnExists('khata_last_reminder_at')) {
-            $customer->update(['khata_last_reminder_at' => now()]);
+        if (!PosCustomer::khataColumnExists('khata_last_reminder_at')) {
+            return response()->json(['success' => true, 'reminded_at' => null]);
         }
 
-        return response()->json([
-            'success' => true,
-            'reminded_at' => $customer->khata_last_reminder_at
-                ? $customer->khata_last_reminder_at->format('d M Y h:i A')
-                : null,
-        ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($companyId, $customerId) {
+            $customer = PosCustomer::lockForUpdate()
+                ->where('company_id', $companyId)
+                ->findOrFail($customerId);
+            if ($customer->khata_last_reminder_at
+                && $customer->khata_last_reminder_at->gt(now()->subHours(24))) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Is customer ko pichlay 24 ghantay mein reminder bheja ja chuka hai.',
+                    'reminded_at' => $customer->khata_last_reminder_at->format('d M Y h:i A'),
+                ], 409);
+            }
+
+            $customer->update(['khata_last_reminder_at' => now()]);
+
+            return response()->json([
+                'success' => true,
+                'reminded_at' => $customer->khata_last_reminder_at->format('d M Y h:i A'),
+            ]);
+        });
     }
 }

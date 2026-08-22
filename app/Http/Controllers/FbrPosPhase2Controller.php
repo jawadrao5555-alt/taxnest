@@ -25,6 +25,17 @@ class FbrPosPhase2Controller extends Controller
     private function user() { return Auth::guard('fbrpos')->user(); }
     private function companyId(): int { return (int) $this->user()->company_id; }
 
+    /**
+     * Direct return URLs must obey the same custom-access verdict as the visible
+     * Return action. Otherwise an unticked cashier permission is bypassable.
+     */
+    private function assertReturnAllowed(): void
+    {
+        if (!\App\Services\PosAccessService::returnsAllowed($this->user())) {
+            abort(403, __('pos.return_manager_only'));
+        }
+    }
+
     // ========================= TERMINALS =========================
 
     public function terminals()
@@ -864,7 +875,12 @@ class FbrPosPhase2Controller extends Controller
             }
         }
         foreach ($returns as $rt) {
-            $returnsCash += (float) $rt->total_amount;
+            // Card, store-credit and khata returns never leave the physical cash
+            // drawer. Counting all refunds here made a credit adjustment look like
+            // missing cash at day close.
+            if (($rt->refund_method ?? $rt->payment_method) === 'cash') {
+                $returnsCash += (float) $rt->total_amount;
+            }
         }
 
         return [
@@ -913,6 +929,7 @@ class FbrPosPhase2Controller extends Controller
      */
     public function quickReturnLookup(Request $r)
     {
+        $this->assertReturnAllowed();
         $q = strtoupper(trim((string) $r->query('q', '')));
         if ($q === '' || strlen($q) > 40) {
             return response()->json(['error' => __('pos.quick_return_enter_number')], 422);
@@ -945,8 +962,8 @@ class FbrPosPhase2Controller extends Controller
             return response()->json(['error' => __('pos.quick_return_not_found')], 404);
         }
 
-        // Same rule returnForm enforces: a return can never be returned.
-        if ($txn->transaction_type === 'return') {
+        // Same rule returnForm enforces: only a completed original sale can be returned.
+        if ($txn->transaction_type !== 'sale' || $txn->status !== 'completed') {
             return response()->json(['error' => __('pos.quick_return_not_found')], 422);
         }
 
@@ -958,9 +975,10 @@ class FbrPosPhase2Controller extends Controller
 
     public function returnForm($id)
     {
+        $this->assertReturnAllowed();
         $original = FbrPosTransaction::with('items')->where('company_id', $this->companyId())->findOrFail($id);
-        if ($original->transaction_type === 'return') {
-            return back()->with('error', 'Cannot return a return');
+        if ($original->transaction_type !== 'sale' || $original->status !== 'completed') {
+            return back()->with('error', 'Only a completed sale can be returned.');
         }
         if ($this->returnWindowExpired($original)) {
             return back()->with('error', __('pos.fbr_return_window_expired', ['days' => self::RETURN_WINDOW_DAYS]));
@@ -970,7 +988,11 @@ class FbrPosPhase2Controller extends Controller
 
     public function processReturn(Request $r, $id)
     {
+        $this->assertReturnAllowed();
         $original = FbrPosTransaction::with('items')->where('company_id', $this->companyId())->findOrFail($id);
+        if ($original->transaction_type !== 'sale' || $original->status !== 'completed') {
+            return back()->with('error', 'Only a completed sale can be returned.');
+        }
         if ($this->returnWindowExpired($original)) {
             return back()->with('error', __('pos.fbr_return_window_expired', ['days' => self::RETURN_WINDOW_DAYS]));
         }
@@ -999,6 +1021,15 @@ class FbrPosPhase2Controller extends Controller
             $original = FbrPosTransaction::where('company_id', $this->companyId())
                 ->lockForUpdate()->findOrFail($id);
             $original->load('items');
+            if ($original->transaction_type !== 'sale' || $original->status !== 'completed') {
+                return back()->with('error', 'Only a completed sale can be returned.');
+            }
+            if ($this->returnWindowExpired($original)) {
+                return back()->with('error', __('pos.fbr_return_window_expired', ['days' => self::RETURN_WINDOW_DAYS]));
+            }
+            if ($r->refund_method === 'khata' && (!$original->customer_id || $original->payment_method !== 'credit')) {
+                return back()->with('error', 'Khata adjust sirf saved customer ke udhaar bill par ho sakta hai.');
+            }
 
             $totalSubtotal = 0; $totalTax = 0; $totalDiscount = 0;
             $returnItems = [];
@@ -1100,24 +1131,15 @@ class FbrPosPhase2Controller extends Controller
 
             // ── KHATA REFUND (Aug 2026 — Retail Core) ────────────────────────────
             // Refund credited into the customer's udhaar ledger — balance goes DOWN.
-            if ($r->refund_method === 'khata' && $original->customer_id) {
-                $cust = \App\Models\PosCustomer::lockForUpdate()
-                    ->where('company_id', $this->companyId())
-                    ->find($original->customer_id);
-                if ($cust) {
-                    $newBalance = round((float) $cust->khata_balance - (float) $return->total_amount, 2);
-                    \App\Models\FbrCustomerLedger::create([
-                        'company_id' => $this->companyId(),
-                        'customer_id' => $cust->id,
-                        'entry_type' => 'return_adjust',
-                        'amount' => -1 * (float) $return->total_amount,
-                        'balance_after' => $newBalance,
-                        'transaction_id' => $return->id,
-                        'note' => "Return {$invNum} — khata adjust (bill {$original->invoice_number})",
-                        'created_by' => $this->user()->id,
-                    ]);
-                    $cust->update(['khata_balance' => $newBalance]);
-                }
+            if ($r->refund_method === 'khata') {
+                app(\App\Services\FbrKhataService::class)->recordReturnAdjustment(
+                    $this->companyId(),
+                    (int) $original->customer_id,
+                    (float) $return->total_amount,
+                    (int) $return->id,
+                    $invNum,
+                    $this->user(),
+                );
             }
 
             // ── STOCK RESTORE (Aug 2026 — Retail Core) ───────────────────────────

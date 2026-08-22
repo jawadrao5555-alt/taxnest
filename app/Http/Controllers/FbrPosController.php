@@ -1141,7 +1141,11 @@ class FbrPosController extends Controller
         $fbrReportingEnabled = (bool) $company->fbr_reporting_enabled;
         // The setup warning is an owner/company-admin concern. Keep the flag
         // server-side so cashier pages do not even render the notice.
-        $isFbrCompanyAdmin = Auth::guard('fbrpos')->user()?->role === 'company_admin';
+        $fbrUser = Auth::guard('fbrpos')->user();
+        $isFbrCompanyAdmin = $fbrUser?->role === 'company_admin';
+        // The Khata page itself is manager-only. Bake the same verdict into the
+        // sale screen so a cashier never sees a shortcut they cannot use.
+        $canManageKhata = $fbrUser && !$fbrUser->isPosCashier();
 
         // 🧮 Pending Day-Close detection (rush/holiday recovery)
         $pendingDayCloses = $this->getPendingDayCloses($companyId, 10);
@@ -1289,7 +1293,7 @@ class FbrPosController extends Controller
             'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
             'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed',
-            'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin', 'canKotReprint',
+            'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin', 'canManageKhata', 'canKotReprint',
             'petiRates', 'petiRateEnabled'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -1593,6 +1597,15 @@ class FbrPosController extends Controller
                 'payment_method' => $request->input('payment_method'),
             ]);
             throw $ve;
+        }
+
+        // A credit sale is never anonymous. Do this before any invoice, quota,
+        // stock or ledger mutation so a forged payload cannot create a bill that
+        // says "credit" without a customer ledger entry.
+        if ($request->input('payment_method') === 'credit' && !$request->filled('customer_id')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'customer_id' => __('pos.udhaar_pick_customer'),
+            ]);
         }
 
         // ── IDEMPOTENCY REPLAY GUARD (Aug 2026) ──────────────────────────────────
@@ -2519,87 +2532,36 @@ class FbrPosController extends Controller
                     $transaction->items()->create($itemData);
                 }
 
-                // ── UDHAAR/KHATA LEDGER (Aug 2026 — Retail Core) ─────────────────
-                // Same DB transaction as the sale: ledger row + cached balance move
-                // together or not at all.
-                if ($request->payment_method === 'credit' && $request->customer_id) {
+                // ── UDHAAR/KHATA LEDGER ──────────────────────────────────────────
+                // A single service owns every FBR credit write. It locks the
+                // company-scoped customer and moves the immutable ledger + cached
+                // balance together, so no write path can create a ledgerless bill.
+                if ($request->payment_method === 'credit') {
+                    // Keep the same locked customer instance through the limit
+                    // decision and ledger write. The service owns the rule, while
+                    // this early lock makes a vanished/foreign customer abort this
+                    // sale before any later FBR side effect can escape.
                     $khataCustomer = \App\Models\PosCustomer::lockForUpdate()
                         ->where('company_id', $companyId)
                         ->find($request->customer_id);
                     if (!$khataCustomer) {
-                        // Customer vanished between guard and lock — abort the whole
-                        // sale rather than booking a credit bill with no ledger row.
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'customer_id' => 'Customer nahi mila — udhaar bill cancel.',
                         ]);
                     }
-                    if ($khataCustomer) {
-                        // ── UDHAAR HADD (credit limit) GUARD (Khata upgrade Aug 2026) ────
-                        // WHY HERE: the decision reads the balance from the LOCKED row
-                        // ($khataCustomer, lockForUpdate above) and the SAME instance
-                        // then writes the ledger + balance — one lock, one decision,
-                        // one write. Doing it earlier (unlocked) let two concurrent
-                        // credit sales both approve against a stale balance and serialise
-                        // only on the increment, exceeding the hadd unauthorised.
-                        // Throwing here rolls back the whole txn (invoice + items
-                        // already created), so a rejected udhaar bill leaves ZERO trace.
-                        //
-                        // Column may be missing on a drifted PROD DB (see
-                        // prod-schema-drift-selfheal.md) → treat as "no limit" and let
-                        // the sale through rather than 500.
-                        $khataLimit = \App\Models\PosCustomer::khataColumnExists('khata_limit')
-                            ? $khataCustomer->khata_limit
-                            : null;
-                        if ($khataLimit !== null) {
-                            $curBal = round((float) $khataCustomer->khata_balance, 2);
-                            $wouldBe = round($curBal + $totalAmount, 2);
-                            if ($wouldBe > round((float) $khataLimit, 2) + 0.001) {
-                                $fbrUser = Auth::guard('fbrpos')->user();
-                                // Override: ONLY a shop owner (company_admin) or pos_manager/
-                                // pos_admin may post khata_limit_override=1 to push past the
-                                // hadd. A pos_cashier (or local_viewer) is HARD-blocked even
-                                // if the flag is sent — the flag alone never bypasses.
-                                $canOverride = ($fbrUser->role ?? '') === 'company_admin'
-                                    || in_array($fbrUser->pos_role ?? '', ['pos_admin', 'pos_manager'], true);
-                                $wantsOverride = $request->boolean('khata_limit_override');
-                                if (!($canOverride && $wantsOverride)) {
-                                    // Hard block — names the limit, current balance and this
-                                    // bill so the manager knows exactly by how much it overshoots.
-                                    throw \Illuminate\Validation\ValidationException::withMessages([
-                                        'payment_method' => __('pos.khata_limit_exceeded', [
-                                            'name' => $khataCustomer->name,
-                                            'limit' => number_format((float) $khataLimit, 0),
-                                            'balance' => number_format($curBal, 0),
-                                            'bill' => number_format($totalAmount, 0),
-                                        ]),
-                                    ]);
-                                }
-                                // Manager override accepted — recorded in the ledger note below.
-                                $khataLimitOverridden = true;
-                            }
-                        }
-
-                        $newBalance = round((float) $khataCustomer->khata_balance + $totalAmount, 2);
-                        // (Khata upgrade Aug 2026) audit the hadd override IN the ledger
-                        // note so the owner can later see the limit was consciously bypassed.
-                        $khataNote = "Udhaar bill {$invoiceNumber}";
-                        if ($khataLimitOverridden) {
-                            $khataNote .= ' ' . __('pos.khata_limit_override_note', [
-                                'user' => (string) (Auth::guard('fbrpos')->user()->name ?? '—'),
-                            ]);
-                        }
-                        \App\Models\FbrCustomerLedger::create([
-                            'company_id' => $companyId,
-                            'customer_id' => $khataCustomer->id,
-                            'entry_type' => 'udhaar',
-                            'amount' => $totalAmount,
-                            'balance_after' => $newBalance,
-                            'transaction_id' => $transaction->id,
-                            'note' => $khataNote,
-                            'created_by' => Auth::guard('fbrpos')->id(),
-                        ]);
-                        $khataCustomer->update(['khata_balance' => $newBalance]);
-                    }
+                    $khataLimit = \App\Models\PosCustomer::khataColumnExists('khata_limit')
+                        ? $khataCustomer->khata_limit
+                        : null;
+                    app(\App\Services\FbrKhataService::class)->recordCreditSale(
+                        $companyId,
+                        (int) $request->customer_id,
+                        (float) $totalAmount,
+                        (int) $transaction->id,
+                        $invoiceNumber,
+                        Auth::guard('fbrpos')->user(),
+                        $request->boolean('khata_limit_override'),
+                        $khataCustomer,
+                    );
                 }
 
                 // ── STOCK DEDUCT (Aug 2026 — Retail Core) ────────────────────────

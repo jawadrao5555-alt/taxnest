@@ -550,6 +550,25 @@ class FbrPosKhataUpgradeTest extends TestCase
             ->assertOk()
             ->assertJson(['success' => true]);
         $this->assertNotNull($c->fresh()->khata_last_reminder_at, 'manager call must stamp khata_last_reminder_at');
+
+        // A refresh/double click must not permit a second WhatsApp reminder.
+        $this->asUser($this->admin)
+            ->postJson('/fbr-pos/khata/' . $c->id . '/reminder-sent')
+            ->assertStatus(409)
+            ->assertJson(['success' => false]);
+    }
+
+    public function test_sale_screen_shortcut_preopens_wasooli_only_for_own_outstanding_customer(): void
+    {
+        $customer = $this->makeCustomer(['khata_balance' => 500]);
+
+        $html = $this->asUser($this->admin)
+            ->get('/fbr-pos/khata?wasooli_customer=' . $customer->id)
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('wasooliCustomerId: ' . $customer->id, $html);
+        $this->assertStringContainsString('showWasooli: true', $html);
     }
 
     // ── 5. UMAR (aging) ─────────────────────────────────────────────────────────

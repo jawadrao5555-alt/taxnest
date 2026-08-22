@@ -179,6 +179,7 @@
             <form method="POST" action="{{ route('fbrpos.khata.wasooli') }}">
                 @csrf
                 <input type="hidden" name="customer_id" :value="wasooliCustomerId">
+                <input type="hidden" name="request_uuid" value="{{ $wasooliRequestUuid }}">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Received amount (Rs)</label>
                 <input type="number" name="amount" x-ref="wasooliAmount" step="0.01" min="0.01" required autocomplete="off" data-lpignore="true"
                        class="w-full border rounded-lg px-3 py-2.5 text-lg font-bold dark:bg-gray-700 dark:text-white dark:border-gray-600 mb-3">
@@ -240,10 +241,10 @@ function khataPage() {
         showBulk: false,
         // (Khata upgrade Aug 2026) ids ticked off after a reminder was opened.
         sentReminders: [],
-        showWasooli: false,
-        wasooliCustomerId: null,
-        wasooliName: '',
-        wasooliBalance: 0,
+        showWasooli: @json($directWasooliCustomer !== null),
+        wasooliCustomerId: @json($directWasooliCustomer?->id),
+        wasooliName: @json($directWasooliCustomer?->name ?? ''),
+        wasooliBalance: @json((float) ($directWasooliCustomer?->khata_balance ?? 0)),
         showLedger: false,
         ledgerLoading: false,
         ledgerCustomer: {},
@@ -254,15 +255,29 @@ function khataPage() {
         // Opens the customer's WhatsApp chat (wa.me can only open ONE at a time),
         // ticks it off, and records the send server-side so "aakhri yaad dehani"
         // updates — nobody gets pestered twice a day.
-        sendReminder(id, url) {
-            window.open(url, '_blank');
-            if (!this.sentReminders.includes(id)) this.sentReminders.push(id);
+        async sendReminder(id, url) {
+            // Open a blank tab synchronously so popup blockers accept the user
+            // gesture. It is only navigated to WhatsApp after the server reserves
+            // this reminder; a duplicate attempt closes the blank tab instead.
+            const popup = window.open('', '_blank');
             try {
-                fetch(`{{ url('/fbr-pos/khata') }}/${id}/reminder-sent`, {
+                const res = await fetch(`{{ url('/fbr-pos/khata') }}/${id}/reminder-sent`, {
                     method: 'POST',
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
-            } catch (e) {}
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    popup?.close();
+                    alert(data.message || 'Reminder abhi nahi bheja gaya.');
+                    return;
+                }
+                if (popup) popup.location.href = url;
+                else window.location.href = url;
+                if (!this.sentReminders.includes(id)) this.sentReminders.push(id);
+            } catch (e) {
+                popup?.close();
+                alert('Reminder send nahi ho saka. Dobara koshish karein.');
+            }
         },
         openWasooli(id, name, balance) {
             this.wasooliCustomerId = id;

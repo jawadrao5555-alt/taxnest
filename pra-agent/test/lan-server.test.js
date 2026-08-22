@@ -81,12 +81,22 @@ function j(res) { return res.json(); }
         });
         assert.strictEqual(ours.headers.get('access-control-allow-origin'), 'https://taxnest.com.pk');
 
-        // A random site the shop PC happens to visit gets no CORS header, so
-        // the browser refuses to hand it the shop's caller list.
-        const theirs = await fetch(base + '/lan/caller/events', {
-            headers: { Origin: 'https://evil.example.com' },
-        });
-        assert.strictEqual(theirs.headers.get('access-control-allow-origin'), null);
+        // Anything else gets no CORS header, so the browser refuses to hand it
+        // the shop's caller list: a random site, a laptop-hosted page on the
+        // same shop WiFi, and a lookalike domain all stay locked out.
+        const hostile = [
+            'https://evil.example.com',
+            'http://192.168.1.50:3000',
+            'https://taxnest.com.pk.evil.com',
+            'https://someone.replit.dev',
+        ];
+        for (const origin of hostile) {
+            const res = await fetch(base + '/lan/caller/events', { headers: { Origin: origin } });
+            assert.strictEqual(
+                res.headers.get('access-control-allow-origin'), null,
+                'must not hand data to ' + origin
+            );
+        }
     });
 
     // Own instance: the brute-force lock is per IP, and over loopback the

@@ -187,21 +187,26 @@ function createLanServer(options) {
         res.end(body);
     }
 
-    // Which web pages may read this server from a browser. Anything else gets
-    // no CORS header at all: the request still runs, but the page cannot see
-    // the answer — the browser's own protection against a hostile site
-    // fishing on localhost.
+    // Which web pages may READ this server from a browser. Deliberately a tiny
+    // first-party list: the caller list is customer data, and /lan/caller/events
+    // answers this PC without pairing. Anything else gets no CORS header at
+    // all — the request still runs, but the page cannot see the answer.
+    //
+    // Not on the list, on purpose:
+    //  · other machines on the shop WiFi — a laptop on the same network is NOT
+    //    trusted just for being there;
+    //  · preview/dev domains — a stranger's page on such a host would inherit
+    //    the trust. Need one for testing? Pass it in explicitly.
+    // A page SERVED BY this server (waiter tablet) is same-origin and needs no
+    // header in the first place.
     function allowedOrigin(origin) {
         const o = String(origin || '').trim().toLowerCase().replace(/\/+$/, '');
         if (!o) { return ''; }
         if (extraOrigins.indexOf(o) !== -1) { return origin; }
+        // The POS running on THIS machine (desktop shell / a local dev copy).
         if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o)) { return origin; }
-        // Our own site (any subdomain) and Replit dev previews of it.
+        // Our own site only.
         if (/^https:\/\/([a-z0-9-]+\.)*taxnest\.com\.pk$/.test(o)) { return origin; }
-        if (/^https:\/\/[a-z0-9-]+\.replit\.dev$/.test(o)) { return origin; }
-        // The shop's own PC reached by LAN IP (tablet browsing to the counter).
-        const host = o.replace(/^https?:\/\//, '').split(':')[0];
-        if (isPrivateAddress(host)) { return origin; }
         return '';
     }
 
@@ -335,6 +340,12 @@ function createLanServer(options) {
             .map(function (e) {
                 return {
                     id: e.id,
+                    // The ring's identity, also used when the agent forwards it
+                    // to the cloud. The counter needs it to recognise the SAME
+                    // ring coming back through the cloud lane after recovery —
+                    // without it the cashier gets a second popup for one call.
+                    // Mirror the agent's fallback key exactly (agent.js).
+                    uuid: e.uuid || ('lan-' + e.id + '-' + e.at_ms),
                     number: e.number,
                     name: e.name,
                     source: e.source,

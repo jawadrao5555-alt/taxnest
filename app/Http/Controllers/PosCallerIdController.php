@@ -777,6 +777,11 @@ class PosCallerIdController extends Controller
         $events = $rows->map(function ($row) use ($companyId) {
             return [
                 'id' => (int) $row->id,
+                // LAN Mode: rings the counter already showed from the shop's own
+                // PC come back through this lane once the line recovers. The
+                // uuid is how the sale screen recognises them and stays quiet —
+                // otherwise one call pops twice. NULL for a normal cloud ring.
+                'uuid' => property_exists($row, 'offline_uuid') ? $row->offline_uuid : null,
                 'phone' => $this->displayPhone($row->phone),
                 'name' => $row->caller_name,
                 'source' => $row->source,

@@ -3555,6 +3555,10 @@ function restaurantPos() {
         _callerLanLastId: 0,      // cursor into the agent's ring buffer
         _callerLanNextTry: 0,     // backoff: no agent here = stop knocking
         _callerLanFails: 0,
+        // Ring ids already popped on THIS counter, whichever lane they came
+        // through. The same call arrives twice by design (locally now, from the
+        // cloud after recovery) — the cashier must still see it once.
+        _callerSeenKeys: [],
         callerDialBusy: false,    // double-tap guard on every Call back button
         callerDialFallback: null, // {phone, dial, name, reason} — koi phone nahi mila
         activeCartIndex: -1,
@@ -8345,9 +8349,14 @@ function restaurantPos() {
                     const data = await res.json();
                     if (data && data.enabled) {
                         if (Array.isArray(data.events) && data.events.length) {
-                            this.callerQueue.push(...data.events);
+                            // LAN Mode: a ring this counter already popped from
+                            // the shop's own PC comes back through the cloud
+                            // once the line recovers — same call, one popup.
+                            const fresh = data.events.filter(ev => !(ev.uuid && this._callerSeenKeys.indexOf(ev.uuid) !== -1));
+                            fresh.forEach(ev => this.rememberCallerKey(ev.uuid));
+                            this.callerQueue.push(...fresh);
                             // Unseen badge — new rings count until the log is opened.
-                            data.events.forEach(ev => { if ((parseInt(ev.id, 10) || 0) > this.callerSeenId) this.callerUnseen++; });
+                            fresh.forEach(ev => { if ((parseInt(ev.id, 10) || 0) > this.callerSeenId) this.callerUnseen++; });
                         }
                         // Task 1397: badge ki ginti HAR tick par server se —
                         // counter apne taur par jama-nafi nahi karta. Warna
@@ -8399,20 +8408,23 @@ function restaurantPos() {
         async pollCallerLan() {
             if (!this.callerIdOn) { return false; }
             if (Date.now() < (this._callerLanNextTry || 0)) { return false; }
-            const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-            const kill = setTimeout(() => { try { if (ac) ac.abort(); } catch (e) {} }, 2500);
-            try {
-                const res = await fetch('http://127.0.0.1:8531/lan/caller/events?after=' + (this._callerLanLastId || 0),
-                    { headers: { 'Accept': 'application/json' }, signal: ac ? ac.signal : undefined });
-                if (!res.ok) { throw new Error('lan ' + res.status); }
-                const data = await res.json();
+            for (const port of this.callerLanPorts()) {
+                const data = await this.callerLanFetch(port);
+                if (!data) { continue; }
+                // Found the agent — remember where, so the next offline spell
+                // costs exactly one request.
+                try { localStorage.setItem('tn_lan_port', String(port)); } catch (e) {}
                 this._callerLanFails = 0;
                 this._callerLanNextTry = 0;
                 (Array.isArray(data.events) ? data.events : []).forEach(ev => {
+                    const key = ev.uuid || ('lan-' + ev.id);
+                    if (this._callerSeenKeys.indexOf(key) !== -1) { return; }
+                    this.rememberCallerKey(key);
                     // Own id space ('L…') so a local ring can never be confused
                     // with a cloud one by the cursor or the beep guard.
                     this.callerQueue.push({
                         id: 'L' + ev.id,
+                        uuid: key,
                         phone: ev.number || '',
                         name: ev.name || null,
                         source: ev.source === 'whatsapp' ? 'whatsapp' : 'sim',
@@ -8428,18 +8440,42 @@ function restaurantPos() {
                 // the popup still feels instant while the line is down.
                 this._callerFast = true;
                 return true;
+            }
+            // No agent on this PC (the normal case) — back off, or an offline
+            // counter knocks on 127.0.0.1 every single tick.
+            this._callerLanFails = (this._callerLanFails || 0) + 1;
+            if (this._callerLanFails >= 3) {
+                this._callerLanNextTry = Date.now() + 60000;
+                this._callerLanFails = 0;
+            }
+            return false;
+        },
+        // Where the agent might be listening. Its own default first, then the
+        // neighbours it offers when 8531 is already taken on that PC.
+        callerLanPorts() {
+            let saved = 0;
+            try { saved = parseInt(localStorage.getItem('tn_lan_port') || '0', 10) || 0; } catch (e) {}
+            const list = [saved, 8531, 8532, 8533].filter(p => p > 0 && p < 65536);
+            return list.filter((p, i) => list.indexOf(p) === i);
+        },
+        async callerLanFetch(port) {
+            const ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const kill = setTimeout(() => { try { if (ac) ac.abort(); } catch (e) {} }, 1200);
+            try {
+                const res = await fetch('http://127.0.0.1:' + port + '/lan/caller/events?after=' + (this._callerLanLastId || 0),
+                    { headers: { 'Accept': 'application/json' }, signal: ac ? ac.signal : undefined });
+                if (!res.ok) { return null; }
+                return await res.json();
             } catch (e) {
-                // No agent on this PC (the normal case) — back off, or an
-                // offline counter knocks on 127.0.0.1 every single tick.
-                this._callerLanFails = (this._callerLanFails || 0) + 1;
-                if (this._callerLanFails >= 3) {
-                    this._callerLanNextTry = Date.now() + 60000;
-                    this._callerLanFails = 0;
-                }
-                return false;
+                return null;
             } finally {
                 clearTimeout(kill);
             }
+        },
+        rememberCallerKey(key) {
+            if (!key) { return; }
+            this._callerSeenKeys.push(key);
+            if (this._callerSeenKeys.length > 60) { this._callerSeenKeys.splice(0, 30); }
         },
         callerLocalTime(iso) {
             try {

@@ -425,9 +425,10 @@ Sale screen ki mazeed cheezein:
 - Cancel modal mein (jab KOT ja chuki ho) har item ke aage "Ban gaya ✓ / Nahi bana" ka tick hota hai — poora order nahi, item-wise batayein. Cancelled Orders report mein bane hue items par ✓ aur "zaya (bane hue) ki maliyat" ka alag khana aata hai.
 
 ## Subscription packages — kis package mein kya hai (2 Aug 2026)
-- Starter: bunyadi billing — PRA receipts, barcode, thermal print, customers/khata, inventory, basic reports + day close. (Deals, riders, hazri, analytics, CSV/PDF export ismein NAHI.)
-- Business: Starter + offline billing/desktop app, 3 terminals, Deals & combos, advanced reports CSV/PDF export, Excel import/export.
-- Pro: Business + poora Restaurant module (tables/KOT/kitchen/waiter), cancelled/waste report, day-close auto-final, analytics dashboard. (Riders, Hazri aur public QR Menu ismein NAHI.)
-- Pro Max (Rs 34,999/saal): Pro + Delivery Riders & khata, Staff Hazri report, public QR Menu page — 15 team accounts, 5,000 bills/mahina, 3 branches.
-- Unlimited: Pro Max ke sab features + Team Custom Access (sirf yahan), har limit UNLIMITED (bills/team/branches), Priority Support + training.
+- Starter: bunyadi billing — PRA receipts, barcode, thermal print, customers/khata, inventory, basic reports + day close. Delivery Riders, public QR Menu aur Staff Hazri ismein NAHI.
+- Business: Starter + poora Restaurant module, offline billing/desktop app, Deals & combos, analytics, advanced reports/exports, Team Custom Access, Delivery Riders aur public QR Menu.
+- Pro: Business ke sab features + Staff Hazri report, 10 team accounts, 2 branches aur 10,000 final bills/mahina.
+- Pro Max: Pro ke sab features + 20 team accounts, 3 branches aur unlimited final bills.
+- Unlimited: Pro Max ke sab features + unlimited team accounts, 5 branches, unlimited billing aur Priority Support.
+- Sirf teen optional paid add-ons hain: WhatsApp Bill, Rider Live Tracking aur Caller ID. Delivery Riders, QR Menu aur Staff Hazri add-ons nahi rahe.
 - Trial ke dauran SAB features milte hain. Agar koi feature package mein na ho to us ka page Billing par le jata hai — upgrade kar ke khul jata hai.

@@ -61,10 +61,8 @@ class PosPlanCardClaimsTest extends TestCase
             return $plan;
         };
 
-        // 22 Aug 2026: riders / qr_menu / whatsapp / hazri / rider_tracking /
-        // caller_id are PAID ADD-ONS — no plan row carries them (their columns
-        // stay false on every package), so the ladder differs by limits and by
-        // custom_access (Business+) only.
+        // Current package policy: Riders + QR Menu are Business+, Staff Hazri
+        // is Pro+, and the remaining optional features stay paid add-ons.
         return collect([
             $make(['name' => 'Starter', 'invoice_limit' => 2000, 'user_limit' => 2,
                    'branch_limit' => 1, 'max_terminals' => 1]),
@@ -72,22 +70,25 @@ class PosPlanCardClaimsTest extends TestCase
                    'branch_limit' => 1, 'max_terminals' => 3,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                   'custom_access_enabled' => true]),
+                    'custom_access_enabled' => true, 'riders_enabled' => true, 'qr_menu_enabled' => true]),
             $make(['name' => 'Pro', 'invoice_limit' => 10000, 'user_limit' => 10,
                    'branch_limit' => 2, 'max_terminals' => -1,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                   'custom_access_enabled' => true]),
+                    'custom_access_enabled' => true, 'riders_enabled' => true, 'qr_menu_enabled' => true,
+                    'hazri_enabled' => true]),
             $make(['name' => 'Pro Max', 'invoice_limit' => -1, 'user_limit' => 20,
                    'branch_limit' => 3, 'max_terminals' => -1,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                   'custom_access_enabled' => true]),
+                    'custom_access_enabled' => true, 'riders_enabled' => true, 'qr_menu_enabled' => true,
+                    'hazri_enabled' => true]),
             $make(['name' => 'Unlimited', 'invoice_limit' => -1, 'user_limit' => -1,
                    'branch_limit' => 5, 'max_terminals' => -1,
                    'restaurant_enabled' => true, 'deals_enabled' => true, 'analytics_enabled' => true,
                    'reports_enabled' => true, 'excel_enabled' => true, 'offline_enabled' => true,
-                   'custom_access_enabled' => true]),
+                    'custom_access_enabled' => true, 'riders_enabled' => true, 'qr_menu_enabled' => true,
+                    'hazri_enabled' => true]),
         ]);
     }
 
@@ -114,8 +115,8 @@ class PosPlanCardClaimsTest extends TestCase
         $this->assertContains('restaurant', $business);
         $this->assertContains('analytics', $business);
         $this->assertContains('custom_access', $business);
-        // Add-on-sold features must NOT appear on any card.
-        $this->assertNotContains('riders', $business);
+        $this->assertContains('riders', $business);
+        $this->assertContains('qr_menu', $business);
         $this->assertNotContains('caller_id', $business);
 
         $pro = $this->keys(PosPlanComparisonService::cardHighlights($ladder['Pro'], $ladder['Business']));
@@ -123,6 +124,7 @@ class PosPlanCardClaimsTest extends TestCase
         $this->assertNotContains('analytics', $pro);
         $this->assertNotContains('restaurant', $pro);
         $this->assertNotContains('custom_access', $pro);
+        $this->assertContains('hazri', $pro);
 
         // A cap that lifts is a real gain, spelled out in words.
         $this->assertContains('counters', $pro);
@@ -133,15 +135,13 @@ class PosPlanCardClaimsTest extends TestCase
     }
 
     /**
-     * 22 Aug 2026: the six optional features are paid add-ons. FEATURE_ROWS
-     * no longer knows them, so NO card on the whole ladder may ever emit one
-     * of their keys — a card claiming "Delivery Riders included" would
-     * contradict the add-on catalogue sold right under it.
+     * The three remaining optional features are paid add-ons. FEATURE_ROWS
+     * must never emit them on package cards.
      */
-    public function test_addon_sold_features_never_appear_on_any_card(): void
+    public function test_remaining_addon_sold_features_never_appear_on_any_card(): void
     {
         $ladder = $this->ladder()->values();
-        $addonKeys = ['riders', 'qr_menu', 'whatsapp', 'hazri', 'rider_tracking', 'caller_id'];
+        $addonKeys = ['whatsapp', 'rider_tracking', 'caller_id'];
 
         foreach ($ladder as $index => $plan) {
             $prev = $index > 0 ? $ladder[$index - 1] : null;

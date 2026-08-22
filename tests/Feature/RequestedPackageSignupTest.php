@@ -346,9 +346,10 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_pos_signup_page_carries_only_allow_listed_addons_into_the_form(): void
     {
-        $this->get('/pos/register?addons[]=delivery_riders&addons[]=not-a-real-feature&addon_cycle=quarterly')
+        $this->get('/pos/register?addons[]=caller_id&addons[]=delivery_riders&addons[]=not-a-real-feature&addon_cycle=quarterly')
             ->assertOk()
-            ->assertSee('name="requested_addons[]" value="delivery_riders"', false)
+            ->assertSee('name="requested_addons[]" value="caller_id"', false)
+            ->assertDontSee('name="requested_addons[]" value="delivery_riders"', false)
             ->assertDontSee('name="requested_addons[]" value="not-a-real-feature"', false)
             ->assertSee('name="requested_addon_cycle" value="quarterly"', false);
     }
@@ -358,12 +359,12 @@ class RequestedPackageSignupTest extends TestCase
         $this->posSignup(
             'Addon Selection Mart',
             'addon-selection@example.com',
-            ['caller_id', 'qr_menu'],
+            ['caller_id', 'whatsapp_bill'],
             'quarterly'
         );
 
         $selection = session(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
-        $this->assertSame(['caller_id', 'qr_menu'], $selection['codes']);
+        $this->assertSame(['caller_id', 'whatsapp_bill'], $selection['codes']);
         $this->assertSame('quarterly', $selection['cycle']);
         $this->assertSame(['codes', 'cycle'], array_keys($selection));
     }

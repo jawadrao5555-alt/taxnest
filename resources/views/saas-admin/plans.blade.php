@@ -66,8 +66,8 @@
             </div>
 
             <div class="flex items-start gap-2 rounded-lg border border-indigo-800/50 bg-indigo-900/20 px-3 py-2 text-[11px] text-indigo-200">
-                <span class="font-semibold shrink-0">Custom Access:</span>
-                <span>Not a paid add-on. It is included in Business, Pro, Pro Max and Unlimited; Starter does not include it.</span>
+                <span class="font-semibold shrink-0">Included features:</span>
+                <span>Custom Access, Delivery Riders and QR Menu are included from Business upward. Staff Attendance is included from Pro upward. They are not paid add-ons.</span>
             </div>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save Add-on Rates</button>
         </form>

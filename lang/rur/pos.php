@@ -2979,7 +2979,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'qr_hours' => 'Auqat',
     'qr_items_count' => ':count items',
     'qr_menu' => 'Menu',
-    'qr_menu_plan_locked' => 'Public QR menu page Pro, Pro Max aur Unlimited packages mein shamil hai — upgrade karein taake customer scan kar ke aap ka menu online dekh sakein.',
+    'qr_menu_plan_locked' => 'Public QR menu page Business, Pro, Pro Max aur Unlimited packages mein shamil hai — Starter se upgrade karein taake customer scan kar ke aap ka menu online dekh sakein.',
     'qr_mobile' => 'Mobile',
     'qr_ntn' => 'NTN',
     'qr_phone' => 'Phone',

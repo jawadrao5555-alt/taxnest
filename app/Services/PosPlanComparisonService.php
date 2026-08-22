@@ -53,6 +53,9 @@ class PosPlanComparisonService
     public const FEATURE_ROWS = [
         'restaurant'     => ['column' => 'restaurant_enabled',     'hint' => true],
         'deals'          => ['column' => 'deals_enabled',          'hint' => false],
+        'riders'         => ['column' => 'riders_enabled',         'hint' => true],
+        'qr_menu'        => ['column' => 'qr_menu_enabled',        'hint' => true],
+        'hazri'          => ['column' => 'hazri_enabled',          'hint' => true],
         'analytics'      => ['column' => 'analytics_enabled',      'hint' => false],
         'reports'        => ['column' => 'reports_enabled',        'hint' => true],
         'excel'          => ['column' => 'excel_enabled',          'hint' => true],
@@ -95,11 +98,9 @@ class PosPlanComparisonService
     ];
 
     /**
-     * Gate columns sold as PAID ADD-ONS (22 Aug 2026, owner): no POS package
-     * includes them, so they have no tick/cross row — their customer-facing
-     * name lives in the add-on catalogue (PosAddonPricingService::ADDONS,
-     * pos.addon_label_* / pos.addon_desc_* lang lines) shown in the billing
-     * purchase box and the <x-pos-addon-strip> under the comparison table.
+     * Gate columns sold as PAID ADD-ONS: no POS package includes them, so they
+     * have no tick/cross row — their customer-facing name lives in the add-on
+     * catalogue shown in the billing purchase box and comparison-table strip.
      *
      * Map: pricing_plans gate column => add-on code. auditNames() verifies
      * the code exists in the catalogue and reads in all three languages;
@@ -107,10 +108,7 @@ class PosPlanComparisonService
      * columns ON (a package would silently include a paid add-on).
      */
     public const ADDON_COLUMNS = [
-        'riders_enabled'         => 'delivery_riders',
-        'qr_menu_enabled'        => 'qr_menu',
         'whatsapp_enabled'       => 'whatsapp_bill',
-        'hazri_enabled'          => 'staff_attendance',
         'rider_tracking_enabled' => 'rider_tracking',
         'caller_id_enabled'      => 'caller_id',
     ];

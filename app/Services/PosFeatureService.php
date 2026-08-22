@@ -499,9 +499,9 @@ class PosFeatureService
             }
         }
 
-        // Paid add-on: a Business+ PRA shop can BUY one of the six optional
-        // features instead of upgrading its package. Checked last — it only
-        // ever ADDS access, never removes what the package already grants.
+        // Paid add-on: a Business+ PRA shop can buy a catalogue feature
+        // instead of upgrading its package. Checked last — it only ever ADDS
+        // access, never removes what the package already grants.
         if (!$allowed) {
             $allowed = self::addonAllows($company, $planColumn);
         }

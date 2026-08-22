@@ -46,10 +46,10 @@ class PosPlanLadderAuditTest extends TestCase
     /** plan name => the tick/cross row keys that must be ON. Everything else is a cross. */
     private const FEATURES_ON = [
         'Starter'   => [],
-        'Business'  => ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline'],
-        'Pro'       => ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline', 'riders', 'qr_menu', 'whatsapp'],
-        'Pro Max'   => ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline', 'riders', 'qr_menu', 'whatsapp', 'hazri'],
-        'Unlimited' => ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline', 'riders', 'qr_menu', 'whatsapp', 'hazri', 'rider_tracking', 'custom_access', 'caller_id'],
+        'Business'  => ['restaurant', 'deals', 'riders', 'qr_menu', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
+        'Pro'       => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
+        'Pro Max'   => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
+        'Unlimited' => ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access'],
     ];
 
     /** The real PRA POS ladder, in memory — no DB row is touched. */

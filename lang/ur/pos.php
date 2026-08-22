@@ -2977,7 +2977,7 @@ return [
     'qr_hours' => 'اوقات',
     'qr_items_count' => ':count آئٹمز',
     'qr_menu' => 'مینیو',
-    'qr_menu_plan_locked' => 'پبلک QR مینیو پیج Pro، Pro Max اور Unlimited پیکجز میں شامل ہے — اپ گریڈ کریں تاکہ گاہک اسکین کر کے آپ کا مینیو آن لائن دیکھ سکیں۔',
+    'qr_menu_plan_locked' => 'پبلک QR مینیو پیج Business، Pro، Pro Max اور Unlimited پیکجز میں شامل ہے — اسٹارٹر سے اپ گریڈ کریں تاکہ گاہک اسکین کر کے آپ کا مینیو آن لائن دیکھ سکیں۔',
     'qr_mobile' => 'موبائل',
     'qr_ntn' => 'NTN',
     'qr_phone' => 'فون',

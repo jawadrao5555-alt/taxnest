@@ -105,15 +105,13 @@ class AdminPlanLadderGuardTest extends TestCase
     private function seedPosLadder(): void
     {
         $rows = [
-            // 22 Aug 2026: the six optional features (riders, qr_menu,
-            // whatsapp, hazri, rider_tracking, caller_id) are paid add-ons —
-            // no plan row carries them, so the ladder differs by limits and
-            // by custom_access (Business+) only.
+            // Riders + QR Menu are Business+, Staff Hazri is Pro+, and the
+            // remaining optional feature gates stay paid add-ons.
             ['Starter',   6000,  2000,  2,  1, 1, []],
-            ['Business',  12000, 5000,  5,  1, 3, ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
-            ['Pro',       24000, 10000, 10, 2, -1, ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
-            ['Pro Max',   36000, -1,    20, 3, -1, ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
-            ['Unlimited', 60000, -1,    -1, 5, -1, ['restaurant', 'deals', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
+            ['Business',  12000, 5000,  5,  1, 3, ['restaurant', 'deals', 'riders', 'qr_menu', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
+            ['Pro',       24000, 10000, 10, 2, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
+            ['Pro Max',   36000, -1,    20, 3, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
+            ['Unlimited', 60000, -1,    -1, 5, -1, ['restaurant', 'deals', 'riders', 'qr_menu', 'hazri', 'analytics', 'reports', 'excel', 'offline', 'custom_access']],
         ];
 
         foreach ($rows as [$name, $price, $bills, $team, $branches, $counters, $on]) {

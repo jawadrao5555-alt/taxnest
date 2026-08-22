@@ -24,10 +24,10 @@ use Tests\TestCase;
 /**
  * PAID FEATURE ADD-ONS — request → approval → gate (owner approved, Aug 2026)
  *
- * Six optional PRA POS features (Delivery Riders, QR Menu, WhatsApp Bill, Staff
- * Attendance, Rider Live Tracking, Caller ID) can be bought on top of a package
- * instead of upgrading. Custom Access is deliberately NOT one of them — it is
- * included free from Business upward.
+ * Three optional PRA POS features (WhatsApp Bill, Rider Live Tracking and
+ * Caller ID) can be bought on top of a package instead of upgrading. Delivery
+ * Riders and QR Menu are included from Business upward; Staff Attendance is
+ * included from Pro upward; Custom Access is included from Business upward.
  *
  * The regressions that would be expensive and silent:
  *
@@ -146,7 +146,7 @@ class PosPaidAddonFlowTest extends TestCase
             $table->integer('invoice_limit')->nullable();
             $table->integer('user_limit')->nullable();
             $table->integer('branch_limit')->nullable();
-            // The six add-on gates + the one that is NOT for sale.
+            // Package and add-on gate columns used by the entitlement service.
             foreach (['riders_enabled', 'qr_menu_enabled', 'whatsapp_enabled', 'hazri_enabled',
                 'rider_tracking_enabled', 'caller_id_enabled', 'custom_access_enabled'] as $col) {
                 $table->boolean($col)->default(false);
@@ -359,7 +359,7 @@ class PosPaidAddonFlowTest extends TestCase
         $company = $this->makeShop($trial, [], ['trial_ends_at' => now()->addDays(10)]);
 
         $this->assertFalse(PosAddonService::purchaseEligibility($company)['allowed']);
-        $this->buy($company, ['qr_menu']);
+        $this->buy($company, ['caller_id']);
         $this->assertSame(0, PaymentProof::count(), 'A trial shop must upgrade before buying features');
     }
 
@@ -380,26 +380,27 @@ class PosPaidAddonFlowTest extends TestCase
 
     // ─── 2. never sell what the shop already owns ────────────────────────
 
-    public function test_features_included_in_the_package_are_not_offered(): void
+    public function test_package_included_features_are_not_in_the_addon_catalogue(): void
     {
-        $company = $this->makeShop($this->makePlan('Pro', ['riders_enabled' => true, 'qr_menu_enabled' => true]));
-
-        $purchasable = PosAddonService::purchasableCodes($company);
-        $this->assertNotContains('delivery_riders', $purchasable, 'A package-granted feature must never be for sale');
-        $this->assertNotContains('qr_menu', $purchasable);
-        $this->assertContains('caller_id', $purchasable);
+        foreach (['delivery_riders', 'qr_menu', 'staff_attendance'] as $code) {
+            $this->assertArrayNotHasKey($code, PosAddonPricingService::ADDONS);
+        }
+        $this->assertSame(
+            ['whatsapp_bill', 'rider_tracking', 'caller_id'],
+            array_keys(PosAddonPricingService::ADDONS)
+        );
     }
 
-    public function test_server_drops_a_posted_code_the_package_already_grants(): void
+    public function test_server_rejects_a_retired_addon_code_from_a_tampered_post(): void
     {
         $company = $this->makeShop($this->makePlan('Pro', ['riders_enabled' => true]));
 
-        // The form is only a hint — a tampered POST must not be charged for.
-        $this->buy($company, ['delivery_riders', 'caller_id']);
+        // The form is only a hint — a retired code must make a tampered request
+        // fail instead of charging an ambiguous subset.
+        $response = $this->buy($company, ['delivery_riders', 'caller_id']);
 
-        $proof = PaymentProof::first();
-        $this->assertNotNull($proof);
-        $this->assertSame(['caller_id'], $proof->addonCodeList());
+        $response->assertSessionHasErrors();
+        $this->assertSame(0, PaymentProof::count());
     }
 
     public function test_request_with_only_already_owned_codes_is_refused(): void
@@ -410,13 +411,16 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertSame(0, PaymentProof::count());
     }
 
-    public function test_custom_access_is_not_a_purchasable_addon(): void
+    public function test_only_the_three_optional_features_remain_purchasable(): void
     {
         $this->assertArrayNotHasKey('custom_access', PosAddonPricingService::ADDONS);
         $gates = array_column(PosAddonPricingService::ADDONS, 'gate');
         $this->assertNotContains('custom_access_enabled', $gates,
             'Custom Access is included from Business upward — it must never be sold as an add-on');
-        $this->assertCount(6, PosAddonPricingService::ADDONS);
+        foreach (['riders_enabled', 'qr_menu_enabled', 'hazri_enabled'] as $gate) {
+            $this->assertNotContains($gate, $gates);
+        }
+        $this->assertCount(3, PosAddonPricingService::ADDONS);
     }
 
     // ─── 3. the request row ──────────────────────────────────────────────
@@ -425,7 +429,7 @@ class PosPaidAddonFlowTest extends TestCase
     {
         $company = $this->makeShop($this->makePlan('Business'));
 
-        $this->buy($company, ['caller_id', 'qr_menu'], 'quarterly');
+        $this->buy($company, ['caller_id', 'whatsapp_bill'], 'quarterly');
 
         $proof = PaymentProof::first();
         $this->assertNotNull($proof);
@@ -434,10 +438,10 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertFalse($proof->isExtraBranch());
         $this->assertSame('quarterly', $proof->billing_cycle);
         $this->assertSame('quarterly', PosAddonService::cycleForProof($proof));
-        $this->assertEqualsCanonicalizing(['caller_id', 'qr_menu'], $proof->addonCodeList());
+        $this->assertEqualsCanonicalizing(['caller_id', 'whatsapp_bill'], $proof->addonCodeList());
 
         $expected = PosAddonPricingService::price('caller_id', 'quarterly')
-            + PosAddonPricingService::price('qr_menu', 'quarterly');
+            + PosAddonPricingService::price('whatsapp_bill', 'quarterly');
         $this->assertEquals($expected, (float) $proof->amount);
     }
 
@@ -475,7 +479,7 @@ class PosPaidAddonFlowTest extends TestCase
         $company = $this->makeShop($this->makePlan('Business'));
 
         $this->buy($company, ['caller_id']);
-        $this->buy($company, ['qr_menu']);
+        $this->buy($company, ['whatsapp_bill']);
 
         $this->assertSame(1, PaymentProof::count(), 'Only one add-on request may sit in the queue');
     }
@@ -511,13 +515,13 @@ class PosPaidAddonFlowTest extends TestCase
     public function test_approval_activates_only_the_requested_features(): void
     {
         $company = $this->makeShop($this->makePlan('Business'));
-        $this->buy($company, ['caller_id', 'staff_attendance']);
+        $this->buy($company, ['caller_id', 'whatsapp_bill']);
         $proof = PaymentProof::first();
 
         $this->approve($proof);
 
         $codes = PosAddon::where('company_id', $company->id)->pluck('addon_code')->all();
-        $this->assertEqualsCanonicalizing(['caller_id', 'staff_attendance'], $codes);
+        $this->assertEqualsCanonicalizing(['caller_id', 'whatsapp_bill'], $codes);
         $this->assertSame('verified', $proof->fresh()->status);
     }
 
@@ -551,7 +555,7 @@ class PosPaidAddonFlowTest extends TestCase
     public function test_admin_may_narrow_the_list_but_never_widen_it(): void
     {
         $company = $this->makeShop($this->makePlan('Business'));
-        $this->buy($company, ['caller_id', 'qr_menu']);
+        $this->buy($company, ['caller_id', 'whatsapp_bill']);
         $proof = PaymentProof::first();
 
         // Admin unticks one and tries to slip in a third the shop never paid for.
@@ -612,7 +616,7 @@ class PosPaidAddonFlowTest extends TestCase
 
         PosFeatureService::flushGateCaches();
         $fresh = $company->fresh();
-        foreach (['riders_enabled', 'qr_menu_enabled', 'whatsapp_enabled', 'hazri_enabled', 'rider_tracking_enabled'] as $gate) {
+        foreach (['whatsapp_enabled', 'rider_tracking_enabled'] as $gate) {
             $this->assertFalse(PosFeatureService::planAllows($fresh, $gate), "{$gate} must stay shut");
         }
     }

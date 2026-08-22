@@ -18,29 +18,15 @@ class PosAddonPricingService
     public const DEFAULT_QUARTERLY_PRICE = 3000;
 
     /**
-     * Custom Access is intentionally not in this catalogue: it is included in
-     * every paid POS package except Starter.
+     * Package-included features are intentionally absent from this catalogue:
+     * Custom Access, Delivery Riders and QR Menu are included from Business
+     * upward, while Staff Attendance is included from Pro upward.
      */
     public const ADDONS = [
-        'delivery_riders' => [
-            'label' => 'Delivery Riders',
-            'description' => 'Rider khata, settlements and rider portal',
-            'gate' => 'riders_enabled',
-        ],
-        'qr_menu' => [
-            'label' => 'QR Menu',
-            'description' => 'Customers scan a QR code and browse the menu',
-            'gate' => 'qr_menu_enabled',
-        ],
         'whatsapp_bill' => [
             'label' => 'WhatsApp Bill',
             'description' => 'Send bills to customers on WhatsApp',
             'gate' => 'whatsapp_enabled',
-        ],
-        'staff_attendance' => [
-            'label' => 'Staff Attendance',
-            'description' => 'Login-based attendance and reports',
-            'gate' => 'hazri_enabled',
         ],
         'rider_tracking' => [
             'label' => 'Rider Live Tracking',

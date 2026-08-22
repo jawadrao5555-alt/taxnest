@@ -14,10 +14,8 @@
         'ogUrl'         => 'https://taxnest.com.pk/tutorials',
     ])
     <link rel="canonical" href="https://taxnest.com.pk/tutorials">
-    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap">
-    <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap"></noscript>
+    {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+    @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root {

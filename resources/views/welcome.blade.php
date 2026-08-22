@@ -12,8 +12,8 @@
         <link rel="canonical" href="https://taxnest.com.pk/">
 
         <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+        {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+        @include('partials.font-css', ['fontFamilies' => 'instrument-sans:400,500,600'])
 
         <!-- Styles / Scripts -->
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))

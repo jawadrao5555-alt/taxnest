@@ -35,9 +35,8 @@
         }
         applyAdminTheme(getAdminTheme());
     </script>
-    {{-- ONE font CDN only (perf, Jul 2026): same bunny.net Inter as the other panels. --}}
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet">
+    {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+    @include('partials.font-css', ['fontFamilies' => 'inter:300,400,500,600,700,800,900'])
     <style>
         *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }

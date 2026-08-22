@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
     <title>Admin Login - TaxNest</title>
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
+    {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+    @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         @keyframes pulse-glow { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }

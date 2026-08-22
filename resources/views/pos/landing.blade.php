@@ -14,10 +14,8 @@
         'ogUrl'         => 'https://taxnest.com.pk/pos',
     ])
     <link rel="canonical" href="https://taxnest.com.pk/pos">
-    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap">
-    <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap"></noscript>
+    {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+    @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700'])
     @include('partials.fast-first-paint')
     <style>
         :root {

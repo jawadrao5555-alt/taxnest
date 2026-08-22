@@ -7,10 +7,8 @@
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>FBR POS — Bank-Grade Point of Sale by TaxNest</title>
-    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap">
-    <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap"></noscript>
+    {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+    @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @include('partials.fast-first-paint')
     <style>
         :root {

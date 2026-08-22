@@ -81,9 +81,8 @@
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-fbr/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-fbr/icon-512.png">
         <title>FBR POS — {{ config('app.name', 'TaxNest') }}</title>
-        {{-- ONE font CDN only (perf, Jul 2026): Google Fonts duplicate removed — mirrors pos-app. --}}
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" />
+        {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+        @include('partials.font-css', ['fontFamilies' => 'inter:300,400,500,600,700,800,900'])
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         {{-- Alpine CDN fallback — arm only AFTER DOMContentLoaded. A blind timer can
              start Alpine while a large cached sale document is still parsing, before

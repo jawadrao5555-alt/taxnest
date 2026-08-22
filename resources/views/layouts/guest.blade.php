@@ -11,8 +11,8 @@
 
         <title>{{ config('app.name', 'TaxNest') }}</title>
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
+        {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
+        @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700'])
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <style>

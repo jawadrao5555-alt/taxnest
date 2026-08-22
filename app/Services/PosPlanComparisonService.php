@@ -638,6 +638,9 @@ class PosPlanComparisonService
                 if (!isset(PosAddonPricingService::ADDONS[$code])) {
                     $problems[] = "ADDON_COLUMNS maps '{$column}' to unknown add-on '{$code}' — "
                         . 'it must exist in PosAddonPricingService::ADDONS.';
+                } elseif ((PosAddonPricingService::ADDONS[$code]['gate'] ?? null) !== $column) {
+                    $problems[] = "ADDON_COLUMNS maps '{$column}' to add-on '{$code}' but that catalogue entry's "
+                        . "gate is '" . (PosAddonPricingService::ADDONS[$code]['gate'] ?? 'NULL') . "' — the two maps disagree.";
                 }
                 foreach (['en', 'rur', 'ur'] as $locale) {
                     foreach (['addon_label_' . $code, 'addon_desc_' . $code] as $key) {
@@ -654,6 +657,16 @@ class PosPlanComparisonService
         foreach (self::COVERED_BY as $column => $rowKey) {
             if (!isset(self::FEATURE_ROWS[$rowKey]) && !isset(self::INCLUDED_ROWS[$rowKey])) {
                 $problems[] = "COVERED_BY maps '{$column}' to unknown row '{$rowKey}'.";
+            }
+        }
+        // The catalogue side of the same coin: every sellable add-on's gate
+        // column must be declared in ADDON_COLUMNS, or the audits above never
+        // look at it and a re-enabled plan column would sneak past deploy.
+        foreach (PosAddonPricingService::ADDONS as $code => $spec) {
+            $gate = $spec['gate'] ?? null;
+            if ($gate === null || (self::ADDON_COLUMNS[$gate] ?? null) !== $code) {
+                $problems[] = "Add-on '{$code}' (gate '" . ($gate ?? 'NULL') . "') is missing from "
+                    . 'PosPlanComparisonService::ADDON_COLUMNS — declare it so the plan-column audit covers it.';
             }
         }
 

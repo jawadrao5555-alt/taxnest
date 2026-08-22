@@ -11,11 +11,10 @@
     $adsPrices = [];
     $adsLabels = [];
     foreach ($adsCatalog as $adsCode => $adsSpec) {
-        $adsPrices[$adsCode] = [
-            'annual' => (int) $adsSpec['annual_price'],
-            'quarterly' => (int) $adsSpec['quarterly_price'],
-            'monthly' => (int) $adsSpec['monthly_price'],
-        ];
+        foreach (\App\Services\PosAddonPricingService::CYCLES as $adsCycle) {
+            $adsQuote = \App\Services\PosAddonService::quote([$adsCode], $adsCycle);
+            $adsPrices[$adsCode][$adsCycle] = (int) ($adsQuote['lines'][$adsCode] ?? 0);
+        }
         $adsLabels[$adsCode] = __('pos.addon_label_' . $adsCode);
     }
 @endphp

@@ -257,8 +257,22 @@ class PaymentProofController extends Controller
         // would otherwise file two requests for the same features and the shop
         // could be charged twice. Every writer in this lane locks the same
         // company row first, so the second one sees the first one's proof.
-        $outcome = \Illuminate\Support\Facades\DB::transaction(function () use ($company, $validated) {
-            \App\Models\Company::where('id', $company->id)->lockForUpdate()->first();
+        $outcome = \Illuminate\Support\Facades\DB::transaction(function () use ($company, $validated, $path) {
+            $lockedCompany = \App\Models\Company::where('id', $company->id)->lockForUpdate()->first();
+            if (!$lockedCompany) {
+                return ['status' => 'nothing_to_buy'];
+            }
+
+            // The package can lapse or be replaced while this request waits for
+            // the company mutex. Re-check on the locked row so an expired or
+            // newly ineligible package can never create a zero-month proof.
+            $eligibility = \App\Services\PosAddonService::purchaseEligibility($lockedCompany);
+            if (!$eligibility['allowed']) {
+                return [
+                    'status' => 'ineligible',
+                    'reason_key' => $eligibility['reason_key'] ?? 'pos.addons_not_available',
+                ];
+            }
 
             $pending = PaymentProof::posAddonKind()
                 ->where('company_id', $company->id)
@@ -273,13 +287,47 @@ class PaymentProofController extends Controller
             // is only a hint. Re-read INSIDE the lock so a purchase approved a
             // moment ago cannot be bought a second time.
             \App\Services\PosAddonService::flushCache();
-            $purchasable = \App\Services\PosAddonService::purchasableCodes($company);
+            $purchasable = \App\Services\PosAddonService::purchasableCodes($lockedCompany);
             $codes = array_values(array_intersect($validated['addon_codes'], $purchasable));
             if (empty($codes)) {
                 return ['status' => 'nothing_to_buy'];
             }
 
-            return ['status' => 'ok', 'codes' => $codes];
+            $quote = \App\Services\PosAddonService::quote(
+                $codes,
+                $validated['addon_cycle'],
+                $lockedCompany
+            );
+            $proofData = [
+                'company_id' => $lockedCompany->id,
+                // Context only — approval never reads it for pricing.
+                'pricing_plan_id' => $eligibility['subscription']?->pricing_plan_id,
+                // The add-on's OWN cycle (annual/quarterly). Safe to reuse this
+                // column: the subscriptionKind scope keeps pos_addon rows out of
+                // every renewal query, so it can never be read as a package cycle.
+                'billing_cycle' => $quote['cycle'],
+                'request_type' => 'pos_addon',
+                'addon_codes' => json_encode($quote['codes']),
+                // Displayed browser totals are a convenience only. Never accept
+                // an amount from the request for paid features.
+                'amount' => $quote['total'],
+                'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
+                'reference' => $validated['reference'] ?? null,
+                'payment_date' => $validated['payment_date'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'proof_path' => $path,
+                'status' => 'pending',
+            ];
+            if (PaymentProof::addonQuoteSnapshotColumnExists()) {
+                $proofData['addon_quote_snapshot'] = $quote;
+            }
+
+            return [
+                'status' => 'ok',
+                'codes' => $codes,
+                'quote' => $quote,
+                'proof' => PaymentProof::create($proofData),
+            ];
         });
 
         if ($outcome['status'] === 'pending') {
@@ -290,31 +338,13 @@ class PaymentProofController extends Controller
             return back()->with('error', __('pos.addons_nothing_to_buy'))
                 ->with('payment_proof', 'error');
         }
+        if ($outcome['status'] === 'ineligible') {
+            return back()->with('error', __($outcome['reason_key']))
+                ->with('payment_proof', 'error');
+        }
 
-        $quote = \App\Services\PosAddonService::quote($outcome['codes'], $validated['addon_cycle']);
-        $sub = $eligibility['subscription'] ?? null;
-
-        $proof = PaymentProof::create([
-            'company_id' => $company->id,
-            // Context only — approval never reads it for pricing.
-            'pricing_plan_id' => $sub?->pricing_plan_id,
-            // The add-on's OWN cycle (annual/quarterly). Safe to reuse this
-            // column: the subscriptionKind scope keeps pos_addon rows out of
-            // every renewal query, so it can never be read as a package cycle.
-            'billing_cycle' => $quote['cycle'],
-            'request_type' => 'pos_addon',
-            'addon_codes' => json_encode($quote['codes']),
-            // Displayed browser totals are a convenience only. Never accept an
-            // amount from the request for paid features; current admin-managed
-            // catalogue prices are the sole source of truth.
-            'amount' => $quote['total'],
-            'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
-            'reference' => $validated['reference'] ?? null,
-            'payment_date' => $validated['payment_date'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'proof_path' => $path,
-            'status' => 'pending',
-        ]);
+        $quote = $outcome['quote'];
+        $proof = $outcome['proof'];
 
         $this->alertAdminsPosAddon($company, $proof, $quote);
         $request->session()->forget(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);

@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\PricingPlan;
+use App\Models\Company;
 use App\Models\Subscription;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Single source of truth for assigning a paid subscription to a company.
@@ -135,35 +137,46 @@ class SubscriptionAssignmentService
             ]);
         }
 
-        // Product-type-aware pricing also normalizes/forces the correct cycle
-        // (e.g. POS is annual-only), so the expiry below always matches the charge.
-        // The company is passed so a renewal is charged base package + the
-        // extra-branch slots it has already bought (Rs 10,000/branch/year).
-        $priced = self::computePrice($plan, $billingCycle, BranchAddonService::findCompany($companyId));
-        $cycle = $priced['cycle'];
-        $months = Subscription::getMonthsForCycle($cycle);
+        return DB::transaction(function () use ($companyId, $pricingPlanId, $billingCycle, $plan) {
+            // This is the subscription-replacement mutex. Add-on approval takes
+            // the same company lock, so it can never attach a paid feature to a
+            // package renewal that is being replaced at the same moment.
+            $company = Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
 
-        Subscription::where('company_id', $companyId)
-            ->where('active', true)
-            ->update(['active' => false]);
+            // Product-type-aware pricing also normalizes/forces the correct cycle
+            // (e.g. POS is annual-only), so the expiry below always matches the charge.
+            // The company is passed so a renewal is charged base package + the
+            // extra-branch slots it has already bought (Rs 10,000/branch/year).
+            $priced = self::computePrice($plan, $billingCycle, $company);
+            $cycle = $priced['cycle'];
+            $months = Subscription::getMonthsForCycle($cycle);
 
-        $subscription = Subscription::create([
-            'company_id' => $companyId,
-            'pricing_plan_id' => $pricingPlanId,
-            'start_date' => now()->toDateString(),
-            'end_date' => now()->addMonths($months)->toDateString(),
-            'active' => true,
-            'billing_cycle' => $cycle,
-            'discount_percent' => $priced['discount_percent'],
-            'final_price' => $priced['final_price'],
-        ]);
+            Subscription::where('company_id', $companyId)
+                ->where('active', true)
+                ->lockForUpdate()
+                ->get();
+            Subscription::where('company_id', $companyId)
+                ->where('active', true)
+                ->update(['active' => false]);
 
-        // Affiliate program: every admin-recorded payment of a referred company
-        // earns its consultant a commission. Internally duplicate-safe and
-        // failure-safe (never blocks the assignment itself).
-        ConsultantService::recordCommissionForSubscription($subscription);
+            $subscription = Subscription::create([
+                'company_id' => $companyId,
+                'pricing_plan_id' => $pricingPlanId,
+                'start_date' => now()->toDateString(),
+                'end_date' => now()->addMonths($months)->toDateString(),
+                'active' => true,
+                'billing_cycle' => $cycle,
+                'discount_percent' => $priced['discount_percent'],
+                'final_price' => $priced['final_price'],
+            ]);
 
-        return $subscription;
+            // Affiliate program: every admin-recorded payment of a referred company
+            // earns its consultant a commission. Internally duplicate-safe and
+            // failure-safe (never blocks the assignment itself).
+            ConsultantService::recordCommissionForSubscription($subscription);
+
+            return $subscription;
+        });
     }
 
     /**

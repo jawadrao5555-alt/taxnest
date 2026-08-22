@@ -91,6 +91,16 @@ class PosAddonPricingService
         return in_array($cycle, self::CYCLES, true) ? $cycle : 'annual';
     }
 
+    /** Number of months represented by one advertised cycle rate. */
+    public static function monthsForCycle(?string $cycle): int
+    {
+        return match (self::normalizeCycle($cycle)) {
+            'monthly' => 1,
+            'quarterly' => 3,
+            default => 12,
+        };
+    }
+
     public static function price(string $code, string $cycle = 'annual'): int
     {
         if (!isset(self::ADDONS[$code])) {

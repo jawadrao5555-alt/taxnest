@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PaymentProof;
 use App\Models\PosAddon;
 use App\Models\Subscription;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 // PosFeatureService is the single gate; purchasableCodes() asks it what the
@@ -90,6 +91,14 @@ class PosAddonService
 
         if ($plan->name === 'Starter') {
             return ['allowed' => false, 'reason_key' => 'pos.addons_upgrade_required'];
+        }
+
+        // An "active" row is not enough: some old packages remain active after
+        // their end date. Never sell a zero-month feature or attach an already
+        // expired entitlement to one of those rows.
+        $remainingMonths = self::remainingMonths($sub);
+        if ($remainingMonths === null || $remainingMonths === 0) {
+            return ['allowed' => false, 'reason_key' => 'pos.addons_package_expired'];
         }
 
         return ['allowed' => true, 'subscription' => $sub, 'plan' => $plan];
@@ -200,10 +209,9 @@ class PosAddonService
      * The cycle an add-on SHOULD be sold on for this company: the one its
      * package already runs on.
      *
-     * An add-on always expires with the package (see activate()), so the two
-     * must agree — a monthly shop buying a yearly add-on would pay twelve
-     * months for thirty days of use. Shops with no live package (signup) fall
-     * back to annual, the cheapest rate per month.
+     * An add-on always expires with the package (see activate()). The billing
+     * page defaults to the package's cycle, although the shop may choose a
+     * different rate ladder and is then charged for its remaining months.
      */
     public static function cycleForCompany(?Company $company): string
     {
@@ -212,7 +220,22 @@ class PosAddonService
         return PosAddonPricingService::normalizeCycle($sub?->billing_cycle);
     }
 
-    public static function quote(array $codes, string $cycle): array
+    /**
+     * Exact add-on charge for this shop.
+     *
+     * Paid features end when the active package ends. Charge only the remaining
+     * whole months (a partial month rounds up), using the selected rate ladder:
+     * annual rate ÷ 12, quarterly ÷ 3, monthly × 1. Without a dated package,
+     * such as on the public signup picker, show one complete selected cycle.
+     *
+     * @return array{cycle:string,codes:array,lines:array,full_lines:array,total:int,months:int,cycle_months:int,prorated:bool,until:?string}
+     */
+    public static function quote(
+        array $codes,
+        string $cycle,
+        ?Company $company = null,
+        ?Subscription $subscription = null
+    ): array
     {
         $cycle = PosAddonPricingService::normalizeCycle($cycle);
         $codes = array_values(array_unique(array_filter(
@@ -220,15 +243,100 @@ class PosAddonService
             fn ($code) => is_string($code) && isset(PosAddonPricingService::ADDONS[$code])
         )));
 
+        $subscription ??= $company ? self::activeSubscription($company) : null;
+        $cycleMonths = PosAddonPricingService::monthsForCycle($cycle);
+        $months = self::remainingMonths($subscription) ?? $cycleMonths;
         $lines = [];
+        $fullLines = [];
         $total = 0;
         foreach ($codes as $code) {
-            $price = PosAddonPricingService::price($code, $cycle);
+            $fullPrice = PosAddonPricingService::price($code, $cycle);
+            $price = (int) round($fullPrice * $months / $cycleMonths);
             $lines[$code] = $price;
+            $fullLines[$code] = $fullPrice;
             $total += $price;
         }
 
-        return ['cycle' => $cycle, 'codes' => $codes, 'lines' => $lines, 'total' => $total];
+        return [
+            'cycle' => $cycle,
+            'codes' => $codes,
+            'lines' => $lines,
+            'full_lines' => $fullLines,
+            'total' => $total,
+            'months' => $months,
+            'cycle_months' => $cycleMonths,
+            'prorated' => $months !== $cycleMonths,
+            'until' => $subscription?->end_date
+                ? Carbon::parse($subscription->end_date)->toDateString()
+                : null,
+        ];
+    }
+
+    /**
+     * Keep an approved subset on the submitted quote, rather than silently
+     * charging it at a later price or with fewer remaining package months.
+     */
+    public static function narrowSnapshotQuote(array $snapshot, array $codes): ?array
+    {
+        $snapshotCodes = array_values(array_unique(array_filter(
+            $snapshot['codes'] ?? [],
+            fn ($code) => is_string($code) && isset(PosAddonPricingService::ADDONS[$code])
+        )));
+        $codes = array_values(array_intersect($snapshotCodes, $codes));
+        $lines = is_array($snapshot['lines'] ?? null) ? $snapshot['lines'] : [];
+        if (empty($codes)) {
+            return null;
+        }
+
+        $selectedLines = [];
+        foreach ($codes as $code) {
+            if (!array_key_exists($code, $lines) || !is_numeric($lines[$code])) {
+                return null;
+            }
+            $selectedLines[$code] = max(0, (int) round((float) $lines[$code]));
+        }
+
+        return array_merge($snapshot, [
+            'codes' => $codes,
+            'lines' => $selectedLines,
+            'total' => array_sum($selectedLines),
+        ]);
+    }
+
+    /**
+     * Whole remaining months through the package end date. A partial month is
+     * chargeable as a full month, matching the paid extra-branch rule.
+     */
+    private static function remainingMonths(?Subscription $subscription): ?int
+    {
+        if (!$subscription || empty($subscription->end_date)) {
+            return null;
+        }
+
+        try {
+            $end = Carbon::parse($subscription->end_date)->endOfDay();
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($end->isPast()) {
+            return 0;
+        }
+
+        $today = Carbon::now()->startOfDay();
+        $expiry = $end->startOfDay();
+
+        // Calendar-month arithmetic is deliberate: a package from 1 December
+        // to 1 March is exactly three months even though it spans 90–92 days,
+        // and an annual term across a leap day remains twelve months. Any
+        // fraction beyond a whole calendar-month boundary rounds up.
+        $months = (($expiry->year - $today->year) * 12) + ($expiry->month - $today->month);
+        $wholeMonthBoundary = $today->copy()->addMonthsNoOverflow($months);
+        if ($wholeMonthBoundary->lt($expiry)) {
+            $months++;
+        }
+
+        return max(1, $months);
     }
 
     /**
@@ -247,7 +355,8 @@ class PosAddonService
         string $cycle,
         float|int $amount,
         int $proofId,
-        ?Subscription $subscription
+        ?Subscription $subscription,
+        ?array $approvedQuote = null
     ): void {
         $end = $subscription?->end_date;
         if (!$subscription || !$end) {
@@ -257,7 +366,7 @@ class PosAddonService
         }
         $end = $end instanceof \DateTimeInterface ? $end->format('Y-m-d') : (string) $end;
 
-        $quote = self::quote($codes, $cycle);
+        $quote = $approvedQuote ?? self::quote($codes, $cycle, $company, $subscription);
         $start = now()->toDateString();
 
         foreach ($quote['codes'] as $code) {

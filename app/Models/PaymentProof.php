@@ -24,6 +24,7 @@ class PaymentProof extends Model
         'request_type',
         'extra_branch_qty',
         'addon_codes',
+        'addon_quote_snapshot',
         'subscription_id',
         'notes',
         'verified_by',
@@ -39,6 +40,7 @@ class PaymentProof extends Model
         'verified_at' => 'datetime',
         'file_pruned_at' => 'datetime',
         'extra_branch_qty' => 'integer',
+        'addon_quote_snapshot' => 'array',
     ];
 
     /** Non-package request lanes. Anything NOT listed here is a renewal proof. */
@@ -48,6 +50,8 @@ class PaymentProof extends Model
     private static ?bool $kindColumn = null;
 
     private static ?bool $addonCodesColumn = null;
+
+    private static ?bool $addonQuoteSnapshotColumn = null;
 
     public static function kindColumnExists(): bool
     {
@@ -74,6 +78,20 @@ class PaymentProof extends Model
         }
 
         return self::$addonCodesColumn;
+    }
+
+    public static function addonQuoteSnapshotColumnExists(): bool
+    {
+        if (self::$addonQuoteSnapshotColumn === null) {
+            try {
+                self::$addonQuoteSnapshotColumn = self::addonCodesColumnExists()
+                    && Schema::hasColumn('payment_proofs', 'addon_quote_snapshot');
+            } catch (\Throwable $e) {
+                self::$addonQuoteSnapshotColumn = false;
+            }
+        }
+
+        return self::$addonQuoteSnapshotColumn;
     }
 
     /** 'subscription' | 'extra_branch' | 'pos_addon' — pre-migration rows = subscription. */
@@ -112,6 +130,51 @@ class PaymentProof extends Model
             $decoded,
             fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::ADDONS[$code])
         )));
+    }
+
+    /**
+     * Server quote captured when the shop submitted this add-on proof.
+     * Old rows intentionally return null and use the legacy live-quote path.
+     */
+    public function addonQuoteSnapshot(): ?array
+    {
+        if (!$this->isPosAddon() || !self::addonQuoteSnapshotColumnExists()
+            || !is_array($this->addon_quote_snapshot)) {
+            return null;
+        }
+
+        $snapshot = $this->addon_quote_snapshot;
+        $cycle = \App\Services\PosAddonPricingService::normalizeCycle($snapshot['cycle'] ?? null);
+        $codes = array_values(array_unique(array_filter(
+            $snapshot['codes'] ?? [],
+            fn ($code) => is_string($code) && isset(\App\Services\PosAddonPricingService::ADDONS[$code])
+        )));
+        $lines = is_array($snapshot['lines'] ?? null) ? $snapshot['lines'] : [];
+        $safeLines = [];
+        foreach ($codes as $code) {
+            if (!array_key_exists($code, $lines) || !is_numeric($lines[$code])) {
+                return null;
+            }
+            $safeLines[$code] = max(0, (int) round((float) $lines[$code]));
+        }
+
+        $total = array_sum($safeLines);
+        if (empty($codes) || !isset($snapshot['total']) || !is_numeric($snapshot['total'])
+            || $total !== (int) round((float) $snapshot['total'])
+            || !isset($snapshot['months'], $snapshot['until'])
+            || (int) $snapshot['months'] < 1
+            || !is_string($snapshot['until'])
+            || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $snapshot['until'])) {
+            return null;
+        }
+
+        $snapshot['cycle'] = $cycle;
+        $snapshot['codes'] = $codes;
+        $snapshot['lines'] = $safeLines;
+        $snapshot['total'] = $total;
+        $snapshot['months'] = (int) $snapshot['months'];
+
+        return $snapshot;
     }
 
     /**

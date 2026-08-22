@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\PricingPlan;
 use App\Models\Subscription;
 use App\Services\SubscriptionAssignmentService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -59,6 +60,18 @@ class PosQuarterlyPricingTest extends TestCase
                 $table->timestamps();
             });
         }
+
+        Schema::dropIfExists('companies');
+        Schema::create('companies', function ($table) {
+            $table->id();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+        DB::table('companies')->insert([
+            ['id' => 4242, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 9001, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 9002, 'created_at' => now(), 'updated_at' => now()],
+        ]);
 
         Schema::dropIfExists('sale_campaigns');
         if (true) {

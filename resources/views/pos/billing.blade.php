@@ -169,12 +169,13 @@
                 $adPreselectedCycle = \App\Services\PosAddonPricingService::normalizeCycle($addons['preselected_cycle'] ?? null);
                 $adForceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('addon_codes') || !empty($adPreselected);
                 $adPrices = [];
+                $adTerm = null;
                 foreach ($adPurchasable as $adCode) {
-                    $adPrices[$adCode] = [
-                        'annual' => (int) ($adCatalog[$adCode]['annual_price'] ?? 0),
-                        'quarterly' => (int) ($adCatalog[$adCode]['quarterly_price'] ?? 0),
-                        'monthly' => (int) ($adCatalog[$adCode]['monthly_price'] ?? 0),
-                    ];
+                    foreach (\App\Services\PosAddonPricingService::CYCLES as $adCycle) {
+                        $adQuote = $addons['quotes'][$adCode][$adCycle] ?? [];
+                        $adPrices[$adCode][$adCycle] = (int) ($adQuote['lines'][$adCode] ?? 0);
+                        $adTerm ??= $adQuote;
+                    }
                 }
             @endphp
 
@@ -294,7 +295,12 @@
                             {{ __('pos.addons_buy_cta') }}
                         </button>
                     </div>
-                    <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-2">{{ __('pos.addons_renewal_note') }}</p>
+                    <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-2">
+                        @if(($adTerm['until'] ?? null) && ($adTerm['months'] ?? 0) > 0)
+                            {{ __('pos.addons_prorated_note', ['months' => $adTerm['months'], 'date' => \Illuminate\Support\Carbon::parse($adTerm['until'])->format('d M Y')]) }}
+                        @endif
+                        {{ __('pos.addons_renewal_note') }}
+                    </p>
 
                     <div x-show="open && picked.length > 0" x-cloak class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
                         <form method="POST" action="{{ route('pos.payment-proof.store') }}" enctype="multipart/form-data" class="space-y-3">

@@ -52,14 +52,15 @@
                                 @if($proof->isPosAddon())
                                     {{-- Paid feature add-on request — no package, no cycle change. --}}
                                     @php
-                                        $paCodes = $proof->addonCodeList();
-                                        $paCycle = \App\Services\PosAddonService::cycleForProof($proof) ?? 'annual';
+                                        $paSnapshot = $proof->addonQuoteSnapshot();
+                                        $paCodes = $paSnapshot['codes'] ?? $proof->addonCodeList();
+                                        $paCycle = $paSnapshot['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
                                         $paCatalog = \App\Services\PosAddonPricingService::ADDONS;
-                                        $paQuote = \App\Services\PosAddonService::quote($paCodes, $paCycle);
+                                        $paQuote = $paSnapshot ?? \App\Services\PosAddonService::quote($paCodes, $paCycle, $proof->company);
                                     @endphp
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-violet-900/40 text-violet-300 border border-violet-700/60">Feature add-on &times; {{ count($paCodes) }}</span>
                                     <span class="block text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                        {{ $paCycle === 'quarterly' ? 'Quarterly' : 'Annual' }} · quoted PKR {{ number_format($paQuote['total']) }}
+                                        {{ ucfirst($paCycle) }} · quoted PKR {{ number_format($paQuote['total']) }}
                                         @if($proof->pricingPlan)
                                             · on {{ $proof->pricingPlan->name }}
                                         @endif
@@ -154,10 +155,11 @@
                                          sirf ghata sakta hai (shop ne kam paisa bheja ho). --}}
                                     <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[260px] max-w-[300px]">
                                         @php
-                                            $paCodesSel = $proof->addonCodeList();
-                                            $paCycleSel = \App\Services\PosAddonService::cycleForProof($proof) ?? 'annual';
+                                            $paSnapshotSel = $proof->addonQuoteSnapshot();
+                                            $paCodesSel = $paSnapshotSel['codes'] ?? $proof->addonCodeList();
+                                            $paCycleSel = $paSnapshotSel['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
                                             $paCatalogSel = \App\Services\PosAddonPricingService::ADDONS;
-                                            $paQuoteSel = \App\Services\PosAddonService::quote($paCodesSel, $paCycleSel);
+                                            $paQuoteSel = $paSnapshotSel ?? \App\Services\PosAddonService::quote($paCodesSel, $paCycleSel, $proof->company);
                                             $paPaid = $proof->amount !== null ? (float) $proof->amount : null;
                                             $paShort = $paPaid !== null ? max(0, $paQuoteSel['total'] - $paPaid) : 0;
                                         @endphp
@@ -191,11 +193,9 @@
                                                 </label>
                                                 @endforeach
                                             </div>
-                                            <label class="block text-[11px] text-gray-400 pt-1">Billing</label>
-                                            <select name="addon_cycle" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                                <option value="annual" @selected($paCycleSel === 'annual')>Annual</option>
-                                                <option value="quarterly" @selected($paCycleSel === 'quarterly')>Quarterly</option>
-                                            </select>
+                                            <p class="text-[11px] text-gray-500 pt-1">
+                                                Billing: {{ ucfirst($paCycleSel) }} — kept exactly as the shop requested and paid for.
+                                            </p>
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Add-on</button>
                                         </form>
                                     </div>

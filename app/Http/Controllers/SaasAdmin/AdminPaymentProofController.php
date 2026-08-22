@@ -329,7 +329,8 @@ class AdminPaymentProofController extends Controller
      */
     private function approvePosAddon(Request $request, PaymentProof $proof)
     {
-        $requested = $proof->addonCodeList();
+        $proofSnapshot = $proof->addonQuoteSnapshot();
+        $requested = $proofSnapshot['codes'] ?? $proof->addonCodeList();
         if (empty($requested)) {
             return back()->with('error', 'This add-on request has no valid features on it — reject it and ask the shop to resubmit.');
         }
@@ -337,7 +338,6 @@ class AdminPaymentProofController extends Controller
         $request->validate([
             'addon_codes' => 'nullable|array',
             'addon_codes.*' => 'string',
-            'addon_cycle' => 'nullable|in:' . implode(',', \App\Services\PosAddonPricingService::CYCLES),
         ]);
 
         if (!Schema::hasTable('pos_addons')) {
@@ -353,14 +353,20 @@ class AdminPaymentProofController extends Controller
             return back()->with('error', 'Select at least one feature to approve, or reject the request instead.');
         }
 
-        $cycle = $request->input('addon_cycle')
-            ?: (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
-        $quote = \App\Services\PosAddonService::quote($codes, $cycle);
-
-        $result = DB::transaction(function () use ($proof, $quote) {
+        // The shop has already paid for its selected billing cycle. An approver
+        // may narrow features, but changing the cycle here would make the
+        // displayed/payment-proof quote disagree with what is activated.
+        $cycle = $proofSnapshot['cycle'] ?? (\App\Services\PosAddonService::cycleForProof($proof) ?? 'annual');
+        $result = DB::transaction(function () use ($proof, $codes, $cycle) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return ['outcome' => 'already_processed'];
+            }
+            $snapshot = $locked->addonQuoteSnapshot();
+            $requested = $snapshot['codes'] ?? $locked->addonCodeList();
+            $codes = array_values(array_intersect($requested, $codes));
+            if (empty($codes)) {
+                return ['outcome' => 'no_codes'];
             }
 
             $company = Company::where('id', $locked->company_id)->lockForUpdate()->first();
@@ -386,13 +392,31 @@ class AdminPaymentProofController extends Controller
                 return ['outcome' => 'no_expiry'];
             }
 
+            if ($snapshot) {
+                $currentUntil = $sub->end_date instanceof \DateTimeInterface
+                    ? $sub->end_date->format('Y-m-d')
+                    : (string) $sub->end_date;
+                if ($snapshot['until'] !== $currentUntil) {
+                    return ['outcome' => 'subscription_changed'];
+                }
+
+                $quote = \App\Services\PosAddonService::narrowSnapshotQuote($snapshot, $codes);
+                if (!$quote) {
+                    return ['outcome' => 'no_codes'];
+                }
+            } else {
+                // Pre-snapshot proof: preserve the legacy review path.
+                $quote = \App\Services\PosAddonService::quote($codes, $cycle, $company, $sub);
+            }
+
             \App\Services\PosAddonService::activate(
                 $company,
                 $quote['codes'],
                 $quote['cycle'],
                 $quote['total'],
                 $locked->id,
-                $sub
+                $sub,
+                $quote
             );
 
             $locked->update([
@@ -404,16 +428,25 @@ class AdminPaymentProofController extends Controller
                 'reject_reason' => null,
             ]);
 
-            return ['outcome' => 'approved', 'company' => $company, 'subscription' => $sub];
+            return [
+                'outcome' => 'approved',
+                'company' => $company,
+                'subscription' => $sub,
+                'quote' => $quote,
+            ];
         });
 
         if (($result['outcome'] ?? null) !== 'approved') {
             return back()->with('error', match ($result['outcome'] ?? '') {
                 'not_eligible' => 'This shop is no longer eligible for paid add-ons (it must be on a live, paid Business-or-higher PRA POS package). Sort the package out first, or reject this request and refund the shop.',
                 'no_expiry' => 'This shop has no dated active package to attach the add-on to. Renew or fix the package first — an add-on must always expire with it.',
+                'subscription_changed' => 'This shop’s package changed after it submitted this add-on request. Reject this proof and ask the shop to submit a fresh request against its current package.',
+                'no_codes' => 'This payment proof no longer contains a valid feature selection. Reject it and ask the shop to submit a fresh request.',
                 default => 'This payment proof was already processed.',
             });
         }
+
+        $quote = $result['quote'];
 
         // A freshly bought feature must be visible on the very next request.
         \App\Services\PosFeatureService::flushGateCaches();

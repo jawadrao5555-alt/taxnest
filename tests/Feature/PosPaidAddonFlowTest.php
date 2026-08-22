@@ -57,7 +57,7 @@ class PosPaidAddonFlowTest extends TestCase
 
         // Every hasTable/hasColumn memo in this lane is process-wide — an
         // earlier suite's schema must never decide this one's answers.
-        foreach ([[PaymentProof::class, 'kindColumn'], [PaymentProof::class, 'addonCodesColumn']] as [$class, $prop]) {
+        foreach ([[PaymentProof::class, 'kindColumn'], [PaymentProof::class, 'addonCodesColumn'], [PaymentProof::class, 'addonQuoteSnapshotColumn']] as [$class, $prop]) {
             $cache = new \ReflectionProperty($class, $prop);
             $cache->setAccessible(true);
             $cache->setValue(null, null);
@@ -182,6 +182,7 @@ class PosPaidAddonFlowTest extends TestCase
             $table->string('request_type')->default('subscription');
             $table->unsignedInteger('extra_branch_qty')->nullable();
             $table->text('addon_codes')->nullable();
+            $table->text('addon_quote_snapshot')->nullable();
             $table->decimal('amount', 12, 2)->nullable();
             $table->string('payment_method')->nullable();
             $table->string('reference')->nullable();
@@ -440,9 +441,12 @@ class PosPaidAddonFlowTest extends TestCase
         $this->assertSame('quarterly', PosAddonService::cycleForProof($proof));
         $this->assertEqualsCanonicalizing(['caller_id', 'whatsapp_bill'], $proof->addonCodeList());
 
-        $expected = PosAddonPricingService::price('caller_id', 'quarterly')
-            + PosAddonPricingService::price('whatsapp_bill', 'quarterly');
+        // The annual package has roughly twelve months left, so a quarterly
+        // rate is charged four times — one price per remaining three months.
+        $expected = round(PosAddonPricingService::price('caller_id', 'quarterly') * 12 / 3)
+            + round(PosAddonPricingService::price('whatsapp_bill', 'quarterly') * 12 / 3);
         $this->assertEquals($expected, (float) $proof->amount);
+        $this->assertEquals($expected, $proof->addonQuoteSnapshot()['total'] ?? null);
     }
 
     public function test_a_forged_browser_amount_cannot_change_the_server_quote(): void
@@ -563,6 +567,11 @@ class PosPaidAddonFlowTest extends TestCase
 
         $codes = PosAddon::where('company_id', $company->id)->pluck('addon_code')->all();
         $this->assertSame(['caller_id'], $codes, 'Approval must only ever activate features the shop requested');
+        $this->assertEquals(
+            $proof->addonQuoteSnapshot()['lines']['caller_id'],
+            PosAddon::where('company_id', $company->id)->value('amount'),
+            'Narrowing a request must retain the per-feature amount originally quoted to the shop.'
+        );
     }
 
     public function test_approving_the_same_proof_twice_does_not_double_charge(): void
@@ -842,6 +851,65 @@ class PosPaidAddonFlowTest extends TestCase
             'A refused approval must leave the proof in the queue, not silently verify it');
     }
 
+    public function test_an_expired_but_still_active_package_cannot_buy_or_approve_an_addon(): void
+    {
+        $company = $this->makeShop(
+            $this->makePlan('Business'),
+            [],
+            ['end_date' => now()->subDay()->toDateString()]
+        );
+
+        $eligibility = PosAddonService::purchaseEligibility($company);
+        $this->assertFalse($eligibility['allowed']);
+        $this->assertSame('pos.addons_package_expired', $eligibility['reason_key']);
+        $this->buy($company, ['caller_id']);
+        $this->assertSame(0, PaymentProof::count());
+
+        // A valid request can become stale while awaiting review. Keeping the
+        // subscription row active must not turn it into a zero-day entitlement.
+        $liveCompany = $this->makeShop($this->makePlan('Business'));
+        $this->buy($liveCompany, ['caller_id']);
+        $proof = PaymentProof::firstOrFail();
+        Subscription::where('company_id', $liveCompany->id)->update([
+            'end_date' => now()->subDay()->toDateString(),
+        ]);
+
+        $this->approve($proof);
+        $this->assertSame('pending', $proof->fresh()->status);
+        $this->assertSame(0, PosAddon::where('company_id', $liveCompany->id)->count());
+    }
+
+    public function test_approval_keeps_the_cycle_the_shop_paid_for(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $this->buy($company, ['caller_id'], 'annual');
+        $proof = PaymentProof::firstOrFail();
+
+        // A forged/admin-form legacy cycle must not change the selected rate.
+        $this->approve($proof, ['addon_cycle' => 'monthly']);
+
+        $addon = PosAddon::where('company_id', $company->id)->firstOrFail();
+        $this->assertSame('annual', $addon->billing_cycle);
+        $this->assertEquals((float) $proof->amount, (float) $addon->amount);
+    }
+
+    public function test_approval_uses_the_submitted_snapshot_when_rates_change_while_pending(): void
+    {
+        $company = $this->makeShop($this->makePlan('Business'));
+        $this->buy($company, ['caller_id'], 'annual');
+        $proof = PaymentProof::firstOrFail();
+        $quotedAmount = (float) $proof->amount;
+
+        // Price edits must apply to new requests, never retrospectively change
+        // the amount this shop was asked to pay on its already-filed proof.
+        PosAddonPricingService::save(['caller_id' => ['annual' => 20000]]);
+        $this->approve($proof)->assertSessionHasNoErrors();
+
+        $addon = PosAddon::where('company_id', $company->id)->firstOrFail();
+        $this->assertEquals($quotedAmount, (float) $addon->amount);
+        $this->assertEquals($quotedAmount, (float) $proof->fresh()->amount);
+    }
+
     public function test_activate_refuses_to_invent_an_expiry(): void
     {
         $company = $this->makeShop($this->makePlan('Business'));
@@ -874,6 +942,86 @@ class PosPaidAddonFlowTest extends TestCase
 
         $this->approve($proof);
         $this->assertEquals(20000, (float) PosAddon::where('company_id', $company->id)->value('amount'));
+    }
+
+    public function test_mid_package_addon_is_prorated_to_the_remaining_whole_months_everywhere(): void
+    {
+        $company = $this->makeShop(
+            $this->makePlan('Business'),
+            [],
+            // 59 days is two chargeable months under the same whole-month rule
+            // already used for paid extra-branch slots.
+            ['end_date' => now()->addDays(59)->toDateString()]
+        );
+        $expected = round(PosAddonPricingService::price('caller_id', 'annual') * 2 / 12);
+
+        $quote = PosAddonService::quote(['caller_id'], 'annual', $company);
+        $this->assertSame(2, $quote['months']);
+        $this->assertTrue($quote['prorated']);
+        $this->assertEquals($expected, $quote['total']);
+        $subscriptionEnd = Subscription::where('company_id', $company->id)->value('end_date');
+        $subscriptionEnd = $subscriptionEnd instanceof \DateTimeInterface
+            ? $subscriptionEnd->format('Y-m-d')
+            : (string) $subscriptionEnd;
+        $this->assertSame($subscriptionEnd, $quote['until']);
+
+        $billing = $this->actingAs($this->posUser($company), 'pos')->get('/pos/billing');
+        $billing->assertOk();
+        $billingQuotes = $billing->viewData('addons')['quotes'];
+        $this->assertEquals(
+            $expected,
+            $billingQuotes['caller_id']['annual']['total'],
+            'The billing page must display the same pro-rated amount stored on the proof.'
+        );
+
+        // The payment-proof amount is the same server quote a manager reviews.
+        $this->buy($company, ['caller_id'], 'annual')->assertSessionHasNoErrors();
+        $proof = PaymentProof::firstOrFail();
+        $this->assertEquals($expected, (float) $proof->amount);
+
+        $this->approve($proof)->assertSessionHasNoErrors();
+        $addon = PosAddon::where('company_id', $company->id)->firstOrFail();
+        $this->assertEquals($expected, (float) $addon->amount);
+        $addonEndsAt = $addon->ends_at instanceof \DateTimeInterface
+            ? $addon->ends_at->format('Y-m-d')
+            : (string) $addon->ends_at;
+        $this->assertSame($quote['until'], $addonEndsAt);
+    }
+
+    public function test_proration_uses_calendar_months_not_average_day_length(): void
+    {
+        try {
+            foreach ([
+                // A three-month term can span 92 days, but it is not four months.
+                ['2023-12-01 09:00:00', '2024-03-01', 3],
+                // An annual term can cross a leap day, but it is not thirteen months.
+                ['2023-03-01 09:00:00', '2024-03-01', 12],
+            ] as [$now, $endDate, $months]) {
+                \Illuminate\Support\Carbon::setTestNow($now);
+                $company = $this->makeShop(
+                    $this->makePlan('Business'),
+                    [],
+                    ['end_date' => $endDate]
+                );
+                $expected = round(PosAddonPricingService::price('caller_id', 'annual') * $months / 12);
+
+                $quote = PosAddonService::quote(['caller_id'], 'annual', $company);
+                $this->assertSame($months, $quote['months']);
+                $this->assertEquals($expected, $quote['total']);
+
+                $this->buy($company, ['caller_id'], 'annual');
+                $proof = PaymentProof::orderByDesc('id')->firstOrFail();
+                $this->assertEquals($expected, $proof->addonQuoteSnapshot()['total']);
+
+                $this->approve($proof);
+                $this->assertEquals(
+                    $expected,
+                    PosAddon::where('company_id', $company->id)->value('amount')
+                );
+            }
+        } finally {
+            \Illuminate\Support\Carbon::setTestNow();
+        }
     }
 
     public function test_quote_ignores_an_unknown_code(): void

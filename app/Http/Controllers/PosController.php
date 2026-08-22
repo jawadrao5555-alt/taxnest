@@ -10842,8 +10842,21 @@ class PosController extends Controller
             (array) ($rememberedAddonSelection['codes'] ?? []),
             // Default to the cycle the PACKAGE runs on: an add-on always expires
             // with the package, so a monthly shop must not be quoted a year.
-            (string) ($rememberedAddonSelection['cycle'] ?? \App\Services\PosAddonService::cycleForCompany($company))
+            (string) ($rememberedAddonSelection['cycle'] ?? \App\Services\PosAddonService::cycleForCompany($company)),
+            $company,
+            $currentSubscription
         );
+        $addonQuotes = [];
+        foreach ($addonPurchasable as $addonCode) {
+            foreach (\App\Services\PosAddonPricingService::CYCLES as $addonCycle) {
+                $addonQuotes[$addonCode][$addonCycle] = \App\Services\PosAddonService::quote(
+                    [$addonCode],
+                    $addonCycle,
+                    $company,
+                    $currentSubscription
+                );
+            }
+        }
         $addons = [
             'eligibility' => \App\Services\PosAddonService::purchaseEligibility($company),
             'catalog' => \App\Services\PosAddonPricingService::catalog(),
@@ -10852,6 +10865,7 @@ class PosController extends Controller
             'pending' => \App\Services\PosAddonService::pendingCodes($company),
             'preselected' => array_values(array_intersect($rememberedAddonQuote['codes'], $addonPurchasable)),
             'preselected_cycle' => $rememberedAddonQuote['cycle'],
+            'quotes' => $addonQuotes,
             // Spending the shop's money is an owner/manager decision. A cashier
             // may still SEE what is active; the POST is guarded server-side.
             'can_buy' => !(auth('pos')->user()?->isPosCashier() ?? false),

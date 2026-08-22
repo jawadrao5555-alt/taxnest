@@ -47,10 +47,13 @@ class AdminPlanController extends Controller
 
     public function updateAddonPricing(Request $request)
     {
+        // One rate per cycle the catalogue sells — adding a cycle to CYCLES
+        // must never leave the admin form silently unable to price it.
         $rules = ['addons' => ['required', 'array']];
         foreach (array_keys(PosAddonPricingService::ADDONS) as $code) {
-            $rules["addons.{$code}.annual"] = ['required', 'numeric', 'min:0', 'max:999999999'];
-            $rules["addons.{$code}.quarterly"] = ['required', 'numeric', 'min:0', 'max:999999999'];
+            foreach (PosAddonPricingService::CYCLES as $cycle) {
+                $rules["addons.{$code}.{$cycle}"] = ['required', 'numeric', 'min:0', 'max:999999999'];
+            }
         }
 
         $data = $request->validate($rules);
@@ -58,13 +61,15 @@ class AdminPlanController extends Controller
         PosAddonPricingService::save($data['addons']);
         $after = PosAddonPricingService::catalog();
 
+        $auditShape = fn (array $catalog) => collect($catalog)->mapWithKeys(fn ($row, $code) => [
+            $code => collect(PosAddonPricingService::CYCLES)
+                ->mapWithKeys(fn ($cycle) => [$cycle => $row["{$cycle}_price"] ?? null])
+                ->all(),
+        ])->all();
+
         AdminAuditLog::log(auth('admin')->id(), 'PRA POS add-on pricing updated', 'SystemSetting', null, [
-            'old' => collect($before)->mapWithKeys(fn ($row, $code) => [
-                $code => ['annual' => $row['annual_price'], 'quarterly' => $row['quarterly_price']],
-            ])->all(),
-            'new' => collect($after)->mapWithKeys(fn ($row, $code) => [
-                $code => ['annual' => $row['annual_price'], 'quarterly' => $row['quarterly_price']],
-            ])->all(),
+            'old' => $auditShape($before),
+            'new' => $auditShape($after),
         ]);
 
         return back()->with('success', 'PRA POS add-on rates saved successfully.');

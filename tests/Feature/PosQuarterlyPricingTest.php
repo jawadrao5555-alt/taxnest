@@ -107,6 +107,43 @@ class PosQuarterlyPricingTest extends TestCase
         $this->assertSame(14999.0, $priced['final_price']);
     }
 
+    /** Third cycle (Aug 2026): monthly must charge the hand-set monthly price. */
+    public function test_pos_monthly_cycle_uses_exact_monthly_price(): void
+    {
+        $plan = $this->makePosPlan(['price_monthly' => 1549]);
+
+        $priced = SubscriptionAssignmentService::computePrice($plan, 'monthly');
+
+        $this->assertSame('monthly', $priced['cycle']);
+        $this->assertSame(1549.0, $priced['final_price']);
+    }
+
+    /** No monthly rate set = the plan is not sold monthly; fall back to annual. */
+    public function test_pos_plan_without_monthly_price_forces_annual(): void
+    {
+        $plan = $this->makePosPlan(['price_monthly' => 0]);
+
+        $priced = SubscriptionAssignmentService::computePrice($plan, 'monthly');
+
+        $this->assertSame('annual', $priced['cycle']);
+        $this->assertSame(14999.0, $priced['final_price']);
+    }
+
+    /** A monthly POS subscription must expire in ONE month, not a year. */
+    public function test_assign_pos_monthly_creates_one_month_subscription(): void
+    {
+        $plan = $this->makePosPlan(['price_monthly' => 1549]);
+
+        $sub = SubscriptionAssignmentService::assign(4242, $plan->id, 'monthly');
+
+        $this->assertSame('monthly', $sub->billing_cycle);
+        $this->assertSame(1549.0, (float) $sub->final_price);
+        $this->assertSame(
+            now()->addMonth()->toDateString(),
+            \Illuminate\Support\Carbon::parse($sub->end_date)->toDateString()
+        );
+    }
+
     public function test_pos_plan_without_quarterly_price_forces_annual(): void
     {
         $plan = $this->makePosPlan(['price_quarterly' => null]);

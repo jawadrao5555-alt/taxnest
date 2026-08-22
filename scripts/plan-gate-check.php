@@ -222,10 +222,38 @@ try {
         bad("Trial plan row missing (product_type=pos, name=Trial)");
     }
 
-    // ── 4. Admin override unlocks everything (rides on Starter) ────────
-    $c = $mkCompany('Override');
-    $mkSub($c, $plans['Starter']->id, ['override_type' => 'temporary', 'override_until' => now()->addDays(10)]);
-    $assertGates($c, $allTrue, 'override on Starter');
+    // ── 4. Admin override = free access ON A PACKAGE ───────────────────
+    // Owner rule (Aug 2026): a grant waives the PAYMENT, not the package. Sat
+    // on a real package the shop gets exactly that package's features; the
+    // admin picks which one while granting. Only a grant with no real package
+    // behind it (Trial row, or no plan at all) still opens everything, so
+    // legacy partner/internal grants never lose access overnight.
+    $ovrExtra = ['override_type' => 'temporary', 'override_until' => now()->addDays(10)];
+    $c = $mkCompany('OverrideStarter');
+    $mkSub($c, $plans['Starter']->id, $ovrExtra);
+    $assertGates($c, $MATRIX['Starter'], 'override on Starter');
+    check(PosFeatureService::restaurantAllowed($c) === false,
+        'override on Starter: Restaurant module must stay closed (Starter has none)');
+
+    $c = $mkCompany('OverridePro');
+    $mkSub($c, $plans['Pro']->id, $ovrExtra);
+    $assertGates($c, $MATRIX['Pro'], 'override on Pro');
+    check(PosFeatureService::restaurantAllowed($c) === true,
+        'override on Pro: Restaurant module must be open');
+
+    if ($trialPlan) {
+        $c = $mkCompany('OverrideTrialPlan');
+        $mkSub($c, $trialPlan->id, array_merge($ovrExtra, ['trial_ends_at' => now()->subMonth()]));
+        $assertGates($c, $allTrue, 'override on a Trial row (no real package)');
+    }
+
+    $c = $mkCompany('OverrideNoPlan');
+    Subscription::create([
+        'company_id' => $c->id, 'pricing_plan_id' => null, 'active' => true,
+        'start_date' => now()->subDay()->toDateString(), 'end_date' => null,
+        'override_type' => 'lifetime', 'override_until' => null,
+    ]);
+    $assertGates($c, $allTrue, 'override with no package at all');
 
     // ── 5. No active subscription = everything locked ───────────────────
     $c = $mkCompany('NoSub');
@@ -290,10 +318,25 @@ try {
     // ── 6c. Paid FEATURE add-ons: catalogue-only gates open through an active
     //   pos_addons row, die with its expiry, and stay OFF on every package.
     foreach (array_keys(\App\Services\PosAddonPricingService::ADDONS) as $adCode) {
-        check(\App\Services\PosAddonPricingService::price($adCode, 'annual') > 0,
-            "feature add-on: {$adCode} must carry a non-zero annual price");
-        check(\App\Services\PosAddonPricingService::price($adCode, 'quarterly') > 0,
-            "feature add-on: {$adCode} must carry a non-zero quarterly price");
+        $adRates = [];
+        foreach (\App\Services\PosAddonPricingService::CYCLES as $adCycle) {
+            $adRates[$adCycle] = \App\Services\PosAddonPricingService::price($adCode, $adCycle);
+            check($adRates[$adCycle] > 0,
+                "feature add-on: {$adCode} must carry a non-zero {$adCycle} price");
+        }
+
+        // Same ladder as the packages: a longer commitment must always be the
+        // cheaper deal, or a shop paying yearly is being punished for it.
+        check($adRates['quarterly'] * 4 > $adRates['annual'],
+            "feature add-on: {$adCode} quarterly×4 ({$adRates['quarterly']}) must cost more than annual ({$adRates['annual']})");
+        check($adRates['monthly'] * 12 > $adRates['quarterly'] * 4,
+            "feature add-on: {$adCode} monthly×12 ({$adRates['monthly']}) must cost more than quarterly×4 ({$adRates['quarterly']})");
+
+        // An add-on rides on a package and dies with it — it may never cost a
+        // meaningful slice of the cheapest package it can be bought against.
+        check($adRates['annual'] * 2 <= (int) $plans['Business']->price,
+            "feature add-on: {$adCode} annual ({$adRates['annual']}) is too close to the Business package ("
+            . (int) $plans['Business']->price . ') — an add-on must stay a small fraction of its package');
     }
     $c = $mkCompany('FeatureAddon');
     $mkSub($c, $plans['Business']->id);
@@ -358,6 +401,49 @@ try {
     $comparisonPlans = \App\Services\PosPlanComparisonService::plans();
     check($comparisonPlans->count() === count($MATRIX),
         'comparison: expected ' . count($MATRIX) . ' paid POS packages, got ' . $comparisonPlans->count());
+
+    // Price ladder + the three billing cycles (owner-set, Aug 2026). Written
+    // here independently of the migration so a hand-edited plan row, a missed
+    // migration or a half-applied reprice blocks the deploy.
+    $PRICE_LADDER = [
+        'Starter'   => ['annual' => 17999, 'quarterly' => 4699, 'monthly' => 1649],
+        'Business'  => ['annual' => 24999, 'quarterly' => 6549, 'monthly' => 2299],
+        'Pro'       => ['annual' => 29999, 'quarterly' => 7849, 'monthly' => 2749],
+        'Unlimited' => ['annual' => 34999, 'quarterly' => 9199, 'monthly' => 3199],
+    ];
+    $posSaleLive = \App\Models\SaleCampaign::activeFor('pos') !== null;
+    foreach ($PRICE_LADDER as $planName => $wantPrices) {
+        $planRow = $plans[$planName] ?? null;
+        if (!$planRow) { bad("price: {$planName} row missing"); continue; }
+
+        $gotPrices = [
+            'annual' => (int) $planRow->price,
+            'quarterly' => (int) $planRow->price_quarterly,
+            'monthly' => (int) $planRow->price_monthly,
+        ];
+        foreach ($wantPrices as $cycle => $want) {
+            check($gotPrices[$cycle] === $want,
+                "price: {$planName} {$cycle} must be {$want}, got " . $gotPrices[$cycle]);
+        }
+
+        // Paying for a longer period must always be the cheaper deal.
+        check($gotPrices['quarterly'] * 4 > $gotPrices['annual'],
+            "price: {$planName} quarterly×4 must cost more than the annual price");
+        check($gotPrices['monthly'] * 12 > $gotPrices['quarterly'] * 4,
+            "price: {$planName} monthly×12 must cost more than quarterly×4");
+
+        // ...and what the checkout actually charges must be that same number.
+        // (Skipped while a sale campaign is discounting the annual price.)
+        $planModel = \App\Models\PricingPlan::find($planRow->id);
+        if (!$posSaleLive && $planModel) {
+            foreach ($wantPrices as $cycle => $want) {
+                $priced = \App\Services\SubscriptionAssignmentService::computePrice($planModel, $cycle);
+                check($priced['cycle'] === $cycle && (int) $priced['final_price'] === $want,
+                    "price: computePrice({$planName}, {$cycle}) must charge {$cycle}/{$want}, got "
+                    . $priced['cycle'] . '/' . (int) $priced['final_price']);
+            }
+        }
+    }
     foreach ($comparisonPlans as $p) {
         check(((int) ($p->max_products ?? -1)) < 0,
             "comparison: {$p->name} must have unlimited products, got " . var_export($p->max_products, true));

@@ -51,7 +51,10 @@
                         <p class="text-sm font-semibold text-white">{{ $addon['label'] }}</p>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $addon['description'] }}</p>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    {{-- One box per sellable cycle. Add-ons follow the package
+                         ladder: annual cheapest per month, then quarterly, then
+                         monthly. --}}
+                    <div class="grid grid-cols-3 gap-2">
                         <label class="text-[10px] text-gray-500 uppercase">
                             Annual (PKR)
                             <input type="number" name="addons[{{ $code }}][annual]" value="{{ old("addons.{$code}.annual", $addon['annual_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
@@ -59,6 +62,10 @@
                         <label class="text-[10px] text-gray-500 uppercase">
                             Quarterly (PKR)
                             <input type="number" name="addons[{{ $code }}][quarterly]" value="{{ old("addons.{$code}.quarterly", $addon['quarterly_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                        </label>
+                        <label class="text-[10px] text-gray-500 uppercase">
+                            Monthly (PKR)
+                            <input type="number" name="addons[{{ $code }}][monthly]" value="{{ old("addons.{$code}.monthly", $addon['monthly_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         </label>
                     </div>
                 </div>

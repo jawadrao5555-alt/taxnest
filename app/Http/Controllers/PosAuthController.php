@@ -161,10 +161,31 @@ class PosAuthController extends Controller
             (string) request()->query('addon_cycle', 'annual')
         );
 
+        // Cycle picker (Aug 2026): a shop can pay yearly, 3-monthly or monthly.
+        // Every figure comes from computePrice(), so the signup quote can never
+        // disagree with what approval actually charges.
+        $planPrices = [];
+        foreach ($plans as $plan) {
+            foreach (\App\Services\RequestedPackageService::POS_CYCLES as $cycle) {
+                $planPrices[$plan->id][$cycle] = (float) \App\Services\SubscriptionAssignmentService::computePrice($plan, $cycle)['final_price'];
+            }
+        }
+
         return view('pos.auth.register', [
             'plans' => $plans,
             'preselectedPlanId' => $preselected?->id,
             'requestedAddonQuote' => $requestedAddonQuote,
+            'planPrices' => $planPrices,
+            'cycleOptions' => [
+                'annual' => __('pos.cycle_annual'),
+                'quarterly' => __('pos.cycle_quarterly'),
+                'monthly' => __('pos.cycle_monthly'),
+            ],
+            'cyclePerLabels' => [
+                'annual' => __('pos.auth_per_year'),
+                'quarterly' => __('pos.auth_per_quarter'),
+                'monthly' => __('pos.auth_per_month'),
+            ],
         ]);
     }
 
@@ -181,6 +202,9 @@ class PosAuthController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
             'pricing_plan_id' => 'required|integer|exists:pricing_plans,id',
+            // Optional: a shop that skips the cycle picker (or posts a bad one)
+            // is charged annually — see RequestedPackageService::cycleForPlan().
+            'billing_cycle' => 'nullable|string|max:20',
             // Unknown public codes/cycles are harmlessly dropped/normalised by
             // PosAddonService::quote() below. Validate shape and size here, but
             // do not make a tampered optional field block account creation.
@@ -234,9 +258,14 @@ class PosAuthController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_integration_mode')) {
             $companyData['pos_integration_mode'] = $integrationMode;
         }
-        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'requested_plan_id')) {
-            $companyData['requested_plan_id'] = $selectedPlan->id;
-        }
+        // Package + how often the shop wants to pay. Both columns are written by
+        // RequestedPackageService (hasColumn-guarded there) so signup, admin
+        // approval and the price quote can never disagree about the cycle. A
+        // tampered or missing cycle falls back to annual, never to the dearest.
+        $companyData += \App\Services\RequestedPackageService::companyAttributes(
+            $selectedPlan,
+            $request->input('billing_cycle')
+        );
 
         $company = Company::create($companyData);
 

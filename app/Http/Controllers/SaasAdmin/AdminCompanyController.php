@@ -11,6 +11,7 @@ use App\Models\PosTransaction;
 use App\Models\FbrPosTransaction;
 use App\Models\User;
 use App\Models\Subscription;
+use App\Models\PricingPlan;
 use App\Models\Franchise;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -358,7 +359,16 @@ class AdminCompanyController extends Controller
                 ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'pra_status']);
         }
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills'));
+        // Packages the temporary-access grant may be given ON: this company's
+        // own product only, and never a retired POS package.
+        $grantPlans = PricingPlan::where('product_type', $company->product_type)
+            ->where(function ($q) { $q->where('is_trial', false)->orWhereNull('is_trial'); })
+            ->orderBy('price')
+            ->get()
+            ->filter(fn ($p) => $p->product_type !== 'pos' || \App\Services\PosPlanComparisonService::isSellablePlan($p))
+            ->values();
+
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans'));
     }
 
     /**
@@ -1166,26 +1176,57 @@ class AdminCompanyController extends Controller
     {
         $request->validate([
             'until' => 'required|date|after:today',
+            'pricing_plan_id' => 'nullable|integer|exists:pricing_plans,id',
             'free_invoice_limit' => 'nullable|integer|min:1|max:1000000',
             'reason' => 'nullable|string|max:255',
         ]);
         $company = Company::findOrFail($id);
+
+        // Which package the free access runs on (optional — empty keeps the
+        // one the company already has). The override alone opens the FEATURE
+        // gates, but every limit (team accounts, branches, invoice quota) and
+        // every "your plan" label still reads the subscription's plan, and a
+        // company with no plan at all trips the plan-limit middleware. Picking
+        // a package here makes the trial behave like the real thing.
+        $plan = null;
+        if ($request->filled('pricing_plan_id')) {
+            $plan = PricingPlan::find((int) $request->input('pricing_plan_id'));
+            if (!$plan || $plan->product_type !== $company->product_type) {
+                return back()->with('error', 'That package belongs to a different product — pick a package of this company\'s own product.');
+            }
+            if ($plan->product_type === 'pos' && !$plan->is_trial
+                && !\App\Services\PosPlanComparisonService::isSellablePlan($plan)) {
+                return back()->with('error', 'That retired POS package can no longer be assigned.');
+            }
+        }
+
         $limit = $request->filled('free_invoice_limit') ? (int) $request->input('free_invoice_limit') : null;
         $limitLabel = $limit === null ? 'unlimited' : (string) $limit;
         $sub = $this->getOrCreateActiveSubscription($company->id);
-        $sub->update([
+        $previousPlanId = $sub->pricing_plan_id;
+        $changes = [
             'override_type' => 'temporary',
             'override_until' => $request->input('until'),
             'override_granted_at' => now(),
             'free_invoice_limit' => $limit,
             'override_reason' => $request->input('reason') ?: 'Temporary access granted by admin',
             'override_by' => auth('admin')->id(),
-        ]);
+        ];
+        // Only touch the plan when the admin actually picked one — an empty
+        // picker must never wipe a paying company's real package.
+        if ($plan) {
+            $changes['pricing_plan_id'] = $plan->id;
+        }
+        $sub->update($changes);
         $this->activateForGrant($company);
+        // A plan swap changes what the gates read — drop the cached answers.
+        \App\Services\PosFeatureService::flushGateCaches();
         AdminAuditLog::log(auth('admin')->id(), 'Override granted: TEMPORARY', 'Subscription', $sub->id, [
             'company' => $company->name, 'until' => $sub->override_until?->toDateString(), 'invoices' => $limitLabel, 'reason' => $sub->override_reason,
+            'plan' => $plan?->name ?? 'unchanged', 'previous_plan_id' => $previousPlanId,
         ]);
-        return back()->with('success', "Temporary access granted to '{$company->name}' until " . $sub->override_until->format('Y-m-d') . " ({$limitLabel} invoices).");
+        $planNote = $plan ? " on the {$plan->name} package" : '';
+        return back()->with('success', "Temporary access granted to '{$company->name}'{$planNote} until " . $sub->override_until->format('Y-m-d') . " ({$limitLabel} invoices).");
     }
 
     public function removeOverride($id)

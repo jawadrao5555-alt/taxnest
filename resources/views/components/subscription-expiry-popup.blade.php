@@ -100,10 +100,11 @@
                 $seSubmit = route('payment-proof.store');
                 $seProductType = 'di';
             }
+            // PRA POS sells three cycles since Aug 2026 (annual cheapest per month).
             $seCycles = $seProductType === 'di'
                 ? [['key' => 'monthly', 'label' => __('pos.cycle_monthly')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'semi_annual', 'label' => __('pos.cycle_semi_annual')], ['key' => 'annual', 'label' => __('pos.cycle_annual')]]
                 : ($seProductType === 'pos'
-                    ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')]]
+                    ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'monthly', 'label' => __('pos.cycle_monthly')]]
                     : [['key' => 'annual', 'label' => __('pos.cycle_annual')]]);
             try {
                 // Total = base package + paid extra-branch slots (Rs 10,000/branch/

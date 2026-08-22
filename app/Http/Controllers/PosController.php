@@ -10840,7 +10840,9 @@ class PosController extends Controller
         $rememberedAddonSelection = session(\App\Services\PosAddonService::SIGNUP_SESSION_KEY, []);
         $rememberedAddonQuote = \App\Services\PosAddonService::quote(
             (array) ($rememberedAddonSelection['codes'] ?? []),
-            (string) ($rememberedAddonSelection['cycle'] ?? 'annual')
+            // Default to the cycle the PACKAGE runs on: an add-on always expires
+            // with the package, so a monthly shop must not be quoted a year.
+            (string) ($rememberedAddonSelection['cycle'] ?? \App\Services\PosAddonService::cycleForCompany($company))
         );
         $addons = [
             'eligibility' => \App\Services\PosAddonService::purchaseEligibility($company),

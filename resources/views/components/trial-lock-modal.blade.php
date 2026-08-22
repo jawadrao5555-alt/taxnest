@@ -81,12 +81,12 @@
             $lockProductType = 'di';
         }
 
-        // DI = full toggle; PRA POS = Annual + Quarterly (Aug 2026);
+        // DI = full toggle; PRA POS = Annual + Quarterly + Monthly (Aug 2026);
         // standalone / FBR POS = annual-only.
         $lockCycles = $lockProductType === 'di'
             ? [['key' => 'monthly', 'label' => __('pos.cycle_monthly')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'semi_annual', 'label' => __('pos.cycle_semi_annual')], ['key' => 'annual', 'label' => __('pos.cycle_annual')]]
             : ($lockProductType === 'pos'
-                ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')]]
+                ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'monthly', 'label' => __('pos.cycle_monthly')]]
                 : [['key' => 'annual', 'label' => __('pos.cycle_annual')]]);
 
         // Total = base package + paid extra-branch slots (Rs 10,000/branch/year).

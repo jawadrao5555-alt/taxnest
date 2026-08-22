@@ -49,19 +49,39 @@ class RequestedPackageService
         return $plan;
     }
 
+    /** The three cycles PRA POS sells (Aug 2026). Order = cheapest per month first. */
+    public const POS_CYCLES = ['annual', 'quarterly', 'monthly'];
+
     /**
      * The cycle a requested package is actually charged on.
      *
      * Digital Invoice quotes a MONTHLY price and the pricing page lets the
      * visitor pick one of four cycles — that choice is honoured (unknown or
-     * missing falls back to monthly). Every other product is licensed by the
-     * YEAR, so the visitor never picks a cycle and none can be smuggled in.
+     * missing falls back to monthly). PRA POS sells all three of its own cycles
+     * since Aug 2026. Every other product is licensed by the YEAR, so the
+     * visitor never picks a cycle and none can be smuggled in.
      */
     public static function cycleForPlan(PricingPlan $plan, ?string $stored = null): string
     {
-        return ($plan->product_type ?? 'di') === 'di'
-            ? SubscriptionAssignmentService::normalizeCycle($stored)
-            : 'annual';
+        $type = $plan->product_type ?? 'di';
+
+        if ($type === 'di') {
+            return SubscriptionAssignmentService::normalizeCycle($stored);
+        }
+
+        if ($type === 'pos') {
+            // Deliberately NOT normalizeCycle(): that helper maps anything it
+            // does not recognise to 'monthly', which here is the DEAREST cycle
+            // per month. A tampered, empty or DI-only value ('semi_annual')
+            // must fall back to the annual default instead of silently
+            // upgrading the shop onto the most expensive rate.
+            $raw = mb_strtolower(trim((string) $stored));
+            $raw = $raw === 'yearly' ? 'annual' : $raw;
+
+            return in_array($raw, self::POS_CYCLES, true) ? $raw : 'annual';
+        }
+
+        return 'annual';
     }
 
     /**

@@ -225,9 +225,21 @@ class PosPlanComparisonService
                 $col['sale_badge']    = $plan->sale_badge;
             }
 
+            // Shorter cycles are listed as alternatives to the headline annual
+            // price. Each one only appears when the plan actually carries that
+            // price, which is the same condition computePrice() charges on — a
+            // note can never advertise a cycle the checkout would refuse.
+            $alternativeCycles = [];
             $quarterly = (float) ($plan->price_quarterly ?? 0);
             if ($quarterly > 0) {
-                $col['price_note'] = __('pos.pcmp_or_quarterly', ['price' => number_format($quarterly)])
+                $alternativeCycles[] = __('pos.pcmp_or_quarterly', ['price' => number_format($quarterly)]);
+            }
+            $monthly = (float) ($plan->price_monthly ?? 0);
+            if ($monthly > 0) {
+                $alternativeCycles[] = __('pos.pcmp_or_monthly', ['price' => number_format($monthly)]);
+            }
+            if ($alternativeCycles !== []) {
+                $col['price_note'] = implode(' · ', $alternativeCycles)
                     . ($onSale ? ' ' . __('pos.pcmp_sale_annual_only') : '');
             }
 

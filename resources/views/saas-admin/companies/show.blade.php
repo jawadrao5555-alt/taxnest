@@ -476,7 +476,9 @@
          SUBSCRIPTION OVERRIDE + USAGE LIMIT — admin-only controls
          ============================================================ --}}
     @php
-        $activeSub = \App\Models\Subscription::where('company_id', $company->id)->orderByDesc('id')->first();
+        // Eager-load the plan: live runs with lazy loading disabled, so the
+        // package name below would throw on a bare relation access.
+        $activeSub = \App\Models\Subscription::where('company_id', $company->id)->with('pricingPlan')->orderByDesc('id')->first();
         $overrideActive = $activeSub && method_exists($activeSub, 'hasActiveOverride') && $activeSub->hasActiveOverride();
     @endphp
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-6" x-data="{ open: null }">
@@ -530,6 +532,23 @@
                 @csrf
                 <label class="text-xs text-gray-400 block">Access until (date)</label>
                 <input type="date" name="until" required min="{{ now()->addDay()->toDateString() }}" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                {{-- Which package the free access runs on. The override opens the
+                     feature gates by itself, but team/branch/invoice limits and
+                     every "your plan" label still read this. --}}
+                <label class="text-xs text-gray-400 block">
+                    Package
+                    <span class="text-gray-600">— currently
+                        {{ $activeSub?->pricingPlan?->name ?? 'none' }}</span>
+                </label>
+                <select name="pricing_plan_id" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                    <option value="">Keep current package{{ $activeSub?->pricingPlan?->name ? ' (' . $activeSub->pricingPlan->name . ')' : ' (none)' }}</option>
+                    @foreach(($grantPlans ?? collect()) as $gp)
+                        {{-- live PDO hands ints back as strings — compare as ints --}}
+                        <option value="{{ $gp->id }}" @selected((int) ($activeSub?->pricing_plan_id ?? 0) === (int) $gp->id)>
+                            {{ $gp->name }} — PKR {{ number_format((float) $gp->price) }}
+                        </option>
+                    @endforeach
+                </select>
                 <label class="text-xs text-gray-400 block">Invoice Limit (optional — leave empty for unlimited)</label>
                 <input type="number" name="free_invoice_limit" min="1" max="1000000" placeholder="Empty = unlimited" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
                 <label class="text-xs text-gray-400 block">Reason (optional)</label>

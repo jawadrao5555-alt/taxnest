@@ -64,24 +64,37 @@
                             (string) old('requested_addon_cycle', $requestedAddonQuote['cycle'] ?? 'annual')
                         );
                     @endphp
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}' }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
                         @csrf
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at
-                             sign-up; admin sees it at approval and approves exactly this plan
-                             for a 1-year subscription. --}}
+                             sign-up; admin sees it at approval and approves exactly this plan.
+                             Since Aug 2026 it also picks HOW OFTEN it pays. --}}
                         <div class="pb-1">
-                            <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">{{ __('pos.auth_select_package') }} <span class="normal-case font-normal">{{ __('pos.auth_annual_billing') }}</span></p>
+                            <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">{{ __('pos.auth_select_package') }} <span class="normal-case font-normal">{{ __('pos.auth_pick_billing') }}</span></p>
                         </div>
 
                         <input type="hidden" name="pricing_plan_id" :value="planId">
+
+                        {{-- Billing cycle. Yearly is the cheapest per month; the card prices
+                             below re-quote live from the server-computed figures. --}}
+                        <input type="hidden" name="billing_cycle" :value="cycle">
+                        <div class="grid grid-cols-3 gap-1 p-1 rounded-xl" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
+                            @foreach(($cycleOptions ?? []) as $cycleKey => $cycleLabel)
+                            <button type="button" @click="cycle = @js($cycleKey)"
+                                    class="text-[11px] font-semibold py-1.5 rounded-lg transition-all"
+                                    :class="cycle === @js($cycleKey) ? 'bg-purple-600 text-white shadow' : 'text-purple-200/60 hover:text-white'">
+                                {{ $cycleLabel }}
+                            </button>
+                            @endforeach
+                        </div>
 
                         <div class="grid grid-cols-2 gap-2">
                             @foreach(($plans ?? collect()) as $plan)
                             <label class="relative cursor-pointer" @click="planId = '{{ $plan->id }}'">
                                 <div class="flex flex-col gap-0.5 py-2.5 px-3 rounded-xl transition-all cat-card" :class="planId === '{{ $plan->id }}' ? 'cat-active' : ''">
                                     <span class="text-sm font-bold text-white">{{ $plan->name }}</span>
-                                    <span class="text-xs font-semibold text-purple-200/80">Rs {{ number_format((float) $plan->sale_price) }}<span class="text-purple-300/40 font-normal"> {{ __('pos.auth_per_year') }}</span></span>
+                                    <span class="text-xs font-semibold text-purple-200/80">Rs <span x-text="priceOf({{ $plan->id }})">{{ number_format((float) $plan->sale_price) }}</span><span class="text-purple-300/40 font-normal">&nbsp;<span x-text="perLabel">{{ __('pos.auth_per_year') }}</span></span></span>
                                     <span class="text-[10px] text-purple-200/50 leading-tight">
                                         {{ __('pos.auth_team_accounts', ['count' => ($plan->user_limit ?? 0) === -1 ? __('pos.auth_unlimited') : $plan->user_limit]) }}
                                         · {{ __('pos.auth_branches', ['count' => ($plan->branch_limit ?? 0) === -1 ? __('pos.auth_unlimited') : ($plan->branch_limit ?? 1)]) }}

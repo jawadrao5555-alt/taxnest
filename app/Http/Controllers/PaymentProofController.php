@@ -47,7 +47,8 @@ class PaymentProofController extends Controller
         $productType = $this->resolveProductType($company);
         $allowedCycles = match ($productType) {
             'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
-            'pos' => ['annual', 'quarterly'], // PRA POS: Annual + Quarterly (Aug 2026)
+            // PRA POS: annual, quarterly (+5%) or monthly (+10%) — Aug 2026.
+            'pos' => ['annual', 'quarterly', 'monthly'],
             default => ['annual'],            // standalone / fbrpos stay annual-only
         };
 
@@ -239,7 +240,7 @@ class PaymentProofController extends Controller
         $validated = $request->validate([
             'addon_codes' => 'required|array|min:1',
             'addon_codes.*' => 'required|string|in:' . implode(',', array_keys(\App\Services\PosAddonPricingService::ADDONS)),
-            'addon_cycle' => 'required|in:annual,quarterly',
+            'addon_cycle' => 'required|in:' . implode(',', \App\Services\PosAddonPricingService::CYCLES),
             'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
             'reference' => 'nullable|string|max:120',
             'payment_date' => 'nullable|date',

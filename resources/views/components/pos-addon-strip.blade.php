@@ -14,6 +14,7 @@
         $adsPrices[$adsCode] = [
             'annual' => (int) $adsSpec['annual_price'],
             'quarterly' => (int) $adsSpec['quarterly_price'],
+            'monthly' => (int) $adsSpec['monthly_price'],
         ];
         $adsLabels[$adsCode] = __('pos.addon_label_' . $adsCode);
     }
@@ -99,6 +100,9 @@
             <button type="button" class="tn-addons__cycle" :class="{ 'is-active': cycle === 'annual' }" @click="cycle = 'annual'">
                 {{ __('pos.addons_cycle_annual') }}
             </button>
+            <button type="button" class="tn-addons__cycle" :class="{ 'is-active': cycle === 'monthly' }" @click="cycle = 'monthly'">
+                {{ __('pos.addons_cycle_monthly') }}
+            </button>
             <button type="button" class="tn-addons__cycle" :class="{ 'is-active': cycle === 'quarterly' }" @click="cycle = 'quarterly'">
                 {{ __('pos.addons_cycle_quarterly') }}
             </button>
@@ -124,7 +128,11 @@
             <p class="tn-addons__price">
                 PKR <span x-text="fmt(priceOf({{ \Illuminate\Support\Js::from($adsCode) }}))">{{ number_format($adsSpec['annual_price']) }}</span>
                 <span class="tn-addons__period"
-                      x-text="cycle === 'quarterly' ? {{ \Illuminate\Support\Js::from('/ ' . __('pos.addons_per_quarter')) }} : {{ \Illuminate\Support\Js::from('/ ' . __('pos.addons_per_year')) }}">
+                      x-text="({{ \Illuminate\Support\Js::from([
+                          'annual' => '/ ' . __('pos.addons_per_year'),
+                          'quarterly' => '/ ' . __('pos.addons_per_quarter'),
+                          'monthly' => '/ ' . __('pos.addons_per_month'),
+                      ]) }})[cycle]">
                     / {{ __('pos.addons_per_year') }}
                 </span>
             </p>

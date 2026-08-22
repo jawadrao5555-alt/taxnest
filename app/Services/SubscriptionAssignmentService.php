@@ -84,6 +84,19 @@ class SubscriptionAssignmentService
                     'discount_percent' => 0.0,
                 ];
             }
+
+            // Monthly (Aug 2026, owner-approved): PRA POS ONLY, and only when the
+            // plan carries an explicit monthly price. Like quarterly it is priced
+            // ABOVE the annual pro-rata (~+10%) on purpose, and like quarterly a
+            // plan without the price silently falls back to annual below rather
+            // than charging a cycle the owner never set.
+            if ($type === 'pos' && $cycle === 'monthly' && (float) ($plan->price_monthly ?? 0) > 0) {
+                return [
+                    'cycle' => 'monthly',
+                    'final_price' => round((float) $plan->price_monthly),
+                    'discount_percent' => 0.0,
+                ];
+            }
             return [
                 'cycle' => 'annual',
                 'final_price' => round((float) $plan->sale_price),

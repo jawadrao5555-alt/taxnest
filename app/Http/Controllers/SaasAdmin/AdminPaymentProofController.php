@@ -93,10 +93,10 @@ class AdminPaymentProofController extends Controller
         }
 
         // Cycle guard: same per-product rules as customer submission
-        // (di = 4 cycles, pos = annual+quarterly, others annual-only).
+        // (di = 4 cycles, pos = annual/quarterly/monthly, others annual-only).
         $allowedCycles = match ($plan->product_type ?? 'di') {
             'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
-            'pos' => ['annual', 'quarterly'],
+            'pos' => ['annual', 'quarterly', 'monthly'],
             default => ['annual'],
         };
         $requestedCycle = SubscriptionAssignmentService::normalizeCycle($request->billing_cycle);
@@ -337,7 +337,7 @@ class AdminPaymentProofController extends Controller
         $request->validate([
             'addon_codes' => 'nullable|array',
             'addon_codes.*' => 'string',
-            'addon_cycle' => 'nullable|in:annual,quarterly',
+            'addon_cycle' => 'nullable|in:' . implode(',', \App\Services\PosAddonPricingService::CYCLES),
         ]);
 
         if (!Schema::hasTable('pos_addons')) {

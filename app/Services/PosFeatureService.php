@@ -409,11 +409,16 @@ class PosFeatureService
         }
         $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
         if ($sub) {
-            if ($sub->hasActiveOverride()) {
+            // Same rule as planAllows(): a grant that sits on a real package
+            // gives that package's Restaurant answer, nothing more.
+            if ($sub->hasActiveOverride() && self::overrideGrantsEverything($sub)) {
                 return 'override';
             }
             if ($sub->pricingPlan && $sub->pricingPlan->restaurant_enabled) {
-                return 'plan';
+                return $sub->hasActiveOverride() ? 'override' : 'plan';
+            }
+            if ($sub->hasActiveOverride()) {
+                return null;
             }
             if ($sub->isTrialActive()) {
                 // Owner decision (Jul 2026): active-trial companies get the
@@ -424,6 +429,22 @@ class PosFeatureService
             }
         }
         return null;
+    }
+
+    /**
+     * Does this access grant open EVERYTHING, or only its package?
+     *
+     * A grant is package-scoped as soon as it sits on a real paid package —
+     * the admin picks one while granting temporary access, or the company
+     * already had one. With only a Trial row or no plan at all there is no
+     * package to read, so the grant stays blanket (the historical behaviour
+     * every existing partner / internal grant relies on).
+     */
+    private static function overrideGrantsEverything(\App\Models\Subscription $sub): bool
+    {
+        $plan = $sub->pricingPlan;
+
+        return !$plan || (bool) $plan->is_trial;
     }
 
     /** Clear per-request gate caches (tests / admin plan flips mid-request). */
@@ -464,7 +485,17 @@ class PosFeatureService
                 $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
                 if ($sub) {
                     if ($sub->hasActiveOverride()) {
-                        $allowed = true;
+                        // An override waives the PAYMENT, not the package.
+                        // Owner rule (Aug 2026): the shop gets exactly the
+                        // package the grant sits on — the one the admin picked
+                        // while granting, or the one the company already had.
+                        // A grant with no real package behind it (Trial row or
+                        // no plan at all) keeps the old blanket access: there
+                        // is nothing to read, and legacy partner/internal
+                        // grants must never lose access overnight.
+                        $allowed = self::overrideGrantsEverything($sub)
+                            || !\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)
+                            || !empty($sub->pricingPlan->{$planColumn});
                     } elseif ($sub->pricingPlan) {
                         if (!\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)) {
                             $allowed = true; // fail open until migration lands

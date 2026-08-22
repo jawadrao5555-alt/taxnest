@@ -193,12 +193,28 @@ class PosAddonService
             return null;
         }
 
-        return $proof->billing_cycle === 'quarterly' ? 'quarterly' : 'annual';
+        return PosAddonPricingService::normalizeCycle($proof->billing_cycle);
+    }
+
+    /**
+     * The cycle an add-on SHOULD be sold on for this company: the one its
+     * package already runs on.
+     *
+     * An add-on always expires with the package (see activate()), so the two
+     * must agree — a monthly shop buying a yearly add-on would pay twelve
+     * months for thirty days of use. Shops with no live package (signup) fall
+     * back to annual, the cheapest rate per month.
+     */
+    public static function cycleForCompany(?Company $company): string
+    {
+        $sub = self::activeSubscription($company);
+
+        return PosAddonPricingService::normalizeCycle($sub?->billing_cycle);
     }
 
     public static function quote(array $codes, string $cycle): array
     {
-        $cycle = $cycle === 'quarterly' ? 'quarterly' : 'annual';
+        $cycle = PosAddonPricingService::normalizeCycle($cycle);
         $codes = array_values(array_unique(array_filter(
             $codes,
             fn ($code) => is_string($code) && isset(PosAddonPricingService::ADDONS[$code])

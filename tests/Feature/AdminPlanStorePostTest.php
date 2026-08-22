@@ -230,9 +230,12 @@ class AdminPlanStorePostTest extends TestCase
     /** Admin can change every PRA POS add-on rate without changing plan rows. */
     public function test_admin_can_update_pos_addon_rates(): void
     {
+        // Every cycle the catalogue sells must be settable in one post — add a
+        // cycle to CYCLES and this test proves the form still covers it.
+        $rates = ['annual' => 13500, 'quarterly' => 3600, 'monthly' => 1250];
         $addons = [];
         foreach (\App\Services\PosAddonPricingService::ADDONS as $code => $_addon) {
-            $addons[$code] = ['annual' => 13500, 'quarterly' => 3600];
+            $addons[$code] = $rates;
         }
 
         $this->actingAsAdmin()
@@ -242,19 +245,34 @@ class AdminPlanStorePostTest extends TestCase
             ->assertSessionHas('success');
 
         foreach (array_keys(\App\Services\PosAddonPricingService::ADDONS) as $code) {
+            foreach (\App\Services\PosAddonPricingService::CYCLES as $cycle) {
+                $this->assertSame(
+                    (string) $rates[$cycle],
+                    DB::table('system_settings')
+                        ->where('key', "pos_addon_{$code}_{$cycle}_price")
+                        ->value('value'),
+                    "add-on {$code} {$cycle} rate must be saved"
+                );
+            }
+        }
+    }
+
+    /** A monthly shop must be quoted the monthly add-on rate, not a year. */
+    public function test_pos_addon_quote_supports_all_three_cycles(): void
+    {
+        foreach (\App\Services\PosAddonPricingService::CYCLES as $cycle) {
+            $quote = \App\Services\PosAddonService::quote(['caller_id'], $cycle);
+            $this->assertSame($cycle, $quote['cycle']);
             $this->assertSame(
-                '13500',
-                DB::table('system_settings')
-                    ->where('key', "pos_addon_{$code}_annual_price")
-                    ->value('value')
-            );
-            $this->assertSame(
-                '3600',
-                DB::table('system_settings')
-                    ->where('key', "pos_addon_{$code}_quarterly_price")
-                    ->value('value')
+                \App\Services\PosAddonPricingService::price('caller_id', $cycle),
+                (int) $quote['total'],
+                "caller_id {$cycle} quote must match the catalogue rate"
             );
         }
+
+        // Garbage / another product's cycle falls back to the CHEAPEST rate,
+        // never silently to the dearest one.
+        $this->assertSame('annual', \App\Services\PosAddonService::quote(['caller_id'], 'semi_annual')['cycle']);
     }
 
     /** Guests can never hit the write paths. */

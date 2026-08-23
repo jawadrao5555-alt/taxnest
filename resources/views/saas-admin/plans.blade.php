@@ -102,7 +102,14 @@
                         <option value="fbrpos">FBR POS</option>
                     </select>
                 </div>
-                <input type="number" name="price" placeholder="Price (PKR)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price" placeholder="Price (PKR — DI/FBR POS = per month)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                {{-- Sep 2026: a new package used to be born monthly-only — the
+                     other three cycles could not be priced until AFTER it was
+                     created, so whatever the ladder invented is what a
+                     quarterly or yearly buyer got charged in between. --}}
+                <input type="number" name="price_quarterly" placeholder="Quarterly Price (3 mo — optional)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price_semi_annual" placeholder="Half-Year Price (6 mo — optional)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price_yearly" placeholder="Annual Price (12 mo — optional)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="invoice_limit" placeholder="Invoice Limit (-1=unlimited)" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="max_terminals" placeholder="Max Terminals (-1=unlimited)" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="max_users" placeholder="Max Users (-1=unlimited)" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">

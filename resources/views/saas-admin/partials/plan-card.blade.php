@@ -24,6 +24,49 @@
             <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($hasOffer ? $plan->sale_price : $plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ in_array($plan->product_type, ['pos', 'standalone']) ? '/yr' : '/mo' }}</span></div>
         </div>
 
+        {{-- Sep 2026: this card used to quote the monthly figure ONLY, so the
+             package looked like a monthly-only subscription even though
+             checkout sells all four cycles. Every cycle a buyer can pick is
+             listed with the exact rupees they are charged. --}}
+        @if(in_array($plan->product_type, ['di', 'fbrpos']))
+        @php
+            $cycleLabels = ['monthly' => 'Monthly', 'quarterly' => 'Quarterly', 'semi_annual' => 'Half-Year', 'annual' => 'Annual'];
+            $cycleRates = [];
+            foreach ($cycleLabels as $cycleKey => $cycleLabel) {
+                $cycleRates[$cycleKey] = [
+                    'label'  => $cycleLabel,
+                    'row'    => \App\Models\Subscription::priceForPlanCycle($plan, $cycleKey),
+                    'is_set' => $plan->explicitCyclePrice($cycleKey) !== null,
+                ];
+            }
+            $anyDerived = collect($cycleRates)->contains(fn ($r) => !$r['is_set']);
+        @endphp
+        <div class="mb-3 pb-3 border-b border-gray-800">
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Cycle Rates (what checkout charges)</p>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                @foreach($cycleRates as $rate)
+                <div class="flex justify-between gap-2 text-[11px]">
+                    <span class="text-gray-400">{{ $rate['label'] }}</span>
+                    <span class="text-gray-200 font-medium whitespace-nowrap">
+                        {{ number_format($rate['row']['final_price']) }}@if(!$rate['is_set'])<span class="text-amber-400" title="No hand-set rate — worked out from the shared cycle-discount ladder">*</span>@endif
+                    </span>
+                </div>
+                @endforeach
+            </div>
+            @if($anyDerived)
+            <p class="text-[10px] text-amber-400/80 mt-1.5">* worked out from the shared cycle-discount ladder — set a rate in Edit to fix it.</p>
+            @endif
+        </div>
+        @elseif($plan->product_type === 'pos')
+        <div class="mb-3 pb-3 border-b border-gray-800">
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Cycle Rates</p>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual</span><span class="text-gray-200 font-medium">{{ number_format($hasOffer ? $plan->sale_price : $plan->price) }}</span></div>
+                <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Quarterly</span><span class="text-gray-200 font-medium">{{ $plan->price_quarterly !== null ? number_format($plan->price_quarterly) : '—' }}</span></div>
+            </div>
+        </div>
+        @endif
+
         <div class="space-y-1.5 text-sm">
             <div class="flex justify-between"><span class="text-gray-400">Invoices{{ $plan->product_type === 'pos' ? '' : '/mo' }}</span><span class="text-white">{{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) : ($plan->invoice_limit == -1 ? 'Unlimited' : '0') }}</span></div>
             @if($plan->product_type === 'di')

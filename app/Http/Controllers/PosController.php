@@ -11664,6 +11664,13 @@ class PosController extends Controller
         // the close (ZFC closed a day while delivery orders never left the shop);
         // rider unsettled cash is a WARNING only (khata legitimately carries).
         $pendingDeliveries = $this->undispatchedDeliverySummary($companyId, $company, $date);
+        // The blocker list stays company-wide, but only rows this branch owns
+        // may be CLEARED from here — the page must not offer a button that
+        // would mutate another branch's live delivery (branch-less shops: all).
+        foreach ($pendingDeliveries->rows as $dcRow) {
+            $dcRow->clearable = $this->dayCloseRowInScope($dcRow, $dcBranchId);
+        }
+        $dcBlockersAllClearable = $pendingDeliveries->rows->every(fn ($r) => $r->clearable);
 
         // Task 1197: $dcIso gates the blade's COMPANY-WIDE Z sections (frozen
         // cash recon, local/rider summaries, Z print links) for isolated cashiers.
@@ -11674,7 +11681,7 @@ class PosController extends Controller
         // the page just reminds the shop they are still sitting there.
         $parkedBills = \App\Services\PosParkedBills::count(\App\Services\PosParkedBills::PRA_TABLE, $companyId);
 
-        return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
+        return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcBlockersAllClearable', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
     }
 
     /**
@@ -11803,7 +11810,13 @@ class PosController extends Controller
                 })
                 ->with('rider:id,name')
                 ->orderBy('created_at')
-                ->get(['id', 'rider_id', 'total_amount', 'invoice_number', 'pra_invoice_number', 'delivery_status', 'customer_name', 'created_at']);
+                ->get(array_merge(
+                    ['id', 'rider_id', 'total_amount', 'invoice_number', 'pra_invoice_number', 'delivery_status', 'customer_name', 'created_at'],
+                    // Which branch the bill belongs to — the blocker itself stays
+                    // company-wide (unchanged), but the CLEAR must never mutate
+                    // another branch's live delivery from this branch's close.
+                    \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'branch_id') ? ['branch_id'] : []
+                ));
 
             // Rider unsettled cash khata — warning-only context (whole open
             // khata, archived included: same scope as the rider settle path).
@@ -11842,7 +11855,12 @@ class PosController extends Controller
                 // blocking bill and closes it in place (owner, 23 Aug 2026).
                 'rows' => $rows->map(fn ($t) => (object) [
                     'id' => $t->id,
-                    'invoice_number' => $t->pra_invoice_number ?: ($t->invoice_number ?: ('#' . $t->id)),
+                    // The SHOP-facing serial (POS-2026-000NN / L-NNN) — a PRA
+                    // USIN means nothing to the counter staff looking for this
+                    // bill on their board. Fiscal number rides along separately.
+                    'invoice_number' => $t->invoice_number ?: ($t->pra_invoice_number ?: ('#' . $t->id)),
+                    'fiscal_number' => $t->pra_invoice_number,
+                    'branch_id' => $t->branch_id ?? null,
                     'rider_name' => $t->rider->name ?? null,
                     'delivery_status' => $t->delivery_status,
                     'customer_name' => $t->customer_name,
@@ -11891,6 +11909,198 @@ class PosController extends Controller
         return back()->with('error', $data['message'] ?? __('pos.madadgar_err_generic'));
     }
 
+    /**
+     * Mark ONE blocking delivery bill as delivered, from the Day Close page.
+     *
+     * Why this does NOT reuse the deliveries board endpoint (Frost and Brew,
+     * 23 Aug 2026 — the close was stuck for days): the board applies the STAFF
+     * STREAM LOCK (local vs PRA, welded to the user's reporting flag). This
+     * shop's owner runs reporting OFF, so his stream is 'local' — the two
+     * PRA-stream delivery bills were invisible on his board AND a direct POST
+     * was refused by streamScopeAllowsTxn. Meanwhile the close blocker counts
+     * BOTH streams, so those bills could never be cleared by anyone: a
+     * permanent dead end, not a user mistake.
+     *
+     * A day close is a company-level act that covers both streams by
+     * definition, so its own cure must be stream-agnostic. Everything else
+     * stays as strict as the board: company scope, the blocker shape only
+     * (never a settled or already-closed bill), and the same stamps.
+     */
+    public function dayCloseMarkDelivered(Request $request, $txnId)
+    {
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        $companyId = (int) app('currentCompanyId');
+        // The ONLY bills this endpoint may touch are the ones currently
+        // blocking the close — the same list the page just rendered. Deriving
+        // them from the blocker query itself (instead of re-stating its rules)
+        // means an archived bill, a bill older than the blocker's window, a
+        // return, or a settled one can never be stamped through a crafted POST.
+        $blockers = $this->dayCloseBlockingDeliveryIds($companyId);
+
+        return $this->dayCloseDeliverBill($companyId, (int) $txnId, $blockers)
+            ? back()->with('success', __('pos.dc_delivered_ok'))
+            : back()->with('error', __('pos.dc_delivered_failed'));
+    }
+
+    /**
+     * Ids of the delivery bills that are blocking the close RIGHT NOW, straight
+     * from the blocker summary (single source of truth for the predicate).
+     */
+    private function dayCloseBlockingDeliveryIds(int $companyId): array
+    {
+        $company = Company::find($companyId);
+        $date = \App\Services\PosBusinessDay::current($companyId);
+        $branchId = $this->dayCloseBranchId();
+
+        return $this->undispatchedDeliverySummary($companyId, $company, $date)
+            ->rows
+            ->filter(fn ($r) => $this->dayCloseRowInScope($r, $branchId))
+            ->pluck('id')->map(fn ($i) => (int) $i)->all();
+    }
+
+    /**
+     * May THIS close touch that row? Same rule as scopeToBranch(): the branch's
+     * own rows plus legacy rows stamped before branches existed. A branch-less
+     * shop (the overwhelming majority) has no active branch, so everything is
+     * in scope — but on a multi-branch shop the day close must never mark
+     * ANOTHER branch's live delivery as delivered. That bill is a real order in
+     * somebody else's shift; it has to be cleared where it lives.
+     */
+    private function dayCloseRowInScope($row, ?int $branchId): bool
+    {
+        if (! $branchId) {
+            return true;
+        }
+        $rowBranch = $row->branch_id ?? null;
+
+        return $rowBranch === null || (int) $rowBranch === $branchId;
+    }
+
+    /**
+     * Low-level "this delivery bill is no longer pending" write — shared by the
+     * single-row button and the one-click clear. $blockerIds is the authoritative
+     * allow-list; the shape checks below are belt-and-braces on top of it.
+     * Returns false when the bill is not (or is no longer) a blocker; callers
+     * surface that to the user.
+     */
+    private function dayCloseDeliverBill(int $companyId, int $txnId, array $blockerIds): bool
+    {
+        try {
+            if (! in_array($txnId, $blockerIds, true)) {
+                return false;
+            }
+            if (! \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status')) {
+                return false;
+            }
+            $txn = PosTransaction::where('company_id', $companyId)
+                ->where('is_archived', false)
+                ->find($txnId);
+            if (! $txn || $txn->status !== 'completed' || $txn->order_type !== 'delivery' || $txn->rider_settlement_id) {
+                return false;
+            }
+            // Only the two shapes the blocker actually counts: unassigned+fresh,
+            // or assigned-to-a-rider but never dispatched. Anything already
+            // delivered/returned is left exactly as it is.
+            $isUnassigned = $txn->rider_id === null && $txn->delivery_status === null;
+            $isAssigned = $txn->rider_id !== null && $txn->delivery_status === 'assigned';
+            if (! $isUnassigned && ! $isAssigned) {
+                return false;
+            }
+
+            $upd = ['delivery_status' => 'delivered'];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivered_at')) {
+                $upd['delivered_at'] = now();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivered_by')) {
+                $upd['delivered_by'] = \Illuminate\Support\Facades\Auth::guard('pos')->id();
+            }
+            $txn->update($upd);
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Clear EVERY day-close blocker in one server pass (owner, 23 Aug 2026:
+     * "idhar se udhar click click na karte rahein").
+     *
+     * The close button itself carries this — one click cancels the stale open
+     * orders, closes the pending delivery bills and then closes the day, all in
+     * the same request. The per-row buttons stay for anyone who wants to clear
+     * them one by one.
+     *
+     * Cancelling orders needs the board's own admin/manager verdict; if the
+     * closer lacks it we refuse the WHOLE clear rather than half-clearing and
+     * failing at the guard two lines later.
+     */
+    private function clearDayCloseBlockers(int $companyId, ?Company $company, string $date, $user, Request $request, ?int $branchId = null): array
+    {
+        $cancelled = 0;
+        $delivered = 0;
+        $failed = [];
+
+        // Branch safety FIRST, before anything is destroyed: a delivery bill
+        // belonging to another branch is a live order in someone else's shift.
+        // We refuse the whole clear (touching nothing) and name the bills, so
+        // they get closed at the branch that owns them.
+        $pendingRows = $this->undispatchedDeliverySummary($companyId, $company, $date)->rows;
+        $outOfScope = $pendingRows->reject(fn ($r) => $this->dayCloseRowInScope($r, $branchId));
+        if ($outOfScope->isNotEmpty()) {
+            return [
+                'ok' => false,
+                'message' => __('pos.dc_clear_other_branch', ['items' => $outOfScope->pluck('invoice_number')->take(5)->implode(', ')]),
+                'note' => '',
+            ];
+        }
+
+        $open = $this->openHeldOrdersSummary($companyId, $company);
+        if ($open->count > 0) {
+            if (! \App\Services\PosAccessService::orderCancelAllowed($user)) {
+                return ['ok' => false, 'message' => __('pos.dc_clear_needs_admin'), 'note' => ''];
+            }
+            foreach ($open->rows as $row) {
+                $resp = app(\App\Http\Controllers\RestaurantPosController::class)->deleteOrder($request, $row->id);
+                $data = ($resp instanceof \Illuminate\Http\JsonResponse) ? (array) $resp->getData(true) : [];
+                if (! empty($data['success'])) {
+                    $cancelled++;
+                } else {
+                    $failed[] = $row->order_number;
+                }
+            }
+        }
+
+        // Mirrors the blocker set EXACTLY: whatever refuses the close is what
+        // gets cleared — never one row more (and never out of branch scope,
+        // which the guard above already proved).
+        $blockerIds = $pendingRows->pluck('id')->map(fn ($i) => (int) $i)->all();
+        foreach ($pendingRows as $row) {
+            if ($this->dayCloseDeliverBill($companyId, (int) $row->id, $blockerIds)) {
+                $delivered++;
+            } else {
+                $failed[] = $row->invoice_number;
+            }
+        }
+
+        if (! empty($failed)) {
+            return [
+                'ok' => false,
+                'message' => __('pos.dc_clear_partial', ['items' => implode(', ', array_slice($failed, 0, 5))]),
+                'note' => '',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'message' => '',
+            'note' => __('pos.dc_cleared_note', ['orders' => $cancelled, 'bills' => $delivered]),
+        ];
+    }
+
     public function closeDayReport(Request $request)
     {
         // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
@@ -11921,22 +12131,35 @@ class PosController extends Controller
         // (AutoCloseDayPos) applies the skip_alert policy (owner 10 Aug 2026):
         // it SKIPS the day entirely and logs a warning — staff must settle
         // orders and close manually; the auto-close retries on the next run.
-        $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
-        if ($openAtClose->count > 0) {
-            return back()->with('error', __('pos.dayclose_blocked_open_orders', [
-                'count' => $openAtClose->count,
-                'tables' => $openAtClose->tableNumbers !== '' ? ' (' . __('pos.dc_open_tables_list', ['tables' => $openAtClose->tableNumbers]) . ')' : '',
-            ]));
-        }
+        //
+        // ONE-CLICK CLEAR: the close button may carry `clear_blockers` — the
+        // closer confirmed a dialog naming every order and bill about to be
+        // cleared. NOTHING is cleared at this point: destroying a blocker and
+        // then failing on a later guard (bad cash figure, cashier override,
+        // report already exists) would leave the shop worse off than before.
+        // The clear runs further down — last, once every other precondition has
+        // passed — and these two hard blocks are re-asserted right after it.
+        $wantsClear = $request->boolean('clear_blockers');
+        $clearedNote = '';
 
-        // HARD BLOCK #2 (Task 661, ZFC waqia): undispatched delivery bills —
-        // assigned-but-not-dispatched or fresh unassigned delivery bills — also
-        // refuse the close. The day is not settled while delivery orders never
-        // left the shop. Rider unsettled cash (khata) deliberately does NOT
-        // block — it carries to the next day (warning on the page only).
-        $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $date);
-        if ($pendingDel->count > 0) {
-            return back()->with('error', __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
+        if (! $wantsClear) {
+            $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
+            if ($openAtClose->count > 0) {
+                return back()->with('error', __('pos.dayclose_blocked_open_orders', [
+                    'count' => $openAtClose->count,
+                    'tables' => $openAtClose->tableNumbers !== '' ? ' (' . __('pos.dc_open_tables_list', ['tables' => $openAtClose->tableNumbers]) . ')' : '',
+                ]));
+            }
+
+            // HARD BLOCK #2 (Task 661, ZFC waqia): undispatched delivery bills —
+            // assigned-but-not-dispatched or fresh unassigned delivery bills — also
+            // refuse the close. The day is not settled while delivery orders never
+            // left the shop. Rider unsettled cash (khata) deliberately does NOT
+            // block — it carries to the next day (warning on the page only).
+            $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $date);
+            if ($pendingDel->count > 0) {
+                return back()->with('error', __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
+            }
         }
 
         // Local-bill wash at day-close now follows the STANDING company policy set by
@@ -12022,13 +12245,56 @@ class PosController extends Controller
         // mint a fabricated zero Z-report. Today's close stays strict too.
         $allowEmpty = $date < \App\Services\PosBusinessDay::current($companyId)
             && $this->unclosedPriorBusinessDays($companyId, null, false, $dcBranchId)->contains($date);
+
+        // THE ONE-CLICK CLEAR runs here — deliberately last. Validation, the
+        // cashier/override authority checks and the "already closed" check are
+        // all behind us, so this is the last point where the close can still be
+        // refused for a reason that has nothing to do with the blockers.
+        if ($wantsClear) {
+            if (PosDayCloseReport::where('company_id', $companyId)->forBranch($dcBranchId)->whereDate('report_date', $date)->exists()) {
+                return back()->with('error', __('pos.dayclose_report_exists'));
+            }
+            // All-or-nothing: one row that refuses to clear rolls the WHOLE
+            // clear back, so a shop can never end up half-cleared with the day
+            // still open (some orders cancelled, some bills untouched).
+            try {
+                $cleared = DB::transaction(function () use ($companyId, $company, $date, $user, $request, $dcBranchId) {
+                    $c = $this->clearDayCloseBlockers($companyId, $company, $date, $user, $request, $dcBranchId);
+                    if (! $c['ok']) {
+                        throw new \RuntimeException($c['message']);
+                    }
+
+                    return $c;
+                });
+            } catch (\RuntimeException $e) {
+                return back()->withInput()->with('error', $e->getMessage());
+            }
+            $clearedNote = $cleared['note'];
+
+            // The hard blocks keep the last word — if anything still stands
+            // (a race with another counter), the close refuses as always.
+            $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
+            if ($openAtClose->count > 0) {
+                return back()->with('error', __('pos.dayclose_blocked_open_orders', [
+                    'count' => $openAtClose->count,
+                    'tables' => $openAtClose->tableNumbers !== '' ? ' (' . __('pos.dc_open_tables_list', ['tables' => $openAtClose->tableNumbers]) . ')' : '',
+                ]));
+            }
+            $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $date);
+            if ($pendingDel->count > 0) {
+                return back()->with('error', __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
+            }
+        }
+
         $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon, $allowEmpty, $actionOverride, $dcBranchId);
 
+        // A close that fails AFTER the clear must still say what was cleared —
+        // the shop may never be left guessing which bills we touched.
         if ($result['status'] === 'exists') {
-            return back()->with('error', __('pos.dayclose_report_exists'));
+            return back()->with('error', trim(__('pos.dayclose_report_exists') . ' ' . $clearedNote));
         }
         if ($result['status'] === 'empty') {
-            return back()->with('error', __('pos.dayclose_no_transactions'));
+            return back()->with('error', trim(__('pos.dayclose_no_transactions') . ' ' . $clearedNote));
         }
 
         $msg = __('pos.dayclose_report_generated', ['number' => $result['report_number'], 'date' => \Carbon\Carbon::parse($date)->format('d M Y')]);
@@ -12053,6 +12319,11 @@ class PosController extends Controller
         $backlogSwept = array_sum(array_column($result['summary'] ?? [], 'backlog'));
         if ($backlogSwept > 0) {
             $msg .= __('pos.dayclose_backlog_included', ['count' => $backlogSwept]);
+        }
+        // What the one-click clear actually did, spelled out in the same flash —
+        // the shop must never wonder which orders/bills the close touched.
+        if ($clearedNote !== '') {
+            $msg .= ' ' . $clearedNote;
         }
         // Sweep summary (Task 157, FBR pattern): only when the 'finalize' (Khud
         // Final) policy actually ran and finalized something. Breaks down PRA

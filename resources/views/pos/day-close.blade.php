@@ -725,13 +725,25 @@
                         <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $db->rider_name ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' }}">{{ $db->rider_name ?: __('pos.dc_no_rider_yet') }}</span>
                         <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ \Carbon\Carbon::parse($db->created_at)->format('d M, h:i A') }}{{ $db->customer_name ? ' — ' . $db->customer_name : '' }}</span>
                         <span class="ml-auto text-xs font-bold text-gray-900 dark:text-white whitespace-nowrap">PKR {{ number_format($db->total_amount) }}</span>
-                        <form method="POST" action="{{ route('pos.deliveries.status', $db->id) }}" class="inline"
+                        {{-- Day-close's OWN endpoint, not the deliveries board's:
+                             the board applies the staff stream lock, so a closer
+                             running reporting-OFF is refused on a PRA-stream bill
+                             that the close still counts (Frost and Brew, 23 Aug
+                             2026 — the close was stuck for days). --}}
+                        @if($db->clearable ?? true)
+                        <form method="POST" action="{{ route('pos.day-close.deliver', $db->id) }}" class="inline"
                               onsubmit="return confirm({{ \Illuminate\Support\Js::from($db->rider_name ? __('pos.dc_mark_delivered_confirm') : __('pos.del_mark_delivered_confirm')) }});">
-                            @csrf<input type="hidden" name="delivery_status" value="delivered">
+                            @csrf
                             <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
                         </form>
+                        @else
+                        {{-- Another branch's live delivery: it is somebody else's
+                             shift, so it is named here but closed over there. --}}
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ __('pos.dc_row_other_branch') }}</span>
+                        @endif
                     </div>
                     @endforeach
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.dc_hidden_stream_note') }}</p>
                 </div>
                 @endif
                 @else
@@ -982,11 +994,30 @@
             </div>
             @endif
             @if(($openOrders ?? 0) > 0 || ($pendingDeliveries->count ?? 0) > 0)
+            {{-- ONE CLICK (owner, 23 Aug 2026): clearing blockers one by one meant
+                 hunting them across two other screens — and a delivery bill outside
+                 the closer's billing stream could not be cleared at ALL (the board
+                 hides it, the board's endpoint refuses it, the close still counts
+                 it). This submits the SAME close form with clear_blockers=1: the
+                 server cancels the open orders, closes the pending delivery bills
+                 and closes the day in one request. Offered only when this account
+                 may actually do it (an open order needs the cancel verdict). --}}
+            @php $dcCanClearAll = ((int) ($openOrders ?? 0) === 0 || ($dcCanCancelOrder ?? false)) && ($dcBlockersAllClearable ?? true); @endphp
+            <div class="flex flex-wrap items-center gap-2">
             <button type="button" disabled
                 class="px-6 py-2.5 bg-gray-400 dark:bg-gray-600 text-white font-semibold rounded-lg cursor-not-allowed text-sm flex items-center gap-2" title="{{ __('pos.dayclose_blocked_hint') }}">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 {{ __('pos.close_day_generate_z') }}
             </button>
+            @if($dcCanClearAll)
+            <button type="submit" name="clear_blockers" value="1"
+                class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-sm flex items-center gap-2 transition"
+                onclick="return confirm({{ \Illuminate\Support\Js::from(__('pos.dc_clear_and_close_confirm', ['orders' => (int) ($openOrders ?? 0), 'bills' => (int) ($pendingDeliveries->count ?? 0)])) }});">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {{ __('pos.dc_clear_and_close_btn') }}
+            </button>
+            @endif
+            </div>
             @else
             {{-- Pending local/provisional confirmation (mandatory): when local
                  bills are still un-finalized, the close button opens an EXPLICIT

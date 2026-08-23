@@ -127,6 +127,9 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
             $table->unsignedBigInteger('rider_id')->nullable();
             $table->string('delivery_status')->nullable();
             $table->unsignedBigInteger('rider_settlement_id')->nullable();
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->timestamp('delivered_at')->nullable();
+            $table->unsignedBigInteger('delivered_by')->nullable();
             $table->timestamp('rider_settled_at')->nullable();
             $table->decimal('rider_partial_paid', 12, 2)->default(0);
             $table->timestamps();
@@ -392,6 +395,191 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         // No rider → the page shows "no rider assigned" and still offers Delivered.
         $this->assertNull($byId[$unassigned]->rider_name);
         $this->assertSame('L-410', $byId[$unassigned]->invoice_number);
+    }
+
+    /**
+     * The row must name the bill the SHOP knows (POS-2026-00274), not the PRA
+     * USIN — staff hunting the bill on their board have no idea what
+     * 195958FHKU35236543 is (Frost and Brew, 23 Aug 2026).
+     */
+    public function test_blocker_row_shows_the_shop_serial_not_the_fiscal_number(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, [
+            'order_type' => 'delivery',
+            'invoice_number' => 'POS-2026-00274',
+            'pra_invoice_number' => '195958FHKU35236543',
+        ]);
+
+        $row = $this->summary($cid)->rows->first();
+        $this->assertSame('POS-2026-00274', $row->invoice_number);
+        $this->assertSame('195958FHKU35236543', $row->fiscal_number);
+    }
+
+    // ── 1b. clearing the blockers from the day-close page ───────────────────
+
+    /**
+     * THE DEAD END (Frost and Brew, 23 Aug 2026). The deliveries board applies
+     * the staff STREAM LOCK: a closer whose reporting flag is OFF bills on the
+     * 'local' stream and can neither see nor touch a PRA-stream bill there. The
+     * close blocker counts BOTH streams — so those bills were unclearable by
+     * anyone, and the day stayed open for days.
+     *
+     * Day close is a company-level, cross-stream act, so its own cure must be
+     * stream-agnostic: the day-close endpoint clears the bill whatever stream
+     * it belongs to, and the close then goes through.
+     */
+    public function test_pra_stream_bill_clears_from_day_close_even_when_closer_runs_local_stream(): void
+    {
+        $cid = $this->makeCompany();
+        $bill = $this->makeBill($cid, [
+            'order_type' => 'delivery',
+            'invoice_mode' => 'pra',
+            'pra_status' => 'submitted',
+            'pra_invoice_number' => '195958FHKU35236543',
+            'invoice_number' => 'POS-2026-00274',
+        ]);
+
+        // Closer bills on the LOCAL stream (reporting flag off) — exactly the
+        // shop owner whose board hid this bill.
+        $user = $this->makeUser($cid);
+        DB::table('users')->where('id', $user->id)->update(['pra_reporting_enabled' => false]);
+        User::flushScopeColumnCache();
+
+        $res = $this->actingAs($user->fresh(), 'pos')
+            ->from('/pos/day-close')
+            ->post('/pos/day-close/delivery/' . $bill . '/delivered');
+
+        $res->assertRedirect('/pos/day-close');
+        $this->assertSame(__('pos.dc_delivered_ok'), (string) session('success'));
+
+        $row = DB::table('pos_transactions')->find($bill);
+        $this->assertSame('delivered', $row->delivery_status);
+        $this->assertNotNull($row->delivered_at, 'Delivery time must be stamped.');
+
+        // …and now the day actually closes.
+        $this->assertSame(0, $this->summary($cid)->count);
+        $this->closeDay($user->fresh());
+        $this->assertSame(1, DB::table('pos_day_close_reports')->count());
+    }
+
+    /**
+     * ONE CLICK: the close button itself may carry clear_blockers=1 — every
+     * pending delivery bill is closed and the day is closed in the SAME
+     * request, instead of the shop hopping between two other screens.
+     */
+    public function test_clear_blockers_closes_every_pending_delivery_and_the_day(): void
+    {
+        $cid = $this->makeCompany();
+        $rid = $this->makeRider($cid);
+        $assigned = $this->makeBill($cid, ['rider_id' => $rid, 'delivery_status' => 'assigned', 'order_type' => 'delivery']);
+        $unassigned = $this->makeBill($cid, ['order_type' => 'delivery']);
+
+        $res = $this->closeDay($this->makeUser($cid), ['clear_blockers' => 1]);
+
+        $res->assertRedirect('/pos/day-close');
+        $this->assertSame(1, DB::table('pos_day_close_reports')->count(), 'The day must close in the same request.');
+        $this->assertStringContainsString(
+            __('pos.dc_cleared_note', ['orders' => 0, 'bills' => 2]),
+            (string) session('success'),
+            'The flash must spell out what the one click cleared.'
+        );
+        foreach ([$assigned, $unassigned] as $id) {
+            $this->assertSame('delivered', DB::table('pos_transactions')->find($id)->delivery_status);
+        }
+    }
+
+    /**
+     * The cure stays EXACTLY as narrow as the blocker: only a bill the close is
+     * actually refusing over can be stamped from here. A crafted POST carrying
+     * a returned bill, another company's bill, an archived one or one outside
+     * the blocker's 7-day window changes nothing.
+     */
+    public function test_day_close_deliver_refuses_a_bill_that_is_not_a_blocker(): void
+    {
+        $cid = $this->makeCompany();
+        $other = $this->makeCompany();
+        $done = $this->makeBill($cid, ['order_type' => 'delivery', 'delivery_status' => 'returned']);
+        $foreign = $this->makeBill($other, ['order_type' => 'delivery']);
+        $archived = $this->makeBill($cid, ['order_type' => 'delivery', 'is_archived' => true]);
+        $stale = $this->makeBill($cid, ['order_type' => 'delivery', 'created_at' => now()->subDays(9)]);
+        $user = $this->makeUser($cid);
+
+        foreach ([$done, $foreign, $archived, $stale] as $id) {
+            $res = $this->actingAs($user, 'pos')->from('/pos/day-close')
+                ->post('/pos/day-close/delivery/' . $id . '/delivered');
+            $res->assertRedirect('/pos/day-close');
+            $this->assertSame(__('pos.dc_delivered_failed'), (string) session('error'));
+        }
+
+        $this->assertSame('returned', DB::table('pos_transactions')->find($done)->delivery_status);
+        foreach ([$foreign, $archived, $stale] as $id) {
+            $this->assertNull(DB::table('pos_transactions')->find($id)->delivery_status);
+        }
+    }
+
+    /**
+     * BRANCH SAFETY: a delivery bill belonging to another branch is a live
+     * order in somebody else's shift. The clear names it and refuses OUTRIGHT —
+     * touching nothing, not even the rows it could legally have cleared.
+     */
+    public function test_clear_refuses_and_touches_nothing_when_a_blocker_belongs_to_another_branch(): void
+    {
+        $cid = $this->makeCompany();
+        $mine = $this->makeBill($cid, ['order_type' => 'delivery', 'branch_id' => 7, 'invoice_number' => 'POS-MINE']);
+        $legacy = $this->makeBill($cid, ['order_type' => 'delivery', 'branch_id' => null, 'invoice_number' => 'POS-LEGACY']);
+        $theirs = $this->makeBill($cid, ['order_type' => 'delivery', 'branch_id' => 9, 'invoice_number' => 'POS-THEIRS']);
+
+        $m = new \ReflectionMethod(\App\Http\Controllers\PosController::class, 'clearDayCloseBlockers');
+        $m->setAccessible(true);
+        $controller = app(\App\Http\Controllers\PosController::class);
+        $date = \App\Services\PosBusinessDay::current($cid);
+        $user = $this->makeUser($cid);
+
+        $res = $m->invoke($controller, $cid, null, $date, $user, new \Illuminate\Http\Request(), 7);
+
+        $this->assertFalse($res['ok'], 'A cross-branch blocker must refuse the whole clear.');
+        $this->assertStringContainsString('POS-THEIRS', $res['message']);
+        foreach ([$mine, $legacy, $theirs] as $id) {
+            $this->assertNull(
+                DB::table('pos_transactions')->find($id)->delivery_status,
+                'A refused clear must leave every bill untouched.'
+            );
+        }
+
+        // Branch-less shop (no active branch) — the same three clear fine.
+        $ok = $m->invoke($controller, $cid, null, $date, $user, new \Illuminate\Http\Request(), null);
+        $this->assertTrue($ok['ok']);
+        foreach ([$mine, $legacy, $theirs] as $id) {
+            $this->assertSame('delivered', DB::table('pos_transactions')->find($id)->delivery_status);
+        }
+    }
+
+    /**
+     * The one-click clear must not destroy anything when the close itself would
+     * be refused: a day that is ALREADY closed leaves every blocker standing.
+     */
+    public function test_clear_blockers_touches_nothing_when_the_day_is_already_closed(): void
+    {
+        $cid = $this->makeCompany();
+        $bill = $this->makeBill($cid, ['order_type' => 'delivery']);
+        $user = $this->makeUser($cid);
+
+        DB::table('pos_day_close_reports')->insert([
+            'company_id' => $cid,
+            'report_number' => 'Z-EXISTS',
+            'report_date' => now()->toDateString(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->closeDay($user, ['clear_blockers' => 1]);
+
+        $this->assertSame(__('pos.dayclose_report_exists'), trim((string) session('error')));
+        $this->assertNull(
+            DB::table('pos_transactions')->find($bill)->delivery_status,
+            'A refused close must leave the blocking bill exactly as it was.'
+        );
     }
 
     // ── 2. dispatched = khata warning only, close allowed ───────────────────

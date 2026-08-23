@@ -930,6 +930,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Owner 23 Aug 2026: clear a blocking open order from the checklist itself
     // (literal path — sits BEFORE the /day-close/{id}/... routes by design).
     Route::post('/day-close/open-order/{id}/cancel', [PosController::class, 'dayCloseCancelOrder'])->name('pos.day-close.cancel-order');
+    // Same reason for delivery bills, PLUS the stream trap: the deliveries
+    // board hides (and refuses) bills outside the closer's own local/PRA
+    // stream, while the close counts both — so the cure lives here, not there.
+    Route::post('/day-close/delivery/{id}/delivered', [PosController::class, 'dayCloseMarkDelivered'])->name('pos.day-close.deliver');
     Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
     // Task 1375: per-counter cash drawer — close ONE counter's drawer (the
     // other counters keep billing; the shop's day closes once every used

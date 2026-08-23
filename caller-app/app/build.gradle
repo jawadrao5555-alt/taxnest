@@ -28,8 +28,12 @@ android {
         // update nahi hoga. RELEASE.md dekhein.
         //   1.3.0 = teen zubaanon ka switch (Task 1382)
         //   1.4.0 = POS se call back (Task 1381)
-        versionCode 5
-        versionName "1.4.0"
+        //   1.5.0 = plus build par number ki wapsi: SIM ka number ab telephony
+        //           se (notification se sirf naam milta tha jab number contact
+        //           mein save ho), aur WhatsApp ke naam ka number phone ki
+        //           contact list se — dekhein "Plus build ka number" RELEASE.md
+        versionCode 6
+        versionName "1.5.0"
     }
 
     // ── Builds (Task 1345 + 1346) — ek hi package id, ek hi keystore ────────
@@ -84,6 +88,16 @@ android {
     //   src/web/res    → sirf Task 1381 ki dial strings (web/java ke saath).
     //   src/notif/*    → notification-listener detector + prominent disclosure.
     //                    plus AUR play, bilkul ek jaisa.
+    //   src/telephony/ → PhoneStateReceiver (Android telephony se SIM ki ring).
+    //                    sim AUR plus dono website builds mein. Play mein KABHI
+    //                    nahi: READ_PHONE_STATE/READ_CALL_LOG Play ka Call Log
+    //                    declaration form lazmi kar dete hain, aur
+    //                    scripts/play-build-check.sh is class ko AAB mein
+    //                    dekhte hi build fail kar deta hai. Yeh folder is liye
+    //                    src/sim se nikaal kar alag kiya gaya ke plus ise bhi
+    //                    compile kare — poora src/sim/java plus mein daalna
+    //                    mumkin nahi tha (Detector.kt dono jagah hai →
+    //                    "Redeclaration").
     // Ek source set ke do res folders mein ek hi key dobara likhna "Duplicate
     // resources" error deta hai — is liye har build ki apni key uski apni
     // res/values/strings.xml mein rehti hai (misal `build_badge`: src/plus/res
@@ -95,11 +109,11 @@ android {
     // karne se Urdu/Roman mode mein src/main wali line reh jati hai.
     sourceSets {
         getByName("sim") {
-            java.srcDirs += 'src/web/java'
+            java.srcDirs += ['src/web/java', 'src/telephony/java']
             res.srcDirs += 'src/web/res'
         }
         getByName("plus") {
-            java.srcDirs += ['src/web/java', 'src/notif/java']
+            java.srcDirs += ['src/web/java', 'src/notif/java', 'src/telephony/java']
             res.srcDirs += ['src/notif/res', 'src/web/res']
         }
         getByName("play") {
@@ -111,7 +125,10 @@ android {
         // folder dono flavors ke test source set mein jata hai:
         //   gradle testPlusReleaseUnitTest testPlayReleaseUnitTest
         getByName("testPlus") {
-            java.srcDirs += 'src/notifTest/java'
+            // src/plusTest = sirf plus wale hisse ke tests (ContactNumberLookup) —
+            // play mein us class ka no-op version hai, is liye ye tests uske
+            // test source set mein NAHI ja sakte.
+            java.srcDirs += ['src/notifTest/java', 'src/plusTest/java']
         }
         getByName("testPlay") {
             java.srcDirs += 'src/notifTest/java'

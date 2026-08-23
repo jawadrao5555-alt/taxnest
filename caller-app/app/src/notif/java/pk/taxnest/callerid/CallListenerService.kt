@@ -4,10 +4,13 @@ import android.app.Notification
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.telecom.TelecomManager
+import kotlin.concurrent.thread
 
 /**
  * Notification builds (plus + play) ka dil: Android hamein har notification
@@ -42,6 +45,14 @@ class CallListenerService : NotificationListenerService() {
     private var dialerPkgs: Set<String> = emptySet()
     private var dialerPkgsAt = 0L
 
+    /**
+     * Sirf SIM ki notification ko chand second rokne ke liye (v1.5.0) — dekhein
+     * [RingCoordinator]. Notification callback isi (main) thread par aata hai,
+     * aur yeh service bandhi rehti hai, is liye postDelayed mehfooz hai;
+     * network kaam waise bhi alag thread par jata hai.
+     */
+    private val handler = Handler(Looper.getMainLooper())
+
     override fun onListenerConnected() {
         dialerPkgsAt = 0L
     }
@@ -75,12 +86,71 @@ class CallListenerService : NotificationListenerService() {
         val text = (extras.getCharSequence(Notification.EXTRA_TEXT) ?: "").toString().trim()
         if (CallSourceRules.isNonIncoming(title, text)) return
 
-        RingReporter.reportAsync(
-            this,
-            CallSourceRules.extractNumber(title, text),
-            CallSourceRules.extractName(title),
-            source,
-        )
+        val name = CallSourceRules.extractName(title)
+        val number = CallSourceRules.extractNumber(title, text)
+
+        // SIM ki call ab (v1.5.0) plus build mein telephony se bhi aati hai,
+        // jahan number hamesha milta hai — chahe caller phone mein save ho.
+        // Dialer ki notification par sirf naam hota hai. Dono chal paren to ek
+        // ring ke DO event jate (ek "No phone" wala) — RingReporter ka dedupe
+        // unhein alag samajhta hai kyunki us ki key phone+naam hai.
+        //
+        // Is liye: telephony ki ring ka nishan taaza ho to yeh copy chhoR do.
+        // Nishan na ho to foran chhoRna GHALAT hoga — number chhupa hua ho, ya
+        // OEM ne EXTRA_INCOMING_NUMBER khali diya ho, to telephony kuch bhejti
+        // hi nahi aur ring bilkul zaya ho jati. Is liye chand second intezar,
+        // phir bhi nishan na aaye to naam wali report bhej do.
+        //
+        // Play build: yeh permissions declare hi nahi hotin (na PhoneStateReceiver
+        // compile hoti hai), is liye telephonyDetectorLive() hamesha false aur
+        // SIM pehle ki tarah seedha notification se jati hai. Plus build par
+        // shop ne phone permission na di ho, tab bhi yehi purana rasta chalta hai.
+        if (source == CallSourceRules.SOURCE_SIM && telephonyDetectorLive()) {
+            if (RingCoordinator.telephonyRingFresh(this)) return
+            val ctx = applicationContext
+            handler.postDelayed({
+                if (!RingCoordinator.telephonyRingFresh(ctx)) {
+                    reportWithContacts(number, name, source)
+                }
+            }, RingCoordinator.WAIT_MS)
+            return
+        }
+
+        reportWithContacts(number, name, source)
+    }
+
+    /**
+     * Report bhejo — aur agar notification mein number tha hi nahi (WhatsApp par
+     * saved contact ki call) to usi naam ka number phone ki contact list se
+     * nikaal kar. Lookup background thread par hota hai: ContentResolver ka
+     * query main thread par nahi chalna chahiye, aur notification callback main
+     * thread par aata hai. Play build mein lookup no-op hai.
+     */
+    private fun reportWithContacts(number: String?, name: String?, source: String) {
+        val ctx = applicationContext
+        thread(name = "caller-ring-post") {
+            try {
+                RingReporter.report(ctx, number ?: ContactNumberLookup.numberFor(ctx, name), name, source)
+            } catch (_: Exception) {
+                // Listener kabhi crash na kare.
+            }
+        }
+    }
+
+    /**
+     * Is build mein SIM ki ring telephony se aa rahi hai?
+     *
+     * Dono permissions website ki plus build hi declare karti hai (aur wohi
+     * src/telephony compile karti hai). Permission na mile to detector chal hi
+     * nahi sakta — us soorat mein notification wala purana rasta hi behtar hai.
+     */
+    private fun telephonyDetectorLive(): Boolean = try {
+        checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(android.Manifest.permission.READ_CALL_LOG) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+    } catch (_: Exception) {
+        false
     }
 
     /**

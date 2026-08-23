@@ -167,7 +167,7 @@ class MainActivity : BaseActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == Detector.REQUEST_CODE) renderState()
+        if (requestCode == Detector.REQUEST_CODE || requestCode == ExtraPerms.REQUEST_CODE) renderState()
     }
 
     private fun logoutLocal() {
@@ -186,6 +186,13 @@ class MainActivity : BaseActivity() {
         val permOn = Detector.granted(this)
         permRow.text = if (permOn) getString(R.string.perm_on) else getString(R.string.perm_off)
         permBtn.visibility = if (permOn) View.GONE else View.VISIBLE
+
+        // v1.5.0 — build ki asal permission mil chuki ho to woh baqi
+        // permissions bhi ek baar maang lo jo SIRF isi build ne declare ki hain
+        // (plus: phone + call log = SIM ka number, contacts = WhatsApp ke naam
+        // ka number). Clean aur Play build mein yeh khali list dekh kar wapas
+        // aa jati hai — dekhein ExtraPerms.
+        if (permOn) ExtraPerms.maybeRequest(this)
 
         val battOn = batteryExempt()
         batteryRow.text = if (battOn) getString(R.string.battery_on) else getString(R.string.battery_off)

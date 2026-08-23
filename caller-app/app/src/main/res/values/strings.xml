@@ -48,6 +48,11 @@
     <!-- Play build battery ki LIST kholti hai (uske paas seedhi permission nahi) -->
     <string name="battery_list_toast">Find TaxNest Caller ID in the list and set it to \"Don\'t optimize / Unrestricted\"</string>
 
+    <!-- v1.5.0 — sirf us build par dikhta hai jo yeh permissions maangti hai
+         (aaj: plus). Phone + call log = SIM ka asli number; contacts = WhatsApp
+         par saved contact ka number, kyunki WhatsApp sirf naam bhejta hai. -->
+    <string name="extra_perms_toast">Please allow phone and contacts access — without it the counter sees only the caller\'s name, not the number</string>
+
     <string name="test_btn">Send a test ring</string>
     <string name="test_sent">Test sent — check for the popup on the POS sale screen</string>
     <string name="feature_off_toast">Caller ID is switched off in POS settings — turn it on from the portal first</string>

@@ -28,6 +28,7 @@
     <string name="battery_off">✖ Battery optimisation on hai — app kabhi kabhi so sakti hai</string>
     <string name="battery_btn">Battery ki ijazat dein</string>
     <string name="battery_list_toast">Fehrist mein TaxNest Caller ID dhoond kar \"Don\'t optimize / Unrestricted\" karein</string>
+    <string name="extra_perms_toast">Phone aur contacts ki ijazat dein — warna counter par sirf naam aata hai, number nahi</string>
 
     <string name="test_btn">Test ring bhejein</string>
     <string name="test_sent">Test bhej diya — POS sale screen par popup dekhein</string>

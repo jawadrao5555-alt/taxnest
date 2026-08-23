@@ -10,6 +10,30 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- SIM ka number (v1.5.0). Sirf notification par bharosa karne se saved
+         contact ki call par number milta hi nahi tha — dialer apne notification
+         mein number ki jagah contact ka NAAM likhta hai, aur counter par "No
+         phone" aata tha. Ab is build mein bhi clean build wala telephony
+         detector hai (PhoneStateReceiver, src/telephony), jo har SIM ring ka
+         asli number deta hai — save ho ya na ho.
+         READ_CALL_LOG lazmi hai: Android 9+ par uske baghair
+         EXTRA_INCOMING_NUMBER khali aata hai. Dono Play Protect ki blocked
+         chaar mein NAHI hain, aur is build par waise bhi notification-listener
+         ki wajah se Play Protect band karni parti hai. Play manifest mein yeh
+         KABHI nahi jana (Call Log declaration form). -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+
+    <!-- WhatsApp ka number (v1.5.0). WhatsApp saved contact ki call par apni
+         notification mein sirf naam deta hai, number deta hi nahi. Us naam ka
+         number phone ki apni contact list se nikala jata hai
+         (ContactNumberLookup, sirf is build mein) — bilkul wahi naam, aur sirf
+         tab jab us naam ka ek hi number ho. Contacts kabhi server par nahi
+         jati; sirf jis ne call ki hai us ka number jata hai. Play build mein
+         yeh permission nahi hai (wahan lookup ka no-op version compile hota
+         hai). -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
     <!-- Task 1381 (call back) — hu-ba-hu src/sim/AndroidManifest.xml jaisa
          block; ek source set ka ek hi manifest hota hai is liye duplication
          majboori hai. Ek jagah badlein to doosri bhi badlein. Play build ke
@@ -47,6 +71,20 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- SIM ki ring, Android ke apne telephony broadcast se (v1.5.0) —
+             hu-ba-hu src/sim/AndroidManifest.xml wala receiver, kyunki ab
+             src/telephony dono website builds mein compile hota hai.
+             Manifest-registered hai: app band ho tab bhi Android jagata hai.
+             Jab tak yeh chalta hai, CallListenerService dialer ki notification
+             ko haath nahi lagati — warna ek hi call ke do popup jate. -->
+        <receiver
+            android:name=".PhoneStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
 
         <!-- Prominent disclosure — notification access se pehle (Task 1346).
              Play ki User Data policy ki shart hai, aur website wali is build

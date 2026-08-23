@@ -36,6 +36,14 @@ class PhoneStateReceiver : BroadcastReceiver() {
             if (number.isNullOrBlank()) return          // number chhupa hua / permission nahi
             if (Prefs.token(context) == null) return    // sign-in ke baghair kuch nahi
 
+            // Plus build mein yehi ring dialer ki notification se bhi dikhti hai
+            // (jahan sirf naam hota hai). Nishan laga do taake wo copy chhoR di
+            // jaye — warna counter par do popup aate, ek "No phone" wala.
+            // Nishan POST se PEHLE, kyunki notification chand hi lamhon mein aa
+            // jati hai aur network yahan slow ho sakta hai. Clean build ke liye
+            // yeh bay-zarar hai (wahan koi parhne wala hi nahi).
+            RingCoordinator.markTelephonyRing(context)
+
             val pending = goAsync()
             thread(name = "caller-ring-post") {
                 try {

@@ -11689,7 +11689,7 @@ class PosController extends Controller
      */
     private function openHeldOrdersSummary(int $companyId, ?Company $company): object
     {
-        $empty = (object) ['count' => 0, 'tables' => 0, 'tableNumbers' => '', 'amount' => 0.0, 'noTableCount' => 0];
+        $empty = (object) ['count' => 0, 'tables' => 0, 'tableNumbers' => '', 'amount' => 0.0, 'noTableCount' => 0, 'rows' => collect()];
         // Cheap column check FIRST: restaurantAllowed() hits subscriptions —
         // non-restaurant companies (the vast majority) must short-circuit
         // before any plan lookup (also keeps minimal-schema tests green).
@@ -11707,7 +11707,8 @@ class PosController extends Controller
             ->whereIn('status', ['held', 'preparing', 'ready'])
             ->whereHas('items')
             ->with('table:id,table_number')
-            ->get(['id', 'table_id', 'total_amount']);
+            ->orderBy('created_at')
+            ->get(['id', 'table_id', 'total_amount', 'order_number', 'order_type', 'customer_name', 'created_at']);
 
         if ($orders->isEmpty()) {
             return $empty;
@@ -11725,6 +11726,19 @@ class PosController extends Controller
             'tableNumbers' => $tableNumbers->implode(', '),
             'amount' => (float) $orders->sum('total_amount'),
             'noTableCount' => $orders->whereNull('table_id')->count(),
+            // Owner (23 Aug 2026, Frost and Brew): the checklist has to NAME the
+            // orders that block the close — a counter/takeaway order owns no
+            // table tile, so "1 open order" alone left the shop hunting for
+            // something it could not see. Rows drive the clear-it-here list.
+            'rows' => $orders->map(fn ($o) => (object) [
+                'id' => $o->id,
+                'order_number' => $o->order_number,
+                'table_number' => $o->table->table_number ?? null,
+                'order_type' => $o->order_type,
+                'customer_name' => $o->customer_name,
+                'total_amount' => (float) $o->total_amount,
+                'created_at' => $o->created_at,
+            ])->values(),
         ];
     }
 
@@ -11746,7 +11760,7 @@ class PosController extends Controller
      */
     public function undispatchedDeliverySummary(int $companyId, ?Company $company, string $date): object
     {
-        $empty = (object) ['active' => false, 'count' => 0, 'amount' => 0.0, 'assigned' => 0, 'unassigned' => 0, 'khata_count' => 0, 'khata_amount' => 0.0];
+        $empty = (object) ['active' => false, 'count' => 0, 'amount' => 0.0, 'assigned' => 0, 'unassigned' => 0, 'khata_count' => 0, 'khata_amount' => 0.0, 'rows' => collect()];
         try {
             if (! \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
                 || ! \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status')) {
@@ -11787,7 +11801,9 @@ class PosController extends Controller
                             ->where('created_at', '>=', now()->subDays(7));
                     });
                 })
-                ->get(['id', 'rider_id', 'total_amount']);
+                ->with('rider:id,name')
+                ->orderBy('created_at')
+                ->get(['id', 'rider_id', 'total_amount', 'invoice_number', 'pra_invoice_number', 'delivery_status', 'customer_name', 'created_at']);
 
             // Rider unsettled cash khata — warning-only context (whole open
             // khata, archived included: same scope as the rider settle path).
@@ -11822,12 +11838,57 @@ class PosController extends Controller
                 'unassigned' => $rows->filter(fn ($t) => ! $t->rider_id)->count(),
                 'khata_count' => $khataCount,
                 'khata_amount' => $khataAmount,
+                // Same reason as the open-orders rows: the checklist names each
+                // blocking bill and closes it in place (owner, 23 Aug 2026).
+                'rows' => $rows->map(fn ($t) => (object) [
+                    'id' => $t->id,
+                    'invoice_number' => $t->pra_invoice_number ?: ($t->invoice_number ?: ('#' . $t->id)),
+                    'rider_name' => $t->rider->name ?? null,
+                    'delivery_status' => $t->delivery_status,
+                    'customer_name' => $t->customer_name,
+                    'total_amount' => (float) $t->total_amount,
+                    'created_at' => $t->created_at,
+                ])->values(),
             ];
         } catch (\Throwable $e) {
             // Checklist must never brick day-close on prod schema drift — fail
             // open (empty summary) exactly like the rider figures helper.
             return $empty;
         }
+    }
+
+    /**
+     * Cancel ONE open restaurant order straight from the Day Close checklist
+     * (owner, 23 Aug 2026 — "day close kyun nahi ho raha, delete kyun nahin").
+     *
+     * A counter/takeaway order owns no table tile, so on a tables shop the only
+     * way to it was the sale screen's TABLE board → amber chip → menu. Shops
+     * never found that, and the order blocked the close for days. The page that
+     * REFUSES the close can now clear its own blocker.
+     *
+     * Authority is unchanged: the page gate (dayCloseAllowed) plus the SAME
+     * cancel verdict the board uses (PosAccessService::orderCancelAllowed), and
+     * the cancel itself runs through RestaurantPosController::deleteOrder so the
+     * void KOT, table release, stock and audit log stay byte-identical.
+     */
+    public function dayCloseCancelOrder(Request $request, $orderId)
+    {
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        if (!\App\Services\PosAccessService::orderCancelAllowed($user)) {
+            return back()->with('error', __('pos.order_cancel_not_allowed'));
+        }
+
+        $response = app(\App\Http\Controllers\RestaurantPosController::class)->deleteOrder($request, $orderId);
+        $data = ($response instanceof \Illuminate\Http\JsonResponse) ? (array) $response->getData(true) : [];
+
+        if (! empty($data['success'])) {
+            return back()->with('success', __('pos.dc_order_cancelled_ok'));
+        }
+
+        return back()->with('error', $data['message'] ?? __('pos.madadgar_err_generic'));
     }
 
     public function closeDayReport(Request $request)

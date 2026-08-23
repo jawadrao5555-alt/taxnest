@@ -137,6 +137,36 @@ class PosDayCloseOpenOrdersWarningTest extends TestCase
         $this->assertSame(1, $s->noTableCount);
     }
 
+    /**
+     * Owner 23 Aug 2026 (Frost and Brew): the checklist must NAME the orders
+     * that block the close and offer the cure in place. A takeaway/counter
+     * order owns no table tile, so "1 open order" alone sent the shop hunting
+     * for something the sale screen never showed them. rows[] is what the
+     * day-close page lists (order number, what it is, money, cancel button).
+     */
+    public function test_rows_name_each_blocking_order_including_the_table_less_one(): void
+    {
+        $c = $this->makeCompany();
+        $t7 = \DB::table('restaurant_tables')->insertGetId(['company_id' => $c->id, 'table_number' => '7', 'created_at' => now(), 'updated_at' => now()]);
+
+        $dineIn = $this->order($c, $t7, 'held', 1200);
+        $dineIn->update(['order_number' => 'R-7001', 'order_type' => 'dine_in']);
+        $takeaway = $this->order($c, null, 'held', 648);
+        $takeaway->update(['order_number' => 'R-7002', 'order_type' => 'takeaway']);
+
+        $rows = $this->summarize($c)->rows;
+        $this->assertCount(2, $rows);
+
+        $byNumber = $rows->keyBy('order_number');
+        $this->assertSame('7', $byNumber['R-7001']->table_number);
+        $this->assertEqualsWithDelta(1200.0, $byNumber['R-7001']->total_amount, 0.01);
+
+        // The invisible one: no table, so the page must fall back to its type.
+        $this->assertNull($byNumber['R-7002']->table_number);
+        $this->assertSame('takeaway', $byNumber['R-7002']->order_type);
+        $this->assertSame($takeaway->id, $byNumber['R-7002']->id); // cancel button target
+    }
+
     public function test_completed_cancelled_and_itemless_orders_ignored(): void
     {
         $c = $this->makeCompany();

@@ -362,6 +362,38 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         $this->assertSame(0, DB::table('pos_day_close_reports')->count());
     }
 
+    /**
+     * Owner 23 Aug 2026 (Frost and Brew): three undispatched bills stalled the
+     * close and the checklist only ever said "3". rows[] names each blocking
+     * bill so the page can list it and mark it delivered in place — the
+     * Deliveries board offered no way to clear an UNASSIGNED bill from there.
+     */
+    public function test_rows_name_each_blocking_bill_with_rider_or_unassigned(): void
+    {
+        $cid = $this->makeCompany();
+        $rid = $this->makeRider($cid);
+
+        $assigned = $this->makeBill($cid, [
+            'rider_id' => $rid, 'delivery_status' => 'assigned',
+            'order_type' => 'delivery', 'invoice_number' => 'POS-2026-00289', 'total_amount' => 640,
+        ]);
+        $unassigned = $this->makeBill($cid, [
+            'order_type' => 'delivery', 'invoice_number' => 'L-410', 'total_amount' => 570,
+        ]);
+
+        $rows = $this->summary($cid)->rows;
+        $this->assertCount(2, $rows);
+
+        $byId = $rows->keyBy('id');
+        $this->assertSame('Qaisar', $byId[$assigned]->rider_name);
+        $this->assertSame('POS-2026-00289', $byId[$assigned]->invoice_number);
+        $this->assertEqualsWithDelta(640.0, $byId[$assigned]->total_amount, 0.01);
+
+        // No rider → the page shows "no rider assigned" and still offers Delivered.
+        $this->assertNull($byId[$unassigned]->rider_name);
+        $this->assertSame('L-410', $byId[$unassigned]->invoice_number);
+    }
+
     // ── 2. dispatched = khata warning only, close allowed ───────────────────
 
     public function test_dispatched_cash_bill_does_not_block_and_shows_khata_warning(): void

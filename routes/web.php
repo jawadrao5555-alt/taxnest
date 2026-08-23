@@ -927,6 +927,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
     // Task 516: bulk-close every stranded prior business day in one click.
     Route::post('/day-close/close-all-prior', [PosController::class, 'closeAllPriorDays'])->name('pos.close-all-days');
+    // Owner 23 Aug 2026: clear a blocking open order from the checklist itself
+    // (literal path — sits BEFORE the /day-close/{id}/... routes by design).
+    Route::post('/day-close/open-order/{id}/cancel', [PosController::class, 'dayCloseCancelOrder'])->name('pos.day-close.cancel-order');
     Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
     // Task 1375: per-counter cash drawer — close ONE counter's drawer (the
     // other counters keep billing; the shop's day closes once every used

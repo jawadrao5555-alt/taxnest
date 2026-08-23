@@ -652,6 +652,9 @@
             ['count' => $pd->khata_count, 'block' => false],
         ];
         $clBlocked = ($openOrders ?? 0) > 0 || $pd->count > 0;
+        // Cancel button = the SAME verdict the sale-screen board uses, so the
+        // checklist never shows a button the endpoint would 403.
+        $dcCanCancelOrder = auth('pos')->user() && \App\Services\PosAccessService::orderCancelAllowed(auth('pos')->user());
     @endphp
     <div class="bg-white dark:bg-gray-900 rounded-xl border {{ $clBlocked ? 'border-red-300 dark:border-red-800' : 'border-gray-200 dark:border-gray-700' }} shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.dc_checklist_title') }}</h3>
@@ -669,6 +672,32 @@
                     <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{{ __('pos.dc_check_blocks') }}</span>
                     <a href="{{ route('pos.invoice.create') }}" class="text-xs underline font-semibold text-red-700 dark:text-red-300">{{ __('pos.dc_open_table_board') }}</a>
                 </span>
+                {{-- Owner 23 Aug 2026 (Frost and Brew): NAME every blocking order and
+                     let it be cleared right here. A takeaway/counter order has no
+                     table tile, so the sale-screen board hid it — the close it
+                     blocks now owns the cure. Cancel = same verdict + same code
+                     path as the board (RestaurantPosController::deleteOrder). --}}
+                @if(!empty($openHeld->rows) && count($openHeld->rows) > 0)
+                <div class="w-full mt-2 space-y-1.5">
+                    <p class="text-[11px] font-bold text-red-700 dark:text-red-300">{{ __('pos.dc_blockers_fix_here') }}</p>
+                    @foreach($openHeld->rows as $oo)
+                    <div class="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800">
+                        <span class="text-xs font-bold text-gray-900 dark:text-white">{{ $oo->order_number }}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">{{ $oo->table_number ? __('pos.table_word') . ' ' . $oo->table_number : ($oo->order_type === 'delivery' ? __('pos.delivery') : ($oo->order_type === 'dine_in' ? __('pos.dine_in') : __('pos.takeaway'))) }}</span>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ \Carbon\Carbon::parse($oo->created_at)->format('d M, h:i A') }}{{ $oo->customer_name ? ' — ' . $oo->customer_name : '' }}</span>
+                        <span class="ml-auto text-xs font-bold text-gray-900 dark:text-white whitespace-nowrap">PKR {{ number_format($oo->total_amount) }}</span>
+                        @if($dcCanCancelOrder)
+                        <form method="POST" action="{{ route('pos.day-close.cancel-order', $oo->id) }}" class="inline"
+                              onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('pos.dc_cancel_order_confirm', ['order' => $oo->order_number])) }});">
+                            @csrf
+                            <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/40 transition">{{ __('pos.dc_cancel_order_btn') }}</button>
+                        </form>
+                        @endif
+                    </div>
+                    @endforeach
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.dc_open_order_bill_hint') }}</p>
+                </div>
+                @endif
                 @else
                 <span class="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ __('pos.dc_check_clear') }}</span>
                 @endif
@@ -685,6 +714,26 @@
                     <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{{ __('pos.dc_check_blocks') }}</span>
                     <a href="{{ route('pos.deliveries') }}" class="text-xs underline font-semibold text-red-700 dark:text-red-300">{{ __('pos.dc_open_deliveries_board') }}</a>
                 </span>
+                {{-- Same cure for the delivery blocker: each bill by name, closed
+                     from here via the Deliveries board's own endpoint (owner 23 Aug 2026). --}}
+                @if(!empty($pd->rows) && count($pd->rows) > 0)
+                <div class="w-full mt-2 space-y-1.5">
+                    <p class="text-[11px] font-bold text-red-700 dark:text-red-300">{{ __('pos.dc_blockers_fix_here') }}</p>
+                    @foreach($pd->rows as $db)
+                    <div class="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800">
+                        <span class="text-xs font-bold text-gray-900 dark:text-white">{{ $db->invoice_number }}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $db->rider_name ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' }}">{{ $db->rider_name ?: __('pos.dc_no_rider_yet') }}</span>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ \Carbon\Carbon::parse($db->created_at)->format('d M, h:i A') }}{{ $db->customer_name ? ' — ' . $db->customer_name : '' }}</span>
+                        <span class="ml-auto text-xs font-bold text-gray-900 dark:text-white whitespace-nowrap">PKR {{ number_format($db->total_amount) }}</span>
+                        <form method="POST" action="{{ route('pos.deliveries.status', $db->id) }}" class="inline"
+                              onsubmit="return confirm({{ \Illuminate\Support\Js::from($db->rider_name ? __('pos.dc_mark_delivered_confirm') : __('pos.del_mark_delivered_confirm')) }});">
+                            @csrf<input type="hidden" name="delivery_status" value="delivered">
+                            <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
+                        </form>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
                 @else
                 <span class="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ __('pos.dc_check_clear') }}</span>
                 @endif
@@ -969,7 +1018,7 @@
                 data-fallback-final-amount="{{ (float) ($localWash->final_amount ?? 0) }}"
                 onclick="return dcConfirmPendingLocal(this)"
                 @else
-                onclick="return confirm({{ Js::from(__('pos.confirm_close_day')) }})"
+                onclick="return confirm({{ \Illuminate\Support\Js::from(__('pos.confirm_close_day')) }})"
                 @endif
                 class="px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>

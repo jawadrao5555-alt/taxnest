@@ -29,7 +29,7 @@
             <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('pos.dcp_note') }}</p>
         </div>
         <div class="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
-            <button type="button" @click="show = false" class="px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">{{ __('pos.dcp_later') }}</button>
+            <button type="button" @click="laterDismiss()" class="px-3 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">{{ __('pos.dcp_later') }}</button>
             <a :href="url" class="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg">{{ __('pos.dcp_close_now') }}</a>
         </div>
     </div>
@@ -44,6 +44,11 @@ function dayClosePendingPopup() {
         title: '',
         oneTpl: @json(__('pos.dcp_title_one')),
         manyTpl: @json(__('pos.dcp_title_many', ['count' => '__C__'])),
+        // "Baad mein" — hide for this page view only. No storage on purpose:
+        // the owner asked for it to keep coming back until the day is closed.
+        laterDismiss() {
+            this.show = false;
+        },
         async check() {
             // Offline (or a cached page opened with no line): nothing to ask.
             if (typeof navigator !== 'undefined' && navigator.onLine === false) return;

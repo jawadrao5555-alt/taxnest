@@ -208,7 +208,7 @@
                 "name": "Which billing cycles are available for Digital Invoice?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Digital Invoice is fully flexible: pay Monthly, Quarterly (1% off), Semi-Annual (3% off) or Annual (6% off). You pick the cycle at checkout — no lock-in beyond the period you choose."
+                    "text": "Digital Invoice is fully flexible: pay Monthly, Quarterly, Semi-Annual or Annual — the longer the cycle, the lower the effective monthly rate shown on the package cards. You pick the cycle at checkout, with no lock-in beyond the period you choose."
                 }
             },
             {
@@ -486,13 +486,28 @@
                 <p class="text-lg text-gray-600 max-w-2xl mx-auto font-light">Choose the billing cycle that fits your business. All plans include 3-day free trial.</p>
             </div>
 
+            @php
+                // Prices come from the SERVER for every cycle (the DI packages
+                // carry hand-set quarterly / half-year / annual rates), so the
+                // heading, the badge and checkout all quote one figure.
+                $diCyclePricing = isset($plans) && $plans->count()
+                    ? \App\Services\DiPlanComparisonService::cyclePricing($plans)
+                    : [];
+                $diCycleDiscounts = isset($plans) && $plans->count()
+                    ? \App\Services\DiPlanComparisonService::cycleDiscounts($plans)
+                    : ['monthly' => 0, 'quarterly' => 0, 'semi_annual' => 0, 'annual' => 0];
+            @endphp
             <div x-data="{
                     cycle: 'monthly',
-                    discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
+                    pricing: {{ \Illuminate\Support\Js::from($diCyclePricing) }},
+                    discounts: {{ \Illuminate\Support\Js::from($diCycleDiscounts) }},
                     months: { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 },
+                    row(planId) { return (this.pricing[planId] || {})[this.cycle] || null; },
+                    planTotal(planId) { let r = this.row(planId); return r ? Math.round(r.final_price) : 0; },
+                    planMonthly(planId) { let r = this.row(planId); return r ? Math.round(r.monthly_effective) : 0; },
                     calcPrice(base) {
                         let m = this.months[this.cycle];
-                        let d = this.discounts[this.cycle];
+                        let d = this.discounts[this.cycle] || 0;
                         let total = base * m;
                         return Math.round(total - (total * d / 100));
                     },
@@ -505,9 +520,12 @@
                 <div class="flex justify-center mb-12">
                     <div class="inline-flex bg-white p-1 rounded-md border border-gray-200 shadow-sm">
                         <button @click="cycle = 'monthly'" :class="cycle === 'monthly' ? 'bg-gray-100 text-gray-900 border-gray-200' : 'border-transparent text-gray-500 hover:text-gray-900'" class="px-5 py-2 rounded text-sm font-semibold transition border">Monthly</button>
-                        <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-gray-100 text-gray-900 border-gray-200' : 'border-transparent text-gray-500 hover:text-gray-900'" class="px-5 py-2 rounded text-sm font-semibold transition border flex items-center gap-1.5">Quarterly <span class="bg-[#0F6171]/10 text-[#0A4D5C] px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider leading-none">-1%</span></button>
-                        <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-gray-100 text-gray-900 border-gray-200' : 'border-transparent text-gray-500 hover:text-gray-900'" class="px-5 py-2 rounded text-sm font-semibold transition border flex items-center gap-1.5">Semi-Annual <span class="bg-[#0F6171]/10 text-[#0A4D5C] px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider leading-none">-3%</span></button>
-                        <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-gray-100 text-gray-900 border-gray-200' : 'border-transparent text-gray-500 hover:text-gray-900'" class="px-5 py-2 rounded text-sm font-semibold transition border flex items-center gap-1.5">Annual <span class="bg-[#0F6171]/10 text-[#0A4D5C] px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider leading-none">-6%</span></button>
+                        {{-- Badge numbers come from the SAME server pricing the cards
+                             quote, so a package reprice can never leave a stale
+                             "-6%" promising a discount nobody gets. --}}
+                        <button @click="cycle = 'quarterly'" :class="cycle === 'quarterly' ? 'bg-gray-100 text-gray-900 border-gray-200' : 'border-transparent text-gray-500 hover:text-gray-900'" class="px-5 py-2 rounded text-sm font-semibold transition border flex items-center gap-1.5">Quarterly <span x-show="discounts.quarterly > 0" class="bg-[#0F6171]/10 text-[#0A4D5C] px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider leading-none" x-text="'-' + discounts.quarterly + '%'"></span></button>
+                        <button @click="cycle = 'semi_annual'" :class="cycle === 'semi_annual' ? 'bg-gray-100 text-gray-900 border-gray-200' : 'border-transparent text-gray-500 hover:text-gray-900'" class="px-5 py-2 rounded text-sm font-semibold transition border flex items-center gap-1.5">Semi-Annual <span x-show="discounts.semi_annual > 0" class="bg-[#0F6171]/10 text-[#0A4D5C] px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider leading-none" x-text="'-' + discounts.semi_annual + '%'"></span></button>
+                        <button @click="cycle = 'annual'" :class="cycle === 'annual' ? 'bg-gray-100 text-gray-900 border-gray-200' : 'border-transparent text-gray-500 hover:text-gray-900'" class="px-5 py-2 rounded text-sm font-semibold transition border flex items-center gap-1.5">Annual <span x-show="discounts.annual > 0" class="bg-[#0F6171]/10 text-[#0A4D5C] px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider leading-none" x-text="'-' + discounts.annual + '%'"></span></button>
                     </div>
                 </div>
 
@@ -677,7 +695,7 @@
                         <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">Which billing cycles are available?</span>
                         <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Digital Invoice is fully flexible: pay Monthly, Quarterly (1% off), Semi-Annual (3% off) or Annual (6% off). You pick the cycle at checkout — no lock-in beyond the period you choose.</div>
+                    <div x-show="open === 2" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Digital Invoice is fully flexible: pay Monthly, Quarterly, Semi-Annual or Annual — the longer the cycle, the lower the effective monthly rate shown on the package cards. You pick the cycle at checkout, with no lock-in beyond the period you choose.</div>
                 </div>
                 <div class="bg-white">
                     <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">

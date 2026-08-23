@@ -117,13 +117,37 @@ class AdminPlanController extends Controller
         ]);
     }
 
+    /**
+     * Drop keys the pricing_plans table does not actually carry.
+     *
+     * Columns arrive by migration, and a panel that 500s on a database which
+     * has not caught up yet is worse than one that quietly saves the fields
+     * it can. Everything the form needs is validated before it gets here.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function onlyExistingColumns(array $attributes): array
+    {
+        static $columns = null;
+        if ($columns === null) {
+            $columns = \Illuminate\Support\Facades\Schema::getColumnListing('pricing_plans');
+        }
+
+        return array_intersect_key($attributes, array_flip($columns));
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'price_quarterly' => 'nullable|numeric|min:0',
+            'price_semi_annual' => 'nullable|numeric|min:0',
+            'price_yearly' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
+            'ai_page_limit' => 'nullable|integer|min:-1',
+            'fair_use_limit' => 'nullable|integer|min:0',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
@@ -145,20 +169,27 @@ class AdminPlanController extends Controller
 
         // Explicit field list (never mass-assign the whole request) so sensitive
         // columns like is_trial can't be injected via crafted POST data.
-        $plan = PricingPlan::create([
+        $plan = PricingPlan::create($this->onlyExistingColumns([
             'name' => $data['name'],
             'product_type' => $data['product_type'],
             'price' => $data['price'],
             'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
             'price_quarterly' => $data['price_quarterly'] ?? null,
+            // DI packages carry hand-set half-year / annual rates; the cycle
+            // discount ladder is shared with FBR POS and must stay untouched.
+            'price_semi_annual' => $data['price_semi_annual'] ?? null,
+            'price_yearly' => $data['price_yearly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],
+            'ai_page_limit' => $data['ai_page_limit'] ?? 0,
+            'fair_use_limit' => $data['fair_use_limit'] ?? null,
+            'is_public' => $request->boolean('is_public'),
             'max_terminals' => $request->input('max_terminals'),
             'max_users' => $request->input('max_users'),
             'max_products' => $request->input('max_products'),
             'inventory_enabled' => $request->boolean('inventory_enabled'),
             'reports_enabled' => $request->boolean('reports_enabled'),
             'features' => $features,
-        ]);
+        ]));
 
         AdminAuditLog::log(auth('admin')->id(), 'Plan created', 'PricingPlan', $plan->id, array_filter([
             'name' => $plan->name,
@@ -177,7 +208,11 @@ class AdminPlanController extends Controller
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'price_quarterly' => 'nullable|numeric|min:0',
+            'price_semi_annual' => 'nullable|numeric|min:0',
+            'price_yearly' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
+            'ai_page_limit' => 'nullable|integer|min:-1',
+            'fair_use_limit' => 'nullable|integer|min:0',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
@@ -197,20 +232,25 @@ class AdminPlanController extends Controller
 
         // Explicit field list (never mass-assign the whole request) so sensitive
         // columns like is_trial can't be injected via crafted POST data.
-        $plan->update([
+        $plan->update($this->onlyExistingColumns([
             'name' => $data['name'],
             'product_type' => $data['product_type'],
             'price' => $data['price'],
             'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
             'price_quarterly' => $data['price_quarterly'] ?? null,
+            'price_semi_annual' => $data['price_semi_annual'] ?? null,
+            'price_yearly' => $data['price_yearly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],
+            'ai_page_limit' => $data['ai_page_limit'] ?? 0,
+            'fair_use_limit' => $data['fair_use_limit'] ?? null,
+            'is_public' => $request->boolean('is_public'),
             'max_terminals' => $request->input('max_terminals'),
             'max_users' => $request->input('max_users'),
             'max_products' => $request->input('max_products'),
             'inventory_enabled' => $request->boolean('inventory_enabled'),
             'reports_enabled' => $request->boolean('reports_enabled'),
             'features' => $features,
-        ]);
+        ]));
 
         AdminAuditLog::log(auth('admin')->id(), 'Plan updated', 'PricingPlan', $plan->id, array_filter([
             'name' => $plan->name,

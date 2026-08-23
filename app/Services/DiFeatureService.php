@@ -44,6 +44,15 @@ class DiFeatureService
      * "Custom Plan" rows) get NO premium features — fail closed.
      */
     public const PLAN_FEATURES = [
+        // Sep 2026 restructure — the three packages that are actually sold.
+        // AI Reader is now part of EVERY paid package (each carries its own
+        // monthly page allowance); recurring_invoices is deliberately absent
+        // because the feature has no implementation yet and must not be sold.
+        'Asaan'      => ['ai_reader'],
+        'Kaarobar'   => ['ai_reader', 'white_label', 'public_api'],
+        'Unlimited'  => ['ai_reader', 'white_label', 'public_api'],
+
+        // Legacy rows — retired from sale, kept for existing subscriptions.
         'Trial'      => [],
         'Retail'     => [],
         'Business'   => ['recurring_invoices'],

@@ -44,6 +44,12 @@ class PaymentProofController extends Controller
             return $this->storePosAddonRequest($request, $company);
         }
 
+        // AI Reader page top-up (Digital Invoice, Sep 2026) — chauthi lane:
+        // approve par sirf pages ka balance barhta hai, package ko haath nahi.
+        if ($request->input('request_type') === 'ai_pages') {
+            return $this->storeAiPagesRequest($request, $company);
+        }
+
         $productType = $this->resolveProductType($company);
         $allowedCycles = match ($productType) {
             'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
@@ -75,6 +81,14 @@ class PaymentProofController extends Controller
         if ($productType === 'pos' && !\App\Services\PosPlanComparisonService::isSellablePlan($plan)) {
             return back()
                 ->withErrors(['pricing_plan_id' => 'Please select a current PRA POS package.'])
+                ->withInput()
+                ->with('payment_proof', 'error');
+        }
+        // Same for Digital Invoice: a retired package must not enter the review
+        // queue, or approving it would put a shop back on a dead plan.
+        if ($productType === 'di' && !\App\Services\DiPlanComparisonService::isSellablePlan($plan)) {
+            return back()
+                ->withErrors(['pricing_plan_id' => 'Please select a current Digital Invoice package.'])
                 ->withInput()
                 ->with('payment_proof', 'error');
         }
@@ -351,6 +365,129 @@ class PaymentProofController extends Controller
 
         return back()->with('success', __('pos.addons_submitted'))
             ->with('payment_proof', 'submitted');
+    }
+
+    /**
+     * AI Reader page top-up request (Digital Invoice, Sep 2026).
+     *
+     * Package ke sath har mahine pages milte hain; khatam hon to shop yahan se
+     * extra pages khareedti hai. Extra-branch ki tarah apni lane: approve par
+     * SIRF pages ka balance barhta hai — package, uski miyaad aur uski qeemat
+     * bilkul waise hi rehte hain. Khareede hue pages kabhi expire nahi hote.
+     */
+    private function storeAiPagesRequest(Request $request, ?\App\Models\Company $company)
+    {
+        // Sirf Digital Invoice panel — POS/FBR par AI Reader hai hi nahi.
+        if (!$company || !auth('web')->check() || $this->resolveProductType($company) !== 'di') {
+            return back()->with('error', 'AI page top-up is not available on this account.')
+                ->with('payment_proof', 'error');
+        }
+
+        // Paisay ka faisla sirf malik ka — staff top-up request file na kar sakay.
+        if (!in_array(auth('web')->user()->role ?? '', ['super_admin', 'company_admin'], true)) {
+            abort(403);
+        }
+
+        // AI Reader jis package mein hai hi nahi, uske liye pages bechna bemani hai.
+        if (!\App\Services\DiFeatureService::planAllows($company, 'ai_reader')) {
+            return back()->with('error', 'AI Invoice Reader is not part of your current package. Upgrade to buy extra pages.')
+                ->with('payment_proof', 'error');
+        }
+
+        if (!PaymentProof::addonQuoteSnapshotColumnExists() || !Schema::hasColumn('companies', 'ai_page_balance')) {
+            return back()->with('error', 'AI page top-up is temporarily unavailable. Please contact support.')
+                ->with('payment_proof', 'error');
+        }
+
+        $validated = $request->validate([
+            'ai_pages' => 'required|integer|in:' . implode(',', array_keys(\App\Services\AiPageCreditService::PACKS)),
+            'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
+            'reference' => 'nullable|string|max:120',
+            'payment_date' => 'nullable|date',
+            'notes' => 'nullable|string|max:500',
+            'proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+        ]);
+
+        $pages = (int) $validated['ai_pages'];
+        // Qeemat hamesha server se — browser ka bheja hua amount kabhi nahi.
+        $price = \App\Services\AiPageCreditService::packPrice($pages);
+        if ($price === null) {
+            return back()->with('error', 'That top-up pack is no longer available.')
+                ->with('payment_proof', 'error');
+        }
+
+        // Ek waqt mein ek hi top-up request — warna do tabs se do baar paisay.
+        $pending = PaymentProof::aiPagesKind()
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->exists();
+        if ($pending) {
+            return back()->with('success', 'Your AI page top-up is already under review. We will add the pages as soon as it is verified.')
+                ->with('payment_proof', 'pending');
+        }
+
+        $path = $request->file('proof')->store('payment-proofs/' . $company->id, 'local');
+
+        $sub = \App\Models\Subscription::where('company_id', $company->id)
+            ->where('active', true)
+            ->orderByDesc('id')
+            ->first();
+
+        $proof = PaymentProof::create([
+            'company_id' => $company->id,
+            // Context only — approval never reads it for pricing.
+            'pricing_plan_id' => $sub?->pricing_plan_id,
+            'billing_cycle' => null,
+            'request_type' => 'ai_pages',
+            'addon_quote_snapshot' => ['pages' => $pages, 'price' => $price],
+            'amount' => $price,
+            'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
+            'reference' => $validated['reference'] ?? null,
+            'payment_date' => $validated['payment_date'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'proof_path' => $path,
+            'status' => 'pending',
+        ]);
+
+        $this->alertAdminsAiPages($company, $proof, $pages, $price);
+
+        return back()->with('success', 'Top-up request submitted! Your ' . number_format($pages) . ' AI pages will be added once our team verifies the payment.')
+            ->with('payment_proof', 'submitted');
+    }
+
+    /** Admins ko AI page top-up ki ittila (best-effort, kabhi submission na toray). */
+    private function alertAdminsAiPages(\App\Models\Company $company, PaymentProof $proof, int $pages, int $price): void
+    {
+        try {
+            $emails = \App\Models\AdminUser::whereNotNull('email')
+                ->where('email', '!=', '')
+                ->pluck('email')->unique()->values();
+            if ($emails->isEmpty()) {
+                return;
+            }
+
+            $body = "An AI READER PAGE TOP-UP request is waiting for review.\n\n"
+                . 'Company: ' . ($company->name ?? ('Company #' . $proof->company_id)) . "\n"
+                . 'Panel: Digital Invoicing' . "\n"
+                . 'Pages requested: ' . number_format($pages) . "\n"
+                . 'Quoted amount: PKR ' . number_format($price) . "\n"
+                . ($proof->reference ? 'Reference: ' . $proof->reference . "\n" : '')
+                . "\nApproving ONLY adds the pages to the company's purchased balance. The package, its expiry and its price stay untouched.\n"
+                . 'Review: ' . route('saas.admin.payment-proofs') . "\n\nTaxNest";
+
+            Mail::raw($body, function ($m) use ($emails, $company) {
+                $m->to($emails->all())->subject('AI page top-up request — ' . ($company->name ?? 'Company'));
+            });
+
+            \App\Services\MailHealth::recordSuccess();
+        } catch (\Throwable $e) {
+            Log::warning('AI page top-up admin alert failed', [
+                'proof_id' => $proof->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            \App\Services\MailHealth::recordFailure('AI page top-up admin alert', $e);
+        }
     }
 
     /** Admins ko feature add-on request ki ittila (best-effort, kabhi submission na toray). */

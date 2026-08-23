@@ -5,15 +5,6 @@
                 <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Billing & Plans</h2>
             </div>
 
-            @php
-                // Task 135: the Premium top tier is featured on its own wide card
-                // below the grid. If it is ever renamed it simply falls back into
-                // the normal grid.
-                $premiumPlan = $plans->firstWhere('name', 'Premium');
-                $gridPlans = $premiumPlan ? $plans->reject(fn ($p) => $p->id === $premiumPlan->id) : $plans;
-                $isCurrentPremium = $premiumPlan && $currentSubscription && $currentSubscription->pricing_plan_id === $premiumPlan->id;
-            @endphp
-
             @if($currentSubscription && $usageData)
                 @if($usageData['trial'] && $usageData['trial']['is_trial'])
                 <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-6 mb-6">
@@ -57,34 +48,52 @@
                             <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Current Plan: {{ $currentSubscription->pricingPlan->name }}</h3>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 {{ \App\Models\Subscription::getCycleLabel($usageData['billing_cycle']) }} billing
-                                @if($usageData['discount_percent'] > 0) &middot; {{ $usageData['discount_percent'] }}% discount @endif
                                 &middot; Active until {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}
                             </p>
                         </div>
                         <div class="flex flex-col items-end gap-2">
                             <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">Active</span>
-                            @if($premiumPlan && !$isCurrentPremium)
-                            <a href="#premium-plan" class="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700">
-                                Upgrade to Premium
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-                            </a>
-                            @endif
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Invoices</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                                Invoices this month
+                                @if($usageData['has_override'])
+                                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 text-[10px] font-bold align-middle">CUSTOM</span>
+                                @endif
+                            </p>
                             <div class="flex items-center space-x-3">
                                 @if($usageData['invoice_limit'] === -1)
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $usageData['invoice_count'] }} / Unlimited</span>
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ number_format($usageData['invoice_count']) }} / Unlimited</span>
                                 @else
                                     <div class="flex-1 bg-gray-200 rounded-full h-3">
                                         <div class="h-3 rounded-full transition-all {{ $usageData['usage_percent'] > 80 ? 'bg-red-500' : 'bg-emerald-500' }}"
                                             style="width: {{ $usageData['usage_percent'] }}%"></div>
                                     </div>
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $usageData['invoice_count'] }}/{{ $usageData['invoice_limit'] }}</span>
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ number_format($usageData['invoice_count']) }}/{{ number_format($usageData['invoice_limit']) }}</span>
                                 @endif
                             </div>
+                            <p class="text-[11px] text-gray-400 mt-1">Only FBR-submitted invoices count &middot; resets {{ $usageData['quota_resets_on'] }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">AI Reader pages</p>
+                            @if($aiPages)
+                                @if($aiPages['unlimited'])
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Unlimited</span>
+                                @else
+                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ number_format($aiPages['allowance_used']) }}/{{ number_format($aiPages['allowance']) }} used</span>
+                                    <p class="text-[11px] text-gray-400 mt-1">
+                                        @if($aiPages['purchased'] > 0)
+                                            + {{ number_format($aiPages['purchased']) }} purchased pages
+                                        @else
+                                            Monthly allowance &middot; resets {{ $aiPages['resets_on'] }}
+                                        @endif
+                                    </p>
+                                @endif
+                            @else
+                                <span class="text-sm font-medium text-gray-400">—</span>
+                            @endif
                         </div>
                         <div>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Users</p>
@@ -98,25 +107,137 @@
                 </div>
             @endif
 
+            {{-- AI Reader page top-up (Sep 2026). Monthly allowance package ke sath
+                 aati hai; khatam ho jaye to shop yahan se extra pages khareedti hai.
+                 Approve par SIRF pages barhte hain — package ko haath nahi lagta. --}}
+            @if($aiPages && $aiReaderAllowed && !$aiPages['unlimited'])
+            @php
+                $aiBank = [
+                    'bank_name' => \App\Models\SystemSetting::get('payment_bank_name', ''),
+                    'account_title' => \App\Models\SystemSetting::get('payment_account_title', ''),
+                    'account_number' => \App\Models\SystemSetting::get('payment_account_number', ''),
+                    'iban' => \App\Models\SystemSetting::get('payment_iban', ''),
+                    'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
+                ];
+                $aiCanBuy = in_array(auth()->user()->role, ['super_admin', 'company_admin'], true);
+                $aiPackList = [];
+                foreach ($aiPages['packs'] as $aiPackPages => $aiPackPrice) {
+                    $aiPackList[] = ['pages' => (int) $aiPackPages, 'price' => (int) $aiPackPrice];
+                }
+            @endphp
+            <div id="ai-pages" class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-8"
+                 x-data="{ open: false, pack: {{ $aiPackList[1]['pages'] ?? ($aiPackList[0]['pages'] ?? 100) }} }">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-fuchsia-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            AI Reader Pages
+                        </h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {{ number_format($aiPages['allowance_remaining']) }} of {{ number_format($aiPages['allowance']) }} monthly pages left &middot; resets {{ $aiPages['resets_on'] }}.
+                            @if($aiPages['purchased'] > 0)
+                                You also have <span class="font-semibold text-gray-700 dark:text-gray-300">{{ number_format($aiPages['purchased']) }} purchased pages</span> that never expire.
+                            @endif
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-gray-400 uppercase tracking-wide">Available now</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ number_format($aiPages['total_remaining']) }}</p>
+                        <p class="text-xs text-gray-400">pages</p>
+                        <a href="{{ route('billing.ai-pages') }}" class="text-xs font-semibold text-fuchsia-600 dark:text-fuchsia-400 hover:underline">Page history</a>
+                    </div>
+                </div>
+
+                @if($aiTopupPending)
+                    <div class="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                        Your top-up payment is under review. The pages will be added as soon as our team verifies it.
+                    </div>
+                @elseif($aiCanBuy)
+                    <div class="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        @foreach($aiPackList as $aiPack)
+                        <label class="relative flex flex-col rounded-xl border p-4 cursor-pointer transition"
+                               :class="pack === {{ $aiPack['pages'] }} ? 'border-fuchsia-500 bg-fuchsia-50 dark:bg-fuchsia-900/20 ring-1 ring-fuchsia-500' : 'border-gray-200 dark:border-gray-700 hover:border-fuchsia-300'">
+                            <input type="radio" class="sr-only" :checked="pack === {{ $aiPack['pages'] }}" @change="pack = {{ $aiPack['pages'] }}">
+                            <span class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ number_format($aiPack['pages']) }} pages</span>
+                            <span class="text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-400 mt-1">PKR {{ number_format($aiPack['price']) }}</span>
+                            <span class="text-[11px] text-gray-400 mt-1">Rs {{ number_format($aiPack['price'] / $aiPack['pages'], 2) }} per page</span>
+                        </label>
+                        @endforeach
+                    </div>
+
+                    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <p class="text-[11px] text-gray-400 dark:text-gray-500 max-w-md">
+                            Purchased pages never expire and are only used after your monthly allowance is finished. A page is charged only when a read succeeds.
+                        </p>
+                        <button type="button" @click="open = !open"
+                                class="bg-fuchsia-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-fuchsia-700 transition">
+                            Buy Pages
+                        </button>
+                    </div>
+
+                    <div x-show="open" x-cloak class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <form method="POST" action="{{ route('payment-proof.store') }}" enctype="multipart/form-data" class="space-y-3">
+                            @csrf
+                            <input type="hidden" name="request_type" value="ai_pages">
+                            <input type="hidden" name="ai_pages" :value="pack">
+
+                            @if($aiBank['bank_name'] || $aiBank['account_number'] || $aiBank['iban'])
+                            <div class="rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300 space-y-0.5">
+                                <p class="font-semibold text-gray-700 dark:text-gray-200">Bank details</p>
+                                @if($aiBank['bank_name'])<p>{{ $aiBank['bank_name'] }}</p>@endif
+                                @if($aiBank['account_title'])<p>{{ $aiBank['account_title'] }}</p>@endif
+                                @if($aiBank['account_number'])<p class="font-mono">{{ $aiBank['account_number'] }}</p>@endif
+                                @if($aiBank['iban'])<p class="font-mono">{{ $aiBank['iban'] }}</p>@endif
+                                @if($aiBank['instructions'])<p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $aiBank['instructions'] }}</p>@endif
+                            </div>
+                            @endif
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <select name="payment_method"
+                                        class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                                    <option value="">Payment method</option>
+                                    <option value="bank">Bank Transfer</option>
+                                    <option value="jazzcash">JazzCash</option>
+                                    <option value="easypaisa">EasyPaisa</option>
+                                    <option value="other">Other</option>
+                                </select>
+                                <input type="text" name="reference" maxlength="120" placeholder="Transaction reference (optional)"
+                                       autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                       class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                            </div>
+                            <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" required
+                                   class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-fuchsia-600 file:text-white hover:file:bg-fuchsia-500">
+                            @error('proof')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+                            @error('ai_pages')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
+                            <p class="text-[11px] text-gray-400">JPG, PNG or PDF &middot; up to 5 MB</p>
+
+                            <button type="submit" class="w-full sm:w-auto bg-fuchsia-600 text-white rounded-lg px-5 py-2.5 text-sm font-semibold hover:bg-fuchsia-700">
+                                Submit Payment Proof
+                            </button>
+                        </form>
+                    </div>
+                @endif
+            </div>
+            @endif
+
             <div class="text-center mb-8">
                 <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Choose Your Plan</h3>
-                <p class="text-gray-500 dark:text-gray-400 mt-2">Aggressive pricing for high-volume businesses. All plans include FBR compliance.</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">Every package includes FBR digital invoicing, the AI Invoice Reader and the 6-year audit archive.</p>
             </div>
 
+            {{-- Prices come from the SERVER (planPricing), never from a client-side
+                 discount ladder — the card, the toggle, the comparison table and
+                 checkout must all quote the same figure. --}}
             <div x-data="{
                 cycle: 'monthly',
-                discounts: { monthly: 0, quarterly: 1, semi_annual: 3, annual: 6 },
+                pricing: {{ \Illuminate\Support\Js::from($planPricing) }},
                 months: { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 },
-                cycleLabels: { monthly: 'Monthly', quarterly: 'Quarterly', semi_annual: 'Semi-Annual', annual: 'Annual' },
-                calcPrice(base) {
-                    let m = this.months[this.cycle];
-                    let d = this.discounts[this.cycle];
-                    let total = base * m;
-                    return Math.round(total - (total * d / 100));
-                },
-                calcMonthly(base) {
-                    return Math.round(this.calcPrice(base) / this.months[this.cycle]);
-                }
+                cycleLabels: { monthly: 'month', quarterly: '3 months', semi_annual: '6 months', annual: 'year' },
+                row(planId) { return (this.pricing[planId] || {})[this.cycle] || null; },
+                total(planId) { let r = this.row(planId); return r ? Math.round(r.final_price) : 0; },
+                perMonth(planId) { let r = this.row(planId); return r ? Math.round(r.monthly_effective) : 0; },
+                saving(planId) { let r = this.row(planId); return r ? Math.max(0, Math.round(r.total_before_discount - r.final_price)) : 0; },
+                fmt(n) { return Number(n).toLocaleString('en-US'); }
             }">
                 <div class="flex justify-center mb-8">
                     <div class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
@@ -133,21 +254,30 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    @foreach($gridPlans as $plan)
-                    @php $hasOffer = $plan->sale_percent > 0; @endphp
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    @foreach($plans as $plan)
+                    @php
+                        $hasOffer = $plan->sale_percent > 0;
+                        // "Most popular" = the middle package, whatever it is called.
+                        $isFeatured = $plans->count() === 3 && $loop->index === 1;
+                        $isCurrent = $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id;
+                        $planFeatures = $plan->features;
+                        if (is_string($planFeatures)) $planFeatures = json_decode($planFeatures, true);
+                        if (is_string($planFeatures)) $planFeatures = json_decode($planFeatures, true);
+                        if (!is_array($planFeatures)) $planFeatures = [];
+                    @endphp
                     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border-2 transition relative
-                        {{ $plan->name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200 dark:border-gray-800' }}
-                        {{ $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id ? 'border-emerald-500' : '' }}">
+                        {{ $isFeatured ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200 dark:border-gray-800' }}
+                        {{ $isCurrent ? 'border-emerald-500' : '' }}">
 
-                        @if($plan->name === 'Business')
+                        @if($isFeatured)
                         <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
                             <span class="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">MOST POPULAR</span>
                         </div>
                         @endif
 
                         <div class="p-6">
-                            @if($currentSubscription && $currentSubscription->pricing_plan_id === $plan->id)
+                            @if($isCurrent)
                             <span class="inline-flex px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium mb-3">Current Plan</span>
                             @endif
                             <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</h3>
@@ -155,51 +285,31 @@
                             <span class="inline-block mt-2 px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-full text-[11px] font-bold">{{ $plan->sale_badge }}</span>
                             @endif
                             <div class="mt-4">
-                                <div x-show="cycle === 'monthly'">
-                                    @if($hasOffer)<span class="text-base text-gray-400 line-through mr-1">PKR {{ number_format($plan->price) }}</span>@endif
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR {{ number_format($plan->sale_price) }}</span>
-                                    <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
-                                </div>
-                                <div x-show="cycle !== 'monthly'">
-                                    @if($hasOffer)<span class="text-base text-gray-400 line-through mr-1">PKR <span x-text="calcMonthly({{ $plan->price }}).toLocaleString()"></span></span>@endif
-                                    <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="calcMonthly({{ $plan->sale_price }}).toLocaleString()"></span></span>
-                                    <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
-                                    <p class="text-xs text-gray-400 mt-1">@if($hasOffer)<span class="line-through mr-1">PKR <span x-text="calcPrice({{ $plan->price }}).toLocaleString()"></span></span> @endif PKR <span x-text="calcPrice({{ $plan->sale_price }}).toLocaleString()"></span> total</p>
-                                </div>
+                                <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="fmt(perMonth({{ $plan->id }}))"></span></span>
+                                <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
+                                <p class="text-xs text-gray-400 mt-1" x-show="cycle !== 'monthly'">
+                                    PKR <span x-text="fmt(total({{ $plan->id }}))"></span> billed every <span x-text="cycleLabels[cycle]"></span>
+                                    <template x-if="saving({{ $plan->id }}) > 0">
+                                        <span class="text-emerald-600 font-semibold"> &middot; save PKR <span x-text="fmt(saving({{ $plan->id }}))"></span></span>
+                                    </template>
+                                </p>
+                                <p class="text-xs text-gray-400 mt-1" x-show="cycle === 'monthly'">Billed monthly &middot; cancel anytime</p>
                             </div>
                             <ul class="mt-5 space-y-2.5">
-                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                                    <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    {{ $plan->getInvoiceLimitDisplay() }} invoices/mo
+                                @foreach($planFeatures as $feature)
+                                <li class="flex items-start text-sm text-gray-600 dark:text-gray-400">
+                                    <svg class="w-4 h-4 text-emerald-500 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span>{{ $feature }}</span>
                                 </li>
-                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                                    <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    {{ $plan->getUserLimitDisplay() }} users
-                                </li>
-                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                                    <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    {{ $plan->getBranchLimitDisplay() }} {{ $plan->branch_limit === -1 ? 'branches' : ($plan->branch_limit === 1 ? 'branch' : 'branches') }}
-                                </li>
-                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                                    <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    FBR Integration
-                                </li>
-                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                                    <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    Compliance Scoring
-                                </li>
-                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                                    <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    FBR Audit Pack &middot; 6-year archive
-                                </li>
+                                @endforeach
                             </ul>
-                            @if(!$currentSubscription || $currentSubscription->pricing_plan_id !== $plan->id)
+                            @if(!$isCurrent)
                             <form method="POST" action="/billing/subscribe" class="mt-6">
                                 @csrf
                                 <input type="hidden" name="plan_id" value="{{ $plan->id }}">
                                 <input type="hidden" name="billing_cycle" :value="cycle">
                                 <button type="submit" class="w-full py-2.5 rounded-lg font-semibold text-sm transition shadow-sm
-                                    {{ $plan->name === 'Business' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
+                                    {{ $isFeatured ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-900 text-white hover:bg-gray-800' }}">
                                     Subscribe
                                 </button>
                             </form>
@@ -213,87 +323,13 @@
                     @endforeach
                 </div>
 
-                @if($premiumPlan)
-                @php
-                    $premiumFeatures = $premiumPlan->features;
-                    if (is_string($premiumFeatures)) $premiumFeatures = json_decode($premiumFeatures, true);
-                    if (is_string($premiumFeatures)) $premiumFeatures = json_decode($premiumFeatures, true);
-                    if (!is_array($premiumFeatures)) $premiumFeatures = [];
-                @endphp
-                <div id="premium-plan" class="mt-6 relative bg-gray-900 dark:bg-gray-950 rounded-xl shadow-lg overflow-hidden border {{ $isCurrentPremium ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-800' }}">
-                    <div class="absolute top-0 left-0 right-0 h-1 bg-amber-400"></div>
-                    <div class="p-6 md:p-8 md:flex md:items-start md:justify-between md:gap-8">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-3 flex-wrap">
-                                <span class="bg-amber-400 text-gray-900 text-xs font-bold px-3 py-1 rounded-full tracking-wide">PREMIUM</span>
-                                @if($isCurrentPremium)
-                                <span class="inline-flex px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-xs font-medium">Current Plan</span>
-                                @endif
-                            </div>
-                            <h3 class="mt-3 text-2xl font-bold text-white">{{ $premiumPlan->name }}</h3>
-                            <p class="mt-1 text-sm text-gray-400">Everything unlimited, plus the premium toolkit — white-label branding, API access, AI-assisted invoicing and automated billing.</p>
-                            <ul class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
-                                @foreach($premiumFeatures as $feature)
-                                <li class="flex items-start text-sm text-gray-300">
-                                    <svg class="w-4 h-4 text-amber-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    <span>{{ $feature }}</span>
-                                </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                        <div class="mt-6 md:mt-0 md:w-64 flex-shrink-0 md:text-right">
-                            @if($premiumPlan->sale_percent > 0)
-                            <span class="inline-block mb-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">{{ $premiumPlan->sale_badge }}</span>
-                            @endif
-                            <div x-show="cycle === 'monthly'">
-                                @if($premiumPlan->sale_percent > 0)<span class="text-base text-gray-500 line-through mr-1">PKR {{ number_format($premiumPlan->price) }}</span>@endif
-                                <span class="text-4xl font-bold text-white">PKR {{ number_format($premiumPlan->sale_price) }}</span>
-                                <span class="text-gray-400 text-sm">/mo</span>
-                            </div>
-                            <div x-show="cycle !== 'monthly'">
-                                <span class="text-4xl font-bold text-white">PKR <span x-text="calcMonthly({{ $premiumPlan->sale_price }}).toLocaleString()"></span></span>
-                                <span class="text-gray-400 text-sm">/mo</span>
-                                <p class="text-xs text-gray-500 mt-1">PKR <span x-text="calcPrice({{ $premiumPlan->sale_price }}).toLocaleString()"></span> total</p>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-2">Unlimited invoices &middot; users &middot; branches</p>
-                            @if($isCurrentPremium)
-                            <div class="mt-5">
-                                <button disabled class="w-full py-2.5 px-6 rounded-lg font-semibold text-sm bg-gray-800 text-gray-500 cursor-not-allowed">Current Plan</button>
-                            </div>
-                            @else
-                            <form method="POST" action="/billing/subscribe" class="mt-5">
-                                @csrf
-                                <input type="hidden" name="plan_id" value="{{ $premiumPlan->id }}">
-                                <input type="hidden" name="billing_cycle" :value="cycle">
-                                <button type="submit" class="w-full py-2.5 px-6 rounded-lg font-semibold text-sm bg-amber-400 text-gray-900 hover:bg-amber-300 transition shadow-sm">
-                                    {{ $currentSubscription ? 'Upgrade to Premium' : 'Subscribe to Premium' }}
-                                </button>
-                            </form>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-                @endif
+                {{-- Sep 2026: the self-serve "Build Custom Plan" card is gone. The
+                     catalogue is exactly these three packages; anything special is
+                     an admin arrangement (limit overrides), not a plan a shop can
+                     invent for itself at a formula price nobody reviewed. --}}
 
-                @if(in_array(auth()->user()->role, ['super_admin', 'company_admin']))
-                <div class="mt-8">
-                    <a href="/billing/custom-plan" class="block bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl shadow-sm border-2 border-dashed border-emerald-300 dark:border-emerald-700 p-6 hover:border-emerald-500 dark:hover:border-emerald-500 transition group">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-4">
-                                <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl flex items-center justify-center group-hover:bg-emerald-200 dark:group-hover:bg-emerald-800/40 transition">
-                                    <svg class="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                                </div>
-                                <div>
-                                    <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Build Custom Plan</h3>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">Need specific limits? Configure invoices, users, and branches to get instant pricing.</p>
-                                </div>
-                            </div>
-                            <svg class="w-5 h-5 text-emerald-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                        </div>
-                    </a>
-                </div>
-                @endif
-
+                {{-- Comparison table. Every row is driven by the SAME plan rows and
+                     feature gates the cards use, so the two can never drift apart. --}}
                 <div class="mt-8 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
                     <div class="p-6 border-b border-gray-200 dark:border-gray-800">
                         <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">Feature Comparison</h3>
@@ -302,64 +338,79 @@
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 w-1/5">Feature</th>
+                                    <th class="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400 w-1/4">Feature</th>
                                     @foreach($plans as $plan)
                                     <th class="text-center py-3 px-4 text-sm font-bold text-gray-900 dark:text-gray-100">{{ $plan->name }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
-                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Monthly Price</td>
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Price</td>
                                     @foreach($plans as $plan)
-                                    <td class="py-3 px-4 text-center text-sm font-semibold">@if($plan->sale_percent > 0)<span class="text-gray-400 line-through font-normal mr-1">PKR {{ number_format($plan->price) }}</span> @endif PKR {{ number_format($plan->sale_price) }}</td>
+                                    <td class="py-3 px-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                        PKR <span x-text="fmt(total({{ $plan->id }}))"></span>
+                                        <span class="block text-[11px] font-normal text-gray-400">per <span x-text="cycleLabels[cycle]"></span></span>
+                                    </td>
                                     @endforeach
                                 </tr>
-                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">
-                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Invoices</td>
+                                <tr class="bg-gray-50 dark:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">FBR invoices / month</td>
                                     @foreach($plans as $plan)
-                                    <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getInvoiceLimitDisplay() }}</td>
+                                    <td class="py-3 px-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                        {{ $plan->getInvoiceLimitDisplay() }}
+                                        @if($plan->invoice_limit === -1 && (int) ($plan->fair_use_limit ?? 0) > 0)
+                                        <span class="block text-[11px] font-normal text-gray-400">fair use {{ number_format($plan->fair_use_limit) }}</span>
+                                        @endif
+                                    </td>
                                     @endforeach
                                 </tr>
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                    <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">AI Reader pages / month</td>
+                                    @foreach($plans as $plan)
+                                    <td class="py-3 px-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $plan->getAiPageLimitDisplay() }}</td>
+                                    @endforeach
+                                </tr>
+                                <tr class="bg-gray-50 dark:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Users</td>
                                     @foreach($plans as $plan)
-                                    <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getUserLimitDisplay() }}</td>
+                                    <td class="py-3 px-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $plan->getUserLimitDisplay() }}</td>
                                     @endforeach
                                 </tr>
-                                <tr class="bg-gray-50 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">Branches</td>
                                     @foreach($plans as $plan)
-                                    <td class="py-3 px-4 text-center text-sm font-semibold">{{ $plan->getBranchLimitDisplay() }}</td>
+                                    <td class="py-3 px-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $plan->getBranchLimitDisplay() }}</td>
                                     @endforeach
                                 </tr>
                                 @php
-                                // Tier-ranked availability (keyed by plan name) so the
-                                // table stays aligned no matter how many DI plans exist.
-                                // Unknown/custom plan names show ✗ for everything.
-                                $tierRank = ['Retail' => 1, 'Business' => 2, 'Industrial' => 3, 'Enterprise' => 4, 'Premium' => 5];
-                                $features = [
-                                    'FBR Integration' => 1,
-                                    'PDF Generation' => 1,
-                                    'Compliance Scoring' => 1,
-                                    'FBR Audit Pack (6-Year Archive)' => 1,
-                                    'MIS Reports' => 2,
-                                    'Customer Ledger' => 2,
-                                    'Recurring Invoices' => 2,
-                                    'Audit Logs' => 3,
-                                    'Priority Support' => 3,
-                                    'Custom Integrations' => 4,
-                                    'White-label Branding' => 5,
-                                    'Public REST API & Webhooks' => 5,
-                                    'AI Invoice Reader' => 5,
-                                ];
+                                    // Ticks come from the real gates (DiFeatureService) or from the
+                                    // package's own position in the ladder — never a name lookup,
+                                    // which silently turns into a column of crosses after a rename.
+                                    $rankByPlanId = [];
+                                    foreach ($plans as $i => $p) {
+                                        $rankByPlanId[$p->id] = $i + 1;
+                                    }
+                                    $comparisonRows = [
+                                        'FBR e-invoicing & digital invoice numbers' => fn ($p) => true,
+                                        'PDF, WhatsApp & share-link delivery' => fn ($p) => true,
+                                        'Excel / CSV bulk import' => fn ($p) => true,
+                                        'AI Invoice Reader (PDF, Excel, photo)' => fn ($p) => \App\Services\DiFeatureService::planIncludes($p, 'ai_reader'),
+                                        'Customers, products & MIS reports' => fn ($p) => true,
+                                        'Compliance scoring' => fn ($p) => true,
+                                        'FBR Audit Pack (6-year archive)' => fn ($p) => true,
+                                        'White-label branding' => fn ($p) => \App\Services\DiFeatureService::planIncludes($p, 'white_label'),
+                                        'Public REST API & webhooks' => fn ($p) => \App\Services\DiFeatureService::planIncludes($p, 'public_api'),
+                                        'Priority support' => fn ($p) => ($rankByPlanId[$p->id] ?? 0) >= 2,
+                                        'Dedicated account manager' => fn ($p) => ($rankByPlanId[$p->id] ?? 0) >= 3,
+                                    ];
                                 @endphp
-                                @foreach($features as $feature => $minTier)
-                                <tr class="{{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">
+                                @foreach($comparisonRows as $feature => $has)
+                                <tr class="{{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{{ $feature }}</td>
                                     @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center">
-                                        @if(($tierRank[$plan->name] ?? 0) >= $minTier)
+                                        @if($has($plan))
                                         <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         @else
                                         <svg class="w-5 h-5 text-gray-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -370,6 +421,10 @@
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+                    <div class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                        <p>Invoice quota is per calendar month and only counts invoices actually submitted to FBR — drafts and failed submissions are free.</p>
+                        <p>Extra AI Reader pages can be topped up any time from this page; purchased pages never expire.</p>
                     </div>
                 </div>
             </div>

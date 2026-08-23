@@ -68,6 +68,16 @@
                                     <span class="block text-[11px] text-gray-400 mt-1 max-w-[240px]">
                                         {{ implode(', ', array_map(fn ($c) => $paCatalog[$c]['label'] ?? $c, $paCodes)) ?: '—' }}
                                     </span>
+                                @elseif($proof->isAiPages())
+                                    {{-- AI Reader page top-up — no package, no cycle. --}}
+                                    @php $aiPagesQty = $proof->aiPagesRequested(); @endphp
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-fuchsia-900/40 text-fuchsia-300 border border-fuchsia-700/60">AI pages &times; {{ number_format($aiPagesQty) }}</span>
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                        Top-up only · never expires
+                                        @if($proof->pricingPlan)
+                                            · on {{ $proof->pricingPlan->name }}
+                                        @endif
+                                    </span>
                                 @elseif($proof->isExtraBranch())
                                     {{-- Extra-branch add-on request — no package, no cycle. --}}
                                     @php $ebQty = max(1, (int) ($proof->extra_branch_qty ?? 1)); @endphp
@@ -197,6 +207,39 @@
                                                 Billing: {{ ucfirst($paCycleSel) }} — kept exactly as the shop requested and paid for.
                                             </p>
                                             <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Approve Add-on</button>
+                                        </form>
+                                    </div>
+                                    @elseif($proof->isAiPages())
+                                    {{-- AI page top-up: SIRF pages ka balance barhta hai. Pack
+                                         shop ne chuna tha — admin sirf haan/na karta hai. --}}
+                                    <div x-show="panel === 'approve'" x-cloak class="mt-3 text-left bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2 min-w-[240px] max-w-[300px]">
+                                        @php
+                                            $aiQty = $proof->aiPagesRequested();
+                                            $aiQuoted = \App\Services\AiPageCreditService::packPrice($aiQty) ?? 0;
+                                            $aiPaid = $proof->amount !== null ? (float) $proof->amount : null;
+                                            $aiShort = $aiPaid !== null ? max(0, $aiQuoted - $aiPaid) : 0;
+                                            $aiBalance = \App\Services\AiPageCreditService::purchasedBalance($proof->company_id);
+                                        @endphp
+                                        <p class="text-[11px] text-gray-400 mb-1">AI Reader top-up. Approving adds <span class="text-gray-200 font-medium">purchased pages only</span> — the package, its expiry and the subscription row are not touched.</p>
+                                        <div class="rounded-lg border px-2.5 py-2 text-[11px] leading-relaxed {{ $aiShort > 0 ? 'border-red-700/70 bg-red-900/25' : 'border-emerald-800/60 bg-emerald-900/15' }}">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-gray-400">Pack</span>
+                                                <span class="text-white font-semibold">{{ number_format($aiQty) }} pages · PKR {{ number_format($aiQuoted) }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-gray-700/60">
+                                                <span class="text-gray-400">Company says paid</span>
+                                                <span class="font-semibold {{ $aiShort > 0 ? 'text-red-300' : 'text-emerald-300' }}">
+                                                    {{ $aiPaid !== null ? 'PKR ' . number_format($aiPaid) : 'Not stated' }}
+                                                </span>
+                                            </div>
+                                            @if($aiShort > 0)
+                                                <p class="mt-1 font-bold text-red-300">SHORT by PKR {{ number_format($aiShort) }} — reject and ask for the balance.</p>
+                                            @endif
+                                        </div>
+                                        <p class="text-[11px] text-gray-500">Current purchased balance: {{ number_format($aiBalance) }} pages</p>
+                                        <form method="POST" action="{{ route('saas.admin.payment-proofs.approve', $proof->id) }}" class="space-y-2">
+                                            @csrf
+                                            <button type="submit" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">Add {{ number_format($aiQty) }} Pages</button>
                                         </form>
                                     </div>
                                     @elseif($proof->isExtraBranch())

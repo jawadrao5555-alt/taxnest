@@ -92,6 +92,15 @@ class AiInvoiceReaderService
     // Quota
     // ------------------------------------------------------------------
 
+    /**
+     * Monthly AI page allowance that comes with the package.
+     *
+     * Since the Sep 2026 DI restructure this is DATA, not a constant: every
+     * package carries its own ai_page_limit (Asaan 200 / Kaarobar 400 /
+     * Unlimited 700). The old constants stay as the fallback for legacy plan
+     * rows that predate the column, so an untouched Premium customer keeps
+     * exactly the allowance they had.
+     */
     public static function monthlyQuota(Company $company): int
     {
         if ($company->is_internal_account) {
@@ -99,7 +108,14 @@ class AiInvoiceReaderService
         }
 
         $sub = DiFeatureService::effectiveSubscription($company);
-        if ($sub && $sub->pricingPlan && $sub->pricingPlan->name === 'Premium') {
+        $plan = $sub?->pricingPlan;
+
+        $planPages = (int) ($plan->ai_page_limit ?? 0);
+        if ($planPages !== 0) {
+            return $planPages; // -1 stays unlimited
+        }
+
+        if ($plan && $plan->name === 'Premium') {
             return self::QUOTA_PREMIUM;
         }
         if ($sub && $sub->isTrialActive()) {
@@ -109,9 +125,23 @@ class AiInvoiceReaderService
         return self::QUOTA_DEFAULT;
     }
 
-    /** Successful parses this calendar month (failed attempts are free). */
+    /**
+     * Allowance pages spent this calendar month.
+     *
+     * The ledger is the truth (a strong-model read costs more than one page,
+     * and purchased pages must not be counted as allowance). Falls back to the
+     * old successful-parse count when the ledger table isn't there yet.
+     */
     public static function usedThisMonth(int $companyId): int
     {
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('ai_page_ledgers')) {
+                return \App\Services\AiPageCreditService::usedThisMonth($companyId);
+            }
+        } catch (\Throwable $e) {
+            // fall through to the legacy count
+        }
+
         return AiInvoiceParse::where('company_id', $companyId)
             ->where('status', 'success')
             ->where('created_at', '>=', now()->startOfMonth())
@@ -133,12 +163,18 @@ class AiInvoiceReaderService
                 ->count();
         }
 
+        // Purchased pages sit on top of the monthly allowance and never expire,
+        // so a shop that topped up must be able to keep working after the
+        // package pages run out.
+        $purchased = \App\Services\AiPageCreditService::purchasedBalance($company);
+
         return [
             'quota' => $quota,
             'used' => $used,
             'reserved' => $reserved,
+            'purchased' => $purchased,
             'unlimited' => $quota === -1,
-            'remaining' => $quota === -1 ? -1 : max(0, $quota - $used - $reserved),
+            'remaining' => $quota === -1 ? -1 : max(0, $quota - $used - $reserved) + $purchased,
         ];
     }
 
@@ -152,7 +188,7 @@ class AiInvoiceReaderService
      * (a 'failed' row is stored for the recent-attempts list; failures
      * never consume quota).
      */
-    public static function parseUpload(UploadedFile $file, Company $company, ?int $userId): AiInvoiceParse
+    public static function parseUpload(UploadedFile $file, Company $company, ?int $userId, array $creditMeta = []): AiInvoiceParse
     {
         $sourceType = self::detectSourceType($file);
         $filename = self::cleanString((string) $file->getClientOriginalName(), 200);
@@ -173,8 +209,17 @@ class AiInvoiceReaderService
             // items at all), retry ONCE with the admin-set strong vision model
             // and keep whichever read has more high-confidence items. Vision
             // sources only (text/Excel gain nothing); still ONE quota parse.
+            // A strong-model read costs 10 pages instead of 1, so it may only be
+            // attempted when the shop can actually pay for it — otherwise the
+            // charge after a successful read would be bigger than the balance
+            // and the read would end up free.
             $strong = self::strongModel();
-            if ($strong !== null && $strong !== $model
+            $canAffordStrong = !\App\Services\AiPageCreditService::ledgerReady()
+                || (\App\Services\AiPageCreditService::canConsume(
+                    $company,
+                    \App\Services\AiPageCreditService::STRONG_MODEL_PAGE_COST
+                )['allowed'] ?? false);
+            if ($strong !== null && $strong !== $model && $canAffordStrong
                 && ($content['kind'] ?? '') === 'image'
                 && self::extractionLooksLow($raw)) {
                 try {
@@ -222,7 +267,7 @@ class AiInvoiceReaderService
 
         $payload['meta']['escalated'] = $escalated;
 
-        return AiInvoiceParse::create([
+        $parse = AiInvoiceParse::create([
             'company_id' => $company->id,
             'user_id' => $userId,
             'status' => 'success',
@@ -232,6 +277,31 @@ class AiInvoiceReaderService
             'model' => $model,
             'total_tokens' => $tokens,
         ]);
+
+        // Pages are charged ONLY for a read that worked (Sep 2026 package
+        // rule). Bookkeeping must never turn a good read into an error, so a
+        // ledger failure is logged, not thrown.
+        try {
+            \App\Services\AiPageCreditService::consume(
+                $company,
+                \App\Services\AiPageCreditService::pageCostFor($model),
+                $creditMeta['source'] ?? (in_array($sourceType, ['import_map', 'import_fix'], true) ? 'import_assist' : 'single_parse'),
+                [
+                    'user_id'  => $userId,
+                    'ref_type' => $creditMeta['ref_type'] ?? 'ai_invoice_parse',
+                    'ref_id'   => $creditMeta['ref_id'] ?? $parse->id,
+                    'note'     => $escalated ? 'strong-model escalation' : null,
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('AI page ledger write failed', [
+                'company_id' => $company->id,
+                'parse_id' => $parse->id,
+                'err' => mb_substr($e->getMessage(), 0, 200),
+            ]);
+        }
+
+        return $parse;
     }
 
     /**

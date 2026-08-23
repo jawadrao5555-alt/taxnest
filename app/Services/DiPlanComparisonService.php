@@ -46,12 +46,16 @@ class DiPlanComparisonService
     public const LIMIT_ROWS = [
         'invoices' => [
             'column' => 'invoice_limit',
-            'label'  => 'Invoices',
-            // Deliberately not "per month": PlanLimitService::canCreateInvoice()
-            // compares the plan cap against every invoice the company has ever
-            // created, with no date window. Saying "per month" here would be
-            // exactly the drift this table exists to remove.
-            'hint'   => 'Counted over the life of the account, not per month — the panel stops new invoices once the total is reached.',
+            'label'  => 'Invoices per month',
+            // Sep 2026: PlanLimitService::canCreateInvoice() now counts only
+            // the invoices actually submitted to FBR in the CURRENT calendar
+            // month, and the counter restarts on the 1st.
+            'hint'   => 'Counted per calendar month and only for invoices actually submitted to FBR — drafts and failed submissions are free. The counter restarts on the 1st.',
+        ],
+        'ai_pages' => [
+            'column' => 'ai_page_limit',
+            'label'  => 'AI Reader pages per month',
+            'hint'   => 'Pages the AI Invoice Reader can read from a PDF, Excel or photo each month. Extra pages can be topped up any time and never expire.',
         ],
         'users' => [
             'column' => 'user_limit',
@@ -114,16 +118,88 @@ class DiPlanComparisonService
         'debit_credit'   => ['label' => 'Debit and credit notes against a submitted invoice'],
     ];
 
-    /** Premium is the flagged column on both the cards and the table. */
-    public const POPULAR_PLAN = 'Premium';
+    /** The middle package is the flagged column on cards and table. */
+    public const POPULAR_PLAN = 'Kaarobar';
 
-    /** The paid DI packages, cheapest first — same query the cards use. */
+    /**
+     * The paid DI packages, cheapest first — same query the cards use.
+     *
+     * Retired packages keep their rows so existing subscriptions still resolve,
+     * but they must never appear on a page a buyer can order from.
+     */
     public static function plans(): Collection
     {
         return PricingPlan::where('is_trial', false)
             ->where('product_type', 'di')
+            ->when(
+                \Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', 'is_public'),
+                fn ($q) => $q->where('is_public', true)
+            )
             ->orderBy('price')
             ->get();
+    }
+
+    /**
+     * Can a shop actually BUY this package right now?
+     *
+     * The one predicate every buying path must agree on — landing cards,
+     * signup, the billing page, the quote endpoint, checkout and the payment
+     * proof queue. Without it a crafted POST could still subscribe someone to
+     * a retired package that no surface advertises any more.
+     */
+    public static function isSellablePlan(?PricingPlan $plan): bool
+    {
+        if ($plan === null || $plan->is_trial || ($plan->product_type ?? 'di') !== 'di') {
+            return false;
+        }
+
+        // Before the restructure migration lands there is nothing to hide, so
+        // every non-trial DI package stays sellable.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', 'is_public')) {
+            return true;
+        }
+
+        return (bool) $plan->is_public;
+    }
+
+    /**
+     * Per-cycle prices for the landing page, computed the SAME way checkout
+     * computes them (Subscription::priceForPlanCycle) so the column heading
+     * and the invoice can never disagree.
+     *
+     * @return array<int, array<string, array<string, float|int>>>
+     */
+    public static function cyclePricing(Collection $plans): array
+    {
+        $map = [];
+        foreach ($plans as $plan) {
+            foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $cycle) {
+                $map[(int) $plan->id][$cycle] = \App\Models\Subscription::priceForPlanCycle($plan, $cycle);
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * "Save up to X%" per cycle, floored so the badge never promises more
+     * than the cheapest package actually gives.
+     *
+     * @return array<string, int>
+     */
+    public static function cycleDiscounts(Collection $plans): array
+    {
+        $pricing = self::cyclePricing($plans);
+        $out = [];
+        foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $cycle) {
+            $best = 0.0;
+            foreach ($pricing as $byCycle) {
+                $best = max($best, (float) ($byCycle[$cycle]['discount_percent'] ?? 0));
+            }
+            $out[$cycle] = (int) floor($best);
+        }
+
+        return $out;
     }
 
     /** null / any negative value means "no cap" everywhere in the codebase. */
@@ -190,21 +266,29 @@ class DiPlanComparisonService
 
             $sale = (float) $plan->sale_price;
             $full = (float) $plan->price;
+            $planId = (int) $plan->id;
 
+            // DI packages carry hand-set per-cycle rates, so the heading must
+            // read the SERVER's price for the picked cycle (planMonthly /
+            // planTotal come from the pricing map in the page's x-data) — a
+            // client-side discount ladder would quote a price nobody is charged.
             $col['price']        = 'Rs ' . number_format($sale);
             $col['price_period'] = '/ month';
-            $col['price_x']      = "'Rs ' + calcMonthly({$sale}).toLocaleString()";
+            $col['price_x']      = "'Rs ' + planMonthly({$planId}).toLocaleString()";
 
             if ($sale < $full) {
-                $col['price_compare']   = 'Rs ' . number_format($full);
-                $col['price_compare_x'] = "'Rs ' + calcMonthly({$full}).toLocaleString()";
+                $col['price_compare'] = 'Rs ' . number_format($full);
+                // The crossed-out "was" price only exists as a monthly figure;
+                // deriving it for the other cycles off the old ladder would
+                // print a number nobody was ever charged, so it hides instead.
+                $col['price_compare_x'] = "cycle === 'monthly' ? 'Rs ' + {$full}.toLocaleString() : ''";
                 $col['sale_badge']      = $plan->sale_badge;
             }
 
             // Monthly billing has nothing extra to say; the other three cycles
             // show what actually leaves the bank each time.
             $col['price_note']   = '';
-            $col['price_note_x'] = "cycle === 'monthly' ? '' : 'Billed Rs ' + calcPrice({$sale}).toLocaleString()";
+            $col['price_note_x'] = "cycle === 'monthly' ? '' : 'Billed Rs ' + planTotal({$planId}).toLocaleString()";
 
             // Task 1484: the button carries BOTH the package and the billing
             // cycle into signup, so the shop is later approved onto exactly

@@ -49,6 +49,8 @@ class Company extends Model
         'invoice_limit_override',
         'user_limit_override',
         'branch_limit_override',
+        // Purchased AI Reader pages (never expire — see AiPageCreditService).
+        'ai_page_balance',
         // Paid extra-branch slots (Rs 10,000/branch/year add-on, Aug 2026) —
         // package ki shamil branches se OOPER khareede hue slots.
         'extra_branch_slots',

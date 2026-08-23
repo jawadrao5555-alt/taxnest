@@ -241,7 +241,9 @@ Route::get('/download/agent', [\App\Http\Controllers\AgentManagementController::
 Route::get('/tutorials', [\App\Http\Controllers\TutorialController::class, 'publicIndex'])->name('tutorials.page');
 
 Route::get('/digital-invoice', function () {
-    $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
+    // Only the packages still on sale — retired plans keep their rows for
+    // existing subscriptions but must never be orderable from the landing.
+    $plans = \App\Services\DiPlanComparisonService::plans();
     return view('di-landing', ['plans' => $plans]);
 })->name('di.landing');
 
@@ -368,6 +370,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);
     Route::post('/api/billing/calculate', [BillingController::class, 'calculatePrice']);
+    // AI Reader page ledger — what was spent, refunded, bought or granted.
+    Route::get('/billing/ai-pages', [BillingController::class, 'aiPagesLedger'])->name('billing.ai-pages');
     Route::get('/billing/custom-plan', [BillingController::class, 'customPlanBuilder']);
     Route::post('/billing/calculate-custom', [BillingController::class, 'calculateCustomPlan']);
     Route::post('/billing/subscribe-custom', [BillingController::class, 'subscribeCustomPlan']);
@@ -1381,6 +1385,9 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/suspend', [AdminCompanyController::class, 'suspend'])->name('saas.admin.companies.suspend');
     Route::post('/companies/{id}/activate', [AdminCompanyController::class, 'activate'])->name('saas.admin.companies.activate');
     Route::post('/companies/{id}/limits', [AdminCompanyController::class, 'updateLimits'])->name('saas.admin.companies.limits');
+    // Hand a DI shop AI Reader pages without a payment proof (goodwill, or a
+    // transfer paid for outside the panel).
+    Route::post('/companies/{id}/ai-pages', [AdminCompanyController::class, 'grantAiPages'])->name('saas.admin.companies.aiPages');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
     Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');

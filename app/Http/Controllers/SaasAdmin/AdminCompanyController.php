@@ -977,6 +977,50 @@ class AdminCompanyController extends Controller
         return back()->with('success', "Limits updated for '{$company->name}'.");
     }
 
+    /**
+     * Grant AI Reader pages straight into the shop's never-expiring balance.
+     *
+     * The paid route is the payment-proof lane; this is the manual one for
+     * goodwill pages or money collected outside the panel. Every grant lands
+     * in the same ledger the shop can read, so the balance is never a number
+     * nobody can explain.
+     */
+    public function grantAiPages(Request $request, $id)
+    {
+        $company = Company::findOrFail($id);
+
+        $data = $request->validate([
+            'pages' => 'required|integer|min:1|max:100000',
+            'note'  => 'nullable|string|max:200',
+        ]);
+
+        $entry = \App\Services\AiPageCreditService::credit(
+            $company,
+            (int) $data['pages'],
+            \App\Models\AiPageLedger::KIND_ADMIN_GRANT,
+            [
+                'source'   => 'admin_grant',
+                'user_id'  => null,
+                'ref_type' => 'admin_user',
+                'ref_id'   => auth('admin')->id(),
+                'note'     => $data['note'] ?? 'Granted by admin',
+            ]
+        );
+
+        if (!$entry) {
+            return back()->with('error', 'Could not add AI pages — nothing was changed.');
+        }
+
+        AdminAuditLog::log(auth('admin')->id(), 'AI pages granted', 'Company', $company->id, [
+            'name'  => $company->name,
+            'pages' => (int) $data['pages'],
+            'note'  => $data['note'] ?? null,
+        ]);
+
+        return back()->with('success', number_format((int) $data['pages'])
+            . " AI Reader pages added to '{$company->name}'.");
+    }
+
     public function softDelete(Request $request, $id)
     {
         $company = Company::findOrFail($id);

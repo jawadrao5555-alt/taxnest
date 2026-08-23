@@ -332,11 +332,10 @@ class SubscriptionAccessService
                 ->count();
         }
 
-        // Digital Invoice uses the invoices table.
-        return Invoice::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
-            ->where('company_id', $company->id)
-            ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
-            ->count();
+        // Digital Invoice uses the invoices table. Since the Sep 2026 package
+        // restructure only invoices that REACHED FBR are billable — drafts and
+        // failed submissions never eat a grant allowance or a trial.
+        return PlanLimitService::countedInvoices($company->id, $since);
     }
 
     /**

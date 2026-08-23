@@ -3,6 +3,9 @@
         <div class="flex items-center gap-2">
             <h3 class="text-lg font-bold text-white">{{ $plan->name }}</h3>
             @if($plan->is_trial)<span class="text-[10px] px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded font-bold">TRIAL</span>@endif
+            @if(!$plan->is_trial && \Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', 'is_public') && !$plan->is_public)
+                <span class="text-[10px] px-1.5 py-0.5 bg-amber-900/50 text-amber-300 rounded font-bold" title="Kept for existing subscriptions, hidden from every buying surface">RETIRED</span>
+            @endif
             @php $badgeColors = ['di' => 'bg-emerald-900/50 text-emerald-300', 'pos' => 'bg-purple-900/50 text-purple-300', 'fbrpos' => 'bg-blue-900/50 text-blue-300']; @endphp
             <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {{ $badgeColors[$plan->product_type ?? 'di'] ?? 'bg-gray-900/50 text-gray-300' }}">{{ strtoupper($plan->product_type ?? 'di') }}</span>
         </div>
@@ -23,6 +26,9 @@
 
         <div class="space-y-1.5 text-sm">
             <div class="flex justify-between"><span class="text-gray-400">Invoices{{ $plan->product_type === 'pos' ? '' : '/mo' }}</span><span class="text-white">{{ $plan->invoice_limit > 0 ? number_format($plan->invoice_limit) : ($plan->invoice_limit == -1 ? 'Unlimited' : '0') }}</span></div>
+            @if($plan->product_type === 'di')
+            <div class="flex justify-between"><span class="text-gray-400">AI pages/mo</span><span class="text-white">{{ $plan->getAiPageLimitDisplay() }}</span></div>
+            @endif
             <div class="flex justify-between"><span class="text-gray-400">Users</span><span class="text-white">{{ ($plan->max_users ?? 0) == -1 ? 'Unlimited' : ($plan->max_users ?? ($plan->user_limit ?? 'N/A')) }}</span></div>
             <div class="flex justify-between"><span class="text-gray-400">Terminals</span><span class="text-white">{{ ($plan->max_terminals ?? 0) == -1 ? 'Unlimited' : ($plan->max_terminals ?? 'N/A') }}</span></div>
             <div class="flex justify-between"><span class="text-gray-400">Products</span><span class="text-white">{{ ($plan->max_products ?? 0) == -1 ? 'Unlimited' : ($plan->max_products ?? 'N/A') }}</span></div>
@@ -76,10 +82,33 @@
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Quarterly Price (PKR / 3 mo — POS only; blank = annual-only)</label>
                 <input type="number" name="price_quarterly" value="{{ $plan->price_quarterly !== null ? intval($plan->price_quarterly) : '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
+            @if($plan->product_type === 'di')
+            {{-- Sep 2026: DI packages quote hand-set rates for every cycle. The
+                 global cycle-discount ladder is shared with FBR POS, so it must
+                 NOT be touched to reprice a DI package — set the rate here. --}}
+            <div>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Half-Year Price (PKR / 6 mo — blank = use ladder)</label>
+                <input type="number" name="price_semi_annual" value="{{ $plan->price_semi_annual !== null ? intval($plan->price_semi_annual) : '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Annual Price (PKR / 12 mo — blank = use ladder)</label>
+                <input type="number" name="price_yearly" value="{{ $plan->price_yearly !== null ? intval($plan->price_yearly) : '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+            </div>
+            @endif
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Invoice Limit</label>
                 <input type="number" name="invoice_limit" value="{{ $plan->invoice_limit }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
+            @if($plan->product_type === 'di')
+            <div>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">AI Pages / month (-1 = unlimited)</label>
+                <input type="number" name="ai_page_limit" value="{{ (int) ($plan->ai_page_limit ?? 0) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Fair-Use Cap (unlimited plans only — blank = none)</label>
+                <input type="number" name="fair_use_limit" value="{{ $plan->fair_use_limit !== null ? intval($plan->fair_use_limit) : '' }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+            </div>
+            @endif
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Max Terminals</label>
                 <input type="number" name="max_terminals" value="{{ $plan->max_terminals }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
@@ -92,9 +121,13 @@
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Max Products</label>
                 <input type="number" name="max_products" value="{{ $plan->max_products }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
-            <div class="flex items-center gap-4 pt-4">
+            <div class="flex flex-wrap items-center gap-4 pt-4">
                 <label class="flex items-center gap-1.5 text-sm text-gray-400"><input type="checkbox" name="inventory_enabled" value="1" {{ $plan->inventory_enabled ? 'checked' : '' }} class="rounded bg-gray-800 border-gray-600 text-indigo-500"> Inventory</label>
                 <label class="flex items-center gap-1.5 text-sm text-gray-400"><input type="checkbox" name="reports_enabled" value="1" {{ $plan->reports_enabled ? 'checked' : '' }} class="rounded bg-gray-800 border-gray-600 text-indigo-500"> Reports</label>
+                {{-- Unticking this retires the package: existing subscriptions keep
+                     working, but it disappears from the landing, the billing page
+                     and signup. --}}
+                <label class="flex items-center gap-1.5 text-sm text-gray-400" title="Show this package on the landing page, billing page and signup"><input type="checkbox" name="is_public" value="1" {{ $plan->is_public ? 'checked' : '' }} class="rounded bg-gray-800 border-gray-600 text-indigo-500"> On sale</label>
             </div>
         </div>
         <div>

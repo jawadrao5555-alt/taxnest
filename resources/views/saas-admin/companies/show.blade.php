@@ -412,6 +412,30 @@
                 @endif
                 <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Update Limits</button>
             </form>
+
+            {{-- AI Reader pages: monthly allowance comes from the package, this
+                 adds to the purchased balance (never expires, spent only after
+                 the monthly allowance is used up). --}}
+            @if(($company->product_type ?? 'di') === 'di' && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'ai_page_balance'))
+                @php $aiPages = \App\Services\AiPageCreditService::summary($company); @endphp
+                <div class="mt-5 pt-4 border-t border-gray-800">
+                    <h4 class="text-sm font-semibold text-white mb-1">AI Reader Pages</h4>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Allowance {{ $aiPages['unlimited'] ? 'Unlimited' : number_format($aiPages['allowance_used']) . ' / ' . number_format($aiPages['allowance']) }} used this month ·
+                        purchased balance <span class="text-fuchsia-300 font-semibold">{{ number_format($aiPages['purchased']) }}</span> ·
+                        resets {{ $aiPages['resets_on'] }}
+                    </p>
+                    <form method="POST" action="{{ route('saas.admin.companies.aiPages', $company->id) }}" class="space-y-2">
+                        @csrf
+                        <div class="flex gap-2">
+                            <input type="number" name="pages" min="1" max="100000" placeholder="Pages" required class="w-28 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-fuchsia-500 placeholder-gray-600">
+                            <input type="text" name="note" maxlength="200" placeholder="Reason (optional)" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-fuchsia-500 placeholder-gray-600">
+                        </div>
+                        <button type="submit" class="w-full px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-sm font-semibold rounded-lg transition">Add Pages</button>
+                    </form>
+                    <p class="text-[11px] text-gray-500 mt-1">Paid top-ups normally arrive through the payment-proof queue. Use this for goodwill pages or money collected outside the panel — every grant is logged.</p>
+                </div>
+            @endif
         </div>
     </div>
 

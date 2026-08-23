@@ -144,7 +144,7 @@
                     </div>
                     <div>
                         <p class="text-sm font-bold text-orange-900 dark:text-orange-100">{{ round($usagePercent) }}% Capacity Used</p>
-                        <p class="text-xs text-orange-600 dark:text-orange-400">{{ $invoicesUsed }} of {{ $invoiceLimit }} invoices used this period</p>
+                        <p class="text-xs text-orange-600 dark:text-orange-400">{{ number_format($invoicesUsed) }} of {{ $invoiceLimit === -1 ? 'unlimited' : number_format($invoiceLimit) }} FBR invoices used this month &middot; resets {{ $quotaResetsOn }}</p>
                     </div>
                 </div>
                 <a href="/billing/plans" class="px-4 py-2 bg-orange-600 text-white text-xs font-bold rounded-lg hover:bg-orange-700 shadow-sm transition">Upgrade</a>
@@ -278,8 +278,8 @@
                                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                             </div>
                         </div>
-                        <p class="text-2xl font-extrabold text-white">{{ $invoicesUsed }}<span class="text-base text-orange-200/70 font-normal">/{{ $invoiceLimit }}</span></p>
-                        <p class="text-xs font-medium text-orange-100/80 mt-1 uppercase tracking-wider">Plan Usage</p>
+                        <p class="text-2xl font-extrabold text-white">{{ number_format($invoicesUsed) }}<span class="text-base text-orange-200/70 font-normal">/{{ $invoiceLimit === -1 ? '∞' : number_format($invoiceLimit) }}</span></p>
+                        <p class="text-xs font-medium text-orange-100/80 mt-1 uppercase tracking-wider">Invoices This Month</p>
                         @if($subscription)
                         <div class="mt-3">
                             <div class="w-full bg-white/20 rounded-full h-1.5 overflow-hidden backdrop-blur-sm">

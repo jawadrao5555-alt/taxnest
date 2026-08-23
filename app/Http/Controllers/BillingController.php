@@ -15,10 +15,32 @@ class BillingController extends Controller
 {
     public function plans()
     {
-        // Digital Invoice panel shows ONLY DI plans (POS/FBR POS have their own billing pages).
-        $plans = PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
+        // Digital Invoice panel shows ONLY DI plans (POS/FBR POS have their own
+        // billing pages), and only the packages still on sale — retired plans
+        // keep their rows for existing subscriptions but must not be buyable.
+        $plans = PricingPlan::where('is_trial', false)
+            ->where('product_type', 'di')
+            ->when(
+                \Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', 'is_public'),
+                fn ($q) => $q->where('is_public', true)
+            )
+            ->orderBy('price')
+            ->get();
+
+        // Cycle prices come from the plan row when it has hand-set rates, so the
+        // card, the toggle and the checkout all quote the SAME figure.
+        $planPricing = [];
+        foreach ($plans as $plan) {
+            foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $cycle) {
+                $planPricing[$plan->id][$cycle] = Subscription::priceForPlanCycle($plan, $cycle);
+            }
+        }
+
         $currentSubscription = null;
         $usageData = null;
+        $aiPages = null;
+        $aiReaderAllowed = false;
+        $aiTopupPending = false;
 
         $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
         if ($companyId) {
@@ -27,9 +49,29 @@ class BillingController extends Controller
                 ->with('pricingPlan')
                 ->first();
 
+            $company = \App\Models\Company::find($companyId);
+            if ($company) {
+                $aiPages = \App\Services\AiPageCreditService::summary($company);
+                $aiReaderAllowed = \App\Services\DiFeatureService::planAllows($company, 'ai_reader');
+                $aiTopupPending = \Illuminate\Support\Facades\Schema::hasTable('payment_proofs')
+                    && \App\Models\PaymentProof::aiPagesKind()
+                        ->where('company_id', $company->id)
+                        ->where('status', 'pending')
+                        ->exists();
+            }
+
             if ($currentSubscription) {
-                $invoiceCount = Invoice::where('company_id', $companyId)->count();
+                // Quota is per calendar month and only FBR-submitted invoices
+                // count — the page must show the same number the gate enforces.
+                $invoiceCount = \App\Services\PlanLimitService::monthlyInvoiceCount($companyId);
                 $limit = $currentSubscription->pricingPlan->invoice_limit;
+
+                // An admin override replaces the package limit, so showing the
+                // package number here would be a lie on the one screen a shop
+                // checks before buying.
+                if ($company && $company->invoice_limit_override !== null) {
+                    $limit = (int) $company->invoice_limit_override;
+                }
                 $usagePercent = ($limit > 0 && $limit !== -1) ? round(($invoiceCount / $limit) * 100, 1) : ($limit === -1 ? 0 : 0);
                 $daysLeft = Carbon::parse($currentSubscription->end_date)->isFuture()
                     ? (int) now()->startOfDay()->diffInDays(Carbon::parse($currentSubscription->end_date)->startOfDay())
@@ -57,6 +99,8 @@ class BillingController extends Controller
                     'invoice_count' => $invoiceCount,
                     'invoice_limit' => $limit,
                     'invoice_limit_display' => $limit === -1 ? 'Unlimited' : $limit,
+                    'quota_resets_on' => \App\Services\PlanLimitService::quotaResetsOn(),
+                    'has_override' => $company && $company->invoice_limit_override !== null,
                     'usage_percent' => $limit === -1 ? 0 : min(100, $usagePercent),
                     'days_left' => $daysLeft,
                     'total_days' => $totalDays > 0 ? $totalDays : 30,
@@ -77,14 +121,34 @@ class BillingController extends Controller
             }
         }
 
+        // The "-X%" on each cycle button must come from the SAME numbers the
+        // cards quote. DI packages carry hand-set per-cycle rates, so the old
+        // fixed 1/3/6% ladder would advertise a discount nobody is charged.
         $billingCycles = [
             'monthly' => ['label' => 'Monthly', 'discount' => 0],
-            'quarterly' => ['label' => 'Quarterly', 'discount' => 1],
-            'semi_annual' => ['label' => 'Semi-Annual', 'discount' => 3],
-            'annual' => ['label' => 'Annual', 'discount' => 6],
+            'quarterly' => ['label' => 'Quarterly', 'discount' => 0],
+            'semi_annual' => ['label' => 'Semi-Annual', 'discount' => 0],
+            'annual' => ['label' => 'Annual', 'discount' => 0],
         ];
+        foreach (array_keys($billingCycles) as $cycle) {
+            $best = 0;
+            foreach ($planPricing as $byCycle) {
+                $best = max($best, (float) ($byCycle[$cycle]['discount_percent'] ?? 0));
+            }
+            // Floor: never advertise a bigger saving than a customer can get.
+            $billingCycles[$cycle]['discount'] = (int) floor($best);
+        }
 
-        return view('billing.plans', compact('plans', 'currentSubscription', 'usageData', 'billingCycles'));
+        return view('billing.plans', compact(
+            'plans',
+            'currentSubscription',
+            'usageData',
+            'billingCycles',
+            'planPricing',
+            'aiPages',
+            'aiReaderAllowed',
+            'aiTopupPending'
+        ));
     }
 
     public function subscribe(Request $request)
@@ -106,7 +170,14 @@ class BillingController extends Controller
             return back()->with('error', 'This plan is not available for Digital Invoice accounts.');
         }
 
-        $pricing = Subscription::calculateFinalPrice($plan->sale_price, $cycle);
+        // Retired packages keep working for the companies already on them, but
+        // nobody may subscribe to one — the plan id in this POST is attacker
+        // controlled, so the check has to live here, not only on the page.
+        if (!\App\Services\DiPlanComparisonService::isSellablePlan($plan)) {
+            return back()->with('error', 'That package is no longer available. Please choose one of the current packages.');
+        }
+
+        $pricing = Subscription::priceForPlanCycle($plan, $cycle);
         $months = Subscription::getMonthsForCycle($cycle);
 
         Subscription::where('company_id', $companyId)->update(['active' => false]);
@@ -134,25 +205,72 @@ class BillingController extends Controller
         return redirect('/dashboard')->with('success', "Subscribed to {$plan->name} plan ({$cycleLabel}) for PKR " . number_format($pricing['final_price']) . "!");
     }
 
+    /**
+     * "Meri AI pages kahan gayin?" — the shop's own page ledger.
+     *
+     * Reads the same rows the credit service writes, so a batch that ate 40
+     * pages and the refund that gave them back are both visible to the shop,
+     * not just to us.
+     */
+    public function aiPagesLedger(Request $request)
+    {
+        $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
+        $company = $companyId ? \App\Models\Company::find($companyId) : null;
+
+        if (!$company) {
+            return redirect()->route('billing.plans');
+        }
+
+        // Same gate as the top-up panel: a package without the reader has no
+        // page ledger to show.
+        if (!\App\Services\DiFeatureService::planAllows($company, 'ai_reader')) {
+            return redirect()->route('billing.plans')
+                ->with('error', 'AI Reader is not part of your current package.');
+        }
+
+        $summary = \App\Services\AiPageCreditService::summary($company);
+
+        $entries = \App\Models\AiPageLedger::where('company_id', $company->id)
+            ->latest('id')
+            ->paginate(30);
+
+        // Who ran it, resolved in one query instead of per row.
+        $userNames = \App\Models\User::whereIn('id', $entries->pluck('user_id')->filter()->unique())
+            ->pluck('name', 'id');
+
+        return view('billing.ai-pages', compact('summary', 'entries', 'userNames'));
+    }
+
     public function calculatePrice(Request $request)
     {
         $plan = PricingPlan::find($request->plan_id);
-        if (!$plan) {
+        // Quoting a retired package would hand back a price for something the
+        // subscribe path refuses — same allowlist here.
+        if (!$plan || !\App\Services\DiPlanComparisonService::isSellablePlan($plan)) {
             return response()->json(['error' => 'Plan not found'], 404);
         }
 
         $cycle = $request->billing_cycle ?? 'monthly';
-        $pricing = Subscription::calculateFinalPrice($plan->sale_price, $cycle);
+        $pricing = Subscription::priceForPlanCycle($plan, $cycle);
 
         return response()->json($pricing);
     }
 
+    /**
+     * Retired Sep 2026 with the three-package restructure.
+     *
+     * The builder priced itself off its own formula and its own discount
+     * ladder, so a shop could subscribe to a package the catalogue had never
+     * heard of. Old links land back on the real packages instead of 404-ing.
+     */
     public function customPlanBuilder()
     {
         if (!in_array(auth()->user()->role, ['super_admin', 'company_admin'])) {
             abort(403);
         }
-        return view('billing.custom-plan');
+
+        return redirect()->route('billing.plans')
+            ->with('info', 'Custom plans are no longer built here — pick one of the three packages, or contact support if you need different limits.');
     }
 
     public function calculateCustomPlan(Request $request)

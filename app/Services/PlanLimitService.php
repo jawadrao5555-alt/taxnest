@@ -36,6 +36,65 @@ class PlanLimitService
         return !$plan || (bool) $plan->is_trial;
     }
 
+    /**
+     * DI invoices that actually consume quota (Sep 2026 package restructure).
+     *
+     * Only an invoice that REACHED FBR counts. Drafts, validation failures and
+     * failed submissions are free, so a shop can type, test and retry without
+     * paying for it. 'production' is today's success status; 'submitted' is
+     * legacy data from the older submission path and was a real submission too.
+     */
+    public const COUNTED_FBR_STATUSES = ['production', 'submitted'];
+
+    /** Per-process probe: invoices.submitted_at can be missing on drifted prod boxes. */
+    protected static ?bool $invoiceSubmittedAtColumn = null;
+
+    protected static function invoiceSubmittedAtColumnExists(): bool
+    {
+        return self::$invoiceSubmittedAtColumn ??= \Illuminate\Support\Facades\Schema::hasColumn('invoices', 'submitted_at');
+    }
+
+    /**
+     * Count DI invoices that consumed quota, optionally inside a window.
+     * The window follows the SUBMISSION timestamp — a draft typed last month
+     * and pushed to FBR today belongs to today's quota month.
+     */
+    public static function countedInvoices(int $companyId, $from = null, $to = null): int
+    {
+        $query = Invoice::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+            ->where('company_id', $companyId)
+            ->whereIn('fbr_status', self::COUNTED_FBR_STATUSES);
+
+        $stamp = self::invoiceSubmittedAtColumnExists() ? 'COALESCE(submitted_at, created_at)' : 'created_at';
+
+        if ($from) {
+            $query->whereRaw("{$stamp} >= ?", [$from]);
+        }
+        if ($to) {
+            $query->whereRaw("{$stamp} <= ?", [$to]);
+        }
+
+        return $query->count();
+    }
+
+    /** Counted invoices inside the CURRENT calendar month (same basis as POS). */
+    public static function monthlyInvoiceCount(int $companyId): int
+    {
+        return self::countedInvoices($companyId, now()->startOfMonth(), now()->endOfMonth());
+    }
+
+    /** Human date the monthly quota rolls over on. */
+    public static function quotaResetsOn(): string
+    {
+        return now()->startOfMonth()->addMonth()->format('d M Y');
+    }
+
+    /**
+     * DI invoice quota — PER CALENDAR MONTH since the Sep 2026 restructure
+     * (it used to be a lifetime count, which handed a renewing shop zero
+     * invoices). A numeric admin override is read as invoices/month too,
+     * exactly like the POS override.
+     */
     public static function canCreateInvoice(int $companyId): array
     {
         $company = \App\Models\Company::find($companyId);
@@ -44,13 +103,14 @@ class PlanLimitService
         }
 
         if ($company && $company->invoice_limit_override !== null) {
-            if ($company->invoice_limit_override === -1) {
+            if ((int) $company->invoice_limit_override === -1) {
                 return ['allowed' => true, 'unlimited' => true];
             }
-            $count = Invoice::where('company_id', $companyId)->count();
-            $limit = $company->invoice_limit_override;
+            $count = self::monthlyInvoiceCount($companyId);
+            $limit = (int) $company->invoice_limit_override;
             if ($count >= $limit) {
-                return ['allowed' => false, 'reason' => "Invoice limit reached ({$count}/{$limit}). Please contact admin."];
+                $resets = self::quotaResetsOn();
+                return ['allowed' => false, 'reason' => "Monthly invoice limit reached ({$count}/{$limit}). Quota resets on {$resets}. Please contact admin."];
             }
             return ['allowed' => true, 'remaining' => $limit - $count];
         }
@@ -78,9 +138,10 @@ class PlanLimitService
             return ['allowed' => true];
         }
 
-        $count = Invoice::where('company_id', $companyId)->count();
+        $count = self::monthlyInvoiceCount($companyId);
         if ($count >= $limit) {
-            return ['allowed' => false, 'reason' => "Invoice limit reached ({$count}/{$limit}). Please upgrade your plan."];
+            $resets = self::quotaResetsOn();
+            return ['allowed' => false, 'reason' => "Monthly invoice limit reached ({$count}/{$limit}). Quota resets on {$resets}. Please upgrade your plan."];
         }
 
         return ['allowed' => true, 'remaining' => $limit - $count];

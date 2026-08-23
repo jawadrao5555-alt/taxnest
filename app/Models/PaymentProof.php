@@ -44,7 +44,7 @@ class PaymentProof extends Model
     ];
 
     /** Non-package request lanes. Anything NOT listed here is a renewal proof. */
-    public const ADDON_KINDS = ['extra_branch', 'pos_addon'];
+    public const ADDON_KINDS = ['extra_branch', 'pos_addon', 'ai_pages'];
 
     /** hasColumn() per call = DB round trip; per-request memo. */
     private static ?bool $kindColumn = null;
@@ -112,6 +112,28 @@ class PaymentProof extends Model
     public function isPosAddon(): bool
     {
         return $this->kind() === 'pos_addon';
+    }
+
+    /** AI Reader page top-up (Digital Invoice, Sep 2026). */
+    public function isAiPages(): bool
+    {
+        return $this->kind() === 'ai_pages';
+    }
+
+    /**
+     * Pages requested on an ai_pages proof, validated against the server pack
+     * list so an edited snapshot can never credit an arbitrary number.
+     */
+    public function aiPagesRequested(): int
+    {
+        if (!$this->isAiPages() || !self::addonQuoteSnapshotColumnExists()
+            || !is_array($this->addon_quote_snapshot)) {
+            return 0;
+        }
+
+        $pages = (int) ($this->addon_quote_snapshot['pages'] ?? 0);
+
+        return \App\Services\AiPageCreditService::packPrice($pages) === null ? 0 : $pages;
     }
 
     /** Feature codes requested on a pos_addon proof (JSON column → clean list). */
@@ -212,6 +234,15 @@ class PaymentProof extends Model
         }
 
         return $q->where('request_type', 'pos_addon');
+    }
+
+    public function scopeAiPagesKind(Builder $q): Builder
+    {
+        if (!self::addonQuoteSnapshotColumnExists()) {
+            return $q->whereRaw('1 = 0');
+        }
+
+        return $q->where('request_type', 'ai_pages');
     }
 
     public function company()

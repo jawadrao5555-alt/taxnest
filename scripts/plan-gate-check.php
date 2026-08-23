@@ -669,21 +669,25 @@ try {
     //       DiFeatureService::PLAN_FEATURES matrix, so the ticks are pinned by
     //       gate key here and the limits by column, both written independently
     //       of DiPlanComparisonService.
-    $DI_INVOICE_LADDER = ['Retail' => 100, 'Business' => 700, 'Industrial' => 2500,
-                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
+    //       Sep 2026 restructure: only three packages are sold. The retired
+    //       rows still exist for the companies sitting on them, so they are
+    //       pinned separately below instead of being deleted.
+    $DI_INVOICE_LADDER = ['Asaan' => 700, 'Kaarobar' => 2500, 'Unlimited' => 'Unlimited'];
+    $DI_AI_PAGE_LADDER = ['Asaan' => 200, 'Kaarobar' => 400, 'Unlimited' => 700];
     // Seats: the TIGHTER of user_limit (canAddUser) and max_users
     // (plan.limit:users) — both guard POST /company/users.
-    $DI_USER_LADDER    = ['Retail' => 2, 'Business' => 5, 'Industrial' => 15,
-                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
-    $DI_BRANCH_LADDER  = ['Retail' => 1, 'Business' => 3, 'Industrial' => 'Unlimited',
-                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
-    // KNOWN ODDITY, pinned on purpose so it cannot spread: Business is the only
-    // DI row carrying a max_products cap, so a cheaper Retail account may hold
-    // MORE products. Changing the ladder is an owner pricing call, not a deploy
-    // fix — until then the table prints it honestly and this line freezes it.
-    $DI_PRODUCT_LADDER = ['Retail' => 'Unlimited', 'Business' => 500, 'Industrial' => 'Unlimited',
-                          'Enterprise' => 'Unlimited', 'Premium' => 'Unlimited'];
+    $DI_USER_LADDER    = ['Asaan' => 2, 'Kaarobar' => 4, 'Unlimited' => 'Unlimited'];
+    $DI_BRANCH_LADDER  = ['Asaan' => 1, 'Kaarobar' => 3, 'Unlimited' => 'Unlimited'];
+    $DI_PRODUCT_LADDER = ['Asaan' => 'Unlimited', 'Kaarobar' => 'Unlimited', 'Unlimited' => 'Unlimited'];
     $DI_GATE_MATRIX = [
+        'Asaan'     => ['ai_reader'],
+        'Kaarobar'  => ['ai_reader', 'white_label', 'public_api'],
+        'Unlimited' => ['ai_reader', 'white_label', 'public_api'],
+    ];
+    // Retired-from-sale packages. They no longer appear on any buying surface,
+    // so they are NOT audited against the comparison table — they are only here
+    // so a gate that survives on a legacy row still counts as pinned.
+    $DI_RETIRED_GATE_MATRIX = [
         'Retail'     => [],
         'Business'   => ['recurring_invoices'],
         'Industrial' => ['recurring_invoices'],
@@ -694,10 +698,24 @@ try {
     // A brand-new DI gate must be pinned here too, not just named in the table.
     foreach (\App\Services\DiFeatureService::GATES as $gate) {
         $pinned = false;
-        foreach ($DI_GATE_MATRIX as $granted) {
+        foreach (array_merge($DI_GATE_MATRIX, $DI_RETIRED_GATE_MATRIX) as $granted) {
             if (in_array($gate, $granted, true)) { $pinned = true; break; }
         }
         check($pinned, "di comparison: gate '{$gate}' is not pinned by any package in this file's matrix.");
+    }
+
+    // Every pin above must still match DiFeatureService, retired rows included —
+    // a legacy company's feature must not change silently.
+    foreach (array_merge($DI_GATE_MATRIX, $DI_RETIRED_GATE_MATRIX) as $name => $granted) {
+        $matrixRow = \App\Services\DiFeatureService::PLAN_FEATURES[$name] ?? null;
+        check($matrixRow !== null, "di comparison: plan '{$name}' is pinned here but missing from DiFeatureService::PLAN_FEATURES.");
+        if ($matrixRow !== null) {
+            sort($granted);
+            sort($matrixRow);
+            check($granted === $matrixRow,
+                "di comparison: '{$name}' gates drifted — this file pins [" . implode(', ', $granted)
+                . '] but DiFeatureService grants [' . implode(', ', $matrixRow) . '].');
+        }
     }
 
     $diExpectedLimits = [];
@@ -705,6 +723,7 @@ try {
     foreach ($DI_GATE_MATRIX as $name => $granted) {
         $diExpectedLimits[$name] = [
             'invoices' => $DI_INVOICE_LADDER[$name],
+            'ai_pages' => $DI_AI_PAGE_LADDER[$name],
             'users'    => $DI_USER_LADDER[$name],
             'branches' => $DI_BRANCH_LADDER[$name],
             'products' => $DI_PRODUCT_LADDER[$name],

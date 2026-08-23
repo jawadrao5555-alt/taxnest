@@ -365,7 +365,11 @@ class BulkAiImageImportService
             $company = Company::findOrFail($item->company_id);
             $path = Storage::disk('local')->path($item->storage_path);
             $upload = new UploadedFile($path, $item->original_filename, $item->mime_type ?: 'image/jpeg', null, true);
-            $parse = AiInvoiceReaderService::parseUpload($upload, $company, $item->batch->user_id);
+            $parse = AiInvoiceReaderService::parseUpload($upload, $company, $item->batch->user_id, [
+                'source' => 'bulk_batch',
+                'ref_type' => 'bulk_ai_image_item',
+                'ref_id' => $item->id,
+            ]);
             $item->update(['parse_id' => $parse->id, 'reservation_status' => 'consumed']);
             $item->batch()->decrement('reserved_credits');
 

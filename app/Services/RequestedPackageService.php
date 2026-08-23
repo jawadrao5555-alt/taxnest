@@ -45,6 +45,11 @@ class RequestedPackageService
         if ($productType === 'pos' && !PosPlanComparisonService::isSellablePlan($plan)) {
             return null;
         }
+        // Sep 2026: a retired DI package must not come back through a stale
+        // ?plan=Retail link on the signup form.
+        if ($productType === 'di' && !DiPlanComparisonService::isSellablePlan($plan)) {
+            return null;
+        }
 
         return $plan;
     }

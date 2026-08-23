@@ -136,4 +136,46 @@ class Subscription extends Model
             'monthly_effective' => round($finalPrice / $months, 2),
         ];
     }
+
+    /**
+     * Price for a plan on a given cycle, preferring the rate written ON the
+     * plan row (Sep 2026 DI packages carry hand-set quarterly / half-year /
+     * annual rates so the printed figure is exactly the approved one).
+     *
+     * Falls back to the global cycle-discount formula for every plan that has
+     * no explicit rate — PRA POS and FBR POS quotes are unchanged.
+     */
+    public static function priceForPlanCycle(\App\Models\PricingPlan $plan, string $cycle): array
+    {
+        $explicit = $plan->explicitCyclePrice($cycle);
+        $monthly = (float) $plan->sale_price;
+
+        if ($explicit === null) {
+            return self::calculateFinalPrice($monthly, $cycle);
+        }
+
+        $months = self::getMonthsForCycle($cycle);
+
+        // An active sale campaign discounts the explicit cycle rate too,
+        // otherwise a sale would only apply to monthly buyers.
+        $salePercent = (float) $plan->sale_percent;
+        $finalPrice = $salePercent > 0
+            ? round($explicit * (1 - $salePercent / 100))
+            : round($explicit, 2);
+
+        $totalBeforeDiscount = round($monthly * $months, 2);
+        $discountAmount = max(0, round($totalBeforeDiscount - $finalPrice, 2));
+        $discountPercent = $totalBeforeDiscount > 0
+            ? round(($discountAmount / $totalBeforeDiscount) * 100, 2)
+            : 0.0;
+
+        return [
+            'months' => $months,
+            'discount_percent' => $discountPercent,
+            'total_before_discount' => $totalBeforeDiscount,
+            'discount_amount' => $discountAmount,
+            'final_price' => $finalPrice,
+            'monthly_effective' => round($finalPrice / $months, 2),
+        ];
+    }
 }

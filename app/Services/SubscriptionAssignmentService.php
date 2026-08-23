@@ -114,8 +114,9 @@ class SubscriptionAssignmentService
             ];
         }
 
-        // di (and any unknown type) → monthly base with the cycle's discount applied.
-        $pricing = Subscription::calculateFinalPrice((float) $plan->sale_price, $cycle);
+        // di (and any unknown type) → the plan's own cycle rate when it has one
+        // (Sep 2026 packages), else the monthly base with the cycle discount.
+        $pricing = Subscription::priceForPlanCycle($plan, $cycle);
 
         return [
             'cycle' => $cycle,

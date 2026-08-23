@@ -69,6 +69,11 @@ class AdminPaymentProofController extends Controller
             return $this->approvePosAddon($request, $proof);
         }
 
+        // AI Reader page top-up: sirf khareede hue pages ka balance barhta hai.
+        if ($proof->isAiPages()) {
+            return $this->approveAiPages($request, $proof);
+        }
+
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
@@ -317,6 +322,75 @@ class AdminPaymentProofController extends Controller
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
 
         return back()->with('success', "Extra branch approved — {$result['company']->name} now has {$result['after']} paid branch slot(s). The package and its expiry were not changed.");
+    }
+
+    /**
+     * AI Reader page top-up approval (Digital Invoice, Sep 2026).
+     *
+     * Sirf khareede hue pages ka balance barhta hai — subscription row, plan,
+     * miyaad aur qeemat ko haath nahi lagta. Pages kabhi expire nahi hote, is
+     * liye package ki halat (chalu/khatam) yahan maani nahi rakhti: paisay aa
+     * chuke hain, pages account mein jama ho jate hain.
+     */
+    private function approveAiPages(Request $request, PaymentProof $proof)
+    {
+        $pages = $proof->aiPagesRequested();
+        if ($pages <= 0) {
+            return back()->with('error', 'This top-up request has no valid pack on it — reject it and ask the company to resubmit.');
+        }
+
+        if (!Schema::hasTable('ai_page_ledgers') || !Schema::hasColumn('companies', 'ai_page_balance')) {
+            return back()->with('error', 'The AI page credit tables are missing — run php artisan migrate --force first.');
+        }
+
+        $result = DB::transaction(function () use ($proof, $pages) {
+            $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
+            if (!$locked || $locked->status !== 'pending') {
+                return null;
+            }
+
+            $company = Company::where('id', $locked->company_id)->lockForUpdate()->first();
+            if (!$company) {
+                return null;
+            }
+
+            $before = \App\Services\AiPageCreditService::purchasedBalance($company);
+
+            \App\Services\AiPageCreditService::credit($company, $pages, \App\Models\AiPageLedger::KIND_TOPUP, [
+                // Admin panel ka guard alag hai — company ka user id yahan nahi.
+                'user_id' => null,
+                'source' => 'topup',
+                'ref_type' => 'payment_proof',
+                'ref_id' => $locked->id,
+                'note' => 'Top-up approved by admin',
+            ]);
+
+            $locked->update([
+                'status' => 'verified',
+                'verified_by' => auth('admin')->id(),
+                'verified_at' => now(),
+                'reject_reason' => null,
+            ]);
+
+            return ['company' => $company, 'before' => $before, 'after' => $before + $pages];
+        });
+
+        if (!$result) {
+            return back()->with('error', 'This payment proof was already processed.');
+        }
+
+        AdminAuditLog::log(auth('admin')->id(), 'AI page top-up approved', 'PaymentProof', $proof->id, [
+            'company_id' => $proof->company_id,
+            'pages' => $pages,
+            'balance_before' => $result['before'],
+            'balance_after' => $result['after'],
+            'amount_claimed' => $proof->amount,
+        ]);
+
+        $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
+
+        return back()->with('success', number_format($pages) . ' AI Reader pages added — ' . $result['company']->name
+            . ' now has ' . number_format($result['after']) . ' purchased pages. The package and its expiry were not changed.');
     }
 
     /**
@@ -616,6 +690,85 @@ class AdminPaymentProofController extends Controller
                 'fbrpos' => ['Nest FBR POS', url('/fbr-pos/login')],
                 default => ['Digital Invoicing', url('/login')],
             };
+
+            // AI Reader page top-up: package ki baat hi nahi — sirf pages.
+            if ($proof->isAiPages()) {
+                $pages = $proof->aiPagesRequested();
+                $pagesLabel = $pages > 0 ? number_format($pages) . ' AI Reader pages' : 'your AI Reader pages';
+
+                if ($decision === 'approved') {
+                    $balance = \App\Services\AiPageCreditService::purchasedBalance($company);
+
+                    $title = 'AI pages added';
+                    $message = "{$pagesLabel} have been added to your account. Purchased pages never expire — they are used after your monthly allowance runs out.";
+                    $subject = 'AI Reader pages added to your account';
+                    $headline = 'Your AI Reader pages are ready.';
+                    $paragraphs = array_values(array_filter([
+                        "We have verified your top-up payment for {$company->name}.",
+                        "Pages added: {$pagesLabel}.",
+                        'Purchased balance: ' . number_format($balance) . ' pages. These never expire and are only used once your monthly package allowance is finished.',
+                        'Your package, its expiry date and its price stay exactly the same.',
+                    ]));
+                    $ctaLabel = 'Open AI Invoice Reader';
+                } else {
+                    $reason = trim((string) $proof->reject_reason);
+                    $reasonLine = $reason !== '' ? $reason : 'No reason specified — please contact support.';
+                    if (!str_ends_with($reasonLine, '.')) {
+                        $reasonLine .= '.';
+                    }
+                    $title = 'AI page top-up rejected';
+                    $message = 'Your AI page top-up was rejected: ' . $reasonLine . ' No pages were added.';
+                    $subject = 'AI page top-up rejected — action required';
+                    $headline = 'Your AI page top-up could not be verified.';
+                    $paragraphs = [
+                        "The top-up payment you submitted for {$company->name} could not be verified.",
+                        "Reason: {$reasonLine}",
+                        'No pages were added. Please submit a new payment proof from the Billing page, or contact our support team on WhatsApp.',
+                    ];
+                    $ctaLabel = 'Log In & Resubmit';
+                }
+
+                Notification::create([
+                    'company_id' => $company->id,
+                    'type' => $decision === 'approved' ? 'ai_pages_approved' : 'ai_pages_rejected',
+                    'title' => $title,
+                    'message' => $message,
+                    'read' => false,
+                    'metadata' => [
+                        'payment_proof_id' => $proof->id,
+                        'product_type' => 'di',
+                        'pages' => $pages,
+                    ],
+                ]);
+
+                $email = $this->companyRecipientEmail($company);
+                if ($email) {
+                    try {
+                        Mail::to($email)->send(new \App\Mail\TrialReminderMail(
+                            subjectLine: $subject,
+                            companyName: $company->name ?? 'your company',
+                            headline: $headline,
+                            paragraphs: $paragraphs,
+                            ctaUrl: $ctaUrl,
+                            ctaLabel: $ctaLabel,
+                            panelName: $panelName,
+                        ));
+
+                        \App\Services\MailHealth::recordSuccess();
+                    } catch (\Throwable $e) {
+                        Log::warning('AI page top-up decision email failed', [
+                            'payment_proof_id' => $proof->id,
+                            'company_id' => $company->id,
+                            'decision' => $decision,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        \App\Services\MailHealth::recordFailure('AI page top-up decision email', $e);
+                    }
+                }
+
+                return;
+            }
 
             // Paid feature add-on: package ki baat hi nahi — sirf chune hue features.
             if ($proof->isPosAddon()) {

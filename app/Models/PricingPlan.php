@@ -15,6 +15,8 @@ class PricingPlan extends Model
         'price',
         'price_monthly',
         'price_quarterly',
+        'price_semi_annual',
+        'price_yearly',
         'compare_at_price',
         'features',
         'product_type',
@@ -24,6 +26,9 @@ class PricingPlan extends Model
         'inventory_enabled',
         'reports_enabled',
         'restaurant_enabled',
+        'ai_page_limit',
+        'fair_use_limit',
+        'is_public',
     ];
 
     protected $casts = [
@@ -41,7 +46,52 @@ class PricingPlan extends Model
         'invoice_limit' => 'integer',
         'user_limit' => 'integer',
         'branch_limit' => 'integer',
+        'ai_page_limit' => 'integer',
+        'fair_use_limit' => 'integer',
+        'is_public' => 'boolean',
     ];
+
+    /**
+     * Cycle price written on the plan itself (Sep 2026 DI restructure).
+     *
+     * DI packages carry hand-set quarterly / half-year / annual rates so the
+     * printed price is exactly what the owner approved instead of a formula
+     * result with paisa tails. Deliberately DI-only: PRA POS stores its price
+     * column as an ANNUAL rate, so letting it read these columns would change
+     * POS quotes.
+     *
+     * Returns null when this plan has no explicit rate for the cycle — the
+     * caller then falls back to Subscription::calculateFinalPrice.
+     */
+    public function explicitCyclePrice(string $cycle): ?float
+    {
+        if ($this->product_type !== 'di') {
+            return null;
+        }
+
+        $column = match ($cycle) {
+            'monthly'     => 'price_monthly',
+            'quarterly'   => 'price_quarterly',
+            'semi_annual' => 'price_semi_annual',
+            'annual'      => 'price_yearly',
+            default       => null,
+        };
+
+        if (!$column || !array_key_exists($column, $this->getAttributes())) {
+            return null;
+        }
+
+        $value = $this->getAttribute($column);
+
+        return ($value === null || (float) $value <= 0) ? null : (float) $value;
+    }
+
+    public function getAiPageLimitDisplay(): string
+    {
+        $limit = (int) ($this->ai_page_limit ?? 0);
+
+        return $limit === -1 ? 'Unlimited' : number_format($limit);
+    }
 
     public function subscriptions()
     {

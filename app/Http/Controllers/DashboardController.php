@@ -60,15 +60,24 @@ class DashboardController extends Controller
             ->with('pricingPlan')
             ->first();
 
+        // Package quota is per CALENDAR MONTH and only counts invoices that
+        // actually reached FBR — the dashboard must show the same number the
+        // gate enforces, otherwise a shop reads "limit finished" on day one.
         $invoiceLimit = $subscription && $subscription->pricingPlan ? $subscription->pricingPlan->invoice_limit : 0;
-        $invoicesUsed = $totalInvoices;
+        if ($company && $company->invoice_limit_override !== null) {
+            $invoiceLimit = (int) $company->invoice_limit_override;
+        }
+        $invoicesUsed = \App\Services\PlanLimitService::monthlyInvoiceCount($companyId);
+        $quotaResetsOn = \App\Services\PlanLimitService::quotaResetsOn();
 
         $planTier = 'retail';
         if ($subscription && $subscription->pricingPlan) {
             $planName = strtolower($subscription->pricingPlan->name);
-            if (in_array($planName, ['enterprise', 'industrial'])) {
+            // Sep 2026 packages sit on the same tiers their predecessors did:
+            // Asaan ~ Business, Kaarobar ~ Industrial, Unlimited ~ Enterprise.
+            if (in_array($planName, ['enterprise', 'industrial', 'premium', 'kaarobar', 'unlimited'])) {
                 $planTier = 'enterprise';
-            } elseif ($planName === 'business') {
+            } elseif (in_array($planName, ['business', 'asaan'])) {
                 $planTier = 'business';
             }
         }
@@ -219,7 +228,7 @@ class DashboardController extends Controller
 
         return view('dashboard', compact(
             'company', 'totalInvoices', 'draftCount', 'failedCount', 'lockedCount',
-            'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed',
+            'totalRevenue', 'subscription', 'invoiceLimit', 'invoicesUsed', 'quotaResetsOn',
             'statusData', 'monthlyData', 'recentInvoices',
             'draftAging', 'fbrSuccessRate', 'complianceScore',
             'hybridScore', 'riskLevel', 'riskBadge',

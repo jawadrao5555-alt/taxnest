@@ -151,17 +151,15 @@ function snap(page) {
  * cashier would: click each one's own dismiss button. They all follow the
  * layout's `xxDismiss()` convention, so a popup added later is handled too.
  */
-async function clearLayoutPopups(page) {
-    // Mark What's New seen so it does not re-open on the next page load.
-    await page.evaluate(async () => {
-        const t = document.querySelector('meta[name="csrf-token"]')?.content;
-        if (t) {
-            await fetch('/pos/whats-new/seen', {
-                method: 'POST', headers: { 'X-CSRF-TOKEN': t, Accept: 'application/json' },
-            }).catch(() => {});
-        }
-    });
-    for (let pass = 0; pass < 6; pass++) {
+/**
+ * Click every layout popup's own dismiss button (the `xxDismiss()` convention)
+ * until nothing is left for `settle` ms. Popups that ask the server first can
+ * land a second or two after load, so silence has to be sustained, not instant.
+ */
+async function sweep(page, budgetMs = 6000) {
+    const until = Date.now() + budgetMs;
+    let quietSince = null;
+    while (Date.now() < until) {
         const handle = await page.evaluateHandle(() => {
             // NOTE: offsetParent is always null for position:fixed — measure instead.
             const vis = (el) => {
@@ -175,15 +173,43 @@ async function clearLayoutPopups(page) {
                 .find((n) => !root?.contains(n) && vis(n));
             if (!overlay) return null;
             return [...overlay.querySelectorAll('button')]
-                .find((b) => /Dismiss\(\)/.test(b.getAttribute('@click') || '') && vis(b)) || null;
+                .find((b) => /Dismiss\(\)/.test(b.getAttribute('@click') || b.getAttribute('x-on:click') || '') && vis(b)) || null;
         });
         const el = handle.asElement();
-        if (!el) break;
-        await el.click({ timeout: 5000 }).catch(() => {});
-        await page.waitForTimeout(250);
+        if (!el) {
+            if (quietSince === null) quietSince = Date.now();
+            if (Date.now() - quietSince >= 2000) return;
+            await page.waitForTimeout(200);
+            continue;
+        }
+        quietSince = null;
+        // A real click first (that is what a cashier does), but if Playwright's
+        // actionability check refuses — another transparent overlay on top, a
+        // transition still running — fall back to a plain DOM click so one
+        // stubborn popup cannot fail the whole check for the wrong reason.
+        try {
+            await el.click({ timeout: 2000 });
+        } catch {
+            await el.evaluate((b) => b.click()).catch(() => {});
+        }
+        await page.waitForTimeout(200);
     }
-    // Anything still floating would make every click below fail for the wrong
-    // reason — say so plainly instead of blaming the button.
+}
+
+async function clearLayoutPopups(page) {
+    // Mark What's New seen so it does not re-open on the next page load.
+    await page.evaluate(async () => {
+        const t = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (t) {
+            await fetch('/pos/whats-new/seen', {
+                method: 'POST', headers: { 'X-CSRF-TOKEN': t, Accept: 'application/json' },
+            }).catch(() => {});
+        }
+    });
+    // Some popups arrive LATE (the day-close reminder asks the server first,
+    // and that answer can take a second on a shop with a long backlog), so an
+    // empty pass proves nothing — sweep for a few seconds before believing it.
+    await sweep(page, 6000);
     const blocker = await page.evaluate(() => {
         const vis = (el) => {
             const cs = getComputedStyle(el);
@@ -193,9 +219,28 @@ async function clearLayoutPopups(page) {
         };
         const root = document.querySelector('[data-tn-sale-root]');
         const el = [...document.querySelectorAll('.fixed.inset-0')].find((n) => !root?.contains(n) && vis(n));
-        return el ? (el.getAttribute('x-show') || el.className) : null;
+        if (!el) return null;
+        // Name it properly — "show" alone tells the next person nothing.
+        const label = (el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 70);
+        const clicks = [...el.querySelectorAll('button')]
+            .map((b) => b.getAttribute('@click') || b.getAttribute('x-on:click') || '')
+            .filter(Boolean).join(' | ') || 'no @click buttons';
+        return `${el.getAttribute('x-show') || el.className.slice(0, 40)} :: "${label}" :: ${clicks}`;
     });
-    if (blocker) cannotRun(`a layout popup is covering the sale screen (${blocker}) — give it a dismiss button or extend clearLayoutPopups()`);
+    if (blocker) {
+        await sweep(page, 4000);
+        const stillThere = await page.evaluate(() => {
+            const vis = (el) => {
+                const cs = getComputedStyle(el);
+                if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return false;
+                const r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0;
+            };
+            const root = document.querySelector('[data-tn-sale-root]');
+            return [...document.querySelectorAll('.fixed.inset-0')].some((n) => !root?.contains(n) && vis(n));
+        });
+        if (stillThere) cannotRun(`a layout popup is covering the sale screen (${blocker}) — give it a dismiss button or extend clearLayoutPopups()`);
+    }
 }
 
 async function waitFor(page, predicate, label, timeout = 10000) {

@@ -667,6 +667,14 @@
                 <td class="col-rate">{{ number_format($lineRate, 0) }}</td>
                 <td class="col-total">{{ number_format($lineAmt, 0) }}</td>
             </tr>
+            {{-- Per-item comment (owner voice note, 23 Aug 2026): cart row ke pen se
+                 likha note ab tak sirf KOT par chhapta tha — customer ke bill par
+                 nazar hi nahi aata tha ("comments bill par print nahi hote"). --}}
+            @if(!empty($item->special_notes))
+            <tr>
+                <td class="col-item" colspan="4" style="padding-left:8px; font-size:9px; font-weight:normal;">&nbsp;&nbsp;* {{ $item->special_notes }}</td>
+            </tr>
+            @endif
             {{-- Deal components (frozen snapshot) — indented, NO price columns: the
                  deal line above carries the money; these are informational only. --}}
             @if($item->item_type === 'deal' && is_array($item->deal_snapshot))

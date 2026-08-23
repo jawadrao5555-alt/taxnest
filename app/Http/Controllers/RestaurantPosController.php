@@ -1402,6 +1402,11 @@ class RestaurantPosController extends Controller
                     // T006 — manual lines carry NULL item_id (no product/service master).
                     'item_id' => $item->item_id !== null ? (int) $item->item_id : null,
                     'item_name' => (string) $item->item_name,
+                    // Owner voice note (23 Aug 2026): per-item comment ("no onions")
+                    // lived only on the restaurant_order_item — the bill row was
+                    // created without it, so the customer receipt could never print
+                    // it. Consolidation keys ON the note, so merged lines share one.
+                    'special_notes' => $item->special_notes ?: null,
                     'quantity' => $itemQty,
                     'unit_price' => (float) $item->unit_price,
                     'subtotal' => (float) $item->subtotal,

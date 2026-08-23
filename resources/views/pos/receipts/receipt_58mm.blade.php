@@ -595,6 +595,12 @@
                 <td class="col-rate">{{ number_format($lineRate, 0) }}</td>
                 <td class="col-total">{{ number_format($lineAmt, 0) }}</td>
             </tr>
+            {{-- Per-item comment (owner voice note, 23 Aug 2026) — 80mm ke saath parity. --}}
+            @if(!empty($item->special_notes))
+            <tr>
+                <td class="col-item" colspan="4" style="padding-left:6px; font-size:8px; font-weight:normal;">&nbsp;&nbsp;* {{ $item->special_notes }}</td>
+            </tr>
+            @endif
             {{-- Deal components (frozen snapshot) — indented, NO price columns. --}}
             @if($item->item_type === 'deal' && is_array($item->deal_snapshot))
             @foreach($item->deal_snapshot as $comp)

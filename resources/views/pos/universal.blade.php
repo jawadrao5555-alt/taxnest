@@ -1616,9 +1616,12 @@ window.addEventListener('popstate', function() {
                                  cart-height complaint wale hamesha-khule inputs wapas NAHI
                                  aaye — note sirf button dabane par khulta hai. KOT template
                                  special_notes pehle se chhapta hai. --}}
+                            {{-- ZFC (owner video, 23 Aug 2026): idle rang gray-300 tha — cashier ko
+                                 pen sirf hover par nazar aata tha ("mouse le jao to dikhta hai").
+                                 Ab idle par bhi amber tint + solid icon, note likha ho to bhara amber. --}}
                             <button @click.stop="toggleItemNote(index)" title="{{ __('pos.item_note_btn') }}"
-                                :class="(item.special_notes || '').length ? 'text-amber-500' : 'text-gray-300 dark:text-gray-600'"
-                                class="p-1.5 flex-shrink-0 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition active:scale-90">
+                                :class="(item.special_notes || '').length ? 'text-amber-600 bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300' : 'text-amber-500/80 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400/80'"
+                                class="p-1.5 flex-shrink-0 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             </button>
                             <button @click.stop="removeFromCart(index)" class="p-1.5 flex-shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition active:scale-90">
@@ -2075,7 +2078,7 @@ window.addEventListener('popstate', function() {
     </div>
 
     @if($features->tables)
-    <div x-show="showTablePicker" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showTablePicker = false">
+    <div x-show="showTablePicker" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="closeTablePicker()">
         {{-- Pizza Master feedback (Jul 2026): bara "chart" layout — saari tables ek
              nazar mein (max-w-md → max-w-3xl, 3 → up-to-6 columns). --}}
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden" x-transition.scale.90>
@@ -2084,7 +2087,7 @@ window.addEventListener('popstate', function() {
                     <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.select_table') }}</h3>
                     <p class="text-[10px] text-gray-400 mt-0.5">&uarr; &darr; &larr; &rarr; select &middot; Enter reserve &middot; Esc close</p>
                 </div>
-                <button @click="showTablePicker = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button @click="closeTablePicker()" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             {{-- Select-Table picker (Dine-In, Jul 2026): LIVE floors + tables, refreshed on every open via
                  /pos/restaurant/api/table-status. Green=free, amber=reserved, red=occupied.
@@ -4611,6 +4614,7 @@ function restaurantPos() {
         // Task 502: Tables page open-order card → boot par isi order ka direct recall.
         bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
+        _dineTypeRevert: null, // DINE IN pill se aya type-switch; picker bina table band hua to yahin wapas
         tablePickerIndex: 0,
         // ZFC (Aug 2026): unsent-cart switch prompt — { kind:'table', table } |
         // { kind:'type', type }. Opens when a table is ALREADY selected and the
@@ -6867,12 +6871,12 @@ function restaurantPos() {
                 if ((e.key === 'ArrowRight' || e.key === 'ArrowDown') && n) { e.preventDefault(); this.tablePickerIndex = (this.tablePickerIndex + 1) % n; return; }
                 if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && n)  { e.preventDefault(); this.tablePickerIndex = (this.tablePickerIndex - 1 + n) % n; return; }
                 if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); const t = flat[this.tablePickerIndex]; if (t) this.selectTable(t); return; }
-                if (e.key === 'Escape') { e.preventDefault(); this.showTablePicker = false; return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.closeTablePicker(); return; }
                 {{-- 10 Aug 2026 (Pizza Master voice note): Dine-In tab picker khol deta
                      hai aur F2 mar jata tha — cashier pehle items dalna chahta hai.
                      F2 = picker band + seedha search; table baad mein (hold/pay guard
                      picker dobara khol dega). --}}
-                if (e.key === 'F2') { e.preventDefault(); this.showTablePicker = false; this.enterSearchMode(); return; }
+                if (e.key === 'F2') { e.preventDefault(); this.closeTablePicker(); this.enterSearchMode(); return; }
                 if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;
             }
@@ -7291,7 +7295,7 @@ function restaurantPos() {
                 if (this.showShortcuts) { this.showShortcuts = false; return; }
                 if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
                 if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }
-                if (this.showTablePicker) { this.showTablePicker = false; return; }
+                if (this.showTablePicker) { this.closeTablePicker(); return; }
                 if (this.showCustomerPicker) { this.showCustomerPicker = false; return; }
                 if (this.showCustomerHistory) { this.showCustomerHistory = false; return; }
                 if (this.customerPhoneDropdown) { this.customerPhoneDropdown = false; return; }
@@ -7521,6 +7525,13 @@ function restaurantPos() {
                 // 26 Jul 2026: table selected ho tab BHI picker khole — pill par
                 // dobara click = table change ka raasta (top Table button retire).
                 const reopen = this.orderType === 'dine_in' && this.selectedTable;
+                // ZFC (owner video, 23 Aug 2026): DINE IN dabate hi type flip ho
+                // jata tha, table baad mein. Picker bina table chune band karne par
+                // screen "dine_in + koi table nahi" par phans jati thi — Pay har baar
+                // "pehle table chunein" bolta aur cashier ko table ATKA hua lagta.
+                // Ab: sirf is EXPLICIT type-switch ka rollback yaad rakho; picker
+                // bina table ke band hua to type wapas wahi jo pehle tha.
+                if (this.orderType !== 'dine_in' && !this.selectedTable) this._dineTypeRevert = this.orderType;
                 this.orderType = 'dine_in';
                 if (!this.selectedTable || reopen) this.openTablePicker();
                 return;
@@ -7768,7 +7779,7 @@ function restaurantPos() {
                 (table.order && Number(table.order.id) === Number(cartOrderId)) ||
                 (inc && Number(inc.id) === Number(cartOrderId)) ||
                 (this.recalledOrderId && this.selectedTable && Number(this.selectedTable.id) === Number(table.id))
-            )) { this.showTablePicker = false; return; }
+            )) { this._dineTypeRevert = null; this.showTablePicker = false; return; }
             // Task 1027 (Task 975 hissa 2): cart mein kisi AUR table ka
             // recalled/claimed order khula ho aur cashier DOOSRE table par
             // click kare — pehle sirf warning toast milta tha aur cashier
@@ -7804,7 +7815,7 @@ function restaurantPos() {
                     // (tableClickDirectOpen ka check hatao — warna default cashiers ke liye tile
                     // purple dikhta hai lekin click par openBoardMenu khulta tha, claim hota hi
                     // nahi tha). Non-empty cart: warning barqarar (cart kabhi silently discard na ho).
-                    if (this.cart.length === 0) { this.showTablePicker = false; await this.claimAndLoadIncoming(inc); return; }
+                    if (this.cart.length === 0) { this._dineTypeRevert = null; this.showTablePicker = false; await this.claimAndLoadIncoming(inc); return; }
                     this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
                 }
                 await this.claimAndLoadIncoming(inc); return;
@@ -7816,7 +7827,7 @@ function restaurantPos() {
                 // (3 Aug 2026): warning ab AGLA QADAM batati hai — sirf "masroof
                 // hai" se cashier samajhta tha ke table kharab/phansa hua hai.
                 // Task 781: flag ON = popup skip, order seedha edit mode mein.
-                if (this.cart.length === 0) { this.showTablePicker = false; if (this.tableClickDirectOpen) { await this.directOpenTable(table); } else { this.openBoardMenu(table); } return; }
+                if (this.cart.length === 0) { this._dineTypeRevert = null; this.showTablePicker = false; if (this.tableClickDirectOpen) { await this.directOpenTable(table); } else { this.openBoardMenu(table); } return; }
                 this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
             }
             // ZFC (Aug 2026): table ALREADY selected + a DIFFERENT free table +
@@ -7843,6 +7854,7 @@ function restaurantPos() {
             if (this.selectedTable && this.selectedTable.id !== table.id) this.releaseTable(this.selectedTable.id);
             this.selectedTable = { id: table.id, table_number: table.table_number, seats: table.seats };
             this.orderType = 'dine_in';
+            this._dineTypeRevert = null; // table mil gaya — rollback ka koi sawal nahi
             this.showTablePicker = false;
             this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.reserved_suffix, 'success');
             // Dine-In Auto KOT (owner, Jul 2026): with the setting ON and a filled
@@ -7878,6 +7890,7 @@ function restaurantPos() {
                     return;
                 }
                 this.loadIncomingToCart(data.order || o);
+                this._dineTypeRevert = null;
                 this.showTablePicker = false;
                 if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: tile turns "mine"
                 // Guided keyboard flow: resume the Enter-chain into cart mode so
@@ -7941,6 +7954,19 @@ function restaurantPos() {
                 total_amount: (o && o.total_amount) || this.totalAmount || 0,
             }));
             this.boardCancelMade = {};
+        },
+        // Picker ka HAR "bina table chune" band hone wala raasta yahan se guzarta
+        // hai (X, backdrop, Esc, F2). ZFC (owner video, 23 Aug 2026): DINE IN pill
+        // se aya type-switch tabhi rollback hota hai jab cashier ne khud abhi type
+        // badla tha (_dineTypeRevert) — Pay-guard ka khola hua picker type ko haath
+        // nahi lagata (wahan cart pehle se dine-in ka hai).
+        closeTablePicker() {
+            this.showTablePicker = false;
+            if (this._dineTypeRevert && this.orderType === 'dine_in' && !this.selectedTable
+                && !this.recalledOrderId && !this.incomingOrderId) {
+                this.orderType = this._dineTypeRevert;
+            }
+            this._dineTypeRevert = null;
         },
         // Fire-and-forget: backend only flips status='reserved' → available, so this
         // is harmless after payment (already freed) or on occupied tables (held-order

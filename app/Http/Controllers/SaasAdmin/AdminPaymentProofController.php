@@ -8,7 +8,6 @@ use App\Models\Company;
 use App\Models\Notification;
 use App\Models\PaymentProof;
 use App\Models\PricingPlan;
-use App\Services\PosPlanComparisonService;
 use App\Services\SubscriptionAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,8 +38,7 @@ class AdminPaymentProofController extends Controller
 
         $proofs = $query->paginate(20)->appends($request->all());
         $plans = PricingPlan::where('is_trial', false)->orderBy('price')->get()
-            ->reject(fn (PricingPlan $plan) => $plan->product_type === 'pos'
-                && !PosPlanComparisonService::isSellablePlan($plan))
+            ->reject(fn (PricingPlan $plan) => \App\Services\PlanSellabilityService::isRetired($plan))
             ->values();
 
         return view('saas-admin.payment-proofs', [
@@ -86,8 +84,8 @@ class AdminPaymentProofController extends Controller
         if ($plan->is_trial) {
             return back()->with('error', 'Trial plans cannot be assigned from payment approval.');
         }
-        if ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan)) {
-            return back()->with('error', 'That retired POS package can no longer be assigned.');
+        if (\App\Services\PlanSellabilityService::isRetired($plan)) {
+            return back()->with('error', \App\Services\PlanSellabilityService::retiredMessage($plan));
         }
 
         // Product-line guard: the approved plan must stay on the same product
@@ -98,10 +96,10 @@ class AdminPaymentProofController extends Controller
         }
 
         // Cycle guard: same per-product rules as customer submission
-        // (di = 4 cycles, pos = annual/quarterly/monthly, others annual-only).
+        // (di = 4 cycles, both POS lines = annual/quarterly/monthly, others annual-only).
         $allowedCycles = match ($plan->product_type ?? 'di') {
             'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
-            'pos' => ['annual', 'quarterly', 'monthly'],
+            'pos', 'fbrpos' => ['annual', 'quarterly', 'monthly'],
             default => ['annual'],
         };
         $requestedCycle = SubscriptionAssignmentService::normalizeCycle($request->billing_cycle);
@@ -294,6 +292,18 @@ class AdminPaymentProofController extends Controller
                 return null;
             }
 
+            // A proof can sit in the queue for days. Whatever was true when the
+            // shop paid, what matters is whether a paid slot would DO anything
+            // now: an expired term, an admin branch override, a switch to a
+            // trial / unlimited-branch / unsupported package all make the slot
+            // dead weight. Refuse instead of selling a branch that cannot open —
+            // the proof stays pending so it can be refunded or approved after a
+            // renewal.
+            $eligibility = \App\Services\BranchAddonService::purchaseEligibility($company);
+            if (!$eligibility['allowed']) {
+                return ['blocked' => $eligibility['reason_key']];
+            }
+
             $before = \App\Services\BranchAddonService::slots($company);
             $company->update(['extra_branch_slots' => $before + $qty]);
 
@@ -310,6 +320,14 @@ class AdminPaymentProofController extends Controller
 
         if (!$result) {
             return back()->with('error', 'This payment proof was already processed.');
+        }
+
+        if (isset($result['blocked'])) {
+            $reason = $result['blocked'] ? __($result['blocked']) : '';
+            $reason = ($reason && $reason !== $result['blocked']) ? ' (' . $reason . ')' : '';
+            return back()->with('error',
+                'This company can no longer use a paid extra branch' . $reason
+                . ' — renew or fix the package first, or reject this proof and refund it.');
         }
 
         AdminAuditLog::log(auth('admin')->id(), 'Extra branch slots approved', 'PaymentProof', $proof->id, [

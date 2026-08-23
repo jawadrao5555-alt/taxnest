@@ -21,9 +21,25 @@
             <button class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700">{{ __('pos.add_branch') }}</button>
         </form>
         @if(!($quota['allowed'] ?? true))
-        <p class="mt-2 text-xs text-amber-600">{{ $quota['reason'] ?? '' }}</p>
+        <p class="mt-2 text-xs text-amber-600">{{ \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason'] ?? __('pos.plan_locked_feature')) }}</p>
+        @endif
+
+        {{-- Quota summary: package ki shamil branches + khareede hue paid slots. --}}
+        @if($addon['limit'] !== null)
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ __('pos.eb_quota_line', ['used' => $addon['used'], 'limit' => $addon['limit']]) }}
+            @if($addon['override'] !== null)
+                <span class="text-gray-400">({{ __('pos.eb_admin_set') }})</span>
+            @elseif($addon['included'] !== null)
+                <span class="text-gray-400">({{ __('pos.eb_included_line', ['included' => $addon['included'], 'slots' => $addon['slots']]) }})</span>
+            @endif
+        </p>
         @endif
     </div>
+
+    {{-- Paid extra-branch add-on (Rs 10,000/branch/year) — same component and
+         same approval path as the PRA POS panel. --}}
+    <x-extra-branch-addon :addon="$addon" :bank="$bank" :action="route('fbrpos.payment-proof.store')" accent="blue" />
 
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden" x-data="{ editId: null }">
         <table class="w-full text-sm table-cards">

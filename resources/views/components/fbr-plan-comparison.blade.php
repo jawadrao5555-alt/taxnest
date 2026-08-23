@@ -42,7 +42,7 @@
     popular-label="Popular"
     current-label="Your plan"
     tick-label="Included"
-    note="Prices are per year and already include the 6% annual discount. Every package bills to FBR in real time from day one."
+    note="The headline price is for a full year — the cheapest way to run. Paying every 3 months or monthly costs a little more. Every package bills to FBR in real time from day one."
     tip="Scroll sideways to see all packages."
     included-title="Included in every package"
     included-sub="These never depend on which package you pick."

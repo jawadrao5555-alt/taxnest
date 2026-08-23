@@ -26,7 +26,9 @@ use Illuminate\Support\Facades\Schema;
  *   kisi cycle ka add-on = slots × 10,000 × (us cycle ke mahine / 12)
  *   beech-saal kharidari = qty × 10,000 × (subscription khatam hone tak baqi mahine / 12)
  *
- * Scope: sirf PRA POS ('pos') packages — FBR POS aur DI par ye add-on nahi.
+ * Scope: dono POS lines — PRA POS ('pos') aur FBR POS ('fbrpos'). FBR POS 23
+ * Aug 2026 ko shamil hua jab uska Business package 2 branches par set hua; DI
+ * par ye add-on ab bhi nahi.
  * Slots companies.extra_branch_slots par mehfooz hain aur SIRF admin approval
  * (payment proof) ya admin ke hath se badalte hain.
  */
@@ -36,7 +38,7 @@ class BranchAddonService
     public const PRICE_PER_YEAR = 10000;
 
     /** Product lines jin par ye add-on chalta hai. */
-    public const PRODUCT_TYPES = ['pos'];
+    public const PRODUCT_TYPES = ['pos', 'fbrpos'];
 
     /** Ek request mein maximum slots (operator-error guard). */
     public const MAX_QTY = 20;

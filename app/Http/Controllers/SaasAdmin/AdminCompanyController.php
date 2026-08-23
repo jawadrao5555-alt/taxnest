@@ -360,12 +360,12 @@ class AdminCompanyController extends Controller
         }
 
         // Packages the temporary-access grant may be given ON: this company's
-        // own product only, and never a retired POS package.
+        // own product only, and never a retired package.
         $grantPlans = PricingPlan::where('product_type', $company->product_type)
             ->where(function ($q) { $q->where('is_trial', false)->orWhereNull('is_trial'); })
             ->orderBy('price')
             ->get()
-            ->filter(fn ($p) => $p->product_type !== 'pos' || \App\Services\PosPlanComparisonService::isSellablePlan($p))
+            ->filter(fn ($p) => !\App\Services\PlanSellabilityService::isRetired($p))
             ->values();
 
         return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills', 'grantPlans'));
@@ -1238,9 +1238,8 @@ class AdminCompanyController extends Controller
             if (!$plan || $plan->product_type !== $company->product_type) {
                 return back()->with('error', 'That package belongs to a different product — pick a package of this company\'s own product.');
             }
-            if ($plan->product_type === 'pos' && !$plan->is_trial
-                && !\App\Services\PosPlanComparisonService::isSellablePlan($plan)) {
-                return back()->with('error', 'That retired POS package can no longer be assigned.');
+            if (\App\Services\PlanSellabilityService::isRetired($plan)) {
+                return back()->with('error', \App\Services\PlanSellabilityService::retiredMessage($plan));
             }
         }
 

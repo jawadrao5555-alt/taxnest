@@ -180,9 +180,14 @@ class FbrPosPlanComparisonService
     /** Business is the flagged column on both the cards and the table. */
     public const POPULAR_PLAN = 'Business';
 
-    /** Annual licensing: 12 months with the 6% discount the landing advertises. */
-    public const ANNUAL_MONTHS = 12;
-    public const ANNUAL_DISCOUNT = 0.94;
+    /**
+     * The FBR POS packages still on sale (owner decision, 23 Aug 2026): Pro was
+     * merged INTO Business, so only these two may be shown, picked at signup or
+     * assigned. Retired rows stay in the table for the shops already on them.
+     * Matched by name because that is what the landing, the signup link and the
+     * admin panel all carry.
+     */
+    public const SELLABLE_PLAN_NAMES = ['Starter', 'Business'];
 
     /** The single FBR POS surface that renders package cards above this table. */
     /**
@@ -212,13 +217,25 @@ class FbrPosPlanComparisonService
         'max_products'           => 'the products column',
     ];
 
-    /** The paid FBR POS packages, cheapest first — same query the cards use. */
+    /** The SELLABLE paid FBR POS packages, cheapest first — same query the cards use. */
     public static function plans(): Collection
     {
         return PricingPlan::where('is_trial', false)
             ->where('product_type', 'fbrpos')
+            ->whereIn('name', self::SELLABLE_PLAN_NAMES)
             ->orderBy('price')
             ->get();
+    }
+
+    /**
+     * May this package still be sold / assigned? Retired FBR POS rows (Pro)
+     * stay assigned to the shops already on them but are off the shelf.
+     */
+    public static function isSellablePlan(?PricingPlan $plan): bool
+    {
+        return $plan
+            && ($plan->product_type ?? null) === 'fbrpos'
+            && ($plan->is_trial || in_array($plan->name, self::SELLABLE_PLAN_NAMES, true));
     }
 
     /** null / any negative value means "no cap" everywhere in the codebase. */
@@ -236,12 +253,18 @@ class FbrPosPlanComparisonService
         return PlanLimitService::teamAccountLimit($plan);
     }
 
-    /** The yearly figure the price cards print, so the table cannot show another. */
+    /**
+     * The yearly figure the price cards print, so the table cannot show another.
+     *
+     * Since 23 Aug 2026 pricing_plans.price IS the annual rate on FBR POS (it
+     * used to be a monthly rate charged ×12 with a 6% discount). Quarterly and
+     * monthly are hand-set columns priced ABOVE the annual pro-rata, exactly
+     * like PRA POS — see SubscriptionAssignmentService::computeBasePrice(),
+     * which is what actually charges.
+     */
     public static function annualPrice(PricingPlan $plan, bool $beforeDiscount = false): int
     {
-        $monthly = (float) ($beforeDiscount ? $plan->price : $plan->sale_price);
-
-        return (int) round($monthly * self::ANNUAL_MONTHS * self::ANNUAL_DISCOUNT);
+        return (int) round((float) ($beforeDiscount ? $plan->price : $plan->sale_price));
     }
 
     /**
@@ -271,9 +294,26 @@ class FbrPosPlanComparisonService
             $col['price']        = 'Rs ' . number_format(self::annualPrice($plan));
             $col['price_period'] = '/ year';
 
-            if ((float) $plan->sale_price < (float) $plan->price) {
+            $onSale = (float) $plan->sale_price < (float) $plan->price;
+            if ($onSale) {
                 $col['price_compare'] = 'Rs ' . number_format(self::annualPrice($plan, true));
                 $col['sale_badge']    = $plan->sale_badge;
+            }
+
+            // Shorter cycles (23 Aug 2026) are alternatives to the headline
+            // annual price, and each one only appears when the plan really
+            // carries that rate — the same condition computeBasePrice() charges
+            // on, so a note can never advertise a cycle checkout would refuse.
+            $alternatives = [];
+            if ((float) ($plan->price_quarterly ?? 0) > 0) {
+                $alternatives[] = 'or Rs ' . number_format((float) $plan->price_quarterly) . ' / 3 months';
+            }
+            if ((float) ($plan->price_monthly ?? 0) > 0) {
+                $alternatives[] = 'Rs ' . number_format((float) $plan->price_monthly) . ' / month';
+            }
+            if ($alternatives !== []) {
+                $col['price_note'] = implode(' · ', $alternatives)
+                    . ($onSale ? ' (sale is on the yearly price)' : '');
             }
 
             $col['cta_url']   = route('fbrpos.register', ['plan' => $plan->name], false);

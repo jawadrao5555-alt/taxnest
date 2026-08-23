@@ -6,6 +6,7 @@ use App\Models\PricingPlan;
 use App\Models\Company;
 use App\Models\Subscription;
 use App\Services\DiPlanComparisonService;
+use App\Services\PlanSellabilityService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -74,13 +75,18 @@ class SubscriptionAssignmentService
         $type = $plan->product_type ?? 'di';
         $cycle = self::normalizeCycle($cycle);
 
-        if ($type === 'pos' || $type === 'standalone') {
-            // Quarterly (Aug 2026, owner-approved): PRA POS ('pos') ONLY, and only
+        // FBR POS joined this branch on 23 Aug 2026: its `price` column stopped
+        // being a monthly rate (charged ×12×0.94 once a year) and became the
+        // ANNUAL rate with hand-set quarterly/monthly rates, exactly like PRA.
+        $cycled = $type === 'pos' || $type === 'fbrpos';
+
+        if ($cycled || $type === 'standalone') {
+            // Quarterly (Aug 2026, owner-approved): the POS lines ONLY, and only
             // when the plan carries an explicit quarterly price (price_quarterly).
             // 'standalone' stays forced-annual even if a quarterly price is ever
             // set on such a plan by mistake. Sale campaigns intentionally
             // discount the ANNUAL price only — quarterly is already the premium path.
-            if ($type === 'pos' && $cycle === 'quarterly' && (float) ($plan->price_quarterly ?? 0) > 0) {
+            if ($cycled && $cycle === 'quarterly' && (float) ($plan->price_quarterly ?? 0) > 0) {
                 return [
                     'cycle' => 'quarterly',
                     'final_price' => round((float) $plan->price_quarterly),
@@ -88,12 +94,12 @@ class SubscriptionAssignmentService
                 ];
             }
 
-            // Monthly (Aug 2026, owner-approved): PRA POS ONLY, and only when the
-            // plan carries an explicit monthly price. Like quarterly it is priced
+            // Monthly (Aug 2026, owner-approved): the POS lines ONLY, and only when
+            // the plan carries an explicit monthly price. Like quarterly it is priced
             // ABOVE the annual pro-rata (~+10%) on purpose, and like quarterly a
             // plan without the price silently falls back to annual below rather
             // than charging a cycle the owner never set.
-            if ($type === 'pos' && $cycle === 'monthly' && (float) ($plan->price_monthly ?? 0) > 0) {
+            if ($cycled && $cycle === 'monthly' && (float) ($plan->price_monthly ?? 0) > 0) {
                 return [
                     'cycle' => 'monthly',
                     'final_price' => round((float) $plan->price_monthly),
@@ -103,14 +109,6 @@ class SubscriptionAssignmentService
             return [
                 'cycle' => 'annual',
                 'final_price' => round((float) $plan->sale_price),
-                'discount_percent' => 6.0,
-            ];
-        }
-
-        if ($type === 'fbrpos') {
-            return [
-                'cycle' => 'annual',
-                'final_price' => round((float) $plan->sale_price * 12 * 0.94),
                 'discount_percent' => 6.0,
             ];
         }
@@ -132,10 +130,9 @@ class SubscriptionAssignmentService
     public static function assign(int $companyId, int $pricingPlanId, string $billingCycle = 'monthly'): Subscription
     {
         $plan = PricingPlan::findOrFail($pricingPlanId);
-        if ($plan->product_type === 'pos' && !$plan->is_trial
-            && !PosPlanComparisonService::isSellablePlan($plan)) {
+        if (PlanSellabilityService::isRetired($plan)) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'pricing_plan_id' => 'That retired POS package can no longer be assigned.',
+                'pricing_plan_id' => PlanSellabilityService::retiredMessage($plan),
             ]);
         }
 
@@ -205,13 +202,11 @@ class SubscriptionAssignmentService
         }
 
         $plan = PricingPlan::find($planId);
-        if (!$plan || $plan->is_trial
-            || ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan))
-            // A signup that predates the Sep 2026 DI restructure can still be
-            // sitting in the approval queue asking for a package that is no
-            // longer sold. Approving must not quietly resurrect it — the admin
-            // assigns one of the current packages by hand instead.
-            || ($plan->product_type === 'di' && !DiPlanComparisonService::isSellablePlan($plan))) {
+        // A signup can sit in the approval queue for months, asking for a
+        // package that has since been retired (DI Sep 2026, both POS lines
+        // 23 Aug 2026). Approving must not quietly resurrect it — the admin
+        // assigns one of the current packages by hand instead.
+        if (!$plan || $plan->is_trial || PlanSellabilityService::isRetired($plan)) {
             return null;
         }
 

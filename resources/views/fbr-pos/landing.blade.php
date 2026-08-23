@@ -370,7 +370,7 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16 fade-in-up">
                 <h2 class="text-4xl font-serif text-[#052730] mb-4">Straightforward Licensing</h2>
-                <p class="text-gray-600 text-lg">Predictable annual pricing. 6% discount baked directly into all plans.</p>
+                <p class="text-gray-600 text-lg">Two packages, one clear yearly price. Prefer to pay every 3 months or monthly? That works too, for a little more.</p>
             </div>
 
             @if(isset($plans) && $plans->count())
@@ -464,7 +464,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Loyalty Points</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">Set your own earn and redeem rates. Regular customers collect points on every bill and cash them in at the counter — the full points ledger stays auditable per customer. Pro plan.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Set your own earn and redeem rates. Regular customers collect points on every bill and cash them in at the counter — the full points ledger stays auditable per customer. Business plan.</p>
                 </div>
 
                 <!-- Promotions -->
@@ -473,7 +473,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Promotions &amp; Discount Codes</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">Run time-boxed promotions, deals and discount codes that validate live at billing. Prices are enforced server-side, so cashiers can't hand out discounts you didn't approve. Pro plan.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Run time-boxed promotions, deals and discount codes that validate live at billing. Prices are enforced server-side, so cashiers can't hand out discounts you didn't approve. Business plan.</p>
                 </div>
 
                 <!-- Khata -->
@@ -536,7 +536,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18v4H3V3zm2 8h14m-9 4h4m-7 4h10a2 2 0 002-2v-6H5v6a2 2 0 002 2z"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Restaurant Orders &amp; Kitchen</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">Run dine-in tables, print kitchen order tickets by station, and put a kitchen display screen in front of the chef — plus a scan-to-order public QR menu for your customers. Kitchen printing is on the Pro plan.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Run dine-in tables, print kitchen order tickets by station, and put a kitchen display screen in front of the chef — plus a scan-to-order public QR menu for your customers. Kitchen printing is on the Business plan.</p>
                 </div>
 
                 <!-- Inventory -->
@@ -572,7 +572,7 @@
                         <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
                     <h4 class="text-lg font-bold text-[#052730] mb-2">Reports &amp; Analytics</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">Sales and tax reports with PDF export from the Business plan, and a full analytics dashboard — trends, top products, busiest hours — on the Pro plan. Know your shop by the numbers.</p>
+                    <p class="text-gray-600 text-sm leading-relaxed">Sales and tax reports with PDF export, plus a full analytics dashboard — trends, top products, busiest hours — on the Business plan. Know your shop by the numbers.</p>
                 </div>
 
                 <!-- Mobile app -->

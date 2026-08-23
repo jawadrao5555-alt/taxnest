@@ -142,6 +142,7 @@ class AdminPlanController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
+            'price_monthly' => 'nullable|numeric|min:0',
             'price_quarterly' => 'nullable|numeric|min:0',
             'price_semi_annual' => 'nullable|numeric|min:0',
             'price_yearly' => 'nullable|numeric|min:0',
@@ -173,7 +174,10 @@ class AdminPlanController extends Controller
             'name' => $data['name'],
             'product_type' => $data['product_type'],
             'price' => $data['price'],
-            'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
+            // DI prices MONTHLY, so its headline price is the monthly rate. Both
+            // POS lines price the YEAR and carry a hand-set monthly rate (23 Aug
+            // 2026 — FBR POS left the monthly convention with Pro's merge).
+            'price_monthly' => $data['product_type'] === 'di' ? $data['price'] : ($data['price_monthly'] ?? null),
             'price_quarterly' => $data['price_quarterly'] ?? null,
             // DI packages carry hand-set half-year / annual rates; the cycle
             // discount ladder is shared with FBR POS and must stay untouched.
@@ -207,6 +211,7 @@ class AdminPlanController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
+            'price_monthly' => 'nullable|numeric|min:0',
             'price_quarterly' => 'nullable|numeric|min:0',
             'price_semi_annual' => 'nullable|numeric|min:0',
             'price_yearly' => 'nullable|numeric|min:0',
@@ -236,7 +241,16 @@ class AdminPlanController extends Controller
             'name' => $data['name'],
             'product_type' => $data['product_type'],
             'price' => $data['price'],
-            'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
+            // A hand-set POS monthly rate must SURVIVE an unrelated edit (the
+            // old blanket null wiped the monthly cycle off every POS package
+            // that was ever saved from this form). Only an explicit field, or
+            // a switch away from DI (where the value was a mirror of the
+            // monthly price), may change it.
+            'price_monthly' => $data['product_type'] === 'di'
+                ? $data['price']
+                : (array_key_exists('price_monthly', $data)
+                    ? $data['price_monthly']
+                    : ($plan->product_type === 'di' ? null : $plan->price_monthly)),
             'price_quarterly' => $data['price_quarterly'] ?? null,
             'price_semi_annual' => $data['price_semi_annual'] ?? null,
             'price_yearly' => $data['price_yearly'] ?? null,

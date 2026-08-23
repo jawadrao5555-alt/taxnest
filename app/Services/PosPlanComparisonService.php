@@ -61,6 +61,12 @@ class PosPlanComparisonService
         'excel'          => ['column' => 'excel_enabled',          'hint' => true],
         'offline'        => ['column' => 'offline_enabled',        'hint' => true],
         'custom_access'  => ['column' => 'custom_access_enabled',  'hint' => true],
+        // Sold BOTH ways (23 Aug 2026): included in the packages whose column
+        // is ON, still buyable as an add-on by the packages below them. Marked
+        // 'addon' so a cross renders as "Add-on" instead of a flat no — the
+        // shop can have the feature, it is simply not in that package's price.
+        'whatsapp'       => ['column' => 'whatsapp_enabled',       'hint' => true, 'addon' => true],
+        'caller_id'      => ['column' => 'caller_id_enabled',      'hint' => true, 'addon' => true],
     ];
 
     /**
@@ -98,14 +104,18 @@ class PosPlanComparisonService
     ];
 
     /**
-     * Gate columns sold as PAID ADD-ONS: no POS package includes them, so they
-     * have no tick/cross row — their customer-facing name lives in the add-on
-     * catalogue shown in the billing purchase box and comparison-table strip.
+     * Gate columns that can be BOUGHT as paid add-ons.
      *
-     * Map: pricing_plans gate column => add-on code. auditNames() verifies
-     * the code exists in the catalogue and reads in all three languages;
-     * audit() fails the deploy if any POS plan row still has one of these
-     * columns ON (a package would silently include a paid add-on).
+     * Until 23 Aug 2026 this also meant "no package may include them", so they
+     * had no tick/cross row at all. The owner then folded WhatsApp Bill into
+     * Business + Unlimited and Caller ID into Unlimited, so the rule changed:
+     * an add-on column MAY ride a package, but only if it also has a
+     * FEATURE_ROWS row — otherwise the shop pays for a package containing
+     * something no surface admits to. audit() enforces exactly that, and
+     * auditNames() still demands the catalogue name in all three languages
+     * (the add-on is still sold to the packages that do not include it).
+     *
+     * Map: pricing_plans gate column => add-on code.
      */
     public const ADDON_COLUMNS = [
         'whatsapp_enabled'       => 'whatsapp_bill',
@@ -121,7 +131,7 @@ class PosPlanComparisonService
      * pricing_plans for history but cannot become sellable merely because a
      * new row name appears in the database.
      */
-    public const SELLABLE_PLAN_NAMES = ['Starter', 'Business', 'Pro', 'Unlimited'];
+    public const SELLABLE_PLAN_NAMES = ['Starter', 'Business', 'Unlimited'];
 
     /**
      * The POS surfaces that render package cards (Task 1384). auditCards()
@@ -286,6 +296,11 @@ class PosPlanComparisonService
                 'column' => $spec['column'],
                 'label'  => __('pos.pcmp_' . $key),
                 'hint'   => $spec['hint'] ? __('pos.pcmp_' . $key . '_hint') : null,
+                // A package that does not include a still-sellable add-on gets
+                // "Add-on", not a cross: the shop can buy it on top.
+                'addon_text' => !empty($spec['addon']) && isset(self::ADDON_COLUMNS[$spec['column']])
+                    ? __('pos.pcmp_addon')
+                    : null,
                 'values' => $plans->map(fn (PricingPlan $plan) => (bool) $plan->{$spec['column']})->all(),
             ];
         }
@@ -776,15 +791,19 @@ class PosPlanComparisonService
             }
         }
 
-        // 3b. Add-on-sold features may never ride a package: the table has no
-        //     row for them, so a plan column left ON would grant a paid add-on
-        //     silently — the shop pays for a package that includes something
-        //     no surface admits to.
+        // 3b. An add-on-sold feature may ride a package ONLY if the table has a
+        //     row for it. Without a row the shop pays for a package that
+        //     silently contains a paid feature no surface admits to.
+        $rowColumns = array_column(self::FEATURE_ROWS, 'column');
         foreach (self::ADDON_COLUMNS as $column => $code) {
+            if (in_array($column, $rowColumns, true)) {
+                continue;
+            }
             foreach ($plans as $plan) {
                 if (!empty($plan->{$column})) {
                     $problems[] = "'{$code}' is sold as a paid add-on but {$plan->name} has {$column} ON — "
-                        . 'switch it off on the plan row (add-ons never ride a package) or move it back into FEATURE_ROWS.';
+                        . 'give it a FEATURE_ROWS row so the table shows what the package includes, '
+                        . 'or switch the column off on the plan row.';
                 }
             }
         }

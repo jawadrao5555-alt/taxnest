@@ -152,15 +152,49 @@ class AdminPlanStorePostTest extends TestCase
         $this->assertEquals(1500.0, (float) $plan->price_monthly);
     }
 
-    /** fbrpos plans store monthly prices — price_monthly mirrors price. */
-    public function test_store_mirrors_price_monthly_for_fbrpos(): void
+    /**
+     * fbrpos plans store ANNUAL prices since 23 Aug 2026 — price_monthly is a
+     * hand-set rate, never a mirror. Mirroring it would sell a whole year for
+     * one month's fee the moment a shop picked the monthly cycle.
+     */
+    public function test_store_never_mirrors_price_monthly_for_fbrpos(): void
     {
         $this->actingAsAdmin()->post('/admin/plans', $this->validPayload([
-            'name' => 'FBR Plan', 'product_type' => 'fbrpos', 'price' => 3200,
+            'name' => 'FBR Plan', 'product_type' => 'fbrpos', 'price' => 27999,
         ]))->assertSessionHasNoErrors();
 
         $plan = DB::table('pricing_plans')->where('name', 'FBR Plan')->first();
-        $this->assertEquals(3200.0, (float) $plan->price_monthly);
+        $this->assertNull($plan->price_monthly, 'fbrpos price is annual — the monthly rate must be hand-set.');
+    }
+
+    /** ...and the hand-set monthly rate is stored exactly as typed. */
+    public function test_store_keeps_hand_set_monthly_rate_for_pos_lines(): void
+    {
+        foreach (['pos' => 2599, 'fbrpos' => 2599] as $type => $monthly) {
+            $this->actingAsAdmin()->post('/admin/plans', $this->validPayload([
+                'name' => 'Cycle ' . $type, 'product_type' => $type,
+                'price' => 27999, 'price_monthly' => $monthly, 'price_quarterly' => 7349,
+            ]))->assertSessionHasNoErrors();
+
+            $plan = DB::table('pricing_plans')->where('name', 'Cycle ' . $type)->first();
+            $this->assertEquals(27999.0, (float) $plan->price, "{$type}: price is the ANNUAL rate");
+            $this->assertEquals($monthly, (float) $plan->price_monthly, "{$type}: hand-set monthly rate");
+            $this->assertEquals(7349.0, (float) $plan->price_quarterly, "{$type}: hand-set quarterly rate");
+        }
+    }
+
+    /** An unrelated edit must never wipe a POS package's monthly rate. */
+    public function test_update_preserves_hand_set_monthly_rate_for_pos(): void
+    {
+        $id = $this->seedPlan(['product_type' => 'pos', 'price' => 27999, 'price_monthly' => 2599]);
+
+        $this->actingAsAdmin()->put("/admin/plans/{$id}", $this->validPayload([
+            'product_type' => 'pos', 'price' => 27999,
+        ]))->assertSessionHasNoErrors();
+
+        $plan = DB::table('pricing_plans')->find($id);
+        $this->assertEquals(2599.0, (float) $plan->price_monthly,
+            'A saved POS package must keep the monthly cycle it was selling.');
     }
 
     /** pos plans store ANNUAL prices — price_monthly must stay NULL. */

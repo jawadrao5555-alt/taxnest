@@ -174,11 +174,16 @@ class PosPlanMergeMigrationTest extends TestCase
         $this->assertSame($proMaxId, (int) DB::table('payment_proofs')->where('id', $verifiedProofId)->value('pricing_plan_id'));
         $this->assertNotNull(DB::table('pricing_plans')->where('id', $proMaxId)->first(), 'Retired row must remain for history.');
 
+        // Sellable list (23 Aug 2026): Pro was later merged INTO Business, so
+        // this migration's own row stays in the table for the shops on it but
+        // is no longer offered. The retirement is asserted by its own test.
         $this->assertSame(
-            ['Starter', 'Business', 'Pro', 'Unlimited'],
+            ['Starter', 'Business', 'Unlimited'],
             PosPlanComparisonService::plans()->pluck('name')->all()
         );
-        $this->assertSame([$starterId, $businessId, $proId, $unlimitedId], PosPlanComparisonService::plans()->pluck('id')->all());
+        $this->assertSame([$starterId, $businessId, $unlimitedId], PosPlanComparisonService::plans()->pluck('id')->all());
+        $this->assertNotNull(DB::table('pricing_plans')->where('id', $proId)->first(),
+            'Retired Pro row must remain for the shops still on it.');
 
         $this->runMigration();
         $this->assertSame($proId, (int) DB::table('subscriptions')->where('id', $activeSubscriptionId)->value('pricing_plan_id'));

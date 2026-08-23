@@ -304,8 +304,10 @@ foreach (['di', 'pos', 'fbrpos'] as $product) {
             $final = round($plan->price * $months * (1 - $disc / 100));
             $end = date('Y-m-d', strtotime($start . " +$months months"));
         } else {
-            $cycle = 'annual'; $disc = 6;
-            $final = $product === 'fbrpos' ? round($plan->price * 12 * 0.94) : $plan->price;
+            // 23 Aug 2026: BOTH POS lines store the ANNUAL rate in `price`.
+            // fbrpos used to be a monthly rate charged x12x0.94 — never again.
+            $cycle = 'annual'; $disc = 0;
+            $final = $plan->price;
             $end = date('Y-m-d', strtotime($start . ' +12 months'));
         }
         if ($expired) $end = date('Y-m-d', strtotime('-' . mt_rand(3, 60) . ' days'));

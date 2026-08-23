@@ -4950,7 +4950,10 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'fbrpos')->orderBy('price')->get();
+        // Sellable packages only (23 Aug 2026): Pro was merged into Business, so
+        // the panel must never offer it again — even though shops still on it
+        // keep it. Same allowlist the landing and signup use.
+        $plans = \App\Services\FbrPosPlanComparisonService::plans();
         $currentSubscription = \App\Models\Subscription::where('company_id', $companyId)
             ->where('active', true)
             ->with('pricingPlan')

@@ -715,4 +715,84 @@ class PosExtraBranchPurchaseFlowTest extends TestCase
         $this->approve($proof)->assertRedirect();
         $this->assertSame(2, (int) $shop->fresh()->extra_branch_slots, 'a pro-rata price still buys the full slots');
     }
+
+    // ─────────── a proof that went stale while it sat in the queue ───────────
+    //
+    // Eligibility is checked when the shop SUBMITS, but approval can be days
+    // later. Whatever changed in between, a paid slot must still be able to do
+    // something — otherwise the shop is charged for a branch it cannot open.
+    // The proof stays pending so it can be refunded, or approved after a fix.
+
+    public function test_a_proof_whose_package_expired_while_queued_cannot_be_approved(): void
+    {
+        $plan = $this->makePlan();
+        $shop = $this->makeShop($plan, branches: 2);
+        $proof = $this->extraBranchProof($shop, 1, 10000);
+
+        // The term ran out while the request sat in the review queue.
+        $this->activeSub($shop)->update(['end_date' => now()->subDay()->toDateString()]);
+
+        $this->approve($proof)->assertRedirect();
+
+        $this->assertSame(0, (int) $shop->fresh()->extra_branch_slots, 'no slot may be credited on a dead package');
+        $this->assertSame('pending', $proof->fresh()->status, 'the proof must stay in the queue for a refund or a renewal');
+    }
+
+    public function test_a_proof_cannot_be_approved_after_an_admin_set_the_branch_limit_by_hand(): void
+    {
+        $plan = $this->makePlan();
+        $shop = $this->makeShop($plan, branches: 2);
+        $proof = $this->extraBranchProof($shop, 1, 10000);
+
+        // An override outranks slots entirely — paying for one buys nothing.
+        $shop->update(['branch_limit_override' => 6]);
+
+        $this->approve($proof)->assertRedirect();
+
+        $this->assertSame(0, (int) $shop->fresh()->extra_branch_slots);
+        $this->assertSame('pending', $proof->fresh()->status);
+    }
+
+    public function test_a_proof_cannot_be_approved_after_the_shop_moved_to_an_unlimited_branch_package(): void
+    {
+        $plan = $this->makePlan();
+        $shop = $this->makeShop($plan, branches: 2);
+        $proof = $this->extraBranchProof($shop, 1, 10000);
+
+        // Moved up to a package whose branches are already unlimited.
+        $unlimited = $this->makePlan('pos', 34999, -1, ['name' => 'Unlimited']);
+        $this->activeSub($shop)->update(['pricing_plan_id' => $unlimited->id]);
+
+        $this->approve($proof)->assertRedirect();
+
+        $this->assertSame(0, (int) $shop->fresh()->extra_branch_slots);
+        $this->assertSame('pending', $proof->fresh()->status);
+    }
+
+    public function test_a_proof_cannot_be_approved_after_the_shop_dropped_to_a_trial(): void
+    {
+        $plan = $this->makePlan();
+        $shop = $this->makeShop($plan, branches: 2);
+        $proof = $this->extraBranchProof($shop, 1, 10000);
+
+        $trial = $this->makePlan('pos', 0, 1, ['name' => 'POS Trial', 'is_trial' => true]);
+        $this->activeSub($shop)->update(['pricing_plan_id' => $trial->id]);
+
+        $this->approve($proof)->assertRedirect();
+
+        $this->assertSame(0, (int) $shop->fresh()->extra_branch_slots);
+        $this->assertSame('pending', $proof->fresh()->status);
+    }
+
+    public function test_a_still_eligible_proof_is_approved_exactly_as_before(): void
+    {
+        $plan = $this->makePlan();
+        $shop = $this->makeShop($plan, branches: 2);
+        $proof = $this->extraBranchProof($shop, 2, 20000);
+
+        $this->approve($proof)->assertRedirect();
+
+        $this->assertSame(2, (int) $shop->fresh()->extra_branch_slots);
+        $this->assertSame('verified', $proof->fresh()->status);
+    }
 }

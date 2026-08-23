@@ -67,12 +67,17 @@ $EXPECTED_GATE_ORDER = [
 ];
 $MATRIX = [
     // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id, whatsapp]
+    // 23 Aug 2026 (owner): Pro and Pro Max are RETIRED — Pro was merged into
+    // Business, which keeps the name and takes Pro's whole feature set at
+    // Rs 27,999/yr. Three sellable packages remain: Starter, Business,
+    // Unlimited. WhatsApp Bill is now INCLUDED in Business and Unlimited, and
+    // Caller ID is included in Unlimited (still a paid add-on below it) — an
+    // add-on gate may ride a package only because both now have a comparison
+    // row. Rider Live Tracking stays add-on-only on every package.
     // 22 Aug 2026 (owner): Delivery Riders + QR Menu are included from
-    // Business upward; Staff Hazri is included from Pro upward. WhatsApp Bill,
-    // Rider Live Tracking and Caller ID remain paid add-ons only. Active trials
-    // still unlock everything by rule; admin override and internal accounts too.
-    // 22 Aug 2026 (owner): Custom Access is included in Business, Pro and
-    // Unlimited; it is not a paid add-on and is unavailable on Starter.
+    // Business upward. Active trials still unlock everything by rule; admin
+    // override and internal accounts too. Custom Access is included from
+    // Business upward and is unavailable on Starter.
     // 9 Aug 2026 strict binding: reports_enabled gates CSV/PDF exports only —
     // Starter card promises basic report PAGES (ungated) but NOT exports, so
     // Starter reports=false; excel_enabled (product import/export) = Business+.
@@ -82,23 +87,23 @@ $MATRIX = [
     // 13 Aug 2026 (owner, market-capture move): Business gains Kitchen mode
     // (restaurant_enabled — asserted separately below) + Analytics.
     'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false],
-    'Business'  => [true,  true,  false, true,  true,  false, true,  true,  true,  true,  true, true, true, false, false],
-    'Pro'       => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, false],
-    'Unlimited' => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, false],
+    'Business'  => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, true],
+    'Unlimited' => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, true,  true],
 ];
 // Branch ladder (owner-approved 21 Aug 2026): har package apne card wali
 // branches MUFT deta hai; us se ooper har branch Rs 10,000 SAALANA paid add-on
 // (BranchAddonService + companies.extra_branch_slots). Unlimited ki hadd -1 se
 // 5 hui — warna branch feature live hote hi wo shop bila hisaab branches bana
 // leti. Ye qatar aur pricing formula lockstep mein rehni chahiye.
-$BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Pro' => 3, 'Unlimited' => 5];
+// 23 Aug 2026 (owner): Unlimited 2 branches, baqi 1 — us se ooper paid slots.
+$BRANCH_LADDER = ['Starter' => 1, 'Business' => 1, 'Unlimited' => 2];
 
 // Derived-surface expectations per plan:
-$CUSTOM_SET_PLANS = ['Business', 'Pro', 'Unlimited']; // included Business+
-$QR_URL_PLANS     = ['Business', 'Pro', 'Unlimited'];
+$CUSTOM_SET_PLANS = ['Business', 'Unlimited']; // included Business+
+$QR_URL_PLANS     = ['Business', 'Unlimited'];
 // Restaurant module (pricing_plans.restaurant_enabled → restaurantAllowed()):
 // Business+ since 13 Aug 2026 (Kitchen mode opened up for Business).
-$RESTAURANT_PLANS = ['Business', 'Pro', 'Unlimited'];
+$RESTAURANT_PLANS = ['Business', 'Unlimited'];
 
 $fail = 0;
 $pass = 0;
@@ -248,11 +253,11 @@ try {
     check(PosFeatureService::restaurantAllowed($c) === false,
         'override on Starter: Restaurant module must stay closed (Starter has none)');
 
-    $c = $mkCompany('OverridePro');
-    $mkSub($c, $plans['Pro']->id, $ovrExtra);
-    $assertGates($c, $withAddons($MATRIX['Pro']), 'override on Pro');
+    $c = $mkCompany('OverrideUnlimited');
+    $mkSub($c, $plans['Unlimited']->id, $ovrExtra);
+    $assertGates($c, $withAddons($MATRIX['Unlimited']), 'override on Unlimited');
     check(PosFeatureService::restaurantAllowed($c) === true,
-        'override on Pro: Restaurant module must be open');
+        'override on Unlimited: Restaurant module must be open');
 
     if ($trialPlan) {
         $c = $mkCompany('OverrideTrialPlan');
@@ -282,22 +287,21 @@ try {
     //   included branches free → hadd par ruke → khareede hue slots se aage
     //   khule → renewal ka total base + slots×10,000 bane. Admin override aur
     //   trial ke rules waise ke waise.
-    $ebPlan = $plans['Pro'];                    // 3 included branches
+    $ebPlan = $plans['Unlimited'];              // 2 included branches
     $c = $mkCompany('BranchAddon');
     $mkSub($c, $ebPlan->id);
     $mkBranch = function (Company $co, string $nm) {
         Branch::create(['company_id' => $co->id, 'name' => $nm, 'is_active' => true, 'is_head_office' => false]);
     };
-    check(PlanLimitService::canAddBranch($c->id)['allowed'] === true, 'add-on: included branches must be free (0/3)');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === true, 'add-on: included branches must be free (0/2)');
     $mkBranch($c, 'B1');
     $mkBranch($c, 'B2');
-    $mkBranch($c, 'B3');
-    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop at the package limit (3/3)');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop at the package limit (2/2)');
     $c->extra_branch_slots = 1;
     $c->save();
-    check(PlanLimitService::canAddBranch($c->fresh()->id)['allowed'] === true, 'add-on: a paid slot must open the next branch (3/4)');
-    $mkBranch($c, 'B4');
-    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop again once the paid slot is used (4/4)');
+    check(PlanLimitService::canAddBranch($c->fresh()->id)['allowed'] === true, 'add-on: a paid slot must open the next branch (2/3)');
+    $mkBranch($c, 'B3');
+    check(PlanLimitService::canAddBranch($c->id)['allowed'] === false, 'add-on: must stop again once the paid slot is used (3/3)');
 
     // Pricing formula — one source of truth for every surface.
     check(BranchAddonService::priceForMonths(1, 12) === 10000.0, 'add-on: 1 slot / 12 months must be Rs 10,000');
@@ -381,9 +385,11 @@ try {
     // service, so a hand-edited plan row, a renamed column or a new
     // unnamed gate blocks the deploy instead of quietly publishing a
     // promise the gates do not keep.
-    $BILL_LADDER    = ['Starter' => 2000, 'Business' => 'Unlimited', 'Pro' => 'Unlimited', 'Unlimited' => 'Unlimited'];
-    $TEAM_LADDER    = ['Starter' => 2, 'Business' => 5, 'Pro' => 20, 'Unlimited' => 'Unlimited'];
-    $COUNTER_LADDER = ['Starter' => 1, 'Business' => 3, 'Pro' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+    // 23 Aug 2026 (owner): Business took Pro's capacity — unlimited bills and
+    // counters, 7 team accounts; Unlimited 12.
+    $BILL_LADDER    = ['Starter' => 2000, 'Business' => 'Unlimited', 'Unlimited' => 'Unlimited'];
+    $TEAM_LADDER    = ['Starter' => 2, 'Business' => 7, 'Unlimited' => 12];
+    $COUNTER_LADDER = ['Starter' => 1, 'Business' => 'Unlimited', 'Unlimited' => 'Unlimited'];
 
     $expectedLimits = [];
     $expectedFeatures = [];
@@ -420,8 +426,7 @@ try {
     // migration or a half-applied reprice blocks the deploy.
     $PRICE_LADDER = [
         'Starter'   => ['annual' => 17999, 'quarterly' => 4699, 'monthly' => 1649],
-        'Business'  => ['annual' => 24999, 'quarterly' => 6549, 'monthly' => 2299],
-        'Pro'       => ['annual' => 29999, 'quarterly' => 7849, 'monthly' => 2749],
+        'Business'  => ['annual' => 27999, 'quarterly' => 7349, 'monthly' => 2599],
         'Unlimited' => ['annual' => 34999, 'quarterly' => 9199, 'monthly' => 3199],
     ];
     $posSaleLive = \App\Models\SaleCampaign::activeFor('pos') !== null;
@@ -511,21 +516,28 @@ try {
             . "team-account number ({$seats}) — never mirror POS seats into the DI users cap.");
     }
 
-    // ── 7. FBR POS ladder (owner-approved 9 Aug 2026 — strict binding +
-    //       reprice 999/1999/2999). Rows matched by product_type+name; a
-    //       drift here means the fbrpos_plan_reprice_and_strict_gating
+    // ── 7. FBR POS ladder (owner-approved 23 Aug 2026 — Pro merged INTO
+    //       Business, two sellable packages, and the PRA price convention:
+    //       pricing_plans.price is the ANNUAL rate with hand-set quarterly /
+    //       monthly columns, NOT a monthly rate charged ×12. Rows matched by
+    //       product_type+name; a drift here means the two_package_ladder
     //       migration didn't run or someone hand-edited the rows. ────────
     $fbrGateCols = ['inventory_enabled', 'offline_enabled', 'excel_enabled', 'khata_enabled',
                     'reports_enabled', 'deals_enabled', 'loyalty_enabled', 'kot_enabled',
                     'analytics_enabled'];
     $FBR_MATRIX = [
-        // name => [price, inventory, offline, excel, khata, reports, deals, loyalty, kot, analytics]
-        'Starter'  => [999,  true,  false, false, false, false, false, false, false, false],
-        'Business' => [1999, true,  true,  true,  true,  true,  false, false, false, false],
-        'Pro'      => [2999, true,  true,  true,  true,  true,  true,  true,  true,  true],
+        // name => [annual price, inventory, offline, excel, khata, reports, deals, loyalty, kot, analytics]
+        'Starter'  => [17999, true,  false, false, false, false, false, false, false, false],
+        'Business' => [27999, true,  true,  true,  true,  true,  true,  true,  true,  true],
         // Trial gate COLUMNS stay false (PRA convention): active trial unlocks
         // via isTrialActive; true columns would leak features to EXPIRED trials.
-        'Trial'    => [0,    true,  false, false, false, false, false, false, false, false],
+        'Trial'    => [0,     true,  false, false, false, false, false, false, false, false],
+    ];
+    // Shorter cycles, hand-set like PRA POS (annual ÷ 4 × 1.05, annual ÷ 12 × 1.10).
+    // Trial is not sold, so it carries no cycle rates.
+    $FBR_CYCLE_PRICES = [
+        'Starter'  => ['quarterly' => 4699, 'monthly' => 1649],
+        'Business' => ['quarterly' => 7349, 'monthly' => 2599],
     ];
     $fbrPlans = DB::table('pricing_plans')->where('product_type', 'fbrpos')->get()->keyBy('name');
     foreach ($FBR_MATRIX as $name => $row) {
@@ -533,9 +545,24 @@ try {
         if (!$p) { bad("fbrpos plan row missing: {$name}"); continue; }
         $wantPrice = array_shift($row);
         check((float) $p->price === (float) $wantPrice,
-            "fbrpos {$name}: price must be {$wantPrice}, got {$p->price}");
-        check((float) ($p->price_monthly ?? -1) === (float) $wantPrice,
-            "fbrpos {$name}: price_monthly must be {$wantPrice}, got " . ($p->price_monthly ?? 'NULL'));
+            "fbrpos {$name}: annual price must be {$wantPrice}, got {$p->price}");
+        // price_monthly must NEVER mirror price again — that was the old
+        // monthly convention, and a mirror would sell a year for a month's fee.
+        foreach ($FBR_CYCLE_PRICES[$name] ?? [] as $cycle => $wantCycle) {
+            $col = 'price_' . $cycle;
+            check((int) ($p->{$col} ?? -1) === $wantCycle,
+                "fbrpos {$name}: {$col} must be {$wantCycle}, got " . ($p->{$col} ?? 'NULL'));
+        }
+        // ...and what checkout actually charges must be those same numbers.
+        $fbrPlanModel = \App\Models\PricingPlan::find($p->id);
+        if ($fbrPlanModel && isset($FBR_CYCLE_PRICES[$name]) && \App\Models\SaleCampaign::activeFor('fbrpos') === null) {
+            foreach (['annual' => $wantPrice] + $FBR_CYCLE_PRICES[$name] as $cycle => $wantCharge) {
+                $priced = \App\Services\SubscriptionAssignmentService::computePrice($fbrPlanModel, $cycle);
+                check($priced['cycle'] === $cycle && (int) $priced['final_price'] === (int) $wantCharge,
+                    "fbrpos {$name}: computePrice({$cycle}) must charge {$wantCharge}, got "
+                    . $priced['cycle'] . '/' . (int) $priced['final_price']);
+            }
+        }
         foreach ($fbrGateCols as $i => $col) {
             check((bool) ($p->{$col} ?? false) === $row[$i],
                 "fbrpos {$name}: {$col} expected " . var_export($row[$i], true));
@@ -564,11 +591,10 @@ try {
         $c = $mkFbrCompany('Business');
         $mkSub($c, $fbrPlans['Business']->id);
         PosFeatureService::flushGateCaches();
-        foreach (['offline_enabled', 'excel_enabled', 'khata_enabled', 'reports_enabled'] as $g) {
+        // 23 Aug 2026: Business absorbed Pro, so every gate Pro held is open here.
+        foreach (['offline_enabled', 'excel_enabled', 'khata_enabled', 'reports_enabled',
+                  'deals_enabled', 'loyalty_enabled', 'kot_enabled', 'analytics_enabled'] as $g) {
             check(PosFeatureService::planAllows($c, $g) === true, "fbrpos Business sub: {$g} must be open");
-        }
-        foreach (['deals_enabled', 'loyalty_enabled', 'kot_enabled', 'analytics_enabled'] as $g) {
-            check(PosFeatureService::planAllows($c, $g) === false, "fbrpos Business sub: {$g} must be locked");
         }
 
         $c = $mkFbrCompany('TrialActive');
@@ -594,13 +620,15 @@ try {
     //       hand-edited plan row, a renamed column or a new unnamed FBR gate
     //       blocks the deploy instead of quietly publishing a promise the FBR
     //       gates do not keep.
-    $FBR_BILL_LADDER    = ['Starter' => 500, 'Business' => 2000, 'Pro' => 'Unlimited'];
-    $FBR_TEAM_LADDER    = ['Starter' => 1,   'Business' => 3,    'Pro' => 'Unlimited'];
-    $FBR_BRANCH_LADDER  = ['Starter' => 1,   'Business' => 2,    'Pro' => 'Unlimited'];
-    $FBR_COUNTER_LADDER = ['Starter' => 1,   'Business' => 3,    'Pro' => 'Unlimited'];
-    // Products stay CAPPED on FBR POS. PRA POS went unlimited in Aug 2026
-    // (section 6 asserts that); the fbrpos rows deliberately did not follow.
-    $FBR_PRODUCT_LADDER = ['Starter' => 100, 'Business' => 500,  'Pro' => 'Unlimited'];
+    // 23 Aug 2026 (owner): Starter 2,000 bills; Business takes Pro's uncapped
+    // capacity EXCEPT branches, which stop at 2 (extra branches are the paid
+    // Rs 10,000/year add-on, same as PRA POS). Products are now unlimited on
+    // both packages — the old 100 / 500 caps are gone.
+    $FBR_BILL_LADDER    = ['Starter' => 2000, 'Business' => 'Unlimited'];
+    $FBR_TEAM_LADDER    = ['Starter' => 1,    'Business' => 'Unlimited'];
+    $FBR_BRANCH_LADDER  = ['Starter' => 1,    'Business' => 2];
+    $FBR_COUNTER_LADDER = ['Starter' => 1,    'Business' => 'Unlimited'];
+    $FBR_PRODUCT_LADDER = ['Starter' => 'Unlimited', 'Business' => 'Unlimited'];
 
     $fbrFeatureColumns = array_column(\App\Services\FbrPosPlanComparisonService::FEATURE_ROWS, 'column');
     $fbrFeatureKeys    = array_keys(\App\Services\FbrPosPlanComparisonService::FEATURE_ROWS);

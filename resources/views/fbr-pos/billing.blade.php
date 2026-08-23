@@ -28,10 +28,16 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 @foreach($plans as $plan)
                 @php
-                    $yearlyTotal = (int) round($plan->sale_price * 12 * 0.94);
+                    // 23 Aug 2026: FBR POS prices the YEAR (price = annual rate)
+                    // with hand-set quarterly/monthly rates, exactly like PRA POS.
+                    // Never re-derive — SubscriptionAssignmentService charges
+                    // these very columns.
+                    $yearlyTotal = (int) round($plan->sale_price);
                     $perMonth = (int) round($yearlyTotal / 12);
+                    $quarterlyRate = (int) round((float) ($plan->price_quarterly ?? 0));
+                    $monthlyRate = (int) round((float) ($plan->price_monthly ?? 0));
                     $hasOffer = ($plan->sale_percent ?? 0) > 0;
-                    $compareYearly = $hasOffer ? (int) round($plan->price * 12 * 0.94) : 0;
+                    $compareYearly = $hasOffer ? (int) round($plan->price) : 0;
                     $isCurrent = $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id;
                     $isPopular = $plan->name === 'Business';
                     $planFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
@@ -57,6 +63,17 @@
                             <span class="text-gray-400 text-sm">{{ __('pos.per_year') }}</span>
                         </div>
                         <p class="text-xs text-gray-400">{{ __('pos.pkr_per_mo_effective', ['amount' => number_format($perMonth)]) }}</p>
+                        {{-- Shorter cycles only appear when the package really
+                             carries that rate — the same condition checkout
+                             charges on, so this can never quote a cycle the
+                             approval would refuse. --}}
+                        @if($quarterlyRate > 0 || $monthlyRate > 0)
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                            @if($quarterlyRate > 0){{ __('pos.pcmp_or_quarterly', ['price' => number_format($quarterlyRate)]) }}@endif
+                            @if($quarterlyRate > 0 && $monthlyRate > 0) · @endif
+                            @if($monthlyRate > 0){{ __('pos.pcmp_or_monthly', ['price' => number_format($monthlyRate)]) }}@endif
+                        </p>
+                        @endif
                         @if($hasOffer)<p class="text-xs text-blue-600 font-medium mt-0.5">{{ __('pos.save_pkr', ['amount' => number_format($compareYearly - $yearlyTotal)]) }}</p>@endif
 
                         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 text-sm text-gray-600 dark:text-gray-400">

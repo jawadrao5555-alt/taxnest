@@ -178,21 +178,46 @@ class PosQuarterlyPricingTest extends TestCase
         }
     }
 
-    public function test_fbrpos_quarterly_still_forces_annual(): void
+    /**
+     * 23 Aug 2026: FBR POS left the monthly convention behind. price is now the
+     * ANNUAL rate and the shorter cycles are hand-set columns — exactly like
+     * PRA POS — so all three cycles are charged from the row, never derived.
+     */
+    public function test_fbrpos_charges_the_hand_set_cycle_rates(): void
     {
         $plan = PricingPlan::create([
             'name' => 'FBR Basic',
             'product_type' => 'fbrpos',
-            'price' => 1000, // monthly base for fbrpos
-            'price_quarterly' => 9999, // must be IGNORED for fbrpos
+            'price' => 27999,           // ANNUAL rate
+            'price_quarterly' => 7349,
+            'price_monthly' => 2599,
             'is_trial' => false,
             'invoice_limit' => -1,
         ]);
 
-        $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
+        foreach (['annual' => 27999.0, 'quarterly' => 7349.0, 'monthly' => 2599.0] as $cycle => $want) {
+            $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
+            $this->assertSame($cycle, $priced['cycle'], "fbrpos must sell the {$cycle} cycle");
+            $this->assertSame($want, (float) $priced['final_price'], "fbrpos {$cycle} rate");
+        }
+    }
 
-        $this->assertSame('annual', $priced['cycle']);
-        $this->assertSame(round(1000 * 12 * 0.94), $priced['final_price']);
+    /** A cycle the fbrpos row does not price falls back to annual, never to a guess. */
+    public function test_fbrpos_unpriced_cycle_falls_back_to_annual(): void
+    {
+        $plan = PricingPlan::create([
+            'name' => 'FBR Annual Only',
+            'product_type' => 'fbrpos',
+            'price' => 17999,
+            'is_trial' => false,
+            'invoice_limit' => -1,
+        ]);
+
+        foreach (['quarterly', 'monthly', 'semi_annual', 'garbage'] as $cycle) {
+            $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
+            $this->assertSame('annual', $priced['cycle'], "cycle [{$cycle}] must fall back to annual");
+            $this->assertSame(17999.0, (float) $priced['final_price']);
+        }
     }
 
     public function test_di_quarterly_formula_unchanged(): void

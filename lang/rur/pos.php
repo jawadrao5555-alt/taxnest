@@ -5433,6 +5433,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pcmp_qr_menu' => 'QR Menu',
     'pcmp_qr_menu_hint' => 'Customer scan kar ke menu dekhe',
     'pcmp_whatsapp' => 'WhatsApp par bill',
+    'pcmp_whatsapp_hint' => 'Bill seedha customer ke WhatsApp par bhejein',
+    'pcmp_addon' => 'Add-on',
     'pcmp_hazri' => 'Staff Hazri',
     'pcmp_hazri_hint' => 'Login se banti hazri report',
     'pcmp_rider_tracking' => 'Rider Live Tracking',

@@ -166,6 +166,13 @@
 .tnpc-cross { background:#F9FAFB; border:1px solid #D1D5DB; color:#9CA3AF; }
 .tnpc-tick svg, .tnpc-cross svg { width:.875rem; height:.875rem; }
 
+/* "Add-on": the package does not include it, but it is on sale for this
+   package — a bare cross would read as "you cannot have this". */
+.tnpc-addon { display:inline-flex; align-items:center; justify-content:center;
+              padding:.125rem .4rem; border:1px dashed #D1D5DB; border-radius:999px;
+              font-size:.6875rem; font-weight:600; line-height:1.3; color:#6B7280;
+              white-space:nowrap; }
+
 .tnpc-note { display:flex; align-items:flex-start; gap:.5rem; margin:.75rem 0 0;
              font-size:.75rem; line-height:1.6; color:#4B5563; }
 .tnpc-note i { flex:none; margin-top:.375rem; width:.375rem; height:.375rem;
@@ -312,6 +319,9 @@
                                 <span class="tnpc-tick" role="img" aria-label="{{ $tickLabel }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
                                 </span>
+                            @elseif(!empty($row['addon_text']))
+                                {{-- Not in this package's price, but the shop CAN buy it --}}
+                                <span class="tnpc-addon">{{ $row['addon_text'] }}</span>
                             @else
                                 <span class="tnpc-cross" role="img" aria-label="—">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>

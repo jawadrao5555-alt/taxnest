@@ -27,8 +27,8 @@ use Tests\TestCase;
  *   1. renewalReview() puts the expected total (base + slots) and the amount
  *      the shop claims side by side, and flags the shortfall — from the SAME
  *      pricing source the renewal is charged from.
- *   2. It only applies where the add-on is actually sold (PRA POS, non-trial,
- *      slots > 0) — an FBR POS / DI renewal is untouched.
+ *   2. It only applies where the add-on is actually sold (both POS lines since
+ *      23 Aug 2026, non-trial, slots > 0) — a DI renewal is untouched.
  *   3. Approving a renewal may KEEP or REDUCE the slot count, and the reduced
  *      count is what the new subscription is priced at.
  *   4. It may never drop below the branches the shop already has (the floor),
@@ -195,7 +195,8 @@ class PosRenewalBranchSlotReviewTest extends TestCase
     private function makePlan(string $productType = 'pos', float $price = 24999, ?int $branches = 2, array $attrs = []): PricingPlan
     {
         return PricingPlan::create(array_merge([
-            'name' => $productType === 'pos' ? 'Business' : strtoupper($productType) . ' Pro',
+            // Both POS lines sell "Business"; only DI gets a made-up name here.
+            'name' => $productType === 'di' ? 'DI Premium' : 'Business',
             'product_type' => $productType,
             'is_trial' => false,
             'price' => $price,
@@ -376,16 +377,34 @@ class PosRenewalBranchSlotReviewTest extends TestCase
 
     public function test_review_does_not_apply_to_other_product_lines_or_trials(): void
     {
-        $fbrPlan = $this->makePlan('fbrpos', 3000, 2);
         $diPlan = $this->makePlan('di', 1500, 1);
         $trialPlan = $this->makePlan('pos', 0, 1, ['name' => 'Trial', 'is_trial' => true]);
         $shop = $this->makeShop(slots: 3, branches: 4);
 
-        foreach ([$fbrPlan, $diPlan, $trialPlan] as $plan) {
+        foreach ([$diPlan, $trialPlan] as $plan) {
             $review = BranchAddonService::renewalReview($shop, $plan, 'annual', 1);
-            $this->assertFalse($review['applies'], $plan->product_type . ' must not charge the PRA add-on');
+            $this->assertFalse($review['applies'], $plan->product_type . ' must not charge the branch add-on');
             $this->assertSame(0.0, $review['addon_price']);
         }
+    }
+
+    /**
+     * 23 Aug 2026: FBR POS sells the same Rs 10,000/branch/year add-on, so its
+     * renewals must be reviewed exactly like PRA POS — a base-only transfer on
+     * an FBR shop with paid slots is just as short.
+     */
+    public function test_review_applies_to_an_fbr_pos_renewal_too(): void
+    {
+        $fbrPlan = $this->makePlan('fbrpos', 27999, 2);
+        $shop = $this->makeShop(slots: 3, branches: 5, attrs: ['product_type' => 'fbrpos']);
+
+        $review = BranchAddonService::renewalReview($shop, $fbrPlan, 'annual', 27999);
+
+        $this->assertTrue($review['applies']);
+        $this->assertSame(27999.0, $review['base_price']);
+        $this->assertSame(30000.0, $review['addon_price'], '3 slots x Rs 10,000 for a full year');
+        $this->assertSame(57999.0, $review['expected_total']);
+        $this->assertTrue($review['short'], 'a base-only FBR transfer must be flagged short');
     }
 
     // ─── 3. the floor ────────────────────────────────────────────────────
@@ -503,9 +522,9 @@ class PosRenewalBranchSlotReviewTest extends TestCase
 
     public function test_slot_field_is_ignored_for_a_product_line_that_never_had_the_addon(): void
     {
-        $plan = $this->makePlan('fbrpos', 3000, 2);
-        $shop = $this->makeShop(3, 4, ['product_type' => 'fbrpos']);
-        $proof = $this->makeProof($shop, $plan, 33840);
+        $plan = $this->makePlan('di', 3000, 2);
+        $shop = $this->makeShop(3, 4, ['product_type' => 'di']);
+        $proof = $this->makeProof($shop, $plan, 3000);
 
         $this->approve($proof, $plan, ['extra_branch_slots' => 0])->assertRedirect();
 
@@ -513,7 +532,25 @@ class PosRenewalBranchSlotReviewTest extends TestCase
         $shop->refresh();
 
         $this->assertSame('verified', $proof->status);
-        $this->assertSame(3, (int) $shop->extra_branch_slots, 'FBR POS renewal must not touch the (inert) stored count');
+        $this->assertSame(3, (int) $shop->extra_branch_slots, 'a DI renewal must not touch the (inert) stored count');
+    }
+
+    /** ...but an FBR POS renewal decides slots exactly like PRA POS does. */
+    public function test_approving_an_fbr_renewal_can_reduce_slots_and_reprices_it(): void
+    {
+        $plan = $this->makePlan('fbrpos', 27999, 2);
+        $shop = $this->makeShop(slots: 3, branches: 4, attrs: ['product_type' => 'fbrpos']);
+        $proof = $this->makeProof($shop, $plan, 47999);
+
+        $this->approve($proof, $plan, ['extra_branch_slots' => 2])->assertRedirect();
+
+        $proof->refresh();
+        $shop->refresh();
+
+        $this->assertSame('verified', $proof->status);
+        $this->assertSame(2, (int) $shop->extra_branch_slots);
+        $this->assertSame(47999.0, (float) $this->activeSub($shop)->final_price,
+            'FBR renewal = base 27,999 + 2 paid branches');
     }
 
     // ─── 5. audit trail ──────────────────────────────────────────────────
@@ -566,5 +603,19 @@ class PosRenewalBranchSlotReviewTest extends TestCase
 
         $this->assertSame(0, AdminAuditLog::where('target_type', 'Company')->where('target_id', $shop->id)->count());
         $this->assertSame(1, AdminAuditLog::where('target_type', 'PaymentProof')->count());
+    }
+
+    // ─────────────── retired packages are refused at approval ───────────────
+
+    public function test_an_fbr_renewal_cannot_be_approved_onto_the_retired_package(): void
+    {
+        $retired = $this->makePlan('fbrpos', 2999, -1, ['name' => 'Pro']);
+        $shop = $this->makeShop(slots: 0, branches: 1, attrs: ['product_type' => 'fbrpos']);
+        $proof = $this->makeProof($shop, $retired, 2999.0);
+
+        $this->approve($proof, $retired)->assertRedirect();
+
+        $this->assertSame('pending', $proof->fresh()->status, 'the proof must stay in the queue');
+        $this->assertNull($this->activeSub($shop), 'no subscription may be created on a retired package');
     }
 }

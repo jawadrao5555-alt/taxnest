@@ -211,17 +211,22 @@ class PosExtraBranchSlotScopeTest extends TestCase
         $this->assertStringContainsString('Buy an extra branch', $verdict['reason']);
     }
 
-    // ── 2. Other product lines: slots must do nothing ───────────────────────
+    // ── 2. Other product lines ──────────────────────────────────────────────
 
-    public function test_fbr_pos_company_slots_do_not_change_the_branch_limit(): void
+    /**
+     * 23 Aug 2026: FBR POS sells the SAME paid extra branch (Rs 10,000/year) as
+     * PRA POS, so its slots must count — panel and gate alike. DI and a company
+     * with no product line still get nothing.
+     */
+    public function test_fbr_pos_company_slots_extend_the_branch_limit(): void
     {
         $withSlots = $this->makeCompany('fbrpos', 2, 4);
         $without = $this->makeCompany('fbrpos', 2, 0);
 
-        $this->assertSame(2, $this->reportedLimit($withSlots));
-        $this->assertSame(2, $this->enforcedLimit($withSlots));
-        $this->assertSame($this->reportedLimit($without), $this->reportedLimit($withSlots));
-        $this->assertSame(0, PlanLimitService::getEffectiveLimits($withSlots)['branch']['extra_slots']);
+        $this->assertSame(6, $this->reportedLimit($withSlots), 'panel must advertise 2 included + 4 paid');
+        $this->assertSame(6, $this->enforcedLimit($withSlots), 'gate must open for 2 included + 4 paid');
+        $this->assertSame(2, $this->reportedLimit($without), 'no slots = package limit only');
+        $this->assertSame(4, PlanLimitService::getEffectiveLimits($withSlots)['branch']['extra_slots']);
     }
 
     public function test_di_company_slots_do_not_change_the_branch_limit(): void
@@ -245,8 +250,9 @@ class PosExtraBranchSlotScopeTest extends TestCase
         $company = $this->makeCompany('pos', 2, 2);
         $this->assertSame(4, $this->enforcedLimit($company), 'PRA POS: 2 included + 2 paid');
 
-        // Plan swapped to the FBR POS line; the stored slot count is untouched.
-        DB::table('pricing_plans')->update(['product_type' => 'fbrpos']);
+        // Plan swapped to a line that does NOT sell the add-on (DI); the stored
+        // slot count is untouched but must stop counting, with no cleanup step.
+        DB::table('pricing_plans')->update(['product_type' => 'di']);
 
         $this->assertSame(2, $this->reportedLimit($company), 'slots must stop applying with no cleanup step');
         $this->assertSame(2, $this->enforcedLimit($company));
@@ -336,15 +342,17 @@ class PosExtraBranchSlotScopeTest extends TestCase
 
     // ── 8. Admin manual control is scoped the same way ──────────────────────
 
-    public function test_only_pra_pos_companies_may_be_given_slots_by_an_admin(): void
+    public function test_only_pos_line_companies_may_be_given_slots_by_an_admin(): void
     {
         $pos = \App\Models\Company::find($this->makeCompany('pos', 2, 0));
         $fbr = \App\Models\Company::find($this->makeCompany('fbrpos', 2, 0));
+        $di = \App\Models\Company::find($this->makeCompany('di', 2, 0));
         $trial = \App\Models\Company::find($this->makeCompany('pos', 1, 0, [], ['is_trial' => true]));
         $unlimited = \App\Models\Company::find($this->makeCompany('pos', -1, 0));
 
         $this->assertTrue(BranchAddonService::supportsCompany($pos));
-        $this->assertFalse(BranchAddonService::supportsCompany($fbr));
+        $this->assertTrue(BranchAddonService::supportsCompany($fbr), 'FBR POS sells the same paid branch (23 Aug 2026)');
+        $this->assertFalse(BranchAddonService::supportsCompany($di));
         $this->assertFalse(BranchAddonService::supportsCompany($trial));
         $this->assertFalse(BranchAddonService::supportsCompany($unlimited));
         $this->assertFalse(BranchAddonService::supportsCompany(null));

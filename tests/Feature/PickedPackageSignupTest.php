@@ -54,8 +54,8 @@ class PickedPackageSignupTest extends TestCase
 
         $rows = [
             ['name' => 'Business',  'product_type' => 'pos',    'price' => 24999, 'price_quarterly' => 7199],
-            ['name' => 'Pro',       'product_type' => 'pos',    'price' => 49999, 'price_quarterly' => 14399],
-            ['name' => 'FBR Growth', 'product_type' => 'fbrpos', 'price' => 22549],
+            ['name' => 'Unlimited', 'product_type' => 'pos',    'price' => 34999, 'price_quarterly' => 9199],
+            ['name' => 'Business', 'product_type' => 'fbrpos', 'price' => 27999, 'price_quarterly' => 7349],
             ['name' => 'DI Premium', 'product_type' => 'di',     'price' => 3499],
             // A trial row must never be pickable on any surface.
             ['name' => 'Free Trial', 'product_type' => 'pos',    'price' => 0, 'is_trial' => true],
@@ -83,12 +83,12 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_pra_signup_ticks_the_package_the_shop_clicked(): void
     {
-        $response = $this->get('/pos/register?plan=Pro');
+        $response = $this->get('/pos/register?plan=Unlimited');
 
         $response->assertOk();
-        $this->assertSame($this->planId('Pro'), (int) $response->viewData('preselectedPlanId'));
+        $this->assertSame($this->planId('Unlimited'), (int) $response->viewData('preselectedPlanId'));
         // The picker's Alpine state boots on that id, so the column arrives ticked.
-        $response->assertSee("planId: '" . $this->planId('Pro') . "'", false);
+        $response->assertSee("planId: '" . $this->planId('Unlimited') . "'", false);
     }
 
     public function test_pra_signup_matches_the_package_name_case_insensitively(): void
@@ -110,8 +110,8 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_pra_signup_ignores_an_unknown_or_tampered_package(): void
     {
-        // Pro Max is retired — it must not preselect even though a DB row may exist.
-        foreach (['Platinum Deluxe', '999', '<script>alert(1)</script>', 'Free Trial', 'Pro Max'] as $bogus) {
+        // Pro / Pro Max are retired — they must not preselect even though a DB row may exist.
+        foreach (['Platinum Deluxe', '999', '<script>alert(1)</script>', 'Free Trial', 'Pro Max', 'Pro'] as $bogus) {
             $response = $this->get('/pos/register?plan=' . urlencode($bogus));
 
             $response->assertOk();
@@ -125,7 +125,7 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_pra_signup_cannot_be_pointed_at_another_products_package(): void
     {
-        foreach (['FBR Growth', 'DI Premium'] as $foreign) {
+        foreach (['DI Premium'] as $foreign) {
             $response = $this->get('/pos/register?plan=' . urlencode($foreign));
 
             $response->assertOk();
@@ -137,11 +137,11 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_fbr_signup_names_the_package_the_shop_clicked(): void
     {
-        $response = $this->get('/fbr-pos/register?plan=FBR+Growth');
+        $response = $this->get('/fbr-pos/register?plan=Business');
 
         $response->assertOk();
-        $this->assertSame('FBR Growth', $response->viewData('pickedPlanName'));
-        $response->assertSee('FBR Growth', false);
+        $this->assertSame('Business', $response->viewData('pickedPlanName'));
+        $response->assertSee('Business', false);
     }
 
     public function test_fbr_signup_shows_no_package_notice_without_a_package(): void
@@ -155,7 +155,9 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_fbr_signup_ignores_an_unknown_or_foreign_package(): void
     {
-        foreach (['Platinum Deluxe', '<script>alert(1)</script>', 'Business', 'DI Premium'] as $bogus) {
+        // 'Unlimited' is a real PRA POS package and 'Pro' a retired FBR one —
+        // neither may be named back on the FBR signup.
+        foreach (['Platinum Deluxe', '<script>alert(1)</script>', 'Unlimited', 'DI Premium', 'Pro'] as $bogus) {
             $response = $this->get('/fbr-pos/register?plan=' . urlencode($bogus));
 
             $response->assertOk();
@@ -189,7 +191,7 @@ class PickedPackageSignupTest extends TestCase
 
     public function test_di_signup_ignores_an_unknown_or_foreign_package(): void
     {
-        foreach (['Platinum Deluxe', '<script>alert(1)</script>', 'Business', 'FBR Growth'] as $bogus) {
+        foreach (['Platinum Deluxe', '<script>alert(1)</script>', 'Pro', 'Unlimited'] as $bogus) {
             $response = $this->get('/register?plan=' . urlencode($bogus));
 
             $response->assertOk();

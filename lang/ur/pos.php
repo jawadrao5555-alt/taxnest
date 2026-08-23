@@ -5429,6 +5429,8 @@ return [
     'pcmp_qr_menu' => 'QR مینیو',
     'pcmp_qr_menu_hint' => 'گاہک اسکین کر کے مینیو دیکھے',
     'pcmp_whatsapp' => 'WhatsApp پر بل',
+    'pcmp_whatsapp_hint' => 'بل سیدھا گاہک کے WhatsApp پر بھیجیں',
+    'pcmp_addon' => 'الگ سے',
     'pcmp_hazri' => 'عملے کی حاضری',
     'pcmp_hazri_hint' => 'لاگ اِن سے بننے والی حاضری رپورٹ',
     'pcmp_rider_tracking' => 'رائیڈر کی لائیو نگرانی',

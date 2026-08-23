@@ -21,14 +21,14 @@
                 <span class="text-[10px] px-1.5 py-0.5 bg-rose-900/40 text-rose-300 rounded font-bold">{{ $plan->sale_badge }}</span>
             </div>
             @endif
-            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($hasOffer ? $plan->sale_price : $plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ in_array($plan->product_type, ['pos', 'standalone']) ? '/yr' : '/mo' }}</span></div>
+            <div class="text-2xl font-bold text-{{ $color }}-400">PKR {{ number_format($hasOffer ? $plan->sale_price : $plan->price, 0) }}<span class="text-sm text-gray-500 dark:text-gray-400 font-normal">{{ in_array($plan->product_type, ['pos', 'fbrpos', 'standalone']) ? '/yr' : '/mo' }}</span></div>
         </div>
 
         {{-- Sep 2026: this card used to quote the monthly figure ONLY, so the
              package looked like a monthly-only subscription even though
              checkout sells all four cycles. Every cycle a buyer can pick is
              listed with the exact rupees they are charged. --}}
-        @if(in_array($plan->product_type, ['di', 'fbrpos']))
+        @if($plan->product_type === 'di')
         @php
             $cycleLabels = ['monthly' => 'Monthly', 'quarterly' => 'Quarterly', 'semi_annual' => 'Half-Year', 'annual' => 'Annual'];
             $cycleRates = [];
@@ -57,12 +57,16 @@
             <p class="text-[10px] text-amber-400/80 mt-1.5">* worked out from the shared cycle-discount ladder — set a rate in Edit to fix it.</p>
             @endif
         </div>
-        @elseif($plan->product_type === 'pos')
+        @elseif(in_array($plan->product_type, ['pos', 'fbrpos']))
+        {{-- Both POS lines bill ANNUALLY by default (price = the yearly rate),
+             with hand-set shorter cycles. A blank rate is not sold — checkout
+             falls back to annual — so "—" here means "this cycle is off". --}}
         <div class="mb-3 pb-3 border-b border-gray-800">
-            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Cycle Rates</p>
+            <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Cycle Rates (what checkout charges)</p>
             <div class="grid grid-cols-2 gap-x-3 gap-y-1">
                 <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual</span><span class="text-gray-200 font-medium">{{ number_format($hasOffer ? $plan->sale_price : $plan->price) }}</span></div>
                 <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Quarterly</span><span class="text-gray-200 font-medium">{{ $plan->price_quarterly !== null ? number_format($plan->price_quarterly) : '—' }}</span></div>
+                <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Monthly</span><span class="text-gray-200 font-medium">{{ $plan->price_monthly !== null ? number_format($plan->price_monthly) : '—' }}</span></div>
             </div>
         </div>
         @endif
@@ -118,13 +122,23 @@
                 </select>
             </div>
             <div>
-                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ in_array($plan->product_type, ['pos', 'standalone']) ? '/yr' : '/mo' }})</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ in_array($plan->product_type, ['pos', 'fbrpos', 'standalone']) ? '/yr' : '/mo' }})</label>
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Quarterly Price (PKR / 3 mo — POS only; blank = annual-only)</label>
                 <input type="number" name="price_quarterly" value="{{ $plan->price_quarterly !== null ? intval($plan->price_quarterly) : '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
+            @if(in_array($plan->product_type, ['pos', 'fbrpos']))
+            {{-- Aug 2026: both POS lines sell a monthly cycle at a hand-set rate
+                 (priced ABOVE the annual pro-rata). Blank = monthly is not sold
+                 and checkout quietly falls back to the annual rate. DI ignores
+                 this field — its monthly rate IS the price above. --}}
+            <div>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Monthly Price (PKR / mo — POS only; blank = no monthly)</label>
+                <input type="number" name="price_monthly" value="{{ $plan->price_monthly !== null ? intval($plan->price_monthly) : '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+            </div>
+            @endif
             @if($plan->product_type === 'di')
             {{-- Sep 2026: DI packages quote hand-set rates for every cycle. The
                  global cycle-discount ladder is shared with FBR POS, so it must

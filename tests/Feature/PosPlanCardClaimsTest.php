@@ -137,27 +137,57 @@ class PosPlanCardClaimsTest extends TestCase
     }
 
     /**
-     * The three remaining optional features are paid add-ons. FEATURE_ROWS
-     * must never emit them on package cards.
+     * A paid add-on may NOT be claimed by a card whose plan row does not grant
+     * it. Since 23 Aug 2026 an add-on column CAN ride a package (WhatsApp Bill
+     * is included in Business and Unlimited, Caller ID in Unlimited), so the
+     * old blanket "never on a card" rule became a per-row rule: the card may
+     * only say it when the plan column is really on.
      */
-    public function test_remaining_addon_sold_features_never_appear_on_any_card(): void
+    public function test_a_card_never_claims_an_addon_its_plan_row_does_not_grant(): void
     {
         $ladder = $this->ladder()->values();
         $addonKeys = ['whatsapp', 'rider_tracking', 'caller_id'];
+        $columns = array_column(PosPlanComparisonService::FEATURE_ROWS, 'column', null);
+        $rowColumns = [];
+        foreach (PosPlanComparisonService::FEATURE_ROWS as $key => $spec) {
+            $rowColumns[$key] = $spec['column'];
+        }
 
         foreach ($ladder as $index => $plan) {
             $prev = $index > 0 ? $ladder[$index - 1] : null;
             $keys = $this->keys(PosPlanComparisonService::cardHighlights($plan, $prev));
             foreach ($addonKeys as $key) {
-                $this->assertNotContains($key, $keys, "{$plan->name} card may not claim add-on-sold '{$key}'.");
+                if (!isset($rowColumns[$key])) {
+                    continue; // not a comparison row at all — nothing can print it
+                }
+                if ($plan->{$rowColumns[$key]}) {
+                    continue; // the package really includes it
+                }
+                $this->assertNotContains($key, $keys,
+                    "{$plan->name} card may not claim add-on-sold '{$key}' — its plan column is off.");
             }
         }
 
-        // And the row maps themselves must not quietly re-adopt an add-on column.
-        foreach (PosPlanComparisonService::ADDON_COLUMNS as $column => $code) {
-            $this->assertArrayNotHasKey($column, array_flip(array_column(PosPlanComparisonService::FEATURE_ROWS, 'column')),
-                "Gate column {$column} is sold as add-on '{$code}' and may not also be a FEATURE_ROWS row.");
+        // The both-ways rule: an add-on column may sit in FEATURE_ROWS ONLY if
+        // that row is marked as an add-on, so a package that does NOT include
+        // it renders the "Add-on" pill instead of a bare cross — and every
+        // add-on-marked row must really be a sellable add-on column.
+        $addonMarked = [];
+        foreach (PosPlanComparisonService::FEATURE_ROWS as $key => $spec) {
+            if (!empty($spec['addon'])) {
+                $addonMarked[$spec['column']] = $key;
+            }
+            if (isset(PosPlanComparisonService::ADDON_COLUMNS[$spec['column']])) {
+                $this->assertNotEmpty($spec['addon'] ?? null,
+                    "FEATURE_ROWS row '{$key}' shows add-on-sold column {$spec['column']} but is not marked "
+                    . "'addon' => true — a package without it would print a plain cross instead of the Add-on pill.");
+            }
         }
+        foreach ($addonMarked as $column => $key) {
+            $this->assertArrayHasKey($column, PosPlanComparisonService::ADDON_COLUMNS,
+                "FEATURE_ROWS row '{$key}' is marked as an add-on but {$column} is not sold as one.");
+        }
+        $this->assertNotEmpty($columns);
     }
 
     public function test_a_bullet_disappears_when_the_plan_column_is_off(): void

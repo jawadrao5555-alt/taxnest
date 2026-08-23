@@ -140,10 +140,12 @@ class DiSellablePackageGuardTest extends TestCase
         // still points at the old package; approving must not assign it.
         $this->assertFalse(DiPlanComparisonService::isSellablePlan($retired));
         $this->assertStringContainsString(
-            "product_type === 'di' && !DiPlanComparisonService::isSellablePlan(\$plan)",
+            'PlanSellabilityService::isRetired($plan)',
             file_get_contents(base_path('app/Services/SubscriptionAssignmentService.php')),
-            'assignRequestedPlanOnApproval must reject retired DI packages.'
+            'assignRequestedPlanOnApproval must reject retired packages.'
         );
+        $this->assertTrue(\App\Services\PlanSellabilityService::isRetired($retired),
+            'the central predicate must route a DI package to the DI allowlist');
     }
 
     /**
@@ -155,12 +157,22 @@ class DiSellablePackageGuardTest extends TestCase
         $paths = [
             'app/Http/Controllers/BillingController.php' => 2,      // checkout + price quote
             'app/Http/Controllers/PaymentProofController.php' => 1, // bank-transfer proof
-            'app/Services/RequestedPackageService.php' => 1,        // signup ?plan=
+            'app/Services/RequestedPackageService.php' => 2,        // signup ?plan= + pending summary
         ];
+
+        // Since 23 Aug 2026 a path may ask the DI list directly OR go through
+        // the product-aware predicate (which routes 'di' to that same list) —
+        // what it may never do is stop asking.
+        $this->assertStringContainsString(
+            'DiPlanComparisonService::isSellablePlan',
+            file_get_contents(base_path('app/Services/PlanSellabilityService.php')),
+            'the central predicate must route DI packages to the DI allowlist.'
+        );
 
         foreach ($paths as $file => $expected) {
             $source = file_get_contents(base_path($file));
-            $found = substr_count($source, 'DiPlanComparisonService::isSellablePlan');
+            $found = substr_count($source, 'DiPlanComparisonService::isSellablePlan')
+                + substr_count($source, 'PlanSellabilityService::isRetired');
 
             $this->assertGreaterThanOrEqual(
                 $expected,

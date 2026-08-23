@@ -7,6 +7,7 @@ use App\Models\PricingPlan;
 use App\Models\Subscription;
 use Illuminate\Support\Facades\Schema;
 
+
 /**
  * Task 1484 — the package a shop clicked on the public pricing table, carried
  * through signup and honoured at approval.
@@ -42,19 +43,16 @@ class RequestedPackageService
             ->get()
             ->first(fn (PricingPlan $plan) => mb_strtolower($plan->name) === mb_strtolower($name));
 
-        if ($productType === 'pos' && !PosPlanComparisonService::isSellablePlan($plan)) {
-            return null;
-        }
-        // Sep 2026: a retired DI package must not come back through a stale
-        // ?plan=Retail link on the signup form.
-        if ($productType === 'di' && !DiPlanComparisonService::isSellablePlan($plan)) {
+        // A retired package must never come back through a stale ?plan= link on
+        // a signup form — whichever product line retired it.
+        if (PlanSellabilityService::isRetired($plan)) {
             return null;
         }
 
         return $plan;
     }
 
-    /** The three cycles PRA POS sells (Aug 2026). Order = cheapest per month first. */
+    /** The three cycles the POS lines sell (Aug 2026). Order = cheapest per month first. */
     public const POS_CYCLES = ['annual', 'quarterly', 'monthly'];
 
     /**
@@ -62,9 +60,10 @@ class RequestedPackageService
      *
      * Digital Invoice quotes a MONTHLY price and the pricing page lets the
      * visitor pick one of four cycles — that choice is honoured (unknown or
-     * missing falls back to monthly). PRA POS sells all three of its own cycles
-     * since Aug 2026. Every other product is licensed by the YEAR, so the
-     * visitor never picks a cycle and none can be smuggled in.
+     * missing falls back to monthly). Both POS lines sell all three of their own
+     * cycles (PRA since Aug 2026, FBR POS since 23 Aug 2026). Every other
+     * product is licensed by the YEAR, so the visitor never picks a cycle and
+     * none can be smuggled in.
      */
     public static function cycleForPlan(PricingPlan $plan, ?string $stored = null): string
     {
@@ -74,7 +73,7 @@ class RequestedPackageService
             return SubscriptionAssignmentService::normalizeCycle($stored);
         }
 
-        if ($type === 'pos') {
+        if ($type === 'pos' || $type === 'fbrpos') {
             // Deliberately NOT normalizeCycle(): that helper maps anything it
             // does not recognise to 'monthly', which here is the DEAREST cycle
             // per month. A tampered, empty or DI-only value ('semi_annual')
@@ -141,8 +140,7 @@ class RequestedPackageService
         $plan = $company->relationLoaded('requestedPlan')
             ? $company->getRelation('requestedPlan')
             : PricingPlan::find($company->requested_plan_id ?? null);
-        if (!$plan || $plan->is_trial
-            || ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan))) {
+        if (!$plan || $plan->is_trial || PlanSellabilityService::isRetired($plan)) {
             return null;
         }
 

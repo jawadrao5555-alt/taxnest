@@ -89,6 +89,7 @@ class RequestedPackageSignupTest extends TestCase
             $table->string('product_type')->nullable();
             $table->decimal('price', 12, 2)->default(0);
             $table->decimal('price_quarterly', 12, 2)->nullable();
+            $table->decimal('price_monthly', 12, 2)->nullable();
             $table->boolean('is_trial')->default(false);
             $table->integer('invoice_limit')->nullable();
             $table->integer('branch_limit')->nullable();
@@ -165,8 +166,10 @@ class RequestedPackageSignupTest extends TestCase
         PricingPlan::create(['name' => 'Business', 'product_type' => 'di', 'price' => 3000, 'is_trial' => false]);
         PricingPlan::create(['name' => 'DI Trial', 'product_type' => 'di', 'price' => 0, 'is_trial' => true]);
 
-        // FBR POS: price is MONTHLY, but it is licensed by the YEAR (12 × −6%).
-        PricingPlan::create(['name' => 'Pro', 'product_type' => 'fbrpos', 'price' => 3000, 'is_trial' => false]);
+        // FBR POS: price is the ANNUAL rate since 23 Aug 2026 (like PRA POS).
+        PricingPlan::create(['name' => 'Business', 'product_type' => 'fbrpos', 'price' => 3000, 'is_trial' => false]);
+        // Retired 23 Aug 2026 — kept only to prove it can never be picked again.
+        PricingPlan::create(['name' => 'Pro', 'product_type' => 'fbrpos', 'price' => 2999, 'is_trial' => false]);
         PricingPlan::create(['name' => 'FBR Trial', 'product_type' => 'fbrpos', 'price' => 0, 'is_trial' => true]);
 
         // PRA POS: price is ALREADY the annual total.
@@ -249,18 +252,26 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_fbr_signup_records_the_clicked_package(): void
     {
-        $company = $this->fbrSignup('City Mart', 'city@example.com', 'Pro');
+        $company = $this->fbrSignup('City Mart', 'city@example.com', 'Business');
 
-        $this->assertSame($this->plan('Pro', 'fbrpos')->id, (int) $company->requested_plan_id);
+        $this->assertSame($this->plan('Business', 'fbrpos')->id, (int) $company->requested_plan_id);
         // FBR POS is yearly — the visitor never picks a cycle.
         $this->assertSame('annual', $company->requested_billing_cycle);
     }
 
     public function test_fbr_signup_matches_the_package_name_case_insensitively(): void
     {
-        $company = $this->fbrSignup('Metro Shoes', 'metro@example.com', 'pRo');
+        $company = $this->fbrSignup('Metro Shoes', 'metro@example.com', 'bUsInEsS');
 
-        $this->assertSame($this->plan('Pro', 'fbrpos')->id, (int) $company->requested_plan_id);
+        $this->assertSame($this->plan('Business', 'fbrpos')->id, (int) $company->requested_plan_id);
+    }
+
+    /** A stale link to the retired FBR package must record nothing at all. */
+    public function test_fbr_signup_ignores_the_retired_package(): void
+    {
+        $company = $this->fbrSignup('Old Link Mart', 'oldlink@example.com', 'Pro');
+
+        $this->assertNull($company->requested_plan_id);
     }
 
     public function test_di_signup_records_the_package_and_the_picked_cycle(): void
@@ -300,8 +311,9 @@ class RequestedPackageSignupTest extends TestCase
         $fbr = $this->fbrSignup('Cross Product Mart', 'cross@example.com', 'Starter');
         $this->assertNull($fbr->requested_plan_id, 'An FBR shop must never be recorded against a PRA POS package');
 
-        $di = $this->diSignup('Cross Product Traders', 'cross2@example.com', 'Pro', 'annual');
-        $this->assertNull($di->requested_plan_id, 'A DI shop must never be recorded against an FBR POS package');
+        // 'Pro Max' is a real PRA POS package name — never a DI one.
+        $di = $this->diSignup('Cross Product Traders', 'cross2@example.com', 'Pro Max', 'annual');
+        $this->assertNull($di->requested_plan_id, 'A DI shop must never be recorded against a POS package');
         $this->assertNull($di->requested_billing_cycle, 'No package means no cycle either');
     }
 
@@ -316,7 +328,7 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_a_tampered_or_unknown_package_is_ignored(): void
     {
-        $fbr = $this->fbrSignup('Hacky Mart', 'hacky@example.com', "Pro' OR 1=1 --");
+        $fbr = $this->fbrSignup('Hacky Mart', 'hacky@example.com', "Business' OR 1=1 --");
         $this->assertNull($fbr->requested_plan_id);
 
         $di = $this->diSignup('Ghost Traders', 'ghost@example.com', 'Package That Does Not Exist', 'annual');
@@ -332,9 +344,14 @@ class RequestedPackageSignupTest extends TestCase
             ->assertSee('name="requested_plan" value="Business"', false)
             ->assertSee('name="requested_billing_cycle" value="quarterly"', false);
 
+        $this->get('/fbr-pos/register?plan=Business')
+            ->assertOk()
+            ->assertSee('name="requested_plan" value="Business"', false);
+
+        // A retired FBR package must not survive the trip into the form.
         $this->get('/fbr-pos/register?plan=Pro')
             ->assertOk()
-            ->assertSee('name="requested_plan" value="Pro"', false);
+            ->assertDontSee('name="requested_plan"', false);
 
         // Nothing picked → no hidden fields at all.
         $this->get('/register')->assertOk()->assertDontSee('name="requested_plan"', false);
@@ -428,27 +445,43 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_approval_activates_an_fbr_package_for_a_full_year(): void
     {
-        $plan = $this->plan('Pro', 'fbrpos');
+        $plan = $this->plan('Business', 'fbrpos');
         $company = $this->pendingCompany('fbrpos', $plan, 'annual');
 
         $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
 
         $this->assertSame('annual', $sub->billing_cycle);
-        // Rs 3,000/month × 12 − 6%.
-        $this->assertSame(33840.0, (float) $sub->final_price);
+        // 23 Aug 2026: fbrpos price IS the yearly rate — never ×12 again.
+        $this->assertSame(3000.0, (float) $sub->final_price);
         $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date));
     }
 
-    public function test_an_fbr_package_can_never_be_charged_on_a_monthly_cycle(): void
+    public function test_an_fbr_package_without_a_monthly_rate_falls_back_to_the_year(): void
     {
-        // Even if a stray cycle were somehow stored, FBR POS stays yearly.
-        $plan = $this->plan('Pro', 'fbrpos');
+        // FBR POS sells monthly since 23 Aug 2026, but only when the row prices
+        // it. This plan has no price_monthly, so the cycle must fall back to
+        // annual rather than invent a figure.
+        $plan = $this->plan('Business', 'fbrpos');
         $company = $this->pendingCompany('fbrpos', $plan, 'monthly');
 
         $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
 
         $this->assertSame('annual', $sub->billing_cycle);
-        $this->assertSame(33840.0, (float) $sub->final_price);
+        $this->assertSame(3000.0, (float) $sub->final_price);
+    }
+
+    /** ...and when the row DOES price the month, that is what the shop is charged. */
+    public function test_an_fbr_package_is_charged_monthly_when_the_row_prices_it(): void
+    {
+        $plan = $this->plan('Business', 'fbrpos');
+        $plan->update(['price_monthly' => 2599, 'price_quarterly' => 7349]);
+        $company = $this->pendingCompany('fbrpos', $plan->fresh(), 'monthly');
+
+        $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
+
+        $this->assertSame('monthly', $sub->billing_cycle);
+        $this->assertSame(2599.0, (float) $sub->final_price);
+        $this->assertSame(1, (int) $sub->start_date->diffInMonths($sub->end_date));
     }
 
     public function test_pra_pos_approval_is_unchanged(): void
@@ -504,9 +537,9 @@ class RequestedPackageSignupTest extends TestCase
         $this->assertStringContainsString('Rs 8,910 every 3 months', $summary['badge']);
         $this->assertStringContainsString('3 months', $summary['note']);
 
-        $fbr = $this->pendingCompany('fbrpos', $this->plan('Pro', 'fbrpos'), null);
+        $fbr = $this->pendingCompany('fbrpos', $this->plan('Business', 'fbrpos'), null);
         $fbrSummary = RequestedPackageService::pendingSummary($fbr);
-        $this->assertStringContainsString('Rs 33,840 / year', $fbrSummary['badge']);
+        $this->assertStringContainsString('Rs 3,000 / year', $fbrSummary['badge']);
     }
 
     public function test_admin_summary_shows_nothing_for_a_di_signup_that_picked_no_package(): void

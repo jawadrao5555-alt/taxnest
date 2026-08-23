@@ -53,9 +53,10 @@ class PaymentProofController extends Controller
         $productType = $this->resolveProductType($company);
         $allowedCycles = match ($productType) {
             'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
-            // PRA POS: annual, quarterly (+5%) or monthly (+10%) — Aug 2026.
-            'pos' => ['annual', 'quarterly', 'monthly'],
-            default => ['annual'],            // standalone / fbrpos stay annual-only
+            // Both POS lines: annual, quarterly (+5%) or monthly (+10%). PRA
+            // Aug 2026, FBR POS joined 23 Aug 2026.
+            'pos', 'fbrpos' => ['annual', 'quarterly', 'monthly'],
+            default => ['annual'],            // standalone stays annual-only
         };
 
         $validated = $request->validate([
@@ -78,17 +79,11 @@ class PaymentProofController extends Controller
                 ->withInput()
                 ->with('payment_proof', 'error');
         }
-        if ($productType === 'pos' && !\App\Services\PosPlanComparisonService::isSellablePlan($plan)) {
+        // A retired package must not enter the review queue on ANY product
+        // line, or approving it would put a shop back on a dead plan.
+        if (\App\Services\PlanSellabilityService::isRetired($plan)) {
             return back()
-                ->withErrors(['pricing_plan_id' => 'Please select a current PRA POS package.'])
-                ->withInput()
-                ->with('payment_proof', 'error');
-        }
-        // Same for Digital Invoice: a retired package must not enter the review
-        // queue, or approving it would put a shop back on a dead plan.
-        if ($productType === 'di' && !\App\Services\DiPlanComparisonService::isSellablePlan($plan)) {
-            return back()
-                ->withErrors(['pricing_plan_id' => 'Please select a current Digital Invoice package.'])
+                ->withErrors(['pricing_plan_id' => \App\Services\PlanSellabilityService::pickCurrentMessage($plan)])
                 ->withInput()
                 ->with('payment_proof', 'error');
         }
@@ -155,8 +150,12 @@ class PaymentProofController extends Controller
      */
     private function storeExtraBranchRequest(Request $request, ?\App\Models\Company $company)
     {
-        // PRA POS panel ka feature hai — baqi panels par raasta hi nahi.
-        if (!$company || !auth('pos')->check() || $this->resolveProductType($company) !== 'pos') {
+        // Dono POS panels ka feature hai (FBR POS 23 Aug 2026 se) — DI par
+        // raasta hi nahi. Guard aur company ka product line dono match karein.
+        $type = $company ? $this->resolveProductType($company) : null;
+        $guarded = ($type === 'pos' && auth('pos')->check())
+            || ($type === 'fbrpos' && auth('fbrpos')->check());
+        if (!$company || !$guarded) {
             return back()->with('error', __('pos.eb_not_available'))
                 ->with('payment_proof', 'error');
         }

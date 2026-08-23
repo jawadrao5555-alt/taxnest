@@ -393,9 +393,8 @@ class AdminController extends Controller
         ]);
 
         $plan = PricingPlan::findOrFail((int) $request->pricing_plan_id);
-        if ($plan->product_type === 'pos' && !$plan->is_trial
-            && !\App\Services\PosPlanComparisonService::isSellablePlan($plan)) {
-            return back()->with('error', 'That retired POS package can no longer be assigned.');
+        if (\App\Services\PlanSellabilityService::isRetired($plan)) {
+            return back()->with('error', \App\Services\PlanSellabilityService::retiredMessage($plan));
         }
 
         Subscription::where('company_id', $company->id)->where('active', true)->update(['active' => false]);

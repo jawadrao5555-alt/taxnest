@@ -334,6 +334,12 @@ try {
 
     // ── 6c. Paid FEATURE add-ons: catalogue-only gates open through an active
     //   pos_addons row, die with its expiry, and stay OFF on every package.
+    // Annual-only since 23 Aug 2026 (owner): add-ons are sold for a year, same
+    // as the packages they ride on. A second cycle reappearing here means the
+    // retirement was half-undone.
+    check(\App\Services\PosAddonPricingService::CYCLES === ['annual'],
+        'feature add-on: annual must be the ONLY add-on cycle, got '
+        . implode('/', \App\Services\PosAddonPricingService::CYCLES));
     foreach (array_keys(\App\Services\PosAddonPricingService::ADDONS) as $adCode) {
         $adRates = [];
         foreach (\App\Services\PosAddonPricingService::CYCLES as $adCycle) {
@@ -341,13 +347,6 @@ try {
             check($adRates[$adCycle] > 0,
                 "feature add-on: {$adCode} must carry a non-zero {$adCycle} price");
         }
-
-        // Same ladder as the packages: a longer commitment must always be the
-        // cheaper deal, or a shop paying yearly is being punished for it.
-        check($adRates['quarterly'] * 4 > $adRates['annual'],
-            "feature add-on: {$adCode} quarterly×4 ({$adRates['quarterly']}) must cost more than annual ({$adRates['annual']})");
-        check($adRates['monthly'] * 12 > $adRates['quarterly'] * 4,
-            "feature add-on: {$adCode} monthly×12 ({$adRates['monthly']}) must cost more than quarterly×4 ({$adRates['quarterly']})");
 
         // An add-on rides on a package and dies with it — it may never cost a
         // meaningful slice of the cheapest package it can be bought against.
@@ -424,40 +423,38 @@ try {
     // Price ladder + the three billing cycles (owner-set, Aug 2026). Written
     // here independently of the migration so a hand-edited plan row, a missed
     // migration or a half-applied reprice blocks the deploy.
+    // Annual-only since 23 Aug 2026: price_quarterly / price_monthly still sit
+    // in the table for legacy subscriptions but are NOT sellable, so only the
+    // annual rate is asserted — and every requested cycle must charge it.
     $PRICE_LADDER = [
-        'Starter'   => ['annual' => 17999, 'quarterly' => 4699, 'monthly' => 1649],
-        'Business'  => ['annual' => 27999, 'quarterly' => 7349, 'monthly' => 2599],
-        'Unlimited' => ['annual' => 34999, 'quarterly' => 9199, 'monthly' => 3199],
+        'Starter'   => ['annual' => 17999],
+        'Business'  => ['annual' => 27999],
+        'Unlimited' => ['annual' => 34999],
     ];
+    check(\App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES === ['annual'],
+        'price: annual must be the ONLY sellable cycle, got '
+        . implode('/', \App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES));
     $posSaleLive = \App\Models\SaleCampaign::activeFor('pos') !== null;
     foreach ($PRICE_LADDER as $planName => $wantPrices) {
         $planRow = $plans[$planName] ?? null;
         if (!$planRow) { bad("price: {$planName} row missing"); continue; }
 
-        $gotPrices = [
-            'annual' => (int) $planRow->price,
-            'quarterly' => (int) $planRow->price_quarterly,
-            'monthly' => (int) $planRow->price_monthly,
-        ];
-        foreach ($wantPrices as $cycle => $want) {
-            check($gotPrices[$cycle] === $want,
-                "price: {$planName} {$cycle} must be {$want}, got " . $gotPrices[$cycle]);
-        }
+        check((int) $planRow->price === $wantPrices['annual'],
+            "price: {$planName} annual must be {$wantPrices['annual']}, got " . (int) $planRow->price);
 
-        // Paying for a longer period must always be the cheaper deal.
-        check($gotPrices['quarterly'] * 4 > $gotPrices['annual'],
-            "price: {$planName} quarterly×4 must cost more than the annual price");
-        check($gotPrices['monthly'] * 12 > $gotPrices['quarterly'] * 4,
-            "price: {$planName} monthly×12 must cost more than quarterly×4");
+        // A retired column must never MIRROR the annual rate — that is how a
+        // year gets sold for a month's fee if a cycle is ever revived.
+        check((int) $planRow->price_monthly !== (int) $planRow->price,
+            "price: {$planName} price_monthly must not mirror the annual price");
 
-        // ...and what the checkout actually charges must be that same number.
-        // (Skipped while a sale campaign is discounting the annual price.)
+        // ...and every requested cycle must check out as ANNUAL at that same
+        // number. (Skipped while a sale campaign is discounting it.)
         $planModel = \App\Models\PricingPlan::find($planRow->id);
         if (!$posSaleLive && $planModel) {
-            foreach ($wantPrices as $cycle => $want) {
+            foreach (['annual', 'quarterly', 'monthly', 'semi_annual'] as $cycle) {
                 $priced = \App\Services\SubscriptionAssignmentService::computePrice($planModel, $cycle);
-                check($priced['cycle'] === $cycle && (int) $priced['final_price'] === $want,
-                    "price: computePrice({$planName}, {$cycle}) must charge {$cycle}/{$want}, got "
+                check($priced['cycle'] === 'annual' && (int) $priced['final_price'] === $wantPrices['annual'],
+                    "price: computePrice({$planName}, {$cycle}) must charge annual/{$wantPrices['annual']}, got "
                     . $priced['cycle'] . '/' . (int) $priced['final_price']);
             }
         }
@@ -533,12 +530,10 @@ try {
         // via isTrialActive; true columns would leak features to EXPIRED trials.
         'Trial'    => [0,     true,  false, false, false, false, false, false, false, false],
     ];
-    // Shorter cycles, hand-set like PRA POS (annual ÷ 4 × 1.05, annual ÷ 12 × 1.10).
-    // Trial is not sold, so it carries no cycle rates.
-    $FBR_CYCLE_PRICES = [
-        'Starter'  => ['quarterly' => 4699, 'monthly' => 1649],
-        'Business' => ['quarterly' => 7349, 'monthly' => 2599],
-    ];
+    // Annual-only since 23 Aug 2026: the hand-set shorter-cycle columns are
+    // frozen legacy data, so they are no longer asserted — what matters is that
+    // NO cycle can be charged as anything but the annual rate. Trial isn't sold.
+    $FBR_SELLABLE = ['Starter', 'Business'];
     $fbrPlans = DB::table('pricing_plans')->where('product_type', 'fbrpos')->get()->keyBy('name');
     foreach ($FBR_MATRIX as $name => $row) {
         $p = $fbrPlans[$name] ?? null;
@@ -546,20 +541,19 @@ try {
         $wantPrice = array_shift($row);
         check((float) $p->price === (float) $wantPrice,
             "fbrpos {$name}: annual price must be {$wantPrice}, got {$p->price}");
-        // price_monthly must NEVER mirror price again — that was the old
-        // monthly convention, and a mirror would sell a year for a month's fee.
-        foreach ($FBR_CYCLE_PRICES[$name] ?? [] as $cycle => $wantCycle) {
-            $col = 'price_' . $cycle;
-            check((int) ($p->{$col} ?? -1) === $wantCycle,
-                "fbrpos {$name}: {$col} must be {$wantCycle}, got " . ($p->{$col} ?? 'NULL'));
+        // price_monthly must NEVER mirror price — that was the old monthly
+        // convention, and a mirror would sell a year for a month's fee.
+        if (in_array($name, $FBR_SELLABLE, true)) {
+            check((int) ($p->price_monthly ?? -1) !== (int) $p->price,
+                "fbrpos {$name}: price_monthly must not mirror the annual price");
         }
-        // ...and what checkout actually charges must be those same numbers.
+        // ...and every requested cycle must check out as ANNUAL at that price.
         $fbrPlanModel = \App\Models\PricingPlan::find($p->id);
-        if ($fbrPlanModel && isset($FBR_CYCLE_PRICES[$name]) && \App\Models\SaleCampaign::activeFor('fbrpos') === null) {
-            foreach (['annual' => $wantPrice] + $FBR_CYCLE_PRICES[$name] as $cycle => $wantCharge) {
+        if ($fbrPlanModel && in_array($name, $FBR_SELLABLE, true) && \App\Models\SaleCampaign::activeFor('fbrpos') === null) {
+            foreach (['annual', 'quarterly', 'monthly', 'semi_annual'] as $cycle) {
                 $priced = \App\Services\SubscriptionAssignmentService::computePrice($fbrPlanModel, $cycle);
-                check($priced['cycle'] === $cycle && (int) $priced['final_price'] === (int) $wantCharge,
-                    "fbrpos {$name}: computePrice({$cycle}) must charge {$wantCharge}, got "
+                check($priced['cycle'] === 'annual' && (int) $priced['final_price'] === (int) $wantPrice,
+                    "fbrpos {$name}: computePrice({$cycle}) must charge annual/{$wantPrice}, got "
                     . $priced['cycle'] . '/' . (int) $priced['final_price']);
             }
         }

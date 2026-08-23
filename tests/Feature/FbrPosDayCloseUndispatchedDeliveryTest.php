@@ -15,9 +15,10 @@ use Illuminate\Database\Schema\Blueprint;
  * checks + per-close wash override + auto-close skip.
  *
  * Locked here:
- *  1. UNDISPATCHED DELIVERY BILLS HARD-BLOCK the manual FBR close (assigned-
- *     but-not-dispatched OR fresh unassigned delivery bills, 7-day window) —
- *     closeDayReport refuses with pos.dayclose_blocked_undispatched.
+ *  1. UNDISPATCHED DELIVERY BILLS HARD-BLOCK the manual FBR close (assigned to
+ *     a rider but never dispatched) — closeDayReport refuses with
+ *     pos.dayclose_blocked_undispatched. A RIDER-LESS delivery bill never
+ *     blocks (owner rule 23 Aug 2026: the shop handed it over itself).
  *  2. 'dispatched' does NOT block — rider khata is WARNING figures only.
  *  3. Feature gate: shops without the delivery feature are never blocked.
  *  4. PER-CLOSE OVERRIDE: wash_override=delete removes the day's provisionals
@@ -330,22 +331,25 @@ class FbrPosDayCloseUndispatchedDeliveryTest extends TestCase
         $this->assertSame(0, DB::table('fbr_day_close_reports')->count(), 'No Z-report may be created.');
     }
 
-    public function test_unassigned_fresh_delivery_blocks(): void
+    /**
+     * OWNER RULE (23 Aug 2026, mirrors PRA): nobody assigned a rider, so the
+     * shop handed the order over itself — no rider cash, nothing to settle, so
+     * the bill must never hold the day open.
+     */
+    public function test_rider_less_delivery_never_blocks_the_close(): void
     {
         $cid = $this->makeCompany();
-        $this->makeBill($cid, ['order_type' => 'delivery']);
+        $riderLess = $this->makeBill($cid, ['order_type' => 'delivery']);
 
         $sum = $this->summary($cid);
         $this->assertTrue($sum->active);
-        $this->assertSame(1, $sum->count);
-        $this->assertSame(1, $sum->unassigned);
+        $this->assertSame(0, $sum->count, 'A rider-less delivery bill is not a blocker.');
+        $this->assertSame(0, $sum->unassigned);
 
-        $this->closeDay($this->makeUser($cid));
-        $this->assertStringContainsString(
-            __('pos.dayclose_blocked_undispatched', ['count' => 1]),
-            (string) session('error')
-        );
-        $this->assertSame(0, DB::table('fbr_day_close_reports')->count());
+        $res = $this->closeDay($this->makeUser($cid));
+        $res->assertSessionHas('success');
+        $this->assertSame(1, DB::table('fbr_day_close_reports')->count());
+        $this->assertNull(DB::table('fbr_pos_transactions')->find($riderLess)->delivery_status);
     }
 
     // ── 2. dispatched = khata warning only, close allowed ───────────────────

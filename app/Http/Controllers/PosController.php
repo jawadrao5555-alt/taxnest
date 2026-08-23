@@ -11751,15 +11751,22 @@ class PosController extends Controller
 
     /**
      * Undispatched delivery bills for the day-close pending checklist (Task 661,
-     * ZFC waqia): completed delivery bills that never reached a rider's hands —
-     * either ASSIGNED to a rider but not yet dispatched, or UNASSIGNED fresh
-     * delivery bills (same 7-day window as the Deliveries board / sale-screen
-     * popup, Task 512/513 — old pre-feature bills must not brick the close
-     * forever). These HARD-BLOCK the manual close and make the 6 AM auto-close
-     * SKIP the day (same policy as open restaurant orders). 'dispatched' does
-     * NOT block — the rider has the order; its cash is covered by the khata
-     * figures. Rider unsettled cash NEVER blocks (khata legitimately carries to
-     * the next day) — it rides along here as warning-only context.
+     * ZFC waqia): completed delivery bills that are sitting WITH A RIDER —
+     * assigned to him but never dispatched. These HARD-BLOCK the manual close
+     * and make the 6 AM auto-close SKIP the day (same policy as open restaurant
+     * orders), because the shop's goods and cash are out with a named person.
+     *
+     * NO RIDER = NOT A BLOCKER (owner rule, 23 Aug 2026). If nobody assigned a
+     * rider, the shop handed the order over ITSELF — the cash is already in the
+     * counter drawer and there is nobody to settle with, so such a bill has no
+     * business holding the day open. Frost and Brew's close stayed stuck for
+     * days over exactly these self-delivered bills. They remain assignable on
+     * the Deliveries board (that board is the ASSIGN queue, not settlement).
+     *
+     * 'dispatched' does NOT block either — the rider has the order; its cash is
+     * covered by the khata figures. Rider unsettled cash NEVER blocks (khata
+     * legitimately carries to the next day) — it rides along here as
+     * warning-only context.
      * Feature-gated (riders plan gate + Delivery toggle, mirrors
      * PosRiderController::deliveryGate) and schema-guarded: non-rider shops get
      * a zeroed summary and are never blocked by this check.
@@ -11792,22 +11799,12 @@ class PosController extends Controller
                 ->when($hasType, fn ($q) => $q->where(function ($w) {
                     $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 }))
-                ->where(function ($q) {
-                    // Assigned to a rider but never handed over (dispatch pending).
-                    $q->where(function ($qa) {
-                        $qa->whereNotNull('rider_id')
-                            ->where('delivery_status', 'assigned')
-                            ->whereNull('rider_settlement_id');
-                    })
-                    // Unassigned fresh delivery bill — nobody is taking it anywhere.
-                    ->orWhere(function ($qu) {
-                        $qu->whereNull('rider_id')
-                            ->whereNull('delivery_status')
-                            ->whereNull('rider_settlement_id')
-                            ->where('order_type', 'delivery')
-                            ->where('created_at', '>=', now()->subDays(7));
-                    });
-                })
+                // Assigned to a rider but never handed over (dispatch pending).
+                // A rider-less delivery bill is the shop's own hand-over and is
+                // deliberately NOT counted here (owner rule, 23 Aug 2026).
+                ->whereNotNull('rider_id')
+                ->where('delivery_status', 'assigned')
+                ->whereNull('rider_settlement_id')
                 ->with('rider:id,name')
                 ->orderBy('created_at')
                 ->get(array_merge(
@@ -12001,12 +11998,12 @@ class PosController extends Controller
             if (! $txn || $txn->status !== 'completed' || $txn->order_type !== 'delivery' || $txn->rider_settlement_id) {
                 return false;
             }
-            // Only the two shapes the blocker actually counts: unassigned+fresh,
-            // or assigned-to-a-rider but never dispatched. Anything already
-            // delivered/returned is left exactly as it is.
-            $isUnassigned = $txn->rider_id === null && $txn->delivery_status === null;
-            $isAssigned = $txn->rider_id !== null && $txn->delivery_status === 'assigned';
-            if (! $isUnassigned && ! $isAssigned) {
+            // The ONE shape the blocker counts: assigned to a rider and never
+            // dispatched. A rider-less bill is the shop's own hand-over — it no
+            // longer blocks the close, so it is not stampable from here either
+            // (owner rule, 23 Aug 2026). Anything already delivered/returned is
+            // left exactly as it is.
+            if ($txn->rider_id === null || $txn->delivery_status !== 'assigned') {
                 return false;
             }
 

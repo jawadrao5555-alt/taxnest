@@ -16,9 +16,11 @@ use Illuminate\Database\Schema\Blueprint;
  *
  * Locked here:
  *  1. UNDISPATCHED DELIVERY BILLS HARD-BLOCK the manual close: a completed
- *     delivery bill that is assigned-but-not-dispatched, or a fresh UNASSIGNED
- *     delivery bill (7-day window, mirrors the Deliveries board), refuses
- *     closeDayReport with pos.dayclose_blocked_undispatched.
+ *     delivery bill ASSIGNED to a rider but never dispatched refuses
+ *     closeDayReport with pos.dayclose_blocked_undispatched. A delivery bill
+ *     with NO RIDER never blocks (owner rule 23 Aug 2026 — nobody assigned a
+ *     rider, so the shop handed it over itself; no cash is out, nothing to
+ *     settle).
  *  2. 'dispatched' does NOT block — the rider has the order; its unsettled
  *     cash surfaces as khata WARNING figures only (khata carries overnight).
  *  3. Feature gate: shops without the delivery feature (or plan) are NEVER
@@ -344,34 +346,40 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         $this->assertSame(0, DB::table('pos_day_close_reports')->count(), 'No Z-report may be created.');
     }
 
-    public function test_unassigned_fresh_delivery_blocks_but_archived_does_not(): void
+    /**
+     * OWNER RULE (23 Aug 2026): "agar koi delivery rider assign nahi karta to
+     * matlab woh khud utha kar de aaya — woh bill settlement mein jana hi nahi
+     * chahiye." No rider = no hand-over, no rider cash, nothing to settle: the
+     * bill must never hold the day open (nor make the 6 AM sweep skip it).
+     * Archived deliveries stay out too — they left the operational stream.
+     */
+    public function test_rider_less_delivery_never_blocks_the_close(): void
     {
         $cid = $this->makeCompany();
-        // Fresh unassigned delivery — blocks (Task 513 window).
-        $this->makeBill($cid, ['order_type' => 'delivery']);
+        // Fresh delivery bill with NO rider — the shop delivered it itself.
+        $riderLess = $this->makeBill($cid, ['order_type' => 'delivery']);
         // Archived delivery — out of the operational stream, never blocks.
         $this->makeBill($cid, ['order_type' => 'delivery', 'is_archived' => true]);
 
         $sum = $this->summary($cid);
         $this->assertTrue($sum->active);
-        $this->assertSame(1, $sum->count);
-        $this->assertSame(1, $sum->unassigned);
+        $this->assertSame(0, $sum->count, 'A rider-less delivery bill is not a blocker.');
+        $this->assertSame(0, $sum->unassigned);
 
         $res = $this->closeDay($this->makeUser($cid));
-        $this->assertStringContainsString(
-            __('pos.dayclose_blocked_undispatched', ['count' => 1]),
-            (string) session('error')
-        );
-        $this->assertSame(0, DB::table('pos_day_close_reports')->count());
+        $res->assertSessionHas('success');
+        $this->assertSame(1, DB::table('pos_day_close_reports')->count(), 'The day must close.');
+        // The bill itself is left exactly as it is — no invented "delivered" stamp.
+        $this->assertNull(DB::table('pos_transactions')->find($riderLess)->delivery_status);
     }
 
     /**
-     * Owner 23 Aug 2026 (Frost and Brew): three undispatched bills stalled the
-     * close and the checklist only ever said "3". rows[] names each blocking
-     * bill so the page can list it and mark it delivered in place — the
-     * Deliveries board offered no way to clear an UNASSIGNED bill from there.
+     * Owner 23 Aug 2026 (Frost and Brew): undispatched bills stalled the close
+     * and the checklist only ever said "3". rows[] names each blocking bill so
+     * the page can list it and mark it delivered in place. Only bills sitting
+     * WITH a rider qualify — a rider-less one is not listed at all.
      */
-    public function test_rows_name_each_blocking_bill_with_rider_or_unassigned(): void
+    public function test_rows_name_each_blocking_bill_and_skip_rider_less_ones(): void
     {
         $cid = $this->makeCompany();
         $rid = $this->makeRider($cid);
@@ -380,21 +388,18 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
             'rider_id' => $rid, 'delivery_status' => 'assigned',
             'order_type' => 'delivery', 'invoice_number' => 'POS-2026-00289', 'total_amount' => 640,
         ]);
-        $unassigned = $this->makeBill($cid, [
+        $riderLess = $this->makeBill($cid, [
             'order_type' => 'delivery', 'invoice_number' => 'L-410', 'total_amount' => 570,
         ]);
 
         $rows = $this->summary($cid)->rows;
-        $this->assertCount(2, $rows);
+        $this->assertCount(1, $rows);
 
         $byId = $rows->keyBy('id');
         $this->assertSame('Qaisar', $byId[$assigned]->rider_name);
         $this->assertSame('POS-2026-00289', $byId[$assigned]->invoice_number);
         $this->assertEqualsWithDelta(640.0, $byId[$assigned]->total_amount, 0.01);
-
-        // No rider → the page shows "no rider assigned" and still offers Delivered.
-        $this->assertNull($byId[$unassigned]->rider_name);
-        $this->assertSame('L-410', $byId[$unassigned]->invoice_number);
+        $this->assertArrayNotHasKey($riderLess, $byId->all(), 'A rider-less bill must not be listed as a blocker.');
     }
 
     /**
@@ -405,7 +410,10 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
     public function test_blocker_row_shows_the_shop_serial_not_the_fiscal_number(): void
     {
         $cid = $this->makeCompany();
+        $rid = $this->makeRider($cid);
         $this->makeBill($cid, [
+            'rider_id' => $rid,
+            'delivery_status' => 'assigned',
             'order_type' => 'delivery',
             'invoice_number' => 'POS-2026-00274',
             'pra_invoice_number' => '195958FHKU35236543',
@@ -432,7 +440,10 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
     public function test_pra_stream_bill_clears_from_day_close_even_when_closer_runs_local_stream(): void
     {
         $cid = $this->makeCompany();
+        $rid = $this->makeRider($cid);
         $bill = $this->makeBill($cid, [
+            'rider_id' => $rid,
+            'delivery_status' => 'assigned',
             'order_type' => 'delivery',
             'invoice_mode' => 'pra',
             'pra_status' => 'submitted',
@@ -473,20 +484,21 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         $cid = $this->makeCompany();
         $rid = $this->makeRider($cid);
         $assigned = $this->makeBill($cid, ['rider_id' => $rid, 'delivery_status' => 'assigned', 'order_type' => 'delivery']);
-        $unassigned = $this->makeBill($cid, ['order_type' => 'delivery']);
+        $riderLess = $this->makeBill($cid, ['order_type' => 'delivery']);
 
         $res = $this->closeDay($this->makeUser($cid), ['clear_blockers' => 1]);
 
         $res->assertRedirect('/pos/day-close');
         $this->assertSame(1, DB::table('pos_day_close_reports')->count(), 'The day must close in the same request.');
         $this->assertStringContainsString(
-            __('pos.dc_cleared_note', ['orders' => 0, 'bills' => 2]),
+            __('pos.dc_cleared_note', ['orders' => 0, 'bills' => 1]),
             (string) session('success'),
             'The flash must spell out what the one click cleared.'
         );
-        foreach ([$assigned, $unassigned] as $id) {
-            $this->assertSame('delivered', DB::table('pos_transactions')->find($id)->delivery_status);
-        }
+        $this->assertSame('delivered', DB::table('pos_transactions')->find($assigned)->delivery_status);
+        // The clear stays as narrow as the blocker: a rider-less bill was never
+        // blocking anything, so the one click must not touch it either.
+        $this->assertNull(DB::table('pos_transactions')->find($riderLess)->delivery_status);
     }
 
     /**
@@ -499,13 +511,16 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
     {
         $cid = $this->makeCompany();
         $other = $this->makeCompany();
-        $done = $this->makeBill($cid, ['order_type' => 'delivery', 'delivery_status' => 'returned']);
-        $foreign = $this->makeBill($other, ['order_type' => 'delivery']);
-        $archived = $this->makeBill($cid, ['order_type' => 'delivery', 'is_archived' => true]);
-        $stale = $this->makeBill($cid, ['order_type' => 'delivery', 'created_at' => now()->subDays(9)]);
+        $rid = $this->makeRider($cid);
+        $otherRid = $this->makeRider($other);
+        $done = $this->makeBill($cid, ['rider_id' => $rid, 'order_type' => 'delivery', 'delivery_status' => 'returned']);
+        $foreign = $this->makeBill($other, ['rider_id' => $otherRid, 'delivery_status' => 'assigned', 'order_type' => 'delivery']);
+        $archived = $this->makeBill($cid, ['rider_id' => $rid, 'delivery_status' => 'assigned', 'order_type' => 'delivery', 'is_archived' => true]);
+        // Rider-less delivery: never a blocker, so never stampable from here.
+        $riderLess = $this->makeBill($cid, ['order_type' => 'delivery']);
         $user = $this->makeUser($cid);
 
-        foreach ([$done, $foreign, $archived, $stale] as $id) {
+        foreach ([$done, $foreign, $archived, $riderLess] as $id) {
             $res = $this->actingAs($user, 'pos')->from('/pos/day-close')
                 ->post('/pos/day-close/delivery/' . $id . '/delivered');
             $res->assertRedirect('/pos/day-close');
@@ -513,9 +528,9 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         }
 
         $this->assertSame('returned', DB::table('pos_transactions')->find($done)->delivery_status);
-        foreach ([$foreign, $archived, $stale] as $id) {
-            $this->assertNull(DB::table('pos_transactions')->find($id)->delivery_status);
-        }
+        $this->assertSame('assigned', DB::table('pos_transactions')->find($foreign)->delivery_status);
+        $this->assertSame('assigned', DB::table('pos_transactions')->find($archived)->delivery_status);
+        $this->assertNull(DB::table('pos_transactions')->find($riderLess)->delivery_status);
     }
 
     /**
@@ -526,9 +541,11 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
     public function test_clear_refuses_and_touches_nothing_when_a_blocker_belongs_to_another_branch(): void
     {
         $cid = $this->makeCompany();
-        $mine = $this->makeBill($cid, ['order_type' => 'delivery', 'branch_id' => 7, 'invoice_number' => 'POS-MINE']);
-        $legacy = $this->makeBill($cid, ['order_type' => 'delivery', 'branch_id' => null, 'invoice_number' => 'POS-LEGACY']);
-        $theirs = $this->makeBill($cid, ['order_type' => 'delivery', 'branch_id' => 9, 'invoice_number' => 'POS-THEIRS']);
+        $rid = $this->makeRider($cid);
+        $out = ['rider_id' => $rid, 'delivery_status' => 'assigned', 'order_type' => 'delivery'];
+        $mine = $this->makeBill($cid, $out + ['branch_id' => 7, 'invoice_number' => 'POS-MINE']);
+        $legacy = $this->makeBill($cid, $out + ['branch_id' => null, 'invoice_number' => 'POS-LEGACY']);
+        $theirs = $this->makeBill($cid, $out + ['branch_id' => 9, 'invoice_number' => 'POS-THEIRS']);
 
         $m = new \ReflectionMethod(\App\Http\Controllers\PosController::class, 'clearDayCloseBlockers');
         $m->setAccessible(true);
@@ -541,7 +558,8 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         $this->assertFalse($res['ok'], 'A cross-branch blocker must refuse the whole clear.');
         $this->assertStringContainsString('POS-THEIRS', $res['message']);
         foreach ([$mine, $legacy, $theirs] as $id) {
-            $this->assertNull(
+            $this->assertSame(
+                'assigned',
                 DB::table('pos_transactions')->find($id)->delivery_status,
                 'A refused clear must leave every bill untouched.'
             );
@@ -562,7 +580,8 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
     public function test_clear_blockers_touches_nothing_when_the_day_is_already_closed(): void
     {
         $cid = $this->makeCompany();
-        $bill = $this->makeBill($cid, ['order_type' => 'delivery']);
+        $rid = $this->makeRider($cid);
+        $bill = $this->makeBill($cid, ['rider_id' => $rid, 'delivery_status' => 'assigned', 'order_type' => 'delivery']);
         $user = $this->makeUser($cid);
 
         DB::table('pos_day_close_reports')->insert([
@@ -576,7 +595,8 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         $this->closeDay($user, ['clear_blockers' => 1]);
 
         $this->assertSame(__('pos.dayclose_report_exists'), trim((string) session('error')));
-        $this->assertNull(
+        $this->assertSame(
+            'assigned',
             DB::table('pos_transactions')->find($bill)->delivery_status,
             'A refused close must leave the blocking bill exactly as it was.'
         );

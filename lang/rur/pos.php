@@ -736,7 +736,7 @@ Bills cashier ke paas hi rahenge — ye sirf kitchen display clear karega.',
     'confirm_new_password' => 'Naya Password Confirm karein',
     'dayclose_blocked_open_orders' => 'Din band nahi ho sakta: :count order abhi OPEN hain:tables. Pehle unhein final ya cancel karein — din band hone ke baad final nahi ho sakte.',
     'dayclose_blocked_hint' => 'Jab tak ye orders final ya cancel nahi hote, din band nahi ho sakta.',
-    'dayclose_blocked_undispatched' => 'Din band nahi ho sakta: :count delivery bill abhi tak kisi rider ko dispatch nahi hui. Pehle Deliveries board se rider assign/dispatch ya settle karein.',
+    'dayclose_blocked_undispatched' => 'Din band nahi ho sakta: :count delivery bill abhi tak rider ke paas khuli hain — rider assign hua magar dispatch nahi hui. Pehle Deliveries board se dispatch, delivered ya settle karein.',
     'confirm_promote_local_bill' => 'Bill :invoice ko PRA par jama karein?
 
 • Ye bill FINAL ho jayega aur naya POS serial number milega
@@ -1073,7 +1073,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dc_checklist_title' => 'Pending checklist — Day Close se pehle yeh nimta lein',
     'dc_checklist_hint' => 'Jab tak neeche wale rokne wale items clear na hon, din band nahi ho sakta.',
     'dc_check_open_orders' => 'Khule restaurant orders',
-    'dc_check_undispatched' => 'Bina dispatch delivery bills',
+    'dc_check_undispatched' => 'Rider ke paas khuli deliveries',
     'dc_check_pending_local' => 'Pending local / provisional bills',
     'dc_check_rider_khata' => 'Rider cash khata (un-settled)',
     'dc_check_clear' => 'Clear',
@@ -1096,7 +1096,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dc_clear_other_branch' => 'Yeh delivery bills doosri branch ke hain: :items. Unhein wahin se band karein — chalti delivery yahan se nahi chheri jati.',
     'dc_row_other_branch' => 'Doosri branch',
     'dc_cleared_note' => 'Band karne se pehle clear kiya: :orders order cancel, :bills delivery bill delivered.',
-    'dc_undispatched_detail' => ':count bill — PKR :amount — abhi kisi rider ko dispatch nahi hui.',
+    'dc_undispatched_detail' => ':count bill — PKR :amount — rider ko assign hui magar dispatch nahi hui.',
     'dc_open_deliveries_board' => 'Deliveries board kholen',
     'dc_rider_khata_note' => 'PKR :amount riders ke paas (:count bill) — close ho sakta hai; khata agle din tak chalta hai.',
     'dc_carry_pending_note' => 'Yeh bills close ke baad bhi pending rahenge (Carry Forward).',

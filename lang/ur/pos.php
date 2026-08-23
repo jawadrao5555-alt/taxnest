@@ -736,7 +736,7 @@ return [
     'confirm_new_password' => 'نیا پاس ورڈ کنفرم کریں',
     'dayclose_blocked_open_orders' => 'دن بند نہیں ہو سکتا: :count آرڈر ابھی OPEN ہیں:tables۔ پہلے انہیں فائنل یا کینسل کریں — دن بند ہونے کے بعد فائنل نہیں ہو سکتے۔',
     'dayclose_blocked_hint' => 'جب تک یہ آرڈر فائنل یا کینسل نہیں ہوتے، دن بند نہیں ہو سکتا۔',
-    'dayclose_blocked_undispatched' => 'دن بند نہیں ہو سکتا: :count ڈیلیوری بل ابھی تک کسی رائیڈر کو ڈسپیچ نہیں ہوئے۔ پہلے ڈیلیوریز بورڈ سے رائیڈر مقرر/ڈسپیچ یا سیٹل کریں۔',
+    'dayclose_blocked_undispatched' => 'دن بند نہیں ہو سکتا: :count ڈیلیوری بل ابھی تک رائیڈر کے پاس کھلے ہیں — رائیڈر مقرر ہوا مگر ڈسپیچ نہیں ہوئے۔ پہلے ڈیلیوریز بورڈ سے ڈسپیچ، ڈیلیورڈ یا سیٹل کریں۔',
     'confirm_promote_local_bill' => 'بل :invoice کو پی آر اے پر جمع کریں؟
 
 • یہ بل FINAL ہو جائے گا اور نیا POS سیریل نمبر ملے گا
@@ -1073,7 +1073,7 @@ return [
     'dc_checklist_title' => 'زیرِ التوا چیک لسٹ — دن بند کرنے سے پہلے یہ نمٹا لیں',
     'dc_checklist_hint' => 'جب تک نیچے والے روکنے والے آئٹم صاف نہ ہوں، دن بند نہیں ہو سکتا۔',
     'dc_check_open_orders' => 'کھلے ریسٹورنٹ آرڈر',
-    'dc_check_undispatched' => 'بغیر ڈسپیچ ڈیلیوری بل',
+    'dc_check_undispatched' => 'رائیڈر کے پاس کھلی ڈیلیوریاں',
     'dc_check_pending_local' => 'زیرِ التوا لوکل / پروویژنل بل',
     'dc_check_rider_khata' => 'رائیڈر کیش کھاتہ (غیر سیٹلڈ)',
     'dc_check_clear' => 'صاف',
@@ -1096,7 +1096,7 @@ return [
     'dc_clear_other_branch' => 'یہ ڈیلیوری بل دوسری شاخ کے ہیں: :items۔ انہیں وہیں سے بند کریں — چلتی ڈیلیوری یہاں سے نہیں چھیڑی جاتی۔',
     'dc_row_other_branch' => 'دوسری شاخ',
     'dc_cleared_note' => 'بند کرنے سے پہلے صاف کیا: :orders آرڈر منسوخ، :bills ڈیلیوری بل ڈیلیورڈ۔',
-    'dc_undispatched_detail' => ':count بل — PKR :amount — ابھی کسی رائیڈر کو ڈسپیچ نہیں ہوئے۔',
+    'dc_undispatched_detail' => ':count بل — PKR :amount — رائیڈر کو دیے گئے مگر ڈسپیچ نہیں ہوئے۔',
     'dc_open_deliveries_board' => 'ڈیلیوریز بورڈ کھولیں',
     'dc_rider_khata_note' => 'PKR :amount رائیڈرز کے پاس (:count بل) — کلوز ہو سکتا ہے؛ کھاتہ اگلے دن تک چلتا ہے۔',
     'dc_carry_pending_note' => 'یہ بل کلوز کے بعد بھی زیرِ التوا رہیں گے (کیری فارورڈ)۔',

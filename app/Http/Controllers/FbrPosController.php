@@ -6960,12 +6960,16 @@ class FbrPosController extends Controller
     /**
      * Undispatched delivery bills for the FBR day-close pending checklist
      * (Task 676 — FBR mirror of PRA Task 661, ZFC waqia): completed delivery
-     * bills that never reached a rider's hands — either ASSIGNED to a rider
-     * but not yet dispatched, or UNASSIGNED fresh delivery bills (same 7-day
-     * window as the Deliveries board / sale-screen popup — old pre-feature
-     * bills must not brick the close forever). These HARD-BLOCK the manual
-     * close and make the hourly auto-close SKIP the day (skip_alert policy).
-     * 'dispatched' does NOT block — the rider has the order; its cash is
+     * bills sitting WITH A RIDER — assigned to him but never dispatched. These
+     * HARD-BLOCK the manual close and make the hourly auto-close SKIP the day
+     * (skip_alert policy).
+     *
+     * NO RIDER = NOT A BLOCKER (owner rule, 23 Aug 2026 — mirrors PRA): an
+     * unassigned delivery bill was handed over by the shop itself, its cash is
+     * already in the drawer and there is nobody to settle with, so it must
+     * never hold the day open.
+     *
+     * 'dispatched' does NOT block either — the rider has the order; its cash is
      * covered by the khata figures. Rider unsettled cash NEVER blocks (khata
      * legitimately carries to the next day) — warning-only context here.
      * Feature-gated (riders plan gate + Delivery toggle, mirrors
@@ -6998,22 +7002,12 @@ class FbrPosController extends Controller
                 ->when($hasType, fn ($q) => $q->where(function ($w) {
                     $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 }))
-                ->where(function ($q) {
-                    // Assigned to a rider but never handed over (dispatch pending).
-                    $q->where(function ($qa) {
-                        $qa->whereNotNull('rider_id')
-                            ->where('delivery_status', 'assigned')
-                            ->whereNull('rider_settlement_id');
-                    })
-                    // Unassigned fresh delivery bill — nobody is taking it anywhere.
-                    ->orWhere(function ($qu) {
-                        $qu->whereNull('rider_id')
-                            ->whereNull('delivery_status')
-                            ->whereNull('rider_settlement_id')
-                            ->where('order_type', 'delivery')
-                            ->where('created_at', '>=', now()->subDays(7));
-                    });
-                })
+                // Assigned to a rider but never handed over (dispatch pending).
+                // A rider-less delivery bill is the shop's own hand-over and is
+                // deliberately NOT counted here (owner rule, 23 Aug 2026).
+                ->whereNotNull('rider_id')
+                ->where('delivery_status', 'assigned')
+                ->whereNull('rider_settlement_id')
                 ->get(['id', 'rider_id', 'total_amount']);
 
             // Rider unsettled cash khata — warning-only context (whole open

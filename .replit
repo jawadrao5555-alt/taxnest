@@ -63,10 +63,6 @@ args = "test"
 task = "workflow.run"
 args = "Video Batch"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Deploy Live"
-
 [[workflows.workflow]]
 name = "Laravel Server"
 author = "agent"
@@ -119,17 +115,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash tools/video-pipeline/batch-new11.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Deploy Live"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/deploy-live.sh 2>&1 | tee /tmp/deploy-live.log"
 
 [workflows.workflow.metadata]
 outputType = "console"

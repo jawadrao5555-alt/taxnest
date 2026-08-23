@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\PricingPlan;
 use App\Models\Company;
 use App\Models\Subscription;
+use App\Services\DiPlanComparisonService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -205,7 +206,12 @@ class SubscriptionAssignmentService
 
         $plan = PricingPlan::find($planId);
         if (!$plan || $plan->is_trial
-            || ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan))) {
+            || ($plan->product_type === 'pos' && !PosPlanComparisonService::isSellablePlan($plan))
+            // A signup that predates the Sep 2026 DI restructure can still be
+            // sitting in the approval queue asking for a package that is no
+            // longer sold. Approving must not quietly resurrect it — the admin
+            // assigns one of the current packages by hand instead.
+            || ($plan->product_type === 'di' && !DiPlanComparisonService::isSellablePlan($plan))) {
             return null;
         }
 

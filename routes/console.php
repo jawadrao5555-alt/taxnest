@@ -198,3 +198,8 @@ Schedule::command('app:mysql-conn-health')->everyFiveMinutes()->withoutOverlappi
 // link failure vs a real origin outage. One alert email per incident + one
 // recovery email; full probe history in storage/logs/uptime-watch.log.
 Schedule::command('site:uptime-watch')->everyTwoMinutes()->withoutOverlapping();
+// Sep 2026 DI restructure — fair-use watch on the "Unlimited" package. The
+// shop is NEVER blocked or warned; the office simply hears once a month when
+// an account runs past the fair-use figure printed on its package, so a custom
+// arrangement can be discussed instead of it surfacing months later.
+Schedule::command('di:fair-use-alerts')->dailyAt('06:40')->withoutOverlapping();

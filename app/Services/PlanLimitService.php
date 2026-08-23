@@ -54,6 +54,12 @@ class PlanLimitService
         return self::$invoiceSubmittedAtColumn ??= \Illuminate\Support\Facades\Schema::hasColumn('invoices', 'submitted_at');
     }
 
+    /** Tests rebuild the invoices table between cases; the probe must follow. */
+    public static function forgetSchemaProbe(): void
+    {
+        self::$invoiceSubmittedAtColumn = null;
+    }
+
     /**
      * Count DI invoices that consumed quota, optionally inside a window.
      * The window follows the SUBMISSION timestamp — a draft typed last month

@@ -65,14 +65,16 @@ class AiPageCreditService
      */
     public static function ledgerReady(): bool
     {
-        static $ready = null;
+        return self::$ledgerReady ??= \Illuminate\Support\Facades\Schema::hasTable('ai_page_ledgers')
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'ai_page_balance');
+    }
 
-        if ($ready === null) {
-            $ready = \Illuminate\Support\Facades\Schema::hasTable('ai_page_ledgers')
-                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'ai_page_balance');
-        }
+    /** Per-process probe cache; tests rebuild the schema between cases. */
+    protected static ?bool $ledgerReady = null;
 
-        return $ready;
+    public static function forgetLedgerProbe(): void
+    {
+        self::$ledgerReady = null;
     }
 
     /** Allowance pages already spent in the current calendar month (net of refunds). */

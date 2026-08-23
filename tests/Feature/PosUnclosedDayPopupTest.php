@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\PosTransaction;
 use App\Models\User;
 use App\Services\PosFeatureService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -24,6 +25,25 @@ use Tests\TestCase;
 class PosUnclosedDayPopupTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * The POS business day rolls over at 6 AM, so between midnight and 05:59
+     * (PKT) a bill dated now()->subDay() still lands on TODAY's business day —
+     * "pending" is then correctly false and this suite fails on the clock
+     * alone. Freeze a mid-afternoon moment so "yesterday" is always a previous
+     * business day, whatever hour the suite runs at.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Carbon::setTestNow(Carbon::create(2026, 8, 20, 14, 0, 0, config('app.timezone')));
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 
     private function company(): Company
     {

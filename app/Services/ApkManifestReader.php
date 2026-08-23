@@ -87,24 +87,47 @@ class ApkManifestReader
     /** The one zip entry we ever read out of the APK. */
     private const ENTRY = 'AndroidManifest.xml';
 
-    /** Open the APK zip, pull AndroidManifest.xml, parse the root attributes. */
+    /**
+     * Hard ceilings for the no-ext-zip reader. A real APK's central directory
+     * is a few hundred KB and its binary AndroidManifest.xml ~10 KB, so these
+     * are wildly generous — they exist only so a corrupt (or swapped) file
+     * cannot make us allocate the whole archive or inflate a zip bomb. PHP's
+     * memory-exhaustion fatal is NOT catchable, so refusing early is the only
+     * way this stays fail-open.
+     */
+    private const MAX_CENTRAL_DIRECTORY = 8388608;   // 8 MiB
+    private const MAX_ENTRY_BYTES = 4194304;         // 4 MiB compressed or inflated
+
+    /**
+     * Open the APK zip, pull AndroidManifest.xml, parse the root attributes.
+     *
+     * EVERYTHING here is inside one fail-open boundary: a corrupt/truncated APK
+     * must make the caller "unable to check", never a 500. The binary walks
+     * below index into the buffer at offsets the file itself supplies, and on
+     * PHP 8 a short `unpack()` throws — so the catch is load-bearing, not
+     * decoration.
+     */
     private static function parse(string $path): ?array
     {
-        $bytes = self::entryBytes($path, self::ENTRY);
-        if ($bytes === null || $bytes === '') {
+        try {
+            $bytes = self::entryBytes($path, self::ENTRY);
+            if ($bytes === null || $bytes === '') {
+                return null;
+            }
+
+            $manifest = self::rootAttributes($bytes);
+            if ($manifest === null) {
+                return null;
+            }
+
+            return [
+                'package'     => $manifest['package'] ?? null,
+                'versionName' => $manifest['versionName'] ?? null,
+                'versionCode' => isset($manifest['versionCode']) ? (string) $manifest['versionCode'] : null,
+            ];
+        } catch (\Throwable $e) {
             return null;
         }
-
-        $manifest = self::rootAttributes($bytes);
-        if ($manifest === null) {
-            return null;
-        }
-
-        return [
-            'package'     => $manifest['package'] ?? null,
-            'versionName' => $manifest['versionName'] ?? null,
-            'versionCode' => isset($manifest['versionCode']) ? (string) $manifest['versionCode'] : null,
-        ];
     }
 
     /**
@@ -271,11 +294,29 @@ class ApkManifestReader
                 return null;
             }
 
+            // The record must end EXACTLY at EOF once its comment length is
+            // counted, and describe a single-disk archive. Without this a
+            // "PK\x05\x06" that merely happens to sit inside a comment (or
+            // inside compressed data) is accepted as the directory pointer and
+            // sends the walk off into arbitrary bytes — a wrong answer, which
+            // is worse than no answer for a version check.
+            $commentLen = self::u16($tail, $eocd + 20);
+            if ($eocd + 22 + $commentLen !== strlen($tail)) {
+                return null;
+            }
+            if (self::u16($tail, $eocd + 4) !== 0 || self::u16($tail, $eocd + 6) !== 0) {
+                return null;                      // multi-disk
+            }
+            if (self::u16($tail, $eocd + 8) !== self::u16($tail, $eocd + 10)) {
+                return null;                      // split across disks
+            }
+
             $cdSize = self::u32($tail, $eocd + 12);
             $cdOffset = self::u32($tail, $eocd + 16);
             // 0xFFFFFFFF = zip64. Our APKs are megabytes, not gigabytes; if one
             // ever gets there, fail open rather than mis-parse.
-            if ($cdSize <= 0 || $cdOffset <= 0 || $cdOffset === 0xFFFFFFFF || $cdOffset + $cdSize > $size) {
+            if ($cdSize <= 0 || $cdSize > self::MAX_CENTRAL_DIRECTORY
+                || $cdOffset <= 0 || $cdOffset === 0xFFFFFFFF || $cdOffset + $cdSize > $size) {
                 return null;
             }
 
@@ -286,6 +327,7 @@ class ApkManifestReader
             $cdLen = strlen($cd);
             $method = null;
             $compressedSize = 0;
+            $plainSize = 0;
             $localOffset = 0;
             while ($p + 46 <= $cdLen) {
                 if (substr($cd, $p, 4) !== "PK\x01\x02") {
@@ -293,16 +335,22 @@ class ApkManifestReader
                 }
                 $nameLen = self::u16($cd, $p + 28);
                 $extraLen = self::u16($cd, $p + 30);
-                $commentLen = self::u16($cd, $p + 32);
+                $entryComment = self::u16($cd, $p + 32);
                 if (substr($cd, $p + 46, $nameLen) === $entry) {
                     $method = self::u16($cd, $p + 10);
                     $compressedSize = self::u32($cd, $p + 20);
+                    $plainSize = self::u32($cd, $p + 24);
                     $localOffset = self::u32($cd, $p + 42);
                     break;
                 }
-                $p += 46 + $nameLen + $extraLen + $commentLen;
+                $p += 46 + $nameLen + $extraLen + $entryComment;
             }
-            if ($method === null || $compressedSize <= 0 || $localOffset + 30 > $size) {
+            // Size ceilings: a real binary manifest is ~10 KB, so anything near
+            // the cap is a corrupt or hostile file, not our APK.
+            if ($method === null || $compressedSize <= 0
+                || $compressedSize > self::MAX_ENTRY_BYTES
+                || $plainSize > self::MAX_ENTRY_BYTES
+                || $localOffset + 30 > $size) {
                 return null;
             }
 

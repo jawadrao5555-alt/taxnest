@@ -83,4 +83,119 @@ class ApkManifestReaderTest extends TestCase
         $apk = FakeApkBuilder::write($this->dir . '/any.apk', '1.4.0', 5);
         $this->assertSame('', ApkManifestReader::advertisedVersion('', $apk));
     }
+
+    // ---------------------------------------------------------------------
+    // The no-ext-zip reader. It only runs where ZipArchive is missing (the
+    // owner's PHP CLI), which is exactly where nobody would notice it going
+    // wrong — so it is tested directly here, on a box that HAS the extension.
+    // ---------------------------------------------------------------------
+
+    /** Call the private fallback reader. */
+    private function fallback(string $path, string $entry = 'AndroidManifest.xml'): ?string
+    {
+        $m = new \ReflectionMethod(ApkManifestReader::class, 'entryBytesWithoutZipExt');
+        $m->setAccessible(true);
+
+        return $m->invoke(null, $path, $entry);
+    }
+
+    public function test_fallback_reader_matches_ziparchive_byte_for_byte(): void
+    {
+        $apk = FakeApkBuilder::write($this->dir . '/fb.apk', '1.5.0', 6);
+
+        $zip = new \ZipArchive();
+        $zip->open($apk);
+        $viaExt = $zip->getFromName('AndroidManifest.xml');
+        $zip->close();
+
+        $this->assertSame($viaExt, $this->fallback($apk));
+        $this->assertNull($this->fallback($apk, 'NoSuchEntry.xml'));
+    }
+
+    public function test_fallback_reader_rejects_a_fake_eocd_and_trailing_garbage(): void
+    {
+        $apk = FakeApkBuilder::write($this->dir . '/tail.apk', '1.5.0', 6);
+        $good = (string) file_get_contents($apk);
+
+        // Bytes appended after the real record: the EOCD no longer ends at EOF.
+        file_put_contents($this->dir . '/garbage.apk', $good . str_repeat("\x00", 64));
+        $this->assertNull($this->fallback($this->dir . '/garbage.apk'));
+
+        // A bare "PK\x05\x06" signature with nonsense offsets is not a directory.
+        // (ext-zip repairs such a file and still finds the entry — that is fine
+        // and is why only the fallback is asserted here.)
+        file_put_contents($this->dir . '/fake-eocd.apk', $good . "PK\x05\x06" . str_repeat("\xFF", 18));
+        $this->assertNull($this->fallback($this->dir . '/fake-eocd.apk'));
+    }
+
+    public function test_fallback_reader_refuses_an_oversized_central_directory(): void
+    {
+        $apk = FakeApkBuilder::write($this->dir . '/big-cd.apk', '1.5.0', 6);
+        $raw = (string) file_get_contents($apk);
+        $eocd = strrpos($raw, "PK\x05\x06");
+
+        // Claim a 512 MB central directory — must be refused, not allocated.
+        $patched = substr_replace($raw, pack('V', 512 * 1024 * 1024), $eocd + 12, 4);
+        file_put_contents($this->dir . '/big-cd.apk', $patched);
+
+        $this->assertNull($this->fallback($this->dir . '/big-cd.apk'));
+    }
+
+    public function test_fallback_reader_refuses_a_compression_bomb(): void
+    {
+        // 12 MB of zeros deflates to a few KB — the declared plain size is what
+        // stops us, before any inflate happens.
+        $bomb = $this->dir . '/bomb.apk';
+        $zip = new \ZipArchive();
+        $zip->open($bomb, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFromString('AndroidManifest.xml', str_repeat("\x00", 12 * 1024 * 1024));
+        $zip->close();
+
+        $this->assertNull($this->fallback($bomb));
+        $this->assertNull(ApkManifestReader::read($bomb));
+    }
+
+    public function test_a_truncated_binary_manifest_returns_null_instead_of_throwing(): void
+    {
+        $apk = FakeApkBuilder::write($this->dir . '/trunc.apk', '1.5.0', 6);
+        $zip = new \ZipArchive();
+        $zip->open($apk);
+        $manifest = (string) $zip->getFromName('AndroidManifest.xml');
+        $zip->close();
+
+        // Cut before the root element is complete → nothing to report.
+        foreach ([4, 12, 40] as $i => $cut) {
+            $path = $this->dir . "/trunc-{$i}.apk";
+            $zip = new \ZipArchive();
+            $zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+            $zip->addFromString('AndroidManifest.xml', substr($manifest, 0, $cut));
+            $zip->close();
+
+            $this->assertNull(ApkManifestReader::read($path), "cut at {$cut} must fail open");
+            $this->assertNull(ApkManifestReader::versionName($path));
+            $this->assertNotNull($this->fallback($path));   // the zip itself is still valid
+        }
+
+        // Cut anywhere at all: the answer may be null or a parsed root, but the
+        // call must never throw — a corrupt hosted file cannot 500 /api/app-version.
+        for ($cut = 1; $cut < strlen($manifest); $cut += 37) {
+            $path = $this->dir . "/scan.apk";
+            @unlink($path);
+            $zip = new \ZipArchive();
+            $zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+            $zip->addFromString('AndroidManifest.xml', substr($manifest, 0, $cut));
+            $zip->close();
+
+            $info = ApkManifestReader::read($path);
+            $this->assertTrue($info === null || is_array($info), "cut at {$cut} threw instead of failing open");
+        }
+
+        // Pure garbage in the manifest slot behaves the same way.
+        $path = $this->dir . '/garbage-manifest.apk';
+        $zip = new \ZipArchive();
+        $zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFromString('AndroidManifest.xml', random_bytes(2048));
+        $zip->close();
+        $this->assertNull(ApkManifestReader::versionName($path));
+    }
 }

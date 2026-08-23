@@ -84,19 +84,14 @@ class ApkManifestReader
         });
     }
 
+    /** The one zip entry we ever read out of the APK. */
+    private const ENTRY = 'AndroidManifest.xml';
+
     /** Open the APK zip, pull AndroidManifest.xml, parse the root attributes. */
     private static function parse(string $path): ?array
     {
-        if (!class_exists(\ZipArchive::class)) {
-            return null;
-        }
-        $zip = new \ZipArchive();
-        if ($zip->open($path) !== true) {
-            return null;
-        }
-        $bytes = $zip->getFromName('AndroidManifest.xml');
-        $zip->close();
-        if ($bytes === false || $bytes === '') {
+        $bytes = self::entryBytes($path, self::ENTRY);
+        if ($bytes === null || $bytes === '') {
             return null;
         }
 
@@ -222,6 +217,127 @@ class ApkManifestReader
         }
 
         return $attrs;
+    }
+
+    /**
+     * Raw bytes of one entry inside the APK.
+     *
+     * ZipArchive is used when it exists — but it does NOT exist everywhere this
+     * runs: the owner's cPanel PHP is built without the zip extension, so on
+     * PRODUCTION (the only place the guard matters) every read returned null
+     * and advertisedVersion() quietly fell back to trusting the setting. That
+     * is the exact blind spot this class was written to close, so when the
+     * extension is missing we read the zip ourselves. It is a tiny read: the
+     * end-of-central-directory record, the one central-directory entry we want,
+     * then that entry's bytes — no temp files, no full-file slurp.
+     */
+    private static function entryBytes(string $path, string $entry): ?string
+    {
+        if (class_exists(\ZipArchive::class)) {
+            $zip = new \ZipArchive();
+            if ($zip->open($path) === true) {
+                $bytes = $zip->getFromName($entry);
+                $zip->close();
+                if (is_string($bytes) && $bytes !== '') {
+                    return $bytes;
+                }
+            }
+        }
+
+        return self::entryBytesWithoutZipExt($path, $entry);
+    }
+
+    /** Pure-PHP zip entry read (no ext-zip). Returns null on anything unexpected. */
+    private static function entryBytesWithoutZipExt(string $path, string $entry): ?string
+    {
+        $fh = @fopen($path, 'rb');
+        if ($fh === false) {
+            return null;
+        }
+
+        try {
+            $size = @filesize($path);
+            if (!is_int($size) || $size < 22) {
+                return null;
+            }
+
+            // --- End of central directory: last 22 bytes, plus up to 64 KB of
+            //     trailing zip comment. APKs have no comment, but scan anyway.
+            $tailLen = (int) min($size, 22 + 65535);
+            fseek($fh, $size - $tailLen);
+            $tail = (string) fread($fh, $tailLen);
+            $eocd = strrpos($tail, "PK\x05\x06");
+            if ($eocd === false || $eocd + 22 > strlen($tail)) {
+                return null;
+            }
+
+            $cdSize = self::u32($tail, $eocd + 12);
+            $cdOffset = self::u32($tail, $eocd + 16);
+            // 0xFFFFFFFF = zip64. Our APKs are megabytes, not gigabytes; if one
+            // ever gets there, fail open rather than mis-parse.
+            if ($cdSize <= 0 || $cdOffset <= 0 || $cdOffset === 0xFFFFFFFF || $cdOffset + $cdSize > $size) {
+                return null;
+            }
+
+            // --- Central directory: find the entry, note where its local header sits.
+            fseek($fh, $cdOffset);
+            $cd = (string) fread($fh, $cdSize);
+            $p = 0;
+            $cdLen = strlen($cd);
+            $method = null;
+            $compressedSize = 0;
+            $localOffset = 0;
+            while ($p + 46 <= $cdLen) {
+                if (substr($cd, $p, 4) !== "PK\x01\x02") {
+                    return null;
+                }
+                $nameLen = self::u16($cd, $p + 28);
+                $extraLen = self::u16($cd, $p + 30);
+                $commentLen = self::u16($cd, $p + 32);
+                if (substr($cd, $p + 46, $nameLen) === $entry) {
+                    $method = self::u16($cd, $p + 10);
+                    $compressedSize = self::u32($cd, $p + 20);
+                    $localOffset = self::u32($cd, $p + 42);
+                    break;
+                }
+                $p += 46 + $nameLen + $extraLen + $commentLen;
+            }
+            if ($method === null || $compressedSize <= 0 || $localOffset + 30 > $size) {
+                return null;
+            }
+
+            // --- Local header: its name/extra lengths can differ from the central
+            //     directory's, so the data offset must come from here.
+            fseek($fh, $localOffset);
+            $local = (string) fread($fh, 30);
+            if (strlen($local) < 30 || substr($local, 0, 4) !== "PK\x03\x04") {
+                return null;
+            }
+            $dataAt = $localOffset + 30 + self::u16($local, 26) + self::u16($local, 28);
+            if ($dataAt + $compressedSize > $size) {
+                return null;
+            }
+
+            fseek($fh, $dataAt);
+            $raw = (string) fread($fh, $compressedSize);
+            if (strlen($raw) !== $compressedSize) {
+                return null;
+            }
+
+            if ($method === 0) {                    // stored
+                return $raw;
+            }
+            if ($method === 8) {                    // deflate
+                $out = @gzinflate($raw);
+                return is_string($out) && $out !== '' ? $out : null;
+            }
+
+            return null;                            // some other method — not ours to guess
+        } catch (\Throwable $e) {
+            return null;
+        } finally {
+            @fclose($fh);
+        }
     }
 
     private static function u16(string $data, int $off): int

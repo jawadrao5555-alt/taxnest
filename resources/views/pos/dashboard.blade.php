@@ -30,6 +30,11 @@
         </div>
         @endif
 
+        {{-- Same fact as the banner above, but as a popup the shop cannot walk
+             past on the way to New Sale (owner request, 23 Aug 2026). It asks
+             the server itself, so it lives OUTSIDE the banner's condition. --}}
+        @include('pos.partials.day-close-pending-popup')
+
         {{-- ━━━ In-app notifications (mark-read dismissal, 30-day window — mirrors DI dashboard) ━━━ --}}
         @if(isset($notifications) && $notifications->count() > 0)
         <div class="mb-4 space-y-2">

@@ -11949,4 +11949,8 @@ document.addEventListener('keydown', function (e) {
 }, true);
 </script>
 @endif
+{{-- Unclosed prior day: the shop lands straight here every morning, so the
+     warning has to live on the sale screen too (owner request, 23 Aug 2026). --}}
+@include('pos.partials.day-close-pending-popup')
+
 </x-pos-layout>

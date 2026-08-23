@@ -100,24 +100,23 @@
                 <input type="text" id="custSearchInput" name="q" value="{{ $q ?? '' }}" placeholder="{{ __('pos.search_customer_placeholder') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-9 pr-3 py-2 focus:ring-2 focus:ring-purple-500">
             </div>
+            {{-- The Search button stays: without JS (or mid-load) the form still
+                 works exactly as before — the live search is an enhancement. --}}
             <button type="submit" class="px-4 py-2 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg">{{ __('pos.search_btn') }}</button>
-            @if(($q ?? '') !== '')
-            <a href="{{ route('pos.customers') }}" class="px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">{{ __('pos.clear_btn') }}</a>
-            @endif
+            <a id="custClearBtn" href="{{ route('pos.customers') }}" class="px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 {{ ($q ?? '') !== '' ? '' : 'hidden' }}">{{ __('pos.clear_btn') }}</a>
         </form>
-        <p class="text-xs text-gray-400 mt-1">
+        <p id="custCountLine" class="text-xs text-gray-400 mt-1">
             @if(($q ?? '') !== '')
                 {{ __('pos.customers_found_of_total', ['found' => $customers->total(), 'total' => $totalCount ?? $customers->total()]) }}
             @else
                 {{ __('pos.customers_total_line', ['total' => $totalCount ?? $customers->total()]) }}
             @endif
         </p>
-        <p id="custSearchCount" class="text-xs text-gray-400 mt-1 hidden"></p>
     </div>
 
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm table-cards">
+            <table id="custTable" class="w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <th class="px-4 py-3">{{ __('pos.customer_word') }}</th>
@@ -134,117 +133,9 @@
                         @endif
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    @forelse($customers as $customer)
-                    <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="custRow({{ (int) $customer->id }})"
-                        data-search="{{ Str::lower(trim(($customer->name ?? '') . ' ' . ($customer->phone ?? '') . ' ' . ($customer->email ?? '') . ' ' . ($customer->address ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->cnic ?? '') . ' ' . ($customer->ntn ?? ''))) }}">
-                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                            {{ $customer->name }}
-                            {{-- Task 1161: khamosh-repeat chip — same PosRepeatCustomerAlert service as the dashboard card. --}}
-                            @php $icRow = ($inactiveMap ?? [])[$customer->id] ?? null; @endphp
-                            @if($icRow)
-                            <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 whitespace-nowrap align-middle" title="{{ __('pos.inactive_orders_count', ['count' => $icRow['orders']]) }} · {{ __('pos.inactive_last_order_days', ['days' => $icRow['days']]) }}">{{ __('pos.inactive_chip', ['days' => $icRow['days']]) }}</span>
-                            @endif
-                        </td>
-                        <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ $customer->phone ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $customer->email ?? '—' }}</td>
-                        @php
-                            $addrTxt = trim((string) ($customer->address ?? ''));
-                            $cityTxt = trim((string) ($customer->city ?? ''));
-                        @endphp
-                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">
-                            @if($addrTxt !== '')
-                                {{-- inline max-width: arbitrary Tailwind classes need a fresh build --}}
-                                <div class="truncate" style="max-width:240px" title="{{ $addrTxt }}">{{ $addrTxt }}</div>
-                            @endif
-                            @if($cityTxt !== '')
-                                <div class="text-xs text-gray-400">{{ $cityTxt }}</div>
-                            @endif
-                            @if($addrTxt === '' && $cityTxt === ''){{ '—' }}@endif
-                        </td>
-                        <td class="px-4 py-3 text-center hidden sm:table-cell">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->type === 'registered' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">{{ $customer->type === 'registered' ? __('pos.registered') : __('pos.unregistered') }}</span>
-                        </td>
-                        <td class="px-4 py-3 text-center hidden sm:table-cell">
-                            @if(!($isCashier ?? false))
-                            <form method="POST" action="{{ route('pos.customers.toggle', $customer->id) }}" class="inline">
-                                @csrf
-                                <button type="submit" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">
-                                    {{ $customer->is_active ? __('pos.active_word') : __('pos.inactive_word') }}
-                                </button>
-                            </form>
-                            @else
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $customer->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }}">
-                                {{ $customer->is_active ? __('pos.active_word') : __('pos.inactive_word') }}
-                            </span>
-                            @endif
-                        </td>
-                        @if(!($isCashier ?? false))
-                        <td class="px-4 py-3 text-center">
-                            <div class="flex items-center justify-center gap-1">
-                                <a href="{{ route('pos.customers.history', $customer->id) }}" class="text-xs text-emerald-600 hover:text-emerald-700 px-2 py-1">{{ __('pos.history_word') }}</a>
-                                <button @click="editing = !editing" class="text-xs text-purple-600 hover:text-purple-700 px-2 py-1">{{ __('pos.edit') }}</button>
-                                <form method="POST" action="{{ route('pos.customers.delete', $customer->id) }}" onsubmit="return confirm({{ Js::from(__('pos.confirm_delete_customer')) }})" class="inline">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="text-xs text-red-500 hover:text-red-600 px-2 py-1">{{ __('pos.delete') }}</button>
-                                </form>
-                            </div>
-                        </td>
-                        @endif
-                    </tr>
-                    @if(!($isCashier ?? false))
-                    <tr x-show="editing" class="bg-purple-50/50 dark:bg-purple-900/10">
-                        <td colspan="7" class="px-4 py-3">
-                            <form method="POST" action="{{ route('pos.customers.update', $customer->id) }}" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 items-end">
-                                @csrf @method('PUT')
-                                <input type="text" name="name" value="{{ $customer->name }}" required placeholder="{{ __('pos.name_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="text" name="phone" value="{{ $customer->phone }}" placeholder="{{ __('pos.phone_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="email" name="email" value="{{ $customer->email }}" placeholder="{{ __('pos.email_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="text" name="city" value="{{ $customer->city }}" placeholder="{{ __('pos.city_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="text" name="cnic" value="{{ $customer->cnic }}" placeholder="{{ __('pos.cnic_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <input type="text" name="ntn" value="{{ $customer->ntn }}" placeholder="{{ __('pos.ntn_label') }}" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                <select name="type" required class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-2 py-1.5 w-full">
-                                    <option value="unregistered" {{ $customer->type === 'unregistered' ? 'selected' : '' }}>{{ __('pos.unregistered') }}</option>
-                                    <option value="registered" {{ $customer->type === 'registered' ? 'selected' : '' }}>{{ __('pos.registered') }}</option>
-                                </select>
-                                <div class="flex gap-2 col-span-2 sm:col-span-1">
-                                    <button type="submit" class="text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 transition">{{ __('pos.save_btn') }}</button>
-                                    <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">{{ __('pos.cancel') }}</button>
-                                </div>
-                            </form>
-                            {{-- Task: saved delivery addresses (pos_customer_addresses) — view/delete
-                                 from the Customers page too, via the same company-scoped endpoints
-                                 the sale screen uses. Loaded lazily when the edit row opens. --}}
-                            <div class="mt-3 pt-3 border-t border-purple-100 dark:border-purple-900/30">
-                                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">{{ __('pos.saved_delivery_addresses') }}</p>
-                                <template x-if="addrLoading"><p class="text-xs text-gray-400">...</p></template>
-                                <template x-if="!addrLoading && addresses.length === 0"><p class="text-xs text-gray-400">{{ __('pos.no_saved_addresses') }}</p></template>
-                                <ul class="space-y-1">
-                                    <template x-for="a in addresses" :key="a.id">
-                                        <li class="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                                            <span x-show="a.id === 0" class="inline-flex px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-medium shrink-0">{{ __('pos.default_addr_label') }}</span>
-                                            <span x-show="a.id !== 0 && a.label" class="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 font-medium shrink-0" x-text="a.label"></span>
-                                            <span x-text="a.address" class="truncate"></span>
-                                            <button type="button" @click="deleteAddress(a)" title="{{ __('pos.ti_delete_address') }}" class="text-red-500 hover:text-red-600 font-bold px-1.5 shrink-0">&times;</button>
-                                        </li>
-                                    </template>
-                                </ul>
-                                <p x-show="addrError" x-text="addrError" class="text-xs text-red-500 mt-1"></p>
-                                {{-- Task 103: add a NEW delivery address right from the Customers page
-                                     (POST /pos/api/customer-addresses — duplicate + 15-limit guards server-side). --}}
-                                <div class="flex items-center gap-1.5 mt-2">
-                                    <input type="text" x-model="newAddrLabel" maxlength="50" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_cust_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-28 shrink-0 text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
-                                    <input type="text" x-model="newAddrText" maxlength="500" @keydown.enter.prevent="saveAddress()" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_cust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
-                                    <button type="button" @click="saveAddress()" :disabled="addrSaving || !newAddrText.trim()" class="text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1.5 rounded-md shrink-0" x-text="addrSaving ? @json(__('pos.saving_dots')) : @json(__('pos.save_btn'))"></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    @endif
-                    @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">{{ __('pos.no_customers_yet') }}</td></tr>
-                    @endforelse
-                </tbody>
+                {{-- The partial emits one <tbody> per customer (Alpine scope) — the
+                     live search swaps every tbody in this table, thead stays. --}}
+                @include('pos.partials.customer-rows', ['customers' => $customers, 'isCashier' => $isCashier ?? false, 'inactiveMap' => $inactiveMap ?? []])
             </table>
         </div>
     </div>
@@ -328,46 +219,100 @@
             },
         };
     }
-    // Customer search (owner request, 1 Aug 2026): client-side filter over the
-    // rendered rows — matches name/phone/email/city/CNIC/NTN via data-search.
+    // LIVE customer search (owner request, 23 Aug 2026).
+    //
+    // Before: typing only filtered the 100 rows already on screen, so a shop
+    // with 11k customers searched a phone number, saw "0 customers found" and
+    // had to press Enter for the real (server) search. Now every keystroke
+    // asks the server after a short pause and swaps in the real result rows.
+    //
+    // The instant within-page filter is kept as the FIRST reaction (zero
+    // latency) — the server answer then replaces the rows outright.
     (function () {
         var input = document.getElementById('custSearchInput');
-        var count = document.getElementById('custSearchCount');
-        if (!input) return;
-        var label = @json(__('pos.search_customers_found'));
-        input.addEventListener('input', function () {
-            var q = input.value.trim().toLowerCase();
-            var rows = document.querySelectorAll('tr.cust-row');
-            var shown = 0;
-            rows.forEach(function (row) {
-                var hit = !q || (row.getAttribute('data-search') || '').indexOf(q) !== -1;
-                row.style.display = hit ? '' : 'none';
-                if (hit) shown++;
-                // Keep the inline edit row in sync with its parent row.
-                // Only force-HIDE on non-match; on match, remove our own inline
-                // display so Alpine's x-show keeps controlling it (never clear
-                // Alpine's display:none, or collapsed edit rows would pop open).
-                var next = row.nextElementSibling;
-                if (next && !next.classList.contains('cust-row')) {
-                    if (hit) {
-                        if (next.dataset.searchHidden === '1') {
-                            next.style.display = ('prevDisplay' in next.dataset) ? next.dataset.prevDisplay : 'none';
-                            delete next.dataset.searchHidden; delete next.dataset.prevDisplay;
-                        }
-                    } else if (next.dataset.searchHidden !== '1') {
-                        next.dataset.prevDisplay = next.style.display;
-                        next.style.display = 'none'; next.dataset.searchHidden = '1';
-                    }
-                }
+        var table = document.getElementById('custTable');
+        var countLine = document.getElementById('custCountLine');
+        var pager = document.getElementById('custPager');
+        var clearBtn = document.getElementById('custClearBtn');
+        if (!input || !table) return;
+
+        var foundTpl = @json(__('pos.customers_found_of_total', ['found' => '__F__', 'total' => '__T__']));
+        var totalTpl = @json(__('pos.customers_total_line', ['total' => '__T__']));
+        var searchingTxt = @json(__('pos.searching_dots'));
+        var failedTxt = @json(__('pos.network_error'));
+        var baseUrl = @json(route('pos.customers', [], false));
+
+        var timer = null, controller = null, lastSent = null;
+
+        // Instant feedback while the server answer is on its way. Hiding the
+        // whole <tbody> takes the inline edit row with it automatically.
+        function instantFilter(q) {
+            var needle = q.toLowerCase();
+            table.querySelectorAll('tbody.cust-tb').forEach(function (tb) {
+                var hit = !needle || (tb.getAttribute('data-search') || '').indexOf(needle) !== -1;
+                tb.style.display = hit ? '' : 'none';
             });
-            if (q) { count.textContent = shown + ' ' + label; count.classList.remove('hidden'); }
-            else { count.classList.add('hidden'); }
+        }
+
+        function swapRows(html) {
+            table.querySelectorAll('tbody').forEach(function (tb) { tb.remove(); });
+            table.insertAdjacentHTML('beforeend', html);
+        }
+
+        function runSearch(q) {
+            if (q === lastSent) return;
+            lastSent = q;
+            if (controller) controller.abort();
+            controller = new AbortController();
+            countLine.textContent = searchingTxt;
+            var url = baseUrl + '?rows=1' + (q ? '&q=' + encodeURIComponent(q) : '');
+            fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                credentials: 'same-origin',
+                signal: controller.signal,
+            })
+                .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+                .then(function (data) {
+                    if (!data || !data.success) throw new Error('bad payload');
+                    // Alpine initialises the injected tbodies itself (it watches
+                    // the DOM), so custRow() state comes back with them.
+                    swapRows(data.html);
+                    if (pager) pager.innerHTML = data.pagination || '';
+                    countLine.textContent = q
+                        ? foundTpl.replace('__F__', data.found).replace('__T__', data.total)
+                        : totalTpl.replace('__T__', data.total);
+                    if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+                    // Keep the address bar honest: a refresh repeats the search.
+                    try {
+                        window.history.replaceState({}, '', q ? baseUrl + '?q=' + encodeURIComponent(q) : baseUrl);
+                    } catch (e) { /* older browsers: not worth failing over */ }
+                })
+                .catch(function (e) {
+                    if (e && e.name === 'AbortError') return;
+                    lastSent = null;
+                    countLine.textContent = failedTxt;
+                });
+        }
+
+        input.addEventListener('input', function () {
+            var q = input.value.trim();
+            instantFilter(q);
+            clearTimeout(timer);
+            timer = setTimeout(function () { runSearch(q); }, 350);
+        });
+
+        // Enter must not reload the page when the live search already answers.
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(timer);
+                runSearch(input.value.trim());
+            }
         });
     })();
     </script>
 
-    @if($customers->hasPages())
-    <div class="mt-4 px-1">{{ $customers->links() }}</div>
-    @endif
+    {{-- Container always rendered: the live search swaps its contents. --}}
+    <div id="custPager" class="mt-4 px-1">@if($customers->hasPages()){{ $customers->links() }}@endif</div>
 </div>
 </x-pos-layout>

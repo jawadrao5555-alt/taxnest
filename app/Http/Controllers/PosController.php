@@ -1786,6 +1786,49 @@ class PosController extends Controller
     }
 
     /**
+     * "Pichla din band nahi hua" popup state (owner request, 23 Aug 2026).
+     *
+     * The day-close page and the dashboard already carry a red banner, but the
+     * shop opens the app and goes straight to New Sale — so an unclosed day was
+     * only discovered later, with a fresh day's bills already on top of it.
+     * The sale screen and dashboard now ASK for this on load and pop a modal
+     * that never times out; the shop dismisses it, or closes the day.
+     *
+     * Deliberately not cached: the dashboard runs the very same query on every
+     * load, and a cached "still open" would keep nagging after a close.
+     */
+    public function dayClosePendingState()
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $silent = ['pending' => false, 'can_close' => false];
+
+        // Only the people who may actually close a day get nagged; a cashier
+        // without the right would just be stuck staring at it every morning.
+        if (!\App\Services\PosAccessService::dayCloseAllowed(auth('pos')->user(), $company)) {
+            return response()->json($silent);
+        }
+        // "All branches" is a reporting view — no day can be closed from there.
+        if ($this->dayCloseAllBranchesView()) {
+            return response()->json($silent);
+        }
+
+        $days = $this->unclosedPriorBusinessDays($companyId, null, false, $this->dayCloseBranchId());
+        if ($days->isEmpty()) {
+            return response()->json(['pending' => false, 'can_close' => true]);
+        }
+
+        return response()->json([
+            'pending' => true,
+            'can_close' => true,
+            'count' => $days->count(),
+            'labels' => $days->map(fn ($d) => \Carbon\Carbon::parse($d)->format('d M Y'))->values()->all(),
+            // Relative: an absolute https URL breaks plain-http browsing.
+            'url' => route('pos.day-close', ['date' => $days->first()], false),
+        ]);
+    }
+
+    /**
      * Stranded-day detection (Task 455, shared for Task 466): prior business
      * days that have bills (archived rows included) but NO PosDayCloseReport
      * row. Keyed by business_date (created_at date on pre-migration schemas).
@@ -9902,6 +9945,47 @@ class PosController extends Controller
         return view('pos.product-labels', compact('products', 'company'));
     }
 
+    /**
+     * "Is customer ko handle kar liya" — clear one row off the dashboard's
+     * gone-quiet card so the next silent regular moves up (owner, 23 Aug 2026).
+     *
+     * Nothing is deleted: only THIS silence is marked handled. If the customer
+     * comes back, orders, and then goes quiet again, the alert returns on its
+     * own (see PosRepeatCustomerAlert::dismiss).
+     */
+    public function dismissInactiveRegular(Request $request)
+    {
+        $user = auth('pos')->user();
+        // Same audience as the card itself — cashiers never see it.
+        $isAdmin = $user && in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin'], true);
+        if (!$isAdmin) {
+            abort(403, 'Only POS administrators can clear customer alerts.');
+        }
+
+        $companyId = app('currentCompanyId');
+        $customerId = (int) $request->input('customer_id');
+
+        // Company scope first: an id from another shop must not even be looked up.
+        $exists = PosCustomer::where('company_id', $companyId)->whereKey($customerId)->exists();
+        if (!$exists) {
+            return response()->json(['success' => false, 'message' => __('pos.failed_word')], 404);
+        }
+
+        if (!\App\Services\PosRepeatCustomerAlert::dismiss($companyId, $customerId, $user->id)) {
+            // Already gone from the list (someone else cleared it, or the
+            // customer ordered again) — the card just needs a refresh.
+            return response()->json([
+                'success' => true,
+                'remaining' => \App\Services\PosRepeatCustomerAlert::listFor($companyId)->count(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'remaining' => \App\Services\PosRepeatCustomerAlert::listFor($companyId)->count(),
+        ]);
+    }
+
     public function customers(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -9926,12 +10010,33 @@ class PosController extends Controller
             });
         }
         $totalCount = PosCustomer::where('company_id', $companyId)->count();
-        $customers = $query->orderBy('name')->paginate(100)->withQueryString();
+        // except('rows'): the live-search flag must never leak into the pager
+        // links, or clicking page 2 would download the JSON payload.
+        $customers = $query->orderBy('name')->paginate(100)->appends($request->except(['page', 'rows']));
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         // Task 1161: khamosh-repeat chip — same cached service as the dashboard
         // card so the definition never drifts.
         $inactiveMap = \App\Services\PosRepeatCustomerAlert::mapFor($companyId);
+
+        // Live search (owner request, 23 Aug 2026): the box searches the SERVER
+        // as the shop types — no Enter, no Search button. Same query, same
+        // rows partial; only the rows + counter + pager travel back.
+        if ($request->boolean('rows')) {
+            return response()->json([
+                'success' => true,
+                'html' => view('pos.partials.customer-rows', [
+                    'customers' => $customers,
+                    'isCashier' => $isCashier,
+                    'inactiveMap' => $inactiveMap,
+                ])->render(),
+                'pagination' => $customers->hasPages() ? (string) $customers->links() : '',
+                'found' => $customers->total(),
+                'total' => $totalCount,
+                'q' => $q,
+            ]);
+        }
+
         return view('pos.customers', compact('customers', 'isCashier', 'q', 'totalCount', 'inactiveMap'));
     }
 
@@ -10331,6 +10436,59 @@ class PosController extends Controller
         $inactiveInfo = \App\Services\PosRepeatCustomerAlert::mapFor($companyId)[$customer->id] ?? null;
 
         return view('pos.customer-history', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders', 'avgOrder', 'lastOrder', 'inactiveInfo'));
+    }
+
+    /**
+     * One bill's line items, for the "kya order kiya tha" quick view on the
+     * customer-history page (owner request, 23 Aug 2026). Saving a customer's
+     * history is only useful if the shop can open a row and see the items.
+     *
+     * Authorization is deliberately IDENTICAL to the bill's own detail page —
+     * company scope, Billing Scope stream lock and per-cashier isolation — so
+     * this modal can never show a bill that transactionShow() would 403.
+     */
+    public function customerHistoryBill($id)
+    {
+        $companyId = app('currentCompanyId');
+        // Archived LOCAL bills stay openable (the history lists them); archived
+        // PRA bills stay hidden — same rule as transactionShow()/receipt().
+        $transaction = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where(function ($q) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                    $q->where('is_archived', false)
+                      ->orWhereNull('is_archived')
+                      ->orWhere('invoice_mode', 'local');
+                }
+            })
+            ->with('items')
+            ->findOrFail($id);
+
+        abort_unless($this->billingScopeAllowsRow($transaction), 403);
+
+        return response()->json([
+            'success' => true,
+            'invoice' => $transaction->pra_invoice_number ?: $transaction->invoice_number,
+            'local_ref' => $transaction->invoice_number,
+            'date' => optional($transaction->created_at)->format('d M Y, H:i'),
+            'is_local' => (bool) $transaction->isLocalBill(),
+            'is_return' => ($transaction->transaction_type ?? 'sale') === 'return',
+            'payment' => ucwords(str_replace('_', ' ', (string) $transaction->payment_method)),
+            'items' => $transaction->items->map(fn ($i) => [
+                'name' => (string) $i->item_name,
+                'qty' => (float) $i->quantity,
+                'price' => (float) $i->unit_price,
+                'discount' => (float) ($i->item_discount_amount ?? 0),
+                'total' => (float) $i->subtotal,
+                'notes' => (string) ($i->special_notes ?? ''),
+            ])->values(),
+            'subtotal' => (float) $transaction->subtotal,
+            'discount' => (float) $transaction->discount_amount,
+            'tax' => (float) $transaction->tax_amount,
+            'total' => (float) $transaction->total_amount,
+            // Relative on purpose: an absolute https URL breaks plain-http dev.
+            'url' => route('pos.transaction.show', $transaction->id, false),
+        ]);
     }
 
     /**

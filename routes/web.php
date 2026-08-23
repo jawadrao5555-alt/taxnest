@@ -988,6 +988,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/products/search-mode', [PosController::class, 'productSearchMode'])->name('pos.products.search-mode');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
     Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
+    // Dashboard "gone quiet" card: mark one customer as handled. Same pattern
+    // as bulk-sale above — OUTSIDE PosAdminOnly (that middleware redirects),
+    // controller enforces the admin/manager allowlist with a true 403 so the
+    // card can roll the row back instead of silently "succeeding".
+    Route::post('/customers/alert-dismiss', [PosController::class, 'dismissInactiveRegular'])->name('pos.customers.alert-dismiss');
 
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
         Route::get('/services', [PosController::class, 'services'])->name('pos.services');
@@ -1037,6 +1042,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::delete('/customers/{id}', [PosController::class, 'deleteCustomer'])->name('pos.customers.delete');
         Route::post('/customers/{id}/toggle', [PosController::class, 'toggleCustomer'])->name('pos.customers.toggle');
         Route::get('/customers/{id}/history', [PosController::class, 'customerHistory'])->name('pos.customers.history');
+        // Bill quick-view on the history page — same authorization as the bill's
+        // own detail page (company + Billing Scope + cashier isolation).
+        Route::get('/customers/history/bill/{id}', [PosController::class, 'customerHistoryBill'])->name('pos.customers.history.bill');
         Route::get('/customers/{id}/history/export', [PosController::class, 'exportCustomerHistory'])->name('pos.customers.history.export');
         Route::get('/customers/{id}/history/pdf', [PosController::class, 'customerHistoryPdf'])->name('pos.customers.history.pdf');
         Route::get('/inventory', [PosInventoryController::class, 'dashboard'])->name('pos.inventory.dashboard');
@@ -1104,6 +1112,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // and Restaurant POS. Previously these were trapped inside restaurant.only,
     // which broke customer name/phone search on retail/general companies.
     Route::get('/restaurant/api/customer-search', [RestaurantPosController::class, 'customerSearch'])->name('pos.restaurant.customer-search');
+    // Unclosed-prior-day popup (sale screen + dashboard ask on load).
+    Route::get('/api/day-close-pending', [PosController::class, 'dayClosePendingState'])->name('pos.api.day-close-pending');
     Route::get('/restaurant/api/customer-lookup', [RestaurantPosController::class, 'customerLookup'])->name('pos.restaurant.customer-lookup');
     Route::post('/restaurant/api/customer-store', [RestaurantPosController::class, 'customerStore'])->name('pos.restaurant.customer-store');
 

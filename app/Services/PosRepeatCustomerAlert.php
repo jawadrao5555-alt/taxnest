@@ -56,8 +56,17 @@ class PosRepeatCustomerAlert
     /** Older than this = long-gone (not *recent* churn) — drops off the alert. */
     public const STALE_DAYS = 60;
 
-    /** Dashboard card renders at most this many rows (full list stays cached). */
-    public const CARD_LIMIT = 10;
+    /**
+     * Dashboard card shows at most this many rows at a time (owner, 23 Aug
+     * 2026: "teen number bas, baqi automatic hide hote jayein" — the card was
+     * pushing the whole dashboard down). The rest stay in the cached list and
+     * move up as the visible ones are handled.
+     */
+    public const CARD_LIMIT = 3;
+
+    /** Rows pre-rendered (hidden) behind the visible ones, so dismissing one
+     *  brings the next forward instantly without a page reload. */
+    public const CARD_BUFFER = 6;
 
     /** Per-company cache TTL, seconds. */
     public const CACHE_TTL = 600;
@@ -69,11 +78,78 @@ class PosRepeatCustomerAlert
      */
     public static function listFor(int $companyId): Collection
     {
+        $dismissed = self::dismissedMap($companyId);
+        if (empty($dismissed)) {
+            return self::rawFor($companyId);
+        }
+
+        // A dismissal only covers the silence it was made for: once the
+        // customer orders again their last-order stamp moves past the stored
+        // one, so a NEW silence legitimately raises the alert again.
+        return self::rawFor($companyId)
+            ->reject(fn ($row) => isset($dismissed[$row['id']])
+                && $dismissed[$row['id']] !== null
+                && $dismissed[$row['id']] >= $row['last_order_at'])
+            ->values();
+    }
+
+    /**
+     * The unfiltered (cached) list — dismissals are applied OUTSIDE the cache
+     * so "handled" takes effect on the very next page load instead of waiting
+     * out the aggregation's TTL.
+     */
+    public static function rawFor(int $companyId): Collection
+    {
         return Cache::remember(
             "pos_inactive_regulars:{$companyId}",
             self::CACHE_TTL,
             fn () => self::compute($companyId)
         );
+    }
+
+    /**
+     * Mark one customer's current silence as handled ("call kar liya").
+     *
+     * @return bool false when the customer is not actually on the alert list.
+     */
+    public static function dismiss(int $companyId, int $customerId, ?int $userId = null): bool
+    {
+        if (!Schema::hasTable('pos_customer_alert_dismissals')) {
+            return false;
+        }
+
+        // The stamp comes from the SERVER's own list, never from the request —
+        // otherwise a stale/forged value could silence a customer for good.
+        $row = self::rawFor($companyId)->firstWhere('id', $customerId);
+        if (!$row) {
+            return false;
+        }
+
+        DB::table('pos_customer_alert_dismissals')->updateOrInsert(
+            ['company_id' => $companyId, 'customer_id' => $customerId],
+            [
+                'last_order_at' => $row['last_order_at'],
+                'dismissed_by' => $userId,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return true;
+    }
+
+    /** customer_id => handled-up-to last_order_at, for this company. */
+    private static function dismissedMap(int $companyId): array
+    {
+        if (!Schema::hasTable('pos_customer_alert_dismissals')) {
+            return [];
+        }
+
+        return DB::table('pos_customer_alert_dismissals')
+            ->where('company_id', $companyId)
+            ->pluck('last_order_at', 'customer_id')
+            ->map(fn ($v) => $v === null ? null : (string) $v)
+            ->all();
     }
 
     /**

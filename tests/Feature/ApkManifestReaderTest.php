@@ -155,6 +155,53 @@ class ApkManifestReaderTest extends TestCase
         $this->assertNull(ApkManifestReader::read($bomb));
     }
 
+    public function test_fallback_reader_refuses_a_bomb_that_lies_about_its_size(): void
+    {
+        // The honest-size bomb is caught by the directory cap; this one forges a
+        // tiny plain size in the central directory, so only a length-limited
+        // inflate can stop it.
+        $path = $this->dir . '/liar.apk';
+        $zip = new \ZipArchive();
+        $zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFromString('AndroidManifest.xml', str_repeat("\x00", 12 * 1024 * 1024));
+        $zip->close();
+
+        $raw = (string) file_get_contents($path);
+        $cd = strpos($raw, "PK\x01\x02");                 // first (and only) entry
+        $this->assertNotFalse($cd);
+        $raw = substr_replace($raw, pack('V', 8000), $cd + 24, 4);   // "it's only 8 KB"
+        file_put_contents($path, $raw);
+
+        $this->assertNull($this->fallback($path), 'a forged plain size must not buy an unbounded inflate');
+    }
+
+    public function test_string_pool_refuses_a_forged_count_and_repeated_offsets(): void
+    {
+        $pool = new \ReflectionMethod(ApkManifestReader::class, 'stringPool');
+        $pool->setAccessible(true);
+
+        // One 32 KB string that every offset points at: 200 entries would decode
+        // to ~6 MB out of a 32 KB buffer. The byte budget must cut it off.
+        $body = "\xFD\x00\xFD\x00" . str_repeat('A', 32000) . "\x00";
+        $build = function (int $count) use ($body): string {
+            $stringsStart = 28 + ($count * 4);
+            $chunk = pack('v', 0x0001) . pack('v', 28) . pack('V', $stringsStart + strlen($body))
+                . pack('V', $count) . pack('V', 0)
+                . pack('V', 1 << 8)                        // UTF-8 flag
+                . pack('V', $stringsStart) . pack('V', 0)
+                . str_repeat(pack('V', 0), $count);        // every offset → the same string
+
+            return $chunk . $body;
+        };
+
+        $this->assertCount(2, $pool->invoke(null, $build(2), 0), 'an honest little pool still reads');
+        $this->assertSame([], $pool->invoke(null, $build(200), 0), 'repeated offsets must hit the byte budget');
+
+        // A count that cannot possibly fit in the buffer is refused outright.
+        $forged = substr_replace($build(2), pack('V', 1000000), 8, 4);
+        $this->assertSame([], $pool->invoke(null, $forged, 0));
+    }
+
     public function test_a_truncated_binary_manifest_returns_null_instead_of_throwing(): void
     {
         $apk = FakeApkBuilder::write($this->dir . '/trunc.apk', '1.5.0', 6);

@@ -99,6 +99,15 @@ class ApkManifestReader
     private const MAX_ENTRY_BYTES = 4194304;         // 4 MiB compressed or inflated
 
     /**
+     * AXML string-pool ceilings. A real manifest pool holds a few hundred
+     * strings; the count and every offset come straight out of the file, so a
+     * forged count (or a million offsets all pointing at one long string) would
+     * otherwise let a 4 MiB manifest balloon into gigabytes of PHP strings.
+     */
+    private const MAX_POOL_STRINGS = 20000;
+    private const MAX_POOL_BYTES = 4194304;          // 4 MiB of decoded strings
+
+    /**
      * Open the APK zip, pull AndroidManifest.xml, parse the root attributes.
      *
      * EVERYTHING here is inside one fail-open boundary: a corrupt/truncated APK
@@ -179,7 +188,18 @@ class ApkManifestReader
         $base = $pos + $stringsStart;
         $len = strlen($data);
 
+        // Refuse an impossible pool rather than allocate from a forged count.
+        // An empty pool simply means no attribute names resolve, and the read
+        // fails open — which is the whole contract of this class.
+        if ($count > self::MAX_POOL_STRINGS || $pos + 28 + ($count * 4) > $len) {
+            return [];
+        }
+        $budget = self::MAX_POOL_BYTES;
+
         for ($i = 0; $i < $count; $i++) {
+            if ($budget <= 0) {
+                return [];
+            }
             $off = self::u32($data, $pos + 28 + ($i * 4));
             $p = $base + $off;
             if ($p >= $len) {
@@ -195,15 +215,20 @@ class ApkManifestReader
                 if ($n & 0x80) {
                     $n = (($n & 0x7F) << 8) | ord($data[$p]); $p++;
                 }
-                $out[] = substr($data, $p, $n);
+                $s = substr($data, $p, $n);
             } else {
                 $n = self::u16($data, $p); $p += 2;
                 if ($n & 0x8000) {
                     $n = (($n & 0x7FFF) << 16) | self::u16($data, $p); $p += 2;
                 }
                 $raw = substr($data, $p, $n * 2);
-                $out[] = mb_convert_encoding($raw, 'UTF-8', 'UTF-16LE');
+                $s = mb_convert_encoding($raw, 'UTF-8', 'UTF-16LE');
             }
+
+            // Offsets may repeat, so the decoded total can dwarf the file the
+            // strings came out of. Spend from a fixed budget instead.
+            $budget -= strlen($s);
+            $out[] = $s;
         }
 
         return $out;
@@ -376,8 +401,17 @@ class ApkManifestReader
                 return $raw;
             }
             if ($method === 8) {                    // deflate
-                $out = @gzinflate($raw);
-                return is_string($out) && $out !== '' ? $out : null;
+                // Length-limited inflate: the directory's declared plain size is
+                // just a claim, so a forged one cannot be trusted to bound the
+                // output. gzinflate() stops AT the limit instead of erroring, so
+                // anything that reaches the ceiling is refused outright — a
+                // manifest that big is not ours.
+                $out = @gzinflate($raw, self::MAX_ENTRY_BYTES);
+                if (!is_string($out) || $out === '' || strlen($out) >= self::MAX_ENTRY_BYTES) {
+                    return null;
+                }
+
+                return $out;
             }
 
             return null;                            // some other method — not ours to guess

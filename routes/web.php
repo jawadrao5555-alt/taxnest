@@ -1484,7 +1484,10 @@ Route::prefix('franchise')->middleware(['franchise.auth'])->group(function () {
 });
 
 Route::get('/fbr-pos-landing', function () {
-    $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'fbrpos')->orderBy('price')->get();
+    // Must come from the service, never a raw query: it is the ONE list of
+    // packages FBR POS still sells. A raw product_type query kept the retired
+    // Pro column (and its stale price) on the public page after the merge.
+    $plans = \App\Services\FbrPosPlanComparisonService::plans();
     return view('fbr-pos.landing', ['plans' => $plans]);
 })->name('fbrpos.landing');
 

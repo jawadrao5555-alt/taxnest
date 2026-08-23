@@ -178,4 +178,30 @@ class PosPlanLadderAuditTest extends TestCase
             );
         }
     }
+
+    // ── the public landings may only offer what is still sold ──
+    //
+    // The FBR landing route queried pricing_plans by product_type directly, so
+    // the day Pro was retired the public page still showed a Pro column and a
+    // "Pick a package" link at its old price. Both landings must read their
+    // package list from the comparison service, which owns the sellable list.
+
+    public function test_both_pos_landings_take_their_packages_from_the_comparison_service(): void
+    {
+        $routes = (string) file_get_contents(base_path('routes/web.php'));
+
+        foreach ([
+            "PosPlanComparisonService::plans()" => 'the PRA POS landing',
+            "FbrPosPlanComparisonService::plans()" => 'the FBR POS landing',
+        ] as $call => $what) {
+            $this->assertStringContainsString($call, $routes,
+                "{$what} must build its package list from the comparison service.");
+        }
+
+        $this->assertDoesNotMatchRegularExpression(
+            "/PricingPlan::where\\('is_trial', false\\)->where\\('product_type', '(pos|fbrpos)'\\)/",
+            $routes,
+            'A landing route must never query the package ladder directly — retired packages come back.'
+        );
+    }
 }

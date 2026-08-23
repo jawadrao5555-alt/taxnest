@@ -430,21 +430,20 @@ class PosPaidAddonFlowTest extends TestCase
     {
         $company = $this->makeShop($this->makePlan('Business'));
 
-        $this->buy($company, ['caller_id', 'whatsapp_bill'], 'quarterly');
+        $this->buy($company, ['caller_id', 'whatsapp_bill'], 'annual');
 
         $proof = PaymentProof::first();
         $this->assertNotNull($proof);
         $this->assertSame('pos_addon', $proof->request_type);
         $this->assertTrue($proof->isPosAddon());
         $this->assertFalse($proof->isExtraBranch());
-        $this->assertSame('quarterly', $proof->billing_cycle);
-        $this->assertSame('quarterly', PosAddonService::cycleForProof($proof));
+        $this->assertSame('annual', $proof->billing_cycle);
+        $this->assertSame('annual', PosAddonService::cycleForProof($proof));
         $this->assertEqualsCanonicalizing(['caller_id', 'whatsapp_bill'], $proof->addonCodeList());
 
-        // The annual package has roughly twelve months left, so a quarterly
-        // rate is charged four times — one price per remaining three months.
-        $expected = round(PosAddonPricingService::price('caller_id', 'quarterly') * 12 / 3)
-            + round(PosAddonPricingService::price('whatsapp_bill', 'quarterly') * 12 / 3);
+        // Paid add-ons have one annual rate, prorated to package time remaining.
+        $expected = round(PosAddonPricingService::price('caller_id', 'annual'))
+            + round(PosAddonPricingService::price('whatsapp_bill', 'annual'));
         $this->assertEquals($expected, (float) $proof->amount);
         $this->assertEquals($expected, $proof->addonQuoteSnapshot()['total'] ?? null);
     }
@@ -773,7 +772,7 @@ class PosPaidAddonFlowTest extends TestCase
         $response->assertOk();
         $addons = $response->viewData('addons');
         $this->assertSame(['caller_id'], $addons['preselected']);
-        $this->assertSame('quarterly', $addons['preselected_cycle']);
+        $this->assertSame('annual', $addons['preselected_cycle']);
     }
 
     public function test_successful_addon_proof_clears_the_signup_selection(): void

@@ -95,17 +95,8 @@
     </div>
 
     <div class="tn-addons__toolbar">
-        <div class="tn-addons__cycles" role="group" aria-label="{{ __('pos.addons_choose_cycle') }}">
-            <button type="button" class="tn-addons__cycle" :class="{ 'is-active': cycle === 'annual' }" @click="cycle = 'annual'">
-                {{ __('pos.addons_cycle_annual') }}
-            </button>
-            <button type="button" class="tn-addons__cycle" :class="{ 'is-active': cycle === 'monthly' }" @click="cycle = 'monthly'">
-                {{ __('pos.addons_cycle_monthly') }}
-            </button>
-            <button type="button" class="tn-addons__cycle" :class="{ 'is-active': cycle === 'quarterly' }" @click="cycle = 'quarterly'">
-                {{ __('pos.addons_cycle_quarterly') }}
-            </button>
-        </div>
+        {{-- Annual-only since 23 Aug 2026 (owner) — nothing left to pick. --}}
+        <span class="tn-addons__cycle is-active">{{ __('pos.addons_cycle_annual') }}</span>
         <p class="tn-addons__hint">{{ __('pos.addons_public_hint') }}</p>
     </div>
 
@@ -126,14 +117,7 @@
             </div>
             <p class="tn-addons__price">
                 PKR <span x-text="fmt(priceOf({{ \Illuminate\Support\Js::from($adsCode) }}))">{{ number_format($adsSpec['annual_price']) }}</span>
-                <span class="tn-addons__period"
-                      x-text="({{ \Illuminate\Support\Js::from([
-                          'annual' => '/ ' . __('pos.addons_per_year'),
-                          'quarterly' => '/ ' . __('pos.addons_per_quarter'),
-                          'monthly' => '/ ' . __('pos.addons_per_month'),
-                      ]) }})[cycle]">
-                    / {{ __('pos.addons_per_year') }}
-                </span>
+                <span class="tn-addons__period">/ {{ __('pos.addons_per_year') }}</span>
             </p>
         </label>
         @endforeach

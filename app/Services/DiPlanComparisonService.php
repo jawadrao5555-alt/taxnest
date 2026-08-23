@@ -163,7 +163,7 @@ class DiPlanComparisonService
     }
 
     /**
-     * Per-cycle prices for the landing page, computed the SAME way checkout
+     * Annual prices for the landing page, computed the SAME way checkout
      * computes them (Subscription::priceForPlanCycle) so the column heading
      * and the invoice can never disagree.
      *
@@ -173,16 +173,14 @@ class DiPlanComparisonService
     {
         $map = [];
         foreach ($plans as $plan) {
-            foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $cycle) {
-                $map[(int) $plan->id][$cycle] = \App\Models\Subscription::priceForPlanCycle($plan, $cycle);
-            }
+            $map[(int) $plan->id]['annual'] = \App\Models\Subscription::priceForPlanCycle($plan, 'annual');
         }
 
         return $map;
     }
 
     /**
-     * "Save up to X%" per cycle, floored so the badge never promises more
+     * The annual saving, floored so a badge never promises more
      * than the cheapest package actually gives.
      *
      * @return array<string, int>
@@ -190,16 +188,12 @@ class DiPlanComparisonService
     public static function cycleDiscounts(Collection $plans): array
     {
         $pricing = self::cyclePricing($plans);
-        $out = [];
-        foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $cycle) {
-            $best = 0.0;
-            foreach ($pricing as $byCycle) {
-                $best = max($best, (float) ($byCycle[$cycle]['discount_percent'] ?? 0));
-            }
-            $out[$cycle] = (int) floor($best);
+        $best = 0.0;
+        foreach ($pricing as $byCycle) {
+            $best = max($best, (float) ($byCycle['annual']['discount_percent'] ?? 0));
         }
 
-        return $out;
+        return ['annual' => (int) floor($best)];
     }
 
     /** null / any negative value means "no cap" everywhere in the codebase. */
@@ -242,20 +236,17 @@ class DiPlanComparisonService
      * Column header data for each package.
      *
      * $withSignup adds the landing-page buying block (Task 1483). Digital
-     * Invoice quotes a MONTHLY price and lets the visitor switch the billing
-     * cycle, so the three price strings also ship an Alpine expression that
-     * the landing's cycle switch re-evaluates (calcMonthly / calcPrice live in
-     * the x-data the table is rendered inside). The server-rendered string is
-     * the monthly default, so the heading is correct before Alpine boots and
-     * on the panel surface, which never passes the flag.
+     * Invoice is sold annually, so the server-rendered heading and signup link
+     * both carry the annual price and cycle.
      */
     public static function planColumns(Collection $plans, ?int $currentPlanId = null, bool $withSignup = false): array
     {
         return $plans->map(function (PricingPlan $plan) use ($currentPlanId, $withSignup) {
+            $annual = \App\Models\Subscription::priceForPlanCycle($plan, 'annual');
             $col = [
                 'id'      => (int) $plan->id,
                 'name'    => $plan->name,
-                'price'   => 'Rs ' . number_format((float) $plan->sale_price) . '/mo',
+                'price'   => 'Rs ' . number_format((float) $annual['final_price']) . '/yr',
                 'popular' => $plan->name === self::POPULAR_PLAN,
                 'current' => $currentPlanId !== null && (int) $plan->id === $currentPlanId,
             ];
@@ -264,40 +255,17 @@ class DiPlanComparisonService
                 return $col;
             }
 
-            $sale = (float) $plan->sale_price;
-            $full = (float) $plan->price;
-            $planId = (int) $plan->id;
+            $col['price']        = 'Rs ' . number_format((float) $annual['final_price']);
+            $col['price_period'] = '/ year';
+            $col['price_note']   = 'Rs ' . number_format((float) $annual['monthly_effective']) . ' / month equivalent';
 
-            // DI packages carry hand-set per-cycle rates, so the heading must
-            // read the SERVER's price for the picked cycle (planMonthly /
-            // planTotal come from the pricing map in the page's x-data) — a
-            // client-side discount ladder would quote a price nobody is charged.
-            $col['price']        = 'Rs ' . number_format($sale);
-            $col['price_period'] = '/ month';
-            $col['price_x']      = "'Rs ' + planMonthly({$planId}).toLocaleString()";
-
-            if ($sale < $full) {
-                $col['price_compare'] = 'Rs ' . number_format($full);
-                // The crossed-out "was" price only exists as a monthly figure;
-                // deriving it for the other cycles off the old ladder would
-                // print a number nobody was ever charged, so it hides instead.
-                $col['price_compare_x'] = "cycle === 'monthly' ? 'Rs ' + {$full}.toLocaleString() : ''";
+            if ((float) $plan->sale_price < (float) $plan->price) {
                 $col['sale_badge']      = $plan->sale_badge;
             }
 
-            // Monthly billing has nothing extra to say; the other three cycles
-            // show what actually leaves the bank each time.
-            $col['price_note']   = '';
-            $col['price_note_x'] = "cycle === 'monthly' ? '' : 'Billed Rs ' + planTotal({$planId}).toLocaleString()";
-
-            // Task 1484: the button carries BOTH the package and the billing
-            // cycle into signup, so the shop is later approved onto exactly
-            // what this column advertised. The server-rendered href holds the
-            // monthly default (correct before Alpine boots / with JS off); the
-            // Alpine binding keeps it in step with the cycle switch above.
+            // The button carries both the package and annual cycle into signup.
             $signupUrl = route('register', ['plan' => $plan->name], false);
-            $col['cta_url']   = $signupUrl . '&cycle=monthly';
-            $col['cta_url_x'] = "'" . str_replace("'", "\\'", $signupUrl) . "&cycle=' + cycle";
+            $col['cta_url']   = $signupUrl . '&cycle=annual';
             $col['cta_label'] = 'Choose';
 
             return $col;

@@ -168,8 +168,10 @@ class PosHoldUuidReplayTest extends TestCase
             'name'                => 'Hold UUID Co',
             'product_type'        => 'pos',
             'is_internal_account' => true,
-            // typeFlowGate=false → Hold is unrestricted by order type
-            'feature_flags'       => [],
+            // 23 Aug 2026: the restaurant hold endpoint refuses PLAIN RETAIL
+            // shops (they park carts through pos_held_sales instead), so this
+            // fixture is a kitchen shop and every hold below is Dine-In.
+            'feature_flags'       => ['kitchen' => true],
         ]);
         app()->instance('currentCompanyId', null);
         app()->bind('currentCompanyId', fn () => $company->id);
@@ -213,7 +215,7 @@ class PosHoldUuidReplayTest extends TestCase
         $uuid = 'test-hold-uuid-' . uniqid();
 
         // First hold — should create one order.
-        $res1 = $this->hold(['items' => $this->items(), 'order_type' => 'takeaway', 'hold_uuid' => $uuid]);
+        $res1 = $this->hold(['items' => $this->items(), 'order_type' => 'dine_in', 'hold_uuid' => $uuid]);
         $this->assertSame(200, $res1->getStatusCode(), 'First hold failed: ' . $res1->getContent());
         $data1 = json_decode($res1->getContent(), true);
         $this->assertTrue($data1['success'], 'First hold success flag');
@@ -224,7 +226,7 @@ class PosHoldUuidReplayTest extends TestCase
         $this->assertSame($uuid, $stored->hold_uuid, 'hold_uuid must be persisted on the order row');
 
         // Second hold with same uuid — simulates lost-response retry.
-        $res2 = $this->hold(['items' => $this->items(), 'order_type' => 'takeaway', 'hold_uuid' => $uuid]);
+        $res2 = $this->hold(['items' => $this->items(), 'order_type' => 'dine_in', 'hold_uuid' => $uuid]);
         $this->assertSame(200, $res2->getStatusCode(), 'Retry must return 200, not 500: ' . $res2->getContent());
         $data2 = json_decode($res2->getContent(), true);
         $this->assertTrue($data2['success'], 'Retry must return success=true');
@@ -242,7 +244,7 @@ class PosHoldUuidReplayTest extends TestCase
         $c = $this->makeCompany();
         $this->makeCashier($c);
 
-        $res = $this->hold(['items' => $this->items(), 'order_type' => 'takeaway']);
+        $res = $this->hold(['items' => $this->items(), 'order_type' => 'dine_in']);
         $this->assertSame(200, $res->getStatusCode(), $res->getContent());
         $data = json_decode($res->getContent(), true);
         $this->assertTrue($data['success']);
@@ -257,8 +259,8 @@ class PosHoldUuidReplayTest extends TestCase
         $c = $this->makeCompany();
         $this->makeCashier($c);
 
-        $res1 = $this->hold(['items' => $this->items(), 'order_type' => 'takeaway', 'hold_uuid' => 'uuid-aaa']);
-        $res2 = $this->hold(['items' => $this->items(), 'order_type' => 'takeaway', 'hold_uuid' => 'uuid-bbb']);
+        $res1 = $this->hold(['items' => $this->items(), 'order_type' => 'dine_in', 'hold_uuid' => 'uuid-aaa']);
+        $res2 = $this->hold(['items' => $this->items(), 'order_type' => 'dine_in', 'hold_uuid' => 'uuid-bbb']);
 
         $this->assertSame(200, $res1->getStatusCode());
         $this->assertSame(200, $res2->getStatusCode());
@@ -315,7 +317,7 @@ class PosHoldUuidReplayTest extends TestCase
         // catch block re-queries and returns the winner.
 
         // Pre-lookup path: holdOrder should return the winner.
-        $res = $this->hold(['items' => $this->items(), 'order_type' => 'takeaway', 'hold_uuid' => $uuid]);
+        $res = $this->hold(['items' => $this->items(), 'order_type' => 'dine_in', 'hold_uuid' => $uuid]);
         $this->assertSame(200, $res->getStatusCode(), 'Race resolution must return 200: ' . $res->getContent());
         $data = json_decode($res->getContent(), true);
         $this->assertTrue($data['success'], 'Race resolution must return success=true');
@@ -358,7 +360,7 @@ class PosHoldUuidReplayTest extends TestCase
         // holdOrder: pre-lookup misses (cancelled), tries to INSERT → hits
         // unique violation in DB. Catch re-queries for held/preparing/ready
         // → none found → returns 500 (not a silent swallow).
-        $res = $this->hold(['items' => $this->items(), 'order_type' => 'takeaway', 'hold_uuid' => $uuid]);
+        $res = $this->hold(['items' => $this->items(), 'order_type' => 'dine_in', 'hold_uuid' => $uuid]);
         $this->assertSame(500, $res->getStatusCode(), 'Must 500 when the catch cannot find a live winner');
         $data = json_decode($res->getContent(), true);
         $this->assertFalse($data['success']);

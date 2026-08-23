@@ -5,17 +5,10 @@ namespace Tests\Feature;
 use App\Models\PricingPlan;
 use Tests\TestCase;
 
-/**
- * The admin plan card used to print the monthly figure and nothing else, so a
- * package that sells four cycles LOOKED like a monthly-only subscription and
- * nobody could see what a quarterly, half-year or yearly buyer is actually
- * charged. These tests keep every cycle on the card, and keep the create form
- * able to price them at birth (before this, the ladder invented those rates
- * until someone remembered to edit the package afterwards).
- */
+/** Admin plan surfaces expose the annual sellable rate only. */
 class AdminPlanCycleRatesTest extends TestCase
 {
-    public function test_a_di_card_shows_the_rupees_charged_for_every_cycle(): void
+    public function test_a_di_card_shows_only_the_annual_sellable_rate(): void
     {
         $plan = new PricingPlan([
             'name' => 'Kaarobar',
@@ -30,16 +23,13 @@ class AdminPlanCycleRatesTest extends TestCase
 
         $html = $this->renderCard($plan);
 
-        $this->assertStringContainsString('Cycle Rates', $html);
-        foreach (['Monthly', 'Quarterly', 'Half-Year', 'Annual'] as $label) {
-            $this->assertStringContainsString($label, $html);
-        }
-        foreach (['2,499', '6,999', '13,799', '24,990'] as $amount) {
-            $this->assertStringContainsString($amount, $html);
-        }
+        $this->assertStringContainsString('Annual rate', $html);
+        $this->assertStringContainsString('24,990', $html);
+        $this->assertStringNotContainsString('6,999', $html);
+        $this->assertStringNotContainsString('13,799', $html);
     }
 
-    public function test_a_hand_set_rate_is_never_flagged_as_guesswork(): void
+    public function test_a_hand_set_annual_rate_is_not_flagged_as_derived(): void
     {
         $plan = new PricingPlan([
             'name' => 'Unlimited',
@@ -54,10 +44,10 @@ class AdminPlanCycleRatesTest extends TestCase
 
         $html = $this->renderCard($plan);
 
-        $this->assertStringNotContainsString('cycle-discount ladder', $html);
+        $this->assertStringNotContainsString('stored monthly base', $html);
     }
 
-    public function test_a_cycle_with_no_rate_of_its_own_is_called_out(): void
+    public function test_a_derived_annual_rate_is_called_out(): void
     {
         $plan = new PricingPlan([
             'name' => 'Half Priced',
@@ -72,12 +62,10 @@ class AdminPlanCycleRatesTest extends TestCase
 
         $html = $this->renderCard($plan);
 
-        // The admin must be able to SEE that three of the four cycles are
-        // being priced by a formula nobody signed off on.
-        $this->assertStringContainsString('cycle-discount ladder', $html);
+        $this->assertStringContainsString('stored monthly base', $html);
     }
 
-    public function test_a_pra_pos_card_shows_its_annual_and_quarterly_rate(): void
+    public function test_a_pra_pos_card_shows_its_annual_rate_only(): void
     {
         $plan = new PricingPlan([
             'name' => 'POS Business',
@@ -90,19 +78,16 @@ class AdminPlanCycleRatesTest extends TestCase
         $html = $this->renderCard($plan);
 
         $this->assertStringContainsString('24,000', $html);
-        $this->assertStringContainsString('7,000', $html);
+        $this->assertStringNotContainsString('7,000', $html);
     }
 
-    public function test_the_create_form_can_price_every_cycle_at_birth(): void
+    public function test_the_create_form_only_edits_the_annual_cycle_rate(): void
     {
         $form = file_get_contents(resource_path('views/saas-admin/plans.blade.php'));
 
-        foreach (['price_quarterly', 'price_semi_annual', 'price_yearly'] as $field) {
-            $this->assertStringContainsString(
-                'name="' . $field . '"',
-                $form,
-                "The new-plan form must be able to set {$field}, or a new package is born monthly-only."
-            );
+        $this->assertStringContainsString('name="price_yearly"', $form);
+        foreach (['price_monthly', 'price_quarterly', 'price_semi_annual'] as $field) {
+            $this->assertStringNotContainsString('name="' . $field . '"', $form);
         }
     }
 

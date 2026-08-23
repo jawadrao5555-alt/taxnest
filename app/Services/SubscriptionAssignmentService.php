@@ -37,6 +37,24 @@ class SubscriptionAssignmentService
     }
 
     /**
+     * Owner, 23 Aug 2026: PRA POS, FBR POS aur Digital Invoice — teeno ab SIRF
+     * SALANA (annual) bikte hain. Monthly / quarterly / semi-annual har
+     * kharidne wale raste se hat gaye hain.
+     *
+     * This is the ONE predicate every buying path asks. normalizeCycle() stays
+     * as the READER for cycles already stored on live subscriptions (a shop
+     * that bought a monthly package before today keeps its own history and
+     * expiry) — only what can be SOLD is narrowed here.
+     */
+    public const SELLABLE_CYCLES = ['annual'];
+
+    /** The cycle any new purchase / renewal / approval is charged on. */
+    public static function purchaseCycle(?string $requested = null, ?string $productType = null): string
+    {
+        return 'annual';
+    }
+
+    /**
      * Product-type-aware price computation. Price semantics differ per product:
      *  - di:               sale_price is the MONTHLY base  → apply the cycle discount.
      *  - pos / standalone: sale_price is ALREADY the ANNUAL total (6% baked in) → use as-is (annual only).
@@ -73,39 +91,18 @@ class SubscriptionAssignmentService
     private static function computeBasePrice(PricingPlan $plan, string $cycle): array
     {
         $type = $plan->product_type ?? 'di';
-        $cycle = self::normalizeCycle($cycle);
 
-        // FBR POS joined this branch on 23 Aug 2026: its `price` column stopped
-        // being a monthly rate (charged ×12×0.94 once a year) and became the
-        // ANNUAL rate with hand-set quarterly/monthly rates, exactly like PRA.
-        $cycled = $type === 'pos' || $type === 'fbrpos';
+        // Annual-only (owner, 23 Aug 2026). Whatever cycle a caller asks for,
+        // a purchase is charged by the YEAR — so the price quoted here and the
+        // expiry assign() derives from it can never describe a cycle the shop
+        // is no longer able to buy. The hand-set price_quarterly /
+        // price_monthly columns stay in the table (old subscriptions' history)
+        // but nothing reads them for a sale anymore.
+        $cycle = self::purchaseCycle($cycle, $type);
 
-        if ($cycled || $type === 'standalone') {
-            // Quarterly (Aug 2026, owner-approved): the POS lines ONLY, and only
-            // when the plan carries an explicit quarterly price (price_quarterly).
-            // 'standalone' stays forced-annual even if a quarterly price is ever
-            // set on such a plan by mistake. Sale campaigns intentionally
-            // discount the ANNUAL price only — quarterly is already the premium path.
-            if ($cycled && $cycle === 'quarterly' && (float) ($plan->price_quarterly ?? 0) > 0) {
-                return [
-                    'cycle' => 'quarterly',
-                    'final_price' => round((float) $plan->price_quarterly),
-                    'discount_percent' => 0.0,
-                ];
-            }
-
-            // Monthly (Aug 2026, owner-approved): the POS lines ONLY, and only when
-            // the plan carries an explicit monthly price. Like quarterly it is priced
-            // ABOVE the annual pro-rata (~+10%) on purpose, and like quarterly a
-            // plan without the price silently falls back to annual below rather
-            // than charging a cycle the owner never set.
-            if ($cycled && $cycle === 'monthly' && (float) ($plan->price_monthly ?? 0) > 0) {
-                return [
-                    'cycle' => 'monthly',
-                    'final_price' => round((float) $plan->price_monthly),
-                    'discount_percent' => 0.0,
-                ];
-            }
+        if ($type === 'pos' || $type === 'fbrpos' || $type === 'standalone') {
+            // Both POS lines and standalone store the ANNUAL total in `price`
+            // (6% already baked in) — use it as-is, never × 12.
             return [
                 'cycle' => 'annual',
                 'final_price' => round((float) $plan->sale_price),
@@ -113,8 +110,9 @@ class SubscriptionAssignmentService
             ];
         }
 
-        // di (and any unknown type) → the plan's own cycle rate when it has one
-        // (Sep 2026 packages), else the monthly base with the cycle discount.
+        // di (and any unknown type) → the plan's own annual rate when it has
+        // one (Sep 2026 packages), else the monthly base × 12 with the annual
+        // discount. Unchanged arithmetic: only the cycle choice is gone.
         $pricing = Subscription::priceForPlanCycle($plan, $cycle);
 
         return [

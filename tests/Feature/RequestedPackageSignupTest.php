@@ -17,9 +17,9 @@ use Tests\TestCase;
  * THE PACKAGE A SHOP CLICKED MUST SURVIVE SIGNUP — AND ONLY A REAL ONE.
  *
  * The public pricing tables send a visitor to signup with ?plan=<package>
- * (Digital Invoice also carries &cycle=<billing cycle>). That request is stored
- * against the new company and approval activates EXACTLY it, charged for the
- * period the product sells: DI on the picked cycle, FBR POS / PRA POS yearly.
+ * (Digital Invoice may also carry a legacy &cycle value). That request is stored
+ * against the new company and approval activates it on the only sellable cycle:
+ * annual for DI, FBR POS and PRA POS.
  *
  * The dangerous half is the other one: a tampered, unknown, trial or
  * wrong-product name in the link must be ignored rather than recorded, so no
@@ -274,22 +274,22 @@ class RequestedPackageSignupTest extends TestCase
         $this->assertNull($company->requested_plan_id);
     }
 
-    public function test_di_signup_records_the_package_and_the_picked_cycle(): void
+    public function test_di_signup_records_the_package_and_annual_cycle(): void
     {
         $company = $this->diSignup('Ali Traders', 'ali@example.com', 'Business', 'quarterly');
 
         $this->assertSame($this->plan('Business', 'di')->id, (int) $company->requested_plan_id);
-        $this->assertSame('quarterly', $company->requested_billing_cycle);
+        $this->assertSame('annual', $company->requested_billing_cycle);
     }
 
-    public function test_di_signup_defaults_to_monthly_when_the_cycle_is_missing_or_unknown(): void
+    public function test_di_signup_defaults_to_annual_when_the_cycle_is_missing_or_unknown(): void
     {
         $missing = $this->diSignup('No Cycle Co', 'nocycle@example.com', 'Business');
-        $this->assertSame('monthly', $missing->requested_billing_cycle);
+        $this->assertSame('annual', $missing->requested_billing_cycle);
 
         $garbage = $this->diSignup('Bad Cycle Co', 'badcycle@example.com', 'Business', 'weekly-ish');
         $this->assertSame($this->plan('Business', 'di')->id, (int) $garbage->requested_plan_id);
-        $this->assertSame('monthly', $garbage->requested_billing_cycle, 'An unrecognised cycle must fall back to monthly, not be stored raw');
+        $this->assertSame('annual', $garbage->requested_billing_cycle, 'An unrecognised cycle must become annual, not be stored raw');
     }
 
     // ── Edge cases: nothing wrong may ever be recorded ────────────────
@@ -342,7 +342,7 @@ class RequestedPackageSignupTest extends TestCase
         $this->get('/register?plan=Business&cycle=quarterly')
             ->assertOk()
             ->assertSee('name="requested_plan" value="Business"', false)
-            ->assertSee('name="requested_billing_cycle" value="quarterly"', false);
+            ->assertSee('name="requested_billing_cycle" value="annual"', false);
 
         $this->get('/fbr-pos/register?plan=Business')
             ->assertOk()
@@ -369,10 +369,10 @@ class RequestedPackageSignupTest extends TestCase
             ->assertSee('name="requested_addons[]" value="caller_id"', false)
             ->assertDontSee('name="requested_addons[]" value="delivery_riders"', false)
             ->assertDontSee('name="requested_addons[]" value="not-a-real-feature"', false)
-            ->assertSee('name="requested_addon_cycle" value="quarterly"', false);
+            ->assertSee('name="requested_addon_cycle" value="annual"', false);
     }
 
-    public function test_pos_signup_remembers_the_valid_addon_quote_for_authenticated_billing(): void
+    public function test_pos_signup_remembers_the_addon_quote_as_annual(): void
     {
         $this->posSignup(
             'Addon Selection Mart',
@@ -383,7 +383,7 @@ class RequestedPackageSignupTest extends TestCase
 
         $selection = session(\App\Services\PosAddonService::SIGNUP_SESSION_KEY);
         $this->assertSame(['caller_id', 'whatsapp_bill'], $selection['codes']);
-        $this->assertSame('quarterly', $selection['cycle']);
+        $this->assertSame('annual', $selection['cycle']);
         $this->assertSame(['codes', 'cycle'], array_keys($selection));
     }
 
@@ -416,7 +416,7 @@ class RequestedPackageSignupTest extends TestCase
         ]);
     }
 
-    public function test_approval_activates_a_di_package_on_the_cycle_the_visitor_picked(): void
+    public function test_approval_activates_a_di_package_annually_despite_legacy_pick(): void
     {
         $plan = $this->plan('Business', 'di');
         $company = $this->pendingCompany('di', $plan, 'quarterly');
@@ -425,22 +425,22 @@ class RequestedPackageSignupTest extends TestCase
 
         $this->assertNotNull($sub);
         $this->assertSame($plan->id, (int) $sub->pricing_plan_id);
-        $this->assertSame('quarterly', $sub->billing_cycle);
-        // Rs 3,000/month × 3 months − 1% cycle discount.
-        $this->assertSame(8910.0, (float) $sub->final_price);
-        $this->assertSame(3, (int) $sub->start_date->diffInMonths($sub->end_date), 'Expiry must match the cycle charged');
+        $this->assertSame('annual', $sub->billing_cycle);
+        // Rs 3,000/month × 12 months − 6% annual discount.
+        $this->assertSame(33840.0, (float) $sub->final_price);
+        $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date), 'Expiry must match the annual cycle charged');
     }
 
-    public function test_approval_activates_a_di_package_monthly_when_no_cycle_was_stored(): void
+    public function test_approval_activates_a_di_package_annually_when_no_cycle_was_stored(): void
     {
         $plan = $this->plan('Business', 'di');
         $company = $this->pendingCompany('di', $plan, null);
 
         $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
 
-        $this->assertSame('monthly', $sub->billing_cycle);
-        $this->assertSame(3000.0, (float) $sub->final_price);
-        $this->assertSame(1, (int) $sub->start_date->diffInMonths($sub->end_date));
+        $this->assertSame('annual', $sub->billing_cycle);
+        $this->assertSame(33840.0, (float) $sub->final_price);
+        $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date));
     }
 
     public function test_approval_activates_an_fbr_package_for_a_full_year(): void
@@ -458,9 +458,7 @@ class RequestedPackageSignupTest extends TestCase
 
     public function test_an_fbr_package_without_a_monthly_rate_falls_back_to_the_year(): void
     {
-        // FBR POS sells monthly since 23 Aug 2026, but only when the row prices
-        // it. This plan has no price_monthly, so the cycle must fall back to
-        // annual rather than invent a figure.
+        // Retired monthly columns never affect the annual FBR POS charge.
         $plan = $this->plan('Business', 'fbrpos');
         $company = $this->pendingCompany('fbrpos', $plan, 'monthly');
 
@@ -470,8 +468,8 @@ class RequestedPackageSignupTest extends TestCase
         $this->assertSame(3000.0, (float) $sub->final_price);
     }
 
-    /** ...and when the row DOES price the month, that is what the shop is charged. */
-    public function test_an_fbr_package_is_charged_monthly_when_the_row_prices_it(): void
+    /** Even a populated retired monthly column must never be charged. */
+    public function test_an_fbr_package_is_charged_annually_when_the_row_prices_monthly(): void
     {
         $plan = $this->plan('Business', 'fbrpos');
         $plan->update(['price_monthly' => 2599, 'price_quarterly' => 7349]);
@@ -479,9 +477,9 @@ class RequestedPackageSignupTest extends TestCase
 
         $sub = SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
 
-        $this->assertSame('monthly', $sub->billing_cycle);
-        $this->assertSame(2599.0, (float) $sub->final_price);
-        $this->assertSame(1, (int) $sub->start_date->diffInMonths($sub->end_date));
+        $this->assertSame('annual', $sub->billing_cycle);
+        $this->assertSame(3000.0, (float) $sub->final_price);
+        $this->assertSame(12, (int) $sub->start_date->diffInMonths($sub->end_date));
     }
 
     public function test_pra_pos_approval_is_unchanged(): void
@@ -532,10 +530,10 @@ class RequestedPackageSignupTest extends TestCase
 
         $this->assertNotNull($summary);
         $this->assertSame('Business', $summary['name']);
-        $this->assertSame('Quarterly', $summary['cycle_label']);
-        $this->assertSame(8910.0, $summary['price']);
-        $this->assertStringContainsString('Rs 8,910 every 3 months', $summary['badge']);
-        $this->assertStringContainsString('3 months', $summary['note']);
+        $this->assertSame('Annual', $summary['cycle_label']);
+        $this->assertSame(33840.0, $summary['price']);
+        $this->assertStringContainsString('Rs 33,840 / year', $summary['badge']);
+        $this->assertStringContainsString('1 full year', $summary['note']);
 
         $fbr = $this->pendingCompany('fbrpos', $this->plan('Business', 'fbrpos'), null);
         $fbrSummary = RequestedPackageService::pendingSummary($fbr);

@@ -20,8 +20,13 @@ use InvalidArgumentException;
  */
 class PosAddonPricingService
 {
-    /** The cycles an add-on can be sold on — same ladder as the packages. */
-    public const CYCLES = ['annual', 'quarterly', 'monthly'];
+    /**
+     * The cycles an add-on can be sold on — same ladder as the packages, which
+     * since 23 Aug 2026 means the YEAR and nothing else (owner). The quarterly
+     * and monthly rate constants below stay for already-sold rows and for the
+     * admin's price history; no buying path quotes them.
+     */
+    public const CYCLES = ['annual'];
 
     /** Fallback for an add-on with no per-feature price of its own. */
     public const DEFAULT_ANNUAL_PRICE = 4999;

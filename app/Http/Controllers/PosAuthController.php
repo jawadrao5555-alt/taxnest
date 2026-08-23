@@ -161,8 +161,8 @@ class PosAuthController extends Controller
             (string) request()->query('addon_cycle', 'annual')
         );
 
-        // Cycle picker (Aug 2026): a shop can pay yearly, 3-monthly or monthly.
-        // Every figure comes from computePrice(), so the signup quote can never
+        // Annual-only since 23 Aug 2026 (owner): the picker is gone and every
+        // figure still comes from computePrice(), so the signup quote can never
         // disagree with what approval actually charges.
         $planPrices = [];
         foreach ($plans as $plan) {
@@ -178,13 +178,9 @@ class PosAuthController extends Controller
             'planPrices' => $planPrices,
             'cycleOptions' => [
                 'annual' => __('pos.cycle_annual'),
-                'quarterly' => __('pos.cycle_quarterly'),
-                'monthly' => __('pos.cycle_monthly'),
             ],
             'cyclePerLabels' => [
                 'annual' => __('pos.auth_per_year'),
-                'quarterly' => __('pos.auth_per_quarter'),
-                'monthly' => __('pos.auth_per_month'),
             ],
         ]);
     }

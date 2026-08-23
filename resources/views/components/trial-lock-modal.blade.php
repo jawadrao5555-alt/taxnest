@@ -81,13 +81,8 @@
             $lockProductType = 'di';
         }
 
-        // DI = full toggle; PRA POS = Annual + Quarterly + Monthly (Aug 2026);
-        // standalone / FBR POS = annual-only.
-        $lockCycles = $lockProductType === 'di'
-            ? [['key' => 'monthly', 'label' => __('pos.cycle_monthly')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'semi_annual', 'label' => __('pos.cycle_semi_annual')], ['key' => 'annual', 'label' => __('pos.cycle_annual')]]
-            : ($lockProductType === 'pos'
-                ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'monthly', 'label' => __('pos.cycle_monthly')]]
-                : [['key' => 'annual', 'label' => __('pos.cycle_annual')]]);
+        // Annual-only since 23 Aug 2026 (owner) — one cycle for every product.
+        $lockCycles = [['key' => 'annual', 'label' => __('pos.cycle_annual')]];
 
         // Total = base package + paid extra-branch slots (Rs 10,000/branch/year).
         // $lockCompany is passed so this modal shows the SAME number the renewal
@@ -101,9 +96,6 @@
             $lockPlans[] = ['id' => $lp->id, 'name' => $lp->name, 'prices' => $prices];
         }
         $lockBranchSlots = \App\Services\BranchAddonService::slots($lockCompany);
-        // Sale note is only relevant for POS — quarterly is annual-only there.
-        // DI has quarterly as a real discounted cycle so we never show this warning there.
-        $lockSaleActive = $lockProductType === 'pos' && \App\Models\SaleCampaign::activeFor('pos') !== null;
     }
 @endphp
 
@@ -212,8 +204,7 @@
                         plans: {{ \Illuminate\Support\Js::from($lockPlans) }},
                         cycles: {{ \Illuminate\Support\Js::from($lockCycles) }},
                         planId: '{{ old('pricing_plan_id') }}',
-                        cycle: '{{ old('billing_cycle', $lockProductType === 'di' ? 'monthly' : 'annual') }}',
-                        saleActive: {{ $lockSaleActive ? 'true' : 'false' }},
+                        cycle: 'annual',
                         get price() {
                             const p = this.plans.find(x => String(x.id) === String(this.planId));
                             return p ? (p.prices[this.cycle] ?? null) : null;
@@ -252,10 +243,6 @@
                     <div x-show="price !== null" x-cloak class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
                         <span x-text="cycleLabel"></span> {{ __('pos.pp_package_total') }}
                         <span class="font-bold">PKR <span x-text="price !== null ? Number(price).toLocaleString() : ''"></span></span>
-                    </div>
-                    <div x-show="saleActive && cycle === 'quarterly'" x-cloak
-                         class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                        {{ __('pos.se_sale_annual_note') }}
                     </div>
                     @if($lockBranchSlots > 0)
                     {{-- Paid extra branches ride on the package total (Rs 10,000/branch/year). --}}

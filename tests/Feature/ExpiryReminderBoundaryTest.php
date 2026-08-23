@@ -445,9 +445,7 @@ class ExpiryReminderBoundaryTest extends TestCase
 
     public function test_pos_paid_email_quotes_current_plan_rates(): void
     {
-        // Task 221: POS renewal reminder must quote the plan's CURRENT
-        // pricing_plans rate (annual + quarterly when set) so the repriced
-        // renewal is no surprise.
+        // POS renewal reminder quotes only the current sellable annual rate.
         $c = $this->company(['product_type' => 'pos', 'email' => 'pos@example.test']);
         $plan = $this->plan(false, null, [
             'name' => 'Unlimited',
@@ -464,8 +462,8 @@ class ExpiryReminderBoundaryTest extends TestCase
             return str_contains($joined, 'Unlimited')
                 && str_contains($joined, 'Rs 69,999')
                 && str_contains($joined, 'per year')
-                && str_contains($joined, 'Rs 19,999')
-                && str_contains($joined, 'per quarter');
+                && ! str_contains($joined, 'Rs 19,999')
+                && ! str_contains($joined, 'per quarter');
         });
     }
 

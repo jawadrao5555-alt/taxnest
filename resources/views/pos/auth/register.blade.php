@@ -69,16 +69,18 @@
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at
                              sign-up; admin sees it at approval and approves exactly this plan.
-                             Since Aug 2026 it also picks HOW OFTEN it pays. --}}
+                             Billing is annual for every package (owner, 23 Aug 2026). --}}
                         <div class="pb-1">
                             <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">{{ __('pos.auth_select_package') }} <span class="normal-case font-normal">{{ __('pos.auth_pick_billing') }}</span></p>
                         </div>
 
                         <input type="hidden" name="pricing_plan_id" :value="planId">
 
-                        {{-- Billing cycle. Yearly is the cheapest per month; the card prices
-                             below re-quote live from the server-computed figures. --}}
+                        {{-- Billing cycle. Annual-only since 23 Aug 2026 (owner), so the
+                             picker only renders if a shorter cycle is ever sold again;
+                             the card prices re-quote from the server-computed figures. --}}
                         <input type="hidden" name="billing_cycle" :value="cycle">
+                        @if(count($cycleOptions ?? []) > 1)
                         <div class="grid grid-cols-3 gap-1 p-1 rounded-xl" style="background: rgba(10,77,92,0.28); border: 1px solid rgba(125,211,252,0.22);">
                             @foreach(($cycleOptions ?? []) as $cycleKey => $cycleLabel)
                             <button type="button" @click="cycle = @js($cycleKey)"
@@ -88,6 +90,7 @@
                             </button>
                             @endforeach
                         </div>
+                        @endif
 
                         <div class="grid grid-cols-2 gap-2">
                             @foreach(($plans ?? collect()) as $plan)
@@ -112,7 +115,7 @@
                                 <div>
                                     <p class="text-xs font-bold text-white">{{ __('pos.addons_signup_title') }}</p>
                                     <p class="text-[10px] text-purple-100/60 mt-0.5">
-                                        {{ $signupAddonQuote['cycle'] === 'quarterly' ? __('pos.addons_cycle_quarterly') : __('pos.addons_cycle_annual') }}
+                                        {{ __('pos.addons_cycle_annual') }}
                                     </p>
                                 </div>
                                 <p class="text-sm font-bold text-amber-300">PKR {{ number_format($signupAddonQuote['total']) }}</p>

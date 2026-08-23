@@ -35,7 +35,9 @@ class AdminSubscriptionController extends Controller
         $request->validate([
             'company_id' => 'required|exists:companies,id',
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
-            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
+            // Annual-only since 23 Aug 2026 (owner). 'yearly' stays accepted as
+            // the legacy spelling of the same thing.
+            'billing_cycle' => 'required|in:annual,yearly',
         ]);
 
         $plan = PricingPlan::findOrFail($request->pricing_plan_id);

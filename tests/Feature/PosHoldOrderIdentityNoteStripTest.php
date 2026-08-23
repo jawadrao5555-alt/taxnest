@@ -143,7 +143,9 @@ class PosHoldOrderIdentityNoteStripTest extends TestCase
         $this->companyId = DB::table('companies')->insertGetId([
             'name' => 'Test Karahi',
             'is_internal_account' => true, // skip subscription/plan lookup
-            'feature_flags' => json_encode([]),  // all flags false → typeFlowGate=false
+            // 23 Aug 2026: plain retail can no longer hold restaurant orders
+            // (it parks carts instead) — this fixture is a kitchen shop.
+            'feature_flags' => json_encode(['kitchen' => true]),
             'created_at' => now(), 'updated_at' => now(),
         ]);
         app()->bind('currentCompanyId', fn () => $this->companyId);
@@ -199,7 +201,7 @@ class PosHoldOrderIdentityNoteStripTest extends TestCase
 
         $payload = [
             'items'          => $items,
-            'order_type'     => 'takeaway',
+            'order_type'     => 'dine_in',
             'kitchen_notes'  => $kitchenNotes,
         ];
 

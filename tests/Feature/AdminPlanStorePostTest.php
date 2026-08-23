@@ -21,10 +21,9 @@ use Illuminate\Database\Schema\Blueprint;
  *    explicit list must keep injected `is_trial` (and other stray fields)
  *    ignored on both store and update.
  *
- * 2. PRICE_MONTHLY MIRRORING — di/fbrpos plans store MONTHLY prices, so
- *    price_monthly must mirror price; pos plans store ANNUAL prices, so
- *    price_monthly must be NULL (and be reset to NULL when a plan is
- *    switched to pos on update).
+ * 2. RETIRED CYCLE RATE PROTECTION — monthly, quarterly and semi-annual
+ *    package rate columns are historical only. Crafted requests cannot write
+ *    them, and ordinary edits must leave existing values untouched.
  */
 class AdminPlanStorePostTest extends TestCase
 {
@@ -141,15 +140,15 @@ class AdminPlanStorePostTest extends TestCase
         $this->assertNull($plan->compare_at, 'compare_at must not be injectable via POST');
     }
 
-    /** di plans store monthly prices — price_monthly mirrors price. */
-    public function test_store_mirrors_price_monthly_for_di(): void
+    /** The monthly base for DI is price; the retired price_monthly column stays unused. */
+    public function test_store_leaves_retired_price_monthly_null_for_di(): void
     {
         $this->actingAsAdmin()->post('/admin/plans', $this->validPayload([
             'name' => 'DI Plan', 'product_type' => 'di', 'price' => 1500,
         ]))->assertSessionHasNoErrors();
 
         $plan = DB::table('pricing_plans')->where('name', 'DI Plan')->first();
-        $this->assertEquals(1500.0, (float) $plan->price_monthly);
+        $this->assertNull($plan->price_monthly);
     }
 
     /**
@@ -167,8 +166,8 @@ class AdminPlanStorePostTest extends TestCase
         $this->assertNull($plan->price_monthly, 'fbrpos price is annual — the monthly rate must be hand-set.');
     }
 
-    /** ...and the hand-set monthly rate is stored exactly as typed. */
-    public function test_store_keeps_hand_set_monthly_rate_for_pos_lines(): void
+    /** Crafted shorter-cycle package rates are ignored for every POS line. */
+    public function test_store_ignores_retired_cycle_rates_for_pos_lines(): void
     {
         foreach (['pos' => 2599, 'fbrpos' => 2599] as $type => $monthly) {
             $this->actingAsAdmin()->post('/admin/plans', $this->validPayload([
@@ -178,23 +177,31 @@ class AdminPlanStorePostTest extends TestCase
 
             $plan = DB::table('pricing_plans')->where('name', 'Cycle ' . $type)->first();
             $this->assertEquals(27999.0, (float) $plan->price, "{$type}: price is the ANNUAL rate");
-            $this->assertEquals($monthly, (float) $plan->price_monthly, "{$type}: hand-set monthly rate");
-            $this->assertEquals(7349.0, (float) $plan->price_quarterly, "{$type}: hand-set quarterly rate");
+            $this->assertNull($plan->price_monthly, "{$type}: monthly package rate is retired");
+            $this->assertNull($plan->price_quarterly, "{$type}: quarterly package rate is retired");
         }
     }
 
-    /** An unrelated edit must never wipe a POS package's monthly rate. */
-    public function test_update_preserves_hand_set_monthly_rate_for_pos(): void
+    /** Historical cycle rates survive unrelated edits but can no longer be changed. */
+    public function test_update_preserves_historical_cycle_rates_for_pos(): void
     {
-        $id = $this->seedPlan(['product_type' => 'pos', 'price' => 27999, 'price_monthly' => 2599]);
+        $id = $this->seedPlan([
+            'product_type' => 'pos',
+            'price' => 27999,
+            'price_monthly' => 2599,
+            'price_quarterly' => 7349,
+        ]);
 
         $this->actingAsAdmin()->put("/admin/plans/{$id}", $this->validPayload([
-            'product_type' => 'pos', 'price' => 27999,
+            'product_type' => 'pos',
+            'price' => 29999,
+            'price_monthly' => 1,
+            'price_quarterly' => 2,
         ]))->assertSessionHasNoErrors();
 
         $plan = DB::table('pricing_plans')->find($id);
-        $this->assertEquals(2599.0, (float) $plan->price_monthly,
-            'A saved POS package must keep the monthly cycle it was selling.');
+        $this->assertEquals(2599.0, (float) $plan->price_monthly);
+        $this->assertEquals(7349.0, (float) $plan->price_quarterly);
     }
 
     /** pos plans store ANNUAL prices — price_monthly must stay NULL. */
@@ -235,8 +242,8 @@ class AdminPlanStorePostTest extends TestCase
         $this->assertEquals(1, (int) $plan->is_trial, 'is_trial must not be clearable via POST');
     }
 
-    /** Update mirrors price_monthly for di/fbrpos. */
-    public function test_update_mirrors_price_monthly_for_di(): void
+    /** Updating the DI monthly base does not rewrite its historical mirror column. */
+    public function test_update_preserves_historical_price_monthly_for_di(): void
     {
         $id = $this->seedPlan(['price' => 1000, 'price_monthly' => 1000]);
 
@@ -245,11 +252,11 @@ class AdminPlanStorePostTest extends TestCase
         ]))->assertSessionHasNoErrors();
 
         $plan = DB::table('pricing_plans')->find($id);
-        $this->assertEquals(4500.0, (float) $plan->price_monthly);
+        $this->assertEquals(1000.0, (float) $plan->price_monthly);
     }
 
-    /** Switching a plan to pos on update must RESET price_monthly to NULL. */
-    public function test_update_resets_price_monthly_when_switched_to_pos(): void
+    /** Switching product line also leaves historical cycle values untouched. */
+    public function test_update_preserves_price_monthly_when_switched_to_pos(): void
     {
         $id = $this->seedPlan(['product_type' => 'di', 'price_monthly' => 1000]);
 
@@ -258,7 +265,7 @@ class AdminPlanStorePostTest extends TestCase
         ]))->assertSessionHasNoErrors();
 
         $plan = DB::table('pricing_plans')->find($id);
-        $this->assertNull($plan->price_monthly);
+        $this->assertEquals(1000.0, (float) $plan->price_monthly);
     }
 
     /** Admin can change every PRA POS add-on rate without changing plan rows. */
@@ -266,7 +273,7 @@ class AdminPlanStorePostTest extends TestCase
     {
         // Every cycle the catalogue sells must be settable in one post — add a
         // cycle to CYCLES and this test proves the form still covers it.
-        $rates = ['annual' => 13500, 'quarterly' => 3600, 'monthly' => 1250];
+        $rates = ['annual' => 13500];
         $addons = [];
         foreach (\App\Services\PosAddonPricingService::ADDONS as $code => $_addon) {
             $addons[$code] = $rates;
@@ -291,8 +298,8 @@ class AdminPlanStorePostTest extends TestCase
         }
     }
 
-    /** A monthly shop must be quoted the monthly add-on rate, not a year. */
-    public function test_pos_addon_quote_supports_all_three_cycles(): void
+    /** Paid POS add-ons expose the annual cycle only. */
+    public function test_pos_addon_quote_supports_annual_only(): void
     {
         foreach (\App\Services\PosAddonPricingService::CYCLES as $cycle) {
             $quote = \App\Services\PosAddonService::quote(['caller_id'], $cycle);

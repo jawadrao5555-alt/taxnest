@@ -231,9 +231,9 @@ class SendTrialReminders extends Command
      *
      * POS packages were repriced on 02 Aug 2026 (existing subscriptions keep
      * the old rate until end_date; renewals charge the NEW rate), so the
-     * reminder quotes the plan's CURRENT rate from pricing_plans — annual
-     * (sale-adjusted, like every charge path) plus quarterly when set.
-     * POS product line only; DI/FBR POS rates are unchanged.
+     * reminder quotes the plan's CURRENT annual rate from pricing_plans
+     * (sale-adjusted, like every charge path). Annual is the only cycle sold
+     * since 23 Aug 2026. POS product line only.
      *
      * @return string[]
      */
@@ -248,14 +248,7 @@ class SendTrialReminders extends Command
             return [];
         }
 
-        $line = "Renewal rate for your {$plan->name} plan: Rs " . number_format($annual) . ' per year';
-
-        $quarterly = (float) ($plan->price_quarterly ?? 0);
-        if ($quarterly > 0) {
-            $line .= ' (or Rs ' . number_format($quarterly) . ' per quarter)';
-        }
-
-        return [$line . '.'];
+        return ["Renewal rate for your {$plan->name} plan: Rs " . number_format($annual) . ' per year.'];
     }
 
     /**

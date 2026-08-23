@@ -21,8 +21,7 @@
      * like the PRA POS and FBR POS tables.
      */
     $dcmpPlans = $plans ?? \App\Services\DiPlanComparisonService::plans();
-    // Task 1483: the landing heading carries the price (re-computed by the
-    // page's billing-cycle switch) and the signup link for that package;
+    // Task 1483: the landing heading carries the annual price and signup link;
     // panel surfaces stay unchanged.
     $dcmpCols = \App\Services\DiPlanComparisonService::planColumns(
         $dcmpPlans,
@@ -44,7 +43,7 @@
     popular-label="Most complete"
     current-label="Your plan"
     tick-label="Included"
-    note="Prices follow the billing cycle you picked above; the packages themselves do not change."
+    note="Every package is billed annually. The smaller figure is the monthly equivalent of the yearly total."
     tip="Scroll sideways to see all packages."
     included-title="Included in every package"
     included-sub="These never depend on which package you pick."

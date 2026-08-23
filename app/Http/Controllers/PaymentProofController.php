@@ -51,13 +51,9 @@ class PaymentProofController extends Controller
         }
 
         $productType = $this->resolveProductType($company);
-        $allowedCycles = match ($productType) {
-            'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
-            // Both POS lines: annual, quarterly (+5%) or monthly (+10%). PRA
-            // Aug 2026, FBR POS joined 23 Aug 2026.
-            'pos', 'fbrpos' => ['annual', 'quarterly', 'monthly'],
-            default => ['annual'],            // standalone stays annual-only
-        };
+        // Owner, 23 Aug 2026: every product line is sold by the YEAR only, so
+        // a stale form or a hand-crafted POST can no longer buy a short cycle.
+        $allowedCycles = \App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES;
 
         $validated = $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
@@ -108,7 +104,7 @@ class PaymentProofController extends Controller
             'company_id' => $companyId,
             'pricing_plan_id' => $plan->id,
             // Store the cycle the APPROVAL will actually assign (computePrice
-            // forces annual when a plan has no quarterly price) so the proof row
+            // always annual since 23 Aug 2026) so the proof row
             // and the resulting subscription can never disagree.
             'billing_cycle' => \App\Services\SubscriptionAssignmentService::computePrice($plan, $validated['billing_cycle'])['cycle'],
             'amount' => $validated['amount'] ?? null,
@@ -315,7 +311,7 @@ class PaymentProofController extends Controller
                 'company_id' => $lockedCompany->id,
                 // Context only — approval never reads it for pricing.
                 'pricing_plan_id' => $eligibility['subscription']?->pricing_plan_id,
-                // The add-on's OWN cycle (annual/quarterly). Safe to reuse this
+                // The add-on's OWN cycle (annual). Safe to reuse this
                 // column: the subscriptionKind scope keeps pos_addon rows out of
                 // every renewal query, so it can never be read as a package cycle.
                 'billing_cycle' => $quote['cycle'],
@@ -511,7 +507,7 @@ class PaymentProofController extends Controller
             $body = "A PAID FEATURE ADD-ON request is waiting for review.\n\n"
                 . 'Company: ' . ($company->name ?? ('Company #' . $proof->company_id)) . "\n"
                 . 'Panel: NestPOS (PRA)' . "\n"
-                . 'Billing: ' . ($quote['cycle'] === 'quarterly' ? 'Quarterly' : 'Annual') . "\n"
+                . 'Billing: Annual' . "\n"
                 . "Features requested:\n" . implode("\n", $lines) . "\n"
                 . 'Quoted total: PKR ' . number_format($quote['total']) . "\n"
                 . "Amount paid: {$amount}\n"

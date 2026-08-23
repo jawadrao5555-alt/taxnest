@@ -202,9 +202,8 @@ class PosPlanComparisonService
      * Column header data for each package.
      *
      * $withSignup adds the landing-page buying block (Task 1483): PRA POS
-     * bills ANNUALLY, so the headline is the yearly price with the hand-set
-     * 3-month alternative underneath, and the button carries the package into
-     * /pos/register. Every number still comes from the pricing_plans columns
+     * bills ANNUALLY, so the headline is the yearly price and the button
+     * carries the package into /pos/register. Every number still comes from the pricing_plans columns
      * the gates read — sale_price/price are accessors over the same row, never
      * the display-only features JSON. The POS billing panel calls this without
      * the flag and keeps rendering exactly as before.
@@ -226,31 +225,10 @@ class PosPlanComparisonService
 
             $col['price_period'] = __('pos.pcmp_per_year');
 
-            // Sale campaigns discount the ANNUAL price only (quarterly is
-            // already priced at a premium) — say so rather than let a shop
-            // read the badge onto the 3-month line.
             $onSale = (float) $plan->sale_price < (float) $plan->price;
             if ($onSale) {
                 $col['price_compare'] = 'Rs ' . number_format((float) $plan->price);
                 $col['sale_badge']    = $plan->sale_badge;
-            }
-
-            // Shorter cycles are listed as alternatives to the headline annual
-            // price. Each one only appears when the plan actually carries that
-            // price, which is the same condition computePrice() charges on — a
-            // note can never advertise a cycle the checkout would refuse.
-            $alternativeCycles = [];
-            $quarterly = (float) ($plan->price_quarterly ?? 0);
-            if ($quarterly > 0) {
-                $alternativeCycles[] = __('pos.pcmp_or_quarterly', ['price' => number_format($quarterly)]);
-            }
-            $monthly = (float) ($plan->price_monthly ?? 0);
-            if ($monthly > 0) {
-                $alternativeCycles[] = __('pos.pcmp_or_monthly', ['price' => number_format($monthly)]);
-            }
-            if ($alternativeCycles !== []) {
-                $col['price_note'] = implode(' · ', $alternativeCycles)
-                    . ($onSale ? ' ' . __('pos.pcmp_sale_annual_only') : '');
             }
 
             $col['cta_url']   = route('pos.register', ['plan' => $plan->name], false);

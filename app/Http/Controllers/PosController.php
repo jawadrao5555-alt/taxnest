@@ -2144,7 +2144,7 @@ class PosController extends Controller
         }
 
         $heldOrders = collect();
-        if ($features->kot && class_exists(RestaurantOrder::class)) {
+        if (($features->kot || $features->tables) && class_exists(RestaurantOrder::class)) {
             $heldOrders = RestaurantOrder::where('company_id', $companyId)
                 ->whereIn('status', ['held', 'preparing', 'ready'])
                 ->with(['table', 'items'])->orderBy('created_at', 'desc')->get();
@@ -2281,7 +2281,7 @@ class PosController extends Controller
         // navigations network-only hain (SALE_CACHE sirf bina-query URL cache
         // karta hai), is liye fingerprint/cache path par koi asar nahi.
         $recallOrderIdForJs = null;
-        if ($request->filled('recall_order') && $features->kot && class_exists(RestaurantOrder::class)) {
+        if ($request->filled('recall_order') && ($features->kot || $features->tables) && class_exists(RestaurantOrder::class)) {
             $recallCandidate = RestaurantOrder::where('company_id', $companyId)
                 ->whereIn('status', ['held', 'preparing', 'ready'])
                 ->find((int) $request->input('recall_order'));
@@ -11669,7 +11669,12 @@ class PosController extends Controller
         // cash recon, local/rider summaries, Z print links) for isolated cashiers.
         $dcIso = $dayCloseIso;
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
+        // Parked bills (owner, 23 Aug 2026): unfinished carts a counter set
+        // aside. They are NOT sales, so they never touch the day's figures —
+        // the page just reminds the shop they are still sitting there.
+        $parkedBills = \App\Services\PosParkedBills::count(\App\Services\PosParkedBills::PRA_TABLE, $companyId);
+
+        return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
     }
 
     /**
@@ -12012,6 +12017,13 @@ class PosController extends Controller
         // block, because quota can block the very first bill. Zero-count skips.
         if (($sweep['quota_blocked'] ?? 0) > 0) {
             $msg .= __('pos.dayclose_bills_quota_blocked', ['count' => $sweep['quota_blocked']]);
+        }
+        // Parked-bill broom (owner, 23 Aug 2026): carts parked on an EARLIER day
+        // are abandoned by definition — that day is closed and they were never
+        // part of its totals. Today's parks survive untouched.
+        $parkedSwept = \App\Services\PosParkedBills::purgeBeforeDay(\App\Services\PosParkedBills::PRA_TABLE, $companyId, $date);
+        if ($parkedSwept > 0) {
+            $msg .= __('pos.hs_day_close_cleared', ['count' => $parkedSwept]);
         }
         return back()->with('success', $msg);
     }

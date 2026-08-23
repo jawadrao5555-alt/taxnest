@@ -7,7 +7,7 @@
             </a>
             <div class="text-center mb-8">
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">NestPOS Plans</h2>
-                <p class="text-gray-500 dark:text-gray-400 mt-2">Annual, 3-monthly or monthly billing — pick a plan, start selling</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">Annual billing — pick a plan, start selling</p>
             </div>
 
             @if($currentSubscription && $currentSubscription->pricingPlan)
@@ -86,21 +86,6 @@
                             <span class="text-gray-400 text-sm">/year</span>
                         </div>
                         <p class="text-xs text-gray-400">PKR {{ number_format($perMonth) }}/mo effective</p>
-                        @if((float) ($plan->price_quarterly ?? 0) > 0)
-                        {{-- never glue @if after a word char ("months@if") — Blade skips the @if
-                             but compiles the @endif → unmatched endif → ParseError 500. --}}
-                        <p class="text-xs text-gray-500 mt-0.5 font-medium">
-                            or PKR {{ number_format($plan->price_quarterly) }} / 3 months
-                            @if($hasOffer)
-                                <span class="text-amber-600 font-semibold">(sale sirf annual par)</span>
-                            @endif
-                        </p>
-                        @endif
-                        @if((float) ($plan->price_monthly ?? 0) > 0)
-                        <p class="text-xs text-gray-500 mt-0.5 font-medium">
-                            or PKR {{ number_format($plan->price_monthly) }} / month
-                        </p>
-                        @endif
                         @if($hasOffer)<p class="text-xs text-purple-600 font-medium mt-0.5">Save PKR {{ number_format($compareYearly - $yearlyTotal) }}</p>@endif
 
                         @php
@@ -236,24 +221,12 @@
                         },
                         fmt(v) { return Number(v || 0).toLocaleString('en-US'); }
                      }">
+                    {{-- Annual-only since 23 Aug 2026 (owner): no cycle picker,
+                         the strip just states what the shop is buying. --}}
                     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                        <div class="inline-flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
-                            <button type="button" @click="cycle = 'annual'"
-                                    class="px-3 py-1.5 rounded-md text-xs font-semibold transition"
-                                    :class="cycle === 'annual' ? 'bg-purple-600 text-white' : 'text-gray-500 dark:text-gray-400'">
-                                {{ __('pos.addons_cycle_annual') }}
-                            </button>
-                            <button type="button" @click="cycle = 'quarterly'"
-                                    class="px-3 py-1.5 rounded-md text-xs font-semibold transition"
-                                    :class="cycle === 'quarterly' ? 'bg-purple-600 text-white' : 'text-gray-500 dark:text-gray-400'">
-                                {{ __('pos.addons_cycle_quarterly') }}
-                            </button>
-                            <button type="button" @click="cycle = 'monthly'"
-                                    class="px-3 py-1.5 rounded-md text-xs font-semibold transition"
-                                    :class="cycle === 'monthly' ? 'bg-purple-600 text-white' : 'text-gray-500 dark:text-gray-400'">
-                                {{ __('pos.addons_cycle_monthly') }}
-                            </button>
-                        </div>
+                        <span class="inline-flex items-center rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200">
+                            {{ __('pos.addons_cycle_annual') }}
+                        </span>
                         <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('pos.addons_included_note') }}</p>
                     </div>
 
@@ -274,12 +247,7 @@
                             </div>
                             <p class="text-sm font-bold text-purple-700 dark:text-purple-300 mt-1">
                                 PKR <span x-text="fmt(priceOf({{ \Illuminate\Support\Js::from($adCode) }}))"></span>
-                                <span class="text-[11px] font-medium text-gray-400"
-                                      x-text="({{ \Illuminate\Support\Js::from([
-                                          'annual' => '/ ' . __('pos.addons_per_year'),
-                                          'quarterly' => '/ ' . __('pos.addons_per_quarter'),
-                                          'monthly' => '/ ' . __('pos.addons_per_month'),
-                                      ]) }})[cycle]"></span>
+                                <span class="text-[11px] font-medium text-gray-400">/ {{ __('pos.addons_per_year') }}</span>
                             </p>
                         </label>
                         @endforeach
@@ -368,7 +336,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <span class="text-xs font-bold text-purple-400">PKR</span>
-                        Annual, quarterly or monthly billing
+                        Annual billing
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>

@@ -212,15 +212,14 @@ class FbrPosTwoPackageLadderMigrationTest extends TestCase
         $this->assertSame(0.0, (float) $trial->price);
         $this->assertSame(10, (int) $trial->invoice_limit);
 
-        // ── Checkout charges exactly these numbers, in all three cycles ──
-        foreach ([$starterId => [17999.0, 4699.0, 1649.0], $businessId => [27999.0, 7349.0, 2599.0]] as $id => $rates) {
-            [$annual, $quarterly, $monthly] = $rates;
+        // ── Checkout sells only annual, even if retired rates remain stored ──
+        foreach ([$starterId => 17999.0, $businessId => 27999.0] as $id => $annual) {
             $plan = PricingPlan::find($id);
-            foreach (['annual' => $annual, 'quarterly' => $quarterly, 'monthly' => $monthly] as $cycle => $want) {
+            foreach (['annual', 'quarterly', 'monthly'] as $cycle) {
                 $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
-                $this->assertSame($cycle, $priced['cycle'], "{$plan->name}: {$cycle} must be sold");
-                $this->assertSame($want, (float) $priced['final_price'],
-                    "{$plan->name}: {$cycle} must charge {$want} — never the old ×12×0.94 reading");
+                $this->assertSame('annual', $priced['cycle'], "{$plan->name}: only annual may be sold");
+                $this->assertSame($annual, (float) $priced['final_price'],
+                    "{$plan->name}: {$cycle} request must charge the annual total");
             }
         }
 

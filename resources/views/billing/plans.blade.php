@@ -229,29 +229,22 @@
                  discount ladder — the card, the toggle, the comparison table and
                  checkout must all quote the same figure. --}}
             <div x-data="{
-                cycle: 'monthly',
+                cycle: 'annual',
                 pricing: {{ \Illuminate\Support\Js::from($planPricing) }},
-                months: { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 },
-                cycleLabels: { monthly: 'month', quarterly: '3 months', semi_annual: '6 months', annual: 'year' },
+                months: { annual: 12 },
+                cycleLabels: { annual: 'year' },
                 row(planId) { return (this.pricing[planId] || {})[this.cycle] || null; },
                 total(planId) { let r = this.row(planId); return r ? Math.round(r.final_price) : 0; },
                 perMonth(planId) { let r = this.row(planId); return r ? Math.round(r.monthly_effective) : 0; },
                 saving(planId) { let r = this.row(planId); return r ? Math.max(0, Math.round(r.total_before_discount - r.final_price)) : 0; },
                 fmt(n) { return Number(n).toLocaleString('en-US'); }
             }">
+                {{-- Annual-only since 23 Aug 2026 (owner): nothing to toggle, so
+                     the row just states how the packages are billed. --}}
                 <div class="flex justify-center mb-8">
-                    <div class="inline-flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
-                        @foreach($billingCycles as $key => $info)
-                        <button @click="cycle = '{{ $key }}'"
-                            :class="cycle === '{{ $key }}' ? 'bg-white dark:bg-gray-700 shadow-sm text-emerald-700 dark:text-emerald-400 font-semibold' : 'text-gray-600 dark:text-gray-400 hover:text-gray-800'"
-                            class="px-4 py-2 rounded-lg text-sm transition">
-                            {{ $info['label'] }}
-                            @if($info['discount'] > 0)
-                            <span class="ml-1 text-xs text-emerald-600 font-bold">-{{ $info['discount'] }}%</span>
-                            @endif
-                        </button>
-                        @endforeach
-                    </div>
+                    <span class="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-4 py-2 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300">
+                        Billed annually
+                    </span>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -287,13 +280,12 @@
                             <div class="mt-4">
                                 <span class="text-3xl font-bold text-gray-900 dark:text-gray-100">PKR <span x-text="fmt(perMonth({{ $plan->id }}))"></span></span>
                                 <span class="text-gray-500 dark:text-gray-400 text-sm">/mo</span>
-                                <p class="text-xs text-gray-400 mt-1" x-show="cycle !== 'monthly'">
-                                    PKR <span x-text="fmt(total({{ $plan->id }}))"></span> billed every <span x-text="cycleLabels[cycle]"></span>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    PKR <span x-text="fmt(total({{ $plan->id }}))"></span> billed every year
                                     <template x-if="saving({{ $plan->id }}) > 0">
                                         <span class="text-emerald-600 font-semibold"> &middot; save PKR <span x-text="fmt(saving({{ $plan->id }}))"></span></span>
                                     </template>
                                 </p>
-                                <p class="text-xs text-gray-400 mt-1" x-show="cycle === 'monthly'">Billed monthly &middot; cancel anytime</p>
                             </div>
                             <ul class="mt-5 space-y-2.5">
                                 @foreach($planFeatures as $feature)

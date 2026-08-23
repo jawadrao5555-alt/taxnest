@@ -95,7 +95,7 @@
                                     @endphp
                                     <span class="text-white font-medium">{{ $proof->pricingPlan->name }}</span>
                                     <span class="block text-[11px] text-gray-500 dark:text-gray-400">
-                                        {{ \App\Models\Subscription::getCycleLabel($reqPriced['cycle']) }} · PKR {{ number_format($reqPriced['final_price']) }}
+                                        {{ \App\Models\Subscription::getCycleLabel($reqCycle) }} · PKR {{ number_format($reqPriced['final_price']) }}
                                         @if(($reqPriced['extra_branch_price'] ?? 0) > 0)
                                             <span class="block">= PKR {{ number_format($reqPriced['base_price']) }} package + PKR {{ number_format($reqPriced['extra_branch_price']) }} for {{ $reqPriced['extra_branch_slots'] }} extra branch(es)</span>
                                         @endif
@@ -288,7 +288,7 @@
                                                         'base' => [],
                                                         'addon' => [],
                                                     ];
-                                                    foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $ebCycle) {
+                                                    foreach (['annual'] as $ebCycle) {
                                                         $ebPriced = \App\Services\SubscriptionAssignmentService::computePrice($ebPlan, $ebCycle);
                                                         $ebMonths = \App\Services\BranchAddonService::monthsForCycle($ebPriced['cycle']);
                                                         $ebRow['base'][$ebCycle] = (float) $ebPriced['final_price'];
@@ -316,7 +316,7 @@
                                         <div x-data="{
                                                 slots: {{ $ebReview['slots'] }},
                                                 maxSlots: {{ $ebReview['slots'] }},
-                                                cycle: @js($reqCycleSel),
+                                                cycle: 'annual',
                                                 plan: @js((string) $proof->pricing_plan_id),
                                                 rows: @js($ebPlanRows),
                                                 paid: @js($ebReview['paid']),
@@ -364,10 +364,7 @@
                                                 @endforeach
                                             </select>
                                             <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
-                                                <option value="monthly" @selected($reqCycleSel === 'monthly')>Monthly</option>
-                                                <option value="quarterly" @selected($reqCycleSel === 'quarterly')>Quarterly</option>
-                                                <option value="semi_annual" @selected($reqCycleSel === 'semi_annual')>Semi-Annual</option>
-                                                <option value="annual" @selected($reqCycleSel === 'annual')>Annual</option>
+                                                <option value="annual">Annual</option>
                                             </select>
                                             @if($ebReview['applies'])
                                             {{-- Slots isi qadam mein: rakhein ya kam karein. Barhane ka

@@ -88,7 +88,7 @@
         $seCanRenew = !in_array($seGuard, ['pos', 'fbrpos'], true)
             || (method_exists($seUser, 'isPosAdmin') && $seUser->isPosAdmin());
 
-        $seSubmit = null; $sePendingProof = false; $sePlans = []; $seCycles = []; $seSaleActive = false;
+        $seSubmit = null; $sePendingProof = false; $sePlans = []; $seCycles = [];
         if ($seCanRenew) {
             if ($seGuard === 'pos') {
                 $seSubmit = route('pos.payment-proof.store');
@@ -100,12 +100,9 @@
                 $seSubmit = route('payment-proof.store');
                 $seProductType = 'di';
             }
-            // PRA POS sells three cycles since Aug 2026 (annual cheapest per month).
-            $seCycles = $seProductType === 'di'
-                ? [['key' => 'monthly', 'label' => __('pos.cycle_monthly')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'semi_annual', 'label' => __('pos.cycle_semi_annual')], ['key' => 'annual', 'label' => __('pos.cycle_annual')]]
-                : ($seProductType === 'pos'
-                    ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'monthly', 'label' => __('pos.cycle_monthly')]]
-                    : [['key' => 'annual', 'label' => __('pos.cycle_annual')]]);
+            // Annual-only since 23 Aug 2026 (owner): every product line is
+            // sold by the YEAR, so there is nothing left to pick here.
+            $seCycles = [['key' => 'annual', 'label' => __('pos.cycle_annual')]];
             try {
                 // Total = base package + paid extra-branch slots (Rs 10,000/branch/
                 // year). $seCompany is passed so this popup shows the SAME number
@@ -117,7 +114,6 @@
                     }
                     $sePlans[] = ['id' => $seLp->id, 'name' => $seLp->name, 'prices' => $sePrices];
                 }
-                $seSaleActive = $seProductType === 'pos' && \App\Models\SaleCampaign::activeFor('pos') !== null;
                 if (\Illuminate\Support\Facades\Schema::hasTable('payment_proofs')) {
                     // Package proofs only — an extra-branch request must not
                     // replace the renewal form with "under review".
@@ -242,8 +238,7 @@
                         plans: {{ \Illuminate\Support\Js::from($sePlans) }},
                         cycles: {{ \Illuminate\Support\Js::from($seCycles) }},
                         planId: '{{ old('pricing_plan_id') }}',
-                        cycle: '{{ old('billing_cycle', $seProductType === 'di' ? 'monthly' : 'annual') }}',
-                        saleActive: {{ $seSaleActive ? 'true' : 'false' }},
+                        cycle: 'annual',
                         get price() {
                             const p = this.plans.find(x => String(x.id) === String(this.planId));
                             return p ? (p.prices[this.cycle] ?? null) : null;
@@ -282,10 +277,6 @@
                     <div x-show="price !== null" x-cloak class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
                         <span x-text="cycleLabel"></span> {{ __('pos.pp_package_total') }}
                         <span class="font-bold">PKR <span x-text="price !== null ? Number(price).toLocaleString() : ''"></span></span>
-                    </div>
-                    <div x-show="saleActive && cycle === 'quarterly'" x-cloak
-                         class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                        {{ __('pos.se_sale_annual_note') }}
                     </div>
                     @if($seBranchSlots > 0)
                     {{-- Paid extra branches ride on the package total (Rs 10,000/branch/year). --}}

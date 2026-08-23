@@ -700,6 +700,18 @@
                 @endif
             </div>
             @endif
+            @if(($parkedBills ?? 0) > 0)
+            {{-- Parked bills (owner, 23 Aug 2026): unfinished carts a counter set
+                 aside to serve the next customer. They are NOT sales, so this is a
+                 reminder only — never a blocker. Carts left parked from EARLIER
+                 days are swept by the close itself. --}}
+            <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
+                <div class="text-sm">
+                    <span class="font-bold text-amber-800 dark:text-amber-300">{{ __('pos.hs_day_close_parked') }}: {{ $parkedBills }}</span>
+                    <p class="text-xs font-medium text-amber-800 dark:text-amber-300 mt-1">{{ __('pos.hs_day_close_parked_hint') }}</p>
+                </div>
+            </div>
+            @endif
             @if(($pendingDeliveries->count ?? 0) > 0)
             {{-- Task 676 (ZFC): undispatched delivery bills HARD-BLOCK the close —
                  the day is not settled while delivery orders never left the shop.

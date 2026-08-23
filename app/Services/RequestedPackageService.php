@@ -52,40 +52,21 @@ class RequestedPackageService
         return $plan;
     }
 
-    /** The three cycles the POS lines sell (Aug 2026). Order = cheapest per month first. */
-    public const POS_CYCLES = ['annual', 'quarterly', 'monthly'];
+    /** Every product line sells the YEAR and nothing else (owner, 23 Aug 2026). */
+    public const POS_CYCLES = SubscriptionAssignmentService::SELLABLE_CYCLES;
 
     /**
      * The cycle a requested package is actually charged on.
      *
-     * Digital Invoice quotes a MONTHLY price and the pricing page lets the
-     * visitor pick one of four cycles — that choice is honoured (unknown or
-     * missing falls back to monthly). Both POS lines sell all three of their own
-     * cycles (PRA since Aug 2026, FBR POS since 23 Aug 2026). Every other
-     * product is licensed by the YEAR, so the visitor never picks a cycle and
-     * none can be smuggled in.
+     * Since 23 Aug 2026 that is ALWAYS the year, for all three products. A
+     * stale ?cycle=monthly link, a remembered signup session or a tampered
+     * form value can therefore no longer smuggle a cycle the shop cannot buy
+     * into approval — the admin activates the same annual package the pricing
+     * page advertised.
      */
     public static function cycleForPlan(PricingPlan $plan, ?string $stored = null): string
     {
-        $type = $plan->product_type ?? 'di';
-
-        if ($type === 'di') {
-            return SubscriptionAssignmentService::normalizeCycle($stored);
-        }
-
-        if ($type === 'pos' || $type === 'fbrpos') {
-            // Deliberately NOT normalizeCycle(): that helper maps anything it
-            // does not recognise to 'monthly', which here is the DEAREST cycle
-            // per month. A tampered, empty or DI-only value ('semi_annual')
-            // must fall back to the annual default instead of silently
-            // upgrading the shop onto the most expensive rate.
-            $raw = mb_strtolower(trim((string) $stored));
-            $raw = $raw === 'yearly' ? 'annual' : $raw;
-
-            return in_array($raw, self::POS_CYCLES, true) ? $raw : 'annual';
-        }
-
-        return 'annual';
+        return SubscriptionAssignmentService::purchaseCycle($stored, $plan->product_type ?? null);
     }
 
     /**

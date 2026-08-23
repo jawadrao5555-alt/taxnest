@@ -27,11 +27,11 @@ class BillingController extends Controller
             ->orderBy('price')
             ->get();
 
-        // Cycle prices come from the plan row when it has hand-set rates, so the
-        // card, the toggle and the checkout all quote the SAME figure.
+        // Annual-only since 23 Aug 2026 (owner): one price per package, still
+        // read from the plan row so the card and the checkout can never differ.
         $planPricing = [];
         foreach ($plans as $plan) {
-            foreach (['monthly', 'quarterly', 'semi_annual', 'annual'] as $cycle) {
+            foreach (\App\Services\SubscriptionAssignmentService::SELLABLE_CYCLES as $cycle) {
                 $planPricing[$plan->id][$cycle] = Subscription::priceForPlanCycle($plan, $cycle);
             }
         }
@@ -121,13 +121,9 @@ class BillingController extends Controller
             }
         }
 
-        // The "-X%" on each cycle button must come from the SAME numbers the
-        // cards quote. DI packages carry hand-set per-cycle rates, so the old
-        // fixed 1/3/6% ladder would advertise a discount nobody is charged.
+        // One cycle left (annual). The saving badge still comes from the SAME
+        // numbers the cards quote, so a reprice can never leave a stale "-6%".
         $billingCycles = [
-            'monthly' => ['label' => 'Monthly', 'discount' => 0],
-            'quarterly' => ['label' => 'Quarterly', 'discount' => 0],
-            'semi_annual' => ['label' => 'Semi-Annual', 'discount' => 0],
             'annual' => ['label' => 'Annual', 'discount' => 0],
         ];
         foreach (array_keys($billingCycles) as $cycle) {
@@ -155,12 +151,14 @@ class BillingController extends Controller
     {
         $request->validate([
             'plan_id' => 'required|exists:pricing_plans,id',
-            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual',
+            // Annual-only since 23 Aug 2026 (owner). 'yearly' = legacy spelling.
+            'billing_cycle' => 'nullable|in:annual,yearly',
         ]);
 
         $plan = PricingPlan::findOrFail($request->plan_id);
         $companyId = app('currentCompanyId');
-        $cycle = $request->billing_cycle;
+        // Whatever a stale form posts, the shop is charged by the year.
+        $cycle = \App\Services\SubscriptionAssignmentService::purchaseCycle($request->billing_cycle, $plan->product_type ?? null);
 
         if ($plan->is_trial) {
             return back()->with('error', 'Trial plan cannot be subscribed to directly.');
@@ -250,7 +248,7 @@ class BillingController extends Controller
             return response()->json(['error' => 'Plan not found'], 404);
         }
 
-        $cycle = $request->billing_cycle ?? 'monthly';
+        $cycle = \App\Services\SubscriptionAssignmentService::purchaseCycle($request->billing_cycle, $plan->product_type ?? null);
         $pricing = Subscription::priceForPlanCycle($plan, $cycle);
 
         return response()->json($pricing);
@@ -279,7 +277,7 @@ class BillingController extends Controller
             'invoice_limit' => 'required|integer|min:50|max:100000',
             'user_count' => 'required|integer|min:1|max:500',
             'branch_count' => 'required|integer|min:1|max:100',
-            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual',
+            'billing_cycle' => 'required|in:annual',
         ]);
 
         $invoiceFactor = 2.5;
@@ -291,7 +289,7 @@ class BillingController extends Controller
                   + ($branchFactor * $request->branch_count);
 
         $cycle = $request->billing_cycle;
-        $discounts = ['monthly' => 0, 'quarterly' => 1, 'semi_annual' => 3, 'annual' => 6];
+        $discounts = ['annual' => 6];
         $discount = $discounts[$cycle] ?? 0;
         $months = Subscription::getMonthsForCycle($cycle);
 
@@ -321,7 +319,7 @@ class BillingController extends Controller
             'invoice_limit' => 'required|integer|min:50|max:100000',
             'user_count' => 'required|integer|min:1|max:500',
             'branch_count' => 'required|integer|min:1|max:100',
-            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual',
+            'billing_cycle' => 'required|in:annual',
         ]);
 
         $companyId = app('currentCompanyId');
@@ -337,7 +335,7 @@ class BillingController extends Controller
         $baseRate = ($invoiceFactor * $request->invoice_limit) + ($userFactor * $request->user_count) + ($branchFactor * $request->branch_count);
 
         $cycle = $request->billing_cycle;
-        $discounts = ['monthly' => 0, 'quarterly' => 1, 'semi_annual' => 3, 'annual' => 6];
+        $discounts = ['annual' => 6];
         $discount = $discounts[$cycle] ?? 0;
         $months = Subscription::getMonthsForCycle($cycle);
         $totalBeforeDiscount = $baseRate * $months;

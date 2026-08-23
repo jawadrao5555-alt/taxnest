@@ -424,7 +424,9 @@ PRA_PAGES=(
   "/pos/reports|pos/reports/csv|raDailyTrend|analyticsLockedCard"
   "/pos/invoice/create|restaurantPos\(|manualItemNameInput"
   "/pos/riders/tracking|rt-page|rt-map|riderTracking\("
-  "/pos/billing|or PKR|3 months"
+  # Annual-only since 23 Aug 2026: the old "or PKR .. / 3 months" cycle lines
+  # are gone, so the marker is the plan grid + the current-package block.
+  "/pos/billing|tnpc-plan|/pos/payment-proof"
   # Multi-branch v1 (Task 1347): owner/admin-only branch management page.
   "/pos/branches|pos/branches\"|name=\"city\""
 )

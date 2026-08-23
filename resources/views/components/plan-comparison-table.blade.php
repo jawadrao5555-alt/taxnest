@@ -4,13 +4,9 @@
      *    price_period    small unit line under the amount ("/ year")
      *    price_compare   struck-through pre-sale amount
      *    sale_badge      running-campaign badge text
-     *    price_note      secondary price line (PRA's 3-month alternative)
+     *    price_note      secondary price line
      *    cta_url         signup link carrying this package
-     *    cta_label       button text
-     *    price_x / price_compare_x / price_note_x
-     *                    optional Alpine expressions that overwrite the three
-     *                    server-rendered strings (Digital Invoice's billing
-     *                    cycle switch drives its headings this way). */
+     *    cta_label       button text */
     'cols' => [],
     /** sections() output: [['key','title','rows' => [...]], ...] */
     'sections' => [],
@@ -120,8 +116,7 @@
                         text-transform:uppercase; letter-spacing:.06em; }
 .tnpc-plan .tnpc-second { display:block; margin-top:.375rem; font-size:.5625rem; line-height:1.35;
                           color:rgba(255,255,255,.55); }
-/* Digital Invoice blanks this line on monthly billing (x-text -> ''), so an
-   empty secondary line must take no space at all. */
+ /* Optional secondary price lines must take no space when empty. */
 .tnpc-plan .tnpc-second:empty { display:none; }
 .tnpc-cta { display:block; margin-top:.75rem; padding:.4375rem .375rem; border:1px solid #FFFFFF;
             background:#FFFFFF; color:var(--tnpc-ink); text-decoration:none;
@@ -271,24 +266,20 @@
                             <span class="tnpc-name">{{ $col['name'] }}</span>
                             @if($tnpcSell)
                                 @if(!empty($col['price_compare']))
-                                    <span class="tnpc-was" @if(!empty($col['price_compare_x'])) x-text="{{ $col['price_compare_x'] }}" @endif>{{ $col['price_compare'] }}</span>
+                                    <span class="tnpc-was">{{ $col['price_compare'] }}</span>
                                 @endif
-                                <span class="tnpc-amount" @if(!empty($col['price_x'])) x-text="{{ $col['price_x'] }}" @endif>{{ $col['price'] }}</span>
+                                <span class="tnpc-amount">{{ $col['price'] }}</span>
                                 @if(!empty($col['price_period']))
                                     <span class="tnpc-per">{{ $col['price_period'] }}</span>
                                 @endif
                                 @if(!empty($col['sale_badge']))
                                     <span class="tnpc-sale">{{ $col['sale_badge'] }}</span>
                                 @endif
-                                @if(!empty($col['price_note']) || !empty($col['price_note_x']))
-                                    <span class="tnpc-second" @if(!empty($col['price_note_x'])) x-text="{{ $col['price_note_x'] }}" @endif>{{ $col['price_note'] ?? '' }}</span>
+                                @if(!empty($col['price_note']))
+                                    <span class="tnpc-second">{{ $col['price_note'] }}</span>
                                 @endif
                                 @if(!empty($col['cta_url']))
-                                    {{-- cta_url_x (Task 1484): surfaces with a billing-cycle
-                                         switch re-point the link at the cycle the visitor is
-                                         actually looking at. The plain href stays the correct
-                                         default for no-JS / pre-boot clicks. --}}
-                                    <a class="tnpc-cta" href="{{ $col['cta_url'] }}" @if(!empty($col['cta_url_x'])) x-bind:href="{{ $col['cta_url_x'] }}" @endif>{{ $col['cta_label'] ?? $col['name'] }}</a>
+                                    <a class="tnpc-cta" href="{{ $col['cta_url'] }}">{{ $col['cta_label'] ?? $col['name'] }}</a>
                                 @endif
                             @else
                                 <span class="tnpc-price">{{ $col['price'] }}</span>
@@ -346,7 +337,7 @@
             @if(!empty($col['cta_url']))
             <a class="tnpc-pick" href="{{ $col['cta_url'] }}">
                 <span class="tnpc-pick-name">{{ $col['name'] }}@if($col['popular'])<em>{{ $popularLabel }}</em>@endif</span>
-                <span class="tnpc-pick-price"><span @if(!empty($col['price_x'])) x-text="{{ $col['price_x'] }}" @endif>{{ $col['price'] }}</span>@if(!empty($col['price_period'])) {{ $col['price_period'] }}@endif</span>
+                <span class="tnpc-pick-price"><span>{{ $col['price'] }}</span>@if(!empty($col['price_period'])) {{ $col['price_period'] }}@endif</span>
                 <span class="tnpc-pick-go">{{ $col['cta_label'] ?? $col['name'] }}</span>
             </a>
             @endif

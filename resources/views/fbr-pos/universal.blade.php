@@ -1567,7 +1567,7 @@ window.addEventListener('popstate', function() {
                             {{ __('pos.draft_word') }}
                             <span x-show="activeDraftId" x-cloak class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-sky-500 rounded-full shadow-sm" title="{{ __('pos.draft_active_dot') }}"></span>
                         </button>
-                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="hasManualItems() || hasDealItems() ? window.TXT.ti_manual_deals_pay_first : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button @click="fbrHoldStart()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="hasManualItems() || hasDealItems() ? window.TXT.ti_manual_deals_pay_first : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -1861,6 +1861,28 @@ window.addEventListener('popstate', function() {
                 <button type="button" x-ref="printConfirmNo" @click="resolvePrintConfirm(false)" @focus="printConfirmChoice = 'no'"
                         class="py-3 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition ring-offset-2 dark:ring-offset-gray-900 focus:outline-none"
                         :class="printConfirmChoice === 'no' ? 'ring-2 ring-gray-500 border-gray-400 dark:border-gray-500' : ''">{{ __('pos.print_confirm_no') }}</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Bill rokne se pehle naam poochein (owner, 23 Aug 2026). Enter = rok do,
+         Esc = wapas cart par. Naam khali chhorne par purana waqt-wala naam. --}}
+    <div x-show="fbrHoldNaming" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="fbrHoldNaming = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white">{{ __('pos.hs_name_title') }}</h3>
+                <p class="text-[11px] text-gray-400 mt-0.5">{{ __('pos.hs_name_hint') }}</p>
+            </div>
+            <div class="p-4 space-y-3">
+                <input type="text" x-ref="fbrHoldNameInput" x-model="fbrHoldName" maxlength="60"
+                       @keydown.enter.prevent.stop="fbrHoldConfirm()" @keydown.escape.prevent.stop="fbrHoldNaming = false"
+                       placeholder="{{ __('pos.hs_name_placeholder') }}"
+                       autocomplete="off" name="fbr_hold_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="w-full px-3 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-400">
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="fbrHoldNaming = false" class="py-2.5 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel') }}</button>
+                    <button @click="fbrHoldConfirm()" :disabled="submitting" class="py-2.5 rounded-xl text-sm font-extrabold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-40 transition" x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hs_confirm"></button>
+                </div>
             </div>
         </div>
     </div>
@@ -3836,6 +3858,10 @@ function restaurantPos() {
         pendingAddrRestore: null,
         toast: { show: false, message: '', type: 'success' },
         lastHoldTime: 0,
+        // "Bill rokein" behtari (owner, 23 Aug 2026): cashier apni pehchaan ka
+        // naam likh sakta hai — "neeli shirt wala" — auto time-stamp ki jagah.
+        fbrHoldNaming: false,
+        fbrHoldName: '',
         lastPayTime: 0,
         showDiscount: false,
         showCartNote: false,
@@ -5732,11 +5758,17 @@ function restaurantPos() {
                 if (e.key === 'Escape') { e.preventDefault(); this.quickReturnOpen = false; }
                 return;
             }
+            // Naam wala modal khula ho: Enter/Esc uske apne handlers ke paas
+            // jaate hain, baaki F-keys yahan ruk jaati hain.
+            if (this.fbrHoldNaming) {
+                if (e.key === 'Escape') { e.preventDefault(); this.fbrHoldNaming = false; }
+                return;
+            }
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
             if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
             if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
             if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm(window.TXT.clear_entire_cart)) { this.clearCart(); } return; }
-            if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
+            if (e.key === 'F5') { e.preventDefault(); this.fbrHoldStart(); return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
             // F7 → Quick Type (was customer-phone-focus, moved to Alt+P)
             if (e.key === 'F7') { e.preventDefault(); this.openQuickType(); return; }
@@ -5759,7 +5791,7 @@ function restaurantPos() {
             // Whole block Blade-gated like the button — no KOT feature, no chord.
             if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.fbrHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
                 if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems()) return;
                 this.sendToKitchen();
                 return;
@@ -5814,7 +5846,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.fbrHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
                 this.openLocalBills();
                 return;
             }
@@ -5822,7 +5854,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.fbrHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
                 this.openFailedBills();
                 return;
             }
@@ -6552,6 +6584,23 @@ function restaurantPos() {
             this.$refs.customerPhoneInput?.focus();
         },
 
+        /** F5 / HOLD button → naam poochne wala modal (cart khali ho to kuch nahi). */
+        fbrHoldStart() {
+            if (!this.cart.length || this.submitting) return;
+            if (this.hasManualItems()) { this.showToast(window.TXT.manual_items_billing_only_hold, 'error'); return; }
+            if (this.hasDealItems()) { this.showToast(window.TXT.manual_deals_billing_only_hold, 'error'); return; }
+            this.fbrHoldName = (this.selectedCustomer?.name || '').slice(0, 60);
+            this.fbrHoldNaming = true;
+            this.$nextTick(() => { try { this.$refs.fbrHoldNameInput?.focus(); this.$refs.fbrHoldNameInput?.select(); } catch (e) {} });
+        },
+
+        async fbrHoldConfirm() {
+            if (this.submitting) return;
+            const name = (this.fbrHoldName || '').trim();
+            this.fbrHoldNaming = false;
+            await this.holdOrder({ name });
+        },
+
         async holdOrder(opts) {
             opts = opts || {};
             if (this.cart.length === 0 || this.submitting) return null;
@@ -6579,7 +6628,12 @@ function restaurantPos() {
                 // FbrPosPhase2Controller::holdSale (NOT restaurant orders — FBR
                 // has no restaurant module). Recall restores the full cart incl.
                 // hs_code / uom / tax_rate / buyer NTN.
-                const holdName = ((this.selectedCustomer?.name || window.TXT.hold_word) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })).slice(0, 100);
+                // Cashier ka apna likha naam sab se pehle; warna purana
+                // "<grahak/Hold> <waqt>" format (behaviour unchanged).
+                const typedName = (opts.name || '').trim();
+                const holdName = typedName
+                    ? typedName.slice(0, 100)
+                    : ((this.selectedCustomer?.name || window.TXT.hold_word) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })).slice(0, 100);
                 const cartData = {
                     items: this.cart.map(i => ({ ...i })),
                     discount_type: this.discountAmount > 0 ? this.discountType : null,
@@ -7381,7 +7435,7 @@ function restaurantPos() {
         // number) → server lookup → existing FBR return form. Sab rules
         // SERVER par (FbrPosPhase2Controller) — yeh sirf navigate karta hai.
         openQuickReturn() {
-            if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.tableSwitchPrompt) return;
+            if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.fbrHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.tableSwitchPrompt) return;
             this.quickReturnQ = '';
             this.quickReturnErr = '';
             this.quickReturnBusy = false;

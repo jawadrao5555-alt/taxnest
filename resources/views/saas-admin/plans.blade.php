@@ -37,7 +37,7 @@
         <div class="flex items-start justify-between gap-4 mb-4">
             <div>
                 <h2 class="text-sm font-semibold text-white">PRA POS Paid Add-ons</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Set each add-on's annual and quarterly price. Defaults are Rs 12,000/year and Rs 3,000/quarter.</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Set each add-on's annual price.</p>
             </div>
             <span class="text-[10px] uppercase tracking-wide text-amber-300 bg-amber-900/30 border border-amber-700/50 rounded px-2 py-1 whitespace-nowrap">Admin editable</span>
         </div>
@@ -51,21 +51,11 @@
                         <p class="text-sm font-semibold text-white">{{ $addon['label'] }}</p>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $addon['description'] }}</p>
                     </div>
-                    {{-- One box per sellable cycle. Add-ons follow the package
-                         ladder: annual cheapest per month, then quarterly, then
-                         monthly. --}}
-                    <div class="grid grid-cols-3 gap-2">
+                    {{-- One box per sellable cycle. --}}
+                    <div>
                         <label class="text-[10px] text-gray-500 uppercase">
                             Annual (PKR)
                             <input type="number" name="addons[{{ $code }}][annual]" value="{{ old("addons.{$code}.annual", $addon['annual_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                        </label>
-                        <label class="text-[10px] text-gray-500 uppercase">
-                            Quarterly (PKR)
-                            <input type="number" name="addons[{{ $code }}][quarterly]" value="{{ old("addons.{$code}.quarterly", $addon['quarterly_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                        </label>
-                        <label class="text-[10px] text-gray-500 uppercase">
-                            Monthly (PKR)
-                            <input type="number" name="addons[{{ $code }}][monthly]" value="{{ old("addons.{$code}.monthly", $addon['monthly_price']) }}" min="0" max="999999999" step="1" required class="mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                         </label>
                     </div>
                 </div>
@@ -102,15 +92,8 @@
                         <option value="fbrpos">FBR POS</option>
                     </select>
                 </div>
-                <input type="number" name="price" placeholder="Price (PKR — DI = per month, POS/FBR POS = per year)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                <input type="number" name="price_monthly" placeholder="Monthly Price (POS lines only — optional)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                {{-- Sep 2026: a new package used to be born monthly-only — the
-                     other three cycles could not be priced until AFTER it was
-                     created, so whatever the ladder invented is what a
-                     quarterly or yearly buyer got charged in between. --}}
-                <input type="number" name="price_quarterly" placeholder="Quarterly Price (3 mo — optional)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                <input type="number" name="price_semi_annual" placeholder="Half-Year Price (6 mo — optional)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                <input type="number" name="price_yearly" placeholder="Annual Price (12 mo — optional)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price" placeholder="Price (PKR — DI = stored monthly base, POS/FBR POS = annual)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                <input type="number" name="price_yearly" placeholder="Annual Price (DI only — blank = monthly × 12 less 6%)" step="1" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="invoice_limit" placeholder="Invoice Limit (-1=unlimited)" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="max_terminals" placeholder="Max Terminals (-1=unlimited)" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
                 <input type="number" name="max_users" placeholder="Max Users (-1=unlimited)" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
@@ -136,7 +119,7 @@
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
             <h2 class="text-lg font-bold text-white">Digital Invoice Plans</h2>
-            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $diPlans->count() }} plans — prices are monthly)</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $diPlans->count() }} plans — sold annually; base prices are stored monthly)</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($diPlans as $plan)
@@ -162,7 +145,7 @@
         <div class="flex items-center gap-2 mb-4">
             <div class="w-2 h-2 rounded-full bg-blue-500"></div>
             <h2 class="text-lg font-bold text-white">FBR POS Plans</h2>
-            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $fbrposPlans->count() }} plans — prices are monthly)</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $fbrposPlans->count() }} plans — prices are annual)</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             @foreach($fbrposPlans as $plan)

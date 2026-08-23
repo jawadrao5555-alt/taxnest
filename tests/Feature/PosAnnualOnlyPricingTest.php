@@ -10,14 +10,12 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * POS Annual + Quarterly pricing (Aug 2026 ladder restructure).
+ * Annual-only pricing contract (23 Aug 2026).
  *
- * Locks the money math: a POS plan with an explicit price_quarterly can be
- * bought quarterly (3-month expiry, exact hand-set price); everything else
- * (no quarterly price, fbrpos, weird cycles) stays forced-annual. DI keeps
- * its full 4-cycle discount formula untouched.
+ * Historical short-cycle columns may remain populated, but POS, FBR POS and
+ * DI purchases must always charge annual and create a twelve-month term.
  */
-class PosQuarterlyPricingTest extends TestCase
+class PosAnnualOnlyPricingTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -100,14 +98,14 @@ class PosQuarterlyPricingTest extends TestCase
         ], $overrides));
     }
 
-    public function test_pos_quarterly_cycle_uses_exact_quarterly_price(): void
+    public function test_pos_quarterly_request_uses_annual_price(): void
     {
         $plan = $this->makePosPlan();
 
         $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
 
-        $this->assertSame('quarterly', $priced['cycle']);
-        $this->assertSame(4299.0, $priced['final_price']);
+        $this->assertSame('annual', $priced['cycle']);
+        $this->assertSame(14999.0, $priced['final_price']);
     }
 
     public function test_pos_annual_cycle_still_uses_annual_price(): void
@@ -120,15 +118,15 @@ class PosQuarterlyPricingTest extends TestCase
         $this->assertSame(14999.0, $priced['final_price']);
     }
 
-    /** Third cycle (Aug 2026): monthly must charge the hand-set monthly price. */
-    public function test_pos_monthly_cycle_uses_exact_monthly_price(): void
+    /** A populated retired column must never make its rate purchasable. */
+    public function test_pos_monthly_request_cannot_charge_monthly_price(): void
     {
         $plan = $this->makePosPlan(['price_monthly' => 1549]);
 
         $priced = SubscriptionAssignmentService::computePrice($plan, 'monthly');
 
-        $this->assertSame('monthly', $priced['cycle']);
-        $this->assertSame(1549.0, $priced['final_price']);
+        $this->assertSame('annual', $priced['cycle']);
+        $this->assertSame(14999.0, $priced['final_price']);
     }
 
     /** No monthly rate set = the plan is not sold monthly; fall back to annual. */
@@ -142,17 +140,17 @@ class PosQuarterlyPricingTest extends TestCase
         $this->assertSame(14999.0, $priced['final_price']);
     }
 
-    /** A monthly POS subscription must expire in ONE month, not a year. */
-    public function test_assign_pos_monthly_creates_one_month_subscription(): void
+    /** Even a direct service caller cannot create a short POS term. */
+    public function test_assign_pos_monthly_request_creates_annual_subscription(): void
     {
         $plan = $this->makePosPlan(['price_monthly' => 1549]);
 
         $sub = SubscriptionAssignmentService::assign(4242, $plan->id, 'monthly');
 
-        $this->assertSame('monthly', $sub->billing_cycle);
-        $this->assertSame(1549.0, (float) $sub->final_price);
+        $this->assertSame('annual', $sub->billing_cycle);
+        $this->assertSame(14999.0, (float) $sub->final_price);
         $this->assertSame(
-            now()->addMonth()->toDateString(),
+            now()->addMonths(12)->toDateString(),
             \Illuminate\Support\Carbon::parse($sub->end_date)->toDateString()
         );
     }
@@ -178,12 +176,8 @@ class PosQuarterlyPricingTest extends TestCase
         }
     }
 
-    /**
-     * 23 Aug 2026: FBR POS left the monthly convention behind. price is now the
-     * ANNUAL rate and the shorter cycles are hand-set columns — exactly like
-     * PRA POS — so all three cycles are charged from the row, never derived.
-     */
-    public function test_fbrpos_charges_the_hand_set_cycle_rates(): void
+    /** FBR POS price is the annual total; retired columns are never charged. */
+    public function test_fbrpos_charges_annual_for_every_requested_cycle(): void
     {
         $plan = PricingPlan::create([
             'name' => 'FBR Basic',
@@ -195,10 +189,10 @@ class PosQuarterlyPricingTest extends TestCase
             'invoice_limit' => -1,
         ]);
 
-        foreach (['annual' => 27999.0, 'quarterly' => 7349.0, 'monthly' => 2599.0] as $cycle => $want) {
+        foreach (['annual', 'quarterly', 'monthly'] as $cycle) {
             $priced = SubscriptionAssignmentService::computePrice($plan, $cycle);
-            $this->assertSame($cycle, $priced['cycle'], "fbrpos must sell the {$cycle} cycle");
-            $this->assertSame($want, (float) $priced['final_price'], "fbrpos {$cycle} rate");
+            $this->assertSame('annual', $priced['cycle'], "fbrpos {$cycle} request must become annual");
+            $this->assertSame(27999.0, (float) $priced['final_price'], "fbrpos {$cycle} request must charge annual");
         }
     }
 
@@ -220,7 +214,7 @@ class PosQuarterlyPricingTest extends TestCase
         }
     }
 
-    public function test_di_quarterly_formula_unchanged(): void
+    public function test_di_annual_formula_is_unchanged_for_quarterly_request(): void
     {
         $plan = PricingPlan::create([
             'name' => 'DI Plan',
@@ -231,22 +225,22 @@ class PosQuarterlyPricingTest extends TestCase
         ]);
 
         $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
-        $expected = Subscription::calculateFinalPrice(1000.0, 'quarterly');
+        $expected = Subscription::calculateFinalPrice(1000.0, 'annual');
 
-        $this->assertSame('quarterly', $priced['cycle']);
+        $this->assertSame('annual', $priced['cycle']);
         $this->assertSame($expected['final_price'], $priced['final_price']);
     }
 
-    public function test_assign_pos_quarterly_creates_three_month_subscription(): void
+    public function test_assign_pos_quarterly_request_creates_twelve_month_subscription(): void
     {
         $plan = $this->makePosPlan();
 
         $sub = SubscriptionAssignmentService::assign(9001, $plan->id, 'quarterly');
 
-        $this->assertSame('quarterly', $sub->billing_cycle);
-        $this->assertSame(4299.0, (float) $sub->final_price);
+        $this->assertSame('annual', $sub->billing_cycle);
+        $this->assertSame(14999.0, (float) $sub->final_price);
         $this->assertSame(
-            now()->addMonths(3)->toDateString(),
+            now()->addMonths(12)->toDateString(),
             \Carbon\Carbon::parse($sub->end_date)->toDateString()
         );
         $this->assertTrue((bool) $sub->active);

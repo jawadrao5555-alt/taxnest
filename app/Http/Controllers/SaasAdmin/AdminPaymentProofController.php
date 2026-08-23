@@ -74,7 +74,8 @@ class AdminPaymentProofController extends Controller
 
         $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
-            'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
+            // Annual-only since 23 Aug 2026 (owner); 'yearly' = legacy spelling.
+            'billing_cycle' => 'required|in:annual,yearly',
             // Paid extra-branch slots ka faisla, isi renewal ke sath (rakhein
             // ya kam karein). Ghair-mojood = purana behaviour, kuch na badle.
             'extra_branch_slots' => 'nullable|integer|min:0|max:' . \App\Services\BranchAddonService::MAX_QTY * 10,
@@ -95,22 +96,18 @@ class AdminPaymentProofController extends Controller
             return back()->with('error', 'Selected package belongs to a different product line than this payment proof.');
         }
 
-        // Cycle guard: same per-product rules as customer submission
-        // (di = 4 cycles, both POS lines = annual/quarterly/monthly, others annual-only).
-        $allowedCycles = match ($plan->product_type ?? 'di') {
-            'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
-            'pos', 'fbrpos' => ['annual', 'quarterly', 'monthly'],
-            default => ['annual'],
-        };
+        // Cycle guard: same rule as customer submission — since 23 Aug 2026
+        // every product line is sold by the YEAR only (owner).
+        $allowedCycles = SubscriptionAssignmentService::SELLABLE_CYCLES;
         $requestedCycle = SubscriptionAssignmentService::normalizeCycle($request->billing_cycle);
         if (!in_array($requestedCycle, $allowedCycles, true)) {
             return back()->with('error', 'That billing cycle is not available for the selected package.');
         }
 
-        // Single source of truth: the cycle actually enforced by pricing
-        // (e.g. quarterly requested on a plan without a quarterly price
-        // silently becomes annual) — the proof row, the subscription and the
-        // customer notification must all carry THIS cycle, never raw input.
+        // Single source of truth: the cycle actually enforced by pricing (every
+        // product line is annual since 23 Aug 2026) — the proof row, the
+        // subscription and the customer notification must all carry THIS
+        // cycle, never raw input.
         $enforcedCycle = SubscriptionAssignmentService::computePrice($plan, $requestedCycle)['cycle'];
 
         // Renewal ka jaiza: mutawaqqa total (base + paid slots) bmuqabla jo

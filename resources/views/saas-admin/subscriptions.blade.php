@@ -18,9 +18,6 @@
                 @foreach($plans as $p)<option value="{{ $p->id }}">{{ $p->name }} (PKR {{ number_format($p->price) }})</option>@endforeach
             </select>
             <select name="billing_cycle" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="semi_annual">Semi-Annual</option>
                 <option value="annual">Annual</option>
             </select>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition whitespace-nowrap">Assign</button>

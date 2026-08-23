@@ -307,17 +307,17 @@ class PosRenewalBranchSlotReviewTest extends TestCase
         $this->assertFalse($review['short'], 'No stated amount is not evidence of a short payment');
     }
 
-    public function test_review_prices_a_quarterly_renewal_pro_rata(): void
+    public function test_review_prices_a_non_annual_request_as_annual_pro_rata(): void
     {
         $plan = $this->makePlan('pos', 24999, 2, ['price_quarterly' => 7199]);
         $shop = $this->makeShop(slots: 2, branches: 2);
 
         $review = BranchAddonService::renewalReview($shop, $plan, 'quarterly', 7199);
 
-        $this->assertSame('quarterly', $review['cycle']);
-        $this->assertSame(7199.0, $review['base_price']);
-        $this->assertSame(5000.0, $review['addon_price'], '2 slots x 10,000 x 3/12');
-        $this->assertSame(12199.0, $review['expected_total']);
+        $this->assertSame('annual', $review['cycle']);
+        $this->assertSame(24999.0, $review['base_price']);
+        $this->assertSame(20000.0, $review['addon_price'], '2 slots x Rs 10,000 for a full year');
+        $this->assertSame(44999.0, $review['expected_total']);
         $this->assertTrue($review['short']);
     }
 

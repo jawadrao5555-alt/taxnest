@@ -6508,7 +6508,11 @@ class FbrPosController extends Controller
                 ->values();
         }
 
-        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays', 'riderFigures', 'pendingDeliveries', 'pendingLocalCount', 'pendingLocalAmount', 'washBills'));
+        // Parked bills (owner, 23 Aug 2026): held carts are not sales, so they
+        // stay out of the figures — this is only a reminder that they exist.
+        $parkedBills = \App\Services\PosParkedBills::count(\App\Services\PosParkedBills::FBR_TABLE, $companyId);
+
+        return view('fbr-pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays', 'riderFigures', 'pendingDeliveries', 'pendingLocalCount', 'pendingLocalAmount', 'washBills'));
     }
 
     /**
@@ -7292,6 +7296,13 @@ class FbrPosController extends Controller
         // were spared (cash still with the rider) so the deleted count adds up.
         if ($this->lastWashGuarded > 0) {
             $msg .= __('pos.dayclose_bills_rider_guarded', ['count' => $this->lastWashGuarded]);
+        }
+        // Parked-bill broom (owner, 23 Aug 2026 — PRA parity): held carts from
+        // EARLIER days are abandoned; the day they belonged to is now closed.
+        // Carts parked during the closed day itself survive.
+        $parkedSwept = \App\Services\PosParkedBills::purgeBeforeDay(\App\Services\PosParkedBills::FBR_TABLE, $companyId, $date);
+        if ($parkedSwept > 0) {
+            $msg .= __('pos.hs_day_close_cleared', ['count' => $parkedSwept]);
         }
         return back()->with('success', $msg);
     }

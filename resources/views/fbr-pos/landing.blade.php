@@ -370,7 +370,7 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16 fade-in-up">
                 <h2 class="text-4xl font-serif text-[#052730] mb-4">Straightforward Licensing</h2>
-                <p class="text-gray-600 text-lg">Two packages, one clear yearly price. Prefer to pay every 3 months or monthly? That works too, for a little more.</p>
+                <p class="text-gray-600 text-lg">Two packages, each with one clear annual price.</p>
             </div>
 
             @if(isset($plans) && $plans->count())

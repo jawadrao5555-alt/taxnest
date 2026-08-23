@@ -1126,6 +1126,15 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
 
+    // ── "Bill rokein" for RETAIL (owner, 23 Aug 2026) ────────────────────────
+    // Plain retail shops (no tables / KOT / kitchen / delivery) park a JSON cart
+    // here instead of creating a restaurant order they could never recall.
+    // Deliberately OUTSIDE PosAdminOnly — the cashier is the one who parks bills.
+    Route::post('/api/held-sales', [\App\Http\Controllers\PosHeldSaleController::class, 'store'])->name('pos.held-sales.store');
+    Route::get('/api/held-sales', [\App\Http\Controllers\PosHeldSaleController::class, 'index'])->name('pos.held-sales.index');
+    Route::post('/api/held-sales/{id}/recall', [\App\Http\Controllers\PosHeldSaleController::class, 'recall'])->name('pos.held-sales.recall');
+    Route::delete('/api/held-sales/{id}', [\App\Http\Controllers\PosHeldSaleController::class, 'destroy'])->name('pos.held-sales.destroy');
+
     Route::middleware('restaurant.only')->group(function () {
     Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/{id}/shift-table', [RestaurantPosController::class, 'shiftTable'])->name('pos.restaurant.orders.shift-table');

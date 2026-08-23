@@ -451,12 +451,12 @@ class PaymentProofInstantAccessTest extends TestCase
             'is_trial' => false,
             'price' => 1000,
         ]);
-        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'monthly']);
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual']);
 
         $this->actingAs($this->admin(), 'admin')
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
-                'billing_cycle' => 'monthly',
+                'billing_cycle' => 'annual',
             ])
             ->assertRedirect();
 
@@ -480,12 +480,12 @@ class PaymentProofInstantAccessTest extends TestCase
         $plan = \App\Models\PricingPlan::create([
             'name' => 'DI Basic', 'product_type' => 'di', 'is_trial' => false, 'price' => 1000,
         ]);
-        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'monthly']);
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual']);
 
         $this->actingAs($this->admin(), 'admin')
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
-                'billing_cycle' => 'monthly',
+                'billing_cycle' => 'annual',
             ])
             ->assertRedirect();
 
@@ -506,7 +506,7 @@ class PaymentProofInstantAccessTest extends TestCase
         ]);
     }
 
-    public function test_approve_quarterly_without_quarterly_price_enforces_annual_everywhere(): void
+    public function test_approve_rejects_a_retired_quarterly_cycle(): void
     {
         $company = $this->makeLockedCompany();
         $plan = \App\Models\PricingPlan::create([
@@ -518,17 +518,19 @@ class PaymentProofInstantAccessTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
                 'billing_cycle' => 'quarterly',
-            ]);
+            ])
+            ->assertSessionHasErrors('billing_cycle');
 
         $proof->refresh();
-        $this->assertSame('verified', $proof->status);
-        $this->assertSame('annual', $proof->billing_cycle, 'Proof must store the ENFORCED cycle, not raw admin input');
-        $sub = Subscription::find($proof->subscription_id);
-        $this->assertNotNull($sub);
-        $this->assertSame('annual', $sub->billing_cycle);
+        $this->assertSame('pending', $proof->status);
+        $this->assertNull($proof->subscription_id);
+        $this->assertSame(1, Subscription::where('company_id', $company->id)->count(),
+            'Validation must not add a subscription to the existing expired trial');
+        $this->assertSame(0, Subscription::where('company_id', $company->id)
+            ->where('pricing_plan_id', $plan->id)->count());
     }
 
-    public function test_approve_quarterly_with_quarterly_price_stays_quarterly(): void
+    public function test_approve_annual_ignores_a_historical_quarterly_price(): void
     {
         $company = $this->makeLockedCompany();
         $plan = \App\Models\PricingPlan::create([
@@ -539,16 +541,16 @@ class PaymentProofInstantAccessTest extends TestCase
         $this->actingAs($this->makeAdmin(), 'admin')
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
-                'billing_cycle' => 'quarterly',
+                'billing_cycle' => 'annual',
             ]);
 
         $proof->refresh();
         $this->assertSame('verified', $proof->status);
-        $this->assertSame('quarterly', $proof->billing_cycle);
+        $this->assertSame('annual', $proof->billing_cycle);
         $sub = Subscription::find($proof->subscription_id);
         $this->assertNotNull($sub);
-        $this->assertSame('quarterly', $sub->billing_cycle);
-        $this->assertSame(7199.0, (float) $sub->final_price);
+        $this->assertSame('annual', $sub->billing_cycle);
+        $this->assertSame(24999.0, (float) $sub->final_price);
     }
 
     public function test_approve_rejects_plan_from_different_product_line(): void

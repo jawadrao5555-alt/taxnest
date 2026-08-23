@@ -256,6 +256,22 @@ class RestaurantPosController extends Controller
             return response()->json(['success' => false, 'message' => 'Hold / Send to Kitchen is for Dine-In orders only. Takeaway is billed directly; Delivery is final or provisional.'], 422);
         }
 
+        // ── RETAIL CART-LOSS GUARD (owner, 23 Aug 2026) ──────────────────────
+        // A plain retail shop (no tables/KOT/kitchen/delivery) has no surface
+        // that can ever show a held restaurant order again — the sale screen
+        // only hydrates them for restaurant-ish companies. Parking a cart here
+        // therefore CLEARED the cashier's screen and lost the bill for good.
+        // Retail now has its own parked-cart store (pos_held_sales), so an
+        // explicit hold from retail is refused instead of swallowed. The
+        // internal billing pass-through (billing_flow) is untouched.
+        if (!$typeFlowGate && !$request->boolean('billing_flow')) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.hs_use_retail_hold'),
+                'use_retail_hold' => true,
+            ], 422);
+        }
+
         // Table-required invariant (owner voice note, 9 Aug 2026): when the company
         // manages tables, a Dine-In punch — explicit Hold/KOT *or* the internal
         // billing pass-through (billing_flow) — must never create an order/KOT

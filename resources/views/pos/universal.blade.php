@@ -7,6 +7,11 @@
      per-item tax, no method hint, no gridEditMode). --}}
 @php
     $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
+    // "Bill rokein" (owner, 23 Aug 2026): a PLAIN retail shop — no tables, no
+    // KOT, no kitchen, no delivery — parks unfinished carts in its own store
+    // (pos_held_sales) instead of the restaurant held-order flow, which such a
+    // shop can never display again. Same predicate as typeFlowGate, inverted.
+    $retailHold = !\App\Services\PosParkedBills::restaurantShaped($features);
 @endphp
 @if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=5">@endif
 {{-- Boot splash (customer report, 25 Jul 2026): on slow shop connections this large
@@ -1835,15 +1840,16 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="grid gap-2 {{ ($features->tables ?? false) ? 'grid-cols-2' : 'grid-cols-3' }}">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
-                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? window.TXT.ti_hold_dine_in_only : ((hasManualItems() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first : '')" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button @click="retailHold ? retailHoldStart() : holdOrder()" :disabled="cart.length === 0 || submitting || (!retailHold && (hasManualItems() || hasDealItems() || !canHold()))" :title="retailHold ? window.TXT.hs_hold_title : (!canHold() ? window.TXT.ti_hold_dine_in_only : ((hasManualItems() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first : ''))" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
                         </button>
                         @unless($features->tables ?? false)
-                        <button @click="showHeldOrders = !showHeldOrders" class="relative py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition flex items-center justify-center gap-0.5">
+                        <button @click="retailHold ? openRetailHeld() : (showHeldOrders = !showHeldOrders)" class="relative py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition flex items-center justify-center gap-0.5">
                             {{ __('pos.recall') }}
-                            <span x-show="heldOrders.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm" x-text="heldOrders.length"></span>
+                            @if($retailHold)<kbd class="text-[8px] bg-purple-200/50 dark:bg-purple-800/30 px-1 rounded font-mono">F3</kbd>@endif
+                            <span x-show="(retailHold ? retailHeldAll().length : heldOrders.length) > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm" x-text="retailHold ? retailHeldAll().length : heldOrders.length"></span>
                         </button>
                         @endunless
                     </div>
@@ -2536,6 +2542,70 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
     @endunless
+
+    @if($retailHold)
+    {{-- ═══ BILL ROKEIN — retail park/recall (owner, 23 Aug 2026) ═══════════ --}}
+    {{-- Naam poochne wala chhota modal: cashier ko yaad rahe kis ka bill hai
+         ("neeli shirt wala", "gaari wala"). Enter = rok do, Esc = wapas. --}}
+    <div x-show="retailHoldNaming" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="retailHoldNaming = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white">{{ __('pos.hs_name_title') }}</h3>
+                <p class="text-[11px] text-gray-400 mt-0.5">{{ __('pos.hs_name_hint') }}</p>
+            </div>
+            <div class="p-4 space-y-3">
+                <input type="text" x-ref="retailHoldNameInput" x-model="retailHoldName" maxlength="60"
+                       @keydown.enter.prevent.stop="retailHoldConfirm()" @keydown.escape.prevent.stop="retailHoldNaming = false"
+                       placeholder="{{ __('pos.hs_name_placeholder') }}"
+                       autocomplete="off" name="pos_hold_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="w-full px-3 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-400">
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="retailHoldNaming = false" class="py-2.5 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel') }}</button>
+                    <button @click="retailHoldConfirm()" :disabled="retailHeldBusy" class="py-2.5 rounded-xl text-sm font-extrabold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-40 transition" x-text="retailHeldBusy ? window.TXT.holding_ellipsis : window.TXT.hs_confirm"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Ruke hue bill ki list. Server + (line dead ho to) is device ke offline
+         bill dono ek hi list mein; ↑↓ se chuno, Enter se wapas cart mein. --}}
+    <div x-show="showRetailHeld" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showRetailHeld = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.hs_list_title') }}</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.hs_list_hint') }}</p>
+                </div>
+                <button @click="showRetailHeld = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="p-3 overflow-y-auto space-y-2">
+                <template x-if="retailHeldAll().length === 0">
+                    <p class="text-center text-sm text-gray-400 py-6" x-text="retailHeldBusy ? window.TXT.hs_loading : window.TXT.hs_empty"></p>
+                </template>
+                <template x-for="(h, idx) in retailHeldAll()" :key="h.key">
+                    <div class="border rounded-xl p-3 transition" :class="idx === retailHeldIndex ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-gray-700'">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate" x-text="h.name"></p>
+                                <p class="text-[11px] text-gray-500 mt-0.5">
+                                    <span x-text="'Rs. ' + Math.round(h.total || 0).toLocaleString()"></span>
+                                    <span x-text="' • ' + h.items + window.TXT.sfx_item_s"></span>
+                                    <span x-show="elapsedSince(h.at)" x-text="' • ' + elapsedSince(h.at)"></span>
+                                </p>
+                            </div>
+                            <span x-show="h.offline" class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0" x-text="window.TXT.hs_offline_badge"></span>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button @click="retailHoldRecall(h)" :disabled="retailHeldBusy" class="flex-1 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 disabled:opacity-40 transition" x-text="window.TXT.hs_recall"></button>
+                            <button @click="retailHoldDelete(h)" :disabled="retailHeldBusy" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 disabled:opacity-40 transition">{{ __('pos.delete') }}</button>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="retailHeldError" x-cloak class="text-xs text-red-600 dark:text-red-400 text-center pt-1" x-text="retailHeldError"></p>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     {{-- PROVISIONAL BILLS MODAL — opens from header "Local" button (F10).      --}}
@@ -4666,6 +4736,20 @@ function restaurantPos() {
         promoteMethodIndex: 0,
         promoteSubmitting: false,
         showHeldOrders: false,
+        // ─── "Bill rokein" — RETAIL park/recall (owner, 23 Aug 2026) ──────────
+        // Retail shops (no tables/KOT/kitchen/delivery) park a JSON cart in
+        // pos_held_sales. Deliberately NOT baked into the page: the parked list
+        // changes every few minutes and this screen is served from SALE_CACHE —
+        // baked data would fight the boot fingerprint. Fetched on open instead.
+        retailHold: {{ $retailHold ? 'true' : 'false' }},
+        retailHeld: [],          // server rows
+        retailHeldLocalRows: [], // parked while the line was dead (this device)
+        showRetailHeld: false,
+        retailHoldNaming: false,
+        retailHoldName: '',
+        retailHeldIndex: 0,
+        retailHeldBusy: false,
+        retailHeldError: '',
         // ─── Table Board (Jul 2026): "TABLE" button below cart → board modal ───
         tableBoardEnabled: {{ ($features->tables ?? false) ? 'true' : 'false' }},
         // Task 779 — TABLES-FIRST FLOW (video note, 15 Aug 2026): ON = dine-in KOT
@@ -6909,14 +6993,20 @@ function restaurantPos() {
                 if (e.key === 'Escape') { e.preventDefault(); this.quickReturnOpen = false; }
                 return;
             }
+            // Bill-rokein ka naam wala modal: apna input hai (Enter = rok do,
+            // Esc = wapas) — baqi global shortcuts is par fire na hon.
+            if (this.retailHoldNaming) {
+                if (e.key === 'Escape') { e.preventDefault(); this.retailHoldNaming = false; }
+                return;
+            }
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
             if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
             // F3 RETIRED (owner, 26 Jul 2026): held orders TABLE board mein merge
             // ho gaye — koi shortcut window nahi kholta. Key swallow hoti hai
             // (browser find na khule) aur table-companies ko board ka hint milta hai.
-            if (e.key === 'F3') { e.preventDefault(); if (this.tableBoardEnabled) { this.showToast(window.TXT.held_orders_on_table_board, 'info'); } return; }
+            if (e.key === 'F3') { e.preventDefault(); if (this.retailHold) { this.openRetailHeld(); } else if (this.tableBoardEnabled) { this.showToast(window.TXT.held_orders_on_table_board, 'info'); } return; }
             if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm(window.TXT.clear_entire_cart)) { this.clearCart(); } return; }
-            if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
+            if (e.key === 'F5') { e.preventDefault(); if (this.retailHold) { this.retailHoldStart(); } else { this.holdOrder(); } return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
             // F7 → Quick Type (was customer-phone-focus, moved to Alt+P).
             // Opt-in gate: when the company toggle is OFF, F7 is a no-op.
@@ -6973,7 +7063,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openLocalBills();
                 return;
             }
@@ -6981,7 +7071,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openFailedBills();
                 return;
             }
@@ -6992,7 +7082,7 @@ function restaurantPos() {
                 e.preventDefault();
                 if (this.tableBoardOpen) {
                     this.tableBoardOpen = false;
-                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt)) {
+                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt)) {
                     this.tableBoardOpen = true;
                 }
                 return;
@@ -7002,7 +7092,7 @@ function restaurantPos() {
             // search input is never hijacked. Same modal-gating as F10/F11.
             if (e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openReprint();
                 return;
             }
@@ -7012,7 +7102,7 @@ function restaurantPos() {
             // keeps the modal. Alt-chord so plain digits keep qty-typing.
             if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 if (this.cart.length === 0 || this.submitting) return;
                 const oneTapCard = (e.code === 'Digit2' || e.key === '2');
                 // Alt+1 (Cash) shares the CASH button's init point: when the Cash
@@ -7036,7 +7126,7 @@ function restaurantPos() {
             // Whole block Blade-gated like the button — no KOT feature, no chord.
             if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems() || !this.canHold()) return;
                 this.sendToKitchen();
                 return;
@@ -7051,7 +7141,7 @@ function restaurantPos() {
             // modals own the D key for their delete-row action.
             // ═══════════════════════════════════════════════════════════════
             if ((e.key === 'd' || e.key === 'D' || e.code === 'KeyD') && !e.ctrlKey && !e.metaKey
-                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
+                && !this.showHeldOrders && !this.showRetailHeld && !this.retailHoldNaming && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
                 && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardCancelAsk && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
@@ -7086,7 +7176,7 @@ function restaurantPos() {
             // future modal "N" shortcuts have a clear path.
             // ═══════════════════════════════════════════════════════════════
             if ((e.key === 'n' || e.key === 'N' || e.code === 'KeyN') && !e.ctrlKey && !e.metaKey
-                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
+                && !this.showHeldOrders && !this.showRetailHeld && !this.retailHoldNaming && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
                 && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardCancelAsk && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
@@ -7197,6 +7287,15 @@ function restaurantPos() {
                 return;
             }
 
+            if (this.showRetailHeld) {
+                const _rows = this.retailHeldAll();
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.retailHeldIndex = Math.min(this.retailHeldIndex + 1, Math.max(0, _rows.length - 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); this.retailHeldIndex = Math.max(this.retailHeldIndex - 1, 0); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (_rows[this.retailHeldIndex]) this.retailHoldRecall(_rows[this.retailHeldIndex]); }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); if (_rows[this.retailHeldIndex]) this.retailHoldDelete(_rows[this.retailHeldIndex]); }
+                else if (e.key === 'Escape') { e.preventDefault(); this.showRetailHeld = false; }
+                return;
+            }
             if (this.showHeldOrders && this.heldOrders.length > 0) {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
@@ -8869,6 +8968,224 @@ function restaurantPos() {
             // Item #1: addresses belong to the cleared customer — drop them.
             this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
             this.$refs.customerPhoneInput?.focus();
+        },
+
+        // ═══ BILL ROKEIN — retail park / recall (owner, 23 Aug 2026) ═════════
+        // Ek adhoora bill (customer dair laga raha hai) rok kar agla customer
+        // banaya ja sake. Restaurant hold se BILKUL alag: yahan koi order/KOT
+        // nahi banta, sirf cart JSON mehfooz hoti hai — is liye manual lines
+        // aur deals bhi ruk sakte hain, paisay ka hisaab payment par hi hota
+        // hai. Line mar jaye to bill isi device par ruk jata hai aur line
+        // wapas aate hi apne aap server par chala jata hai (uuid se dedupe).
+        _retailLocalKey() { return 'pos_held_local_v1_{{ auth("pos")->id() ?? 0 }}_{{ app("currentCompanyId") ?? 0 }}'; },
+        _retailLocalRead() {
+            try { const raw = localStorage.getItem(this._retailLocalKey()); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch (e) { return []; }
+        },
+        _retailLocalWrite(rows) {
+            try { localStorage.setItem(this._retailLocalKey(), JSON.stringify(rows || [])); } catch (e) {}
+            this.retailHeldLocalRows = (rows || []).map(r => ({ uuid: r.uuid, name: r.name, total: r.total, items: r.items, at: r.at }));
+        },
+        // Offline rows sit ON TOP: they exist only here, so they must be the
+        // most visible thing in the list until they reach the server.
+        retailHeldAll() {
+            const local = (this.retailHeldLocalRows || []).map(r => ({ key: 'L' + r.uuid, id: null, uuid: r.uuid, name: r.name, total: r.total, items: r.items, at: r.at, offline: true }));
+            const server = (this.retailHeld || []).map(r => ({ key: 'S' + r.id, id: r.id, uuid: null, name: r.name, total: r.total, items: r.items, at: r.at, offline: false }));
+            return local.concat(server);
+        },
+        _retailHoldCartData() {
+            return {
+                v: 1,
+                items: JSON.parse(JSON.stringify(this.cart)),
+                kitchen_notes: this.kitchenNotes || '',
+                discount_type: this.discountType || 'percentage',
+                discount_value: Number(this.discountValue) || 0,
+                customer: this.selectedCustomer ? { id: this.selectedCustomer.id, name: this.selectedCustomer.name, phone: this.selectedCustomer.phone } : null,
+            };
+        },
+        retailHoldStart() {
+            if (this.editingBillId) { this.showToast(window.TXT.edit_mode_f9_save, 'error'); return; }
+            if (!this.cart.length || this.submitting || this.retailHeldBusy) return;
+            const now = Date.now();
+            if (now - this.lastHoldTime < 1200) return;
+            this.lastHoldTime = now;
+            this.retailHeldError = '';
+            this.retailHoldName = (this.selectedCustomer?.name || '').slice(0, 60);
+            this.retailHoldNaming = true;
+            this.$nextTick(() => { try { this.$refs.retailHoldNameInput?.focus(); this.$refs.retailHoldNameInput?.select(); } catch (e) {} });
+        },
+        async retailHoldConfirm() {
+            if (this.retailHeldBusy || !this.cart.length) return;
+            this.retailHeldBusy = true;
+            const uuid = this._newOfflineUuid();
+            const stamp = new Date();
+            const fallbackName = window.TXT.hs_default_name + ' ' + stamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const name = ((this.retailHoldName || '').trim() || (this.selectedCustomer?.name || '').trim() || fallbackName).slice(0, 60);
+            const cartData = this._retailHoldCartData();
+            const payload = {
+                hold_uuid: uuid,
+                hold_name: name,
+                customer_id: this.selectedCustomer?.id || null,
+                customer_name: this.selectedCustomer?.name || null,
+                customer_phone: this.selectedCustomer?.phone || null,
+                total_amount: Number(this.roundedTotal || 0),
+                cart_data: cartData,
+            };
+            try {
+                const res = await fetch('{{ route("pos.held-sales.store", [], false) }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data && data.success) {
+                    if (data.held) this.retailHeld.unshift(data.held);
+                    this._retailHoldDone(name);
+                    return;
+                }
+                // A real server refusal (cap reached, validation) must NOT be
+                // silently parked offline — the cashier has to see it.
+                this.retailHeldBusy = false;
+                this.retailHoldNaming = false;
+                this.showToast((data && data.message) || window.TXT.hs_failed, 'error');
+                return;
+            } catch (e) {
+                // Line dead → park on this device and sync on reconnect.
+                const rows = this._retailLocalRead();
+                rows.unshift({ uuid, name, total: Number(this.roundedTotal || 0), items: this.cart.length, at: stamp.toISOString(), payload });
+                this._retailLocalWrite(rows);
+                this._retailHoldDone(name, true);
+            }
+        },
+        _retailHoldDone(name, offline) {
+            this.retailHeldBusy = false;
+            this.retailHoldNaming = false;
+            this.retailHoldName = '';
+            this.clearCart();
+            this.showToast((offline ? window.TXT.hs_parked_offline : window.TXT.hs_parked) + ' — ' + name, 'success');
+            this.$nextTick(() => { try { this.enterSearchMode(); } catch (e) {} });
+        },
+        openRetailHeld() {
+            this.showRetailHeld = !this.showRetailHeld;
+            if (!this.showRetailHeld) return;
+            this.retailHeldIndex = 0;
+            this.retailHeldError = '';
+            this.retailHoldFetch();
+        },
+        async retailHoldFetch() {
+            this.retailHeldLocalRows = this._retailLocalRead().map(r => ({ uuid: r.uuid, name: r.name, total: r.total, items: r.items, at: r.at }));
+            this.retailHeldBusy = true;
+            try {
+                const res = await fetch('{{ route("pos.held-sales.index", [], false) }}', { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data && data.success) {
+                    this.retailHeld = Array.isArray(data.held) ? data.held : [];
+                    this.retailHeldError = '';
+                    this.retailHoldSync();
+                }
+            } catch (e) {
+                // Offline: the device's own parked bills still show.
+                this.retailHeldError = window.TXT.hs_offline_list;
+            }
+            this.retailHeldBusy = false;
+            if (this.retailHeldIndex >= this.retailHeldAll().length) this.retailHeldIndex = 0;
+        },
+        // Push this device's offline parks to the server once the line is back.
+        // Same uuid → the server returns the existing row instead of a twin.
+        async retailHoldSync() {
+            const rows = this._retailLocalRead();
+            if (!rows.length) return;
+            for (const row of rows) {
+                try {
+                    const res = await fetch('{{ route("pos.held-sales.store", [], false) }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body: JSON.stringify(row.payload),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok && data && data.success) {
+                        this._retailLocalWrite(this._retailLocalRead().filter(r => r.uuid !== row.uuid));
+                        if (data.held && !this.retailHeld.some(h => h.id === data.held.id)) this.retailHeld.unshift(data.held);
+                    } else if (res.status === 422) {
+                        // Server refuses it for good (cap/validation) — keep it on
+                        // the device rather than dropping the cashier's bill.
+                        break;
+                    }
+                } catch (e) { break; }
+            }
+        },
+        async retailHoldRecall(h) {
+            if (this.retailHeldBusy) return;
+            if (this.cart.length > 0 && !confirm(window.TXT.hs_replace_cart_q)) return;
+            this.retailHeldError = '';
+            if (h.offline) {
+                const rows = this._retailLocalRead();
+                const row = rows.find(r => r.uuid === h.uuid);
+                if (!row) { this.retailHoldFetch(); return; }
+                this._retailLocalWrite(rows.filter(r => r.uuid !== h.uuid));
+                this._retailApplyCart(row.payload?.cart_data);
+                this.showRetailHeld = false;
+                this.showToast(window.TXT.hs_recalled + ' — ' + h.name, 'success');
+                return;
+            }
+            this.retailHeldBusy = true;
+            try {
+                const res = await fetch('/pos/api/held-sales/' + h.id + '/recall', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json().catch(() => ({}));
+                this.retailHeldBusy = false;
+                if (res.ok && data && data.success) {
+                    this.retailHeld = this.retailHeld.filter(r => r.id !== h.id);
+                    this._retailApplyCart(data.cart);
+                    this.showRetailHeld = false;
+                    this.showToast(window.TXT.hs_recalled + ' — ' + h.name, 'success');
+                    return;
+                }
+                // 404/409 = another counter already took it. Never leave the
+                // cashier staring at a bill that no longer exists.
+                this.retailHeld = this.retailHeld.filter(r => r.id !== h.id);
+                this.retailHeldError = (data && data.message) || window.TXT.hs_already_taken;
+                this.retailHoldFetch();
+            } catch (e) {
+                this.retailHeldBusy = false;
+                this.retailHeldError = window.TXT.hs_offline_recall;
+            }
+        },
+        _retailApplyCart(cart) {
+            if (!cart || !Array.isArray(cart.items)) return false;
+            this.clearCart();
+            this.cart = cart.items;
+            this.kitchenNotes = cart.kitchen_notes || '';
+            this.discountType = cart.discount_type || 'percentage';
+            this.discountValue = Number(cart.discount_value) || 0;
+            if (cart.customer && cart.customer.id) {
+                this.selectedCustomer = { id: cart.customer.id, name: cart.customer.name, phone: cart.customer.phone };
+            }
+            this.recalcDiscount();
+            this.fixCartIndex();
+            this.$nextTick(() => { try { this.enterSearchMode(); } catch (e) {} });
+            return true;
+        },
+        async retailHoldDelete(h) {
+            if (this.retailHeldBusy) return;
+            if (!confirm(window.TXT.hs_delete_q)) return;
+            if (h.offline) {
+                this._retailLocalWrite(this._retailLocalRead().filter(r => r.uuid !== h.uuid));
+                return;
+            }
+            this.retailHeldBusy = true;
+            try {
+                await fetch('/pos/api/held-sales/' + h.id, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                this.retailHeld = this.retailHeld.filter(r => r.id !== h.id);
+            } catch (e) {
+                this.retailHeldError = window.TXT.hs_offline_delete;
+            }
+            this.retailHeldBusy = false;
+            if (this.retailHeldIndex >= this.retailHeldAll().length) this.retailHeldIndex = Math.max(0, this.retailHeldAll().length - 1);
         },
 
         async holdOrder(opts) {
@@ -10573,7 +10890,7 @@ function restaurantPos() {
         // Permission + stream lock + returnable rules sab SERVER par
         // (PosReturnController::quickLookup) — yeh sirf navigate karta hai.
         openQuickReturn() {
-            if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+            if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
             this.quickReturnQ = '';
             this.quickReturnErr = '';
             this.quickReturnBusy = false;

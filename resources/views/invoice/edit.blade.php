@@ -150,6 +150,14 @@
                             </select>
                             @error('destination_province') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invoice Date *</label>
+                            <input type="date" name="invoice_date" x-model="invoice_date" required
+                                max="{{ now()->toDateString() }}"
+                                class="w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Date of the actual sale. Reports and FBR both use this date.</p>
+                            @error('invoice_date') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
                     </div>
                 </div>
 
@@ -512,6 +520,7 @@
                 document_type: @js($invoice->document_type ?? 'Sale Invoice'),
                 reference_invoice_number: @js($invoice->reference_invoice_number ?? ''),
                 destination_province: @js($invoice->destination_province ?? ''),
+                invoice_date: @js(old('invoice_date', $invoice->invoice_date ? \Illuminate\Support\Carbon::parse($invoice->invoice_date)->toDateString() : now()->toDateString())),
                 items: {!! json_encode($invoice->items->map(function($i) use ($standardTaxRate) {
                     $scheduleType = $i->schedule_type ?? 'standard';
                     $defaultRate = $standardTaxRate ?? 18;

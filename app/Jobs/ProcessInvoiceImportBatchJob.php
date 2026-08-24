@@ -99,7 +99,8 @@ class ProcessInvoiceImportBatchJob implements ShouldQueue
                             'updated_at' => now(),
                         ]);
                     }
-                }
+                },
+                $batch->id
             );
 
             $createdForSummary = array_slice($result['created'], 0, 300);

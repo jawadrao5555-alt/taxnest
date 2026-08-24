@@ -8,6 +8,7 @@ use App\Models\InvoiceItem;
 use App\Models\InvoiceImportBatch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
@@ -71,6 +72,7 @@ class InvoiceImportService
         'sro_schedule_no',
         'sro_serial_no',
         'reference_invoice_number',
+        'invoice_date',
     ];
 
     /**
@@ -87,6 +89,13 @@ class InvoiceImportService
     private const CODE_COLUMNS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'reference_invoice_number'];
 
     private const NUMERIC_COLUMNS = ['quantity', 'price', 'tax', 'tax_rate', 'mrp'];
+
+    /**
+     * Columns holding a calendar date. Excel hands these over as serial
+     * numbers (45678), so they need their own cleaner — treating them as text
+     * would silently import "45678" as the invoice date.
+     */
+    private const DATE_COLUMNS = ['invoice_date'];
 
     public const VALID_PROVINCES = ['Punjab', 'Sindh', 'Khyber Pakhtunkhwa', 'Balochistan', 'Islamabad', 'Azad Kashmir', 'Gilgit-Baltistan', 'FATA'];
 
@@ -163,6 +172,7 @@ class InvoiceImportService
         'sro_schedule_no' => 'SRO / schedule number (auto-filled when known)',
         'sro_serial_no' => 'SRO item serial number (auto-filled when known)',
         'reference_invoice_number' => 'Original invoice — Credit/Debit Notes only',
+        'invoice_date' => 'Actual sale date (YYYY-MM-DD or DD/MM/YYYY). Blank = today',
     ];
 
     // ------------------------------------------------------------------
@@ -527,6 +537,15 @@ class InvoiceImportService
         if (in_array($col, self::CODE_COLUMNS, true)) {
             return (string) (self::cleanCode($value) ?? '');
         }
+        if (in_array($col, self::DATE_COLUMNS, true)) {
+            $rawStr = trim((string) ($value ?? ''));
+            if ($rawStr === '') {
+                return '';
+            }
+            // Keep the unparseable original so validation can name it back to
+            // the user instead of silently blanking their date.
+            return self::normalizeDate($value) ?? $rawStr;
+        }
         if (in_array($col, self::NUMERIC_COLUMNS, true)) {
             $rawStr = trim((string) ($value ?? ''));
             if ($rawStr === '') {
@@ -611,6 +630,63 @@ class InvoiceImportService
      * and CSV round-trips arrive as scientific notation ("8.90123E+12") — both
      * are restored to plain digit strings. Empty → null.
      */
+    /**
+     * Turn whatever a spreadsheet hands us into a Y-m-d string, or null if it
+     * is not a date at all.
+     *
+     * Excel stores dates as serial numbers, and Pakistani DMS exports write
+     * D/M/Y far more often than M/D/Y — so ambiguous slash dates are read
+     * day-first, matching what the user typed.
+     */
+    public static function normalizeDate($raw): ?string
+    {
+        if ($raw instanceof \DateTimeInterface) {
+            return $raw->format('Y-m-d');
+        }
+
+        $value = trim((string) ($raw ?? ''));
+        if ($value === '') {
+            return null;
+        }
+
+        // Excel/LibreOffice serial number (1900-based). 60 ~= 1900-02-28,
+        // 2958465 = 9999-12-31 — anything outside that is not a date serial.
+        if (preg_match('/^\d+(\.\d+)?$/', $value)) {
+            $serial = (float) $value;
+            if ($serial >= 60 && $serial <= 2958465) {
+                try {
+                    return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($serial)->format('Y-m-d');
+                } catch (\Throwable $e) {
+                    return null;
+                }
+            }
+
+            return null;
+        }
+
+        $value = str_replace(['.', '\\'], ['-', '/'], $value);
+
+        $formats = [
+            'Y-m-d', 'Y/m/d', 'd/m/Y', 'd-m-Y', 'd/m/y', 'd-m-y',
+            'j/n/Y', 'j-n-Y', 'd-M-Y', 'j-M-Y', 'd M Y', 'j M Y',
+            'M d, Y', 'd-M-y', 'Y-m-d H:i:s', 'd/m/Y H:i', 'd/m/Y H:i:s',
+        ];
+
+        foreach ($formats as $format) {
+            $parsed = \DateTime::createFromFormat('!' . $format, $value);
+            $errors = \DateTime::getLastErrors();
+            $failed = is_array($errors) && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0);
+            if ($parsed instanceof \DateTime && !$failed) {
+                $year = (int) $parsed->format('Y');
+                if ($year >= 1990 && $year <= 2100) {
+                    return $parsed->format('Y-m-d');
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static function cleanCode($raw): ?string
     {
         if ($raw === null) {
@@ -712,8 +788,11 @@ class InvoiceImportService
     /** Rows for the same buyer + document type (+ reference) merge into one invoice. */
     public function groupKey(array $data): string
     {
+        // invoice_date is part of the key: the same buyer on two different
+        // days is two invoices, not one merged draft on one of the dates.
         return ($data['buyer_name'] ?? '') . '|' . ($data['buyer_ntn'] ?? '') . '|'
-            . ($data['document_type'] ?? 'Sale Invoice') . '|' . ($data['reference_invoice_number'] ?? '');
+            . ($data['document_type'] ?? 'Sale Invoice') . '|' . ($data['reference_invoice_number'] ?? '')
+            . '|' . ($data['invoice_date'] ?? '');
     }
 
     /**
@@ -780,6 +859,23 @@ class InvoiceImportService
                 $errors[] = 'Invalid destination_province. Must be one of: ' . implode(', ', self::VALID_PROVINCES);
             } else {
                 $data['destination_province'] = $canonical;
+            }
+        }
+
+        // --- Invoice date (optional; blank = created today) ---
+        if (array_key_exists('invoice_date', $data)) {
+            $dateRaw = trim((string) ($data['invoice_date'] ?? ''));
+            if ($dateRaw === '') {
+                $data['invoice_date'] = '';
+            } else {
+                $normalized = self::normalizeDate($dateRaw);
+                if ($normalized === null) {
+                    $errors[] = "invoice_date could not be read — got '{$dateRaw}'. Use YYYY-MM-DD (e.g. 2026-08-15) or DD/MM/YYYY.";
+                } elseif ($normalized > now()->toDateString()) {
+                    $errors[] = "invoice_date is in the future ({$normalized}). FBR does not accept future-dated invoices.";
+                } else {
+                    $data['invoice_date'] = $normalized;
+                }
             }
         }
 
@@ -1031,8 +1127,13 @@ class InvoiceImportService
         ?int $userId,
         string $source = 'bulk_import',
         ?int $maxInvoices = null,
-        ?callable $onProgress = null
+        ?callable $onProgress = null,
+        ?int $importBatchId = null
     ): array {
+        // Batch review fetches "every draft this batch produced" — without the
+        // stamp an Excel batch is unreviewable (result_json caps at 300).
+        $stampBatch = $importBatchId !== null && Schema::hasColumn('invoices', 'import_batch_id');
+
         $standardTaxRate = $company->getStandardTaxRateValue() ?? 18.0;
 
         $grouped = [];
@@ -1062,7 +1163,7 @@ class InvoiceImportService
             }
 
             try {
-                $invoice = DB::transaction(function () use ($entries, $first, $company, $userId, $source, $standardTaxRate) {
+                $invoice = DB::transaction(function () use ($entries, $first, $company, $userId, $source, $standardTaxRate, $importBatchId, $stampBatch) {
                     $buyerNtn = $first['buyer_ntn'] ?: null;
                     $buyerCnic = $first['buyer_cnic'] ?: null;
                     $buyerRegType = \App\Http\Controllers\InvoiceController::detectBuyerRegistrationType($buyerNtn, $buyerCnic);
@@ -1098,8 +1199,13 @@ class InvoiceImportService
                         'reference_invoice_number' => $first['reference_invoice_number'] ?: null,
                         'destination_province' => $first['destination_province'],
                         'supplier_province' => $company->province ?? null,
-                        'invoice_date' => now()->toDateString(),
-                    ]);
+                        // The sale's OWN date drives every report and the FBR
+                        // payload — falling back to today would file back-dated
+                        // sales under the upload date.
+                        'invoice_date' => ($first['invoice_date'] ?? '') !== ''
+                            ? $first['invoice_date']
+                            : now()->toDateString(),
+                    ] + ($stampBatch ? ['import_batch_id' => $importBatchId] : []));
 
                     foreach ($entries as $entry) {
                         $item = $entry['data'];
@@ -1223,15 +1329,27 @@ class InvoiceImportService
             $sheet->getColumnDimension($letter)->setWidth(18);
         }
 
+        // Dates stay TEXT too — otherwise Excel reformats them to the machine's
+        // locale and the user can no longer tell what they actually typed.
+        foreach (self::DATE_COLUMNS as $dateCol) {
+            $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex($dateCol));
+            $sheet->getStyle($letter . ':' . $letter)->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_TEXT);
+            $sheet->getColumnDimension($letter)->setWidth(16);
+        }
+
+        $sampleDate = now()->subDays(3)->toDateString();
         $samples = [
-            ['ABC Trading Co', '1234567', '', '123 Main St, Lahore', 'Punjab', 'Sale Invoice', '15179090', 'Cooking Oil 1L', '10', '250', '450', 'standard', '18', '', '', '', ''],
-            ['Fresh Foods (Pvt) Ltd', '7654321', '', 'Shop 5, Empress Market, Karachi', 'Sindh', 'Sale Invoice', '02023000', 'Frozen Beef Cuts', '25', '900', '0', 'exempt', '0', '', '', '', ''],
-            ['City Electronics', '', '4220112345671', '45 Hall Road, Lahore', 'Punjab', 'Sale Invoice', '85171100', 'Smart Phone X100', '5', '40000', '34000', '3rd_schedule', '17', '42500', '', '', ''],
+            ['ABC Trading Co', '1234567', '', '123 Main St, Lahore', 'Punjab', 'Sale Invoice', '15179090', 'Cooking Oil 1L', '10', '250', '450', 'standard', '18', '', '', '', '', $sampleDate],
+            ['Fresh Foods (Pvt) Ltd', '7654321', '', 'Shop 5, Empress Market, Karachi', 'Sindh', 'Sale Invoice', '02023000', 'Frozen Beef Cuts', '25', '900', '0', 'exempt', '0', '', '', '', '', $sampleDate],
+            ['City Electronics', '', '4220112345671', '45 Hall Road, Lahore', 'Punjab', 'Sale Invoice', '85171100', 'Smart Phone X100', '5', '40000', '34000', '3rd_schedule', '17', '42500', '', '', '', ''],
         ];
         foreach ($samples as $r => $sample) {
             foreach ($sample as $c => $value) {
-                $colName = $columns[$c];
-                if (in_array($colName, self::CODE_COLUMNS, true)) {
+                $colName = $columns[$c] ?? null;
+                if ($colName === null) {
+                    continue;
+                }
+                if (in_array($colName, self::CODE_COLUMNS, true) || in_array($colName, self::DATE_COLUMNS, true)) {
                     $sheet->setCellValueExplicit([$c + 1, $r + 2], $value, DataType::TYPE_STRING);
                 } else {
                     $sheet->setCellValue([$c + 1, $r + 2], $value);
@@ -1244,7 +1362,7 @@ class InvoiceImportService
         $helpRows = [
             ['DI Bulk Invoice Import — Help'],
             [''],
-            ['Each row is ONE invoice line item. Rows with the same buyer_name + buyer_ntn + document_type combine into a single draft invoice.'],
+            ['Each row is ONE invoice line item. Rows with the same buyer_name + buyer_ntn + document_type + invoice_date combine into a single draft invoice.'],
             ['The 3 sample rows on the Invoices sheet are ignored on import — replace them with your data.'],
             ['Limits: max ' . number_format(self::MAX_ROWS) . ' rows and 10 MB per file. Larger imports: split into multiple files.'],
             ['Imported rows become DRAFT invoices. You submit them to FBR from the Invoices screen as usual.'],
@@ -1267,6 +1385,7 @@ class InvoiceImportService
             ['sro_schedule_no', 'Optional. SRO / schedule number for reduced or exempt items (auto-filled when known).'],
             ['sro_serial_no', 'Optional. SRO item serial number (auto-filled when known).'],
             ['reference_invoice_number', 'Required for Credit Note / Debit Note rows: the original invoice number being adjusted.'],
+            ['invoice_date', 'Optional but IMPORTANT. The real sale date — this is the date your reports and FBR use. Blank = today. Formats: 2026-08-15 or 15/08/2026. Future dates are rejected.'],
         ];
         foreach ($helpRows as $r => $cells) {
             foreach ($cells as $c => $value) {

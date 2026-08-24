@@ -185,6 +185,14 @@
                             </select>
                             @error('destination_province') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invoice Date *</label>
+                            <input type="date" name="invoice_date" x-model="invoice_date" required
+                                max="{{ now()->toDateString() }}"
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Date of the actual sale. Reports and FBR both use this date — change it for an older sale.</p>
+                            @error('invoice_date') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
                     </div>
                 </div>
 
@@ -718,6 +726,7 @@
                 document_type: '{{ old("document_type", "Sale Invoice") }}',
                 reference_invoice_number: '{{ old("reference_invoice_number", "") }}',
                 destination_province: '{{ old("destination_province", "Punjab") }}',
+                invoice_date: '{{ old("invoice_date", now()->toDateString()) }}',
                 items: [newItem()],
                 customerSearch: '',
                 customerResults: [],

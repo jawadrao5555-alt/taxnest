@@ -254,6 +254,11 @@ class InvoiceImportController extends Controller
             'error_report_url' => ($batch->invalid_rows > 0 || count($result['row_errors'] ?? []) > 0)
                 ? '/invoices/import/' . $batch->id . '/error-report'
                 : null,
+            // Batch review: check every created draft against FBR's own rules
+            // and fix them in place, instead of hunting them in the list.
+            'review_url' => ($batch->created_invoices ?? 0) > 0
+                ? '/invoices/review/import/' . $batch->id
+                : null,
             'finished_at' => optional($batch->finished_at)->toIso8601String(),
             'updated_at' => optional($batch->updated_at)->toIso8601String(),
         ]);

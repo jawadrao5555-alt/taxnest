@@ -19,6 +19,16 @@ class FbrService
     private const IMS_POS_SANDBOX_URL = 'https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData';
     private const IMS_POS_PRODUCTION_URL = 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData';
 
+    /**
+     * hs_code => [sale_type => mapping row], filled lazily by buildPayload().
+     * Instance-scoped on purpose: bulk callers reuse one service (so hundreds
+     * of invoices sharing a few HS codes cost a few queries, not hundreds),
+     * while a fresh service still sees an admin's mapping edits immediately.
+     *
+     * @var array<string, array<string, object>>
+     */
+    private array $hsMappingCache = [];
+
     private function sanitizeForFbr(?string $text): string
     {
         if (empty($text)) return "";
@@ -220,21 +230,47 @@ class FbrService
         $allHsCodes = $invoice->items->pluck('hs_code')->filter()->unique()->values()->toArray();
         $preloadedMappings = [];
         if (!empty($allHsCodes)) {
-            try {
-                $dbMappings = \Illuminate\Support\Facades\DB::table('hs_code_mappings')
-                    ->whereIn('hs_code', $allHsCodes)
-                    ->where('is_active', true)
-                    ->where('sro_applicable', true)
-                    ->orderBy('priority')
-                    ->get();
-                foreach ($dbMappings as $m) {
-                    $key = $m->hs_code . '|' . $m->sale_type;
-                    if (!isset($preloadedMappings[$key])) {
-                        $preloadedMappings[$key] = $m;
-                    }
+            // Only look up codes this instance has not seen yet. Building one
+            // payload is a single query either way, but bulk callers (batch
+            // review, bulk submit) reuse one FbrService for hundreds of
+            // invoices that repeat the same handful of HS codes.
+            $missing = [];
+            foreach ($allHsCodes as $hs) {
+                if (!array_key_exists((string) $hs, $this->hsMappingCache)) {
+                    $missing[] = $hs;
                 }
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning('HS mapping preload failed: ' . $e->getMessage());
+            }
+
+            if (!empty($missing)) {
+                try {
+                    $dbMappings = \Illuminate\Support\Facades\DB::table('hs_code_mappings')
+                        ->whereIn('hs_code', $missing)
+                        ->where('is_active', true)
+                        ->where('sro_applicable', true)
+                        ->orderBy('priority')
+                        ->get();
+                    foreach ($missing as $hs) {
+                        $this->hsMappingCache[(string) $hs] = [];
+                    }
+                    foreach ($dbMappings as $m) {
+                        $hs = (string) $m->hs_code;
+                        if (!isset($this->hsMappingCache[$hs][$m->sale_type])) {
+                            $this->hsMappingCache[$hs][$m->sale_type] = $m;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // A failed lookup must not be remembered as "no mapping".
+                    foreach ($missing as $hs) {
+                        unset($this->hsMappingCache[(string) $hs]);
+                    }
+                    \Illuminate\Support\Facades\Log::warning('HS mapping preload failed: ' . $e->getMessage());
+                }
+            }
+
+            foreach ($allHsCodes as $hs) {
+                foreach ($this->hsMappingCache[(string) $hs] ?? [] as $saleType => $m) {
+                    $preloadedMappings[$hs . '|' . $saleType] = $m;
+                }
             }
         }
 

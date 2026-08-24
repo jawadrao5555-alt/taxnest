@@ -46,6 +46,7 @@ class Invoice extends Model
         'last_retry_at',
         'source',
         'client_reference',
+        'import_batch_id',
     ];
 
     protected $casts = [

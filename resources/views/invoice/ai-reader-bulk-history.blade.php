@@ -92,6 +92,9 @@
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3 text-right">
                                             <a href="{{ route('invoices.ai-reader.bulk') }}?batch={{ $batch->id }}" class="inline-flex items-center rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700">Open batch</a>
+                                            @if($summary['counts']['ready'] > 0 || $summary['counts']['needs_review'] > 0)
+                                                <a href="{{ route('invoices.batch-review', ['ai', $batch->batch_uuid]) }}" class="mt-1 inline-flex items-center rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-700">Review drafts</a>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach

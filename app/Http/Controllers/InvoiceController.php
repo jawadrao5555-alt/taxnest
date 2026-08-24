@@ -230,6 +230,7 @@ class InvoiceController extends Controller
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
             'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
             'destination_province' => 'required|string|max:100',
+            'invoice_date' => 'nullable|date|before_or_equal:today',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -250,6 +251,7 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
+            'invoice_date.before_or_equal' => 'Invoice date cannot be in the future — FBR rejects future-dated invoices.',
             'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
@@ -322,7 +324,11 @@ class InvoiceController extends Controller
                 'reference_invoice_number' => $request->reference_invoice_number,
                 'supplier_province' => $supplierProvince,
                 'destination_province' => $request->destination_province,
-                'invoice_date' => now()->toDateString(),
+                // The sale's own date — reports and the FBR payload both read
+                // this, so a back-dated sale must not land on today.
+                'invoice_date' => $request->filled('invoice_date')
+                    ? \Illuminate\Support\Carbon::parse($request->input('invoice_date'))->toDateString()
+                    : now()->toDateString(),
             ]);
 
             $manualOverrides = [];
@@ -507,6 +513,7 @@ class InvoiceController extends Controller
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
             'reference_invoice_number' => $request->input('document_type') !== 'Sale Invoice' ? 'required|string|max:255' : 'nullable|string|max:255',
             'destination_province' => 'required|string|max:100',
+            'invoice_date' => 'nullable|date|before_or_equal:today',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -527,6 +534,7 @@ class InvoiceController extends Controller
             'document_type.required' => 'Document type is required.',
             'destination_province.required' => 'Destination Province is required.',
             'reference_invoice_number.required' => 'Reference Invoice is required for Credit/Debit Notes.',
+            'invoice_date.before_or_equal' => 'Invoice date cannot be in the future — FBR rejects future-dated invoices.',
             'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
         ]);
 
@@ -596,6 +604,12 @@ class InvoiceController extends Controller
                 'reference_invoice_number' => $request->reference_invoice_number,
                 'supplier_province' => $supplierProvince,
                 'destination_province' => $request->destination_province,
+                // Keep the date the invoice already carries unless the form
+                // sent a new one — blanking it would push the sale onto
+                // created_at in the FBR payload and in every report.
+                'invoice_date' => $request->filled('invoice_date')
+                    ? \Illuminate\Support\Carbon::parse($request->input('invoice_date'))->toDateString()
+                    : ($invoice->invoice_date ?: now()->toDateString()),
             ];
 
             if ($invoice->status === 'failed') {

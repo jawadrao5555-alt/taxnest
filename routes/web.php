@@ -417,6 +417,20 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/invoices/import-mappings/{id}/rename', [InvoiceImportController::class, 'renameMapping'])->name('invoices.import-mapping-rename');
         Route::delete('/invoices/import-mappings/{id}', [InvoiceImportController::class, 'deleteMapping'])->name('invoices.import-mapping-delete');
         Route::post('/invoices/import/{batchId}/process', [InvoiceImportController::class, 'process'])->middleware('plan.limit:invoices')->name('invoices.import-process');
+        // Batch review: the drafts a bulk upload produced, with FBR's own
+        // verdict per row, inline fixes and a "fix this everywhere" action.
+        // {type} = import (Excel/CSV batch id) | ai (AI photo batch uuid).
+        Route::get('/invoices/review/{type}/{ref}', [\App\Http\Controllers\BulkDraftReviewController::class, 'show'])
+            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review');
+        Route::get('/invoices/review/{type}/{ref}/rows', [\App\Http\Controllers\BulkDraftReviewController::class, 'rows'])
+            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.rows');
+        Route::post('/invoices/review/{type}/{ref}/save', [\App\Http\Controllers\BulkDraftReviewController::class, 'save'])
+            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.save');
+        Route::post('/invoices/review/{type}/{ref}/bulk-fix', [\App\Http\Controllers\BulkDraftReviewController::class, 'bulkFix'])
+            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.bulk-fix');
+        Route::get('/invoices/review/{type}/{ref}/export', [\App\Http\Controllers\BulkDraftReviewController::class, 'export'])
+            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.export');
+
         Route::get('/invoices/import-history', [InvoiceImportController::class, 'history'])->name('invoices.import-history');
         Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');
         Route::get('/invoices/import/{batchId}/error-report', [InvoiceImportController::class, 'errorReport'])->name('invoices.import-error-report');

@@ -329,6 +329,13 @@
                                         <svg x-show="!batchFailed" class="mx-auto h-16 w-16 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         <svg x-show="batchFailed" class="mx-auto h-16 w-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         <p class="mt-3 text-lg font-bold text-gray-800 dark:text-gray-100" x-text="resultMessage"></p>
+                                        <div x-show="reviewUrl" class="mt-4">
+                                            <a :href="reviewUrl" class="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-bold hover:bg-teal-700 transition">
+                                                <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                Review these drafts before submitting
+                                            </a>
+                                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Check every draft against FBR's rules, fix mistakes in place, then submit.</p>
+                                        </div>
                                         <div x-show="failedRowsCount > 0 && errorReportUrl" class="mt-3">
                                             <a :href="errorReportUrl" class="inline-flex items-center px-4 py-2 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition">
                                                 <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -1195,6 +1202,7 @@ function bulkImport() {
         validCount: 0,
         errorCount: 0,
         errorReportUrl: null,
+        reviewUrl: null,
         processedRows: 0,
         createdCount: 0,
         failedRowsCount: 0,
@@ -1259,6 +1267,7 @@ function bulkImport() {
             this.validCount = 0;
             this.errorCount = 0;
             this.errorReportUrl = null;
+            this.reviewUrl = null;
             this.processedRows = 0;
             this.createdCount = 0;
             this.failedRowsCount = 0;
@@ -1674,6 +1683,7 @@ function bulkImport() {
                 this.failedRowsCount = (data.failed_rows || 0) + (data.invalid_rows || 0);
                 this.queueWaiting = data.status === 'queued' && this.pollCount > 8;
                 if (data.error_report_url) this.errorReportUrl = data.error_report_url;
+                if (data.review_url) this.reviewUrl = data.review_url;
 
                 if (data.status === 'completed') {
                     this.stopPolling();

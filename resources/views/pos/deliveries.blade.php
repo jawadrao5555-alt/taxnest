@@ -11,6 +11,18 @@
 <style>
     .tn-embedded .topnav-bar { display: none !important; }
     .tn-embedded .tn-embed-hide { display: none !important; }
+    /* Dashboard ke "Rider settlement pending" alert se aane wala rider card
+       do sekind ke liye numaya ho jata hai, warna char cards ke darmiyan
+       cashier ko dhoondna parta hai. (25 Aug 2026) */
+    .tn-rider-card:target {
+        border-color: #9333ea !important;
+        box-shadow: 0 0 0 3px rgba(147, 51, 234, .35);
+        animation: tnRiderFlash 2s ease-out 1;
+    }
+    @keyframes tnRiderFlash {
+        0%, 60% { background-color: rgba(147, 51, 234, .10); }
+        100%    { background-color: transparent; }
+    }
 </style>
 @if(!empty($custLocReady))
 {{-- Task 1105: customer pin mini-map (self-hosted Leaflet — same vendor copy
@@ -107,7 +119,11 @@
             // Khata remaining — partial receipts (Task 525) already handed over are deducted.
             $owed = (float) $open->sum(fn ($b) => (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0));
         @endphp
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
+        {{-- id= dashboard ke "Rider settlement pending" alert ka nishana hai
+             (25 Aug 2026): wahan se click seedha isi rider ke card par utarta
+             hai. scroll-margin sticky header ko card dhaknay nahi deta. --}}
+        <div id="rider-{{ $rider->id }}" style="scroll-margin-top:96px"
+             class="tn-rider-card bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
             @php $openDel = (int) ($openDeliveryCounts[$rider->id] ?? 0); @endphp
             <div class="flex items-center justify-between gap-2 mb-1">
                 <div class="font-bold text-gray-900 dark:text-white text-sm truncate">

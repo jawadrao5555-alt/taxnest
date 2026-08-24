@@ -1773,6 +1773,10 @@ class PosController extends Controller
                 ->get(['id', 'name', 'pos_role'])
             : collect();
 
+        // Owner (25 Aug 2026): rider ki pari hui settlement bhi dashboard par
+        // dikhni chahiye — "baqi tamam issues dashboard par aa jate hain".
+        $riderPending = $this->pendingRiderKhata($companyId, $company);
+
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
@@ -1781,8 +1785,92 @@ class PosController extends Controller
             'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
             'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata',
             'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
-            'inactiveRegulars', 'dashTeamMembers', 'dashCashierId'
+            'inactiveRegulars', 'dashTeamMembers', 'dashCashierId', 'riderPending'
         ));
+    }
+
+    /**
+     * Rider settlement pending — dashboard alert (owner, 25 Aug 2026).
+     *
+     * ZFC ka wakia: day-close ke waqt ek bill isliye reh gaya ke rider ka cash
+     * abhi wasool nahi hua tha — khata guard aisa bill archive karta hai, delete
+     * nahi, aur usay baad mein koi dobara nahi samet‌ta. Shop ko pata hi tab
+     * chala jab bill agle din tak para raha. Owner ki farmaish: "jis tarah baqi
+     * issues dashboard par aate hain, is ka bhi alert ho — kis rider ki
+     * settlement pari hai, click karo to seedha settlement par chala jaye."
+     *
+     * Predicate PosRider::openCashBills() ka hu-ba-hu aaina hai (archived bills
+     * bhi shamil — warna day-close ke baad khata gayab lagta hai), aur stream
+     * lock PosRiderController::applyStreamScope jaisa, warna dashboard aur
+     * deliveries page do alag raqamein dikhate.
+     */
+    private function pendingRiderKhata($companyId, $company)
+    {
+        // PROD schema drift: rider columns purane shops par ho sakta hai na hon.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
+            || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id')) {
+            return collect();
+        }
+        // Feature/plan gate jaan boojh kar YAHAN nahi lagaya: gate band hone par
+        // bhi rider ke paas para cash phansna nahi chahiye (deliveries board bhi
+        // isi wajah se khula rehta hai — PosRiderController::hasOpenRiderCash).
+        // Khata khali hoga to neeche khud hi khali collection wapas jayegi.
+
+        $q = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereNotNull('rider_id')
+            ->where('payment_method', 'cash')
+            ->whereNull('rider_settlement_id')
+            ->where(function ($s) {
+                $s->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
+            });
+
+        // Stream lock (Task 353) — stream-locked staff sirf apni stream ka cash
+        // dekhe; 'both' (owner/admin) ko sab dikhta hai.
+        $scope = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
+        if ($scope === 'local') {
+            $q->where(function ($s) {
+                $s->where('invoice_mode', 'local')
+                  ->orWhere(function ($s2) {
+                      $s2->whereNull('pra_status')->whereNull('pra_invoice_number');
+                  });
+            });
+        } elseif ($scope === 'pra') {
+            $q->where(function ($s) {
+                $s->where(function ($s2) {
+                    $s2->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
+                })->where(function ($s2) {
+                    $s2->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
+                });
+            });
+        }
+
+        // Ek hi grouped query — rider ke hisaab se ginti, raqam aur sab se
+        // purane bill ki tareekh (N+1 se bachne ke liye).
+        $rows = $q->groupBy('rider_id')
+            ->selectRaw('rider_id, COUNT(*) as bills, COALESCE(SUM('
+                . \App\Models\PosRider::remainingExpr('pos_transactions')
+                . '), 0) as owed, MIN(created_at) as oldest')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $names = \App\Models\PosRider::where('company_id', $companyId)
+            ->whereIn('id', $rows->pluck('rider_id')->all())
+            ->pluck('name', 'id');
+
+        return $rows->map(function ($r) use ($names) {
+            $oldest = $r->oldest ? \Carbon\Carbon::parse($r->oldest) : null;
+            return [
+                'id'    => (int) $r->rider_id,
+                'name'  => $names[$r->rider_id] ?? ('#' . $r->rider_id),
+                'bills' => (int) $r->bills,
+                'owed'  => (float) $r->owed,
+                'days'  => $oldest ? (int) $oldest->copy()->startOfDay()->diffInDays(now()->startOfDay()) : 0,
+            ];
+        })->filter(fn ($r) => $r['owed'] > 0)->sortByDesc('owed')->values();
     }
 
     /**

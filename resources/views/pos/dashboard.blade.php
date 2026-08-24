@@ -357,6 +357,7 @@
         {{-- ─── /PROFIT + BI WIDGETS ─── --}}
 
         @include('pos.partials.pending-bills-tile')
+        @include('pos.partials.rider-settlement-pending')
         @include('pos.partials.inactive-customers')
         @include('pos.partials.today-khata')
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))

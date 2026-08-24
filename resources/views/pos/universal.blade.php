@@ -3086,6 +3086,14 @@ window.addEventListener('popstate', function() {
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
                                 <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.pra_invoice_number || bill.invoice_number"></span>
+                                {{-- ZFC (25 Aug 2026): PRA ka lamba physical number bill dhoondne
+                                     mein madad nahi karta — shop apne hi POS number se pehchanti
+                                     hai. Jab PRA number dikh raha ho to dukan ka apna number
+                                     saath mein chhota chip ban kar aata hai. --}}
+                                <template x-if="bill.pra_invoice_number && bill.invoice_number && bill.invoice_number !== bill.pra_invoice_number">
+                                    <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                                          x-text="bill.invoice_number"></span>
+                                </template>
                                 <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
                                       :class="{
                                           'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300': bill.badge === 'pra',
@@ -11895,6 +11903,21 @@ function restaurantPos() {
         // (24 Aug 2026, ZFC ki shikayat — do dafa cancel kiya, teesri dafa phir
         // aa gaya). Ring phir bhi ginti (bell) aur "Haaliya calls" list mein
         // jati hai — sirf popup dobara nahi kholta.
+        //
+        // 25 Aug 2026 — khamoshi ki HADD (ZFC: "SIM wali call ab dikhti hi
+        // nahi, WhatsApp theek hai"). Sarakti khamoshi bay-hadd thi: SIM ki ek
+        // call ke DO detector hain (telephony foran, dialer notification 30-60s
+        // baad — server ke 20s merge window se bahar) aur Android notification
+        // ko baar baar repost karta hai. Har dabai gai copy khamoshi ko 5 minute
+        // aage dhakel deti thi, is liye jo number bar bar bajta hai (rider,
+        // regular grahak — pizza shop par yehi hota hai) uska popup poori shift
+        // dobara khulta hi nahi tha. WhatsApp ek call = ek row deta hai, is liye
+        // wo saaf bach gaya — bilkul wohi farq jo shop ne bataya.
+        //
+        // Ab: sarakne ka window chhota (SLIDE), aur pehle popup se ginti hui ek
+        // sakht hadd (CAP) jise koi copy paar nahi kar sakti. Repost toofan
+        // khamosh rehta hai, magar asli dobara call CAP ke baad zaroor dikhti
+        // hai — ring kabhi poori tarah gumti nahi.
         callerMuteKey(ev) {
             const k = ev && (ev.phone || ev.name);
             return k ? String(k) : '';
@@ -11904,15 +11927,25 @@ function restaurantPos() {
             if (!k) { return false; }
             return Date.now() < ((this._callerMuted || {})[k] || 0);
         },
-        muteCaller(ev) {
+        // firstPopup = yeh ring counter par DIKHAI gai hai (nai khamoshi shuru).
+        // Warna yeh sirf dabai gai copy hai — window sarkao, magar CAP ke andar.
+        muteCaller(ev, firstPopup) {
             const k = this.callerMuteKey(ev);
             if (!k) { return; }
             if (!this._callerMuted) { this._callerMuted = {}; }
+            if (!this._callerMutedFrom) { this._callerMutedFrom = {}; }
             const t = Date.now();
-            this._callerMuted[k] = t + 300000; // 5 minute
+            // Naya popup = khamoshi ka nishan yahin se. Copy ke liye purana
+            // nishan hi chalta hai (na mile to abhi se — cap phir bhi lagta hai).
+            if (firstPopup || !this._callerMutedFrom[k]) { this._callerMutedFrom[k] = t; }
+            const cap = this._callerMutedFrom[k] + 600000;      // 10 min: sakht hadd
+            this._callerMuted[k] = Math.min(t + 120000, cap);   // 2 min: sarakta window
             // Purani entries saaf — warna poori shift ka object banta jata hai.
             Object.keys(this._callerMuted).forEach(x => {
-                if (this._callerMuted[x] < t) { delete this._callerMuted[x]; }
+                if (this._callerMuted[x] < t) {
+                    delete this._callerMuted[x];
+                    delete this._callerMutedFrom[x];
+                }
             });
         },
         maybeShowCallerPopup() {
@@ -11930,7 +11963,7 @@ function restaurantPos() {
             }
             if (!next) { return; }
             this.callerPopup = next;
-            this.muteCaller(next);
+            this.muteCaller(next, true);
             // v2: soft beep, ONCE per event id (KDS-beep guard pattern —
             // re-polls / requeues must never re-fire the same ring's beep).
             const bid = this.callerPopup && this.callerPopup.id;

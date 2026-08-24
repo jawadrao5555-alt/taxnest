@@ -44,6 +44,12 @@ class ScheduleEngine
         '62034200' => ['pct_code' => '6203.4200', 'schedule_type' => 'standard', 'tax_rate' => 18],
         '85171100' => ['pct_code' => '8517.1100', 'schedule_type' => '3rd_schedule', 'tax_rate' => 17],
         '27101990' => ['pct_code' => '2710.1990', 'schedule_type' => 'reduced', 'tax_rate' => 10],
+        // Nicotine/tobacco products for oral use (pouches and similar). Unlike
+        // cigarettes (2402.20, Third Schedule) this heading is taxed at the
+        // standard rate, so it must NOT inherit the 2402.x MRP treatment.
+        // Confirmed against FBR Annex-A purchase records, which report this
+        // heading as "Goods at standard rate (default)" at 18%.
+        '24049100' => ['pct_code' => '2404.9100', 'schedule_type' => 'standard', 'tax_rate' => 18],
     ];
 
     public static function getScheduleConfig(string $scheduleType): array

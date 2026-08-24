@@ -51,6 +51,46 @@ class ImportInvoiceDateTest extends TestCase
         $this->assertSame('2026-01-02', InvoiceImportService::normalizeDate(new \DateTime('2026-01-02 09:00:00')));
     }
 
+    /**
+     * normalizeDate deliberately does NOT reject future dates — the import path
+     * needs to tell "unreadable" apart from "in the future" so it can show the
+     * right error. Any caller that persists a date without going through row
+     * validation (the AI-photo path) must therefore add its own future check.
+     */
+    public function test_normalize_date_does_not_itself_block_future_dates(): void
+    {
+        $future = (new \DateTime('+3 days'))->format('Y-m-d');
+        $this->assertSame($future, InvoiceImportService::normalizeDate($future));
+    }
+
+    /**
+     * The legacy CSV fallback lists invoice_date in its template so shops get
+     * the column, but must never demand it — every file a shop already has
+     * predates the column and has to keep importing.
+     */
+    public function test_csv_template_offers_invoice_date_without_requiring_it(): void
+    {
+        $reflection = new \ReflectionClass(\App\Http\Controllers\CsvImportController::class);
+        $template = $reflection->getConstant('TEMPLATE_COLUMNS');
+        $optional = $reflection->getConstant('OPTIONAL_TEMPLATE_COLUMNS');
+
+        $this->assertContains('invoice_date', $template, 'CSV template must offer the date column.');
+        $this->assertContains('invoice_date', $optional, 'An existing CSV without the column must still import.');
+    }
+
+    /**
+     * The batch review screen must be able to show and export the date, or a
+     * shop cannot see (let alone fix) a wrong one before submitting to FBR.
+     */
+    public function test_review_screen_treats_invoice_date_as_an_editable_header_field(): void
+    {
+        $this->assertContains(
+            'invoice_date',
+            \App\Services\BulkDraftReviewService::HEADER_FIELDS,
+            'invoice_date must be an editable header field on the review screen.'
+        );
+    }
+
     public function test_same_buyer_on_two_dates_stays_two_invoices(): void
     {
         $service = new InvoiceImportService();

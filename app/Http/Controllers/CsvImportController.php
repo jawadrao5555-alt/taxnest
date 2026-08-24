@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class CsvImportController extends Controller
 {
     private const TEMPLATE_COLUMNS = [
+        'invoice_date',
         'buyer_name',
         'buyer_ntn',
         'buyer_cnic',
@@ -33,12 +34,21 @@ class CsvImportController extends Controller
         'tax_rate',
     ];
 
+    /**
+     * Columns that appear in the template but must not be demanded of a file
+     * a shop already had. Blank/absent invoice_date simply means today.
+     */
+    private const OPTIONAL_TEMPLATE_COLUMNS = [
+        'invoice_date',
+    ];
+
     public function template(): StreamedResponse
     {
         $callback = function () {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, self::TEMPLATE_COLUMNS);
             fputcsv($handle, [
+                now()->toDateString(),
                 'ABC Trading Co',
                 '1234567',
                 '42201-1234567-1',
@@ -82,7 +92,10 @@ class CsvImportController extends Controller
         }
 
         $header = array_map(fn($h) => strtolower(trim($h)), $header);
-        $missingCols = array_diff(self::TEMPLATE_COLUMNS, $header);
+        $missingCols = array_diff(
+            array_diff(self::TEMPLATE_COLUMNS, self::OPTIONAL_TEMPLATE_COLUMNS),
+            $header
+        );
         if (!empty($missingCols)) {
             fclose($handle);
             return response()->json([
@@ -150,6 +163,7 @@ class CsvImportController extends Controller
             'rows.*.tax' => 'required|numeric|min:0',
             'rows.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'rows.*.tax_rate' => 'nullable|numeric|min:0|max:100',
+            'rows.*.invoice_date' => 'nullable|string|max:32',
         ]);
 
         $companyId = app('currentCompanyId');
@@ -158,7 +172,14 @@ class CsvImportController extends Controller
 
         $grouped = [];
         foreach ($request->rows as $row) {
-            $buyerKey = ($row['buyer_name'] ?? '') . '|' . ($row['buyer_ntn'] ?? '');
+            // The sale date is part of the key: the same buyer on two different
+            // days must stay two invoices, not merge onto whichever date came
+            // first. Unreadable dates fall back to today rather than failing
+            // here — validateRows() already flagged them upstream.
+            $rowDate = InvoiceImportService::normalizeDate($row['invoice_date'] ?? null)
+                ?: now()->toDateString();
+            $buyerKey = ($row['buyer_name'] ?? '') . '|' . ($row['buyer_ntn'] ?? '') . '|' . $rowDate;
+            $row['__invoice_date'] = $rowDate;
             $grouped[$buyerKey][] = $row;
         }
 
@@ -202,7 +223,7 @@ class CsvImportController extends Controller
                     'document_type' => $first['document_type'] ?? 'Sale Invoice',
                     'destination_province' => $first['destination_province'],
                     'supplier_province' => $company->province ?? null,
-                    'invoice_date' => now()->toDateString(),
+                    'invoice_date' => $first['__invoice_date'] ?? now()->toDateString(),
                 ]);
 
                 foreach ($items as $item) {

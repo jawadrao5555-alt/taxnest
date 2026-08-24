@@ -49,6 +49,10 @@ class DiInvoiceApiController extends Controller
             'document_type' => 'required|string|in:Sale Invoice,Credit Note,Debit Note',
             'reference_invoice_number' => 'nullable|string|max:255',
             'destination_province' => 'required|string|max:100',
+            // The date of the actual sale. Omit it and today is used. An ERP
+            // pushing back-dated sales must send it — this date goes to FBR,
+            // and in submit mode that cannot be taken back.
+            'invoice_date' => 'nullable|date|before_or_equal:today',
             'items' => 'required|array|min:1',
             'items.*.hs_code' => 'required|string|max:50',
             'items.*.description' => 'required|string|max:255',
@@ -67,6 +71,7 @@ class DiInvoiceApiController extends Controller
             'items.*.further_tax' => 'nullable|numeric|min:0',
         ], [
             'items.*.price.min' => 'Item prices must be greater than Rs 0. FBR rejects free/bonus lines (error 0300). Note the free item in the description of a paid line or omit it.',
+            'invoice_date.before_or_equal' => 'Invoice date cannot be in the future. Use the date the sale actually happened (YYYY-MM-DD).',
         ]);
 
         $documentType = (string) $request->input('document_type', 'Sale Invoice');
@@ -181,7 +186,9 @@ class DiInvoiceApiController extends Controller
                     'reference_invoice_number' => $request->input('reference_invoice_number'),
                     'supplier_province' => $supplierProvince,
                     'destination_province' => $request->input('destination_province'),
-                    'invoice_date' => now()->toDateString(),
+                    'invoice_date' => $request->filled('invoice_date')
+                        ? \Illuminate\Support\Carbon::parse($request->input('invoice_date'))->toDateString()
+                        : now()->toDateString(),
                     'source' => 'api',
                     'client_reference' => $clientReference,
                 ]);

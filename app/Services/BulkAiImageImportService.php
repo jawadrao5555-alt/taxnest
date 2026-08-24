@@ -446,9 +446,23 @@ class BulkAiImageImportService
                 if (!$draft) {
                     throw new \RuntimeException('The extracted invoice could not be saved as a draft.');
                 }
-                if (!empty($payload['document']['original_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $payload['document']['original_date'])) {
+                // The AI can misread a year and hand back a future date. This
+                // update runs AFTER row validation, so nothing else would stop
+                // it — and FBR rejects future invoice dates. Keep today's date
+                // instead and let the draft show up for review.
+                $extractedDate = \App\Services\InvoiceImportService::normalizeDate(
+                    $payload['document']['original_date'] ?? null
+                );
+                if ($extractedDate !== null && $extractedDate > now()->toDateString()) {
+                    $extractedDate = null;
+                }
+                if ($extractedDate !== null) {
                     Invoice::whereKey($draft['id'])->where('company_id', $company->id)
-                        ->update(['invoice_date' => $payload['document']['original_date']]);
+                        ->update(['invoice_date' => $extractedDate]);
+                } elseif (!empty($payload['document']['original_date'])) {
+                    $warnings[] = 'Could not use the date read from the picture ('
+                        . trim((string) $payload['document']['original_date'])
+                        . '). Today\'s date was kept — check it before submitting.';
                 }
                 $parse->newQuery()->whereKey($parse->id)->whereNull('invoice_id')->update(['invoice_id' => $draft['id']]);
                 $locked->update([

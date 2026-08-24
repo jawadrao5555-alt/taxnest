@@ -1,6 +1,19 @@
 # TaxNest FBR POS APK (WebView shell) — Build & Release Runbook
 
-Last updated: Aug 2026 (v1.1.0 FCM push wiring, Task #1283)
+Last updated: 24 Aug 2026 (v1.1.1 blank-screen recovery — the first FBR build
+with the Firebase config actually inside it)
+
+> **Hosted right now: stable `taxnest-fbr-pos.apk` = v1.0.2**, and
+> `fbrpos_app_latest_version` = `1.0.2`, so that is all any shop phone has.
+> v1.1.1 is hosted as a beta only: `/downloads/taxnest-fbr-pos-1.1.1.apk`
+> (shared `rider` key, release check PASS, `Firebase config verified inside
+> app-release.apk`). The older `/downloads/taxnest-fbr-pos-1.1.0.apk` is the
+> push-dead beta — never promote that one.
+>
+> To promote after the owner's phone test: copy the beta over
+> `taxnest-fbr-pos.apk` (keep the current stable as
+> `taxnest-fbr-pos-prev-1.0.2.apk`), set `fbrpos_app_latest_version` = `1.1.1`,
+> add the What's New row.
 
 The shell mirrors the PRA POS shell (`pos-app/RELEASE.md`) and the rider-app
 toolchain (`rider-app/RELEASE.md`). This file covers the FBR-specific bits.
@@ -34,6 +47,14 @@ side):
 4. Build WITHOUT the file = push stays dormant (Push.kt catches the missing
    Firebase init silently); everything else works. **A build made without the
    file must be REBUILT after the file is dropped in** for push to activate.
+
+**Status (24 Aug 2026): done.** `pk.taxnest.fbrpos` is registered in the
+existing `taxnest-rider` Firebase project; the config sits at
+`fbr-pos-app/app/google-services.json` (gitignored) with the backup copy on
+live at `~/rider-signing/google-services-fbrpos.json` (chmod 600). v1.1.1 is
+the first FBR build whose APK actually carries it. Never accept this file
+through a chat attachment — `attached_assets/` is gitignored for exactly this
+reason, but the safe route is the live `~/rider-signing/` copy.
 
 Server endpoints the shell talks to (Task 1275):
 - register: `POST /fbr-pos/app/fcm-token` (session cookie + header

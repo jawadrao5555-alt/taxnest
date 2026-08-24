@@ -11922,7 +11922,11 @@ function restaurantPos() {
             let next = null;
             while (this.callerQueue.length) {
                 const cand = this.callerQueue.shift();
-                if (!this.callerMuted(cand)) { next = cand; break; }
+                // Khamoshi sarakti hai: har dabai gai copy usay aur aage
+                // dhakel deti hai, warna 12 minute ke repost toofan mein har
+                // 5 minute baad ek naya popup nikalta rehta.
+                if (this.callerMuted(cand)) { this.muteCaller(cand); continue; }
+                next = cand; break;
             }
             if (!next) { return; }
             this.callerPopup = next;

@@ -13,24 +13,31 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * CALLER ID — ek call ki saari copies ek ring (24 Aug 2026, ZFC Pizza Point).
+ * CALLER ID — ring ingest: kya jorha jata hai aur kya hargiz nahi (24 Aug 2026).
  *
- * Live par ek hi number 12 minute mein 10 alag rings ban gaya jabke phone par
- * koi call thi hi nahi: phone ke do detector (telephony pehle — number, naam
- * khali; dialer notification baad mein — naam) ek hi call par alag alag waqt
- * bolte hain, aur Android us notification ke HAR update par listener ko dobara
- * jagata hai. Purana 20-second ka window in mein se sirf pehli do copies
- * pakarta tha, baqi har copy nayi ring ban kar cashier ke samne popup kholti
- * rahi.
+ * ZFC Pizza Point par ek hi number 12 minute mein 10 rings ban gaya jabke phone
+ * par koi call thi hi nahi: phone ke do detector (telephony pehle — number,
+ * naam khali; dialer notification baad mein — naam) ek hi call par alag alag
+ * waqt bolte hain, aur Android us notification ke HAR update par listener ko
+ * dobara jagata hai.
+ *
+ * Ilaj do hisson mein baanta gaya hai, aur yeh farq is file ka asal maza hai:
+ *   • Server (yahan) sirf wohi copies jorta hai jo lamhon ke andar aati hain —
+ *     window JAAN BOOJH KAR tang hai. Server ka kaam sach likhna hai; agar woh
+ *     minton tak collapse karta rahe to grahak ki ASLI dobara call bhi mit
+ *     jaye — na bell ki ginti barhe, na "Haaliya calls" mein aaye — aur cashier
+ *     ko kabhi pata hi na chale.
+ *   • Baar baar khulne wale popup ka pehra sale screen par hai (ek number = ek
+ *     popup, agli copies us khamoshi ko aage sarkati hain). Wahan ring gumti
+ *     nahi — sirf cashier ko tang nahi karti.
  *
  * Yahan jo tay kiya ja raha hai:
- *   1. Wohi number window ke andar dobara aaye → nai row nahi banti.
+ *   1. Ek hi ring ki doosri copy nai row nahi banati.
  *   2. Pehli copy be-naam thi aur baad wali mein naam hai → naam usi mojooda
- *      row mein bhar jata hai (Haaliya calls list ko naam milta hai, cashier
- *      ko doosra popup nahi).
+ *      row mein bhar jata hai (list ko naam milta hai, doosri row nahi).
  *   3. Mojooda naam kabhi khali se nahi mitta.
- *   4. Window guzar jane ke baad asli dobara call phir bhi darj hoti hai —
- *      collapse "khamoshi" nahi bunta.
+ *   4. SAB SE AHEM: thori der baad ki asli dobara call PURI TARAH darj hoti
+ *      hai — server kabhi koi call chupata nahi.
  *   5. Do alag numbers kabhi ek doosre mein nahi milte.
  *   6. Be-number (sirf naam) rings bhi isi usool par chalti hain.
  *
@@ -75,14 +82,14 @@ class PosCallerRingCollapseTest extends TestCase
             $t->timestamp('created_at')->nullable();
         });
 
-        // Internal account: planAllows ka escape hatch, taake yeh test sirf
-        // collapse ka faisla naapay — plan gate ka apna test alag hai.
         $company = Company::create(['name' => 'Ring Collapse Shop', 'product_type' => 'pos']);
         $this->companyId = (int) $company->id;
 
         // DB::table par likha ja raha hai: yeh columns Company ke $fillable mein
         // nahi hain aur Eloquent unhen khamoshi se gira deta hai
         // (eloquent-missing-attribute-null) — phir har ring "disabled" ban jati.
+        // is_internal_account = planAllows ka escape hatch, taake yeh test sirf
+        // ingest ka faisla naapay; plan gate ka apna test alag hai.
         $plain = $company->id . '|ringcollapsetoken';
         DB::table('companies')->where('id', $company->id)->update([
             'is_internal_account' => true,
@@ -117,8 +124,7 @@ class PosCallerRingCollapseTest extends TestCase
 
     /**
      * Telephony 21:48:45 par bolti hai (number, naam khali), dialer ki
-     * notification 21:49:25 par (naam ke sath). Purane 20-second window mein
-     * yeh DO rings banti thin — ab ek.
+     * notification usi call par 12 second baad — ek hi ring, ek hi row.
      */
     public function test_second_copy_of_the_same_ring_does_not_create_a_row(): void
     {
@@ -126,7 +132,7 @@ class PosCallerRingCollapseTest extends TestCase
         $first = $this->ring(['phone' => '03022452414', 'source' => 'sim']);
         $this->assertTrue($first['accepted']);
 
-        Carbon::setTestNow('2026-08-24 21:49:25'); // +40s — purane window se bahar
+        Carbon::setTestNow('2026-08-24 21:48:57'); // +12s — wohi call
         $second = $this->ring(['phone' => '03022452414', 'name' => 'Asif Langah', 'source' => 'sim']);
 
         $this->assertFalse($second['accepted']);
@@ -141,7 +147,7 @@ class PosCallerRingCollapseTest extends TestCase
         $this->ring(['phone' => '03022452414', 'source' => 'sim']);
         $this->assertNull($this->rows()->first()->caller_name);
 
-        Carbon::setTestNow('2026-08-24 21:49:25');
+        Carbon::setTestNow('2026-08-24 21:48:57');
         $this->ring(['phone' => '03022452414', 'name' => 'Asif Langah', 'source' => 'sim']);
 
         $rows = $this->rows();
@@ -155,7 +161,7 @@ class PosCallerRingCollapseTest extends TestCase
         Carbon::setTestNow('2026-08-24 21:48:45');
         $this->ring(['phone' => '03022452414', 'name' => 'Asif Langah', 'source' => 'sim']);
 
-        Carbon::setTestNow('2026-08-24 21:49:25');
+        Carbon::setTestNow('2026-08-24 21:48:57');
         $this->ring(['phone' => '03022452414', 'source' => 'sim']);
 
         $rows = $this->rows();
@@ -164,15 +170,19 @@ class PosCallerRingCollapseTest extends TestCase
     }
 
     /**
-     * Collapse "khamoshi" nahi bunta: window guzarne ke baad grahak dobara
-     * call kare to woh ring darj bhi hoti hai aur popup bhi kholti hai.
+     * SAB SE AHEM: server kabhi asli call nahi chupata.
+     *
+     * Line kat gai aur grahak ne 45 second baad dobara milaya — yeh alag call
+     * hai aur poori tarah darj honi chahiye, warna bell ki ginti aur "Haaliya
+     * calls" jhoot bolne lagen. (Popup ki khamoshi screen ka mamla hai; woh
+     * ring ko gaayab nahi karti.)
      */
-    public function test_a_real_repeat_call_after_the_window_is_recorded(): void
+    public function test_a_genuine_call_back_is_always_recorded(): void
     {
         Carbon::setTestNow('2026-08-24 21:48:45');
         $this->ring(['phone' => '03022452414', 'source' => 'sim']);
 
-        Carbon::setTestNow('2026-08-24 21:51:30'); // +165s
+        Carbon::setTestNow('2026-08-24 21:49:30'); // +45s — line katne ke baad
         $again = $this->ring(['phone' => '03022452414', 'source' => 'sim']);
 
         $this->assertTrue($again['accepted']);
@@ -185,7 +195,7 @@ class PosCallerRingCollapseTest extends TestCase
         Carbon::setTestNow('2026-08-24 21:48:45');
         $this->ring(['phone' => '03022452414', 'source' => 'sim']);
 
-        Carbon::setTestNow('2026-08-24 21:48:55'); // usi lamhe ke andar
+        Carbon::setTestNow('2026-08-24 21:48:50'); // usi lamhe ke andar
         $other = $this->ring(['phone' => '03006872227', 'source' => 'sim']);
 
         $this->assertTrue($other['accepted']);
@@ -194,7 +204,7 @@ class PosCallerRingCollapseTest extends TestCase
 
     /**
      * Be-number ring (WhatsApp par saved contact — sirf naam aata hai) bhi isi
-     * usool par: wohi naam window ke andar dobara aaye to nai row nahi.
+     * usool par: wohi naam lamhon ke andar dobara aaye to nai row nahi.
      */
     public function test_nameless_number_rings_collapse_on_the_caller_name(): void
     {
@@ -202,7 +212,7 @@ class PosCallerRingCollapseTest extends TestCase
         $first = $this->ring(['name' => 'Zeshan Butt', 'source' => 'whatsapp']);
         $this->assertTrue($first['accepted']);
 
-        Carbon::setTestNow('2026-08-24 21:49:40');
+        Carbon::setTestNow('2026-08-24 21:48:57');
         $second = $this->ring(['name' => 'Zeshan Butt', 'source' => 'whatsapp']);
 
         $this->assertFalse($second['accepted']);

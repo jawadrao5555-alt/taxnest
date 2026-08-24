@@ -8567,6 +8567,7 @@ function restaurantPos() {
             if (!this._callerMuted) { this._callerMuted = {}; }
             const t = Date.now();
             this._callerMuted[k] = t + 300000; // 5 minute
+            // Purani entries saaf — warna poori shift ka object banta jata hai.
             Object.keys(this._callerMuted).forEach(x => {
                 if (this._callerMuted[x] < t) { delete this._callerMuted[x]; }
             });
@@ -8576,7 +8577,11 @@ function restaurantPos() {
             let next = null;
             while (this.callerQueue.length) {
                 const cand = this.callerQueue.shift();
-                if (!this.callerMuted(cand)) { next = cand; break; }
+                // Khamoshi sarakti hai: har dabai gai copy usay aur aage
+                // dhakel deti hai, warna 12 minute ke repost toofan mein har
+                // 5 minute baad ek naya popup nikalta rehta.
+                if (this.callerMuted(cand)) { this.muteCaller(cand); continue; }
+                next = cand; break;
             }
             if (!next) { return; }
             this.callerPopup = next;

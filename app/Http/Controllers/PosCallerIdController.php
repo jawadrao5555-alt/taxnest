@@ -40,11 +40,16 @@ class PosCallerIdController extends Controller
 {
     private const EVENT_RETENTION_HOURS = 48;  // ring rows purged after this
     private const EVENT_FRESH_SECONDS = 120;   // poll never surfaces older rings
-    // Same caller re-ring collapse. Ek call ki copies minton par phaili hoti
-    // hain (neeche appRing ka note), is liye yeh window ring ki "taazgi" ke
-    // barabar rakhi gai hai — 20 second sirf WhatsApp ke foran ke updates
-    // pakarta tha, dialer notification ke baad walay updates nahi.
-    private const DEDUPE_SECONDS = 120;
+    // Same caller re-ring collapse — JAAN BOOJH KAR tang rakhi gai hai.
+    //
+    // Ek call ki copies minton par phaili hoti hain (neeche appRing ka note),
+    // magar is window ko chorha karne ka matlab hai ke grahak ki ASLI dobara
+    // call bhi mit jaye: na row bane, na bell ki ginti barhe, na "Haaliya
+    // calls" mein aaye — yani cashier ko pata hi na chale. Server ka kaam
+    // sach likhna hai. Baar baar khulne wale popup ka ilaj sale screen par
+    // hai (ek number = ek popup, aur agli copies us khamoshi ko aage
+    // sarkati hain), jahan ring gumti nahi — sirf cashier ko tang nahi karti.
+    private const DEDUPE_SECONDS = 20;
     // Task 1345 — DO builds, ek hi package id:
     //   default ("clean")  = sirf SIM calls, Play Protect ki blocked chaar
     //                        permissions mein se koi nahi → bina rukawat install

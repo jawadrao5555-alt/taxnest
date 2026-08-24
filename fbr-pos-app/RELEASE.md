@@ -3,17 +3,16 @@
 Last updated: 24 Aug 2026 (v1.1.1 blank-screen recovery — the first FBR build
 with the Firebase config actually inside it)
 
-> **Hosted right now: stable `taxnest-fbr-pos.apk` = v1.0.2**, and
-> `fbrpos_app_latest_version` = `1.0.2`, so that is all any shop phone has.
-> v1.1.1 is hosted as a beta only: `/downloads/taxnest-fbr-pos-1.1.1.apk`
-> (shared `rider` key, release check PASS, `Firebase config verified inside
-> app-release.apk`). The older `/downloads/taxnest-fbr-pos-1.1.0.apk` is the
-> push-dead beta — never promote that one.
+> **Hosted right now: stable `taxnest-fbr-pos.apk` = v1.1.1** (sha256
+> `1aba4e70…`) and `fbrpos_app_latest_version` = `1.1.1`, promoted 24 Aug 2026
+> on the owner's go-ahead. Previous stable kept for rollback as
+> `taxnest-fbr-pos-prev-1.0.2.apk` — rollback = copy it back over
+> `taxnest-fbr-pos.apk` and set the setting back to `1.0.2`.
 >
-> To promote after the owner's phone test: copy the beta over
-> `taxnest-fbr-pos.apk` (keep the current stable as
-> `taxnest-fbr-pos-prev-1.0.2.apk`), set `fbrpos_app_latest_version` = `1.1.1`,
-> add the What's New row.
+> This is the first FBR build whose APK actually carries the Firebase config,
+> so instant push (fail-queue alert / day-close reminder) only starts working
+> once a phone is on 1.1.1. The older `/downloads/taxnest-fbr-pos-1.1.0.apk`
+> is the push-dead beta — never promote that one.
 
 The shell mirrors the PRA POS shell (`pos-app/RELEASE.md`) and the rider-app
 toolchain (`rider-app/RELEASE.md`). This file covers the FBR-specific bits.

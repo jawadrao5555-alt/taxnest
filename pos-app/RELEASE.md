@@ -131,19 +131,27 @@ breaks in-place updates for everything. NEVER commit it (public repo).
 
 ---
 
-## Rollout status — v1.1.1 (24 Aug 2026): HOSTED AS BETA, not promoted
+## Rollout status — v1.1.1 (24 Aug 2026): LIVE
 
 - Built with the Firebase config in place (`Firebase config verified inside
   app-release.apk` — push stays alive) and `apk-release-check.sh` PASS: shared
   `rider` key, no blocked permission, version matches `build.gradle`.
-- Hosted as `/downloads/taxnest-pos-1.1.1.apk` only. The stable
-  `/downloads/taxnest-pos.apk` and `pos_app_latest_version` are still on
-  **1.1.0**, so no phone is prompted yet — owner phone test first.
-- To promote: copy the beta over `taxnest-pos.apk` (keep the current stable as
-  `taxnest-pos-prev-1.1.0.apk`), set `pos_app_latest_version` = `1.1.1`, and
-  add the What's New row. The DI shell's 1.0.2 beta
-  (`/downloads/taxnest-di-1.0.2.apk`) is in exactly the same state; the waiter
-  shell's 1.0.3 was promoted to stable on 24 Aug 2026.
+- Promoted on the owner's go-ahead (no phone test — same call he made for
+  1.1.0): `/downloads/taxnest-pos-1.1.1.apk` copied over the stable
+  `/downloads/taxnest-pos.apk` (sha256 `c2361e74…`, previous stable kept as
+  `taxnest-pos-prev-1.1.0.apk`), `pos_app_latest_version` = `1.1.1`.
+- Same day, same way: **FBR POS 1.1.1** (`fbrpos_app_latest_version` = `1.1.1`,
+  prev = `taxnest-fbr-pos-prev-1.0.2.apk`) and **DI 1.0.2**
+  (`di_app_latest_version` = `1.0.2`, prev = `taxnest-di-prev-1.0.1.apk`);
+  waiter 1.0.3 had been promoted earlier the same day.
+- One What's New row (audience `all`, so both the POS and FBR panels show it)
+  announces the update and how to install it.
+- Rollback for any of the three = copy the `*-prev-*.apk` back over the stable
+  filename and set the matching `*_app_latest_version` back.
+- Note on `verify-apk-firebase.sh`: run against the OLD 1.1.0 APK it reports an
+  api-key mismatch. That is a rotated Firebase Android key, not a bad build —
+  the baked `mobilesdk_app_id` still matches `pk.taxnest.pos`. Only ever verify
+  the APK you are about to ship against the CURRENT `google-services.json`.
 
 ---
 

@@ -131,6 +131,22 @@ breaks in-place updates for everything. NEVER commit it (public repo).
 
 ---
 
+## Rollout status — v1.1.1 (24 Aug 2026): HOSTED AS BETA, not promoted
+
+- Built with the Firebase config in place (`Firebase config verified inside
+  app-release.apk` — push stays alive) and `apk-release-check.sh` PASS: shared
+  `rider` key, no blocked permission, version matches `build.gradle`.
+- Hosted as `/downloads/taxnest-pos-1.1.1.apk` only. The stable
+  `/downloads/taxnest-pos.apk` and `pos_app_latest_version` are still on
+  **1.1.0**, so no phone is prompted yet — owner phone test first.
+- To promote: copy the beta over `taxnest-pos.apk` (keep the current stable as
+  `taxnest-pos-prev-1.1.0.apk`), set `pos_app_latest_version` = `1.1.1`, and
+  add the What's New row. The DI shell's 1.0.2 beta
+  (`/downloads/taxnest-di-1.0.2.apk`) is in exactly the same state; the waiter
+  shell's 1.0.3 was promoted to stable on 24 Aug 2026.
+
+---
+
 ## Rollout status — v1.1.0 (20 Aug 2026): LIVE
 
 - Signed APK (sha256 `7a5d3933…f3d7`, shared `rider` key) hosted as

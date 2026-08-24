@@ -1,15 +1,17 @@
 # TaxNest Caller ID APK — Build & Release Runbook
 
-Last updated: Sep 2026 (v1.4.0 — call back from the POS, website builds only,
-Task 1381; v1.3.0 was the English / Roman Urdu / Urdu language switch, Task 1382)
+Last updated: 24 Aug 2026 (v1.5.0 — the real number comes back on the plus
+build; v1.4.0 added call back from the POS, website builds only; v1.3.0 was the
+English / Roman Urdu / Urdu language switch)
 
-> **Hosted right now: v1.4.0 (versionCode 5), since 21 Aug 2026 (Task 1362).**
-> Both website APKs and both admin version settings are on 1.4.0, so every
-> signed-in phone still on 1.1.0 sees the update banner. That single rollout is
-> what finally carried three releases' worth of code to shops — the 1.2.0
-> **disclosure (consent) screen**, the 1.3.0 language switch and the 1.4.0 call
-> back. Building the code without this step ships nothing: the website keeps
-> serving the old file until someone rebuilds, re-hosts and flips the settings.
+> **Hosted right now: v1.5.0 (versionCode 6), since 23 Aug 2026.**
+> Both website APKs (`taxnest-caller.apk` + `taxnest-caller-plus.apk`) and both
+> admin version settings are on 1.5.0, so a phone on any older build sees the
+> update prompt. 1.5.0 is what fixed `No phone` on the plus build; the 1.4.0
+> rollout before it (21 Aug 2026) was what first carried the 1.2.0 disclosure
+> screen and the 1.3.0 language switch to shops. Building the code without this
+> step ships nothing: the website keeps serving the old file until someone
+> rebuilds, re-hosts and flips the settings.
 >
 > The hosted bytes were re-verified on 21 Aug 2026 (Task 1387) by downloading
 > both canonical URLs and running both guards plus the three-locale badge check

@@ -277,4 +277,74 @@ class ImportSaleAreaInvoicesTest extends TestCase
         $this->assertStringContainsString('BHPAHP-04204', $one['buyer_address']);
         $this->assertStringContainsString('BHPAHP-04672', $two['buyer_address']);
     }
+
+    public function test_the_address_it_writes_gives_the_customer_code_back(): void
+    {
+        [$groups] = ImportSaleAreaInvoices::parseSaleArea($this->file, $this->catalogue());
+
+        // A re-run skips a shop-day by reading the code back out of the address
+        // it wrote. If that round-trip ever breaks, the month gets filed twice.
+        foreach ($groups as $group) {
+            $address = ImportSaleAreaInvoices::rowsFor($group, $this->catalogue())[0]['data']['buyer_address'];
+
+            $this->assertSame($group['code'], ImportSaleAreaInvoices::codeInAddress($address));
+        }
+
+        // A town with no code in brackets must not be mistaken for one.
+        $this->assertNull(ImportSaleAreaInvoices::codeInAddress('GHALLA MANDI ROAD AHMEDPUR EAST'));
+    }
+
+    public function test_a_blank_header_is_refused_when_its_rate_fits_two_products(): void
+    {
+        $file = $this->buildExportWhereTwoProductsShareARate();
+
+        try {
+            [$groups, $problems] = ImportSaleAreaInvoices::parseSaleArea($file, $this->catalogue());
+        } finally {
+            @unlink($file);
+        }
+
+        // Recovering a lost header from its rate only works while the rate
+        // names one product. Picking either one would file real volume against
+        // the wrong product, so the whole month must stop instead.
+        $this->assertSame([], $groups);
+        $this->assertCount(1, $problems);
+        $this->assertStringContainsString('MARLBORO GOLD', $problems[0]);
+        $this->assertStringContainsString('CRAFTED BY MARLBORO', $problems[0]);
+    }
+
+    /**
+     * D and E are named and priced the same; F lost its header to a merge and
+     * carries that same rate, so the rate cannot say which product F is.
+     */
+    private function buildExportWhereTwoProductsShareARate(): string
+    {
+        $sheet = (new Spreadsheet())->getActiveSheet();
+
+        $sheet->setCellValue('A1', 'Calendar Date');
+        $sheet->setCellValue('D1', ExcelDate::PHPToExcel(new \DateTime('2026-08-01')));
+
+        $sheet->setCellValue('D2', 'MARLBORO GOLD');
+        $sheet->setCellValue('E2', 'CRAFTED BY MARLBORO');
+        // F2 blank.
+
+        $sheet->setCellValue('A3', 'Town Description');
+        $sheet->setCellValue('B3', 'Customer Registered Name');
+        $sheet->setCellValue('C3', 'Customer Code');
+
+        $sheet->setCellValue('A5', 'AHMEDPUR EAST-B');
+        $sheet->setCellValue('B5', 'AAMIR KIRYANA STORE');
+        $sheet->setCellValue('C5', 'BHPAHP-04204');
+        $sheet->setCellValue('D5', 0.04);
+        $sheet->setCellValue('F5', 0.02);
+
+        $sheet->setCellValue('D7', self::MARLBORO_RATE);
+        $sheet->setCellValue('E7', self::MARLBORO_RATE);
+        $sheet->setCellValue('F7', self::MARLBORO_RATE);
+
+        $path = tempnam(sys_get_temp_dir(), 'salearea') . '.xlsx';
+        (new Xlsx($sheet->getParent()))->save($path);
+
+        return $path;
+    }
 }

@@ -115,7 +115,7 @@ class ImportSaleAreaInvoices extends Command
 
         if ($missingProducts !== []) {
             // Silently dropping a product would under-report the month to FBR.
-            $this->error('These products are in the export but not in the catalogue:');
+            $this->error('The export cannot be filed as it stands:');
             foreach ($missingProducts as $name) {
                 $this->line("  - {$name}");
             }
@@ -151,7 +151,7 @@ class ImportSaleAreaInvoices extends Command
         foreach ($groups as $group) {
             $bar->advance();
 
-            if (isset($alreadyImported[self::addressFor($group) . '|' . $group['date']])) {
+            if (isset($alreadyImported[mb_strtoupper($group['code']) . '|' . $group['date']])) {
                 $skipped++;
                 continue;
             }
@@ -218,7 +218,7 @@ class ImportSaleAreaInvoices extends Command
      * Read the pivot into one group per (customer code, delivery date).
      *
      * @param  array<string, array>  $catalogue  upper-cased product name => catalogue row
-     * @return array{0: array<string, array>, 1: array<int, string>}  [groups, product names with no catalogue entry]
+     * @return array{0: array<string, array>, 1: array<int, string>}  [groups, reasons the export cannot be filed]
      */
     public static function parseSaleArea(string $path, array $catalogue): array
     {
@@ -236,6 +236,7 @@ class ImportSaleAreaInvoices extends Command
         $rateRow = $grid[$lastRow - 1] ?? [];
 
         $nameByRate = [];
+        $sharedRate = [];
         foreach ($productRow as $col => $label) {
             $label = trim((string) $label);
             if (in_array($label, self::NON_PRODUCT_COLUMNS, true)) {
@@ -243,7 +244,15 @@ class ImportSaleAreaInvoices extends Command
             }
             $rate = $rateRow[$col] ?? null;
             if ($rate !== null && $rate !== '' && is_numeric($rate)) {
-                $nameByRate[self::rateKey((float) $rate)] = $label;
+                $key = self::rateKey((float) $rate);
+                // Two products sharing a rate make the rate useless as an
+                // identity. Guessing would file the volume against the wrong
+                // product, so remember the clash and refuse it below.
+                if (isset($nameByRate[$key]) && $nameByRate[$key] !== $label) {
+                    $sharedRate[$key][$nameByRate[$key]] = true;
+                    $sharedRate[$key][$label] = true;
+                }
+                $nameByRate[$key] = $label;
             }
         }
 
@@ -267,6 +276,11 @@ class ImportSaleAreaInvoices extends Command
                 $key = ($rate !== null && $rate !== '' && is_numeric($rate)) ? self::rateKey((float) $rate) : null;
                 // No header and no rate = the grand-total column, not a product.
                 if ($key === null || !isset($nameByRate[$key])) {
+                    continue;
+                }
+                if (isset($sharedRate[$key])) {
+                    $names = implode(', ', array_keys($sharedRate[$key]));
+                    $missing['~rate ' . $key] = "a column header was lost to a merge and its rate {$key} belongs to more than one product ({$names}) - that column must be named in the export";
                     continue;
                 }
                 $label = $nameByRate[$key];
@@ -416,7 +430,7 @@ class ImportSaleAreaInvoices extends Command
         return $catalogue;
     }
 
-    /** @return array<string, true> "address|date" of invoices this import already made */
+    /** @return array<string, true> "customer code|date" of invoices this import already made */
     private function existingKeys(int $companyId): array
     {
         $keys = [];
@@ -426,14 +440,32 @@ class ImportSaleAreaInvoices extends Command
             ->select(['buyer_address', 'invoice_date'])
             ->chunk(2000, function ($chunk) use (&$keys) {
                 foreach ($chunk as $invoice) {
+                    $code = self::codeInAddress((string) $invoice->buyer_address);
+                    if ($code === null) {
+                        continue;
+                    }
                     $date = $invoice->invoice_date instanceof \DateTimeInterface
                         ? $invoice->invoice_date->format('Y-m-d')
                         : substr((string) $invoice->invoice_date, 0, 10);
-                    $keys[$invoice->buyer_address . '|' . $date] = true;
+                    $keys[$code . '|' . $date] = true;
                 }
             });
 
         return $keys;
+    }
+
+    /**
+     * The customer code this import stamps into the buyer address.
+     *
+     * A later export can re-spell the town, but never the code, so the code
+     * is what makes a re-run skip a shop-day it has already filed instead of
+     * filing it twice.
+     */
+    public static function codeInAddress(string $address): ?string
+    {
+        return preg_match('/\\(([A-Za-z0-9][A-Za-z0-9\\-\\/]*)\\)$/', trim($address), $m) === 1
+            ? mb_strtoupper($m[1])
+            : null;
     }
 
     private function openBatch(int $companyId, ?int $userId, string $path, int $groupCount): ?int

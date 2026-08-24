@@ -8548,9 +8548,39 @@ function restaurantPos() {
                 this.pollCallerEvents();
             }, this._callerFast ? 1500 : 7000);
         },
+        // Ek number = ek popup, 5 minute tak (PRA universal ke barabar).
+        // Ek call ki kai copies aa sakti hain aur band kiya hua popup dobara
+        // khulna "band hi nahi hota" lagta hai. Ring phir bhi bell ki ginti aur
+        // "Haaliya calls" list mein jati hai — sirf popup dobara nahi kholta.
+        callerMuteKey(ev) {
+            const k = ev && (ev.phone || ev.name);
+            return k ? String(k) : '';
+        },
+        callerMuted(ev) {
+            const k = this.callerMuteKey(ev);
+            if (!k) { return false; }
+            return Date.now() < ((this._callerMuted || {})[k] || 0);
+        },
+        muteCaller(ev) {
+            const k = this.callerMuteKey(ev);
+            if (!k) { return; }
+            if (!this._callerMuted) { this._callerMuted = {}; }
+            const t = Date.now();
+            this._callerMuted[k] = t + 300000; // 5 minute
+            Object.keys(this._callerMuted).forEach(x => {
+                if (this._callerMuted[x] < t) { delete this._callerMuted[x]; }
+            });
+        },
         maybeShowCallerPopup() {
-            if (this.callerPopup || this.callerQueue.length === 0 || this.callerBlocked()) { return; }
-            this.callerPopup = this.callerQueue.shift();
+            if (this.callerPopup || this.callerBlocked()) { return; }
+            let next = null;
+            while (this.callerQueue.length) {
+                const cand = this.callerQueue.shift();
+                if (!this.callerMuted(cand)) { next = cand; break; }
+            }
+            if (!next) { return; }
+            this.callerPopup = next;
+            this.muteCaller(next);
             // Soft beep, ONCE per event id (KDS-beep guard pattern — re-polls /
             // requeues must never re-fire the same ring's beep).
             const bid = this.callerPopup && this.callerPopup.id;

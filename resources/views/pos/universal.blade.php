@@ -1761,7 +1761,10 @@ window.addEventListener('popstate', function() {
                         <div class="text-right shrink-0">
                             <div class="text-[9px] font-bold tracking-widest text-white/60 uppercase" x-text="cartMethodHint ? window.TXT.total_cash : window.TXT.total_word"></div>
                             <div class="total-animate total-line text-3xl font-black text-white leading-none" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''"></div>
-                            <div x-show="cartMethodHint" x-cloak class="text-[9px] text-white/60 mt-0.5" x-text="cartMethodHint"></div>
+                            {{-- Owner (24 Aug 2026, ZFC): yeh hint "nano" tha — cashier ko
+                                 CASH/CARD dabaye baghair card wali raqam nazar aani chahiye.
+                                 Bara + bold + gold, taake grahak ko foran batayi ja sake. --}}
+                            <div x-show="cartMethodHint" x-cloak class="text-xs font-bold text-amber-300 mt-0.5" x-text="cartMethodHint"></div>
                         </div>
                     </div>
                     <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-white/50 pt-1">
@@ -11884,9 +11887,46 @@ function restaurantPos() {
                 this.pollCallerEvents();
             }, this._callerFast ? 1500 : 7000);
         },
+        // Ek number = ek popup, CALLER_MUTE_MS tak.
+        //
+        // Server ab ek ring ki copies jorh deta hai, magar counter ki taraf bhi
+        // ek pehra chahiye: cashier popup band kare aur wohi number thori der
+        // baad phir khul jaye to yeh "band hi nahi hota" mehsoos hota hai
+        // (24 Aug 2026, ZFC ki shikayat — do dafa cancel kiya, teesri dafa phir
+        // aa gaya). Ring phir bhi ginti (bell) aur "Haaliya calls" list mein
+        // jati hai — sirf popup dobara nahi kholta.
+        callerMuteKey(ev) {
+            const k = ev && (ev.phone || ev.name);
+            return k ? String(k) : '';
+        },
+        callerMuted(ev) {
+            const k = this.callerMuteKey(ev);
+            if (!k) { return false; }
+            return Date.now() < ((this._callerMuted || {})[k] || 0);
+        },
+        muteCaller(ev) {
+            const k = this.callerMuteKey(ev);
+            if (!k) { return; }
+            if (!this._callerMuted) { this._callerMuted = {}; }
+            const t = Date.now();
+            this._callerMuted[k] = t + 300000; // 5 minute
+            // Purani entries saaf — warna poori shift ka object banta jata hai.
+            Object.keys(this._callerMuted).forEach(x => {
+                if (this._callerMuted[x] < t) { delete this._callerMuted[x]; }
+            });
+        },
         maybeShowCallerPopup() {
-            if (this.callerPopup || this.callerQueue.length === 0 || this.callerBlocked()) { return; }
-            this.callerPopup = this.callerQueue.shift();
+            if (this.callerPopup || this.callerBlocked()) { return; }
+            // Muted callers queue se nikaal do (unhen dikhana nahi hai), pehla
+            // baqi bacha event dikhao.
+            let next = null;
+            while (this.callerQueue.length) {
+                const cand = this.callerQueue.shift();
+                if (!this.callerMuted(cand)) { next = cand; break; }
+            }
+            if (!next) { return; }
+            this.callerPopup = next;
+            this.muteCaller(next);
             // v2: soft beep, ONCE per event id (KDS-beep guard pattern —
             // re-polls / requeues must never re-fire the same ring's beep).
             const bid = this.callerPopup && this.callerPopup.id;

@@ -40,7 +40,11 @@ class PosCallerIdController extends Controller
 {
     private const EVENT_RETENTION_HOURS = 48;  // ring rows purged after this
     private const EVENT_FRESH_SECONDS = 120;   // poll never surfaces older rings
-    private const DEDUPE_SECONDS = 20;         // same caller re-ring collapse
+    // Same caller re-ring collapse. Ek call ki copies minton par phaili hoti
+    // hain (neeche appRing ka note), is liye yeh window ring ki "taazgi" ke
+    // barabar rakhi gai hai — 20 second sirf WhatsApp ke foran ke updates
+    // pakarta tha, dialer notification ke baad walay updates nahi.
+    private const DEDUPE_SECONDS = 120;
     // Task 1345 — DO builds, ek hi package id:
     //   default ("clean")  = sirf SIM calls, Play Protect ki blocked chaar
     //                        permissions mein se koi nahi → bina rukawat install
@@ -402,15 +406,32 @@ class PosCallerIdController extends Controller
             }
         }
 
-        // Dedupe: same caller within DEDUPE_SECONDS = one event (WhatsApp posts
-        // several notification updates per ring; SIM ring re-posts too).
-        $dupe = DB::table('pos_caller_events')
+        // Dedupe: ek hi ring ki saari copies = ek event.
+        //
+        // Ek call par phone kai dafa bolta hai. Telephony foran bolti hai
+        // (number, naam khali) aur dialer ki notification baad mein (naam,
+        // number contacts se) — aur Android us notification ke HAR update par
+        // listener ko dobara jagata hai. Nateeja: ek hi call minton tak "nai
+        // ring" ban kar aati rahi (24 Aug 2026, ZFC Pizza Point: ek number,
+        // 12 minute, 10 rows — jabke phone par koi call thi hi nahi). 20
+        // second ka purana window in mein se sirf pehli do copies pakarta tha.
+        //
+        // Nai row banane ke bajaye jo row mojood hai usay behtar kar dete hain:
+        // pehli copy mein naam nahi tha aur baad wali mein hai to naam wahin
+        // bhar do. "Haaliya calls" list ko naam mil jata hai, cashier ko doosra
+        // popup nahi.
+        $recent = DB::table('pos_caller_events')
             ->where('company_id', $company->id)
             ->where('created_at', '>=', now()->subSeconds(self::DEDUPE_SECONDS))
             ->when($phone, fn ($q) => $q->where('phone', $phone))
             ->when(!$phone, fn ($q) => $q->whereNull('phone')->where('caller_name', $name))
-            ->exists();
-        if ($dupe) {
+            ->orderByDesc('id')
+            ->first();
+        if ($recent) {
+            if ($name !== null && trim((string) ($recent->caller_name ?? '')) === '') {
+                DB::table('pos_caller_events')->where('id', $recent->id)
+                    ->update(['caller_name' => $name]);
+            }
             return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'duplicate']);
         }
 

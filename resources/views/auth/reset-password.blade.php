@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ __('pos.auth_rp_title') }} - TaxNest</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- Urdu-script UI font — renders only for locale 'ur' (Task 1287). --}}
+    @include('partials.urdu-font')
 </head>
 <body class="min-h-screen flex items-center justify-center" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 30%, #047857 60%, #0d9488 100%);">
     <div class="w-full max-w-md mx-4">

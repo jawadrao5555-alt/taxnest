@@ -1,5 +1,6 @@
+@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -31,6 +32,15 @@
             .grid { gap: 3mm; }
             .label { border: 1px dashed #cbd5e1; }
         }
+@if($urduScript)
+        /* Urdu-script labels (Task 1287): Jameel Noori Nastaleeq for the Arabic
+           range only — Latin names, prices and SKUs keep the Segoe stack. The
+           name row is nowrap+ellipsis, so give Nastaleeq the extra vertical room
+           it needs or its descenders clip inside the box. */
+        @include('partials.urdu-print-font')
+        body { font-family: 'Jameel Noori Nastaleeq', 'Segoe UI', Tahoma, Arial, sans-serif; }
+        .label .name { line-height: 1.9; }
+@endif
     </style>
 </head>
 <body>

@@ -9,6 +9,8 @@
         {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
         @include('partials.font-css', ['fontFamilies' => 'figtree:400,500,600,700'])
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        {{-- Urdu-script UI font — renders only for locale 'ur' (Task 1287); own <html> head, so own include. --}}
+        @include('partials.urdu-font')
         <style>
             @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
             @keyframes pulse-glow { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.75; transform: scale(1.06); } }

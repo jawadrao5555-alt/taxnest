@@ -40,6 +40,46 @@ class UrduPrintFontCoverageTest extends TestCase
         // (no auto_print), so JNN-gated here but intentionally NOT in the
         // auto-print list below.
         'resources/views/fbr-pos/wasooli-receipt.blade.php',
+        // A4/roll barcode label sheets: not thermal, but they print product
+        // names straight from the DB, so an Urdu-named product needs JNN here
+        // too (manual print button — not in the auto-print list).
+        'resources/views/pos/product-labels.blade.php',
+        'resources/views/fbr-pos/product-labels.blade.php',
+    ];
+
+    /**
+     * SCREEN templates that build their own <html> head instead of extending a
+     * layout — each one must @include('partials.urdu-font') itself, or Urdu-script
+     * users land on a page still rendered in the system Naskh. The panel layouts
+     * are listed too so a refactor cannot silently drop the include.
+     */
+    private const JNN_SCREEN_TEMPLATES = [
+        'resources/views/layouts/pos-app.blade.php',
+        'resources/views/layouts/fbr-pos-app.blade.php',
+        'resources/views/layouts/app.blade.php',
+        'resources/views/layouts/admin-app.blade.php',
+        'resources/views/layouts/guest.blade.php',
+        // Standalone auth screens (own <head>): the FIRST page an اردو user sees.
+        'resources/views/pos/auth/login.blade.php',
+        'resources/views/pos/auth/register.blade.php',
+        'resources/views/fbr-pos/auth/login.blade.php',
+        'resources/views/fbr-pos/auth/register.blade.php',
+        'resources/views/auth/forgot-password.blade.php',
+        'resources/views/auth/reset-password.blade.php',
+        'resources/views/auth/verify-otp.blade.php',
+        // Viewer portals + the locked-restaurant notice: own <head>, POS locale.
+        'resources/views/pos/archive/layout.blade.php',
+        'resources/views/pos/local/layout.blade.php',
+        'resources/views/pos/restaurant-locked.blade.php',
+    ];
+
+    /**
+     * Standalone screens that intentionally stay off the Urdu UI font.
+     * pos/track-public: stateless public link, no session locale — its copy is
+     * hard-coded Roman Urdu + English, so there is no Urdu script to shape.
+     */
+    private const SCREEN_FONT_EXEMPT = [
+        'resources/views/pos/track-public.blade.php',
     ];
 
     /** Templates with an automatic print trigger that must font-gate it. */
@@ -106,6 +146,67 @@ class UrduPrintFontCoverageTest extends TestCase
                 "$rel must keep the bounded 8s failsafe — the print must ALWAYS eventually fire (a fallback slip beats a lost slip)."
             );
         }
+    }
+
+    public function test_every_urdu_capable_screen_wires_the_ui_font_partial(): void
+    {
+        foreach (self::JNN_SCREEN_TEMPLATES as $rel) {
+            $path = $this->root() . '/' . $rel;
+            $this->assertFileExists($path, "$rel is gone — update the JNN screen list.");
+            $this->assertStringContainsString(
+                "@include('partials.urdu-font')",
+                file_get_contents($path),
+                "$rel must @include('partials.urdu-font') — the partial self-gates on locale 'ur', "
+                . "so leaving it out means اردو users read that screen in the system Naskh."
+            );
+        }
+    }
+
+    public function test_sweep_no_standalone_screen_slips_in_without_jnn(): void
+    {
+        // Any blade that opens its own document (@php header allowed before it)
+        // and renders translated text is a standalone SCREEN: it gets no font
+        // wiring from a layout, so it must carry the include itself. Print/PDF
+        // templates are excluded — they use the urdu-print-font partial instead.
+        $missing = [];
+        foreach (['pos', 'fbr-pos', 'auth', 'layouts'] as $dir) {
+            $base = $this->root() . '/resources/views/' . $dir;
+            if (!is_dir($base)) {
+                continue;
+            }
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($base));
+            foreach ($iterator as $file) {
+                if (!$file->isFile() || !str_ends_with($file->getFilename(), '.blade.php')) {
+                    continue;
+                }
+                $name = $file->getFilename();
+                if (preg_match('/(pdf|thermal|receipt|ticket|label|print|proof-bill)/i', $name)) {
+                    continue;
+                }
+                $src = file_get_contents($file->getPathname());
+                // Real document root only — not an HTML string built inside JS.
+                if (!preg_match('/^(?:@php[\s\S]{0,200}?@endphp\s*)?<!DOCTYPE html>/i', ltrim($src))) {
+                    continue;
+                }
+                if (!str_contains($src, '__(')) {
+                    continue;
+                }
+                $rel = ltrim(str_replace($this->root(), '', $file->getPathname()), '/');
+                if (in_array($rel, self::SCREEN_FONT_EXEMPT, true)) {
+                    continue;
+                }
+                if (!str_contains($src, "@include('partials.urdu-font')")) {
+                    $missing[] = $rel;
+                }
+            }
+        }
+        sort($missing);
+        $this->assertSame(
+            [],
+            $missing,
+            'Standalone Urdu-capable screen(s) with no UI font wiring: ' . implode(', ', $missing)
+            . " — add @include('partials.urdu-font') to the <head> (or list it in SCREEN_FONT_EXEMPT with a reason)."
+        );
     }
 
     public function test_sweep_no_thermal_template_slips_in_without_jnn(): void

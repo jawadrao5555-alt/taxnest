@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,11 +8,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        /* JNN first: its @font-face (urdu-font partial below) is unicode-range
+           limited to the Arabic blocks and only exists for locale 'ur', so Latin
+           text always falls through to the system stack. */
+        body { font-family: 'Jameel Noori Nastaleeq', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .archive-grad { background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); }
         .gold { color: #d4af37; }
         .gold-bg { background: linear-gradient(135deg, #d4af37, #b8941f); }
     </style>
+    {{-- Urdu-script UI font — renders only for locale 'ur' (Task 1287). --}}
+    @include('partials.urdu-font')
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
 <div class="archive-grad min-h-screen">

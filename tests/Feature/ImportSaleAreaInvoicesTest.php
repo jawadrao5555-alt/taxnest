@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\ImportSaleAreaInvoices;
+use App\Services\ScheduleEngine;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -227,5 +228,53 @@ class ImportSaleAreaInvoicesTest extends TestCase
         // Skipping it would quietly under-report the month to FBR.
         $this->assertSame([], $groups);
         $this->assertContains('CRAFTED BY MARLBORO', $missing);
+    }
+
+    public function test_the_rows_it_builds_pass_the_same_validation_the_web_form_uses(): void
+    {
+        [$groups] = ImportSaleAreaInvoices::parseSaleArea($this->file, $this->catalogue());
+
+        // Building rows the ScheduleEngine rejects would mean 5,960 drafts
+        // that can never be submitted — catch the contract here, not on live.
+        foreach ($groups as $key => $group) {
+            $rows = ImportSaleAreaInvoices::rowsFor($group, $this->catalogue());
+            $errors = ScheduleEngine::validateItems(array_column($rows, 'data'), 18.0);
+
+            $this->assertSame([], $errors, "Group {$key} failed schedule validation: " . implode('; ', $errors));
+        }
+    }
+
+    public function test_every_line_carries_thousand_unit_and_the_annex_a_mrp(): void
+    {
+        [$groups] = ImportSaleAreaInvoices::parseSaleArea($this->file, $this->catalogue());
+
+        $data = ImportSaleAreaInvoices::rowsFor($groups['BHPAHP-04204|2026-08-02'], $this->catalogue())[0]['data'];
+
+        // Losing the UOM to the "Numbers, pieces, units" fallback is the whole
+        // bug this import exists to prevent.
+        $this->assertSame('Thousand Unit', $data['_default_uom']);
+        $this->assertSame('3rd Schedule Goods', $data['_sale_type']);
+        $this->assertEqualsWithDelta(0.40, $data['quantity'], 0.0001);
+        $this->assertEqualsWithDelta(self::MARLBORO_RATE, $data['price'], 0.01);
+        // Annex-A: the notified value IS the invoice value, so MRP == rate.
+        $this->assertEqualsWithDelta(self::MARLBORO_RATE, $data['mrp'], 0.01);
+        $this->assertEqualsWithDelta(1934.28, $data['tax'], 0.01);
+    }
+
+    public function test_the_customer_code_rides_in_the_address_so_same_named_shops_stay_apart(): void
+    {
+        [$groups] = ImportSaleAreaInvoices::parseSaleArea($this->file, $this->catalogue());
+
+        $one = ImportSaleAreaInvoices::rowsFor($groups['BHPAHP-04204|2026-08-01'], $this->catalogue())[0]['data'];
+        $two = ImportSaleAreaInvoices::rowsFor($groups['BHPAHP-04672|2026-08-01'], $this->catalogue())[0]['data'];
+
+        $this->assertSame($one['buyer_name'], $two['buyer_name'], 'Fixture should have two shops sharing a name.');
+        $this->assertNotSame(
+            $one['buyer_address'],
+            $two['buyer_address'],
+            'Two shops with the same name must be tellable apart on the invoice.'
+        );
+        $this->assertStringContainsString('BHPAHP-04204', $one['buyer_address']);
+        $this->assertStringContainsString('BHPAHP-04672', $two['buyer_address']);
     }
 }

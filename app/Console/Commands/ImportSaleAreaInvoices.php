@@ -96,6 +96,7 @@ class ImportSaleAreaInvoices extends Command
             return self::FAILURE;
         }
 
+        $standardTaxRate = $company->getStandardTaxRateValue();
         $catalogue = $this->loadCatalogue($companyId);
         if ($catalogue === []) {
             $this->error("Company {$companyId} has no products. Run di:cigarette-catalogue first.");
@@ -150,7 +151,7 @@ class ImportSaleAreaInvoices extends Command
         foreach ($groups as $group) {
             $bar->advance();
 
-            if (isset($alreadyImported[$this->addressFor($group) . '|' . $group['date']])) {
+            if (isset($alreadyImported[self::addressFor($group) . '|' . $group['date']])) {
                 $skipped++;
                 continue;
             }
@@ -159,15 +160,17 @@ class ImportSaleAreaInvoices extends Command
                 continue;
             }
 
-            $rows = $this->rowsFor($group, $catalogue);
-
-            $errors = ScheduleEngine::validateItems(array_column($rows, 'data'), $company);
-            if ($errors !== []) {
-                $failed[] = $group['code'] . ' ' . $group['date'] . ': ' . implode('; ', (array) reset($errors));
-                continue;
-            }
-
             try {
+                $rows = self::rowsFor($group, $catalogue);
+
+                // The same gate the web form uses, so a bad group is reported
+                // instead of being written as an unsubmittable draft.
+                $errors = ScheduleEngine::validateItems(array_column($rows, 'data'), $standardTaxRate);
+                if ($errors !== []) {
+                    $failed[] = $group['code'] . ' ' . $group['date'] . ': ' . implode('; ', $errors);
+                    continue;
+                }
+
                 // One group per call — the service groups by buyer NAME, which
                 // would merge two shops that share a name on the same day.
                 $result = $importer->createDraftsFromRows(
@@ -334,7 +337,7 @@ class ImportSaleAreaInvoices extends Command
     // ------------------------------------------------------------------
 
     /** @return array<int, array{row:int, data:array}> */
-    private function rowsFor(array $group, array $catalogue): array
+    public static function rowsFor(array $group, array $catalogue): array
     {
         $rows = [];
         foreach ($group['lines'] as $index => $line) {
@@ -347,7 +350,7 @@ class ImportSaleAreaInvoices extends Command
                 'buyer_name' => $group['buyer'],
                 'buyer_ntn' => '',
                 'buyer_cnic' => '',
-                'buyer_address' => $this->addressFor($group),
+                'buyer_address' => self::addressFor($group),
                 'document_type' => 'Sale Invoice',
                 'reference_invoice_number' => '',
                 'destination_province' => self::DESTINATION_PROVINCE,
@@ -379,7 +382,7 @@ class ImportSaleAreaInvoices extends Command
     }
 
     /** The code disambiguates the 87 shops that share a registered name. */
-    private function addressFor(array $group): string
+    private static function addressFor(array $group): string
     {
         return $group['town'] !== '' ? "{$group['town']} ({$group['code']})" : $group['code'];
     }

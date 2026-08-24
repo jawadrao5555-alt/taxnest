@@ -312,7 +312,7 @@
                 <td class="code">{{ $item->hs_code }}</td>
                 <td class="product">{{ $item->description }}</td>
                 <td class="ac" style="font-size: 9px;">{{ $item->default_uom ?? 'PCS' }}</td>
-                <td class="ar">{{ number_format($item->quantity, 0) }}</td>
+                <td class="ar">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
                 <td class="ar">{{ number_format($item->price, 2) }}</td>
                 <td class="ar" style="font-weight: 800;">{{ number_format($item->price * $item->quantity, 2) }}</td>
                 <td class="ar" style="font-size: 9px;">{{ number_format($item->tax_rate ?? 0, 0) }}%</td>

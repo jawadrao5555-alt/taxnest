@@ -8,18 +8,29 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * di:cigarette-catalogue seeds a DI distributor's product catalogue.
+ * di:cigarette-catalogue seeds a tobacco distributor's product catalogue.
  *
  * The things worth pinning are the ones that would silently mis-file an
  * invoice rather than throw:
- *   - UoM must be "Thousand Unit" (a pack-based UoM overstates volume 50x),
- *   - HS 2402.2000 on the 3rd Schedule with an MRP, because 3rd Schedule tax
- *     is charged on MRP and not on the sale price,
- *   - re-running must not duplicate the catalogue.
+ *   - cigarettes must be in "Thousand Unit" (a pack-based UoM overstates
+ *     volume 50x, and FBR does not validate the unit against the number),
+ *   - HS 2402.2000 on the 3rd Schedule carrying an MRP equal to the sale
+ *     value, because that is how the distributor's Annex-A reports the same
+ *     goods (Value of Purchases == Value of Fixed/notified),
+ *   - HS 2404.9100 sits one digit away but is standard rate with NO MRP, so it
+ *     must never inherit the cigarette treatment,
+ *   - re-running must normalise every duplicate, must not duplicate the
+ *     catalogue, and must not wipe a price the distributor typed in.
  */
 class CigaretteCatalogueCommandTest extends TestCase
 {
     private const COMPANY_ID = 3301;
+
+    /** Cigarette brands on the 3rd Schedule. */
+    private const CIGARETTE_COUNT = 8;
+
+    /** Cigarettes + the standard-rate pouch line. */
+    private const CATALOGUE_COUNT = 9;
 
     protected function setUp(): void
     {
@@ -62,7 +73,7 @@ class CigaretteCatalogueCommandTest extends TestCase
 
         DB::table('companies')->insert([
             'id' => self::COMPANY_ID,
-            'name' => 'Cigarette Distributor',
+            'name' => 'Tobacco Distributor',
             'product_type' => 'di',
             'created_at' => now(),
             'updated_at' => now(),
@@ -74,41 +85,145 @@ class CigaretteCatalogueCommandTest extends TestCase
         return DB::table('products')->where('company_id', self::COMPANY_ID);
     }
 
-    public function test_it_seeds_the_catalogue_in_thousand_unit_on_the_third_schedule(): void
+    public function test_it_seeds_cigarettes_in_thousand_unit_on_the_third_schedule(): void
     {
         $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID])
             ->assertExitCode(0);
 
-        $products = $this->catalogue()->get();
-        $this->assertCount(8, $products);
+        $cigarettes = $this->catalogue()->where('hs_code', '2402.2000')->get();
+        $this->assertCount(self::CIGARETTE_COUNT, $cigarettes);
 
-        foreach ($products as $product) {
+        foreach ($cigarettes as $product) {
             $this->assertSame('Thousand Unit', $product->uom, "{$product->name} is not in Thousand Unit.");
-            $this->assertSame('2402.2000', $product->hs_code);
             $this->assertSame('3rd_schedule', $product->schedule_type);
             $this->assertEquals(1, $product->is_third_schedule);
             $this->assertEquals(18, (float) $product->default_tax_rate);
             $this->assertGreaterThan(0, (float) $product->default_price, "{$product->name} has no price.");
-            $this->assertGreaterThan(
+            $this->assertEqualsWithDelta(
                 (float) $product->default_price,
                 (float) $product->mrp,
-                "{$product->name}: 3rd Schedule tax rides MRP, so MRP must exceed the ex-tax price."
+                0.01,
+                "{$product->name}: the 3rd Schedule notified value is the invoice value, so MRP must equal the rate."
             );
         }
     }
 
-    public function test_the_owner_supplied_rate_survives_the_conversion_to_thousand_unit(): void
+    public function test_the_rate_card_is_stored_per_thousand_unit_not_per_pack(): void
     {
         $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
 
         // Red & White Special: 12,880 per Thousand Unit => 257.60 per pack.
+        // Storing the per-pack figure here is the 50x mis-filing bug.
         $product = $this->catalogue()->where('name', 'Red & White Special')->first();
         $this->assertNotNull($product);
+        $this->assertEqualsWithDelta(12880.00, (float) $product->default_price, 0.01);
+        $this->assertEqualsWithDelta(12880.00, (float) $product->mrp, 0.01);
+    }
 
-        // Ex-tax price is the gross rate less the ~17.8% tax component.
-        $this->assertEqualsWithDelta(10586.96, (float) $product->default_price, 0.05);
-        // 18% of MRP must reproduce the sales tax the DMS charges on that value.
-        $this->assertEqualsWithDelta(0.18 * (float) $product->mrp, 1978.99, 1.0);
+    public function test_a_real_invoice_line_reproduces_the_annex_a_arithmetic(): void
+    {
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        // A real line off the distributor's volume export: 0.04 Ms of Crafted
+        // By Marlboro. Value 339.94, and 3rd Schedule tax is 18% of it.
+        $rate = (float) $this->catalogue()->where('name', 'Crafted By Marlboro')->value('default_price');
+        $value = 0.04 * $rate;
+
+        $this->assertEqualsWithDelta(339.94, $value, 0.01);
+        $this->assertEqualsWithDelta(61.19, $value * 0.18, 0.01);
+    }
+
+    public function test_nicotine_pouches_are_standard_rate_with_no_mrp(): void
+    {
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        $zyn = $this->catalogue()->where('name', 'ZYN')->first();
+        $this->assertNotNull($zyn, 'The standard-rate pouch line was not seeded.');
+
+        $this->assertSame('2404.9100', $zyn->hs_code);
+        $this->assertSame('2404.9100', $zyn->pct_code);
+        $this->assertSame('standard', $zyn->schedule_type);
+        $this->assertEquals(0, $zyn->is_third_schedule);
+        $this->assertSame('Kilograms', $zyn->uom);
+        $this->assertEquals(18, (float) $zyn->default_tax_rate);
+        $this->assertNull($zyn->mrp, 'Standard rate carries no MRP.');
+        $this->assertNull($zyn->sro_reference);
+    }
+
+    public function test_a_pouch_row_previously_seeded_as_third_schedule_loses_its_stale_mrp(): void
+    {
+        // A hand-entered row can already exist with the cigarette treatment
+        // copied onto it. Re-seeding must clear the MRP, not leave it behind.
+        DB::table('products')->insert([
+            'company_id' => self::COMPANY_ID,
+            'name' => 'ZYN',
+            'hs_code' => '2402.2000',
+            'schedule_type' => '3rd_schedule',
+            'is_third_schedule' => true,
+            'mrp' => 999.00,
+            'sro_reference' => 'SRO-STALE',
+            'default_price' => 500.00,
+            'uom' => 'Thousand Unit',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        $zyn = $this->catalogue()->where('name', 'ZYN')->first();
+        $this->assertSame(1, $this->catalogue()->where('name', 'ZYN')->count());
+        $this->assertNull($zyn->mrp, 'A stale 3rd Schedule MRP survived the re-seed.');
+        $this->assertNull($zyn->sro_reference, 'A stale SRO survived the re-seed.');
+        $this->assertSame('standard', $zyn->schedule_type);
+        $this->assertEquals(0, $zyn->is_third_schedule);
+    }
+
+    public function test_a_hand_entered_pouch_price_is_never_wiped_by_a_reseed(): void
+    {
+        // The pouch line is seeded at 0 because no selling rate was supplied.
+        // Once the distributor types one in, re-running must not reset it —
+        // that would silently drop a real price back to zero.
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+        $this->catalogue()->where('name', 'ZYN')->update(['default_price' => 1450.00]);
+
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        $this->assertEqualsWithDelta(
+            1450.00,
+            (float) $this->catalogue()->where('name', 'ZYN')->value('default_price'),
+            0.01,
+            'Re-seeding wiped a price the distributor had entered.'
+        );
+    }
+
+    public function test_every_duplicate_of_a_name_is_normalised_not_just_the_first(): void
+    {
+        // There is no unique index on (company_id, name), so a catalogue can
+        // hold two rows for one brand. Leaving one behind with the wrong HS
+        // code mis-files whichever copy gets picked on the sale screen.
+        foreach ([1, 2] as $ignored) {
+            DB::table('products')->insert([
+                'company_id' => self::COMPANY_ID,
+                'name' => 'Morven',
+                'hs_code' => '9999.0000',
+                'schedule_type' => 'standard',
+                'uom' => 'Packs',
+                'default_price' => 10.00,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        $morvens = $this->catalogue()->where('name', 'Morven')->get();
+        $this->assertCount(2, $morvens, 'Seeding should normalise duplicates, not add or remove rows.');
+
+        foreach ($morvens as $row) {
+            $this->assertSame('2402.2000', $row->hs_code, 'A duplicate kept its wrong HS code.');
+            $this->assertSame('Thousand Unit', $row->uom, 'A duplicate kept a pack-based UoM.');
+            $this->assertSame('3rd_schedule', $row->schedule_type);
+        }
     }
 
     public function test_rerunning_updates_instead_of_duplicating(): void
@@ -118,7 +233,7 @@ class CigaretteCatalogueCommandTest extends TestCase
 
         $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
 
-        $this->assertSame(8, $this->catalogue()->count(), 'Re-running duplicated the catalogue.');
+        $this->assertSame(self::CATALOGUE_COUNT, $this->catalogue()->count(), 'Re-running duplicated the catalogue.');
         $this->assertGreaterThan(
             1,
             (float) $this->catalogue()->where('name', 'Morven')->value('default_price'),

@@ -8,7 +8,7 @@ use App\Models\Scopes\CompanyScope;
 use Illuminate\Console\Command;
 
 /**
- * Seed the cigarette product catalogue for a Digital Invoice distributor.
+ * Seed the tobacco product catalogue for a Digital Invoice distributor.
  *
  * WHY A COMMAND: the DI product catalogue (/products) has no bulk import, and
  * `tinker` is disabled on the production host, so this is the only reviewable,
@@ -18,20 +18,34 @@ use Illuminate\Console\Command;
  *
  * THE NUMBERS
  * -----------
- * The distributor's DMS quotes a GROSS rate (everything included).  FBR wants
- * three different figures per line, and both conversions are per-invoice:
+ * The distributor's DMS quotes a rate per Thousand Unit, and that rate is the
+ * value FBR is filed on:
  *
- *   ex-tax price = DMS gross rate x (invoice Value-Exclusive / invoice Sub Total)
- *   MRP          = ex-tax price   x (invoice Sales Tax / (18% x Value-Exclusive))
- *   sales tax    = 18% x MRP x quantity          <- 3rd Schedule: tax rides MRP
+ *   line value = quantity(Ms) x rate(per Ms)
+ *   line tax   = 18% x line value
  *
- * Both factors drift slightly from invoice to invoice, so the values stored
- * here are STARTING POINTS for manual entry.  An invoice import must always
- * recompute them from that invoice's own totals — never from this table.
+ * Cigarettes (HS 2402.2000) sit on the 3rd Schedule, so each line must also
+ * carry an MRP — but the notified value equals the invoice value.  That is
+ * exactly how the distributor's own Annex-A reports the purchase side: for
+ * every 3rd Schedule row `Value of Purchases == Value of Fixed/notified` and
+ * `Sales Tax == 18% of it`.  So the seeded MRP per Ms is the rate itself, not
+ * an uplift on it.
  *
- * QUANTITY: declared in FBR's "Thousand Unit" (1 = 1000 sticks = 50 packs
- * = 5 outers), so every rate below is per Thousand Unit, and a shop buying
- * 2 packs is quantity 0.04.
+ * A previous revision of this command derived the price and MRP from two
+ * per-invoice factors (~0.822 ex-tax, then ~1.0384 MRP uplift) reverse
+ * engineered from the one FBR-verified invoice.  Those are gone: that invoice
+ * is the known-bad one (quantities filed 50x over) and its value base does not
+ * reconcile with Annex-A.  Deriving a rate card from a single mis-filed
+ * invoice was the error.
+ *
+ * QUANTITY: cigarettes are declared in FBR's "Thousand Unit" (1 = 1000 sticks
+ * = 50 packs = 5 outers), so every rate below is per Thousand Unit, and a shop
+ * buying 2 packs is quantity 0.04.
+ *
+ * WHAT THIS COMMAND OWNS: the tax classification (heading, schedule, UoM, MRP,
+ * SRO).  Getting those wrong mis-files an invoice silently, so they are always
+ * normalised.  A selling price the distributor typed in is his data, and is
+ * only overwritten where the rate card is the whole point (the cigarettes).
  */
 class SeedCigaretteCatalogue extends Command
 {
@@ -39,26 +53,22 @@ class SeedCigaretteCatalogue extends Command
                             {company : Company id to seed the catalogue for}
                             {--dry-run : Show what would change without writing}';
 
-    protected $description = 'Create/update the cigarette product catalogue (HS 2402.2000, Thousand Unit) for a DI company';
+    protected $description = 'Create/update the tobacco product catalogue (HS 2402.2000 cigarettes + HS 2404.9100 pouches) for a DI company';
 
-    /** FBR heading for cigarettes containing tobacco. */
-    private const HS_CODE = '2402.2000';
+    /** FBR heading for cigarettes containing tobacco — 3rd Schedule. */
+    private const HS_CIGARETTES = '2402.2000';
 
     /**
-     * Mean ex-tax factor observed across the distributor's DMS invoices
-     * (0.821957-0.822872). Used only to seed a starting price.
+     * FBR heading for nicotine pouches / oral tobacco substitutes.  One digit
+     * away from the cigarette heading but a completely different treatment:
+     * standard rate, no MRP, and Annex-A reports its notified value as 0.
      */
-    private const EX_TAX_FACTOR = 0.821969;
+    private const HS_NICOTINE_POUCHES = '2404.9100';
 
     /**
-     * Mean MRP uplift observed on the FBR-verified invoice, i.e.
-     * Sales Tax / (18% x Value-Exclusive). Used only to seed a starting MRP.
-     */
-    private const MRP_FACTOR = 1.038378;
-
-    /**
-     * DMS gross rate per Thousand Unit, as supplied by the distributor.
-     * Divide by 5 for an outer, by 50 for a pack.
+     * DMS rate per Thousand Unit, as published in the distributor's own
+     * "Sale Area" export (its last row carries the rate the sheet's Amount
+     * formula multiplies by).  Divide by 5 for an outer, by 50 for a pack.
      */
     private const RATE_CARD = [
         'Marlboro Gold' => 26865.00,
@@ -69,6 +79,24 @@ class SeedCigaretteCatalogue extends Command
         'Diplomat' => 9020.17,
         'Morven Classic' => 8523.65,
         'Crafted By Marlboro' => 8498.50,
+    ];
+
+    /**
+     * Standard-rate tobacco lines that are NOT on the 3rd Schedule, so they
+     * carry no MRP and no SRO.
+     *
+     * The sale rate is seeded at 0 — the distributor supplied the heading and
+     * the tax rate but not a selling price, and these do not appear in the
+     * volume export at all.  A guessed auto-fill price is worse than a blank
+     * one here, because it would ride silently onto a filed FBR invoice.
+     * Once he types a real price it is preserved on every later re-run.
+     */
+    private const STANDARD_RATE_PRODUCTS = [
+        'ZYN' => [
+            'hs_code' => self::HS_NICOTINE_POUCHES,
+            'uom' => 'Kilograms',
+            'price' => 0.00,
+        ],
     ];
 
     public function handle(): int
@@ -93,52 +121,60 @@ class SeedCigaretteCatalogue extends Command
         $created = 0;
         $updated = 0;
 
-        foreach (self::RATE_CARD as $name => $grossPerThousand) {
-            $price = round($grossPerThousand * self::EX_TAX_FACTOR, 2);
-            $mrp = round($price * self::MRP_FACTOR, 2);
+        foreach (self::RATE_CARD as $name => $ratePerThousand) {
+            // 3rd Schedule: the notified/MRP value IS the invoice value, so the
+            // MRP per unit is the same rate the line is priced at.
+            $price = round($ratePerThousand, 2);
 
-            $attributes = [
-                'hs_code' => self::HS_CODE,
-                'pct_code' => self::HS_CODE,
+            $action = $this->persist($companyId, $name, [
+                'hs_code' => self::HS_CIGARETTES,
+                'pct_code' => self::HS_CIGARETTES,
                 'uom' => 'Thousand Unit',
                 'default_tax_rate' => 18,
                 'tax_type' => 'taxable',
                 'schedule_type' => '3rd_schedule',
                 'is_third_schedule' => true,
                 'default_price' => $price,
-                'mrp' => $mrp,
+                'mrp' => $price,
                 'is_active' => true,
-            ];
+            ], $dryRun, $created, $updated);
 
-            $existing = Product::withoutGlobalScope(CompanyScope::class)
-                ->where('company_id', $companyId)
-                ->where('name', $name)
-                ->first();
+            $rows[] = [$action, $name, '3rd Schedule', 'Thousand Unit', number_format($price, 2), number_format($price, 2)];
+        }
 
-            $action = $existing ? 'update' : 'create';
-            $existing ? $updated++ : $created++;
+        foreach (self::STANDARD_RATE_PRODUCTS as $name => $spec) {
+            $action = $this->persist($companyId, $name, [
+                'hs_code' => $spec['hs_code'],
+                'pct_code' => $spec['hs_code'],
+                'uom' => $spec['uom'],
+                'default_tax_rate' => 18,
+                'tax_type' => 'taxable',
+                'schedule_type' => 'standard',
+                'is_third_schedule' => false,
+                'default_price' => $spec['price'],
+                // Standard rate carries no MRP. Null these explicitly so a row
+                // previously classified as 3rd Schedule cannot keep a stale
+                // MRP or SRO that would mis-file the line.
+                'mrp' => null,
+                'sro_reference' => null,
+                'serial_number' => null,
+                'is_active' => true,
+            ], $dryRun, $created, $updated, preservePrice: true);
 
-            if (!$dryRun) {
-                Product::withoutGlobalScope(CompanyScope::class)->updateOrCreate(
-                    ['company_id' => $companyId, 'name' => $name],
-                    $attributes
-                );
-            }
+            $stored = $dryRun ? $spec['price'] : (float) Product::withoutGlobalScope(CompanyScope::class)
+                ->where('company_id', $companyId)->where('name', $name)->value('default_price');
 
             $rows[] = [
                 $action,
                 $name,
-                number_format($grossPerThousand, 2),
-                number_format($price, 2),
-                number_format($mrp, 2),
-                number_format($grossPerThousand / 50, 2),
+                'Standard Rate',
+                $spec['uom'],
+                $stored > 0 ? number_format($stored, 2) : 'set on first sale',
+                '—',
             ];
         }
 
-        $this->table(
-            ['', 'Product', 'DMS gross /Ms', 'Ex-tax price /Ms', 'MRP /Ms', 'gross /pack'],
-            $rows
-        );
+        $this->table(['', 'Product', 'Schedule', 'UoM', 'Rate', 'MRP'], $rows);
 
         $this->info(($dryRun ? 'Would create' : 'Created') . " {$created}, "
             . ($dryRun ? 'would update' : 'updated') . " {$updated}.");
@@ -148,5 +184,61 @@ class SeedCigaretteCatalogue extends Command
         $this->line("Catalogue now holds {$total} product(s) for this company.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Write one catalogue row, counting it as a create or an update.
+     *
+     * There is no unique index on (company_id, name), so a catalogue can
+     * already hold more than one row under the same name — from a hand entry
+     * plus an import, say.  Every matching row is normalised rather than just
+     * the first, otherwise a duplicate keeps its wrong tax classification and
+     * quietly mis-files whichever copy the cashier happens to pick.
+     *
+     * @param  int   $created        running total, by reference
+     * @param  int   $updated        running total, by reference
+     * @param  bool  $preservePrice  keep a non-zero price already on the row
+     */
+    private function persist(
+        int $companyId,
+        string $name,
+        array $attributes,
+        bool $dryRun,
+        int &$created,
+        int &$updated,
+        bool $preservePrice = false
+    ): string {
+        $existing = Product::withoutGlobalScope(CompanyScope::class)
+            ->where('company_id', $companyId)
+            ->where('name', $name)
+            ->get();
+
+        $exists = $existing->isNotEmpty();
+        $exists ? $updated++ : $created++;
+
+        if ($dryRun) {
+            return $exists ? 'update' : 'create';
+        }
+
+        if (!$exists) {
+            Product::withoutGlobalScope(CompanyScope::class)
+                ->create($attributes + ['company_id' => $companyId, 'name' => $name]);
+
+            return 'create';
+        }
+
+        foreach ($existing as $row) {
+            $payload = $attributes;
+
+            // A price the distributor typed in is his data — never replace it
+            // with a placeholder.
+            if ($preservePrice && (float) $row->default_price > 0) {
+                unset($payload['default_price']);
+            }
+
+            $row->fill($payload)->save();
+        }
+
+        return 'update';
     }
 }

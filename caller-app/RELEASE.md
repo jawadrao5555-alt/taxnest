@@ -371,9 +371,14 @@ BT=/home/runner/android-sdk/build-tools/36.0.0
 SIM=caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk
 PLUS=caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk
 
-# a. Clean build has the telephony receiver; plus build has the listener.
+# a. Clean build has the telephony receiver; plus build has the listener AND
+#    (since 1.5.0) telephony + contacts too — notification-only detection never
+#    sees a saved contact's number, so plus reads the number from telephony and
+#    resolves a WhatsApp name through contacts. Both builds therefore carry
+#    READ_PHONE_STATE + READ_CALL_LOG; only plus adds READ_CONTACTS. (Before
+#    1.5.0 plus had none of the three — do not "fix" a build back to that.)
 $BT/aapt2 dump permissions $SIM     # READ_PHONE_STATE + READ_CALL_LOG expected
-$BT/aapt2 dump permissions $PLUS    # neither of those expected
+$BT/aapt2 dump permissions $PLUS    # those two + READ_CONTACTS expected
 
 
 # b. Language switch (Task 1382): each build must show its OWN badge. That the

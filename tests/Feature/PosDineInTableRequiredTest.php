@@ -103,11 +103,17 @@ class PosDineInTableRequiredTest extends TestCase
             $table->unsignedBigInteger('table_id')->nullable();
             $table->string('order_type')->default('dine_in');
             $table->string('status')->default('held');
+            $table->unsignedBigInteger('customer_id')->nullable();
             $table->string('customer_name')->nullable();
             $table->string('customer_phone')->nullable();
+            $table->string('delivery_address')->nullable();
             $table->decimal('subtotal', 12, 2)->default(0);
+            $table->string('discount_type')->nullable();
+            $table->decimal('discount_value', 12, 2)->default(0);
+            $table->decimal('discount_amount', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
             $table->decimal('total_amount', 12, 2)->default(0);
+            $table->decimal('estimated_cost', 12, 2)->default(0);
             $table->string('kitchen_notes')->nullable();
             $table->boolean('priority')->default(false);
             $table->unsignedBigInteger('created_by')->nullable();
@@ -115,6 +121,11 @@ class PosDineInTableRequiredTest extends TestCase
             $table->string('source')->default('waiter');
             $table->timestamp('kot_sent_at')->nullable();
             $table->integer('kot_print_count')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->timestamp('superseded_at')->nullable();
+            $table->text('void_items')->nullable();
+            $table->string('hold_uuid', 64)->nullable()->unique();
             $table->timestamps();
         });
 
@@ -128,7 +139,43 @@ class PosDineInTableRequiredTest extends TestCase
             $table->decimal('unit_price', 12, 2)->default(0);
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->string('special_notes')->nullable();
+            $table->boolean('is_tax_exempt')->default(false);
+            $table->string('item_discount_type')->nullable();
+            $table->decimal('item_discount_value', 12, 2)->default(0);
+            $table->decimal('item_discount_amount', 12, 2)->default(0);
             $table->timestamp('kot_printed_at')->nullable();
+            $table->integer('kot_batch_no')->nullable();
+            $table->timestamps();
+        });
+
+        // A completed hold prices its lines and costs its recipes, so the
+        // takeaway/delivery park tests below need these two present too.
+        Schema::create('pos_tax_rules', function (Blueprint $table) {
+            $table->id();
+            $table->string('payment_method');
+            $table->decimal('tax_rate', 5, 2)->default(0);
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        Schema::create('product_recipes', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('ingredient_id');
+            $table->decimal('quantity_needed', 12, 4)->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('pos_products', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->decimal('price', 12, 2)->default(0);
+            $table->decimal('cost_price', 12, 2)->default(0);
+            $table->decimal('stock_quantity', 12, 2)->default(0);
+            $table->boolean('is_tax_exempt')->default(false);
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }
@@ -194,6 +241,23 @@ class PosDineInTableRequiredTest extends TestCase
     private function holdItems(): array
     {
         return [['item_type' => 'manual', 'item_name' => 'Bottle', 'unit_price' => 100, 'quantity' => 1]];
+    }
+
+    /**
+     * A REAL product line — what the sale screen actually posts on Hold.
+     * The manual fixture above is deliberately not used for the park tests:
+     * the screen refuses to hold manual/deal carts, so a manual payload would
+     * prove a path no cashier can reach.
+     */
+    private function productItems(Company $c): array
+    {
+        $id = DB::table('pos_products')->insertGetId([
+            'company_id' => $c->id, 'name' => 'ZFC Sp Pizza L', 'price' => 1750,
+            'cost_price' => 0, 'stock_quantity' => 100,
+            'is_tax_exempt' => false, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        return [['item_type' => 'product', 'item_id' => $id, 'quantity' => 1]];
     }
 
     // ── 1. Waiter punch path ─────────────────────────────────────────────
@@ -290,18 +354,41 @@ class PosDineInTableRequiredTest extends TestCase
         $this->assertSame(__('pos.dine_in_table_required'), $body['message']);
     }
 
-    public function test_hold_takeaway_still_hits_type_flow_gate_not_table_guard(): void
+    /**
+     * Owner (ZFC PIZZA POINT, 25 Aug 2026): parking is no longer a Dine-In-only
+     * procedure — a counter taking phone orders must be able to set a half-built
+     * Takeaway/Delivery cart aside and answer the next call. What must NOT
+     * follow it: the table guard. These types own no table, so the dine-in
+     * table requirement has to stay silent for them.
+     */
+    public function test_hold_takeaway_parks_and_never_hits_the_table_guard(): void
     {
-        // Explicit hold of takeaway is rejected by the PRE-EXISTING flow gate
-        // (dine-in-only hold) — the new table guard must not change that message.
         $c = $this->makeCompany(['tables' => true, 'kot' => true]);
         $this->makeWaiter($c);
 
-        $res = $this->cashierHold(['items' => $this->holdItems(), 'order_type' => 'takeaway']);
+        $res = $this->cashierHold(['items' => $this->productItems($c), 'order_type' => 'takeaway']);
 
-        $this->assertSame(422, $res->getStatusCode());
+        $this->assertSame(200, $res->getStatusCode(), 'takeaway must park: ' . $res->getContent());
         $body = json_decode($res->getContent(), true);
-        $this->assertNotSame(__('pos.dine_in_table_required'), $body['message']);
-        $this->assertStringContainsString('Dine-In', $body['message']);
+        $this->assertTrue($body['success']);
+        $this->assertSame(1, DB::table('restaurant_orders')->count());
+        $this->assertSame('takeaway', DB::table('restaurant_orders')->value('order_type'));
+        $this->assertNull(DB::table('restaurant_orders')->value('table_id'), 'takeaway parks without a table');
+    }
+
+    /** The ZFC case itself: a delivery cart parks while the next call comes in. */
+    public function test_hold_delivery_parks_and_never_hits_the_table_guard(): void
+    {
+        $c = $this->makeCompany(['tables' => true, 'kot' => true, 'kitchen' => true, 'delivery' => true]);
+        $this->makeWaiter($c);
+
+        $res = $this->cashierHold(['items' => $this->productItems($c), 'order_type' => 'delivery']);
+
+        $this->assertSame(200, $res->getStatusCode(), 'delivery must park: ' . $res->getContent());
+        $body = json_decode($res->getContent(), true);
+        $this->assertTrue($body['success']);
+        $this->assertSame('delivery', DB::table('restaurant_orders')->value('order_type'));
+        $this->assertNull(DB::table('restaurant_orders')->value('table_id'), 'delivery parks without a table');
+        $this->assertSame('held', DB::table('restaurant_orders')->value('status'), 'a parked cart is not a sale');
     }
 }

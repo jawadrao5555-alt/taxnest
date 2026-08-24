@@ -238,23 +238,21 @@ class RestaurantPosController extends Controller
             }
         }
 
-        // Order-type flow rules (owner, Jul 2026): Hold / Send-to-Kitchen is the Dine-In
-        // procedure ONLY on companies where the order-type widget is visible (any of
-        // tables/kot/kitchen/delivery on). Takeaway = direct final bill; Delivery = final
-        // or provisional. Plain retail (widget hidden) keeps hold unrestricted.
-        // billing_flow EXEMPTION: the universal screen's normal payment pipeline routes
-        // plain-product restaurant sales through hold-then-pay (processPayment →
-        // hold → payOrder) for KOT/restaurant_orders bookkeeping — that internal
-        // pass-through sends billing_flow=true and must NOT be blocked, or every
-        // final Takeaway/Delivery sale 422s. This is a workflow rule (not a security
-        // boundary), so trusting the client flag is acceptable: the explicit Hold
-        // button / F5 sends no flag and stays gated. Provisional abuse is impossible
-        // via this bypass — payOrder has its own delivery-only provisional gate.
+        // PARKING BELONGS TO EVERY ORDER TYPE (owner, ZFC PIZZA POINT, 25 Aug 2026).
+        // Hold / Send-to-Kitchen used to be a Dine-In-only procedure (rule from
+        // Jul 2026). That left a delivery counter with nowhere to put a half-built
+        // cart: the phone rang again mid-order and the cashier had to either bin
+        // the cart or make the new caller wait. Takeaway/Delivery carts now park
+        // exactly like Dine-In ones and return through the SAME Recall list, so
+        // nothing becomes invisible.
+        //
+        // Unchanged by this: parking is still not a sale (no invoice number, no
+        // stock movement, no regulator submission), provisional bills stay
+        // DELIVERY-only (payOrder's own gate), a Dine-In punch still needs a
+        // table (guard below), and a plain retail shop still parks in its own
+        // JSON cart lane instead (retail guard below).
         $flowFeatures = \App\Services\PosFeatureService::forCompany($company);
         $typeFlowGate = ($flowFeatures->tables ?? false) || ($flowFeatures->kot ?? false) || ($flowFeatures->kitchen ?? false) || ($flowFeatures->delivery ?? false);
-        if ($typeFlowGate && !$request->boolean('billing_flow') && $request->input('order_type') !== 'dine_in') {
-            return response()->json(['success' => false, 'message' => 'Hold / Send to Kitchen is for Dine-In orders only. Takeaway is billed directly; Delivery is final or provisional.'], 422);
-        }
 
         // ── RETAIL CART-LOSS GUARD (owner, 23 Aug 2026) ──────────────────────
         // A plain retail shop (no tables/KOT/kitchen/delivery) has no surface

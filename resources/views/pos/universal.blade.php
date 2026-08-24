@@ -1843,7 +1843,7 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="grid gap-2 {{ ($features->tables ?? false) ? 'grid-cols-2' : 'grid-cols-3' }}">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
-                        <button @click="retailHold ? retailHoldStart() : holdOrder()" :disabled="cart.length === 0 || submitting || (!retailHold && (hasManualItems() || hasDealItems() || !canHold()))" :title="retailHold ? window.TXT.hs_hold_title : (!canHold() ? window.TXT.ti_hold_dine_in_only : ((hasManualItems() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first : ''))" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button @click="retailHold ? retailHoldStart() : holdOrder()" :disabled="cart.length === 0 || submitting || (!retailHold && (hasManualItems() || hasDealItems()))" :title="(!retailHold && (hasManualItems() || hasDealItems())) ? window.TXT.ti_manual_deals_pay_first : window.TXT.hs_hold_title" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -1861,7 +1861,7 @@ window.addEventListener('popstate', function() {
                          Jul 2026 redesign: Send to Kitchen (KOT companies) joins this row —
                          it was removed from the action bar so all bill actions live here. ─── -->
                     @if($features->kot ?? false)
-                    <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? window.TXT.ti_kitchen_dine_in_only : ((hasManualItems() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first_cart : window.TXT.ti_kot_saves_no_payment)" class="w-full py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition flex items-center justify-center gap-1.5">
+                    <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first_cart : window.TXT.ti_kot_saves_no_payment" class="w-full py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition flex items-center justify-center gap-1.5">
                         <span class="text-sm leading-none">🍳</span>
                         <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.send_to_kitchen"></span>
                         <kbd class="text-[9px] bg-orange-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">Alt+K</kbd>
@@ -7138,7 +7138,7 @@ function restaurantPos() {
             if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
                 e.preventDefault();
                 if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
-                if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems() || !this.canHold()) return;
+                if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems()) return;
                 this.sendToKitchen();
                 return;
             }
@@ -7533,12 +7533,19 @@ function restaurantPos() {
             return this.cartEditFingerprint() !== this._recallCartBaseline;
         },
         // Save-first option sirf wahan jahan Hold/F5 sach mein chalega: claimed
-        // waiter orders payment par settle hote hain (P7 re-hold guard), manual/
-        // deal lines aur non-dine-in types holdOrder khud reject karta hai —
-        // un cases mein prompt sirf discard/cancel dikhata hai.
+        // waiter orders payment par settle hote hain (P7 re-hold guard) aur
+        // manual/deal lines ko YE SCREEN hold se rokti hai (endpoint khud unhein
+        // qubool kar leta hai — rule cart ka hai, server ka nahi) — un cases mein
+        // prompt sirf discard/cancel dikhata hai. Order TYPE ab rukawat nahi:
+        // har type park hota hai (25 Aug 2026).
+        //
+        // Delivery fee ko yahan se chhoot dene ki koshish mat karna: wo ek
+        // synthetic MANUAL line hai, aur manual cart payment processPaymentManual
+        // se jata hai jo recalled restaurant order ko settle NAHI karta — parked
+        // order latak kar roz day-close block karega. Pehle wo settlement banao.
         canSaveRecalledEdits() {
             return !!this.recalledOrderId && !this.incomingOrderId && !this.editingBillId
-                && this.canHold() && !this.hasManualItems() && !this.hasDealItems()
+                && !this.hasManualItems() && !this.hasDealItems()
                 && !(this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable);
         },
         // Enter → action mapping (document handler + search-input race path dono
@@ -7655,9 +7662,15 @@ function restaurantPos() {
 
         // ── Order-type flow rules (owner, Jul 2026) ────────────────────────────
         // Gated on typeFlowGate so plain retail (no order-type widget) keeps the
-        // old behaviour. Restaurant companies: Hold/KOT = Dine-In procedure only;
-        // provisional bills = Delivery only; Takeaway = direct final bill only.
-        canHold() { return !this.typeFlowGate || this.orderType === 'dine_in'; },
+        // old behaviour. Provisional bills stay DELIVERY-only.
+        //
+        // The Dine-In-only hold predicate is GONE (owner, ZFC PIZZA POINT,
+        // 25 Aug 2026). Hold/KOT used to be a Dine-In procedure only, so a
+        // delivery counter had nowhere to put a half-built cart when the next
+        // call came in mid-order. Every order type parks now; the server
+        // mirrors it. Dine-In's table requirement is untouched — it lives in
+        // holdOrder() and opens the table picker rather than greying the
+        // button out.
         canProvisional() { return !this.typeFlowGate || this.orderType === 'delivery'; },
 
         // ── Item #3: Delivery charges (owner, Jul 2026) ────────────────────────
@@ -9208,13 +9221,6 @@ function restaurantPos() {
             }
             opts = opts || {};
             if (this.cart.length === 0 || this.submitting) return null;
-            // Order-type flow rule: Hold / Send-to-Kitchen is the Dine-In procedure
-            // ONLY (restaurant companies). Takeaway = direct final; Delivery = final
-            // or provisional. Backend enforces the same rule (defence-in-depth).
-            if (!this.canHold()) {
-                this.showToast(this.orderType === 'takeaway' ? window.TXT.takeaway_billed_directly : window.TXT.hold_dine_in_only, 'error');
-                return null;
-            }
             // Table-required guard (owner, 9 Aug 2026): dine-in Hold/KOT without a
             // table must not punch — open the table picker instead. Server enforces
             // the same invariant (holdOrder 422s when tables feature is ON).

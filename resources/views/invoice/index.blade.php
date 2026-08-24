@@ -519,8 +519,8 @@
                     <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div class="text-xs text-gray-600 dark:text-gray-400">
-                                <span class="font-semibold text-gray-800 dark:text-gray-200">Bulk PDF Download:</span>
-                                Pick a month or From/To range above (max 500), or click "Download ALL" to grab every completed invoice (latest 500).
+                                <span class="font-semibold text-gray-800 dark:text-gray-200">Quick PDF Download:</span>
+                                Instant ZIP for a small batch (latest 500 completed invoices). For everything — including drafts, with no limit — use the panel below.
                             </div>
                             <div class="flex items-center gap-2 flex-wrap">
                                 {{-- Date-range based ZIP --}}
@@ -547,6 +547,72 @@
                                     Download ALL
                                 </a>
                             </div>
+                        </div>
+                    </div>
+
+                    {{-- Full export: builds in the background, so it is not capped
+                         at 500 and can cover every draft the shop has ever imported. --}}
+                    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800"
+                         x-data="invoiceZipExport({{ session('invoice_zip_export_id') ? (int) session('invoice_zip_export_id') : 'null' }})">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div class="text-xs text-gray-600 dark:text-gray-400 max-w-lg">
+                                <span class="font-semibold text-gray-800 dark:text-gray-200">Full ZIP Export (no limit):</span>
+                                Builds in the background so you can download every invoice at once — 50,000 or more — with the date filters above applied. Drafts included.
+                                <span class="block mt-1 text-gray-500 dark:text-gray-500">Keep this page open while it builds. The file is kept for 24 hours.</span>
+                            </div>
+                            <form method="POST" action="{{ route('invoices.zip-exports.store') }}"
+                                  class="flex items-center gap-2 flex-wrap" @submit="starting = true">
+                                @csrf
+                                @if(request('month'))<input type="hidden" name="month" value="{{ request('month') }}">@endif
+                                @if(request('date_from'))<input type="hidden" name="from" value="{{ request('date_from') }}">@endif
+                                @if(request('date_to'))<input type="hidden" name="to" value="{{ request('date_to') }}">@endif
+                                @if(request('fbr_status'))<input type="hidden" name="fbr_status" value="{{ request('fbr_status') }}">@endif
+                                @if(request('doc_type'))<input type="hidden" name="doc_type" value="{{ request('doc_type') }}">@endif
+                                <select name="scope"
+                                        class="rounded-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold py-2 focus:border-emerald-400 focus:ring-emerald-400">
+                                    <option value="draft">Draft invoices only</option>
+                                    <option value="completed">Completed invoices only</option>
+                                    <option value="all">Every invoice</option>
+                                </select>
+                                <button type="submit" :disabled="starting || building"
+                                        class="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-lg text-xs font-bold hover:from-slate-800 hover:to-black transition shadow-md disabled:opacity-60 disabled:cursor-wait">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    <span x-text="starting ? 'Starting…' : 'Build Full ZIP'"></span>
+                                </button>
+                            </form>
+                        </div>
+
+                        {{-- Live progress --}}
+                        <div x-show="exportId" x-cloak class="mt-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-4 py-3">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <div class="text-xs font-semibold text-gray-800 dark:text-gray-200" x-text="scopeLabel || 'Preparing your ZIP…'"></div>
+                                <div class="text-xs font-bold text-gray-600 dark:text-gray-300" x-show="building" x-text="progress + '%'"></div>
+                            </div>
+
+                            <div x-show="building" class="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                                <div class="h-2 rounded-full bg-emerald-500 transition-all duration-500" :style="'width: ' + progress + '%'"></div>
+                            </div>
+
+                            <div x-show="building" class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                                <span x-text="processed.toLocaleString()"></span> of <span x-text="total.toLocaleString()"></span> invoices packed
+                                <span x-show="failed > 0" class="text-amber-600 dark:text-amber-400">— <span x-text="failed"></span> could not be rendered</span>
+                            </div>
+
+                            <div x-show="ready" x-cloak class="mt-1">
+                                <div class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                    <span x-text="processed.toLocaleString()"></span> invoices packed<span x-show="sizeText"> — <span x-text="sizeText"></span></span>.
+                                </div>
+                                <div x-show="sizeCapped" x-cloak class="mb-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
+                                    The archive hit its size limit and stopped early. Download it, then run the rest one month at a time using the date filters.
+                                </div>
+                                <a :href="downloadUrl"
+                                   class="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition shadow">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    Download ZIP
+                                </a>
+                            </div>
+
+                            <div x-show="errorMessage" x-cloak class="text-xs text-red-700 dark:text-red-400 font-medium" x-text="errorMessage"></div>
                         </div>
                     </div>
                 </div>
@@ -1780,6 +1846,105 @@ function closeUniqueBuyersModal() {
     document.body.style.overflow = '';
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeUniqueBuyersModal(); });
+
+/**
+ * Full ZIP export progress.
+ *
+ * The poll is also what drives the build when no queue worker is listening,
+ * so the chain must re-arm on EVERY exit path — a single unhandled rejection
+ * would otherwise strand the export at whatever percentage it had reached.
+ */
+function invoiceZipExport(initialId) {
+    return {
+        exportId: initialId,
+        starting: false,
+        building: false,
+        ready: false,
+        progress: 0,
+        processed: 0,
+        total: 0,
+        failed: 0,
+        sizeCapped: false,
+        sizeText: '',
+        scopeLabel: '',
+        downloadUrl: '',
+        errorMessage: '',
+        timer: null,
+
+        init() {
+            if (this.exportId) {
+                this.building = true;
+                this.poll();
+            }
+        },
+
+        statusUrl() {
+            return '{{ route('invoices.zip-exports.status', ['export' => 'EXPORT_ID'], false) }}'
+                .replace('EXPORT_ID', this.exportId);
+        },
+
+        rearm(ms) {
+            clearTimeout(this.timer);
+            if (this.exportId && !this.ready && !this.errorMessage) {
+                this.timer = setTimeout(() => this.poll(), ms);
+            }
+        },
+
+        poll() {
+            if (!this.exportId) return;
+
+            // A chunk can legitimately take a while; abandon a hung request
+            // rather than letting it hold the only polling chain open.
+            const controller = new AbortController();
+            const bail = setTimeout(() => controller.abort(), 170000);
+
+            fetch(this.statusUrl(), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal
+            })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+            .then(d => {
+                this.progress = d.progress || 0;
+                this.processed = d.processed || 0;
+                this.total = d.total || 0;
+                this.failed = d.failed || 0;
+                this.sizeCapped = !!d.size_capped;
+                this.scopeLabel = d.scope_label || '';
+                this.sizeText = d.file_size ? this.humanSize(d.file_size) : '';
+
+                if (d.status === 'ready') {
+                    this.building = false;
+                    this.ready = true;
+                    this.progress = 100;
+                    this.downloadUrl = d.download_url;
+                    clearTimeout(this.timer);
+                    return;
+                }
+
+                if (d.status === 'failed') {
+                    this.building = false;
+                    this.errorMessage = d.error || 'ZIP build failed.';
+                    clearTimeout(this.timer);
+                    return;
+                }
+
+                this.building = true;
+                this.rearm(3000);
+            })
+            .catch(() => {
+                // Network blip or an aborted long chunk — keep trying.
+                this.rearm(6000);
+            })
+            .finally(() => clearTimeout(bail));
+        },
+
+        humanSize(bytes) {
+            if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+            if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+            return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+        }
+    };
+}
 </script>
 @include('invoice.partials.send-modal')
 </x-app-layout>

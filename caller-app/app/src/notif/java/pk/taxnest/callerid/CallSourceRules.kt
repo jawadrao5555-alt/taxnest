@@ -127,6 +127,42 @@ object CallSourceRules {
         return SKIP_WORDS.any { hay.contains(it) }
     }
 
+    // ── Aane wali call hai ya ja rahi? ──────────────────────────────────────
+
+    /** `Notification.EXTRA_CALL_TYPE` ki values (CallStyle, Android 12+). */
+    const val CALL_TYPE_INCOMING = 1
+    const val CALL_TYPE_ONGOING = 2
+    const val CALL_TYPE_SCREENING = 3
+
+    /**
+     * Yeh notification BAJTI hui (incoming) call ki hai?
+     *
+     * Lafzon ki fehrist akeli kaafi nahi thi: jab bahar jane wali call mil
+     * jati hai to dialer notification par sirf naam aur timer reh jata hai
+     * ("Bilal Traders 00:14") — na "outgoing", na "dialing" — aur woh bilkul
+     * aane wali call jaisi lagti hai. Isi liye hamari apni milai hui call
+     * counter par popup khol deti thi.
+     *
+     * Tarteeb jaan boojh kar yeh hai:
+     *   1. Android ka apna elaan (CallStyle ka callType) — is se ziyada
+     *      mustanad kuch nahi, magar sirf Android 12+ par milta hai.
+     *   2. Lafz jo saaf batate hain ke ring nahi.
+     *   3. Shak ki soorat mein HAAN. Ghalat "haan" se cashier ko ek fazool
+     *      popup milta hai; ghalat "nahi" se dukaan ka grahak hi gum ho jata
+     *      hai — aur woh ziyada mehnga nuqsan hai.
+     *
+     * Purane phone par jahan callType nahi milta, bahar jane wali call ka
+     * asal pehra telephony par hai (dekhein RingCoordinator: bina RINGING ke
+     * OFFHOOK = hum ne khud milai hai).
+     *
+     * @param callType `EXTRA_CALL_TYPE`, ya null jab notification CallStyle ki
+     *                 na ho (purana Android / OEM ka apna template)
+     */
+    fun isIncomingRing(title: String, text: String, callType: Int?): Boolean {
+        if (callType != null && callType > 0) return callType == CALL_TYPE_INCOMING
+        return !isNonIncoming(title, text)
+    }
+
     /** Number pehle title se, phir text se — jo bhi pehle mil jaye. */
     fun extractNumber(title: String, text: String): String? =
         NUMBER_RE.find(title)?.value ?: NUMBER_RE.find(text)?.value

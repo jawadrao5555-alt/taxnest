@@ -150,6 +150,46 @@ class CallSourceRulesTest {
         assertTrue(CallSourceRules.isNonIncoming("کال ختم ہو گئی", ""))
     }
 
+    // ── aane wali call hai ya hamari apni milai hui ─────────────────────────
+
+    @Test
+    fun call_style_type_beats_the_words() {
+        // Android 12+ khud batata hai. Lafz kuch bhi kahen, callType hi sach hai.
+        assertTrue(CallSourceRules.isIncomingRing("Bilal Traders", "", CallSourceRules.CALL_TYPE_INCOMING))
+        assertFalse(CallSourceRules.isIncomingRing("Bilal Traders", "", CallSourceRules.CALL_TYPE_ONGOING))
+        assertFalse(CallSourceRules.isIncomingRing("0300 1234567", "", CallSourceRules.CALL_TYPE_SCREENING))
+    }
+
+    /**
+     * Asal shikayat (24 Aug 2026): dukaandar kisi ko KHUD call milaye to counter
+     * par popup khul jata tha. Call milte hi dialer ki notification par sirf
+     * naam aur timer reh jata hai — koi "outgoing/dialing" lafz nahi — is liye
+     * purana lafzon wala pehra ise aane wali call samajh leta tha.
+     */
+    @Test
+    fun connected_outgoing_call_is_caught_by_call_type() {
+        assertFalse(CallSourceRules.isIncomingRing("Bilal Traders", "00:14", CallSourceRules.CALL_TYPE_ONGOING))
+        // Purane phone par callType nahi milta: lafz bhi khamosh hain, is liye
+        // yeh notification aane wali call hi lagti hai. Wahan ka pehra
+        // telephony par hai (RingCoordinator: bina RINGING ke OFFHOOK).
+        assertTrue(CallSourceRules.isIncomingRing("Bilal Traders", "00:14", null))
+    }
+
+    @Test
+    fun without_call_type_the_word_list_still_applies() {
+        assertFalse(CallSourceRules.isIncomingRing("Outgoing call", "0300 1234567", null))
+        assertFalse(CallSourceRules.isIncomingRing("کال جاری ہے", "", null))
+        assertTrue(CallSourceRules.isIncomingRing("0300 1234567", "Incoming call", null))
+    }
+
+    @Test
+    fun unknown_call_type_falls_back_instead_of_dropping_the_ring() {
+        // Shak ki soorat mein HAAN: ek fazool popup gawara hai, grahak ka gum
+        // ho jana nahi.
+        assertTrue(CallSourceRules.isIncomingRing("0300 1234567", "", 0))
+        assertTrue(CallSourceRules.isIncomingRing("0300 1234567", "", null))
+    }
+
     // ── number aur naam ─────────────────────────────────────────────────────
 
     @Test

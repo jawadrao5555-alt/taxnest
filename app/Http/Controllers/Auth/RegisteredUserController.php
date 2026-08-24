@@ -24,6 +24,7 @@ class RegisteredUserController extends Controller
 {
     public function create(): View
     {
+        \App\Services\AgentReferralService::rememberFromRequest(request());
         // Task 1483/1484: the Digital Invoice landing's comparison table sends
         // the visitor here with ?plan=<package name>&cycle=<billing cycle>, so
         // the page can name the column they clicked AND the form can carry both
@@ -105,7 +106,10 @@ class RegisteredUserController extends Controller
             $request->input('requested_billing_cycle')
         );
 
-        $user = DB::transaction(function () use ($request, $referralAttrs, $requestedPackage) {
+        $agent = \App\Services\AgentReferralService::agentFromSignup($request);
+        $agentAttrs = $agent ? ['agent_id' => $agent->id] : [];
+
+        $user = DB::transaction(function () use ($request, $referralAttrs, $requestedPackage, $agentAttrs) {
             $company = Company::create(array_merge([
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
@@ -113,7 +117,7 @@ class RegisteredUserController extends Controller
                 'product_type' => 'di',
                 'company_status' => 'active',
                 'status' => 'pending',
-            ], $referralAttrs, $requestedPackage));
+            ], $referralAttrs, $requestedPackage, $agentAttrs));
 
             // Always attaches a trial subscription (even if the trial plan
             // seed row is missing) — no signup may leave a company bare.
@@ -145,6 +149,7 @@ class RegisteredUserController extends Controller
         });
 
         event(new Registered($user));
+        $request->session()->forget(\App\Services\AgentReferralService::SESSION_KEY);
 
         return redirect('/login')->with('success', 'Registration submitted! Your company is pending approval. You have a 3-day free trial with up to 10 invoices.');
     }

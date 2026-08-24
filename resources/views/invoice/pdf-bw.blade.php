@@ -20,86 +20,88 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', 'Helvetica', Arial, sans-serif;
-            color: #000000;
+            color: #17282d;
             background: #ffffff;
-            font-size: 11px;
-            line-height: 1.45;
+            font-size: 10.5px;
+            line-height: 1.42;
             width: 100%;
         }
 
-        .header-row { width: 100%; margin-bottom: 6px; }
+        .header-row { width: 100%; margin-bottom: 7px; }
         .header-row table { width: 100%; border-collapse: collapse; }
         .header-row td { vertical-align: top; }
-        .company-name { font-size: 20px; font-weight: 900; color: #000000; letter-spacing: 0.5px; }
-        .company-info { font-size: 10px; color: #000000; margin-top: 2px; line-height: 1.5; }
+        .company-name { font-size: 19px; font-weight: 900; color: #0A4D5C; letter-spacing: 0.35px; }
+        .company-info { font-size: 9.5px; color: #26373b; margin-top: 3px; line-height: 1.48; }
         .company-info strong { font-weight: 700; }
 
         .status-pill {
             display: inline-block;
-            padding: 3px 12px;
+            padding: 3px 10px;
             border-radius: 0;
-            font-size: 9px;
+            font-size: 8.5px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1.2px;
-            background: #ffffff;
-            color: #000000;
-            border: 1.5px solid #000000;
+            letter-spacing: 1px;
+            background: #F1F6F7;
+            color: #0A4D5C;
+            border: 1px solid #7E9CA3;
         }
 
-        .divider { border: none; border-top: 1px solid #000000; margin: 10px 0; }
-        .divider-dark { border: none; border-top: 1.5px solid #000000; margin: 8px 0; }
+        .divider { border: none; border-top: 1px solid #A9C0C5; margin: 10px 0; }
+        .divider-dark { border: none; border-top: 1.5px solid #0A4D5C; margin: 8px 0; }
 
         .qr-block { text-align: center; padding: 10px 0 8px 0; margin-bottom: 8px; }
-        .qr-inv-no { font-size: 11px; color: #000000; font-weight: 800; margin-top: 5px; letter-spacing: 0.2px; }
+        .qr-inv-no { font-size: 10px; color: #17282d; font-weight: 800; margin-top: 5px; letter-spacing: 0.15px; }
 
-        .doc-title { font-size: 16px; font-weight: 900; color: #000000; margin-bottom: 10px; letter-spacing: 0.5px; }
+        .doc-title { font-size: 15px; font-weight: 900; color: #0A4D5C; margin-bottom: 10px; letter-spacing: 0.45px; }
 
         .info-section { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
         .info-section td { vertical-align: top; padding: 0; }
         .info-heading {
             font-size: 9px;
             text-transform: uppercase;
-            color: #ffffff;
-            background: #000000;
+            color: #0A4D5C;
+            background: #F1F6F7;
             font-weight: 800;
-            letter-spacing: 1.5px;
-            padding: 5px 8px;
-            border: 1px solid #000000;
+            letter-spacing: 1.25px;
+            padding: 5px 8px 4px;
+            border: 1px solid #A9C0C5;
+            border-bottom: 1.5px solid #0A4D5C;
             display: block;
         }
-        .info-body { padding: 6px 8px 4px 8px; border-left: 1px solid #000000; border-right: 1px solid #000000; border-bottom: 1px solid #000000; }
-        .info-row { font-size: 10.5px; color: #000000; padding: 1px 0; line-height: 1.5; }
+        .info-body { padding: 6px 8px 5px; border-left: 1px solid #C7D7DA; border-right: 1px solid #C7D7DA; border-bottom: 1px solid #C7D7DA; }
+        .info-row { font-size: 10px; color: #17282d; padding: 1px 0; line-height: 1.48; }
         .info-row strong { font-weight: 700; }
-        .info-row-label { font-size: 10px; color: #000000; font-weight: 600; }
-        .info-row-value { font-size: 10.5px; color: #000000; font-weight: 700; }
+        .info-row-label { font-size: 9.5px; color: #466066; font-weight: 600; }
+        .info-row-value { font-size: 10px; color: #17282d; font-weight: 700; }
 
-        .detail-table { width: 100%; border-collapse: collapse; border-left: 1px solid #000000; border-right: 1px solid #000000; border-bottom: 1px solid #000000; }
-        .detail-table td { padding: 5px 8px; font-size: 10px; }
-        .detail-table .dt-label { color: #000000; font-weight: 600; text-align: left; width: 40%; }
-        .detail-table .dt-value { color: #000000; font-weight: 700; text-align: right; width: 60%; }
-        .detail-table tr { border-bottom: 1px solid #000000; }
+        .detail-table { width: 100%; border-collapse: collapse; border-left: 1px solid #C7D7DA; border-right: 1px solid #C7D7DA; border-bottom: 1px solid #C7D7DA; }
+        .detail-table td { padding: 5px 8px; font-size: 9.5px; }
+        .detail-table .dt-label { color: #466066; font-weight: 600; text-align: left; width: 40%; }
+        .detail-table .dt-value { color: #17282d; font-weight: 700; text-align: right; width: 60%; }
+        .detail-table tr { border-bottom: 1px solid #D7E3E5; }
         .detail-table tr:last-child { border-bottom: none; }
 
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
         .items-table thead th {
-            background: #000000;
+            background: #F1F6F7;
             padding: 7px 6px;
             font-size: 9px;
             text-transform: uppercase;
-            color: #ffffff;
+            color: #0A4D5C;
             font-weight: 800;
             letter-spacing: 0.5px;
             text-align: left;
-            border: 1px solid #000000;
+            border: 1px solid #A9C0C5;
+            border-bottom: 1.5px solid #0A4D5C;
         }
         .items-table thead th.ar { text-align: right; }
         .items-table thead th.ac { text-align: center; }
         .items-table tbody td {
             padding: 6px;
-            border: 1px solid #000000;
+            border: 1px solid #C7D7DA;
             font-size: 10px;
-            color: #000000;
+            color: #17282d;
             background: #ffffff;
         }
         .items-table tbody td.ar { text-align: right; font-weight: 700; }
@@ -108,7 +110,7 @@
             font-family: 'DejaVu Sans', 'Helvetica', sans-serif;
             font-size: 10px;
             font-weight: 700;
-            color: #000000;
+            color: #0A4D5C;
             letter-spacing: 0.3px;
         }
         .items-table tbody td.product { font-weight: 600; }
@@ -117,30 +119,30 @@
         .summary-table { width: 100%; border-collapse: collapse; }
         .summary-table td { vertical-align: top; }
 
-        .totals-box { border: 1.5px solid #000000; border-radius: 0; overflow: hidden; }
+        .totals-box { border: 1px solid #A9C0C5; border-top: 2px solid #0A4D5C; border-radius: 0; overflow: hidden; }
         .totals-box table { width: 100%; border-collapse: collapse; }
-        .totals-box td { padding: 5px 10px; font-size: 10.5px; }
-        .totals-box .t-label { text-align: right; color: #000000; font-weight: 600; width: 55%; }
-        .totals-box .t-value { text-align: right; color: #000000; font-weight: 700; width: 45%; white-space: nowrap; }
-        .totals-box tr { border-bottom: 1px solid #000000; }
-        .totals-box tr.total-row { background: #000000; }
+        .totals-box td { padding: 5px 10px; font-size: 10px; }
+        .totals-box .t-label { text-align: right; color: #466066; font-weight: 600; width: 55%; }
+        .totals-box .t-value { text-align: right; color: #17282d; font-weight: 700; width: 45%; white-space: nowrap; }
+        .totals-box tr { border-bottom: 1px solid #D7E3E5; }
+        .totals-box tr.total-row { background: #DCEBED; }
         .totals-box tr.total-row td { border-bottom: none; padding: 8px 10px; }
-        .totals-box tr.total-row .t-label { color: #ffffff; font-size: 12px; font-weight: 800; }
-        .totals-box tr.total-row .t-value { color: #ffffff; font-size: 14px; font-weight: 900; }
+        .totals-box tr.total-row .t-label { color: #0A4D5C; font-size: 11.5px; font-weight: 800; }
+        .totals-box tr.total-row .t-value { color: #0A4D5C; font-size: 13px; font-weight: 900; }
 
-        .schedule-info { font-size: 9px; color: #000000; line-height: 1.5; margin-top: 6px; }
-        .schedule-info strong { font-weight: 700; color: #000000; }
+        .schedule-info { font-size: 9px; color: #26373b; line-height: 1.5; margin-top: 6px; }
+        .schedule-info strong { font-weight: 700; color: #0A4D5C; }
 
-        .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #000000; text-align: center; }
-        .footer-text { font-size: 8px; color: #000000; }
-        .footer-brand { font-size: 9px; color: #000000; font-weight: 700; margin-top: 2px; }
+        .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #A9C0C5; text-align: center; }
+        .footer-text { font-size: 8px; color: #466066; }
+        .footer-brand { font-size: 9px; color: #0A4D5C; font-weight: 700; margin-top: 2px; }
 
         .watermark {
             position: fixed;
             top: 40%;
             left: 12%;
             font-size: 60px;
-            color: rgba(0, 0, 0, 0.08);
+            color: rgba(10, 77, 92, 0.08);
             font-weight: bold;
             text-transform: uppercase;
             transform: rotate(-35deg);
@@ -151,13 +153,11 @@
         }
 
         @if($diBrand['accent'])
-        /* Premium white-label accent — heading bars only. QR / FBR number /
+        /* Premium white-label accent — a restrained rule only. QR / FBR number /
            tax rows keep their standard rendering (compliance guardrail). */
-        .info-heading { background: {{ $diBrand['accent'] }}; border-color: {{ $diBrand['accent'] }}; color: {{ $diBrand['accent_text'] }}; }
-        .items-table thead th { background: {{ $diBrand['accent'] }}; border-color: {{ $diBrand['accent'] }}; color: {{ $diBrand['accent_text'] }}; }
-        .totals-box { border-color: {{ $diBrand['accent'] }}; }
-        .totals-box tr.total-row { background: {{ $diBrand['accent'] }}; }
-        .totals-box tr.total-row .t-label, .totals-box tr.total-row .t-value { color: {{ $diBrand['accent_text'] }}; }
+        .info-heading { border-bottom-color: {{ $diBrand['accent'] }}; }
+        .items-table thead th { border-bottom-color: {{ $diBrand['accent'] }}; }
+        .totals-box { border-top-color: {{ $diBrand['accent'] }}; }
         @endif
     </style>
 </head>
@@ -186,9 +186,20 @@
                     <div style="margin-bottom: 4px;"><img src="{{ $diBrand['logo_data_uri'] }}" alt="Logo" style="height: 44px; width: auto;"></div>
                     @endif
                     <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
+                    @php
+                        // A distributor may trade under a different name in each city.
+                        // The branch on the invoice is that trading identity, so it
+                        // prints under the legal name and supplies the address.
+                        $invBranch = $invoice->branch;
+                        $branchAddress = ($invBranch?->address ?: null) ?: $invoice->company->address;
+                        $branchCity = ($invBranch?->city ?: null) ?: $invoice->company->city;
+                    @endphp
+                    @if($invBranch && !$invBranch->is_head_office)
+                    <div style="font-size: 10px; font-weight: bold; color: #0A4D5C; margin-top: 1px;">{{ $invBranch->name }}@if($invBranch->city) &mdash; {{ $invBranch->city }}@endif</div>
+                    @endif
                     <div class="company-info">
-                        @if($invoice->company->address && $dp['show_address'])
-                        {{ $invoice->company->address }}@if($invoice->company->city), {{ $invoice->company->city }}@endif<br>
+                        @if($branchAddress && $dp['show_address'])
+                        {{ $branchAddress }}@if($branchCity), {{ $branchCity }}@endif<br>
                         @endif
                         @if($invoice->company->ntn && $dp['show_ntn'])
                         <strong>NTN: {{ $invoice->company->ntn }}</strong><br>

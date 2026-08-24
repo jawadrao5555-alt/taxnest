@@ -26,7 +26,9 @@ class InvoicePdfService
      */
     public static function buildData(Invoice $invoice, ?float $fallbackWhtRate = null): array
     {
-        $invoice->loadMissing('items', 'company');
+        // 'branch' is eager-loaded because production runs with lazy loading
+        // disabled and the template prints the branch trading name.
+        $invoice->loadMissing('items', 'company', 'branch');
 
         $showWatermark = false;
         $isDraft = $invoice->status === 'draft';

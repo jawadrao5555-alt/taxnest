@@ -59,6 +59,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'agent.auth' => \App\Http\Middleware\AgentAuth::class,
             'di.api' => \App\Http\Middleware\DiApiAuth::class,
             'franchise.auth' => \App\Http\Middleware\FranchiseAuth::class,
+            'agent.portal.auth' => \App\Http\Middleware\AgentPortalAuth::class,
             'plan.limit' => \App\Http\Middleware\CheckPlanLimit::class,
             'company.approval' => \App\Http\Middleware\CheckCompanyApproval::class,
             'restaurant.only' => \App\Http\Middleware\RestaurantOnly::class,

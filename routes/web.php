@@ -379,6 +379,18 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::get('/invoices/unique-buyers', [InvoiceController::class, 'uniqueBuyers'])->name('invoices.unique-buyers');
     Route::get('/invoices/bulk-pdf', [InvoiceController::class, 'bulkDownloadPdf'])->name('invoices.bulk-pdf');
+
+    // Background ZIP export — unlike bulk-pdf this has no 500 cap, covers
+    // DRAFT invoices too, and survives tens of thousands of PDFs by building
+    // in resumable chunks with a progress bar.
+    Route::post('/invoices/zip-exports', [\App\Http\Controllers\InvoiceZipExportController::class, 'store'])
+        ->name('invoices.zip-exports.store');
+    Route::get('/invoices/zip-exports/{export}/status', [\App\Http\Controllers\InvoiceZipExportController::class, 'status'])
+        ->name('invoices.zip-exports.status');
+    Route::get('/invoices/zip-exports/{export}/download', [\App\Http\Controllers\InvoiceZipExportController::class, 'download'])
+        ->name('invoices.zip-exports.download');
+    Route::delete('/invoices/zip-exports/{export}', [\App\Http\Controllers\InvoiceZipExportController::class, 'destroy'])
+        ->name('invoices.zip-exports.destroy');
     // WHT on PDF is now per-invoice (rendered whenever the invoice has a WHT
     // amount applied) — the old session-based toggle route was removed.
 
@@ -1510,6 +1522,23 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/payment-proofs/{id}/download', [AdminPaymentProofController::class, 'download'])->name('saas.admin.payment-proofs.download');
     Route::post('/payment-proofs/{id}/approve', [AdminPaymentProofController::class, 'approve'])->name('saas.admin.payment-proofs.approve');
     Route::post('/payment-proofs/{id}/reject', [AdminPaymentProofController::class, 'reject'])->name('saas.admin.payment-proofs.reject');
+});
+
+// Agent distributor portal and super-admin claim review.
+Route::get('/agent/login', [\App\Http\Controllers\AgentPortalAuthController::class, 'showLogin'])->name('agent.login');
+Route::post('/agent/login', [\App\Http\Controllers\AgentPortalAuthController::class, 'login'])->name('agent.login.submit');
+Route::post('/agent/logout', [\App\Http\Controllers\AgentPortalAuthController::class, 'logout'])->name('agent.logout');
+Route::prefix('agent')->middleware('agent.portal.auth')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\AgentPortalController::class, 'dashboard'])->name('agent.dashboard');
+    Route::get('/companies', [\App\Http\Controllers\AgentPortalController::class, 'companies'])->name('agent.companies');
+    Route::get('/commissions', [\App\Http\Controllers\AgentPortalController::class, 'commissions'])->name('agent.commissions');
+    Route::get('/claims', [\App\Http\Controllers\AgentPortalController::class, 'claims'])->name('agent.claims');
+    Route::post('/claims', [\App\Http\Controllers\AgentPortalController::class, 'storeClaim'])->name('agent.claims.store');
+});
+Route::prefix('admin')->middleware('admin.auth')->group(function () {
+    Route::get('/agent-claims', [\App\Http\Controllers\SaasAdmin\AdminAgentClaimController::class, 'index'])->name('saas.admin.agent-claims');
+    Route::post('/agent-claims/{claim}/review', [\App\Http\Controllers\SaasAdmin\AdminAgentClaimController::class, 'review'])->name('saas.admin.agent-claims.review');
+    Route::post('/agents/{id}/commissions/{commissionId}/paid', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'markPaid'])->name('saas.admin.agents.mark-paid');
 });
 
 Route::get('/franchise/login', [FranchiseAuthController::class, 'showLogin'])->name('franchise.login');

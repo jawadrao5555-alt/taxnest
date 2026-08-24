@@ -1,6 +1,6 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
-    <h1 class="text-2xl font-bold text-white mb-1">Agents / Partners</h1>
+    <div class="flex items-center justify-between gap-3"><h1 class="text-2xl font-bold text-white mb-1">Agents / Partners</h1><a href="{{ route('saas.admin.agent-claims') }}" class="text-sm text-indigo-400 hover:underline">Review Sale Claims</a></div>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Commission agents (Agency Agreement — Model A). Payments come straight to TaxNest; agents earn Schedule A rates on cleared payments of companies they introduced.</p>
 
     @if($tableMissing)
@@ -20,8 +20,10 @@
                 <input type="text" name="cnic" value="{{ old('cnic') }}" placeholder="35202-1234567-1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Phone</label>
                 <input type="text" name="phone" value="{{ old('phone') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
-            <div><label class="text-xs text-gray-400 mb-1 block">Email</label>
-                <input type="email" name="email" value="{{ old('email') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
+            <div><label class="text-xs text-gray-400 mb-1 block">Email *</label>
+                <input type="email" name="email" required value="{{ old('email') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
+            <div><label class="text-xs text-gray-400 mb-1 block">Portal Password *</label>
+                <input type="password" name="password" required minlength="8" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Territory</label>
                 <input type="text" name="territory" value="{{ old('territory') }}" placeholder="e.g. Lahore, Gujranwala" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">New Sale % *</label>

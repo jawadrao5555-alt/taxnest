@@ -47,6 +47,15 @@ class InvoiceImportService
     private array $sroSuggestCache = [];
     private array $refExistsCache = [];
 
+    /** company_id => [normalized branch name/city => branch id, or false when two branches share it] */
+    private array $branchLookupCache = [];
+
+    /** Cached once per service instance — see invoicesHaveBranchColumn(). */
+    private ?bool $invoicesHaveBranch = null;
+
+    /** Cached once per service instance — see branchesTableExists(). */
+    private ?bool $branchesTable = null;
+
     /** Upload size cap in KB (matches route validation). */
     public const MAX_FILE_KB = 10240;
 
@@ -73,6 +82,7 @@ class InvoiceImportService
         'sro_serial_no',
         'reference_invoice_number',
         'invoice_date',
+        'branch',
     ];
 
     /**
@@ -173,6 +183,7 @@ class InvoiceImportService
         'sro_serial_no' => 'SRO item serial number (auto-filled when known)',
         'reference_invoice_number' => 'Original invoice — Credit/Debit Notes only',
         'invoice_date' => 'Actual sale date (YYYY-MM-DD or DD/MM/YYYY). Blank = today',
+        'branch' => 'Which branch made the sale — its city or its name. Blank = head office',
     ];
 
     // ------------------------------------------------------------------
@@ -790,9 +801,15 @@ class InvoiceImportService
     {
         // invoice_date is part of the key: the same buyer on two different
         // days is two invoices, not one merged draft on one of the dates.
+        //
+        // The branch is part of it for the same reason: one distributor selling
+        // to the same buyer from two cities must get one invoice per branch,
+        // each carrying its own branch name — not a single merged draft filed
+        // under whichever branch happened to come first.
         return ($data['buyer_name'] ?? '') . '|' . ($data['buyer_ntn'] ?? '') . '|'
             . ($data['document_type'] ?? 'Sale Invoice') . '|' . ($data['reference_invoice_number'] ?? '')
-            . '|' . ($data['invoice_date'] ?? '');
+            . '|' . ($data['invoice_date'] ?? '')
+            . '|' . ($data['_branch_id'] ?? '');
     }
 
     /**
@@ -875,6 +892,46 @@ class InvoiceImportService
                     $errors[] = "invoice_date is in the future ({$normalized}). FBR does not accept future-dated invoices.";
                 } else {
                     $data['invoice_date'] = $normalized;
+                }
+            }
+        }
+
+        // --- Branch (optional; blank = head office) ---
+        //
+        // A distributor working in two cities trades under a different name in
+        // each. The sheet carries the city, and the branch is resolved from it
+        // here so the cashier never has to fill a branch id by hand. Matching
+        // is deliberately forgiving: branch name OR city, case-insensitive.
+        if (array_key_exists('branch', $data)) {
+            $branchRaw = trim((string) ($data['branch'] ?? ''));
+            $lookup = $this->branchLookup($company);
+
+            if ($branchRaw === '') {
+                // Blank means "the head office". Guessing at the lowest-id
+                // branch instead would silently bill under another city's
+                // trading name — the exact mistake this column exists to stop.
+                if ($lookup === []) {
+                    $data['_branch_id'] = null;
+                } else {
+                    $headId = $this->headOfficeBranchId($company);
+                    if ($headId === null) {
+                        $errors[] = 'branch is blank but no branch is marked as the head office, so there is nothing to fall back to. Either fill the branch column or tick "Head Office" on one branch.';
+                    }
+                    $data['_branch_id'] = $headId;
+                }
+            } elseif ($lookup === []) {
+                $errors[] = "branch '{$branchRaw}' cannot be used — this company has no branches yet. Add them under Branches first.";
+                $data['_branch_id'] = null;
+            } else {
+                $hit = $lookup[self::normalizeBranchKey($branchRaw)] ?? null;
+                if ($hit === false) {
+                    $errors[] = "branch '{$branchRaw}' matches more than one branch. Put the exact branch name in the column instead of the city.";
+                    $data['_branch_id'] = null;
+                } elseif ($hit === null) {
+                    $errors[] = "branch '{$branchRaw}' did not match any branch. Use the branch name or its city — available: " . $this->branchChoices($company) . '.';
+                    $data['_branch_id'] = null;
+                } else {
+                    $data['_branch_id'] = $hit;
                 }
             }
         }
@@ -1097,6 +1154,107 @@ class InvoiceImportService
         return $errors;
     }
 
+    /**
+     * Har branch ke naam AUR city ka ek lookup — dono se branch mil jaye.
+     *
+     * Jahan do branches ek hi lafz par aa jayen wahan `false` rakha jata hai
+     * (yani "mubham"), taake row chupchap ghalat branch par na chali jaye.
+     * Naam ko city par tarjeeh hai kyunki naam ziyada makhsoos hai.
+     *
+     * @return array<string, int|false>
+     */
+    private function branchLookup(Company $company): array
+    {
+        if (array_key_exists($company->id, $this->branchLookupCache)) {
+            return $this->branchLookupCache[$company->id];
+        }
+
+        if (!$this->branchesTableExists()) {
+            return $this->branchLookupCache[$company->id] = [];
+        }
+
+        $branches = \App\Models\Branch::where('company_id', $company->id)->get(['id', 'name', 'city']);
+
+        $byCity = [];
+        $byName = [];
+        foreach ($branches as $branch) {
+            foreach ([['city', &$byCity], ['name', &$byName]] as [$field, &$bucket]) {
+                $key = self::normalizeBranchKey((string) ($branch->{$field} ?? ''));
+                if ($key !== '') {
+                    $bucket[$key][] = $branch->id;
+                }
+            }
+            unset($bucket);
+        }
+
+        $collapse = static fn (array $ids) => count(array_unique($ids)) === 1 ? $ids[0] : false;
+
+        $lookup = [];
+        foreach ($byCity as $key => $ids) {
+            $lookup[$key] = $collapse($ids);
+        }
+        foreach ($byName as $key => $ids) {
+            $lookup[$key] = $collapse($ids);   // naam city ko dhaanp deta hai
+        }
+
+        return $this->branchLookupCache[$company->id] = $lookup;
+    }
+
+    /**
+     * The branch explicitly marked Head Office — khali branch column ke liye.
+     *
+     * Deliberately returns null rather than falling back to the first branch:
+     * an unflagged company must be told to fix its setup, not have a city
+     * picked for it.
+     */
+    private function headOfficeBranchId(Company $company): ?int
+    {
+        if (!$this->branchesTableExists()) {
+            return null;
+        }
+
+        $branch = \App\Models\Branch::where('company_id', $company->id)
+            ->where('is_head_office', true)
+            ->orderBy('id')
+            ->first(['id']);
+
+        return $branch?->id;
+    }
+
+    /** Ghalti ke paighaam mein dikhane ke liye: kaun kaun si branch chal sakti hai. */
+    private function branchChoices(Company $company): string
+    {
+        if (!$this->branchesTableExists()) {
+            return 'none';
+        }
+
+        $choices = \App\Models\Branch::where('company_id', $company->id)
+            ->orderBy('name')
+            ->get(['name', 'city'])
+            ->map(fn ($b) => $b->city ? "{$b->name} ({$b->city})" : $b->name)
+            ->all();
+
+        return $choices ? implode(', ', $choices) : 'none';
+    }
+
+    /** Naam/city ka moqabla karne ke liye ek hi shakal. */
+    private static function normalizeBranchKey(string $raw): string
+    {
+        return trim(preg_replace('/\s+/u', ' ', mb_strtolower($raw)));
+    }
+
+    /** Purana database jis mein invoices.branch_id na ho — import phir bhi chale. */
+    private function invoicesHaveBranchColumn(): bool
+    {
+        return $this->invoicesHaveBranch ??= Schema::hasColumn('invoices', 'branch_id');
+    }
+
+    /** Isi tarah branches table bhi har database mein maujood nahi hoti. */
+    private function branchesTableExists(): bool
+    {
+        return $this->branchesTable ??= Schema::hasTable('branches');
+    }
+
     public function normalizeProvince(string $raw): ?string
     {
         $needle = strtolower(trim($raw));
@@ -1205,7 +1363,12 @@ class InvoiceImportService
                         'invoice_date' => ($first['invoice_date'] ?? '') !== ''
                             ? $first['invoice_date']
                             : now()->toDateString(),
-                    ] + ($stampBatch ? ['import_batch_id' => $importBatchId] : []));
+                    ] + ($stampBatch ? ['import_batch_id' => $importBatchId] : [])
+                      // Resolved from the sheet's city/branch column by
+                      // validateRow(); NULL when the company has no branches.
+                      // Guarded because a database that predates the branch
+                      // column must still be able to import.
+                      + ($this->invoicesHaveBranchColumn() ? ['branch_id' => $first['_branch_id'] ?? null] : []));
 
                     foreach ($entries as $entry) {
                         $item = $entry['data'];
@@ -1339,9 +1502,9 @@ class InvoiceImportService
 
         $sampleDate = now()->subDays(3)->toDateString();
         $samples = [
-            ['ABC Trading Co', '1234567', '', '123 Main St, Lahore', 'Punjab', 'Sale Invoice', '15179090', 'Cooking Oil 1L', '10', '250', '450', 'standard', '18', '', '', '', '', $sampleDate],
-            ['Fresh Foods (Pvt) Ltd', '7654321', '', 'Shop 5, Empress Market, Karachi', 'Sindh', 'Sale Invoice', '02023000', 'Frozen Beef Cuts', '25', '900', '0', 'exempt', '0', '', '', '', '', $sampleDate],
-            ['City Electronics', '', '4220112345671', '45 Hall Road, Lahore', 'Punjab', 'Sale Invoice', '85171100', 'Smart Phone X100', '5', '40000', '34000', '3rd_schedule', '17', '42500', '', '', '', ''],
+            ['ABC Trading Co', '1234567', '', '123 Main St, Lahore', 'Punjab', 'Sale Invoice', '15179090', 'Cooking Oil 1L', '10', '250', '450', 'standard', '18', '', '', '', '', $sampleDate, 'Lahore'],
+            ['Fresh Foods (Pvt) Ltd', '7654321', '', 'Shop 5, Empress Market, Karachi', 'Sindh', 'Sale Invoice', '02023000', 'Frozen Beef Cuts', '25', '900', '0', 'exempt', '0', '', '', '', '', $sampleDate, 'Karachi'],
+            ['City Electronics', '', '4220112345671', '45 Hall Road, Lahore', 'Punjab', 'Sale Invoice', '85171100', 'Smart Phone X100', '5', '40000', '34000', '3rd_schedule', '17', '42500', '', '', '', '', ''],
         ];
         foreach ($samples as $r => $sample) {
             foreach ($sample as $c => $value) {
@@ -1362,7 +1525,7 @@ class InvoiceImportService
         $helpRows = [
             ['DI Bulk Invoice Import — Help'],
             [''],
-            ['Each row is ONE invoice line item. Rows with the same buyer_name + buyer_ntn + document_type + invoice_date combine into a single draft invoice.'],
+            ['Each row is ONE invoice line item. Rows with the same buyer_name + buyer_ntn + document_type + invoice_date + branch combine into a single draft invoice.'],
             ['The 3 sample rows on the Invoices sheet are ignored on import — replace them with your data.'],
             ['Limits: max ' . number_format(self::MAX_ROWS) . ' rows and 10 MB per file. Larger imports: split into multiple files.'],
             ['Imported rows become DRAFT invoices. You submit them to FBR from the Invoices screen as usual.'],
@@ -1386,6 +1549,7 @@ class InvoiceImportService
             ['sro_serial_no', 'Optional. SRO item serial number (auto-filled when known).'],
             ['reference_invoice_number', 'Required for Credit Note / Debit Note rows: the original invoice number being adjusted.'],
             ['invoice_date', 'Optional but IMPORTANT. The real sale date — this is the date your reports and FBR use. Blank = today. Formats: 2026-08-15 or 15/08/2026. Future dates are rejected.'],
+            ['branch', 'Optional. Which of YOUR branches made the sale — write its CITY (e.g. Lahore) or its exact branch name. Set each branch\'s city under Branches first. Blank = your head office. Two branches in the same city cannot be told apart, so give each one its own city.'],
         ];
         foreach ($helpRows as $r => $cells) {
             foreach ($cells as $c => $value) {

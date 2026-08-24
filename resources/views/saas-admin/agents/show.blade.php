@@ -10,6 +10,7 @@
                 {{ $agent->cnic ?? 'CNIC —' }} · {{ $agent->phone ?? 'Phone —' }} · {{ $agent->territory ?? 'Territory —' }}
                 · Schedule A: New {{ rtrim(rtrim(number_format($agent->rate_new, 2), '0'), '.') }}% / Renewal {{ rtrim(rtrim(number_format($agent->rate_renewal, 2), '0'), '.') }}%
             </p>
+            <p class="text-xs text-indigo-400 mt-1">Referral code: {{ $agent->referral_code }} · {{ url('/register?ref='.$agent->referral_code) }}</p>
         </div>
     </div>
 
@@ -29,6 +30,8 @@
                 <input type="text" name="phone" value="{{ old('phone', $agent->phone) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Email</label>
                 <input type="email" name="email" value="{{ old('email', $agent->email) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
+            <div><label class="text-xs text-gray-400 mb-1 block">New Portal Password</label>
+                <input type="password" name="password" minlength="8" placeholder="Leave blank to keep current" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Territory</label>
                 <input type="text" name="territory" value="{{ old('territory', $agent->territory) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">New Sale % *</label>
@@ -75,6 +78,7 @@
                         <th class="px-3 py-2 text-right">Rate %</th>
                         <th class="px-3 py-2 text-right">Commission (Rs)</th>
                         <th class="px-3 py-2">Description</th>
+                        <th class="px-3 py-2">Payout</th>
                         <th class="px-3 py-2 text-center">Refund?</th>
                     </tr>
                 </thead>
@@ -90,6 +94,13 @@
                         <td class="px-3 py-2 text-right text-gray-300">{{ rtrim(rtrim(number_format($l->rate_percent, 2), '0'), '.') }}</td>
                         <td class="px-3 py-2 text-right font-medium {{ (float) $l->amount < 0 ? 'text-red-400' : 'text-white' }}">{{ number_format((float) $l->amount, 2) }}</td>
                         <td class="px-3 py-2 text-gray-400">{{ $l->description }}</td>
+                        <td class="px-3 py-2">
+                            @if(in_array($l->type, ['new', 'renewal']) && $l->status !== 'paid')
+                            <form method="POST" action="{{ route('saas.admin.agents.mark-paid', [$agent->id, $l->id]) }}">@csrf<button class="text-xs text-emerald-400 hover:underline">Mark paid</button></form>
+                            @else
+                            <span class="text-xs text-gray-400">{{ $l->status }}</span>
+                            @endif
+                        </td>
                         <td class="px-3 py-2 text-center">
                             @if(in_array($l->type, ['new', 'renewal']))
                             <button type="button" class="text-xs text-red-400 hover:underline"
@@ -98,7 +109,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="8" class="px-3 py-10 text-center text-gray-500 dark:text-gray-400">No commission lines in {{ $month->format('F Y') }}.</td></tr>
+                    <tr><td colspan="9" class="px-3 py-10 text-center text-gray-500 dark:text-gray-400">No commission lines in {{ $month->format('F Y') }}.</td></tr>
                     @endforelse
                 </tbody>
             </table>

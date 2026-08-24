@@ -81,10 +81,24 @@ class CallListenerService : NotificationListenerService() {
             sbn.packageName, packageName, n.category, dialerPackages(),
         ) ?: return
 
+        // Hamari apni milai hui call ka pehra. Telephony do-took batati hai ke
+        // bina baje call mili thi (yani number HUM ne milaya) — us ke doran
+        // dialer ki notification par sirf naam aur timer hota hai, jo bilkul
+        // aane wali call jaisi lagti hai. Nishan sirf telephony lagati hai, is
+        // liye jis phone par woh permission na ho wahan yeh kabhi nahi chalta.
+        if (source == CallSourceRules.SOURCE_SIM && RingCoordinator.outgoingCallActive(this)) return
+
         val extras = n.extras
         val title = (extras.getCharSequence(Notification.EXTRA_TITLE) ?: "").toString().trim()
         val text = (extras.getCharSequence(Notification.EXTRA_TEXT) ?: "").toString().trim()
-        if (CallSourceRules.isNonIncoming(title, text)) return
+        // Android 12+ khud bata deta hai ke call aa rahi hai ya ja rahi
+        // (CallStyle ka callType); us se pehle sirf lafzon ka andaza tha.
+        val callType = try {
+            extras.getInt("android.callType", 0).takeIf { it > 0 }
+        } catch (_: Exception) {
+            null
+        }
+        if (!CallSourceRules.isIncomingRing(title, text, callType)) return
 
         val name = CallSourceRules.extractName(title)
         val number = CallSourceRules.extractNumber(title, text)

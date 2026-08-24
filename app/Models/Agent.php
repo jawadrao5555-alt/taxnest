@@ -2,19 +2,24 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Commission agent/partner (Agency Agreement Model A — payments come straight
  * to TaxNest; the agent only introduces customers and earns Schedule A rates).
  */
-class Agent extends Model
+class Agent extends Authenticatable
 {
     protected $fillable = [
         'name',
         'cnic',
         'phone',
         'email',
+        'password',
+        'is_active',
+        'referral_code',
         'territory',
         'rate_new',
         'rate_renewal',
@@ -31,7 +36,23 @@ class Agent extends Model
         'terminated_at' => 'datetime',
         'reactivated_at' => 'datetime',
         'termination_windows' => 'array',
+        'is_active' => 'boolean',
+        'password' => 'hashed',
     ];
+
+    protected $hidden = ['password', 'remember_token'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Agent $agent) {
+            if (Schema::hasColumn('agents', 'referral_code') && !$agent->referral_code) {
+                do {
+                    $code = 'AG-' . strtoupper(Str::random(8));
+                } while (static::where('referral_code', $code)->exists());
+                $agent->referral_code = $code;
+            }
+        });
+    }
 
     public function companies()
     {
@@ -41,6 +62,11 @@ class Agent extends Model
     public function commissions()
     {
         return $this->hasMany(AgentCommission::class);
+    }
+
+    public function saleClaims()
+    {
+        return $this->hasMany(AgentSaleClaim::class);
     }
 
     public function isActive(): bool

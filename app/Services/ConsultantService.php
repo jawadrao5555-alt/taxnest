@@ -13,6 +13,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Tax Consultant Console + affiliate program — single source of truth for
@@ -165,44 +166,37 @@ class ConsultantService
      */
     public static function redeemInvite(User $consultant, string $code): ?Company
     {
-        $invite = ConsultantInvite::where('code', strtoupper(trim($code)))->first();
+        return DB::transaction(function () use ($consultant, $code) {
+            $invite = ConsultantInvite::where('code', strtoupper(trim($code)))->lockForUpdate()->first();
 
-        if (!$invite || !$invite->isRedeemable()) {
-            return null;
-        }
+            if (!$invite || !$invite->isRedeemable()) {
+                return null;
+            }
 
-        $company = Company::find($invite->company_id);
-        if (!$company || $company->product_type !== 'di' || $company->id === $consultant->company_id) {
-            return null;
-        }
+            $company = Company::find($invite->company_id);
+            if (!$company || $company->product_type !== 'di' || $company->id === $consultant->company_id) {
+                return null;
+            }
 
-        $link = ConsultantClientLink::firstOrNew([
-            'consultant_user_id' => $consultant->id,
-            'company_id' => $company->id,
-        ]);
+            $link = ConsultantClientLink::firstOrNew([
+                'consultant_user_id' => $consultant->id,
+                'company_id' => $company->id,
+            ]);
 
-        $invite->update([
-            'used_by_user_id' => $consultant->id,
-            'used_at' => now(),
-        ]);
+            $invite->update(['used_by_user_id' => $consultant->id, 'used_at' => now()]);
+            $link->fill([
+                'status' => 'active', 'initiated_by' => 'client',
+                'approved_by_user_id' => $invite->created_by_user_id, 'approved_at' => now(),
+                'revoked_by' => null, 'revoked_at' => null,
+            ])->save();
 
-        $link->fill([
-            'status' => 'active',
-            'initiated_by' => 'client',
-            'approved_by_user_id' => $invite->created_by_user_id,
-            'approved_at' => now(),
-            'revoked_by' => null,
-            'revoked_at' => null,
-        ])->save();
+            AuditLogService::log('consultant_link_activated', 'ConsultantClientLink', $link->id, null, [
+                'via' => 'invite_code', 'invite_id' => $invite->id,
+                'consultant_user_id' => $consultant->id, 'consultant_name' => $consultant->name,
+            ], $company->id, $consultant->id);
 
-        AuditLogService::log('consultant_link_activated', 'ConsultantClientLink', $link->id, null, [
-            'via' => 'invite_code',
-            'invite_id' => $invite->id,
-            'consultant_user_id' => $consultant->id,
-            'consultant_name' => $consultant->name,
-        ], $company->id, $consultant->id);
-
-        return $company;
+            return $company;
+        });
     }
 
     /** Revoke (or reject a pending) link — either side or admin can do this. */

@@ -6,6 +6,7 @@ use App\Models\Agent;
 use App\Models\AgentCommission;
 use App\Models\Company;
 use App\Models\PaymentProof;
+use App\Models\AdminAuditLog;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
@@ -113,7 +114,7 @@ class AgentCommissionService
         // time, so a later reactivation + backfill can never retroactively award
         // commission for the terminated period.
         if (!$agent->wasActiveAt($when)) {
-            AgentCommission::create([
+            $line = AgentCommission::create([
                 'agent_id' => $agent->id,
                 'company_id' => $company->id,
                 'company_name' => $company->name,
@@ -125,6 +126,7 @@ class AgentCommissionService
                 'period_month' => $when->copy()->startOfMonth()->toDateString(),
                 'description' => "No commission — agent terminated when payment cleared (proof #{$proof->id})",
             ]);
+            self::auditCreated($line);
             return;
         }
 
@@ -148,7 +150,7 @@ class AgentCommissionService
         $rate = (float) ($type === 'new' ? $agent->rate_new : $agent->rate_renewal);
         $base = (float) $proof->amount;
 
-        AgentCommission::create([
+        $line = AgentCommission::create([
             'agent_id' => $agent->id,
             'company_id' => $company->id,
             'company_name' => $company->name,
@@ -160,5 +162,20 @@ class AgentCommissionService
             'period_month' => $when->copy()->startOfMonth()->toDateString(),
             'description' => ($type === 'new' ? 'New sale' : 'Renewal') . " — payment proof #{$proof->id}",
         ]);
+        self::auditCreated($line);
+    }
+
+    private static function auditCreated(AgentCommission $line): void
+    {
+        $adminId = auth('admin')->id();
+        if ($adminId) {
+            AdminAuditLog::log($adminId, 'Agent commission created', 'AgentCommission', $line->id, [
+                'agent_id' => $line->agent_id,
+                'company_id' => $line->company_id,
+                'payment_proof_id' => $line->payment_proof_id,
+                'type' => $line->type,
+                'amount' => (float) $line->amount,
+            ]);
+        }
     }
 }

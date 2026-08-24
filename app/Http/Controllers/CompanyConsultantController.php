@@ -17,7 +17,9 @@ class CompanyConsultantController extends Controller
 {
     public function index()
     {
-        $companyId = auth()->user()->company_id;
+        $company = auth()->user()->company;
+        abort_unless($company && $company->product_type === 'di', 403, 'Digital Invoice companies only.');
+        $companyId = $company->id;
 
         $links = ConsultantClientLink::with('consultant')
             ->where('company_id', $companyId)

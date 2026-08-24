@@ -30,7 +30,29 @@ class PhoneStateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         try {
             if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
-            if (intent.getStringExtra(TelephonyManager.EXTRA_STATE) != TelephonyManager.EXTRA_STATE_RINGING) return
+
+            when (intent.getStringExtra(TelephonyManager.EXTRA_STATE)) {
+                TelephonyManager.EXTRA_STATE_OFFHOOK -> {
+                    // Bina baje call mil gai = number HUM ne milaya hai. Nishan
+                    // laga do: dialer ki notification jaari call par sirf naam
+                    // aur timer dikhati hai ("Bilal Traders 00:14") jis mein
+                    // "outgoing/dialing" jaisa koi lafz nahi hota — aur woh
+                    // bilkul aane wali call jaisi lagti hai. Nishan ke baghair
+                    // counter par hamari apni milai hui call ka popup khulta hai.
+                    if (!RingCoordinator.ringingFresh(context)) RingCoordinator.markOutgoingCall(context)
+                    return
+                }
+                TelephonyManager.EXTRA_STATE_IDLE -> {
+                    RingCoordinator.clearCallState(context)
+                    return
+                }
+                TelephonyManager.EXTRA_STATE_RINGING -> Unit  // neeche
+                else -> return
+            }
+
+            // Number mile ya na mile, "phone baja tha" darj hona zaroori hai —
+            // warna agla OFFHOOK bahar jane wali call samjha jayega.
+            RingCoordinator.markRinging(context)
 
             val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)?.trim()
             if (number.isNullOrBlank()) return          // number chhupa hua / permission nahi

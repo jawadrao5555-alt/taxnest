@@ -12,6 +12,7 @@ use App\Services\AgentCommissionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 /**
  * Agents/Partners program (Agency Agreement Model A). Super-admin only:
@@ -67,7 +68,8 @@ class AdminAgentController extends Controller
             'name' => 'required|string|max:255',
             'cnic' => 'nullable|string|max:20',
             'phone' => 'nullable|string|max:30',
-            'email' => 'nullable|email|max:255',
+            'email' => 'required|email|max:255|unique:agents,email',
+            'password' => 'required|string|min:8',
             'territory' => 'nullable|string|max:255',
             'rate_new' => 'required|numeric|min:0|max:100',
             'rate_renewal' => 'required|numeric|min:0|max:100',
@@ -75,7 +77,7 @@ class AdminAgentController extends Controller
         ]);
 
         $agent = Agent::create($request->only([
-            'name', 'cnic', 'phone', 'email', 'territory',
+            'name', 'cnic', 'phone', 'email', 'password', 'territory',
             'rate_new', 'rate_renewal', 'notes',
         ]) + ['status' => 'active']);
 
@@ -98,7 +100,8 @@ class AdminAgentController extends Controller
             'name' => 'required|string|max:255',
             'cnic' => 'nullable|string|max:20',
             'phone' => 'nullable|string|max:30',
-            'email' => 'nullable|email|max:255',
+            'email' => ['required', 'email', 'max:255', Rule::unique('agents', 'email')->ignore($agent->id)],
+            'password' => 'nullable|string|min:8',
             'territory' => 'nullable|string|max:255',
             'rate_new' => 'required|numeric|min:0|max:100',
             'rate_renewal' => 'required|numeric|min:0|max:100',
@@ -107,10 +110,14 @@ class AdminAgentController extends Controller
 
         $oldRates = ['new' => (float) $agent->rate_new, 'renewal' => (float) $agent->rate_renewal];
 
-        $agent->update($request->only([
+        $attrs = $request->only([
             'name', 'cnic', 'phone', 'email', 'territory',
             'rate_new', 'rate_renewal', 'notes',
-        ]));
+        ]);
+        if ($request->filled('password')) {
+            $attrs['password'] = $request->password;
+        }
+        $agent->update($attrs);
 
         AdminAuditLog::log(auth('admin')->id(), 'Agent updated', 'Agent', $agent->id, [
             'name' => $agent->name,
@@ -310,6 +317,29 @@ class AdminAgentController extends Controller
 
         return redirect()->route('saas.admin.agents.show', ['id' => $agent->id, 'month' => now()->format('Y-m')])
             ->with('success', 'Clawback line recorded — commission adjusted by Rs ' . number_format($amount, 2) . '.');
+    }
+
+    public function markPaid($id, $commissionId)
+    {
+        $this->assertSuperAdmin();
+        $agent = Agent::findOrFail($id);
+        $line = AgentCommission::where('agent_id', $agent->id)
+            ->whereIn('type', ['new', 'renewal'])
+            ->findOrFail($commissionId);
+
+        if ($line->status !== 'paid') {
+            $line->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+                'paid_by_admin_id' => auth('admin')->id(),
+            ]);
+            AdminAuditLog::log(auth('admin')->id(), 'Agent commission marked paid', 'AgentCommission', $line->id, [
+                'agent_id' => $agent->id,
+                'amount' => (float) $line->amount,
+            ]);
+        }
+
+        return back()->with('success', 'Commission marked paid.');
     }
 
     private function parseMonth(?string $raw): \Illuminate\Support\Carbon

@@ -48,6 +48,19 @@ class InvoiceBulkImportTest extends TestCase
             $t->timestamps();
         });
 
+        Schema::create('branches', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id')->index();
+            $t->string('name');
+            $t->string('code', 20)->nullable();
+            $t->string('address')->nullable();
+            $t->string('city', 100)->nullable();
+            $t->string('province')->nullable();
+            $t->boolean('is_head_office')->default(false);
+            $t->boolean('is_active')->default(true);
+            $t->timestamps();
+        });
+
         Schema::create('invoices', function (Blueprint $t) {
             $t->id();
             $t->unsignedBigInteger('company_id');
@@ -68,6 +81,7 @@ class InvoiceBulkImportTest extends TestCase
             $t->string('status')->default('draft');
             $t->string('fbr_status')->nullable();
             $t->string('document_type')->nullable();
+            $t->unsignedBigInteger('branch_id')->nullable();
             $t->string('reference_invoice_number')->nullable();
             $t->string('destination_province')->nullable();
             $t->string('supplier_province')->nullable();
@@ -765,5 +779,144 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertStringContainsString("'Sold Units'", $parsed['error']);
         $this->assertStringContainsString('quantity', $parsed['error']);
         @unlink($path);
+    }
+
+    // ------------------------------------------------------------------
+    // Branch resolution (Aug 2026)
+    //
+    // A distributor working in two cities trades under a different name in
+    // each, and the day-end sheet only carries the city. Every draft has to
+    // land on the right branch without anyone typing a branch id by hand.
+    // ------------------------------------------------------------------
+
+    /** @return array{0: \App\Models\Branch, 1: \App\Models\Branch} */
+    private function makeBranches(): array
+    {
+        $head = \App\Models\Branch::create([
+            'company_id' => $this->company->id,
+            'name' => 'Al Rehman Traders',
+            'city' => 'Lahore',
+            'is_head_office' => true,
+        ]);
+        $other = \App\Models\Branch::create([
+            'company_id' => $this->company->id,
+            'name' => 'Al Haq Distributors',
+            'city' => 'Multan',
+            'is_head_office' => false,
+        ]);
+
+        return [$head, $other];
+    }
+
+    public function test_branch_column_resolves_from_the_city(): void
+    {
+        [, $other] = $this->makeBranches();
+
+        $data = $this->row(['branch' => 'Multan']);
+        $errors = $this->service->validateRow($data, $this->company);
+
+        $this->assertSame([], $errors);
+        $this->assertSame($other->id, $data['_branch_id']);
+    }
+
+    public function test_branch_column_resolves_from_the_name_ignoring_case_and_spacing(): void
+    {
+        [$head] = $this->makeBranches();
+
+        $data = $this->row(['branch' => '  AL   REHMAN   traders ']);
+        $errors = $this->service->validateRow($data, $this->company);
+
+        $this->assertSame([], $errors);
+        $this->assertSame($head->id, $data['_branch_id']);
+    }
+
+    public function test_blank_branch_falls_back_to_the_head_office(): void
+    {
+        [$head] = $this->makeBranches();
+
+        $data = $this->row(['branch' => '']);
+        $errors = $this->service->validateRow($data, $this->company);
+
+        $this->assertSame([], $errors);
+        $this->assertSame($head->id, $data['_branch_id']);
+    }
+
+    public function test_unknown_branch_is_rejected_and_names_the_real_ones(): void
+    {
+        $this->makeBranches();
+
+        $data = $this->row(['branch' => 'Peshawar']);
+        $errors = $this->service->validateRow($data, $this->company);
+
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('Peshawar', $errors[0]);
+        $this->assertStringContainsString('Multan', $errors[0]);
+        $this->assertNull($data['_branch_id']);
+    }
+
+    public function test_two_branches_sharing_a_city_are_reported_as_ambiguous(): void
+    {
+        $this->makeBranches();
+        \App\Models\Branch::create([
+            'company_id' => $this->company->id,
+            'name' => 'Al Rehman Sabzi Mandi',
+            'city' => 'Multan',
+        ]);
+
+        $data = $this->row(['branch' => 'Multan']);
+        $errors = $this->service->validateRow($data, $this->company);
+
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('more than one branch', $errors[0]);
+        $this->assertNull($data['_branch_id']);
+
+        // The exact branch name is the way out of the ambiguity.
+        $byName = $this->row(['branch' => 'Al Rehman Sabzi Mandi']);
+        $this->assertSame([], $this->service->validateRow($byName, $this->company));
+    }
+
+    public function test_same_buyer_billed_from_two_branches_stays_two_invoices(): void
+    {
+        $this->makeBranches();
+
+        $lahore = $this->row(['branch' => 'Lahore']);
+        $multan = $this->row(['branch' => 'Multan']);
+        $this->service->validateRow($lahore, $this->company);
+        $this->service->validateRow($multan, $this->company);
+
+        $this->assertNotSame(
+            $this->service->groupKey($lahore),
+            $this->service->groupKey($multan),
+        );
+    }
+
+    public function test_created_drafts_carry_the_branch_resolved_from_the_city(): void
+    {
+        [$head, $multan] = $this->makeBranches();
+
+        $result = $this->service->validateRows($this->parsedRows([
+            $this->row(['description' => 'Lahore sale', 'branch' => 'Lahore']),
+            $this->row(['description' => 'Multan sale', 'branch' => 'Multan']),
+        ]), $this->company);
+
+        $this->assertSame(2, $result['valid_count'], json_encode($result['rows']));
+
+        $validRows = array_values(array_filter($result['rows'], fn ($r) => $r['valid']));
+        $outcome = $this->service->createDraftsFromRows($validRows, $this->company, null, 'bulk_import');
+
+        // Same buyer, same day, two cities → two invoices, not one merged draft.
+        $this->assertSame(2, $outcome['created_count'], json_encode($outcome['row_errors']));
+
+        $branchIds = Invoice::withoutGlobalScopes()->orderBy('id')->pluck('branch_id')->all();
+        $this->assertEqualsCanonicalizing([$head->id, $multan->id], $branchIds);
+    }
+
+    public function test_a_company_with_no_branches_still_imports(): void
+    {
+        $data = $this->row(['branch' => '']);
+        $errors = $this->service->validateRow($data, $this->company);
+
+        $this->assertSame([], $errors);
+        $this->assertNull($data['_branch_id']);
     }
 }

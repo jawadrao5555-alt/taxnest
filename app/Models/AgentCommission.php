@@ -22,6 +22,9 @@ class AgentCommission extends Model
         'amount',
         'period_month',
         'description',
+        'status',
+        'paid_at',
+        'paid_by_admin_id',
         'created_by_admin_id',
     ];
 
@@ -30,6 +33,7 @@ class AgentCommission extends Model
         'rate_percent' => 'decimal:2',
         'amount' => 'decimal:2',
         'period_month' => 'date',
+        'paid_at' => 'datetime',
     ];
 
     public function agent()

@@ -28,6 +28,12 @@
                 </div>
 
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                    <input type="text" name="city" value="{{ old('city') }}" placeholder="e.g. Lahore" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Bulk upload uses this city to pick the branch automatically, so keep it different for every branch.</p>
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
                     <textarea name="address" rows="3" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">{{ old('address') }}</textarea>
                 </div>

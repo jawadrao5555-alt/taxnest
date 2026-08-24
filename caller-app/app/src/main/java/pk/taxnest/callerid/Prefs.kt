@@ -63,6 +63,14 @@ object Prefs {
     fun telephonyRingAt(c: Context): Long = sp(c).getLong("telephony_ring_at", 0L)
     fun setTelephonyRingAt(c: Context, v: Long) { sp(c).edit().putLong("telephony_ring_at", v).commit() }
 
+    /** Phone RINGING halat mein kab gaya (aane wali call ka nishan). */
+    fun ringingAt(c: Context): Long = sp(c).getLong("ringing_at", 0L)
+    fun setRingingAt(c: Context, v: Long) { sp(c).edit().putLong("ringing_at", v).commit() }
+
+    /** Hum ne KHUD kab call milai (bina RINGING ke OFFHOOK). */
+    fun outgoingCallAt(c: Context): Long = sp(c).getLong("outgoing_call_at", 0L)
+    fun setOutgoingCallAt(c: Context, v: Long) { sp(c).edit().putLong("outgoing_call_at", v).commit() }
+
     /** Runtime permission maangi ja chuki hai? ("don't ask again" detect karne ke liye) */
     fun permAsked(c: Context): Boolean = sp(c).getBoolean("perm_asked", false)
     fun setPermAsked(c: Context, v: Boolean) = sp(c).edit().putBoolean("perm_asked", v).apply()

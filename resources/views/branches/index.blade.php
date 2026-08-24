@@ -21,6 +21,7 @@
                         <thead class="bg-gray-50 dark:bg-gray-800">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">City</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Address</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoices</th>
@@ -31,6 +32,13 @@
                             @forelse($branches as $branch)
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 dark:hover:bg-gray-800 transition">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $branch->name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                    @if($branch->city)
+                                        {{ $branch->city }}
+                                    @else
+                                        <span class="text-amber-600" title="Bulk upload cannot pick this branch until it has a city">Not set</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">{{ $branch->address ?? '-' }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @if($branch->is_head_office)
@@ -53,7 +61,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="5" class="px-6 py-12 text-center">
+                                <td colspan="6" class="px-6 py-12 text-center">
                                     <p class="text-gray-500 dark:text-gray-400">No branches yet</p>
                                     <a href="/branches/create" class="mt-3 inline-block text-emerald-600 hover:text-emerald-700 font-medium">Add your first branch</a>
                                 </td>

@@ -161,6 +161,7 @@
                                     'Packs' => 'Packs',
                                     'Dozens' => 'Dozens',
                                     'Tons' => 'Tons',
+                                    'Thousand Unit' => 'Thousand Unit',
                                     'Others' => 'Others',
                                 ];
                             @endphp

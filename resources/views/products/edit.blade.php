@@ -163,6 +163,7 @@
                                     'Packs' => 'Packs',
                                     'Dozens' => 'Dozens',
                                     'Tons' => 'Tons',
+                                    'Thousand Unit' => 'Thousand Unit',
                                     'Others' => 'Others',
                                 ];
                                 $oldUomMap = ['PCS' => 'Numbers, pieces, units', 'KG' => 'Kilograms', 'LTR' => 'Liters', 'MTR' => 'Meters', 'SQM' => 'Square meters', 'CBM' => 'Cubic meters', 'DOZ' => 'Dozens', 'SET' => 'Others', 'PKT' => 'Packs'];

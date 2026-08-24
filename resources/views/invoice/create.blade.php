@@ -1104,7 +1104,7 @@
                         'DOZ': 'Dozens',
                         'SET': 'Others',
                     };
-                    const validFull = ['Numbers, pieces, units','Kilograms','Liters','Meters','Square meters','Cubic meters','Packs','Dozens','Tons','Others'];
+                    const validFull = ['Numbers, pieces, units','Kilograms','Liters','Meters','Square meters','Cubic meters','Packs','Dozens','Tons','Thousand Unit','Others'];
                     if (validFull.includes(productUom)) return productUom;
                     return shortMap[productUom] || 'Numbers, pieces, units';
                 },

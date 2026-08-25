@@ -794,7 +794,7 @@
                                         .finally(()=>{ this.srBusy = false; });
                                 } }">
                             <div x-show="!srDone" class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700">
-                                <p class="text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.spend_records_line', ['count' => $localSeries['spend_records']]) }}</p>
+                                <p class="text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.spend_records_line', ['count' => $localSeries['spend_records']]) }} <x-new-badge feature="spend_records_clear" class="ml-1" /></p>
                                 <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.spend_records_hint') }}</p>
                                 <button type="button" x-show="!srOpen" @click="srOpen = true"
                                     class="mt-2.5 px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] font-bold transition">{{ __('pos.spend_records_clear_btn') }}</button>
@@ -900,7 +900,7 @@
                                         .finally(()=>{ this.lrBusy = false; });
                                 } }">
                             <div x-show="!lrDone" class="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-300 dark:border-teal-700">
-                                <p class="text-[11px] font-bold text-teal-900 dark:text-teal-300">{{ __('pos.local_series_reset_title', ['next' => \App\Services\PosLocalSeries::format(1)]) }}</p>
+                                <p class="text-[11px] font-bold text-teal-900 dark:text-teal-300">{{ __('pos.local_series_reset_title', ['next' => \App\Services\PosLocalSeries::format(1)]) }} <x-new-badge feature="local_series_reset" class="ml-1" /></p>
                                 <p class="text-[11px] text-teal-800 dark:text-teal-400 mt-1">{{ __('pos.local_series_reset_hint') }}</p>
                                 <p x-show="lrErr" x-cloak class="text-[11px] font-bold text-red-700 dark:text-red-400 mt-1.5" x-text="lrErr"></p>
                                 <button type="button" @click="resetSeries()" :disabled="lrBusy" :class="lrBusy && 'opacity-60 cursor-not-allowed'"
@@ -986,6 +986,9 @@
                             @if(!empty($c['badge']))
                             <span class="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full {{ $tn['bd'] }}">{{ $c['badge'] }}</span>
                             @endif
+                            {{-- 26 Aug 2026: agar is card ke page par koi naya switch hai to
+                                 yahin se nazar aa jaye — shop ko andar ja kar dhoondna na pare. --}}
+                            <x-new-badge :url="$c['url']" panel="pos" />
                         </div>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">{{ $c['desc'] }}</p>
                     </div>

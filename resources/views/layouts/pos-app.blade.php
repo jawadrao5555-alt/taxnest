@@ -529,8 +529,10 @@
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.reports') ? 'active text-white' : 'text-white' }}">{{ __('pos.reports') }}</a>
                             @endif
                             @if($posNavCan('customize', !$isCashierLayout))
+                            {{-- 26 Aug 2026: settings mein koi nayi cheez ho to nav par hi
+                                 chhota sabz nuqta — shop ko raasta yahin se mil jaye. --}}
                             <a href="{{ route('pos.customize') }}"
-                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.customize') ? 'active text-white' : 'text-white' }}">{{ __('pos.settings') }}</a>
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.customize') ? 'active text-white' : 'text-white' }}">{{ __('pos.settings') }}<x-new-badge panel="pos" dot class="ml-1" /></a>
                             @endif
                             @endif
                         </nav>
@@ -903,6 +905,7 @@
                                     <a href="{{ route('pos.customize') }}" class="menu-link flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-bold text-gray-800 dark:text-gray-100 {{ request()->routeIs('pos.customize') ? 'bg-purple-50 dark:bg-purple-900/20' : '' }}">
                                         <svg class="w-4 h-4 text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         {{ __('pos.nav_customize_pos') }}
+                                        <x-new-badge panel="pos" />
                                         <span class="ml-auto text-[9px] px-1.5 py-0.5 bg-purple-500 text-white rounded font-bold uppercase tracking-wider">{{ __('pos.all_settings_badge') }}</span>
                                     </a>
                                     @endif
@@ -987,7 +990,7 @@
                     <a href="{{ route('pos.reports') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.reports') }}</a>
                     @endif
                     @if($posNavCan('customize', !$isCashierLayout))
-                    <a href="{{ route('pos.customize') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.settings') }}</a>
+                    <a href="{{ route('pos.customize') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.settings') }}<x-new-badge panel="pos" dot class="ml-1" /></a>
                     @endif
                     @endif
                     <x-pwa-install-menu-item color="teal" app-name="Nest POS" :label="__('pos.download_app')" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />

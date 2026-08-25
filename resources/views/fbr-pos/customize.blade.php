@@ -1117,6 +1117,9 @@
                             @if(!empty($c['badge']))
                             <span class="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full {{ $tn['bd'] }}">{{ $c['badge'] }}</span>
                             @endif
+                            {{-- 26 Aug 2026: is card ke page par koi naya switch ho to yahin
+                                 se nazar aa jaye (register: NewFeatureBadges, panel fbrpos). --}}
+                            <x-new-badge :url="$c['url']" panel="fbrpos" />
                         </div>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">{{ $c['desc'] }}</p>
                     </div>

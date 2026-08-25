@@ -2266,6 +2266,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'never_connected' => 'Kabhi connect nahi hua',
     'never_word' => 'Kabhi nahi',
     'new_badge' => 'Naya',
+    'new_badge_title' => 'Naya — abhi shamil hua hai',
     'new_bills_only_bold' => 'Sirf naye bills par lagu hoga.',
     'new_bills_only_warning_html' => ':bold Purane bills, un ki receipts aur reports apne waqt ke mode ke mutabiq hi rahenge — kuch bhi peechhe ja kar tabdeel nahi hota. Tax har soorat poora PRA ko report hota hai.',
     'new_counter' => 'Naya Counter',

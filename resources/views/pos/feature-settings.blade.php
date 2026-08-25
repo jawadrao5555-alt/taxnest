@@ -240,7 +240,7 @@
                         <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="kotReprint ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'" x-show="flags.kot">
                             <input type="checkbox" name="kot_reprint_enabled" value="1" x-model="kotReprint" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
                             <div class="flex-1 min-w-0">
-                                <div class="text-sm font-bold text-gray-900 dark:text-white">🔁 {{ __('pos.allow_kot_reprint') }}</div>
+                                <div class="text-sm font-bold text-gray-900 dark:text-white">🔁 {{ __('pos.allow_kot_reprint') }} <x-new-badge feature="kot_reprint_switch" class="ml-1" /></div>
                                 <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">{{ __('pos.allow_kot_reprint_desc') }}</p>
                             </div>
                         </label>
@@ -252,7 +252,7 @@
                         <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="kotLastAddon ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'" x-show="flags.kot">
                             <input type="checkbox" name="kot_last_addon_enabled" value="1" x-model="kotLastAddon" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
                             <div class="flex-1 min-w-0">
-                                <div class="text-sm font-bold text-gray-900 dark:text-white">➕ {{ __('pos.allow_kot_last_addon') }}</div>
+                                <div class="text-sm font-bold text-gray-900 dark:text-white">➕ {{ __('pos.allow_kot_last_addon') }} <x-new-badge feature="kot_last_addon_switch" class="ml-1" /></div>
                                 <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">{{ __('pos.allow_kot_last_addon_desc') }}</p>
                             </div>
                         </label>

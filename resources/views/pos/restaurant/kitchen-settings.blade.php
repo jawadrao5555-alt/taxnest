@@ -119,7 +119,7 @@
                  wahi haalat nazar aayegi. --}}
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">🔁 {{ __('pos.allow_kot_reprint') }}</h3>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">🔁 {{ __('pos.allow_kot_reprint') }} <x-new-badge feature="kot_reprint_switch" class="ml-1" /></h3>
                     <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.allow_kot_reprint_desc') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
@@ -130,7 +130,7 @@
             </div>
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">➕ {{ __('pos.allow_kot_last_addon') }}</h3>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">➕ {{ __('pos.allow_kot_last_addon') }} <x-new-badge feature="kot_last_addon_switch" class="ml-1" /></h3>
                     <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.allow_kot_last_addon_desc') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">

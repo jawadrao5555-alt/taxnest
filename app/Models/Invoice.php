@@ -81,20 +81,18 @@ class Invoice extends Model
 
     public function getQrImageUrlAttribute()
     {
-        if (!$this->qr_data) return null;
+        // Same rule as the PDF: the QR carries the FBR invoice number alone,
+        // because that is the only thing Tax Asaan can look up from a scan.
+        // Rendered locally too — an invoice screen must not depend on an
+        // outside image service to show its own verification code.
+        $decoded = json_decode((string) $this->qr_data, true);
 
-        $decoded = json_decode($this->qr_data, true);
-        if (is_array($decoded)) {
-            $qrPayload = json_encode([
-                'sellerNTNCNIC' => $decoded['sellerNTNCNIC'] ?? '',
-                'fbr_invoice_number' => $decoded['fbr_invoice_number'] ?? '',
-                'invoiceDate' => $decoded['invoiceDate'] ?? '',
-                'totalValues' => $decoded['totalValues'] ?? 0,
-            ]);
-            return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($qrPayload);
-        }
+        $number = trim((string) ($this->fbr_invoice_number
+            ?: (is_array($decoded) ? ($decoded['fbr_invoice_number'] ?? '') : $this->qr_data)));
 
-        return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($this->qr_data);
+        if ($number === '') return null;
+
+        return \App\Support\QrImage::dataUri($number, 6) ?: null;
     }
 
     public function items()

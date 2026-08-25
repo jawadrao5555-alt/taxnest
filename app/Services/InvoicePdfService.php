@@ -54,27 +54,25 @@ class InvoicePdfService
         $qrBase64 = '';
         $fbrLogoBase64 = '';
         if ($invoice->fbr_invoice_number) {
-            $qrData = json_encode([
-                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->fbr_registration_no ?: ($invoice->company->ntn ?? '')),
-                'fbr_invoice_number' => $invoice->fbr_invoice_number,
-                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                'totalValues' => $invoice->total_amount,
-            ]);
-            // NB: chillerlan v5 picks the renderer by outputType STRING/const —
-            // GDIMAGE_PNG here; do not switch to outputInterface (silently SVG).
+            // The QR must carry the FBR invoice number and NOTHING else.
+            //
+            // FBR's own instruction to buyers is "enter the FBR invoice no. OR
+            // scan the QR code" — i.e. the scan is a shortcut for typing that
+            // number, and Tax Asaan reads the scanned text as the number it
+            // looks up. We used to encode a JSON object (NTN, number, date,
+            // total); a generic scanner showed the JSON, but Tax Asaan could
+            // not pull an invoice number out of it, so a buyer scanning a
+            // filed invoice got nothing. FBR POS receipts already encode the
+            // bare number — DI was the odd one out.
             //
             // A QR failure (e.g. GD missing on a CLI binary) must not take the
-            // whole invoice down: the template falls back to printing the FBR
-            // number on its own, which is what a buyer actually needs.
-            try {
-                $qrOptions = new \chillerlan\QRCode\QROptions([
-                    'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
-                    'scale' => 10,
-                ]);
-                $qrBase64 = (new \chillerlan\QRCode\QRCode($qrOptions))->render($qrData);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Invoice PDF: QR render failed for invoice #' . $invoice->id . ' — ' . $e->getMessage());
-                $qrBase64 = '';
+            // whole invoice down: QrImage returns an empty string and the
+            // template falls back to printing the FBR number on its own, which
+            // is what a buyer actually needs.
+            $qrBase64 = \App\Support\QrImage::dataUri(trim((string) $invoice->fbr_invoice_number), 8);
+
+            if ($qrBase64 === '') {
+                \Illuminate\Support\Facades\Log::warning('Invoice PDF: QR render failed for invoice #' . $invoice->id);
             }
 
             // The full-size logo is a 42 KB screen asset, and it was being

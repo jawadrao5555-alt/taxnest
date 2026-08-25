@@ -2350,9 +2350,11 @@ class PosController extends Controller
 
         $heldOrders = collect();
         if (($features->kot || $features->tables) && class_exists(RestaurantOrder::class)) {
+            // creator: staff name printed on every held-window row (owner batch,
+            // 26 Aug 2026). Eager-loaded — live throws on lazy relation access.
             $heldOrders = RestaurantOrder::where('company_id', $companyId)
                 ->whereIn('status', ['held', 'preparing', 'ready'])
-                ->with(['table', 'items'])->orderBy('created_at', 'desc')->get();
+                ->with(['table', 'items', 'creator:id,name'])->orderBy('created_at', 'desc')->get();
         }
 
         // Task 100 (Aug 2026): LIVE customer search for huge shops — never bake
@@ -2909,6 +2911,29 @@ class PosController extends Controller
             'incoming_order_id' => 'nullable|integer',
         ]);
 
+        // ── ONLINE-PAYMENT GATE, waiter-order settle path (owner, 26 Aug 2026) ──
+        // payOrder is NOT the only way a marked order can go final: the counter
+        // can load a waiter's order into the cart and ring it up right here. Same
+        // rule, same 422 contract — so the sale screen shows the very same
+        // "paisay aa gaye?" confirmation and retries with the flag. Provisionals
+        // are exempt: they are not final bills and never settle the waiter order.
+        $incomingOrderIdIn = (int) $request->input('incoming_order_id', 0);
+        if ($incomingOrderIdIn > 0
+            && !$request->boolean('save_as_provisional')
+            && !$request->boolean('online_payment_confirmed')
+            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')
+            && \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('id', $incomingOrderIdIn)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->whereNotNull('online_payment_awaited_at')
+                ->exists()) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'online_payment_awaited',
+                'message' => __('pos.online_confirm_body'),
+            ], 422);
+        }
+
         // OFFLINE-FIRST replay guard: if an earlier sync attempt already stored
         // this bill (response was lost mid-flight — network dropped again, tab
         // closed, etc.), return the SAME success payload instead of creating a
@@ -3455,7 +3480,8 @@ class PosController extends Controller
             $waiterOrderSettled = false;
             if (!$saveAsProvisional && $request->filled('incoming_order_id')) {
                 $waiterOrderSettled = RestaurantWaiterController::settleWaiterOrder(
-                    $companyId, (int) $request->input('incoming_order_id'), $transaction, auth('pos')->user()
+                    $companyId, (int) $request->input('incoming_order_id'), $transaction, auth('pos')->user(),
+                    $request->boolean('online_payment_confirmed')
                 );
                 if (!$waiterOrderSettled) {
                     throw new \RuntimeException(__('pos.waiter_order_already_settled'));

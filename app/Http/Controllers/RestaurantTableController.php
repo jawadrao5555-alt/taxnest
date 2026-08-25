@@ -382,6 +382,9 @@ class RestaurantTableController extends Controller
                         'order_type' => $active->order_type,
                         'kot_sent_at' => $active->kot_sent_at,
                         'status' => $active->status,
+                        // Owner batch 26 Aug 2026: table waiting on an online transfer —
+                        // the tile menu shows/toggles it and the proof bill says so.
+                        'online_payment_awaited_at' => $active->online_payment_awaited_at ?? null,
                     ] : null,
                 ];
             });

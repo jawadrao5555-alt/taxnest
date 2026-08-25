@@ -171,7 +171,15 @@
         @if($order->creator)<span>{{ __('pos.proof_user') }} <span class="bold">{{ \Illuminate\Support\Str::of($order->creator->name)->before(' ') }}</span></span>@endif
         <span>{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_',' ',$order->order_type)) }}</span>
     </div>
+    {{-- Owner batch (26 Aug 2026): when the customer says the money is coming
+         ONLINE, the cash-style NOT PAID line misleads the counter into waiting
+         for notes. Same slip, honest wording — the bill still isn't final. --}}
+    @if($order->online_payment_awaited_at ?? null)
+    <div class="proof-line">{{ __('pos.proof_online_awaited') }}</div>
+    <div class="text-center text-sm bold">{{ __('pos.proof_online_hint') }}</div>
+    @else
     <div class="proof-line">{{ __('pos.proof_not_paid') }}</div>
+    @endif
     <div class="text-center text-sm bold">{{ __('pos.proof_thank_you') }}</div>
 
     <script>

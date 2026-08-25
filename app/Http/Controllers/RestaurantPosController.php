@@ -448,6 +448,8 @@ class RestaurantPosController extends Controller
             // Phase 5 — KOT tracking. If this is a re-send (recalled order)
             // carry the prior print count forward so the new ticket prints "UPDATED".
             $carriedKotCount = 0;
+            $carriedOnlineAwaited = null;
+            $carriedOnlineMarkedBy = null;
             // KOT delta on recall (owner, Jul 2026): recall+re-hold recreates the
             // order, which used to wipe kot_printed_at on EVERY line — the next
             // ticket re-fired all dishes. Task 778 (Pizza Master video, Aug 2026):
@@ -474,6 +476,12 @@ class RestaurantPosController extends Controller
                     ->first();
                 if ($oldOrder) {
                     $carriedKotCount = (int) ($oldOrder->kot_print_count ?? 0);
+                    // Owner batch 26 Aug 2026: recall + re-hold ek NAYA row banata
+                    // hai — "paise online aa rahe hain" ka nishan bhi saath jana
+                    // chahiye, warna sirf item add karne se gate khamoshi se khul
+                    // jata aur bill bina tasdeeq final ho jata.
+                    $carriedOnlineAwaited = $oldOrder->online_payment_awaited_at ?? null;
+                    $carriedOnlineMarkedBy = $oldOrder->online_payment_marked_by ?? null;
                     foreach ($oldOrder->items()->whereNotNull('kot_printed_at')->orderBy('kot_batch_no')->orderBy('id')->get() as $oi) {
                         $printedPool[$kotCarryKey($oi->item_type, $oi->item_id, $oi->item_name, $oi->special_notes)][] = [
                             'qty' => (float) $oi->quantity,
@@ -584,6 +592,13 @@ class RestaurantPosController extends Controller
             // client sent a uuid. Conditional key = no SQL error on old schemas.
             if ($holdUuid !== '' && Schema::hasColumn('restaurant_orders', 'hold_uuid')) {
                 $orderCreateData['hold_uuid'] = $holdUuid;
+            }
+            // Nishan supersede ke baad naye row par bhi chale (dekho $carriedOnlineAwaited).
+            if ($carriedOnlineAwaited && Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+                $orderCreateData['online_payment_awaited_at'] = $carriedOnlineAwaited;
+                if (Schema::hasColumn('restaurant_orders', 'online_payment_marked_by')) {
+                    $orderCreateData['online_payment_marked_by'] = $carriedOnlineMarkedBy;
+                }
             }
             $order = RestaurantOrder::create($orderCreateData);
 
@@ -781,7 +796,7 @@ class RestaurantPosController extends Controller
                 // Item #4 (owner, Jul 2026): load table too — the Held Orders modal
                 // renders "Table: T-N" via x-if="order.table"; items-only left fresh
                 // holds table-less in the list until a full page reload.
-                'order' => $order->load(['items', 'table']),
+                'order' => $order->load(['items', 'table', 'creator:id,name']),
                 // Task 753: TRUE = server ne recall+append ki delta KOT queue kar
                 // di — client dobara fire na kare (sirf toast dikhaye).
                 'kot_delta_queued' => $kotDeltaQueued,
@@ -1128,6 +1143,21 @@ class RestaurantPosController extends Controller
             return response()->json(['success' => false, 'message' => 'Order already paid'], 400);
         }
 
+        // ── ONLINE-PAYMENT GATE (owner batch, 26 Aug 2026) ───────────────────
+        // An order marked "paisay online aa rahay hain" is NOT final until a
+        // human at the counter has actually seen the money land (customer's
+        // screenshot / bank alert). The sale screen asks that question and
+        // rides the answer on the retry; any caller that skips the question —
+        // a stale tab, the table board, a crafted POST — is refused here, so
+        // an unpaid table can never be closed by accident.
+        if ($order->awaitingOnlinePayment() && !$request->boolean('online_payment_confirmed')) {
+            return response()->json([
+                'success'  => false,
+                'code'     => 'online_payment_awaited',
+                'message'  => __('pos.online_confirm_body'),
+            ], 422);
+        }
+
         // Monthly bill quota (paid-plan package limits, Jul 2026) — paying a
         // restaurant order creates a FINAL bill, same gate as storeInvoice.
         // Task 215: provisional settles are quota-FREE (mirrors storeInvoice's
@@ -1279,6 +1309,19 @@ class RestaurantPosController extends Controller
                     'success' => false,
                     'message' => 'This order was already settled or cancelled on another terminal — refresh the table board.',
                 ], 409);
+            }
+            // ONLINE-PAYMENT GATE, RE-CHECKED UNDER THE LOCK. The pre-txn check
+            // above read a STALE row: another terminal (or the table board) can
+            // stamp "paisay online aa rahay hain" in the window between that read
+            // and this lock, and the bill would go final without anyone seeing the
+            // money. The locked row is the only trustworthy answer.
+            if ($freshOrder->awaitingOnlinePayment() && !$request->boolean('online_payment_confirmed')) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'online_payment_awaited',
+                    'message' => __('pos.online_confirm_body'),
+                ], 422);
             }
             // Drift guard: header amounts were computed from the PRE-lock read. If a
             // waiter appended/edited lines in between, those amounts are stale — bail
@@ -1433,13 +1476,18 @@ class RestaurantPosController extends Controller
                 ]);
             }
 
-            $order->update([
+            $completionFields = [
                 'status' => 'completed',
                 'payment_method' => $paymentMethod,
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
                 'pos_transaction_id' => $transaction->id,
-            ]);
+            ];
+            // The online-payment wait is over the moment the bill is final.
+            if (Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+                $completionFields['online_payment_awaited_at'] = null;
+            }
+            $order->update($completionFields);
 
             // Per-branch stock (Task 1354): the bill carries the branch, the
             // held order does not — pass it down so the goods leave the right shop.
@@ -1925,9 +1973,11 @@ class RestaurantPosController extends Controller
             return response('', 304)->header('ETag', $etag);
         }
 
+        // creator: the held-orders window prints the staff name on every row
+        // (owner batch 26 Aug 2026). Eager-loaded — live throws on lazy loads.
         $orders = RestaurantOrder::where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])
-            ->with(['table', 'items'])
+            ->with(['table', 'items', 'creator:id,name'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -1940,6 +1990,9 @@ class RestaurantPosController extends Controller
                 'source'          => $o->source,
                 'order_type'      => $o->order_type,
                 'priority'        => (bool) ($o->priority ?? false),
+                'staff_name'      => $o->creator?->name,
+                'online_payment_awaited_at' => $o->online_payment_awaited_at ? $o->online_payment_awaited_at->toJSON() : null,
+                'created_at'      => $o->created_at ? $o->created_at->toJSON() : null,
                 'customer_id'     => $o->customer_id,
                 'customer_name'   => $o->customer_name,
                 'customer_phone'  => $o->customer_phone,
@@ -2054,6 +2107,50 @@ class RestaurantPosController extends Controller
         $order->setRelation('items', $this->consolidateBillLines($order->items));
 
         return view('pos.restaurant.proof-bill', compact('order', 'company'));
+    }
+
+    /**
+     * "Paisay ONLINE aa rahay hain" marker (owner batch, 26 Aug 2026).
+     *
+     * Sets/clears a stamp on an OPEN order. Two consequences, both read from
+     * this one stamp: the Proof Bill prints "PAYMENT ONLINE — NOT RECEIVED"
+     * instead of the cash-style NOT PAID, and payOrder refuses to finalize the
+     * bill until the counter confirms the money actually arrived.
+     *
+     * The order's status is untouched on purpose — KDS, table board, pending
+     * bills and the day-close blocker all keep working exactly as before.
+     */
+    public function markOnlinePayment(\Illuminate\Http\Request $request, $orderId)
+    {
+        $companyId = app('currentCompanyId');
+
+        if (!Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+            // Deploy-before-migrate window: fail loudly instead of pretending
+            // the mark was saved (an optimistic switch must never lie).
+            return response()->json(['success' => false, 'message' => __('pos.online_mark_failed')], 503);
+        }
+
+        $order = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->find($orderId);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => __('pos.online_mark_failed')], 404);
+        }
+
+        $awaited = $request->boolean('awaited');
+        $order->online_payment_awaited_at = $awaited ? now() : null;
+        if (Schema::hasColumn('restaurant_orders', 'online_payment_marked_by')) {
+            $order->online_payment_marked_by = $awaited ? Auth::guard('pos')->id() : null;
+        }
+        $order->save();
+
+        return response()->json([
+            'success' => true,
+            'awaited' => $awaited,
+            'online_payment_awaited_at' => $order->online_payment_awaited_at?->toJSON(),
+            'message' => $awaited ? __('pos.online_mark_saved') : __('pos.online_mark_cleared'),
+        ]);
     }
 
     /**

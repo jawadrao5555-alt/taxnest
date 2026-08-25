@@ -1072,7 +1072,23 @@ class RestaurantWaiterController extends Controller
             return response()->json(['success' => false, 'message' => 'Transaction not found.'], 422);
         }
 
-        if (!self::settleWaiterOrder($companyId, (int) $id, $txn, auth('pos')->user())) {
+        // Online-adaigi gate: yeh client fallback bhi bina tasdeeq final na kare
+        // (wohi 422 contract jo payOrder aur storeInvoice bhejte hain).
+        if (!$request->boolean('online_payment_confirmed')
+            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')
+            && RestaurantOrder::where('company_id', $companyId)
+                ->where('id', (int) $id)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->whereNotNull('online_payment_awaited_at')
+                ->exists()) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'online_payment_awaited',
+                'message' => __('pos.online_confirm_body'),
+            ], 422);
+        }
+
+        if (!self::settleWaiterOrder($companyId, (int) $id, $txn, auth('pos')->user(), $request->boolean('online_payment_confirmed'))) {
             return response()->json(['success' => false, 'message' => 'Order already settled.'], 409);
         }
 
@@ -1093,7 +1109,7 @@ class RestaurantWaiterController extends Controller
      * order id is client-supplied on both call paths, so this guard is the
      * security boundary — never relax it to company-scope alone.
      */
-    public static function settleWaiterOrder(int $companyId, int $orderId, \App\Models\PosTransaction $txn, ?\App\Models\User $user): bool
+    public static function settleWaiterOrder(int $companyId, int $orderId, \App\Models\PosTransaction $txn, ?\App\Models\User $user, bool $onlineConfirmed = false): bool
     {
         if (!$user) {
             return false;
@@ -1103,18 +1119,32 @@ class RestaurantWaiterController extends Controller
             ->where('id', $orderId)
             ->where('source', 'waiter');
         self::whereOpenWaiterOrder($claimQuery);
+        // ONLINE-PAYMENT GATE (owner batch, 26 Aug 2026). An order marked
+        // "paisay online aa rahay hain" is not final until a human confirms the
+        // transfer landed. Both callers ask that question BEFORE they build a
+        // bill; this condition rides on the atomic claim itself so a mark set in
+        // the race window (another terminal, the table board) still wins — the
+        // claim simply fails and the caller's transaction rolls back.
+        if (!$onlineConfirmed && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+            $claimQuery->whereNull('online_payment_awaited_at');
+        }
         if (!$user->isPosAdmin()) {
             $claimQuery->where(function ($w) use ($user) {
                 $w->whereNull('assigned_cashier_id')->orWhere('assigned_cashier_id', $user->id);
             });
         }
-        $claimed = $claimQuery
-            ->update([
-                'status' => 'completed',
-                'pos_transaction_id' => $txn->id,
-                'payment_method' => $txn->payment_method,
-                'updated_at' => now(),
-            ]);
+        $settleFields = [
+            'status' => 'completed',
+            'pos_transaction_id' => $txn->id,
+            'payment_method' => $txn->payment_method,
+            'updated_at' => now(),
+        ];
+        // Bill final ho gaya — intezar khatam (payOrder bhi yehi karta hai),
+        // warna nishan reports aur reprints par latka reh jata.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+            $settleFields['online_payment_awaited_at'] = null;
+        }
+        $claimed = $claimQuery->update($settleFields);
         if (!$claimed) {
             return false;
         }

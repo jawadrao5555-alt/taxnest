@@ -21,6 +21,10 @@ class RestaurantOrder extends Model
         'void_items',
         // Task 1001: per-hold-attempt idempotency key — replay guard for lost responses.
         'hold_uuid',
+        // Owner batch 26 Aug 2026: "paisay online aa rahay hain" marker — the
+        // proof bill prints ONLINE instead of NOT PAID and the bill cannot be
+        // finalized until the counter confirms the payment landed.
+        'online_payment_awaited_at', 'online_payment_marked_by',
     ];
 
     protected $casts = [
@@ -42,7 +46,15 @@ class RestaurantOrder extends Model
         'kitchen_started_at' => 'datetime',
         'kitchen_ready_at' => 'datetime',
         'kitchen_cleared_at' => 'datetime',
+        'online_payment_awaited_at' => 'datetime',
+        'online_payment_marked_by' => 'integer',
     ];
+
+    /** Owner batch 26 Aug 2026: is this order waiting on an online transfer? */
+    public function awaitingOnlinePayment(): bool
+    {
+        return !empty($this->online_payment_awaited_at);
+    }
 
     public function company()
     {

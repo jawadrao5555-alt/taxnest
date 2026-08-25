@@ -2191,6 +2191,16 @@ window.addEventListener('popstate', function() {
                             {{-- Proof Bill (Pizza Master feedback, Jul 2026): customer ko bill
                                  dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
                             <button @click="boardProofBill()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill Print (bina final)</button>
+                            {{-- ONLINE ADAIGI (owner, 26 Aug 2026): dine-in table kehta hai
+                                 "online bhej deta hoon" — nishan lagao, proof bill khud
+                                 ONLINE likh dega aur bill tasdeeq ke baghair final nahi
+                                 hoga. Proof Bill ke UPAR nahi, saath rakha hai taake
+                                 cashier pehle nishan lagaye phir parchi nikale. --}}
+                            <button @click="toggleOnlinePayment(boardMenuTable.order, true)" :disabled="boardBusy || onlineMarkBusy === boardMenuTable.order.id"
+                                    class="w-full py-2.5 rounded-xl text-sm font-bold border transition disabled:opacity-40"
+                                    :class="boardMenuTable.order.online_payment_awaited_at ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' : 'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100'">
+                                <span>&#128179;</span> <span x-text="{{ Js::from(__('pos.online_mark_btn')) }} + (boardMenuTable.order.online_payment_awaited_at ? ' \u2713' : '')"></span>
+                            </button>
                             <button @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
                             {{-- Task 1379: reprint gate — see $canKotReprint. --}}
                             @if((($features->kot ?? false) || ($features->kitchen ?? false)) && $canKotReprint)
@@ -2489,35 +2499,70 @@ window.addEventListener('popstate', function() {
          par sirf BINA-TABLE held orders dikhte hain (heldWindowList()), table
          wale orders apni tiles/board par hi rehte hain — na double-count, na
          dead click. --}}
+    {{-- 26 Aug 2026 (owner voice note): jab 10-15 bill advance-payment ke intezar
+         mein hold hon to yeh list padhi hi nahi jati thi — sirf number, amount aur
+         item count. Ab har row poora ticket hai (items, customer, phone, address,
+         notes, staff) aur upar SEARCH hai: phone/naam/bill number/table se seedha
+         wohi order milta hai. --}}
     <div x-show="showHeldOrders" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showHeldOrders = false">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" x-transition.scale.90>
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.held_orders') }}</h3>
-                    <p class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.recall_nav_hint') }}</p>
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[86vh] overflow-hidden flex flex-col" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.held_orders') }}</h3>
+                        <p class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.recall_nav_hint') }}</p>
+                    </div>
+                    <button @click="showHeldOrders = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
-                <button @click="showHeldOrders = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                {{-- SEARCH — phone number is the real key (advance-payment bills are
+                     hunted by phone). Digits typed anywhere in this window land here
+                     (see the keyboard branch); letters stay shortcuts. The nofill set
+                     stops the browser autofilling the login email into it. --}}
+                <div class="relative mt-3">
+                    <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+                    <input x-ref="heldSearchInput" type="text" x-model="heldSearch" @input="activeHeldIndex = 0"
+                           {{-- Search box mein type karte hue bhi ↑↓ list par chalein aur
+                                Enter WOHI row uthaye jo highlight hai (pehla nahi) — warna
+                                do match hone par cashier ko mouse pakadna padta hai. --}}
+                           @keydown.arrow-down.prevent="activeHeldIndex = Math.min(activeHeldIndex + 1, Math.max(heldWindowList().length - 1, 0))"
+                           @keydown.arrow-up.prevent="activeHeldIndex = Math.max(activeHeldIndex - 1, 0)"
+                           @keydown.enter.prevent="(() => { const _l = heldWindowList(); const _r = _l[activeHeldIndex] || _l[0]; if (_r) recallOrder(_r); })()"
+                           @keydown.escape.prevent="heldSearch ? (heldSearch = '') : (showHeldOrders = false)"
+                           placeholder="{{ __('pos.held_search_ph') }}"
+                           autocomplete="off" name="held_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           class="w-full pl-9 pr-9 py-2.5 text-sm font-bold rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:border-purple-400 dark:focus:border-purple-500 outline-none transition">
+                    <button x-show="heldSearch" @click="heldSearch = ''; activeHeldIndex = 0; $refs.heldSearchInput && $refs.heldSearchInput.focus()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg font-black leading-none px-1">&times;</button>
+                </div>
             </div>
-            <div class="max-h-[60vh] overflow-y-auto">
+            <div class="flex-1 overflow-y-auto">
                 <template x-if="heldWindowList().length === 0">
-                    <div class="p-8 text-center text-gray-400"><p class="text-sm">{{ __('pos.no_held_orders') }}</p></div>
+                    <div class="p-8 text-center text-gray-400"><p class="text-sm font-semibold" x-text="(heldSearch || '').trim() ? {{ Js::from(__('pos.held_no_match')) }} : {{ Js::from(__('pos.no_held_orders')) }}"></p></div>
                 </template>
                 <template x-for="(order, oi) in heldWindowList()" :key="order.id">
-                    <div class="p-4 border-b border-gray-100 dark:border-gray-800 transition-all" :class="activeHeldIndex === oi ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 ring-inset' : ''">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-mono text-gray-400 w-5" x-text="oi + 1"></span>
-                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="order.order_number"></span>
+                    <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 transition-all" :class="activeHeldIndex === oi ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 ring-inset' : ''">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[11px] font-mono font-bold text-gray-400" x-text="(oi + 1) + '.'"></span>
+                                    <span class="text-base font-mono font-black text-gray-900 dark:text-white" x-text="order.order_number"></span>
+                                    <template x-if="order.table"><span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" x-text="window.TXT.table_t_colon + order.table.table_number"></span></template>
+                                    <template x-if="order.priority"><span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">URGENT</span></template>
+                                    <template x-if="order.online_payment_awaited_at"><span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200" x-text="{{ Js::from(__('pos.online_awaited_badge')) }}"></span></template>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full font-black uppercase" :class="{'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300': order.status==='held', 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300': order.status==='preparing', 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300': order.status==='ready'}" x-text="order.status"></span>
+                                </div>
+                                <p class="mt-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 leading-relaxed" x-text="heldItemsLine(order)"></p>
+                                <p x-show="heldCustomerLine(order)" class="mt-1 text-xs font-black text-blue-700 dark:text-blue-300" x-text="heldCustomerLine(order)"></p>
+                                <p x-show="order.delivery_address" class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 leading-snug" x-text="order.delivery_address"></p>
+                                <p x-show="heldNotesLine(order)" class="mt-1.5 text-[11px] font-bold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-2 py-1 leading-snug" x-text="heldNotesLine(order)"></p>
                             </div>
-                            <div class="flex items-center gap-1.5">
-                                <template x-if="order.customer_name"><span class="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium" x-text="order.customer_name"></span></template>
-                                <template x-if="order.priority"><span class="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">URGENT</span></template>
-                                <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="{'bg-amber-100 text-amber-700': order.status==='held', 'bg-blue-100 text-blue-700': order.status==='preparing', 'bg-green-100 text-green-700': order.status==='ready'}" x-text="order.status"></span>
+                            <div class="text-right flex-shrink-0">
+                                <p class="text-base font-black text-gray-900 dark:text-white" x-text="'Rs ' + Number(order.total_amount).toLocaleString()"></p>
+                                <p class="text-[10px] font-bold text-gray-500 dark:text-gray-400" x-text="order.items.length + window.TXT.sfx_item_s"></p>
+                                <p x-show="heldStaffName(order)" class="text-[10px] font-bold text-gray-400" x-text="{{ Js::from(__('pos.held_by_label')) }} + ' ' + heldStaffName(order)"></p>
+                                <p x-show="heldAgeLine(order)" class="text-[10px] font-bold text-purple-500 dark:text-purple-300" x-text="heldAgeLine(order)"></p>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mb-1 ml-7" x-text="'Rs. ' + Number(order.total_amount).toLocaleString() + ' • ' + order.items.length + window.TXT.sfx_item_s"></p>
-                        <template x-if="order.table"><p class="text-[10px] text-purple-600 ml-7" x-text="window.TXT.table_t_colon + order.table.table_number + (elapsedSince(order.table.occupied_since) ? window.TXT.occupied_glue + elapsedSince(order.table.occupied_since) : '')"></p></template>
-                        <div class="flex gap-2 mt-2 ml-7">
+                        <div class="flex flex-wrap gap-2 mt-2.5">
                             <button @click="recallOrder(order)" class="flex-1 py-2 text-xs font-bold text-purple-600 border border-purple-300 rounded-xl hover:bg-purple-50 transition">{{ __('pos.recall') }}</button>
                             {{-- Task 1379: reprint gate — same split as the held-order
                                  menu. The KOT link can still be a FIRST ticket, so it
@@ -2527,11 +2572,41 @@ window.addEventListener('popstate', function() {
                             <button x-show="canKotReprint" @click="resendKitchen(order)" title="Re-send full order ticket to kitchen (marked REPRINT)." class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
                             <button x-show="canKotLastAddon" @click="reprintLastKot(order)" title="{{ __('pos.ti_kot_last_addon') }}" class="py-2 px-2 text-xs font-bold text-amber-700 border border-amber-400 rounded-xl bg-amber-50 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_short') }}</button>
                             @endif
+                            {{-- ONLINE ADAIGI (owner, 26 Aug 2026): customer keh deta hai
+                                 "paise online bhej deta hoon". Yeh nishan lagte hi proof
+                                 bill par "NOT PAID" ki jagah ONLINE likha jata hai aur
+                                 bill tab tak final nahi hota jab tak counter tasdeeq na
+                                 kare ke paise aa gaye. --}}
+                            <button @click="toggleOnlinePayment(order)" :disabled="onlineMarkBusy === order.id"
+                                    :title="{{ Js::from(__('pos.online_mark_btn')) }}"
+                                    class="py-2 px-2.5 text-xs font-black rounded-xl border transition disabled:opacity-40"
+                                    :class="order.online_payment_awaited_at ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' : 'text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'">&#128179;</button>
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
                         </div>
                     </div>
                 </template>
+            </div>
+        </div>
+    </div>
+
+    {{-- ONLINE ADAIGI TASDEEQ (owner, 26 Aug 2026): jis bill par "paise online
+         aa rahe hain" ka nishan laga hai, server usay tab tak final nahi karta
+         jab tak yahan se HAAN na ho. Modal server ke 422 par khulta hai — is
+         liye held row, table tile aur panel, teenon raaste isi se guzarte hain.
+         Koi screenshot upload nahi: parchi/screenshot customer khud dikhata hai,
+         system sirf tasdeeq ke baghair final hone se rokta hai. --}}
+    <div x-show="onlineConfirm" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4" @click.self="onlineConfirm = null" @keydown.escape.window="if (onlineConfirm) onlineConfirm = null">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" x-transition.scale.90>
+            <div class="p-5 text-center">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-2xl">&#128179;</div>
+                <h3 class="mt-3 text-lg font-black text-gray-900 dark:text-white">{{ __('pos.online_confirm_title') }}</h3>
+                <p class="mt-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300 leading-relaxed">{{ __('pos.online_confirm_body') }}</p>
+                <p x-show="onlineConfirm && onlineConfirm.total" class="mt-2.5 text-2xl font-black text-gray-900 dark:text-white" x-text="'Rs ' + Number((onlineConfirm && onlineConfirm.total) || 0).toLocaleString()"></p>
+            </div>
+            <div class="p-4 pt-0 flex gap-2">
+                <button @click="onlineConfirm = null" class="flex-1 py-3 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition">{{ __('pos.online_confirm_no') }}</button>
+                <button @click="onlineConfirmYes()" class="flex-1 py-3 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 transition">{{ __('pos.online_confirm_yes') }}</button>
             </div>
         </div>
     </div>
@@ -4352,6 +4427,11 @@ $heldOrdersJson = $heldOrders->map(function ($o) {
         'customer_phone' => $o->customer_phone,
         'kitchen_notes' => $o->kitchen_notes,
         'delivery_address' => $o->delivery_address ?? null,
+        // Owner batch 26 Aug 2026 — held window shows the full ticket: who took
+        // the order, and whether it is waiting on an online transfer.
+        'staff_name' => $o->creator?->name,
+        'online_payment_awaited_at' => $o->online_payment_awaited_at ? $o->online_payment_awaited_at->toJSON() : null,
+        'created_at' => $o->created_at ? $o->created_at->toJSON() : null,
         'discount_type' => $o->discount_type,
         'discount_value' => (float) ($o->discount_value ?? 0),
         'discount_amount' => (float) ($o->discount_amount ?? 0),
@@ -4699,6 +4779,13 @@ function restaurantPos() {
         cartMode: false,
         get mode() { return this.cartMode ? 'cart' : 'search'; },
         activeHeldIndex: 0,
+        // ── HELD WINDOW search + online-payment mark (owner, 26 Aug 2026) ──
+        // heldSearch filters heldWindowList() itself, so the ↑↓/Enter/P/D cursor
+        // automatically walks the SAME filtered rows the window is showing.
+        heldSearch: '',
+        onlineMarkBusy: null,      // order id whose ONLINE mark is saving (double-tap guard)
+        onlineConfirm: null,       // {orderId, args, total} → "paise aa gaye?" modal
+        _onlineOkByOrder: {},      // orderId → counter ne online adaigi confirm kar di
         gridFocusMode: false,
         gridFocusIndex: 0,
         gridCols: 4,
@@ -5401,6 +5488,10 @@ function restaurantPos() {
             // Do NOT call this.restoreCart() here without explicit product approval.
             this.$watch('cart', () => { this.saveCart(); this.recalcDiscount(); }, { deep: true });
             this.$watch('kitchenNotes', () => { this.saveCart(); });
+            // Held-window search (owner, 26 Aug 2026): window band hote hi search
+            // saaf ho — warna agli dafa khulte hi purani filter lagi milti aur
+            // cashier ko lagta "baqi orders gayab ho gaye".
+            this.$watch('showHeldOrders', v => { if (!v) { this.heldSearch = ''; this.activeHeldIndex = 0; } });
             setTimeout(() => this.cacheProductData(), 800);
             document.addEventListener('keydown', (e) => this.handleKey(e));
             // Owner (28 Jul 2026): "New Sale pe click karo to 'NestPOS load ho raha
@@ -7355,11 +7446,33 @@ function restaurantPos() {
                 else if (e.key === 'Escape') { e.preventDefault(); this.showRetailHeld = false; }
                 return;
             }
-            if (this.showHeldOrders && this.heldWindowList().length > 0) {
+            if (this.showHeldOrders) {
+                // Tasdeeq wala modal upar khula ho to yeh window keys na khaye —
+                // uska apna Escape/HAAN handler chalta hai.
+                if (this.onlineConfirm) return;
                 // Keyboard cursor WOHI list par chale jo window dikha rahi hai
-                // (table shops par sirf bina-table orders) — warna Enter/P kisi
-                // aur order par lag jata.
+                // (table shops par sirf bina-table orders, aur search lagi ho to
+                // sirf matching rows) — warna Enter/P kisi aur order par lag jata.
                 const _hkList = this.heldWindowList();
+                // TYPE-TO-SEARCH (owner, 26 Aug 2026): koi bhi DIGIT seedha search
+                // box mein jata hai — advance-payment wale bill phone number se hi
+                // dhoonde jate hain. Harf (P/D) shortcuts hi rehte hain.
+                if (/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    e.preventDefault();
+                    this.heldSearch = (this.heldSearch || '') + e.key;
+                    this.activeHeldIndex = 0;
+                    this.$nextTick(() => {
+                        const el = this.$refs.heldSearchInput;
+                        if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (_) {} }
+                    });
+                    return;
+                }
+                if (e.key === 'Backspace' && (this.heldSearch || '').length) { e.preventDefault(); this.heldSearch = this.heldSearch.slice(0, -1); this.activeHeldIndex = 0; return; }
+                // Escape: pehle search clear, phir window band — warna filter
+                // lagi list par Esc dabate hi window band ho jati aur agli dafa
+                // purani search wapas mil jati.
+                if (e.key === 'Escape') { e.preventDefault(); if ((this.heldSearch || '').length) { this.heldSearch = ''; this.activeHeldIndex = 0; } else { this.showHeldOrders = false; } return; }
+                if (!_hkList.length) return;
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, _hkList.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); const _hkR = _hkList[this.activeHeldIndex]; if (_hkR) this.recallOrder(_hkR); }
@@ -8468,7 +8581,116 @@ function restaurantPos() {
         // (takeaway/delivery) held orders — table wale orders board/tiles par
         // hain, unhein yahan dikhana double-count aur do jagah se delete/pay ka
         // rasta banata. Bina-table shops par poori list (purana behaviour).
-        heldWindowList() { return this.tableBoardEnabled ? this.heldNoTable() : this.heldOrders; },
+        heldWindowList() {
+            const base = this.tableBoardEnabled ? this.heldNoTable() : this.heldOrders;
+            const q = (this.heldSearch || '').trim().toLowerCase();
+            if (!q) return base;
+            // Phone is the real search key. Digits-only compare karte hain taake
+            // "0300-1234567", "0300 1234567" aur "03001234567" ek hi bill dhoondein.
+            const digits = q.replace(/\D/g, '');
+            return base.filter(o => {
+                const hay = [
+                    o.order_number, o.customer_name, o.customer_phone, o.delivery_address,
+                    o.kitchen_notes, o.staff_name, o.table ? o.table.table_number : '',
+                    (o.items || []).map(it => it.name || it.item_name || '').join(' ')
+                ].filter(Boolean).join(' ').toLowerCase();
+                if (hay.indexOf(q) !== -1) return true;
+                if (digits.length >= 3) {
+                    const phone = String(o.customer_phone || '').replace(/\D/g, '');
+                    if (phone && phone.indexOf(digits) !== -1) return true;
+                    const num = String(o.order_number || '').replace(/\D/g, '');
+                    if (num && num.indexOf(digits) !== -1) return true;
+                }
+                return false;
+            });
+        },
+        // ── Held-row ticket helpers (owner, 26 Aug 2026) ──────────────────────
+        // Waiter app jaisi poori parchi: "2× Chicken Karahi · 1× Naan".
+        heldItemsLine(o) {
+            const items = (o && o.items) || [];
+            if (!items.length) return '';
+            const parts = items.slice(0, 12).map(it => {
+                const q = parseFloat(it.quantity) || 1;
+                const qty = (Math.round(q * 100) / 100).toString();
+                return qty + '\u00D7 ' + (it.name || it.item_name || '');
+            });
+            if (items.length > 12) parts.push('+' + (items.length - 12));
+            return parts.join('  \u00B7  ');
+        },
+        heldCustomerLine(o) {
+            if (!o) return '';
+            return [o.customer_name, o.customer_phone].filter(Boolean).join('  \u00B7  ');
+        },
+        heldNotesLine(o) {
+            const n = (o && (o.kitchen_notes || o.notes)) || '';
+            return String(n).trim() ? '\u270E ' + String(n).trim() : '';
+        },
+        heldStaffName(o) {
+            const n = (o && (o.staff_name || (o.creator && o.creator.name))) || '';
+            return String(n).trim().split(' ')[0] || '';
+        },
+        heldAgeLine(o) {
+            if (!o) return '';
+            const since = (o.table && o.table.occupied_since) || o.created_at || null;
+            return since ? (this.elapsedSince(since) || '') : '';
+        },
+        // ── ONLINE ADAIGI ka nishan (owner, 26 Aug 2026) ──────────────────────
+        // Customer kehta hai "paise online bhej deta hoon": nishan lagte hi proof
+        // bill "NOT PAID" ki jagah ONLINE likhta hai aur bill counter ki tasdeeq
+        // ke baghair FINAL nahi hota. Switch optimistic hai magar jhoot nahi
+        // bolta — server ka jawab hi sach hai, fail par nishan wapas palat jata.
+        async toggleOnlinePayment(order, fromBoard = false) {
+            if (!order || !order.id || this.onlineMarkBusy === order.id) return;
+            const prev = order.online_payment_awaited_at || null;
+            const want = !prev;
+            // Live PDO ids string ho sakti hain — hamesha Number() se match.
+            const same = (a) => a != null && Number(a) === Number(order.id);
+            const mirror = (val) => {
+                order.online_payment_awaited_at = val;
+                const h = (this.heldOrders || []).find(o => same(o.id));
+                if (h) h.online_payment_awaited_at = val;
+                if (this.boardMenuTable && this.boardMenuTable.order && same(this.boardMenuTable.order.id)) this.boardMenuTable.order.online_payment_awaited_at = val;
+                (this.tableFloors || []).forEach(f => (f.tables || []).forEach(t => { if (t.order && same(t.order.id)) t.order.online_payment_awaited_at = val; }));
+            };
+            this.onlineMarkBusy = order.id;
+            mirror(want ? new Date().toISOString() : null);
+            try {
+                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${order.id}/online-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ awaited: want })
+                });
+                let data = null;
+                try { data = await res.json(); } catch (_) {}
+                if (!res.ok || !data || data.success !== true) {
+                    throw new Error((data && data.message) || ('HTTP ' + res.status));
+                }
+                mirror(data.awaited ? (data.online_payment_awaited_at || new Date().toISOString()) : null);
+                // Nishan hatate hi purani tasdeeq bhi khatam — agli dafa counter
+                // se dobara poocha jayega.
+                if (!data.awaited) delete this._onlineOkByOrder[order.id];
+                this.showToast(data.message || (data.awaited ? window.TXT.online_mark_saved : window.TXT.online_mark_cleared), 'success');
+            } catch (e) {
+                console.error('[toggleOnlinePayment] FAIL', e);
+                mirror(prev);
+                this.showToast(window.TXT.online_mark_failed, 'error');
+            } finally {
+                this.onlineMarkBusy = null;
+            }
+        },
+        // "Paise aa gaye?" modal ka HAAN — tasdeeq yaad rakh kar wohi pay dobara
+        // chalata hai (same pay_uuid, is liye duplicate bill nahi banta).
+        async onlineConfirmYes() {
+            const c = this.onlineConfirm;
+            if (!c) return;
+            this.onlineConfirm = null;
+            // Tasdeeq isi bill ke saath chipakti hai, is liye jo bhi raasta dobara
+            // chale — held row ki pay ya counter par waiter order ka settle —
+            // flag apne aap saath chala jata hai.
+            if (c.orderId) this._onlineOkByOrder[c.orderId] = true;
+            if (typeof c.retry === 'function') { await c.retry(); return; }
+            await this.payHeldOrderDirect(...c.args);
+        },
         heldMenuRecall() { const o = this.heldMenu; this.heldMenu = null; if (o) this.recallOrder(o); },
         heldMenuPay()    { const o = this.heldMenu; this.heldMenu = null; if (o) this.payHeldOrder(o.id); },
         heldMenuResend() { const o = this.heldMenu; this.heldMenu = null; if (o) this.resendKitchen(o); },
@@ -9812,6 +10034,9 @@ function restaurantPos() {
                     // BEFORE responding: the very first receipt print can then show
                     // the "Waiter:" line. Provisionals never consume the order.
                     incoming_order_id: (!provisional && this.incomingOrderId) ? this.incomingOrderId : null,
+                    // Online-adaigi ki tasdeeq isi waiter order ke saath jati hai,
+                    // warna server (jaiz taur par) dobara rok deta hai.
+                    online_payment_confirmed: !!(this.incomingOrderId && this._onlineOkByOrder[this.incomingOrderId]),
                     // OFFLINE-FIRST dedupe key rides on EVERY attempt (online too).
                     // If the response is lost mid-flight (flaky WiFi: server saved
                     // the bill but the reply never arrived), the queued replay
@@ -9889,6 +10114,22 @@ function restaurantPos() {
                             this.lastPayTime = 0; // bypass the 3s double-tap debounce for this deliberate retry
                             return await this.processPaymentManual(method, true, skipReceipt);
                         }
+                    }
+                    // ONLINE ADAIGI: server ne is waiter order ko bina tasdeeq final
+                    // karne se roka. Wohi modal khole jo held-row ki pay par khulta
+                    // hai; HAAN par yehi pay dobara chalti hai — gate transaction se
+                    // PEHLE lagta hai, is liye koi adhoora bill peeche nahi rehta.
+                    if (res.status === 422 && data && data.code === 'online_payment_awaited') {
+                        this.submitting = false;
+                        this.onlineConfirm = {
+                            orderId: this.incomingOrderId,
+                            total: savedTotal,
+                            retry: async () => {
+                                this.lastPayTime = 0; // deliberate retry — 3s debounce bypass
+                                await this.processPaymentManual(method, provisional, skipReceipt);
+                            },
+                        };
+                        return;
                     }
                     this.showToast(msg, 'error');
                     this.submitting = false;
@@ -11527,7 +11768,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null, terminal_id: this.terminalId || null }) });
+                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null, terminal_id: this.terminalId || null, online_payment_confirmed: !!this._onlineOkByOrder[orderId] }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));
@@ -11547,6 +11788,21 @@ function restaurantPos() {
                             return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride, skipReceipt, payUuid);
                         }
                     }
+                    // ONLINE ADAIGI GATE (owner, 26 Aug 2026): jis bill par "paise
+                    // online aayenge" ka nishan laga hai woh server par tab tak final
+                    // nahi hota jab tak counter tasdeeq na kare. Server 422 bhejta
+                    // hai → yahan tasdeeq wala modal khulta hai aur HAAN par WOHI
+                    // pay dobara chalti hai (same pay_uuid = duplicate bill nahi).
+                    // Gate server par hai, is liye har pay raasta — held row, table
+                    // tile, panel final — apne aap isi se guzarta hai.
+                    if (res.status === 422 && errData && errData.code === 'online_payment_awaited') {
+                        this.onlineConfirm = {
+                            orderId: orderId,
+                            args: [orderId, method, savedTotal, provisional, orderTypeOverride, skipReceipt, effPayUuid],
+                            total: savedTotal || (heldOrd && heldOrd.total_amount) || 0,
+                        };
+                        return false;
+                    }
                     this.showToast((errData && errData.message) || ('Payment failed (HTTP ' + res.status + ') — F12 console'), 'error');
                     return false;
                 }
@@ -11555,6 +11811,8 @@ function restaurantPos() {
                     // Sale done — retire this order's retry key (next pay of any
                     // other order mints its own). Success body handled centrally.
                     delete this._payUuidByOrder[orderId];
+                    // Online-adaigi ki tasdeeq bhi isi bill tak mehdood thi.
+                    delete this._onlineOkByOrder[orderId];
                     return this.applyPaySuccess(data, orderId, method, savedTotal, payOrderType, skipReceipt, provisional, heldOrd);
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || window.TXT.payment_failed, 'error'); if (res.status === 409 && this.tableBoardEnabled) this.loadTableStatus(); return false; }
             } catch (e) {

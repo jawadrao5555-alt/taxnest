@@ -1218,6 +1218,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Task 794: VOID/CANCEL slip — dishes removed from a running order after their KOT fired.
     Route::get('/restaurant/orders/{id}/void-ticket', [RestaurantPosController::class, 'voidTicket'])->name('pos.restaurant.void-ticket');
     Route::get('/restaurant/orders/{id}/proof-bill', [RestaurantPosController::class, 'proofBill'])->name('pos.restaurant.proof-bill');
+    // Owner batch 26 Aug 2026: mark/unmark "payment online aa rahi hai" on a held
+    // order — proof bill wording + the pay-time confirm gate both read this stamp.
+    Route::post('/restaurant/orders/{id}/online-payment', [RestaurantPosController::class, 'markOnlinePayment'])->name('pos.restaurant.online-payment');
     // Delivery KOT for order-less bills (rendered from the transaction itself).
     Route::get('/transactions/{id}/kitchen-ticket', [RestaurantPosController::class, 'transactionKitchenTicket'])->name('pos.transaction.kitchen-ticket');
 

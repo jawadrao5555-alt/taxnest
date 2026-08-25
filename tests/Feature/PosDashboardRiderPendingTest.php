@@ -233,4 +233,43 @@ class PosDashboardRiderPendingTest extends TestCase
 
         $this->assertSame('', trim($html), 'Khali khata par dashboard par kuch nahi aana chahiye');
     }
+
+    /**
+     * Reminder company ki liability hai — rider ke naam ke saath bahar para
+     * cash. Settle sirf admin/manager kar sakta hai; cashier ko poori dukan ka
+     * khata dikhana na zaroori hai na munasib.
+     */
+    public function test_cashier_is_never_shown_the_company_rider_liability(): void
+    {
+        $this->bill(['rider_id' => 1, 'total_amount' => 550]);
+        $this->assertSame(550.0, $this->pending()->sum('owed'), 'Bina cashier ke khata maujood hai');
+
+        $cashier = User::create([
+            'company_id' => 1,
+            'name' => 'Cashier',
+            'role' => 'user',
+            'pos_role' => 'pos_cashier',
+        ]);
+        Auth::guard('pos')->setUser($cashier);
+
+        $this->assertTrue(
+            $this->pending()->isEmpty(),
+            'Cashier ko doosron ka rider cash nahi dikhna chahiye'
+        );
+    }
+
+    public function test_manager_still_sees_the_liability(): void
+    {
+        $this->bill(['rider_id' => 1, 'total_amount' => 550]);
+
+        $manager = User::create([
+            'company_id' => 1,
+            'name' => 'Manager',
+            'role' => 'user',
+            'pos_role' => 'pos_manager',
+        ]);
+        Auth::guard('pos')->setUser($manager);
+
+        $this->assertSame(550.0, $this->pending()->sum('owed'));
+    }
 }

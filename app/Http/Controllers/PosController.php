@@ -1782,6 +1782,7 @@ class PosController extends Controller
 
         // Owner (25 Aug 2026): rider ki pari hui settlement bhi dashboard par
         // dikhni chahiye — "baqi tamam issues dashboard par aa jate hain".
+        //
         $riderPending = $this->pendingRiderKhata($companyId, $company);
 
         return view('pos.dashboard', compact(
@@ -1819,6 +1820,16 @@ class PosController extends Controller
             || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id')) {
             return collect();
         }
+
+        // Yeh reminder company ki LIABILITY hai — rider ke naam ke saath kitna
+        // cash bahar phansa hua hai. Settle sirf admin/manager kar sakta hai, is
+        // liye cashier ko poori dukan ka bahar para cash dikhana bhi nahi
+        // chahiye. Gate yahan (call site par nahi) taake koi naya caller ise
+        // ghalti se bypass na kar sake.
+        $viewer = auth('pos')->user();
+        if ($viewer && $viewer->posCashierBlocked()) {
+            return collect();
+        }
         // Feature/plan gate jaan boojh kar YAHAN nahi lagaya: gate band hone par
         // bhi rider ke paas para cash phansna nahi chahiye (deliveries board bhi
         // isi wajah se khula rehta hai — PosRiderController::hasOpenRiderCash).
@@ -1832,6 +1843,16 @@ class PosController extends Controller
             ->where(function ($s) {
                 $s->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
             });
+
+        // Multi-branch: baqi har dashboard figure ki tarah yeh reminder bhi
+        // active branch ka hi hona chahiye. Warna ek branch ka manager doosri
+        // branch ka rider cash dekhta hai — jis par wo kuch kar bhi nahi sakta,
+        // aur do screenon par ek hi shop ke do alag hindsay aate hain.
+        // Schema guard: purani DB par branch column/table ho hi na (PROD drift).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'branch_id')
+            && \Illuminate\Support\Facades\Schema::hasTable('branches')) {
+            app(\App\Services\BranchContextService::class)->applyToQuery($q, 'branch_id');
+        }
 
         // Ek hi grouped query — rider ke hisaab se ginti, raqam aur sab se
         // purane bill ki tareekh (N+1 se bachne ke liye).

@@ -13,6 +13,9 @@ class BranchResolver
 
     private ?bool $branchesTable = null;
 
+    /** @var array<int,\Illuminate\Support\Collection> */
+    private array $activeBranchCache = [];
+
     /** @return array<string,int|false> */
     public function branchLookup(Company $company): array
     {
@@ -100,7 +103,9 @@ class BranchResolver
 
         $haystack = $this->normalizeBranchKey($text);
         $candidates = [];
-        $branches = Branch::withoutGlobalScopes()
+        // Ek batch mein 1000 tak drafts aate hain — branch list har invoice par
+        // dobara nikalna 1000 query ban jata hai. Company ke hisaab se cache.
+        $branches = $this->activeBranchCache[$company->id] ??= Branch::withoutGlobalScopes()
             ->where('company_id', $company->id)
             ->where('is_active', true)
             ->orderBy('id')

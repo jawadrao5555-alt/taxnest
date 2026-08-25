@@ -599,7 +599,9 @@ class InvoiceZipBuilderService
         }
 
         $used = [];
+        $packed = 0;
         $omitted = [];
+        $omittedIds = [];
 
         self::snapshotQuery($export)
             ->where('id', '<=', (int) $export->cursor_id)
@@ -608,7 +610,7 @@ class InvoiceZipBuilderService
                 'id', 'company_id', 'created_at', 'updated_at', 'status',
                 'fbr_invoice_number', 'internal_invoice_number', 'invoice_number',
             ])
-            ->chunk(500, function ($rows) use ($zip, &$used, &$omitted) {
+            ->chunk(500, function ($rows) use ($export, $zip, &$used, &$packed, &$omitted, &$omittedIds) {
                 foreach ($rows as $invoice) {
                     $path = InvoicePdfCacheService::currentPath($invoice);
 
@@ -623,16 +625,19 @@ class InvoiceZipBuilderService
 
                     if ($path === null) {
                         $omitted[] = $label;
+                        $omittedIds[] = (int) $invoice->id;
                         continue;
                     }
 
                     try {
                         $zip->addFileFromPath(self::entryName($used, $invoice), $path);
+                        $packed++;
                     } catch (\Throwable $e) {
                         // The file went away between the check and the read.
                         // One missing invoice must not kill the download — but
                         // it does get named in the archive.
                         $omitted[] = $label;
+                        $omittedIds[] = (int) $invoice->id;
                         Log::warning('Invoice ZIP: an invoice dropped out while streaming', [
                             'export_id' => $export->id,
                             'invoice_id' => $invoice->id,
@@ -650,6 +655,15 @@ class InvoiceZipBuilderService
         }
 
         $zip->finish();
+
+        // What actually went down the wire is the honest record — an invoice
+        // that failed while it was being prepared but renders fine now is in
+        // the shop's hands, and the panel should stop calling it a failure.
+        InvoiceZipExport::where('id', $export->id)->update([
+            'processed_invoices' => $packed,
+            'failed_invoices' => count($omittedIds),
+            'failed_ids' => array_slice($omittedIds, 0, self::MAX_TRACKED_FAILURES),
+        ]);
     }
 
     /** How an invoice is named to a human reading the notice file. */

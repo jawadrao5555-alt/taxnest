@@ -2622,6 +2622,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pending_open_tables_sub' => 'Abhi settle nahi hue',
     'pending_counter_orders' => 'Counter orders',
     'pending_counter_orders_sub' => 'Sale screen ke bell panel se khulenge',
+    'pending_held_orders' => 'Held orders',
+    'pending_held_orders_sub' => 'Sale screen ki Held window se khulenge',
     'open_since_date' => ':date se khula',
     'local_archived_explain' => 'Day-close par mehfooz ho chuka — koi action zaroori nahi',
     'pending_provisional_bills' => 'Provisional bills',

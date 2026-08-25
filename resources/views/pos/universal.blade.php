@@ -644,10 +644,10 @@ window.addEventListener('popstate', function() {
                  switch se nahi, KHUD-CHHUPNE se hal hua: table companies par chip
                  sirf tab aata hai jab koi held order MAUJOOD ho. Zero held =
                  screen bilkul waisi hi jaisi pehle thi. --}}
-            <button x-show="{{ ($features->tables ?? false) ? 'heldOrders.length > 0' : 'true' }}" x-cloak @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.ti_held_orders') }}">
+            <button x-show="{{ ($features->tables ?? false) ? 'heldWindowList().length > 0' : 'true' }}" x-cloak @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.ti_held_orders') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.held') }}</span>
-                <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
+                <span x-show="heldWindowList().length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="heldWindowList().length"></span>
             </button>
 
             {{-- 🟢/🟡/🔴 Auto-Sync status pill — same logic as the mobile copy --}}
@@ -2480,7 +2480,15 @@ window.addEventListener('popstate', function() {
 
     {{-- HELD ORDERS window — sirf NON-table companies (owner 26 Jul 2026: table
          companies ke held orders TABLE board mein merge; alag window RETIRED). --}}
-    @unless($features->tables ?? false)
+    {{-- 25 Aug 2026 (shop ki shikayat, video): TABLE companies par yeh window
+         @unless se bilkul render hi nahi hoti thi (26 Jul 2026: table shops ke
+         held orders TABLE board mein merge kar diye gaye the). Ab jab takeaway/
+         delivery bhi hold hote hain to un bina-table orders ka koi ghar nahi
+         raha: chip nazar aata (badge 1) magar click par kuch na khulta — DOM
+         mein window thi hi nahi. Ab window HAR shop par bani hai; table shops
+         par sirf BINA-TABLE held orders dikhte hain (heldWindowList()), table
+         wale orders apni tiles/board par hi rehte hain — na double-count, na
+         dead click. --}}
     <div x-show="showHeldOrders" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showHeldOrders = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -2491,10 +2499,10 @@ window.addEventListener('popstate', function() {
                 <button @click="showHeldOrders = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <div class="max-h-[60vh] overflow-y-auto">
-                <template x-if="heldOrders.length === 0">
+                <template x-if="heldWindowList().length === 0">
                     <div class="p-8 text-center text-gray-400"><p class="text-sm">{{ __('pos.no_held_orders') }}</p></div>
                 </template>
-                <template x-for="(order, oi) in heldOrders" :key="order.id">
+                <template x-for="(order, oi) in heldWindowList()" :key="order.id">
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800 transition-all" :class="activeHeldIndex === oi ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 ring-inset' : ''">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-2">
@@ -2527,7 +2535,6 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
     </div>
-    @endunless
 
     @if($retailHold)
     {{-- ═══ BILL ROKEIN — retail park/recall (owner, 23 Aug 2026) ═══════════ --}}
@@ -5394,6 +5401,16 @@ function restaurantPos() {
                     history.replaceState({}, '', window.location.pathname);
                 }
             } catch (e) {}
+            // 25 Aug 2026: wahi rasta CASHIER ke park kiye hue bina-table orders
+            // ke liye — dashboard tile ka "Held orders" chip ?open_held=1 laata
+            // hai aur Held window khud khul jati hai. Param foran strip (SW
+            // SALE_CACHE sirf bina-query URL cache karta hai).
+            try {
+                if (new URLSearchParams(window.location.search).get('open_held')) {
+                    setTimeout(() => { this.activeHeldIndex = 0; this.showHeldOrders = true; }, 900);
+                    history.replaceState({}, '', window.location.pathname);
+                }
+            } catch (e) {}
             // Lazy-load provisional bill list on mount (for header badge count).
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
@@ -7286,12 +7303,16 @@ function restaurantPos() {
                 else if (e.key === 'Escape') { e.preventDefault(); this.showRetailHeld = false; }
                 return;
             }
-            if (this.showHeldOrders && this.heldOrders.length > 0) {
-                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, this.heldOrders.length - 1); }
+            if (this.showHeldOrders && this.heldWindowList().length > 0) {
+                // Keyboard cursor WOHI list par chale jo window dikha rahi hai
+                // (table shops par sirf bina-table orders) — warna Enter/P kisi
+                // aur order par lag jata.
+                const _hkList = this.heldWindowList();
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeHeldIndex = Math.min(this.activeHeldIndex + 1, _hkList.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeHeldIndex = Math.max(this.activeHeldIndex - 1, 0); }
-                else if (e.key === 'Enter') { e.preventDefault(); this.recallOrder(this.heldOrders[this.activeHeldIndex]); }
-                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.payHeldOrder(this.heldOrders[this.activeHeldIndex].id); }
-                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const _hkO = this.heldOrders[this.activeHeldIndex]; if (_hkO) { this.boardCancelAsk = this.buildOrderCancelAsk(_hkO); this.boardCancelMade = {}; } }
+                else if (e.key === 'Enter') { e.preventDefault(); const _hkR = _hkList[this.activeHeldIndex]; if (_hkR) this.recallOrder(_hkR); }
+                else if (e.key === 'p' || e.key === 'P') { e.preventDefault(); const _hkP = _hkList[this.activeHeldIndex]; if (_hkP) this.payHeldOrder(_hkP.id); }
+                else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); const _hkO = _hkList[this.activeHeldIndex]; if (_hkO) { this.boardCancelAsk = this.buildOrderCancelAsk(_hkO); this.boardCancelMade = {}; } }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showHeldOrders = false; }
                 return;
             }
@@ -7844,10 +7865,11 @@ function restaurantPos() {
                     this.heldOrders = fresh;
                 }
                 // Clamp the held-orders modal cursor so it never points past the list end.
-                if (this.activeHeldIndex >= this.heldOrders.length) {
-                    this.activeHeldIndex = Math.max(0, this.heldOrders.length - 1);
+                const _hwLen = this.heldWindowList().length;
+                if (this.activeHeldIndex >= _hwLen) {
+                    this.activeHeldIndex = Math.max(0, _hwLen - 1);
                 }
-                if (this.heldOrders.length === 0 && this.showHeldOrders) {
+                if (_hwLen === 0 && this.showHeldOrders) {
                     this.showHeldOrders = false;
                     this.activeHeldIndex = 0;
                 }
@@ -8390,6 +8412,11 @@ function restaurantPos() {
         // Waiter-source orders EXCLUDED — woh purple "C" counter chips hain
         // (atomic-claim path); yahan bhi dikhte to double-count + claim bypass hota.
         heldNoTable() { return this.heldOrders.filter(o => !o.table && o.source !== 'waiter'); },
+        // 25 Aug 2026: HELD window ki list. Table companies par sirf bina-table
+        // (takeaway/delivery) held orders — table wale orders board/tiles par
+        // hain, unhein yahan dikhana double-count aur do jagah se delete/pay ka
+        // rasta banata. Bina-table shops par poori list (purana behaviour).
+        heldWindowList() { return this.tableBoardEnabled ? this.heldNoTable() : this.heldOrders; },
         heldMenuRecall() { const o = this.heldMenu; this.heldMenu = null; if (o) this.recallOrder(o); },
         heldMenuPay()    { const o = this.heldMenu; this.heldMenu = null; if (o) this.payHeldOrder(o.id); },
         heldMenuResend() { const o = this.heldMenu; this.heldMenu = null; if (o) this.resendKitchen(o); },

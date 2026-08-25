@@ -1701,7 +1701,7 @@ class PosController extends Controller
         // the canonical plan/override gate (not restaurant_mode) so its pending
         // tile can warn about the same held orders that block day close.
         $isRestaurant = \App\Services\PosFeatureService::restaurantAllowed($company);
-        [$openOrdersCount, $counterOrdersCount] = $this->pendingRestaurantOrderCounts(
+        [$openOrdersCount, $counterOrdersCount, $heldNoTableCount] = $this->pendingRestaurantOrderCounts(
             $companyId,
             $isRestaurant
         );
@@ -1791,7 +1791,7 @@ class PosController extends Controller
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
             'dayOpening', 'dayOpeningTotal', 'openingDrawers', 'openingCounters',
             'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
-            'pendingProvisional', 'openOrdersCount', 'counterOrdersCount',
+            'pendingProvisional', 'openOrdersCount', 'counterOrdersCount', 'heldNoTableCount',
             'unclosedPriorDays', 'canDayClose', 'todayKhata',
             'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
             'inactiveRegulars', 'dashTeamMembers', 'dashCashierId', 'riderPending'
@@ -1890,7 +1890,7 @@ class PosController extends Controller
     private function pendingRestaurantOrderCounts(int $companyId, bool $isRestaurant): array
     {
         if (!$isRestaurant || !\Illuminate\Support\Facades\Schema::hasTable('restaurant_orders')) {
-            return [0, 0];
+            return [0, 0, 0];
         }
 
         $open = RestaurantOrder::where('company_id', $companyId)
@@ -1898,6 +1898,12 @@ class PosController extends Controller
             ->count();
 
         $counter = 0;
+        // 25 Aug 2026: teesri ginti — CASHIER ke park kiye hue BINA-TABLE order
+        // (takeaway/delivery hold). Yeh na Tables page par dikhte hain (table hi
+        // nahi) aur na ghanti panel mein (woh sirf waiter-source hai) — inhein
+        // "open tables" mein ginna dashboard se DEAD-END link banata tha. Ab
+        // apna alag chip: sale screen ka Held window (?open_held=1).
+        $heldNoTable = 0;
         if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'source')
             && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'table_id')) {
             $counter = RestaurantOrder::where('company_id', $companyId)
@@ -1905,9 +1911,17 @@ class PosController extends Controller
                 ->where('source', 'waiter')
                 ->whereNull('table_id')
                 ->count();
+
+            $heldNoTable = RestaurantOrder::where('company_id', $companyId)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->where(function ($q) {
+                    $q->where('source', '!=', 'waiter')->orWhereNull('source');
+                })
+                ->whereNull('table_id')
+                ->count();
         }
 
-        return [$open, $counter];
+        return [$open, $counter, $heldNoTable];
     }
 
     /**

@@ -54,7 +54,12 @@
                 // Tables page (unchanged), counter orders → sale screen with the
                 // bell panel auto-opened (?open_incoming=1; claim stays atomic).
                 $pbCounter = (int) ($counterOrdersCount ?? 0);
-                $pbTableOpen = max(0, $pbOpen - $pbCounter);
+                // 25 Aug 2026 (shop video): wahi dead-end ab CASHIER ke park kiye
+                // hue bina-table orders (takeaway/delivery hold) ke saath bhi tha —
+                // "Open tables" mein gine jate the magar Tables page par hote hi
+                // nahi. Alag chip: sale screen ka Held window (?open_held=1).
+                $pbHeldNoTable = (int) ($heldNoTableCount ?? 0);
+                $pbTableOpen = max(0, $pbOpen - $pbCounter - $pbHeldNoTable);
             @endphp
             <a href="{{ route('pos.restaurant.tables') }}"
                class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 {{ $pbTableOpen > 0 ? 'border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700' }} transition">
@@ -71,6 +76,16 @@
                 <span class="text-left">
                     <span class="block text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.pending_counter_orders') }}</span>
                     <span class="block text-[10px] text-gray-400">{{ __('pos.pending_counter_orders_sub') }}</span>
+                </span>
+            </a>
+            @endif
+            @if($pbHeldNoTable > 0)
+            <a href="{{ route('pos.invoice.create', ['open_held' => 1]) }}"
+               class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">
+                <span class="text-xl font-extrabold text-amber-600 dark:text-amber-400">{{ $pbHeldNoTable }}</span>
+                <span class="text-left">
+                    <span class="block text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.pending_held_orders') }}</span>
+                    <span class="block text-[10px] text-gray-400">{{ __('pos.pending_held_orders_sub') }}</span>
                 </span>
             </a>
             @endif

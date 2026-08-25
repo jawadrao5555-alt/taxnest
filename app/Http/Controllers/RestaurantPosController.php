@@ -2283,6 +2283,17 @@ class RestaurantPosController extends Controller
                 $updates['kot_on_final_if_unsent'] = (bool) $request->kot_on_final_if_unsent;
             }
         }
+        // 25 Aug 2026: KOT re-send + "aakhri add-on" ke switch ab is page par bhi
+        // hain (shop yahi dhoondti hai). DELIBERATELY panel-marker se nahi bandhe:
+        // is page ki PURANI (browser mein khuli) copy ks_present to bhejti hai
+        // magar yeh do field nahi — marker par chalte to woh copy save karte hi
+        // dono switch OFF kar deti. Har taaza form hidden 0 + checkbox 1 bhejta
+        // hai, is liye FIELD ki maujoodgi hi sahi sawal hai.
+        foreach (['kot_reprint_enabled', 'kot_last_addon_enabled'] as $kotGate) {
+            if ($request->has($kotGate) && \Illuminate\Support\Facades\Schema::hasColumn('companies', $kotGate)) {
+                $updates[$kotGate] = (bool) $request->input($kotGate);
+            }
+        }
         // KOT Print Style (customer feedback 27 Jul 2026): paper-saving toggles +
         // print position. hasColumn guards = prod self-heal parity.
         if ($stylePresent) {
@@ -2820,6 +2831,17 @@ class RestaurantPosController extends Controller
             ->where('source', 'waiter')
             ->whereNull('table_id')
             ->count();
+        // 25 Aug 2026 (shop video): ab CASHIER bhi takeaway/delivery park karta
+        // hai. Un bina-table held orders ka bhi Tables page par koi ghar nahi —
+        // apna chip chahiye jo sale screen ka Held window khole (?open_held=1),
+        // warna dashboard ki ginti phir se dead-end ban jati hai.
+        $heldNoTableCount = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->where(function ($q) {
+                $q->where('source', '!=', 'waiter')->orWhereNull('source');
+            })
+            ->whereNull('table_id')
+            ->count();
 
         // Task 113 (ZFC, 2 Aug 2026): Cancelled Orders tile — current BUSINESS
         // day's cancelled count, same cutoff window the dashboard's "today"
@@ -3013,7 +3035,7 @@ class RestaurantPosController extends Controller
             'todayCost', 'todayProfit', 'kitchenStats',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier',
             'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
-            'counterOrdersCount', 'todayKhata',
+            'counterOrdersCount', 'heldNoTableCount', 'todayKhata',
             'todayTotalSale', 'yesterdayTotalSale', 'newCustomersToday', 'newCustomersMonth',
             'inactiveRegulars'
         ));

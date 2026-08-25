@@ -105,7 +105,11 @@ class LangPurityTest extends TestCase
             preg_match_all("/[A-Za-z][A-Za-z0-9'’]{2,}/u", $stripped, $m);
             foreach ($m[0] as $word) {
                 $core = preg_replace("/['’]s?$/u", '', $word);
-                if (! isset($whitelist[$core]) && ! preg_match('/^F\d+$/', $core)) {
+                // Serial formats (P036, L012, D001) are numbers, not words: one
+                // Latin letter carrying digits reads the same in every language.
+                if (! isset($whitelist[$core])
+                    && ! preg_match('/^F\d+$/', $core)
+                    && ! preg_match('/^[A-Z]\d{2,6}$/', $core)) {
                     $bad[$key][] = $word;
                 }
             }

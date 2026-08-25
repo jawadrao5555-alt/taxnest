@@ -166,7 +166,7 @@
 
             {{-- ============ Local receipt panel ============ --}}
             <div x-show="tab === 'local'" class="p-6" style="display:none;">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{!! __('pos.local_panel_note_html', ['local' => '<span class="font-semibold">' . e(__('pos.local_bills')) . '</span>', 'series' => '<span class="font-mono">L-</span>']) !!}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{!! __('pos.local_panel_note_html', ['local' => '<span class="font-semibold">' . e(__('pos.local_bills')) . '</span>', 'series' => '<span class="font-mono">L</span>']) !!}</p>
                 {{-- Task 654 (ZFC): stream clarity — reporting-OFF finals + exempt bills land HERE. --}}
                 <p class="text-[11px] text-amber-700 dark:text-amber-400 mb-4">{{ __('pos.local_panel_stream_hint') }}</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

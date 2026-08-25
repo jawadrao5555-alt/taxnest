@@ -105,31 +105,31 @@ class PosFinalSeriesShortNumberTest extends TestCase
     {
         $cid = $this->makeCompany();
 
-        $this->assertSame('P-001', PosFinalSeries::previewNext($cid));
-        $this->assertSame('P-001', $this->nextRetail($cid));
+        $this->assertSame('P001', PosFinalSeries::previewNext($cid));
+        $this->assertSame('P001', $this->nextRetail($cid));
     }
 
     public function test_both_sale_paths_share_one_series(): void
     {
         $cid = $this->makeCompany();
 
-        $this->assertSame('P-001', $this->nextRetail($cid));
-        $this->makeBill($cid, 'P-001');
+        $this->assertSame('P001', $this->nextRetail($cid));
+        $this->makeBill($cid, 'P001');
         // The restaurant pay path continues the SAME series, never its own.
-        $this->assertSame('P-002', $this->nextRestaurant($cid));
-        $this->makeBill($cid, 'P-002');
-        $this->assertSame('P-003', $this->nextRetail($cid));
+        $this->assertSame('P002', $this->nextRestaurant($cid));
+        $this->makeBill($cid, 'P002');
+        $this->assertSame('P003', $this->nextRetail($cid));
     }
 
     public function test_each_shop_counts_on_its_own(): void
     {
         $a = $this->makeCompany('Shop A');
         $b = $this->makeCompany('Shop B');
-        $this->makeBill($a, 'P-001');
-        $this->makeBill($a, 'P-002');
+        $this->makeBill($a, 'P001');
+        $this->makeBill($a, 'P002');
 
-        $this->assertSame('P-003', $this->nextRetail($a));
-        $this->assertSame('P-001', $this->nextRetail($b));
+        $this->assertSame('P003', $this->nextRetail($a));
+        $this->assertSame('P001', $this->nextRetail($b));
     }
 
     // ── 2. continuity with the old long serial ───────────────────────────────
@@ -140,7 +140,7 @@ class PosFinalSeriesShortNumberTest extends TestCase
         $this->makeBill($cid, 'POS-2026-00034');
         $this->makeBill($cid, 'POS-2026-00035');
 
-        $this->assertSame('P-036', $this->nextRetail($cid));
+        $this->assertSame('P036', $this->nextRetail($cid));
         // …and the old bills keep their own numbers, untouched.
         $this->assertSame(
             ['POS-2026-00034', 'POS-2026-00035'],
@@ -158,15 +158,15 @@ class PosFinalSeriesShortNumberTest extends TestCase
         $this->makeBill($cid, 'POS-2025-00120');
         $this->makeBill($cid, 'POS-2026-00003');
 
-        $this->assertSame('P-121', $this->nextRetail($cid));
+        $this->assertSame('P121', $this->nextRetail($cid));
     }
 
     public function test_archived_finals_still_hold_their_number(): void
     {
         $cid = $this->makeCompany();
-        $this->makeBill($cid, 'P-007', ['is_archived' => true]);
+        $this->makeBill($cid, 'P007', ['is_archived' => true]);
 
-        $this->assertSame('P-008', $this->nextRetail($cid));
+        $this->assertSame('P008', $this->nextRetail($cid));
     }
 
     // ── 3. monotonic across day-close deletes ────────────────────────────────
@@ -174,15 +174,15 @@ class PosFinalSeriesShortNumberTest extends TestCase
     public function test_deleted_finals_never_hand_their_number_to_a_new_bill(): void
     {
         $cid = $this->makeCompany();
-        $this->assertSame('P-001', $this->nextRetail($cid));
-        $one = $this->makeBill($cid, 'P-001');
-        $this->assertSame('P-002', $this->nextRetail($cid));
-        $two = $this->makeBill($cid, 'P-002');
+        $this->assertSame('P001', $this->nextRetail($cid));
+        $one = $this->makeBill($cid, 'P001');
+        $this->assertSame('P002', $this->nextRetail($cid));
+        $two = $this->makeBill($cid, 'P002');
 
         // Day close under the delete policy wipes both reporting-OFF finals.
         DB::table('pos_transactions')->whereIn('id', [$one, $two])->delete();
 
-        $this->assertSame('P-003', $this->nextRetail($cid), 'a short number must never point at two different sales');
+        $this->assertSame('P003', $this->nextRetail($cid), 'a short number must never point at two different sales');
     }
 
     /**
@@ -196,11 +196,11 @@ class PosFinalSeriesShortNumberTest extends TestCase
     public function test_a_failed_sale_gives_its_number_back(): void
     {
         $cid = $this->makeCompany();
-        $this->makeBill($cid, 'P-001');
+        $this->makeBill($cid, 'P001');
 
         try {
             DB::transaction(function () use ($cid) {
-                PosFinalSeries::issueNext($cid); // P-002 reserved …
+                PosFinalSeries::issueNext($cid); // P002 reserved …
                 throw new \RuntimeException('card machine died mid-sale');
             });
             $this->fail('the sale transaction should have thrown');
@@ -208,57 +208,98 @@ class PosFinalSeriesShortNumberTest extends TestCase
             // expected
         }
 
-        $this->assertSame('P-002', $this->nextRetail($cid), 'a rolled-back sale must not burn a number');
+        $this->assertSame('P002', $this->nextRetail($cid), 'a rolled-back sale must not burn a number');
     }
 
     public function test_preview_never_advances_the_counter(): void
     {
         $cid = $this->makeCompany();
-        $this->makeBill($cid, 'P-005');
+        $this->makeBill($cid, 'P005');
 
-        $this->assertSame('P-006', PosFinalSeries::previewNext($cid));
-        $this->assertSame('P-006', PosFinalSeries::previewNext($cid));
-        $this->assertSame('P-006', $this->nextRetail($cid));
+        $this->assertSame('P006', PosFinalSeries::previewNext($cid));
+        $this->assertSame('P006', PosFinalSeries::previewNext($cid));
+        $this->assertSame('P006', $this->nextRetail($cid));
     }
 
     public function test_pad_grows_past_999_without_reusing_numbers(): void
     {
         $cid = $this->makeCompany();
-        $this->makeBill($cid, 'P-999');
+        $this->makeBill($cid, 'P999');
 
-        $this->assertSame('P-1000', $this->nextRetail($cid));
+        $this->assertSame('P1000', $this->nextRetail($cid));
     }
 
     // ── 4. what counts as a final serial ─────────────────────────────────────
 
     public function test_short_and_legacy_serials_both_count_as_final(): void
     {
+        $this->assertTrue(PosFinalSeries::isFinalSerial('P036'));
+        $this->assertTrue(PosFinalSeries::isFinalSerial('P1000'));
+        // Dashed bills issued before the dash was dropped stay valid serials.
         $this->assertTrue(PosFinalSeries::isFinalSerial('P-036'));
-        $this->assertTrue(PosFinalSeries::isFinalSerial('P-1000'));
         $this->assertTrue(PosFinalSeries::isFinalSerial('POS-2026-00035'));
 
+        $this->assertSame(36, PosFinalSeries::serialOf('P036'));
         $this->assertSame(36, PosFinalSeries::serialOf('P-036'));
         $this->assertSame(35, PosFinalSeries::serialOf('POS-2026-00035'));
+    }
+
+    /**
+     * The read-only verifier command must read a mixed history the same way the
+     * sale path does — highest number wins, not the newest row, and stray text
+     * reserves nothing. Otherwise the one tool used to audit live shops reports
+     * a number the shop will never see.
+     */
+    public function test_verifier_reads_a_mixed_history_like_the_sale_path(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'POS-2025-00120'); // legacy long serial
+        $this->makeBill($cid, 'P-999');          // dashed short serial
+        $this->makeBill($cid, 'P001');           // …and a LATER, lower one
+        $this->makeBill($cid, 'P-ABC');          // stray text: reserves nothing
+
+        $command = new \App\Console\Commands\VerifyDiSerials();
+        $derive = new \ReflectionMethod($command, 'nextDerived');
+        $derive->setAccessible(true);
+
+        $derived = $derive->invoke($command, 'pos_transactions', $cid, [
+            'P', 3, ['P%', 'POS-%'], ['/^P-?(\d+)$/', '/^POS-\d{4}-(\d+)$/'],
+        ]);
+
+        $this->assertSame('P1000', $derived);
+        $this->assertSame(PosFinalSeries::previewNext($cid), $derived, 'the verifier must agree with the issuing series');
+    }
+
+    /**
+     * A shop that already billed on the dashed spelling keeps those numbers and
+     * counts on above them — one number may never reach two sales.
+     */
+    public function test_dashed_finals_still_reserve_their_number(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'P-041');
+
+        $this->assertSame('P042', $this->nextRetail($cid));
     }
 
     public function test_local_and_stray_numbers_are_not_final_serials(): void
     {
         // A local bill must never be read as PRA-bound.
-        $this->assertFalse(PosFinalSeries::isFinalSerial('L-015'));
+        $this->assertFalse(PosFinalSeries::isFinalSerial('L015'));
         $this->assertFalse(PosFinalSeries::isFinalSerial('LOCAL-2026-00007'));
         $this->assertFalse(PosFinalSeries::isFinalSerial('P-ABC'));
         $this->assertFalse(PosFinalSeries::isFinalSerial('FPOS-2026-00001'));
         $this->assertFalse(PosFinalSeries::isFinalSerial(''));
         $this->assertFalse(PosFinalSeries::isFinalSerial(null));
 
-        $this->assertNull(PosFinalSeries::serialOf('L-015'));
+        $this->assertNull(PosFinalSeries::serialOf('L015'));
     }
 
     public function test_local_bills_do_not_move_the_final_series(): void
     {
         $cid = $this->makeCompany();
-        $this->makeBill($cid, 'L-045', ['invoice_mode' => 'local', 'pra_status' => 'local']);
+        $this->makeBill($cid, 'L045', ['invoice_mode' => 'local', 'pra_status' => 'local']);
 
-        $this->assertSame('P-001', $this->nextRetail($cid));
+        $this->assertSame('P001', $this->nextRetail($cid));
     }
 }

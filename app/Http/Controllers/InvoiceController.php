@@ -67,15 +67,45 @@ class InvoiceController extends Controller
 
         if ($search = $request->get('search')) {
             $like = \App\Helpers\DbCompat::like();
-            $query->where(function ($q) use ($search, $like) {
-                $q->where('internal_invoice_number', $like, "%{$search}%")
-                  ->orWhere('fbr_invoice_number', $like, "%{$search}%")
-                  ->orWhere('invoice_number', $like, "%{$search}%")
-                  ->orWhere('buyer_name', $like, "%{$search}%")
-                  ->orWhere('buyer_ntn', $like, "%{$search}%")
-                  ->orWhereHas('items', function ($iq) use ($search, $like) {
-                      $iq->where('hs_code', $like, "%{$search}%");
+            $term = trim((string) $search);
+
+            // The shop types the number the short way — "36", "d36", "D-036",
+            // or the tail of FBR's very long number. Search has to find the
+            // invoice from the SMALLEST thing they can remember:
+            //   · spaces and dashes are ignored ("D-036" == "D036")
+            //   · plain digits are also matched as the exact own-number, padded
+            //     and unpadded, so "36" lands on D036 and on the legacy
+            //     {identifier}DI00036 without the shop typing the padding
+            $compact = preg_replace('/[\s\-]/', '', $term);
+            $digits = preg_replace('/\D/', '', $term);
+
+            $exactNumbers = [];
+            if ($digits !== '' && strlen($digits) <= 9) {
+                $sequence = (int) $digits;
+                $exactNumbers[] = \App\Services\InvoiceNumberingService::format($sequence);
+                $exactNumbers[] = \App\Services\InvoiceNumberingService::PREFIX . $sequence;
+            }
+
+            $query->where(function ($q) use ($term, $compact, $exactNumbers, $like) {
+                $q->where('internal_invoice_number', $like, "%{$term}%")
+                  ->orWhere('fbr_invoice_number', $like, "%{$term}%")
+                  ->orWhere('invoice_number', $like, "%{$term}%")
+                  ->orWhere('buyer_name', $like, "%{$term}%")
+                  ->orWhere('buyer_ntn', $like, "%{$term}%")
+                  ->orWhereHas('items', function ($iq) use ($term, $like) {
+                      $iq->where('hs_code', $like, "%{$term}%");
                   });
+
+                if ($compact !== '' && $compact !== $term) {
+                    $q->orWhere('invoice_number', $like, "%{$compact}%")
+                      ->orWhere('internal_invoice_number', $like, "%{$compact}%")
+                      ->orWhere('fbr_invoice_number', $like, "%{$compact}%");
+                }
+
+                foreach ($exactNumbers as $number) {
+                    $q->orWhere('invoice_number', $number)
+                      ->orWhere('internal_invoice_number', $number);
+                }
             });
         }
 

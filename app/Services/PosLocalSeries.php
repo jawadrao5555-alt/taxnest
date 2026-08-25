@@ -10,9 +10,13 @@ use Illuminate\Support\Facades\Schema;
  * PRA POS local bill series "L-NNN" — the ONE place the numbering rule lives
  * (Task 1373).
  *
- * Vendor-requested short format: L-001 (per-company, 3-digit pad, grows
- * naturally past 999). Distinct from the "POS-{year}-NNNNN" fiscal serials so
- * cashiers can spot non-PRA bills at a glance in lists / receipts / PDFs.
+ * Vendor-requested short format: L001 (per-company, 3-digit pad, grows
+ * naturally past 999). Distinct from the fiscal serials so cashiers can spot
+ * non-PRA bills at a glance in lists / receipts / PDFs.
+ *
+ * The shop asked for the dash to go (25 Aug 2026): new bills are minted without
+ * it, while the "L-001" spelling issued earlier stays a valid serial everywhere
+ * it is read, searched or counted — it still reserves its number.
  *
  * Owner rule (22 Aug 2026) — MONOTONIC, never smallest-free: once a company has
  * reached L-832, every later local bill is L-833 or higher even if older local
@@ -23,7 +27,7 @@ use Illuminate\Support\Facades\Schema;
  * (including archived ones) are also inspected as a safety floor so imported or
  * legacy data can only move the sequence forward, never backward.
  *   - legacy "LOCAL-YYYY-NNNNN" bills are NOT part of this series (the coarse
- *     `like 'L-%'` prefilter would otherwise match them and corrupt the
+ *     `like 'L%'` prefilter would otherwise match them and corrupt the
  *     counter), and neither is any other stray "L-…" text: ONLY an exact
  *     /^L-\d+$/ serial reserves a number. preg_match keeps that contract
  *     identical on MySQL and sqlite, where REGEXP support differs.
@@ -41,9 +45,12 @@ use Illuminate\Support\Facades\Schema;
 class PosLocalSeries
 {
     /** Serial prefix. Any other prefix (e.g. legacy "LOCAL-") is not this series. */
-    public const PREFIX = 'L-';
+    public const PREFIX = 'L';
 
-    /** Zero-pad width; longer numbers simply grow past it (L-1000). */
+    /** Dashed spelling issued before the dash was dropped. */
+    public const LEGACY_DASHED_PREFIX = 'L-';
+
+    /** Zero-pad width; longer numbers simply grow past it (L1000). */
     public const PAD = 3;
 
     /**
@@ -177,7 +184,9 @@ class PosLocalSeries
     /** The number an invoice reserves, or null when it is not an L-series serial. */
     public static function serialOf($invoiceNumber): ?int
     {
-        return preg_match('/^' . preg_quote(self::PREFIX, '/') . '(\d+)$/', (string) $invoiceNumber, $m)
+        // "L001" (current) and "L-001" (issued before the dash was dropped) are
+        // the same slot; "LOCAL-2026-00001" and any other stray L-text are not.
+        return preg_match('/^' . preg_quote(self::PREFIX, '/') . '-?(\d+)$/', (string) $invoiceNumber, $m)
             ? (int) $m[1]
             : null;
     }
@@ -188,7 +197,7 @@ class PosLocalSeries
         return self::serialOf($invoiceNumber) !== null;
     }
 
-    /** Render a number in the series format (L-001, L-1000). */
+    /** Render a number in the series format (L001, L1000). */
     public static function format(int $number): string
     {
         return self::PREFIX . str_pad((string) $number, self::PAD, '0', STR_PAD_LEFT);

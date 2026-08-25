@@ -11,8 +11,11 @@ use Illuminate\Support\Facades\Schema;
  *
  * Owner rule (25 Aug 2026): the old "POS-2026-00035" serial was too long to read
  * out or type when matching an order at the counter. New finals are issued as the
- * short "P-036" (same shape as the local "L-015" series, 3-digit pad that grows
+ * short "P036" (same shape as the local "L015" series, 3-digit pad that grows
  * naturally past 999) so a cashier can say and search the number in one breath.
+ * The shop asked for the dash to go too — nothing between the letter and the
+ * digits — so an already-issued "P-036" stays valid input everywhere it is read
+ * or searched, but is never MINTED again.
  *
  * Existing bills are NEVER renumbered: legacy "POS-YYYY-NNNNN" rows keep their
  * serial, stay searchable, and still RESERVE their number — the short series
@@ -34,9 +37,12 @@ use Illuminate\Support\Facades\Schema;
 class PosFinalSeries
 {
     /** Short serial prefix for every NEW final bill. */
-    public const PREFIX = 'P-';
+    public const PREFIX = 'P';
 
-    /** Zero-pad width; longer numbers simply grow past it (P-1000). */
+    /** Dashed spelling issued between 25 Aug 2026 and the dash removal. */
+    public const LEGACY_DASHED_PREFIX = 'P-';
+
+    /** Zero-pad width; longer numbers simply grow past it (P1000). */
     public const PAD = 3;
 
     /**
@@ -83,7 +89,9 @@ class PosFinalSeries
     {
         $serial = (string) $invoiceNumber;
 
-        if (preg_match('/^' . preg_quote(self::PREFIX, '/') . '(\d+)$/', $serial, $m)) {
+        // "P036" (current) and "P-036" (issued before the dash was dropped) are
+        // the same slot in the series — both reserve their number.
+        if (preg_match('/^' . preg_quote(self::PREFIX, '/') . '-?(\d+)$/', $serial, $m)) {
             return (int) $m[1];
         }
 
@@ -104,7 +112,7 @@ class PosFinalSeries
         return self::serialOf($invoiceNumber) !== null;
     }
 
-    /** Render a number in the short series format (P-001, P-1000). */
+    /** Render a number in the short series format (P001, P1000). */
     public static function format(int $number): string
     {
         return self::PREFIX . str_pad((string) $number, self::PAD, '0', STR_PAD_LEFT);
@@ -125,7 +133,16 @@ class PosFinalSeries
         }
 
         return max(
-            self::maxSerialFor($companyId, self::PREFIX . '%', strlen(self::PREFIX) + 1),
+            // Current dashless "P036". The LIKE also sees "P-036" and "POS-…",
+            // so both are excluded here and counted by their own queries below.
+            self::maxSerialFor(
+                $companyId,
+                self::PREFIX . '%',
+                strlen(self::PREFIX) + 1,
+                [self::LEGACY_DASHED_PREFIX . '%', 'POS-%']
+            ),
+            // Dashed "P-036" bills issued before the dash was dropped.
+            self::maxSerialFor($companyId, self::LEGACY_DASHED_PREFIX . '%', strlen(self::LEGACY_DASHED_PREFIX) + 1),
             // "POS-YYYY-" is 9 characters, so the serial starts at position 10.
             self::maxSerialFor($companyId, 'POS-%', 10)
         );
@@ -135,11 +152,17 @@ class PosFinalSeries
      * MAX(serial) for one prefix family. Rows whose tail is not numeric cast to
      * 0 on both MySQL and sqlite, so stray text can never lower the sequence.
      */
-    private static function maxSerialFor(int $companyId, string $like, int $offset): int
+    private static function maxSerialFor(int $companyId, string $like, int $offset, array $notLike = []): int
     {
-        return (int) (DB::table('pos_transactions')
+        $query = DB::table('pos_transactions')
             ->where('company_id', $companyId)
-            ->where('invoice_number', 'like', $like)
+            ->where('invoice_number', 'like', $like);
+
+        foreach ($notLike as $pattern) {
+            $query->where('invoice_number', 'not like', $pattern);
+        }
+
+        return (int) ($query
             ->selectRaw('MAX(' . DbCompat::cast("SUBSTR(invoice_number, {$offset})", 'int') . ') as max_serial')
             ->value('max_serial') ?? 0);
     }

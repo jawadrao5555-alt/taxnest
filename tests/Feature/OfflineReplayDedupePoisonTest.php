@@ -323,7 +323,7 @@ class OfflineReplayDedupePoisonTest extends TestCase
         // 2 × Rs150 = 300 + 16% cash tax (48) = 348 (whole-rupee convention).
         $first->assertOk()->assertJson([
             'success' => true,
-            'invoice_number' => 'L-001',
+            'invoice_number' => 'L001',
             'total_amount' => 348,
         ]);
         $txId = $first->json('transaction_id');
@@ -339,7 +339,7 @@ class OfflineReplayDedupePoisonTest extends TestCase
             'success' => true,
             'replayed' => true,
             'transaction_id' => $txId,
-            'invoice_number' => 'L-001',
+            'invoice_number' => 'L001',
             'total_amount' => 348,
         ]);
 
@@ -420,7 +420,7 @@ class OfflineReplayDedupePoisonTest extends TestCase
         // where one corrupted IndexedDB record sits mid-queue.
         $this->actingAs($user, 'pos')
             ->postJson('/pos/invoice/store', $this->queuedBillPayload('good-entry-1'))
-            ->assertOk()->assertJson(['success' => true, 'invoice_number' => 'L-001']);
+            ->assertOk()->assertJson(['success' => true, 'invoice_number' => 'L001']);
 
         $poisons = [
             // [uuid, payload overrides, expected invalid field]
@@ -453,7 +453,7 @@ class OfflineReplayDedupePoisonTest extends TestCase
         // also proves the rejected entries burned no serials.
         $this->actingAs($user, 'pos')
             ->postJson('/pos/invoice/store', $this->queuedBillPayload('good-entry-2'))
-            ->assertOk()->assertJson(['success' => true, 'invoice_number' => 'L-002']);
+            ->assertOk()->assertJson(['success' => true, 'invoice_number' => 'L002']);
         $this->assertSame(2, DB::table('pos_transactions')->where('company_id', $company->id)->count());
     }
 
@@ -497,7 +497,7 @@ class OfflineReplayDedupePoisonTest extends TestCase
         // The queue is NOT wedged: the next entry lands normally.
         $this->actingAs($user, 'pos')
             ->postJson('/pos/invoice/store', $this->queuedBillPayload('ok-after-poison'))
-            ->assertOk()->assertJson(['success' => true, 'invoice_number' => 'L-002']);
+            ->assertOk()->assertJson(['success' => true, 'invoice_number' => 'L002']);
 
         // The client will keep retrying the poison entry (known gap: no tries
         // cap) — every retry must fail the SAME clean way, never half-commit.

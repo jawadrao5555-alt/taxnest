@@ -27,17 +27,18 @@ return new class extends Migration
             return;
         }
 
-        // Backfill from every exact L-NNN row, including archived bills. Do the
+        // Backfill from every exact LNNN row (and the dashed "L-NNN" spelling
+        // issued before the dash was dropped), archived bills included. Do the
         // parsing in PHP so MySQL and sqlite follow the identical serial grammar.
         $maxByCompany = [];
         DB::table('pos_transactions')
-            ->where('invoice_number', 'like', 'L-%')
+            ->where('invoice_number', 'like', 'L%')
             ->where('invoice_number', 'not like', 'LOCAL-%')
             ->select(['id', 'company_id', 'invoice_number'])
             ->orderBy('id')
             ->chunkById(1000, function ($rows) use (&$maxByCompany) {
                 foreach ($rows as $row) {
-                    if (!preg_match('/^L-(\d+)$/', (string) $row->invoice_number, $match)) {
+                    if (!preg_match('/^L-?(\d+)$/', (string) $row->invoice_number, $match)) {
                         continue;
                     }
 

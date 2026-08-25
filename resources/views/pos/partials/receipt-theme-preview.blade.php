@@ -290,7 +290,7 @@ if (!window.rcptThemePicker) {
             },
             serialNow: function () {
                 if (cfg.mode === 'fbr') { return 'INV-2026-00817'; }
-                return this.tab === 'local' ? 'L-0817' : 'P-817';
+                return this.tab === 'local' ? 'L0817' : 'P817';
             },
             qrNow: function () {
                 if (cfg.mode === 'fbr') { return true; }

@@ -37,7 +37,9 @@ return new class extends Migration
         $maxByCompany = [];
         DB::table('pos_transactions')
             ->where(function ($q) {
-                $q->where('invoice_number', 'like', 'P-%')
+                // "P036" (current), "P-036" (dashed, issued before the dash was
+                // dropped) and the legacy "POS-YYYY-NNNNN" all reserve a number.
+                $q->where('invoice_number', 'like', 'P%')
                     ->orWhere('invoice_number', 'like', 'POS-%');
             })
             ->select(['id', 'company_id', 'invoice_number'])
@@ -45,7 +47,7 @@ return new class extends Migration
             ->chunkById(1000, function ($rows) use (&$maxByCompany) {
                 foreach ($rows as $row) {
                     $serial = (string) $row->invoice_number;
-                    if (preg_match('/^P-(\d+)$/', $serial, $match) === 1
+                    if (preg_match('/^P-?(\d+)$/', $serial, $match) === 1
                         || preg_match('/^POS-\d{4}-(\d+)$/', $serial, $match) === 1) {
                         $companyId = (int) $row->company_id;
                         $maxByCompany[$companyId] = max(

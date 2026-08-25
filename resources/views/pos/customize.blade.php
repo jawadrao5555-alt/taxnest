@@ -883,7 +883,7 @@
                         @endif
 
                         {{-- Fresh start (owner, 25 Aug 2026): jab series bilkul khali
-                             ho to numbering dobara L-001 se shuru karne ka option.
+                             ho to numbering dobara L001 se shuru karne ka option.
                              Monotonic usool waisa hi hai — yeh sirf khali series par
                              jaan-boojh kar kiya gaya amal hai, warna do bill ek hi
                              reference le baithte. --}}

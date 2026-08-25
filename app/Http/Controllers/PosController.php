@@ -7736,10 +7736,10 @@ class PosController extends Controller
     /**
      * The archived L-series rows, narrowed to EXACT L-NNN serials (Task 1358).
      *
-     * The SQL `like 'L-%'` in archivedLocalSeriesQuery() is only a coarse prefilter:
-     * both generators (and the preview below) treat ONLY /^L-\d+$/ as an occupied
-     * number, so anything else that happens to start with "L-" — a hand-typed
-     * "L-001-extra", a legacy "L-DRAFT" — reserves nothing. Such a bill must never
+     * The SQL `like 'L%'` in archivedLocalSeriesQuery() is only a coarse prefilter:
+     * both generators (and the preview below) treat ONLY /^L-?\d+$/ as an occupied
+     * number, so anything else that happens to start with "L" — a hand-typed
+     * "L001-extra", a legacy "LDRAFT" — reserves nothing. Such a bill must never
      * be counted as a blocker or swept up by the (permanent) clear. The narrowing
      * runs through PosLocalSeries::isSeriesSerial(), the same test the generators
      * apply, and preg_match keeps that contract identical on MySQL and sqlite,
@@ -7776,7 +7776,8 @@ class PosController extends Controller
      */
     private function localSeriesStatus(int $companyId): array
     {
-        $empty = ['count' => 0, 'from' => null, 'to' => null, 'next' => 'L-001', 'next_after' => 'L-001', 'can_reset' => false];
+        $first = \App\Services\PosLocalSeries::format(1);
+        $empty = ['count' => 0, 'from' => null, 'to' => null, 'next' => $first, 'next_after' => $first, 'can_reset' => false];
         try {
             if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
                 return $empty;
@@ -8012,7 +8013,7 @@ class PosController extends Controller
 
     /**
      * Customize POS → Local Billing — start the local reference series over at
-     * L-001 (owner request, 25 Aug 2026).
+     * L001 (owner request, 25 Aug 2026).
      *
      * Pas-manzar: shop ne saray provisional/local record clear kar diye, token
      * agle din 1 se shuru hue, magar reference L-016 se aage chalta raha —
@@ -8051,7 +8052,7 @@ class PosController extends Controller
             ], 409);
         }
 
-        \Illuminate\Support\Facades\Log::info('POS local series reset to L-001', [
+        \Illuminate\Support\Facades\Log::info('POS local series reset to its first number', [
             'company_id' => $companyId,
             'by' => $user->id,
         ]);

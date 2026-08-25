@@ -972,6 +972,14 @@ class FbrService
         $internalNumber = $invoice->internal_invoice_number ?? $invoice->invoice_number ?? (string) $invoice->id;
         $cleanNumber = preg_replace('/[^A-Za-z0-9]/', '', $internalNumber);
 
+        // Our own number is short now ("D036") — the shop reads and searches
+        // that. What FBR receives must NOT change shape: rebuild the same
+        // {identifier}DI{NNNNN} reference the sequence produced before, so the
+        // regulator-side reference of invoice 36 stays 36 either way.
+        if (preg_match('/^' . \App\Services\InvoiceNumberingService::PREFIX . '(\d{1,9})$/', $cleanNumber, $m)) {
+            return $identifier . 'DI' . str_pad($m[1], 5, '0', STR_PAD_LEFT);
+        }
+
         if (str_starts_with($cleanNumber, $identifier)) {
             return $cleanNumber;
         }

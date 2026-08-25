@@ -96,20 +96,26 @@ class VerifyDiSerials extends Command
             $this->renumberDrafts($companies, $checkOnly);
         }
 
+        // Each series is described the way its issuing service reads it: the
+        // coarse LIKE prefilters, then the EXACT grammar that decides whether a
+        // row reserves a number. The short PRA series accepts both the current
+        // "P036"/"L012" spelling and the dashed one issued before the dash was
+        // dropped; stray text ("P-ABC", "LOCAL-2026-00007") reserves nothing.
         $this->reportPosSerials(
             'PRA POS',
             'pos_transactions',
             $companies,
-            ['P-', 3],
-            ['L-', 3]
+            ['P', 3, ['P%', 'POS-%'], ['/^P-?(\d+)$/', '/^POS-\d{4}-(\d+)$/']],
+            ['L', 3, ['L%'], ['/^L-?(\d+)$/']]
         );
 
+        $year = now()->format('Y');
         $this->reportPosSerials(
             'FBR POS',
             'fbr_pos_transactions',
             $companies,
-            ['FPOS-' . now()->format('Y') . '-', 5],
-            ['FLOCAL-' . now()->format('Y') . '-', 5]
+            ['FPOS-' . $year . '-', 5, ['FPOS-' . $year . '-%'], ['/^FPOS-\d{4}-(\d+)$/']],
+            ['FLOCAL-' . $year . '-', 5, ['FLOCAL-' . $year . '-%'], ['/^FLOCAL-\d{4}-(\d+)$/']]
         );
 
         $this->line('');
@@ -156,8 +162,8 @@ class VerifyDiSerials extends Command
                 ->get(['id', 'invoice_number']);
 
             foreach ($drafts as $draft) {
-                if (preg_match('/DI\d{5}$/', (string) $draft->invoice_number)) {
-                    continue; // already in the new per-company format
+                if (InvoiceNumberingService::sequenceOf((string) $draft->invoice_number) !== null) {
+                    continue; // already a per-company serial (short D036 or legacy …DI00036)
                 }
 
                 if ($checkOnly) {
@@ -207,10 +213,17 @@ class VerifyDiSerials extends Command
     }
 
     /**
-     * POS serials (PRA + FBR) are derived at sale time from the company's OWN
-     * last bill number — there is no counter column, so this section is a
-     * pure READ-ONLY verification: it shows what each company's next bill
-     * number will be.
+     * POS serials (PRA + FBR) are read back from the company's OWN bills, so
+     * this section is a pure READ-ONLY cross-check of what the sale paths will
+     * issue next. It deliberately re-derives the number instead of asking the
+     * series services — that is the point of a verifier.
+     *
+     * One honest caveat: the PRA series also keep a durable counter, so after a
+     * shop cleared or archived bills the SERVICE can legitimately stand higher
+     * than what the surviving rows show. The derived value is a floor.
+     *
+     * @param array{0:string,1:int,2:array<int,string>,3:array<int,string>} $final
+     * @param array{0:string,1:int,2:array<int,string>,3:array<int,string>} $local
      */
     private function reportPosSerials(string $label, string $table, $companies, array $final, array $local): void
     {
@@ -218,9 +231,6 @@ class VerifyDiSerials extends Command
             $this->warn("{$label}: table {$table} missing — skipped.");
             return;
         }
-
-        [$finalPrefix, $finalPad] = $final;
-        [$localPrefix, $localPad] = $local;
 
         $rows = [];
         foreach ($companies as $company) {
@@ -233,37 +243,58 @@ class VerifyDiSerials extends Command
                 $company->id,
                 mb_strimwidth($company->name ?? '', 0, 30, '…'),
                 $bills,
-                $this->nextDerived($table, $company->id, $finalPrefix, $finalPad),
-                $this->nextDerived($table, $company->id, $localPrefix, $localPad, $localPrefix === 'L-'),
+                $this->nextDerived($table, $company->id, $final),
+                $this->nextDerived($table, $company->id, $local),
             ];
         }
 
         $this->line('');
         $this->info("=== {$label} — per-company (self-deriving, read-only) ===");
         if (empty($rows)) {
-            $this->line('No bills yet — every company will start at ' . $finalPrefix . str_pad('1', $finalPad, '0', STR_PAD_LEFT));
+            $this->line('No bills yet — every company will start at ' . $final[0] . str_pad('1', $final[1], '0', STR_PAD_LEFT));
             return;
         }
         $this->table(['ID', 'Company', 'Bills', 'Next Final #', 'Next Local #'], $rows);
     }
 
-    private function nextDerived(string $table, int $companyId, string $prefix, int $pad, bool $excludeLegacyLocal = false): string
+    /**
+     * Highest number the company's own bills already occupy, plus one.
+     *
+     * The scan reads EVERY matching row (never just the newest one — a shop
+     * that carries "P-999" and a later "P001" would otherwise be reported at
+     * P002 while the sale path correctly issues P1000) and applies the same
+     * exact grammar the issuing service applies, so anything that merely starts
+     * with the letter reserves nothing.
+     *
+     * @param array{0:string,1:int,2:array<int,string>,3:array<int,string>} $spec
+     */
+    private function nextDerived(string $table, int $companyId, array $spec): string
     {
-        $q = DB::table($table)
+        [$prefix, $pad, $likes, $patterns] = $spec;
+
+        $highest = 0;
+        DB::table($table)
             ->where('company_id', $companyId)
-            ->where('invoice_number', 'like', $prefix . '%');
+            ->where(function ($q) use ($likes) {
+                foreach ($likes as $i => $like) {
+                    $i === 0
+                        ? $q->where('invoice_number', 'like', $like)
+                        : $q->orWhere('invoice_number', 'like', $like);
+                }
+            })
+            ->select(['id', 'invoice_number'])
+            ->orderBy('id')
+            ->chunkById(1000, function ($rows) use (&$highest, $patterns) {
+                foreach ($rows as $row) {
+                    foreach ($patterns as $pattern) {
+                        if (preg_match($pattern, (string) $row->invoice_number, $m) === 1) {
+                            $highest = max($highest, (int) $m[1]);
+                            break;
+                        }
+                    }
+                }
+            });
 
-        if ($excludeLegacyLocal) {
-            $q->where('invoice_number', 'not like', 'LOCAL-%');
-        }
-
-        $last = $q->orderByDesc('id')->value('invoice_number');
-
-        $next = 1;
-        if ($last && preg_match('/(\d+)$/', $last, $m)) {
-            $next = ((int) $m[1]) + 1;
-        }
-
-        return $prefix . str_pad((string) $next, $pad, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string) ($highest + 1), $pad, '0', STR_PAD_LEFT);
     }
 }

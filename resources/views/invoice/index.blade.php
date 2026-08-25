@@ -447,7 +447,7 @@
 
             <div class="mb-4">
                 <form method="GET" action="/invoices" class="flex flex-col sm:flex-row gap-3" id="invoiceSearchForm">
-                    <input type="text" name="search" id="invoiceSearchInput" value="{{ request('search') }}" placeholder="Search invoice #, FBR #, customer, NTN, HS code...  (Press /)" class="premium-input flex-1 px-4 py-2.5 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400">
+                    <input type="text" name="search" id="invoiceSearchInput" value="{{ request('search') }}" placeholder="Search invoice # (just 36 or D036), FBR #, customer, NTN, HS code...  (Press /)" class="premium-input flex-1 px-4 py-2.5 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400">
                     <input type="hidden" name="tab" value="{{ $tab }}">
                     @foreach(['per_page','fbr_status','date_from','date_to','month','doc_type','sort','dir'] as $p)
                         @if(request($p))

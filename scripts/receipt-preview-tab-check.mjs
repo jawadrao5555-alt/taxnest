@@ -124,13 +124,13 @@ const { c, form } = build({
 c.tab = 'pra'; c.sync();
 assert(c.p.tax === true, 'PRA tab preview must read rp_show_tax (got tax=' + c.p.tax + ')');
 assert(c.p.address === true, 'PRA tab preview must read rp_show_address');
-assert(c.serialNow() === 'P-817', 'PRA tab must preview a PRA (short P-) serial');
+assert(c.serialNow() === 'P817', 'PRA tab must preview a PRA (short P) serial');
 assert(c.qrNow() === true, 'PRA fiscal (Sahulat) QR must ALWAYS preview on, Menu-QR switch or not');
 
 c.tab = 'local'; c.sync();
 assert(c.p.tax === false, 'Local tab preview must read lp_show_tax, not rp_show_tax');
 assert(c.p.address === false, 'Local tab preview must read lp_show_address');
-assert(c.serialNow() === 'L-0817', 'Local tab must preview an L-series serial');
+assert(c.serialNow() === 'L0817', 'Local tab must preview an L-series serial');
 assert(c.qrNow() === false, 'Menu QR off must remove the QR from the LOCAL bill preview');
 
 // Ticking Local "show tax" must change the preview on the very next sync.

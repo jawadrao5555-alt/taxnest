@@ -500,7 +500,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
         $this->subscribe($companyId);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson('/pos/invoice/store', $this->storePayload());
@@ -521,7 +521,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         // Task 216: restaurant-ish company + non-delivery order_type → the quota 403
         // must NOT offer a provisional retry (dine-in/takeaway settle as finals only).
         $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson('/pos/invoice/store', $this->storePayload(['order_type' => 'dine_in']));
@@ -536,7 +536,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     public function test_store_invoice_quota_403_delivery_restaurantish_allows_provisional(): void
     {
         $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson('/pos/invoice/store', $this->storePayload(['order_type' => 'delivery']));
@@ -552,7 +552,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(); // no admin override → plan decides
         $this->subscribe($companyId, ['name' => 'Starter', 'invoice_limit' => 1]);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
 
         $expected = 'Monthly bill limit reached (1/1 bills this month on the Starter plan). Please upgrade your plan to keep billing.';
 
@@ -567,7 +567,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 2]);
         $this->subscribe($companyId);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson('/pos/invoice/store', $this->storePayload());
@@ -579,7 +579,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertSame('completed', $tx->status);
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertNull($tx->pra_status);
-        $this->assertStringStartsWith('L-', $tx->invoice_number);
+        $this->assertMatchesRegularExpression('/^L\d+$/', $tx->invoice_number);
         $this->assertSame(116.0, (float) $tx->total_amount); // 100 + 16% whole-rupee
 
         // The new final CONSUMED the last slot — quota is now closed (2/2).
@@ -593,7 +593,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
         $this->subscribe($companyId);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson('/pos/invoice/store', $this->storePayload(['save_as_provisional' => 1]));
@@ -616,7 +616,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     public function test_pay_order_blocked_at_quota_full(): void
     {
         $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
         $orderId = $this->makeOrder($companyId);
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
@@ -639,7 +639,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         // Task 216: delivery held order at quota-full → 403 must advertise the
         // provisional retry so the sale screen can offer the one-click save.
         $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
         $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
@@ -670,7 +670,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertSame('completed', $tx->status);
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertNull($tx->pra_status); // reporting-OFF final
-        $this->assertStringStartsWith('L-', $tx->invoice_number);
+        $this->assertMatchesRegularExpression('/^L\d+$/', $tx->invoice_number);
 
         // Settle consumed the only slot — next final is blocked.
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);
@@ -682,7 +682,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         // (delivery-only on restaurant-ish companies) skips the quota gate exactly
         // like storeInvoice's save_as_provisional path, and charges nothing.
         $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
         $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
@@ -794,7 +794,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
         $this->makeFinal($companyId, 'F-001');
-        $billId = $this->makeProvisional($companyId, 'L-001');
+        $billId = $this->makeProvisional($companyId, 'L001');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->from('/pos/transactions')
@@ -812,18 +812,18 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     public function test_retry_pra_local_promote_allowed_within_quota_reporting_off(): void
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
-        $billId = $this->makeProvisional($companyId, 'L-001');
+        $billId = $this->makeProvisional($companyId, 'L001');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->from('/pos/transactions')
             ->post("/pos/transaction/{$billId}/retry-pra");
 
-        $response->assertSessionHas('success', __('pos.bill_now_final_pra_off', ['number' => 'L-001']));
+        $response->assertSessionHas('success', __('pos.bill_now_final_pra_off', ['number' => 'L001']));
 
         $tx = DB::table('pos_transactions')->where('id', $billId)->first();
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertNull($tx->pra_status);
-        $this->assertSame('L-001', $tx->invoice_number, 'reporting-OFF promote keeps the L number');
+        $this->assertSame('L001', $tx->invoice_number, 'reporting-OFF promote keeps the L number');
 
         // Promotion consumed the slot.
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);
@@ -862,7 +862,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
             'agent_submits_pra' => true,
         ]);
         // Reporting-OFF final (pra/NULL) fills the quota by itself.
-        $billId = $this->makeFinal($companyId, 'L-777');
+        $billId = $this->makeFinal($companyId, 'L777');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->from('/pos/transactions')
@@ -874,7 +874,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
 
         $tx = DB::table('pos_transactions')->where('id', $billId)->first();
         $this->assertSame('pending', $tx->pra_status);
-        $this->assertSame('P-001', $tx->invoice_number, 'PRA-bound submit allots the fiscal serial');
+        $this->assertSame('P001', $tx->invoice_number, 'PRA-bound submit allots the fiscal serial');
         $this->assertSame(1, $this->finalsCount($companyId));
     }
 
@@ -886,7 +886,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
         $this->makeFinal($companyId, 'F-001');
-        $billId = $this->makeProvisional($companyId, 'L-001');
+        $billId = $this->makeProvisional($companyId, 'L001');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson("/pos/api/provisional-bills/{$billId}/promote", ['payment_method' => 'cash']);
@@ -905,7 +905,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     public function test_api_promote_allowed_within_quota_reporting_off(): void
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
-        $billId = $this->makeProvisional($companyId, 'L-001');
+        $billId = $this->makeProvisional($companyId, 'L001');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson("/pos/api/provisional-bills/{$billId}/promote", ['payment_method' => 'cash']);
@@ -916,7 +916,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertSame('completed', $tx->status);
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertNull($tx->pra_status); // reporting-OFF finalize
-        $this->assertSame('L-001', $tx->invoice_number);
+        $this->assertSame('L001', $tx->invoice_number);
 
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);
     }
@@ -927,7 +927,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         // and must remain reachable + quota-free even when the quota is FULL.
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
         $this->makeFinal($companyId, 'F-001');
-        $billId = $this->makeProvisional($companyId, 'L-001');
+        $billId = $this->makeProvisional($companyId, 'L001');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
             ->postJson("/pos/api/provisional-bills/{$billId}/promote", ['send_to_pra' => false]);
@@ -1001,9 +1001,9 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 3]);
 
-        $this->makeProvisional($companyId, 'L-001');                                  // free
+        $this->makeProvisional($companyId, 'L001');                                  // free
         $this->makeFinal($companyId, 'D-001', ['status' => 'draft']);                 // free
-        $this->makeFinal($companyId, 'L-050');                                        // counts (NULL-status final)
+        $this->makeFinal($companyId, 'L050');                                        // counts (NULL-status final)
         $this->makeFinal($companyId, 'POS-2026-00001', [                              // counts (archived final)
             'pra_status' => 'submitted', 'is_archived' => true, 'archived_at' => now(),
         ]);
@@ -1021,7 +1021,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     public function test_counting_day_close_deleted_finals_are_added_back(): void
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 2]);
-        $this->makeFinal($companyId, 'L-050');
+        $this->makeFinal($companyId, 'L050');
         // Day-close DELETE policy hard-deleted one final earlier this month.
         DB::table('pos_day_close_reports')->insert([
             'company_id' => $companyId,
@@ -1040,7 +1040,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
         $lastMonth = now()->subMonthNoOverflow();
-        $this->makeFinal($companyId, 'L-050', [
+        $this->makeFinal($companyId, 'L050', [
             'business_date' => $lastMonth->toDateString(),
             'created_at' => $lastMonth,
             'updated_at' => $lastMonth,
@@ -1055,8 +1055,8 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     {
         $companyId = $this->makeCompany();
         $this->subscribe($companyId, ['name' => 'Trial', 'is_trial' => true, 'invoice_limit' => 1], ['trial_ends_at' => now()->addDays(5)]);
-        $this->makeFinal($companyId, 'L-050');
-        $this->makeFinal($companyId, 'L-051');
+        $this->makeFinal($companyId, 'L050');
+        $this->makeFinal($companyId, 'L051');
 
         // 2 finals against invoice_limit 1 — trial plans skip the monthly gate
         // (their 20-bill total cap lives in SubscriptionAccessService).
@@ -1076,7 +1076,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     public function test_deleting_a_final_bill_does_not_give_back_monthly_quota(): void
     {
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
-        $billId = $this->makeFinal($companyId, 'L-050');
+        $billId = $this->makeFinal($companyId, 'L050');
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed'], 'quota should be full before the delete');
 
         $response = $this->actingAs($this->makeUser($companyId), 'pos')
@@ -1093,7 +1093,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertDatabaseHas('pos_bill_deletions', [
             'company_id' => $companyId,
             'transaction_id' => $billId,
-            'invoice_number' => 'L-050',
+            'invoice_number' => 'L050',
         ]);
     }
 
@@ -1102,7 +1102,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         // A deliberate provisional never consumed a slot, so there is nothing to
         // add back — deleting one must leave the allowance exactly as it was.
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
-        $billId = $this->makeProvisional($companyId, 'L-001');
+        $billId = $this->makeProvisional($companyId, 'L001');
 
         $this->actingAs($this->makeUser($companyId), 'pos')
             ->from("/pos/transaction/{$billId}")
@@ -1122,7 +1122,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         // last month — this month's allowance stays untouched.
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
         $lastMonth = now()->subMonthNoOverflow();
-        $billId = $this->makeFinal($companyId, 'L-050', [
+        $billId = $this->makeFinal($companyId, 'L050', [
             'business_date' => $lastMonth->toDateString(),
             'created_at' => $lastMonth,
             'updated_at' => $lastMonth,
@@ -1143,8 +1143,8 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     public function test_counting_internal_account_bypasses_quota(): void
     {
         $companyId = $this->makeCompany(['is_internal_account' => true, 'invoice_limit_override' => 1]);
-        $this->makeFinal($companyId, 'L-050');
-        $this->makeFinal($companyId, 'L-051');
+        $this->makeFinal($companyId, 'L050');
+        $this->makeFinal($companyId, 'L051');
 
         $quota = PlanLimitService::canCreatePosBill($companyId);
         $this->assertTrue($quota['allowed']);

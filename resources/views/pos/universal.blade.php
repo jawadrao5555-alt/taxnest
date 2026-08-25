@@ -10991,7 +10991,7 @@ function restaurantPos() {
         },
         // ─── REPRINT (Alt+R) — today's bills, read-only, click = print ─────────
         // ── QUICK RETURN (Task 681) ───────────────────────────────────────
-        // Bill/serial number (POS-2026-00012, L-012, bare digits, PRA fiscal
+        // Bill/serial number (P036, L012, legacy POS-2026-00012, bare digits, PRA fiscal
         // number, ya receipt order code) → server lookup → return form.
         // Permission + stream lock + returnable rules sab SERVER par
         // (PosReturnController::quickLookup) — yeh sirf navigate karta hai.

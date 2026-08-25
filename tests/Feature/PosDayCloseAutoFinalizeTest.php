@@ -282,8 +282,8 @@ class PosDayCloseAutoFinalizeTest extends TestCase
     {
         $companyId = $this->makeCompany(); // reporting OFF, no user has the flag
 
-        $a = $this->makeProvisional($companyId, 'L-0001', ['subtotal' => 99.50, 'total_amount' => 99.50]);
-        $b = $this->makeProvisional($companyId, 'L-0002');
+        $a = $this->makeProvisional($companyId, 'L0001', ['subtotal' => 99.50, 'total_amount' => 99.50]);
+        $b = $this->makeProvisional($companyId, 'L0002');
 
         $sweep = $this->runSweep($companyId);
 
@@ -300,7 +300,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertSame('pra', $txA->invoice_mode);
         $this->assertNull($txA->pra_status);
         // No fiscal serial burned — the L number stays.
-        $this->assertSame('L-0001', $txA->invoice_number);
+        $this->assertSame('L0001', $txA->invoice_number);
         // Whole-rupee convention: 99.50 → tax round(15.92)=16, total round(115.50)=116.
         $this->assertSame(16.0, (float) $txA->tax_amount);
         $this->assertSame(116.0, (float) $txA->total_amount);
@@ -325,9 +325,9 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         // Admin override: 1 final bill per month.
         $companyId = $this->makeCompany(['invoice_limit_override' => 1]);
 
-        $first = $this->makeProvisional($companyId, 'L-0001');
-        $second = $this->makeProvisional($companyId, 'L-0002');
-        $third = $this->makeProvisional($companyId, 'L-0003');
+        $first = $this->makeProvisional($companyId, 'L0001');
+        $second = $this->makeProvisional($companyId, 'L0002');
+        $third = $this->makeProvisional($companyId, 'L0003');
 
         $sweep = $this->runSweep($companyId);
 
@@ -339,7 +339,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertSame('pra', $this->tx($first)->invoice_mode);
 
         // The remaining two are CARRIED — byte-for-byte untouched provisionals.
-        foreach ([$second => 'L-0002', $third => 'L-0003'] as $id => $number) {
+        foreach ([$second => 'L0002', $third => 'L0003'] as $id => $number) {
             $tx = $this->tx($id);
             $this->assertSame('local', $tx->invoice_mode, "bill {$number} must stay provisional");
             $this->assertSame('local', $tx->pra_status, "bill {$number} must stay provisional");
@@ -359,13 +359,13 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $companyId = $this->makeCompany();
 
         $lastMonthDate = now()->startOfMonth()->subDays(2);
-        $oldBill = $this->makeProvisional($companyId, 'L-0001', [
+        $oldBill = $this->makeProvisional($companyId, 'L0001', [
             'business_date' => $lastMonthDate->toDateString(),
             'created_at' => $lastMonthDate,
             'updated_at' => $lastMonthDate,
         ]);
-        $draft = $this->makeProvisional($companyId, 'L-0002', ['status' => 'draft']);
-        $archivedLocal = $this->makeProvisional($companyId, 'L-0003', [
+        $draft = $this->makeProvisional($companyId, 'L0002', ['status' => 'draft']);
+        $archivedLocal = $this->makeProvisional($companyId, 'L0003', [
             'is_archived' => true,
             'archived_at' => now(),
         ]);
@@ -379,8 +379,8 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertSame(0, $sweep['quota_blocked']);
 
         foreach ([
-            $oldBill => ['completed', 'L-0001'],
-            $draft => ['draft', 'L-0002'],
+            $oldBill => ['completed', 'L0001'],
+            $draft => ['draft', 'L0002'],
         ] as $id => [$status, $number]) {
             $tx = $this->tx($id);
             $this->assertSame('local', $tx->invoice_mode);
@@ -407,7 +407,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             'pra_proxy_url' => 'http://127.0.0.1:9',
         ]);
 
-        $bill = $this->makeProvisional($companyId, 'L-0001', ['subtotal' => 200.00, 'total_amount' => 200.00]);
+        $bill = $this->makeProvisional($companyId, 'L0001', ['subtotal' => 200.00, 'total_amount' => 200.00]);
 
         $sweep = $this->runSweep($companyId);
 
@@ -423,7 +423,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertNull($tx->pra_invoice_number);
         $this->assertFalse((bool) $tx->is_archived);
         // Reporting ON → renumbered onto the real fiscal serial.
-        $this->assertSame('P-001', $tx->invoice_number);
+        $this->assertSame('P001', $tx->invoice_number);
         $this->assertSame(232.0, (float) $tx->total_amount); // whole-rupee re-tax @16%
         // The submit attempt itself was logged (request row written pre-network).
         $this->assertSame(1, DB::table('pra_logs')->where('transaction_id', $bill)->count());
@@ -439,7 +439,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             'agent_submits_pra' => true,
         ]);
 
-        $bill = $this->makeProvisional($companyId, 'L-0001');
+        $bill = $this->makeProvisional($companyId, 'L0001');
 
         $sweep = $this->runSweep($companyId);
 
@@ -450,7 +450,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $tx = $this->tx($bill);
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertSame('pending', $tx->pra_status, 'agent picks the row up — must stay pending');
-        $this->assertSame('P-001', $tx->invoice_number);
+        $this->assertSame('P001', $tx->invoice_number);
         // No server-side network attempt for Agent-Sync companies.
         $this->assertSame(0, DB::table('pra_logs')->count());
     }
@@ -511,8 +511,8 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         // Reporting OFF: sweep finalizes but nothing is submitted/queued/offline
         // → flash must carry the finalized count and NO zero-count suffixes.
         $companyId = $this->makeHttpCompany();
-        $this->makeProvisional($companyId, 'L-0001');
-        $this->makeProvisional($companyId, 'L-0002');
+        $this->makeProvisional($companyId, 'L0001');
+        $this->makeProvisional($companyId, 'L0002');
 
         $response = $this->closeDay($this->makePosUser($companyId));
 
@@ -531,7 +531,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             'agent_enabled' => true,
             'agent_submits_pra' => true,
         ]);
-        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L0001');
 
         $response = $this->closeDay($this->makePosUser($companyId));
 
@@ -550,7 +550,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             'pra_reporting_enabled' => true,
             'pra_proxy_url' => 'http://127.0.0.1:9',
         ]);
-        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L0001');
 
         $response = $this->closeDay($this->makePosUser($companyId));
 
@@ -565,9 +565,9 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         // Quota 1: first bill finalizes, the other two are quota-blocked and
         // carried — the flash MUST warn the cashier (Task 166).
         $companyId = $this->makeHttpCompany(['invoice_limit_override' => 1]);
-        $this->makeProvisional($companyId, 'L-0001');
-        $this->makeProvisional($companyId, 'L-0002');
-        $this->makeProvisional($companyId, 'L-0003');
+        $this->makeProvisional($companyId, 'L0001');
+        $this->makeProvisional($companyId, 'L0002');
+        $this->makeProvisional($companyId, 'L0003');
 
         $response = $this->closeDay($this->makePosUser($companyId));
 
@@ -583,13 +583,13 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         // warning must still appear (it lives OUTSIDE the finalized>0 block).
         $companyId = $this->makeHttpCompany(['invoice_limit_override' => 1]);
         // A completed final from earlier today consumes the whole monthly quota.
-        $this->makeProvisional($companyId, 'P-0001', [
+        $this->makeProvisional($companyId, 'P0001', [
             'invoice_mode' => 'pra',
             'pra_status' => 'submitted',
             'pra_invoice_number' => 'PRA-123',
         ]);
-        $this->makeProvisional($companyId, 'L-0001');
-        $this->makeProvisional($companyId, 'L-0002');
+        $this->makeProvisional($companyId, 'L0001');
+        $this->makeProvisional($companyId, 'L0002');
 
         $response = $this->closeDay($this->makePosUser($companyId));
 
@@ -603,7 +603,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
     {
         // Unlimited quota (default -1): zero-count skip — no warning text at all.
         $companyId = $this->makeHttpCompany();
-        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L0001');
 
         $response = $this->closeDay($this->makePosUser($companyId));
 
@@ -617,8 +617,8 @@ class PosDayCloseAutoFinalizeTest extends TestCase
     public function test_urdu_user_gets_urdu_quota_warning(): void
     {
         $companyId = $this->makeHttpCompany(['invoice_limit_override' => 1]);
-        $this->makeProvisional($companyId, 'L-0001');
-        $this->makeProvisional($companyId, 'L-0002');
+        $this->makeProvisional($companyId, 'L0001');
+        $this->makeProvisional($companyId, 'L0002');
 
         $response = $this->closeDay($this->makePosUser($companyId, 'ur'));
 
@@ -637,9 +637,9 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         // Default 'save' policy: provisional gets ARCHIVED (not finalized) →
         // base message + archived suffix, but NO finalized line.
         $companyId = $this->makeHttpCompany(['pos_dayclose_provisional_action' => 'save']);
-        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L0001');
         // A completed PRA bill so the report itself is never 'empty'.
-        $this->makeProvisional($companyId, 'P-0001', [
+        $this->makeProvisional($companyId, 'P0001', [
             'invoice_mode' => 'pra',
             'pra_status' => 'submitted',
             'pra_invoice_number' => 'PRA-123',
@@ -658,7 +658,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
     {
         // Policy 'finalize' but no provisionals → finalized 0 → no sweep suffix.
         $companyId = $this->makeHttpCompany();
-        $this->makeProvisional($companyId, 'P-0001', [
+        $this->makeProvisional($companyId, 'P0001', [
             'invoice_mode' => 'pra',
             'pra_status' => 'submitted',
             'pra_invoice_number' => 'PRA-123',
@@ -679,7 +679,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         // Cashier language 'ur' → SetPosLocale flips the request locale, so the
         // flash must be built from the ur keys (and differ from the en render).
         $companyId = $this->makeHttpCompany();
-        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L0001');
 
         $response = $this->closeDay($this->makePosUser($companyId, 'ur'));
 
@@ -711,7 +711,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             'pos_role' => 'pos_admin', 'created_at' => now(), 'updated_at' => now(),
         ]);
         $yesterday = now()->subDay()->toDateString();
-        $billId = $this->makeProvisional($companyId, 'L-0001', ['business_date' => $yesterday]);
+        $billId = $this->makeProvisional($companyId, 'L0001', ['business_date' => $yesterday]);
 
         \Illuminate\Support\Facades\Log::shouldReceive('info')
             ->once()
@@ -793,8 +793,8 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $companyId = $this->makeCompany();
         DB::table('companies')->where('id', $companyId)->update(['pos_tax_rate_card' => 8.00]);
 
-        $cash = $this->makeProvisional($companyId, 'L-0001'); // stored method: cash
-        $card = $this->makeProvisional($companyId, 'L-0002', ['payment_method' => 'debit_card']);
+        $cash = $this->makeProvisional($companyId, 'L0001'); // stored method: cash
+        $card = $this->makeProvisional($companyId, 'L0002', ['payment_method' => 'debit_card']);
 
         $sweep = $this->runSweep($companyId);
         $this->assertSame(2, $sweep['finalized']);
@@ -905,7 +905,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->ensureRestaurantTables();
         // is_internal_account=true → restaurantAllowed short-circuits to yes.
         $companyId = $this->makeHttpCompany(['restaurant_mode' => true, 'is_internal_account' => true]);
-        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L0001');
 
         $tableId = DB::table('restaurant_tables')->insertGetId([
             'company_id' => $companyId, 'table_number' => '4',

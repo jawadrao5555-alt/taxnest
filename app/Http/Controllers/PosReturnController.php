@@ -124,6 +124,28 @@ class PosReturnController extends Controller
      * (allowedForBillingScope) + returnableReason — the redirect target
      * re-enforces everything server-side, this endpoint only navigates.
      */
+    /**
+     * Every spelling one short-series number can be stored as: the current
+     * dashless "P036"/"L012", the dashed "P-036" issued before the dash was
+     * dropped, and both of those unpadded (the pad grows past 999, so a shop
+     * carries "L1000" and "L-016" side by side).
+     *
+     * @return array<int,string>
+     */
+    private static function shortSeriesCandidates(string $letter, string $digits): array
+    {
+        $n = ltrim($digits, '0');
+        $n = $n === '' ? '0' : $n;
+        $padded = str_pad($n, 3, '0', STR_PAD_LEFT);
+
+        return [
+            $letter . $padded,
+            $letter . $n,
+            $letter . '-' . $padded,
+            $letter . '-' . $n,
+        ];
+    }
+
     public function quickLookup(Request $r)
     {
         $this->gate();
@@ -138,25 +160,22 @@ class PosReturnController extends Controller
         if (preg_match('/^POS-?(\d{4})-?(\d+)$/', $q, $m)) {
             $candidates[] = 'POS-' . $m[1] . '-' . str_pad($m[2], 5, '0', STR_PAD_LEFT);
         } elseif (preg_match('/^P-?(\d+)$/', $q, $m)) {
-            // Short final series (P-036). Padded + unpadded, pad grows past 999.
-            $candidates[] = 'P-' . str_pad($m[1], 3, '0', STR_PAD_LEFT);
-            $candidates[] = 'P-' . $m[1];
+            // Short final series (P036, and P-036 as issued before the dash was
+            // dropped). Padded + unpadded, pad grows past 999.
+            $candidates = array_merge($candidates, self::shortSeriesCandidates('P', $m[1]));
         } elseif (preg_match('/^L-?(\d+)$/', $q, $m)) {
-            $candidates[] = 'L-' . str_pad($m[1], 3, '0', STR_PAD_LEFT);
-            $candidates[] = 'L-' . $m[1];
+            $candidates = array_merge($candidates, self::shortSeriesCandidates('L', $m[1]));
         } elseif (ctype_digit($q)) {
             // Bare serial digits — the short final series, this year's + last
             // year's legacy POS series, and the L-series (padded + unpadded;
             // both short pads grow past 999 naturally).
             $n = ltrim($q, '0');
             $n = $n === '' ? '0' : $n;
-            $candidates[] = 'P-' . str_pad($n, 3, '0', STR_PAD_LEFT);
-            $candidates[] = 'P-' . $n;
+            $candidates = array_merge($candidates, self::shortSeriesCandidates('P', $n));
             foreach ([now()->format('Y'), now()->subYear()->format('Y')] as $yr) {
                 $candidates[] = 'POS-' . $yr . '-' . str_pad($n, 5, '0', STR_PAD_LEFT);
             }
-            $candidates[] = 'L-' . str_pad($n, 3, '0', STR_PAD_LEFT);
-            $candidates[] = 'L-' . $n;
+            $candidates = array_merge($candidates, self::shortSeriesCandidates('L', $n));
         }
         $candidates = array_values(array_unique($candidates));
 

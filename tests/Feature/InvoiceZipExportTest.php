@@ -503,6 +503,20 @@ class InvoiceZipExportTest extends TestCase
             'fbr_status' => 'production',
         ])->save();
 
+        // Prove the PDF really carries the FBR mark, otherwise a size bound on
+        // an invoice that quietly rendered without logo or QR proves nothing.
+        $data = \App\Services\InvoicePdfService::buildData($invoice->fresh()->load('items', 'company'));
+        $this->assertNotEmpty($data['fbrLogoBase64'], 'filed invoice rendered without the FBR mark');
+        $logoBytes = strlen(base64_decode(explode(',', $data['fbrLogoBase64'])[1] ?? ''));
+        $this->assertLessThan(
+            20 * 1024,
+            $logoBytes,
+            'the full-size screen logo is back in every filed invoice — use the print copy'
+        );
+        if (function_exists('imagecreatetruecolor')) {
+            $this->assertNotEmpty($data['qrBase64'], 'filed invoice rendered without its FBR QR');
+        }
+
         $export = $this->build(InvoiceZipBuilderService::start(
             $this->company->id,
             null,

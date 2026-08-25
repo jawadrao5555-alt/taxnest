@@ -412,11 +412,21 @@ class InvoiceZipExportTest extends TestCase
             'progress' => (int) $fresh->progress,
         ]));
 
-        // A lease that genuinely moved on must still be refused.
+        // A lease that genuinely moved on must still be refused — including
+        // when the write it is attempting would change nothing, which is the
+        // case a no-op-means-success shortcut would wave straight through into
+        // a second worker scribbling on the same archive.
         InvoiceZipBuilderService::release($export, $token);
         $this->assertNotNull(InvoiceZipBuilderService::claim($export));
+
+        $current = $export->fresh();
         $this->assertFalse($this->callProtected('renewLease', $export, $token));
+        $this->assertFalse($this->callProtected('writeState', $export, $token, [
+            'status' => $current->status,
+            'progress' => (int) $current->progress,
+        ]));
         $this->assertFalse($this->callProtected('writeState', $export, $token, ['progress' => 42]));
+        $this->assertSame((int) $current->progress, (int) $export->fresh()->progress);
     }
 
     /** The whole build, driven end to end without letting the clock advance. */

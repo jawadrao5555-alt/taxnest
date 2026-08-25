@@ -27,7 +27,17 @@ class PrerenderInvoicePdfsJob implements ShouldQueue
     /** A failed pre-render costs nothing: the chunk loop covers it. */
     public $tries = 1;
 
-    public $timeout = 300;
+    /**
+     * Must stay under the database queue's retry_after (90s), or the driver
+     * hands this same job to a second worker while the first is still
+     * rendering and then kills it as "attempted too many times". A slice that
+     * finishes well inside the window and re-dispatches itself is how the
+     * build job already survives this.
+     */
+    public $timeout = 80;
+
+    /** Rendering budget for one attempt, comfortably inside the timeout. */
+    private const SLICE_SECONDS = 55;
 
     public function __construct(
         public int $exportId,
@@ -58,7 +68,7 @@ class PrerenderInvoicePdfsJob implements ShouldQueue
             $export,
             $this->slot,
             $this->slots,
-            time() + 240
+            time() + self::SLICE_SECONDS
         );
 
         // Nothing rendered means this slot is fully staged — stop. Otherwise

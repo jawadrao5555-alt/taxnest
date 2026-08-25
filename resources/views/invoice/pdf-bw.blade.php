@@ -4,6 +4,31 @@
     // COMPLIANCE: the FBR QR block, FBR invoice number and tax breakdown
     // below are never gated or altered by any branding choice.
     $diBrand = $diBrand ?? \App\Services\DiBrandingService::forCompany($invoice->company ?? null);
+
+    // One accent drives every coloured band on the page. Default is the
+    // TaxNest teal; a white-label shop's own colour simply replaces it.
+    // Solid bands are deliberate: the earlier tinted-background version
+    // (#F1F6F7 on white) printed washed out on both screen and paper.
+    $accent = $diBrand['accent'] ?: '#0A4D5C';
+    $accentText = $diBrand['accent_text'] ?: '#ffffff';
+
+    $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs();
+
+    $pdfWhtAmount = round(floatval($wht_amount ?? 0), 2);
+    $pdfWhtRate = floatval($wht_rate ?? 0);
+    $pdfWhtRateLabel = $pdfWhtRate > 0 ? ' (' . rtrim(rtrim(number_format($pdfWhtRate, 4, '.', ''), '0'), '.') . '%)' : '';
+    $grandTotal = $pdfWhtAmount > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount;
+
+    $statusLabel = $invoice->fbr_invoice_number ? 'FBR VERIFIED' : strtoupper(str_replace('_', ' ', $invoice->status));
+    // Status colours are fixed, never white-labelled: a buyer must be able to
+    // tell a verified invoice from a draft at a glance on any shop's paper.
+    $statusColor = match (true) {
+        (bool) $invoice->fbr_invoice_number => '#0F7A46',
+        $invoice->status === 'draft' => '#8A6100',
+        $invoice->status === 'failed' => '#A3211B',
+        $invoice->status === 'pending_verification' => '#7A5A00',
+        default => '#0A4D5C',
+    };
 @endphp
 <!DOCTYPE html>
 <html>
@@ -12,272 +37,285 @@
     <title>Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</title>
     <style>
         @page {
-            /* 🖨️ Safer margins — most consumer printers can't print to within 12mm of paper edge.
-               15mm sides + 18mm bottom (for printer feed roller) prevents corner-cut on inkjet/laser. */
-            margin: 15mm 15mm 18mm 15mm;
+            /* Safer margins — most consumer printers can't print to within 12mm of
+               paper edge. 14mm sides + 20mm bottom (feed roller + page footer). */
+            margin: 13mm 14mm 20mm 14mm;
             size: A4 portrait;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'DejaVu Sans', 'Helvetica', Arial, sans-serif;
-            color: #17282d;
+            color: #16262B;
             background: #ffffff;
             font-size: 10.5px;
             line-height: 1.42;
             width: 100%;
         }
 
-        .header-row { width: 100%; margin-bottom: 7px; }
-        .header-row table { width: 100%; border-collapse: collapse; }
-        .header-row td { vertical-align: top; }
-        .company-name { font-size: 19px; font-weight: 900; color: #0A4D5C; letter-spacing: 0.35px; }
-        .company-info { font-size: 9.5px; color: #26373b; margin-top: 3px; line-height: 1.48; }
-        .company-info strong { font-weight: 700; }
+        /* ── Title band ──────────────────────────────────────────────── */
+        .title-band { width: 100%; border-collapse: collapse; background: {{ $accent }}; }
+        .title-band td { padding: 9px 12px; vertical-align: middle; color: {{ $accentText }}; }
+        .title-band .doc-title { font-size: 17px; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; }
+        .title-band .doc-meta { font-size: 10px; text-align: right; line-height: 1.5; }
+        .title-band .doc-meta .big { font-size: 12.5px; font-weight: 800; letter-spacing: 0.3px; }
 
         .status-pill {
             display: inline-block;
-            padding: 3px 10px;
-            border-radius: 0;
+            padding: 3px 9px;
             font-size: 8.5px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 1px;
-            background: #F1F6F7;
-            color: #0A4D5C;
-            border: 1px solid #7E9CA3;
+            background: {{ $statusColor }};
+            color: #ffffff;
         }
 
-        .divider { border: none; border-top: 1px solid #A9C0C5; margin: 10px 0; }
-        .divider-dark { border: none; border-top: 1.5px solid #0A4D5C; margin: 8px 0; }
+        /* ── Seller / FBR strip ──────────────────────────────────────── */
+        .top-strip { width: 100%; border-collapse: collapse; margin-top: 9px; }
+        .top-strip > tbody > tr > td { vertical-align: top; }
+        .seller-name { font-size: 17px; font-weight: 900; color: {{ $accent }}; letter-spacing: 0.3px; }
+        .seller-branch { font-size: 10px; font-weight: 700; color: {{ $accent }}; margin-top: 1px; }
+        .seller-info { font-size: 9.5px; color: #33474C; margin-top: 3px; line-height: 1.5; }
+        .seller-info strong { font-weight: 700; color: #16262B; }
 
-        .qr-block { text-align: center; padding: 10px 0 8px 0; margin-bottom: 8px; }
-        .qr-inv-no { font-size: 10px; color: #17282d; font-weight: 800; margin-top: 5px; letter-spacing: 0.15px; }
-
-        .doc-title { font-size: 15px; font-weight: 900; color: #0A4D5C; margin-bottom: 10px; letter-spacing: 0.45px; }
-
-        .info-section { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
-        .info-section td { vertical-align: top; padding: 0; }
-        .info-heading {
-            font-size: 9px;
-            text-transform: uppercase;
-            color: #0A4D5C;
-            background: #F1F6F7;
-            font-weight: 800;
-            letter-spacing: 1.25px;
-            padding: 5px 8px 4px;
-            border: 1px solid #A9C0C5;
-            border-bottom: 1.5px solid #0A4D5C;
-            display: block;
+        /* The FBR mark keeps its own colours — never tinted by the accent. */
+        .fbr-box { border: 1.5px solid {{ $accent }}; }
+        .fbr-box .fbr-inner { padding: 7px 8px 6px; text-align: center; }
+        .fbr-box .fbr-no {
+            font-size: 8.5px; font-weight: 800; color: #16262B; letter-spacing: 0.2px;
+            word-wrap: break-word; margin-top: 4px; line-height: 1.35;
         }
-        .info-body { padding: 6px 8px 5px; border-left: 1px solid #C7D7DA; border-right: 1px solid #C7D7DA; border-bottom: 1px solid #C7D7DA; }
-        .info-row { font-size: 10px; color: #17282d; padding: 1px 0; line-height: 1.48; }
-        .info-row strong { font-weight: 700; }
-        .info-row-label { font-size: 9.5px; color: #466066; font-weight: 600; }
-        .info-row-value { font-size: 10px; color: #17282d; font-weight: 700; }
+        .fbr-box .fbr-cap {
+            background: {{ $accent }}; color: {{ $accentText }};
+            font-size: 7.5px; font-weight: 800; letter-spacing: 1px;
+            text-transform: uppercase; text-align: center; padding: 3px 4px;
+        }
+        .qr-img { width: 92px; height: 92px; }
+        .not-filed {
+            border: 1.5px dashed #A3211B; color: #A3211B; font-size: 9px; font-weight: 800;
+            text-align: center; padding: 14px 8px; text-transform: uppercase; letter-spacing: 0.8px;
+        }
 
-        .detail-table { width: 100%; border-collapse: collapse; border-left: 1px solid #C7D7DA; border-right: 1px solid #C7D7DA; border-bottom: 1px solid #C7D7DA; }
-        .detail-table td { padding: 5px 8px; font-size: 9.5px; }
-        .detail-table .dt-label { color: #466066; font-weight: 600; text-align: left; width: 40%; }
-        .detail-table .dt-value { color: #17282d; font-weight: 700; text-align: right; width: 60%; }
-        .detail-table tr { border-bottom: 1px solid #D7E3E5; }
-        .detail-table tr:last-child { border-bottom: none; }
+        /* ── Panels (Bill To / Invoice Details) ──────────────────────── */
+        .panels { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .panels > tbody > tr > td { vertical-align: top; }
+        .panel-head {
+            background: {{ $accent }}; color: {{ $accentText }};
+            font-size: 8.5px; text-transform: uppercase; font-weight: 800;
+            letter-spacing: 1.3px; padding: 5px 9px; display: block;
+        }
+        .panel-body { padding: 7px 9px; border: 1px solid {{ $accent }}; border-top: none; }
+        .panel-row { font-size: 10px; color: #16262B; padding: 1px 0; line-height: 1.5; }
+        .panel-label { font-size: 9.5px; color: #4A6167; font-weight: 600; }
+        .buyer-type { font-size: 8.5px; font-weight: 800; letter-spacing: 0.9px; color: #4A6167; text-transform: uppercase; }
+        .buyer-name { font-size: 12.5px; font-weight: 800; color: #16262B; }
 
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        .detail-table { width: 100%; border-collapse: collapse; border: 1px solid {{ $accent }}; border-top: none; }
+        .detail-table td { padding: 4px 9px; font-size: 9.5px; border-bottom: 1px solid #DCE6E8; }
+        .detail-table tr:last-child td { border-bottom: none; }
+        .detail-table .dt-label { color: #4A6167; font-weight: 600; width: 42%; }
+        .detail-table .dt-value { color: #16262B; font-weight: 700; text-align: right; width: 58%; }
+
+        /* ── Items ───────────────────────────────────────────────────── */
+        .items-table { width: 100%; border-collapse: collapse; margin-top: 11px; }
+        /* A long item list must carry its column headings onto every page. */
+        .items-table thead { display: table-header-group; }
         .items-table thead th {
-            background: #F1F6F7;
-            padding: 7px 6px;
-            font-size: 9px;
-            text-transform: uppercase;
-            color: #0A4D5C;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            text-align: left;
-            border: 1px solid #A9C0C5;
-            border-bottom: 1.5px solid #0A4D5C;
+            background: {{ $accent }}; color: {{ $accentText }};
+            padding: 7px 6px; font-size: 8.5px; text-transform: uppercase;
+            font-weight: 800; letter-spacing: 0.6px; text-align: left;
+            border-right: 1px solid rgba(255,255,255,0.28);
         }
+        .items-table thead th:last-child { border-right: none; }
         .items-table thead th.ar { text-align: right; }
         .items-table thead th.ac { text-align: center; }
         .items-table tbody td {
-            padding: 6px;
-            border: 1px solid #C7D7DA;
-            font-size: 10px;
-            color: #17282d;
-            background: #ffffff;
+            padding: 6px; font-size: 10px; color: #16262B;
+            border-bottom: 1px solid #DCE6E8;
+            border-left: 1px solid #DCE6E8;
         }
+        .items-table tbody td:first-child { border-left: 1px solid {{ $accent }}; }
+        .items-table tbody td:last-child { border-right: 1px solid {{ $accent }}; }
+        .items-table tbody tr.alt td { background: #F3F8F9; }
+        .items-table tbody tr:last-child td { border-bottom: 1.5px solid {{ $accent }}; }
         .items-table tbody td.ar { text-align: right; font-weight: 700; }
         .items-table tbody td.ac { text-align: center; }
-        .items-table tbody td.code {
-            font-family: 'DejaVu Sans', 'Helvetica', sans-serif;
-            font-size: 10px;
-            font-weight: 700;
-            color: #0A4D5C;
-            letter-spacing: 0.3px;
-        }
+        .items-table tbody td.code { font-weight: 800; color: {{ $accent }}; letter-spacing: 0.2px; }
+        .items-table tbody td.unit { font-size: 8.5px; text-align: center; color: #4A6167; }
         .items-table tbody td.product { font-weight: 600; }
         .items-table tbody tr { page-break-inside: avoid; }
 
-        .summary-table { width: 100%; border-collapse: collapse; }
-        .summary-table td { vertical-align: top; }
+        /* ── Totals ──────────────────────────────────────────────────── */
+        .summary-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .summary-table > tbody > tr > td { vertical-align: top; }
 
-        .totals-box { border: 1px solid #A9C0C5; border-top: 2px solid #0A4D5C; border-radius: 0; overflow: hidden; }
+        .words-box { border: 1px solid #C4D5D8; border-left: 3px solid {{ $accent }}; padding: 7px 9px; }
+        .words-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1.1px; color: #4A6167; font-weight: 700; }
+        .words-value { font-size: 10px; font-weight: 700; color: #16262B; margin-top: 2px; line-height: 1.45; }
+
+        .schedule-info { font-size: 9px; color: #33474C; line-height: 1.55; margin-top: 8px; }
+        .schedule-info strong { font-weight: 700; color: {{ $accent }}; }
+
+        .totals-box { border: 1px solid {{ $accent }}; }
         .totals-box table { width: 100%; border-collapse: collapse; }
-        .totals-box td { padding: 5px 10px; font-size: 10px; }
-        .totals-box .t-label { text-align: right; color: #466066; font-weight: 600; width: 55%; }
-        .totals-box .t-value { text-align: right; color: #17282d; font-weight: 700; width: 45%; white-space: nowrap; }
-        .totals-box tr { border-bottom: 1px solid #D7E3E5; }
-        .totals-box tr.total-row { background: #DCEBED; }
-        .totals-box tr.total-row td { border-bottom: none; padding: 8px 10px; }
-        .totals-box tr.total-row .t-label { color: #0A4D5C; font-size: 11.5px; font-weight: 800; }
-        .totals-box tr.total-row .t-value { color: #0A4D5C; font-size: 13px; font-weight: 900; }
+        .totals-box td { padding: 5px 10px; font-size: 10px; border-bottom: 1px solid #DCE6E8; }
+        .totals-box .t-label { text-align: right; color: #4A6167; font-weight: 600; width: 54%; }
+        .totals-box .t-value { text-align: right; color: #16262B; font-weight: 700; width: 46%; white-space: nowrap; }
+        .totals-box tr.total-row td { background: {{ $accent }}; border-bottom: none; padding: 8px 10px; }
+        .totals-box tr.total-row .t-label { color: {{ $accentText }}; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; }
+        .totals-box tr.total-row .t-value { color: {{ $accentText }}; font-size: 13.5px; font-weight: 900; }
 
-        .schedule-info { font-size: 9px; color: #26373b; line-height: 1.5; margin-top: 6px; }
-        .schedule-info strong { font-weight: 700; color: #0A4D5C; }
+        /* ── Sign-off + footer ───────────────────────────────────────── */
+        .signoff { width: 100%; border-collapse: collapse; margin-top: 26px; }
+        .signoff td { vertical-align: bottom; font-size: 8.5px; color: #4A6167; }
+        .sign-line { border-top: 1px solid #8FA8AD; padding-top: 3px; text-align: center; font-weight: 700; letter-spacing: 0.5px; }
 
-        .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #A9C0C5; text-align: center; }
-        .footer-text { font-size: 8px; color: #466066; }
-        .footer-brand { font-size: 9px; color: #0A4D5C; font-weight: 700; margin-top: 2px; }
+        .footer { margin-top: 14px; padding-top: 7px; border-top: 2px solid {{ $accent }}; text-align: center; }
+        .footer-text { font-size: 8px; color: #4A6167; }
+        .footer-brand { font-size: 9px; color: {{ $accent }}; font-weight: 800; margin-top: 2px; }
+
+        /* Repeated on every page inside the bottom margin. */
+        .page-foot {
+            /* dompdf places fixed elements against the PAGE edge, not the
+               content box — a negative offset lands off-paper. 7mm keeps it
+               inside the 20mm bottom margin, clear of the last table row. */
+            position: fixed; bottom: 7mm; left: 0; right: 0;
+            font-size: 7.5px; color: #6B8085; text-align: center;
+        }
+        /* counter(page) works; counter(pages) resolves to 0 in this dompdf
+           build because the total is not known when a fixed box is laid out,
+           so the footer prints the page number without a total. */
+        .page-foot .pno:before { content: counter(page); }
 
         .watermark {
-            position: fixed;
-            top: 40%;
-            left: 12%;
-            font-size: 60px;
-            color: rgba(10, 77, 92, 0.08);
-            font-weight: bold;
-            text-transform: uppercase;
-            transform: rotate(-35deg);
-            letter-spacing: 10px;
-            z-index: 9999;
-            pointer-events: none;
-            white-space: nowrap;
+            position: fixed; top: 38%; left: 10%;
+            font-size: 68px; color: rgba(10, 77, 92, 0.10);
+            font-weight: bold; text-transform: uppercase;
+            transform: rotate(-35deg); letter-spacing: 10px;
+            z-index: 9999; white-space: nowrap;
         }
-
-        @if($diBrand['accent'])
-        /* Premium white-label accent — a restrained rule only. QR / FBR number /
-           tax rows keep their standard rendering (compliance guardrail). */
-        .info-heading { border-bottom-color: {{ $diBrand['accent'] }}; }
-        .items-table thead th { border-bottom-color: {{ $diBrand['accent'] }}; }
-        .totals-box { border-top-color: {{ $diBrand['accent'] }}; }
-        @endif
     </style>
 </head>
 <body>
 
-    {{-- ===== COMPANY HEADER ===== --}}
-    <div class="header-row">
-        <table>
-            <tr>
-                <td style="width: 45%;">
-                    @if($invoice->fbr_invoice_number)
-                    <span class="status-pill">FBR VERIFIED</span>
-                    @elseif($invoice->status === 'draft')
-                    <span class="status-pill">DRAFT</span>
-                    @elseif($invoice->status === 'locked')
-                    <span class="status-pill">PRODUCTION</span>
-                    @elseif($invoice->status === 'failed')
-                    <span class="status-pill">FAILED</span>
-                    @elseif($invoice->status === 'pending_verification')
-                    <span class="status-pill">PENDING</span>
+    <div class="page-foot">
+        {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}
+        &nbsp;&middot;&nbsp; Page <span class="pno"></span>
+    </div>
+
+    {{-- ===== TITLE BAND ===== --}}
+    <table class="title-band">
+        <tr>
+            <td style="width: 55%;">
+                <div class="doc-title">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
+            </td>
+            <td style="width: 45%;" class="doc-meta">
+                <div class="big">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</div>
+                <div>{{ $invoice->created_at->format('d M Y') }}</div>
+            </td>
+        </tr>
+    </table>
+
+    {{-- ===== SELLER + FBR DIGITAL INVOICE MARK ===== --}}
+    <table class="top-strip">
+        <tr>
+            <td style="width: 62%; padding-right: 14px;">
+                @if($diBrand['logo_data_uri'])
+                <div style="margin-bottom: 5px;"><img src="{{ $diBrand['logo_data_uri'] }}" alt="Logo" style="height: 42px; width: auto;"></div>
+                @endif
+                <div class="seller-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
+                @php
+                    // A distributor may trade under a different name in each city.
+                    // The branch on the invoice is that trading identity, so it
+                    // prints under the legal name and supplies the address.
+                    $invBranch = $invoice->branch;
+                    $branchAddress = ($invBranch?->address ?: null) ?: $invoice->company->address;
+                    $branchCity = ($invBranch?->city ?: null) ?: $invoice->company->city;
+                @endphp
+                @if($invBranch && !$invBranch->is_head_office)
+                <div class="seller-branch">{{ $invBranch->name }}@if($invBranch->city) &mdash; {{ $invBranch->city }}@endif</div>
+                @endif
+                <div class="seller-info">
+                    @if($branchAddress && $dp['show_address'])
+                    {{ $branchAddress }}@if($branchCity), {{ $branchCity }}@endif<br>
                     @endif
-                </td>
-                <td style="width: 55%; text-align: right;">
-                    @php $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
-                    @if($diBrand['logo_data_uri'])
-                    <div style="margin-bottom: 4px;"><img src="{{ $diBrand['logo_data_uri'] }}" alt="Logo" style="height: 44px; width: auto;"></div>
+                    @if($invoice->company->ntn && $dp['show_ntn'])
+                    <strong>NTN: {{ $invoice->company->ntn }}</strong>
                     @endif
-                    <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
-                    @php
-                        // A distributor may trade under a different name in each city.
-                        // The branch on the invoice is that trading identity, so it
-                        // prints under the legal name and supplies the address.
-                        $invBranch = $invoice->branch;
-                        $branchAddress = ($invBranch?->address ?: null) ?: $invoice->company->address;
-                        $branchCity = ($invBranch?->city ?: null) ?: $invoice->company->city;
-                    @endphp
-                    @if($invBranch && !$invBranch->is_head_office)
-                    <div style="font-size: 10px; font-weight: bold; color: #0A4D5C; margin-top: 1px;">{{ $invBranch->name }}@if($invBranch->city) &mdash; {{ $invBranch->city }}@endif</div>
+                    @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== $invoice->company->registration_no)
+                    &nbsp;|&nbsp; CNIC: {{ $invoice->company->cnic }}
                     @endif
-                    <div class="company-info">
-                        @if($branchAddress && $dp['show_address'])
-                        {{ $branchAddress }}@if($branchCity), {{ $branchCity }}@endif<br>
-                        @endif
-                        @if($invoice->company->ntn && $dp['show_ntn'])
-                        <strong>NTN: {{ $invoice->company->ntn }}</strong><br>
-                        @endif
-                        @if($invoice->company->cnic && $invoice->company->cnic !== $invoice->company->ntn && $invoice->company->cnic !== $invoice->company->registration_no)
-                        CNIC: {{ $invoice->company->cnic }}<br>
-                        @endif
-                        @if($invoice->company->registration_no)
-                        Reg #: {{ $invoice->company->registration_no }}<br>
-                        @endif
-                        @if($invoice->company->phone && $dp['show_mobile'])
-                        Phone: {{ $invoice->company->phone }}
-                        @endif
-                        @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone && $dp['show_mobile'])
-                        &nbsp;| Mobile: {{ $invoice->company->mobile }}
-                        @endif
-                        @if($invoice->company->email && $dp['show_email'])
-                        <br>{{ $invoice->company->email }}
-                        @endif
+                    @if($invoice->company->registration_no)
+                    &nbsp;|&nbsp; Reg #: {{ $invoice->company->registration_no }}
+                    @endif
+                    @if(($invoice->company->ntn && $dp['show_ntn']) || $invoice->company->registration_no)
+                    <br>
+                    @endif
+                    @if($invoice->company->phone && $dp['show_mobile'])
+                    Phone: {{ $invoice->company->phone }}
+                    @endif
+                    @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone && $dp['show_mobile'])
+                    &nbsp;| Mobile: {{ $invoice->company->mobile }}
+                    @endif
+                    @if($invoice->company->email && $dp['show_email'])
+                    <br>{{ $invoice->company->email }}
+                    @endif
+                </div>
+                <div style="margin-top: 7px;"><span class="status-pill">{{ $statusLabel }}</span></div>
+            </td>
+            <td style="width: 38%;">
+                @if($invoice->fbr_invoice_number && !empty($qrBase64))
+                <div class="fbr-box">
+                    <div class="fbr-cap">FBR Digital Invoice</div>
+                    <div class="fbr-inner">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="text-align: center; vertical-align: middle; padding-right: 6px;">
+                                    @if(!empty($fbrLogoBase64))
+                                    <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoicing System" style="height: 62px; width: auto;">
+                                    @endif
+                                </td>
+                                <td style="width: 100px; text-align: center; vertical-align: middle;">
+                                    <img src="{{ $qrBase64 }}" alt="QR Code" class="qr-img">
+                                </td>
+                            </tr>
+                        </table>
+                        <div class="fbr-no">FBR Inv #: {{ $invoice->fbr_invoice_number }}</div>
                     </div>
-                </td>
-            </tr>
-        </table>
-    </div>
-
-    <hr class="divider">
-
-    {{-- ===== QR CODE + FBR DIGITAL INVOICE BADGE (single, centered, premium) ===== --}}
-    @if($invoice->fbr_invoice_number && !empty($qrBase64))
-    <div class="qr-block" style="padding: 12px 0 8px 0;">
-        <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-                <td style="width: 50%; text-align: right; padding-right: 18px; vertical-align: middle;">
-                    @if(!empty($fbrLogoBase64))
-                        <img src="{{ $fbrLogoBase64 }}" alt="FBR Digital Invoice" style="height: 80px; width: auto;">
-                    @endif
-                </td>
-                <td style="width: 50%; text-align: left; padding-left: 18px; vertical-align: middle;">
-                    <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 96px; height: 96px; border: 1px solid #000000; padding: 3px; background: #ffffff;">
-                    <div class="qr-inv-no" style="margin-top: 6px; font-size: 10px;">FBR Inv #: {{ $invoice->fbr_invoice_number }}</div>
-                </td>
-            </tr>
-        </table>
-    </div>
-    <hr class="divider">
-    @endif
-
-    {{-- ===== DOCUMENT TITLE ===== --}}
-    <div class="doc-title">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
+                </div>
+                @else
+                <div class="not-filed">Not submitted to FBR</div>
+                @endif
+            </td>
+        </tr>
+    </table>
 
     {{-- ===== BILL TO + INVOICE DETAILS ===== --}}
-    <table class="info-section">
+    <table class="panels">
         <tr>
-            <td style="width: 52%; padding: 0 7px 0 0;">
-                <div class="info-heading">Bill To</div>
-                <div class="info-body">
-                    <div class="info-row" style="font-weight:800; font-size: 11px; text-transform: uppercase; color: #000000; margin-bottom: 2px;">
-                        {{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}
-                    </div>
-                    <div class="info-row"><strong style="font-size: 12px;">{{ $invoice->buyer_name }}</strong></div>
+            <td style="width: 52%; padding-right: 8px;">
+                <div class="panel-head">Bill To</div>
+                <div class="panel-body">
+                    <div class="buyer-type">{{ $invoice->buyer_registration_type ?? 'UNREGISTERED' }}</div>
+                    <div class="buyer-name">{{ $invoice->buyer_name }}</div>
                     @if($invoice->buyer_ntn)
-                    <div class="info-row"><span class="info-row-label">NTN:</span> <strong>{{ $invoice->buyer_ntn }}</strong></div>
+                    <div class="panel-row"><span class="panel-label">NTN:</span> <strong>{{ $invoice->buyer_ntn }}</strong></div>
                     @endif
                     @if($invoice->buyer_cnic)
-                    <div class="info-row"><span class="info-row-label">CNIC:</span> {{ $invoice->buyer_cnic }}</div>
+                    <div class="panel-row"><span class="panel-label">CNIC:</span> {{ $invoice->buyer_cnic }}</div>
                     @endif
                     @if($invoice->buyer_address)
-                    <div class="info-row">{{ $invoice->buyer_address }}</div>
+                    <div class="panel-row">{{ $invoice->buyer_address }}</div>
                     @endif
                     @if($invoice->destination_province)
-                    <div class="info-row">{{ $invoice->destination_province }}, Pakistan</div>
+                    <div class="panel-row">{{ $invoice->destination_province }}, Pakistan</div>
                     @else
-                    <div class="info-row">Pakistan</div>
+                    <div class="panel-row">Pakistan</div>
                     @endif
                 </div>
             </td>
-            <td style="width: 48%; padding: 0 0 0 7px;">
-                <div class="info-heading">Invoice Details</div>
+            <td style="width: 48%;">
+                <div class="panel-head">Invoice Details</div>
                 <table class="detail-table">
                     <tr>
                         <td class="dt-label">Invoice No.</td>
@@ -304,7 +342,7 @@
                     </tr>
                     @endif
                     <tr>
-                        <td class="dt-label">NTN</td>
+                        <td class="dt-label">Seller NTN</td>
                         <td class="dt-value">{{ $invoice->company->ntn ?? 'N/A' }}</td>
                     </tr>
                     @if($invoice->supplier_province)
@@ -322,23 +360,23 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="ac" style="width: 30px;">SR</th>
-                <th style="width: 78px;">HS CODE</th>
-                <th>DESCRIPTION</th>
-                <th class="ac" style="width: 55px;">UNIT</th>
-                <th class="ar" style="width: 48px;">QTY</th>
-                <th class="ar" style="width: 70px;">RATE</th>
-                <th class="ar" style="width: 80px;">AMOUNT</th>
-                <th class="ar" style="width: 50px;">TAX</th>
+                <th class="ac" style="width: 26px;">#</th>
+                <th style="width: 74px;">HS Code</th>
+                <th>Description</th>
+                <th class="ac" style="width: 58px;">Unit</th>
+                <th class="ar" style="width: 46px;">Qty</th>
+                <th class="ar" style="width: 68px;">Rate</th>
+                <th class="ar" style="width: 82px;">Amount</th>
+                <th class="ar" style="width: 44px;">Tax</th>
             </tr>
         </thead>
         <tbody>
             @foreach($invoice->items as $index => $item)
-            <tr>
+            <tr class="{{ $index % 2 ? 'alt' : '' }}">
                 <td class="ac">{{ $index + 1 }}</td>
                 <td class="code">{{ $item->hs_code }}</td>
                 <td class="product">{{ $item->description }}</td>
-                <td class="ac" style="font-size: 9px;">{{ $item->default_uom ?? 'PCS' }}</td>
+                <td class="unit">{{ $item->default_uom ?? 'PCS' }}</td>
                 <td class="ar">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
                 <td class="ar">{{ number_format($item->price, 2) }}</td>
                 <td class="ar" style="font-weight: 800;">{{ number_format($item->price * $item->quantity, 2) }}</td>
@@ -351,7 +389,11 @@
     {{-- ===== TOTALS SECTION ===== --}}
     <table class="summary-table">
         <tr>
-            <td style="width: 50%; padding-right: 16px;">
+            <td style="width: 52%; padding-right: 14px;">
+                <div class="words-box">
+                    <div class="words-label">Amount in Words</div>
+                    <div class="words-value">{{ \App\Services\InvoicePdfService::amountInWords((float) $grandTotal) }}</div>
+                </div>
                 @php
                     $scheduleTypes = $invoice->items->pluck('schedule_type')->unique()->filter();
                     $sroNumbers = $invoice->items->pluck('sro_schedule_no')->unique()->filter();
@@ -371,7 +413,7 @@
                 </div>
                 @endif
             </td>
-            <td style="width: 50%;">
+            <td style="width: 48%;">
                 <div class="totals-box">
                     <table>
                         <tr>
@@ -392,11 +434,6 @@
                         {{-- WHT / advance income tax: shown only when this invoice actually
                              has a WHT amount applied (per-invoice data, not a session toggle).
                              Invoices without WHT keep the clean PDF with no empty WHT row. --}}
-                        @php
-                            $pdfWhtAmount = round(floatval($wht_amount ?? 0), 2);
-                            $pdfWhtRate = floatval($wht_rate ?? 0);
-                            $pdfWhtRateLabel = $pdfWhtRate > 0 ? ' (' . rtrim(rtrim(number_format($pdfWhtRate, 4, '.', ''), '0'), '.') . '%)' : '';
-                        @endphp
                         @if($pdfWhtAmount > 0)
                         <tr>
                             <td class="t-label">WHT / Advance Tax{{ $pdfWhtRateLabel }}</td>
@@ -405,11 +442,20 @@
                         @endif
                         <tr class="total-row">
                             <td class="t-label">TOTAL</td>
-                            <td class="t-value">PKR {{ number_format($pdfWhtAmount > 0 ? ($net_receivable ?? $invoice->total_amount) : $invoice->total_amount, 2) }}</td>
+                            <td class="t-value">PKR {{ number_format($grandTotal, 2) }}</td>
                         </tr>
                     </table>
                 </div>
             </td>
+        </tr>
+    </table>
+
+    {{-- ===== SIGN-OFF ===== --}}
+    <table class="signoff">
+        <tr>
+            <td style="width: 38%;"><div class="sign-line">Receiver's Signature</div></td>
+            <td style="width: 24%;">&nbsp;</td>
+            <td style="width: 38%;"><div class="sign-line">For {{ $invoice->company->name ?? 'TaxNest' }}</div></td>
         </tr>
     </table>
 
@@ -432,8 +478,8 @@
     <div class="watermark">DRAFT</div>
     @endif
 
-    @if(!empty($showWatermark) && $showWatermark)
-    <div class="watermark" style="font-size: 44px;">SUBSCRIPTION EXPIRED</div>
+    @if(!empty($showWatermark))
+    <div class="watermark" style="top: 58%; left: 16%;">UNPAID</div>
     @endif
 
 </body>

@@ -117,6 +117,54 @@ class InvoicePdfService
         return $pdf;
     }
 
+    /**
+     * "14750.50" -> "Rupees Fourteen Thousand Seven Hundred Fifty and Fifty Paisa Only".
+     *
+     * Buyers routinely check the words line against the figure, so it is
+     * printed under the totals. International scale (thousand / million) is
+     * used rather than lakh / crore: the PDF is English-only by owner rule and
+     * distributor invoices are read outside Pakistan too.
+     */
+    public static function amountInWords(float $amount): string
+    {
+        $amount = round(abs($amount), 2);
+        $rupees = (int) floor($amount);
+        $paisa = (int) round(($amount - $rupees) * 100);
+
+        $words = 'Rupees ' . self::wordsForInt($rupees);
+        if ($paisa > 0) {
+            $words .= ' and ' . self::wordsForInt($paisa) . ' Paisa';
+        }
+
+        return $words . ' Only';
+    }
+
+    /** @internal English words for a non-negative integer. */
+    protected static function wordsForInt(int $n): string
+    {
+        static $ones = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+            'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        static $tens = [2 => 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+        if ($n < 20) {
+            return $ones[$n];
+        }
+        if ($n < 100) {
+            return $tens[intdiv($n, 10)] . ($n % 10 ? ' ' . $ones[$n % 10] : '');
+        }
+        if ($n < 1000) {
+            return $ones[intdiv($n, 100)] . ' Hundred' . ($n % 100 ? ' ' . self::wordsForInt($n % 100) : '');
+        }
+
+        foreach ([1000000000000 => 'Trillion', 1000000000 => 'Billion', 1000000 => 'Million', 1000 => 'Thousand'] as $unit => $name) {
+            if ($n >= $unit) {
+                return self::wordsForInt(intdiv($n, $unit)) . ' ' . $name . ($n % $unit ? ' ' . self::wordsForInt($n % $unit) : '');
+            }
+        }
+
+        return (string) $n; // unreachable for sane invoice values
+    }
+
     public static function filename(Invoice $invoice): string
     {
         return 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';

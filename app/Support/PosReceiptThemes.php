@@ -14,18 +14,18 @@ namespace App\Support;
  * appears in both receipt-settings pickers (PRA + FBR), passes validation,
  * and resolves to the right pre-selected card.
  *
- *   pizza_bold — bold ON + big centered logo (universal default since Jul 2026)
+ *   bold_center — bold ON + big centered logo (universal default since Jul 2026)
  *   bold_side  — bold ON + small logo beside the name
  *   saada      — bold OFF trimmed drafting look (plain-style opt-out shops)
  */
 class PosReceiptThemes
 {
     public const THEMES = [
-        'pizza_bold' => [
+        'bold_center' => [
             'bold'  => true,
             'logo'  => 'center',
-            'label' => 'pos.rcpt_theme_pizza_bold',
-            'hint'  => 'pos.rcpt_theme_pizza_bold_hint',
+            'label' => 'pos.rcpt_theme_bold_center',
+            'hint'  => 'pos.rcpt_theme_bold_center_hint',
         ],
         'bold_side' => [
             'bold'  => true,
@@ -65,7 +65,7 @@ class PosReceiptThemes
             return 'saada';
         }
 
-        return (($style['logo'] ?? 'center') === 'side') ? 'bold_side' : 'pizza_bold';
+        return (($style['logo'] ?? 'center') === 'side') ? 'bold_side' : 'bold_center';
     }
 
     /**

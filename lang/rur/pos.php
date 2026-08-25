@@ -5201,8 +5201,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Task 712: Receipt Themes picker + live preview (PRA + FBR receipt-settings)
     'rcpt_theme_section' => 'Receipt Theme',
     'rcpt_theme_section_sub' => 'Apne chhape bill ka andaz chunein — live preview foran badalta hai; save se pehle kuch nahi badalta.',
-    'rcpt_theme_pizza_bold' => 'Pizza Master / Bold',
-    'rcpt_theme_pizza_bold_hint' => 'Poora bill bold + bada darmiyani logo (default)',
+    'rcpt_theme_bold_center' => 'Bold — Darmiyani Logo',
+    'rcpt_theme_bold_center_hint' => 'Poora bill bold + bada darmiyani logo (default)',
     'rcpt_theme_bold_side' => 'Bold Side-Logo',
     'rcpt_theme_bold_side_hint' => 'Poora bill bold + naam ke saath chhota logo',
     'rcpt_theme_saada' => 'Saada (Plain)',

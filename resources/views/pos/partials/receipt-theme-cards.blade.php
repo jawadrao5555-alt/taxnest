@@ -34,7 +34,7 @@
 
             {{-- Mini receipt sample — pure inline styles (no build needed) --}}
             <span class="block" style="background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:7px 8px;width:96px;margin:0 auto;">
-                @if($tnKey === 'pizza_bold')
+                @if($tnKey === 'bold_center')
                 {{-- big centered logo + all-bold lines --}}
                 <span style="display:block;width:22px;height:22px;border-radius:50%;background:#111827;margin:0 auto 3px;"></span>
                 <span style="display:block;height:5px;background:#111827;border-radius:2px;width:70%;margin:0 auto 3px;"></span>

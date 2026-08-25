@@ -15,7 +15,7 @@ namespace App\Support;
  * and resolves to the right pre-selected card.
  *
  *   khula   — left edge, open spacing (deliberate opt-out)
- *   center  — ticket centered on the paper, open spacing (Pizza Master look;
+ *   center  — ticket centered on the paper, open spacing (restaurant look;
  *             was the NULL default in Task 718 — demoted to explicit opt-in
  *             by Task 757 to match actual left-pinned print behaviour)
  *   compact — left edge, tight paper-saving layout

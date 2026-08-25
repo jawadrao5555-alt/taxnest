@@ -5198,8 +5198,8 @@ return [
     // Task 712: Receipt Themes picker + live preview (PRA + FBR receipt-settings)
     'rcpt_theme_section' => 'رسید کی تھیم',
     'rcpt_theme_section_sub' => 'اپنے چھپے بل کا انداز چنیں — جھلک فوراً بدلتی ہے؛ محفوظ کرنے سے پہلے کچھ نہیں بدلتا۔',
-    'rcpt_theme_pizza_bold' => 'پیزا ماسٹر / بولڈ',
-    'rcpt_theme_pizza_bold_hint' => 'پورا بل بولڈ + بڑا درمیانی لوگو (طے شدہ)',
+    'rcpt_theme_bold_center' => 'بولڈ — درمیانی لوگو',
+    'rcpt_theme_bold_center_hint' => 'پورا بل بولڈ + بڑا درمیانی لوگو (طے شدہ)',
     'rcpt_theme_bold_side' => 'بولڈ سائیڈ لوگو',
     'rcpt_theme_bold_side_hint' => 'پورا بل بولڈ + نام کے ساتھ چھوٹا لوگو',
     'rcpt_theme_saada' => 'سادہ',

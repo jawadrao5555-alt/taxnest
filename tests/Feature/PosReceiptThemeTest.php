@@ -157,18 +157,18 @@ class PosReceiptThemeTest extends TestCase
 
     public function test_resolve_maps_every_pair_to_the_right_theme(): void
     {
-        $this->assertSame('pizza_bold', PosReceiptThemes::resolve(['bold' => true, 'logo' => 'center']));
+        $this->assertSame('bold_center', PosReceiptThemes::resolve(['bold' => true, 'logo' => 'center']));
         $this->assertSame('bold_side', PosReceiptThemes::resolve(['bold' => true, 'logo' => 'side']));
         $this->assertSame('saada', PosReceiptThemes::resolve(['bold' => false, 'logo' => 'side']));
         // Plain opt-out shop running a CENTER logo is still the Saada theme.
         $this->assertSame('saada', PosReceiptThemes::resolve(['bold' => false, 'logo' => 'center']));
         // Untouched company (no saved style) = today's universal default.
-        $this->assertSame('pizza_bold', PosReceiptThemes::resolve([]));
+        $this->assertSame('bold_center', PosReceiptThemes::resolve([]));
     }
 
     public function test_theme_catalogue_shape(): void
     {
-        $this->assertSame(['pizza_bold', 'bold_side', 'saada'], PosReceiptThemes::keys());
+        $this->assertSame(['bold_center', 'bold_side', 'saada'], PosReceiptThemes::keys());
         $this->assertTrue(PosReceiptThemes::isValid('saada'));
         $this->assertFalse(PosReceiptThemes::isValid('neon'));
         $this->assertFalse(PosReceiptThemes::isValid(null));
@@ -195,7 +195,7 @@ class PosReceiptThemeTest extends TestCase
     {
         $this->assertSame(
             ['bold' => true, 'logo' => 'center'],
-            PosReceiptThemes::apply('pizza_bold', ['bold' => false, 'logo' => 'center'])
+            PosReceiptThemes::apply('bold_center', ['bold' => false, 'logo' => 'center'])
         );
         $this->assertSame(
             ['bold' => true, 'logo' => 'side'],

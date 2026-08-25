@@ -1123,11 +1123,15 @@
                         window.location.href = item.url;
                     }
                 },
-                // Owner video (25 Aug 2026): "sale screen par dark mode on karta
-                // hoon, dashboard par jata hoon to khatam" — this used to flip the
-                // class in the browser only, so every navigation re-rendered light
-                // from users.dark_mode. Persist the pick; the layout renders the
-                // class from that column on every page (sale screen included).
+                {{-- NOTE: this whole x-data lives inside a double-quoted HTML
+                     attribute, so a literal double quote anywhere in here (even
+                     in a JS comment) closes the attribute early and kills the
+                     component — the palette backdrop then never hides and eats
+                     every click on the page. Keep quotes out of this block. --}}
+                // Dark mode used to flip the class in the browser only, so every
+                // navigation re-rendered light from users.dark_mode. Persist the
+                // pick; the layout renders the class from that column on every
+                // page (sale screen included).
                 async toggleDark() {
                     const el = document.documentElement;
                     const want = !el.classList.contains('dark');

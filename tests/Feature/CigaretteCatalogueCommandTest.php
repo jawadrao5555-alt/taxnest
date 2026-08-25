@@ -29,8 +29,8 @@ class CigaretteCatalogueCommandTest extends TestCase
     /** Cigarette brands on the 3rd Schedule. */
     private const CIGARETTE_COUNT = 8;
 
-    /** Cigarettes + the standard-rate pouch line. */
-    private const CATALOGUE_COUNT = 9;
+    /** Cigarettes + the three standard-rate pouch lines. */
+    private const CATALOGUE_COUNT = 11;
 
     protected function setUp(): void
     {
@@ -137,17 +137,81 @@ class CigaretteCatalogueCommandTest extends TestCase
     {
         $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
 
-        $zyn = $this->catalogue()->where('name', 'ZYN')->first();
+        $zyn = $this->catalogue()->where('name', 'ZYN Cool Mint 11mg')->first();
         $this->assertNotNull($zyn, 'The standard-rate pouch line was not seeded.');
 
         $this->assertSame('2404.9100', $zyn->hs_code);
         $this->assertSame('2404.9100', $zyn->pct_code);
         $this->assertSame('standard', $zyn->schedule_type);
         $this->assertEquals(0, $zyn->is_third_schedule);
-        $this->assertSame('Kilograms', $zyn->uom);
         $this->assertEquals(18, (float) $zyn->default_tax_rate);
         $this->assertNull($zyn->mrp, 'Standard rate carries no MRP.');
         $this->assertNull($zyn->sro_reference);
+    }
+
+    public function test_every_pouch_variant_is_seeded_at_its_own_per_can_rate(): void
+    {
+        // The rate is per CAN, so the unit must say pieces. Filing a per-can
+        // rate against "Kilograms" would understate the line ~100x and FBR
+        // would not warn — the same silent unit trap as the 50x cigarette bug.
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        $expected = [
+            'ZYN Cool Mint 6mg' => 137.00,
+            'ZYN Cool Mint 11mg' => 183.80,
+            'ZYN Cool Mint 13.5mg' => 230.00,
+        ];
+
+        foreach ($expected as $name => $rate) {
+            $row = $this->catalogue()->where('name', $name)->first();
+            $this->assertNotNull($row, "{$name} was not seeded.");
+            $this->assertEqualsWithDelta($rate, (float) $row->default_price, 0.01, "{$name} has the wrong rate.");
+            $this->assertSame('Numbers, pieces, units', $row->uom, "{$name} is not priced by the can.");
+            $this->assertSame('2404.9100', $row->hs_code);
+        }
+    }
+
+    public function test_the_unpriced_pouch_placeholder_is_retired_not_deleted(): void
+    {
+        // Before the variants had rates the catalogue carried one zero-rate
+        // "ZYN" row. It must stop being sellable, but deleting it would strand
+        // any invoice line already written against it.
+        DB::table('products')->insert([
+            'company_id' => self::COMPANY_ID,
+            'name' => 'ZYN',
+            'hs_code' => '2404.9100',
+            'schedule_type' => 'standard',
+            'uom' => 'Kilograms',
+            'default_price' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        $placeholder = $this->catalogue()->where('name', 'ZYN')->first();
+        $this->assertNotNull($placeholder, 'The placeholder was deleted instead of retired.');
+        $this->assertEquals(0, $placeholder->is_active, 'The zero-rate placeholder is still sellable.');
+    }
+
+    public function test_a_dry_run_does_not_retire_the_placeholder(): void
+    {
+        DB::table('products')->insert([
+            'company_id' => self::COMPANY_ID,
+            'name' => 'ZYN',
+            'hs_code' => '2404.9100',
+            'schedule_type' => 'standard',
+            'uom' => 'Kilograms',
+            'default_price' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID, '--dry-run' => true]);
+
+        $this->assertEquals(1, $this->catalogue()->where('name', 'ZYN')->value('is_active'));
     }
 
     public function test_a_pouch_row_previously_seeded_as_third_schedule_loses_its_stale_mrp(): void
@@ -156,7 +220,7 @@ class CigaretteCatalogueCommandTest extends TestCase
         // copied onto it. Re-seeding must clear the MRP, not leave it behind.
         DB::table('products')->insert([
             'company_id' => self::COMPANY_ID,
-            'name' => 'ZYN',
+            'name' => 'ZYN Cool Mint 6mg',
             'hs_code' => '2402.2000',
             'schedule_type' => '3rd_schedule',
             'is_third_schedule' => true,
@@ -170,8 +234,8 @@ class CigaretteCatalogueCommandTest extends TestCase
 
         $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
 
-        $zyn = $this->catalogue()->where('name', 'ZYN')->first();
-        $this->assertSame(1, $this->catalogue()->where('name', 'ZYN')->count());
+        $zyn = $this->catalogue()->where('name', 'ZYN Cool Mint 6mg')->first();
+        $this->assertSame(1, $this->catalogue()->where('name', 'ZYN Cool Mint 6mg')->count());
         $this->assertNull($zyn->mrp, 'A stale 3rd Schedule MRP survived the re-seed.');
         $this->assertNull($zyn->sro_reference, 'A stale SRO survived the re-seed.');
         $this->assertSame('standard', $zyn->schedule_type);
@@ -180,17 +244,16 @@ class CigaretteCatalogueCommandTest extends TestCase
 
     public function test_a_hand_entered_pouch_price_is_never_wiped_by_a_reseed(): void
     {
-        // The pouch line is seeded at 0 because no selling rate was supplied.
-        // Once the distributor types one in, re-running must not reset it —
-        // that would silently drop a real price back to zero.
+        // The pouch rate card comes from the distributor, but a price he
+        // corrects in the UI is still his data — re-running must not reset it.
         $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
-        $this->catalogue()->where('name', 'ZYN')->update(['default_price' => 1450.00]);
+        $this->catalogue()->where('name', 'ZYN Cool Mint 6mg')->update(['default_price' => 1450.00]);
 
         $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
 
         $this->assertEqualsWithDelta(
             1450.00,
-            (float) $this->catalogue()->where('name', 'ZYN')->value('default_price'),
+            (float) $this->catalogue()->where('name', 'ZYN Cool Mint 6mg')->value('default_price'),
             0.01,
             'Re-seeding wiped a price the distributor had entered.'
         );

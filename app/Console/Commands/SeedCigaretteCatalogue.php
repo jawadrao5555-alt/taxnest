@@ -82,22 +82,47 @@ class SeedCigaretteCatalogue extends Command
     ];
 
     /**
+     * FBR UoM for goods sold by the piece.  The pouch rates below are per CAN,
+     * so the unit has to say so.  Annex-A reports pouches by weight, but a
+     * per-can rate filed against "Kilograms" would understate the line by the
+     * ~100 cans that make up a kilo — the same silent unit trap as the 50x
+     * cigarette bug, and FBR would not warn about this one either.
+     */
+    private const UOM_PIECES = 'Numbers, pieces, units';
+
+    /**
      * Standard-rate tobacco lines that are NOT on the 3rd Schedule, so they
-     * carry no MRP and no SRO.
+     * carry no MRP and no SRO.  None of them appear in the volume export —
+     * these are invoiced by hand.
      *
-     * The sale rate is seeded at 0 — the distributor supplied the heading and
-     * the tax rate but not a selling price, and these do not appear in the
-     * volume export at all.  A guessed auto-fill price is worse than a blank
-     * one here, because it would ride silently onto a filed FBR invoice.
-     * Once he types a real price it is preserved on every later re-run.
+     * Rates are per can, supplied by the distributor (25 Aug 2026).  A price
+     * he later corrects in the UI is still preserved on every re-run.
      */
     private const STANDARD_RATE_PRODUCTS = [
-        'ZYN' => [
+        'ZYN Cool Mint 6mg' => [
             'hs_code' => self::HS_NICOTINE_POUCHES,
-            'uom' => 'Kilograms',
-            'price' => 0.00,
+            'uom' => self::UOM_PIECES,
+            'price' => 137.00,
+        ],
+        'ZYN Cool Mint 11mg' => [
+            'hs_code' => self::HS_NICOTINE_POUCHES,
+            'uom' => self::UOM_PIECES,
+            'price' => 183.80,
+        ],
+        'ZYN Cool Mint 13.5mg' => [
+            'hs_code' => self::HS_NICOTINE_POUCHES,
+            'uom' => self::UOM_PIECES,
+            'price' => 230.00,
         ],
     ];
+
+    /**
+     * The unpriced "ZYN" placeholder that stood in before the three variants
+     * had rates.  Deactivated rather than deleted, so an invoice already
+     * written against it keeps its product row while nobody can pick a
+     * zero-rate line for a new sale.
+     */
+    private const RETIRED_PRODUCTS = ['ZYN'];
 
     public function handle(): int
     {
@@ -172,6 +197,25 @@ class SeedCigaretteCatalogue extends Command
                 $stored > 0 ? number_format($stored, 2) : 'set on first sale',
                 '—',
             ];
+        }
+
+        foreach (self::RETIRED_PRODUCTS as $name) {
+            $stale = Product::withoutGlobalScope(CompanyScope::class)
+                ->where('company_id', $companyId)
+                ->where('name', $name)
+                ->where('is_active', true)
+                ->get();
+
+            if ($stale->isEmpty()) {
+                continue;
+            }
+            if (!$dryRun) {
+                foreach ($stale as $row) {
+                    $row->fill(['is_active' => false])->save();
+                }
+            }
+
+            $rows[] = ['retire', $name, 'superseded by the priced variants', '—', '—', '—'];
         }
 
         $this->table(['', 'Product', 'Schedule', 'UoM', 'Rate', 'MRP'], $rows);

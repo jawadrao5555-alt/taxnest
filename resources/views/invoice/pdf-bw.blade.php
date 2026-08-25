@@ -9,8 +9,9 @@
     // TaxNest teal; a white-label shop's own colour simply replaces it.
     // Solid bands are deliberate: the earlier tinted-background version
     // (#F1F6F7 on white) printed washed out on both screen and paper.
-    $accent = $diBrand['accent'] ?: '#0A4D5C';
-    $accentText = $diBrand['accent_text'] ?: '#ffffff';
+    // Null-coalesced: a caller may hand in a partial branding array.
+    $accent = ($diBrand['accent'] ?? null) ?: '#0A4D5C';
+    $accentText = ($diBrand['accent_text'] ?? null) ?: '#ffffff';
 
     $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs();
 
@@ -78,17 +79,23 @@
         .seller-info { font-size: 9.5px; color: #33474C; margin-top: 3px; line-height: 1.5; }
         .seller-info strong { font-weight: 700; color: #16262B; }
 
-        /* The FBR mark keeps its own colours — never tinted by the accent. */
-        .fbr-box { border: 1.5px solid {{ $accent }}; }
+        /* COMPLIANCE: the whole FBR block is fixed platform colour. A shop's
+           white-label accent must never recolour the FBR mark, its frame or
+           its caption — the monogram and QR keep their own colours. */
+        .fbr-box { border: 1.5px solid #0A4D5C; }
         .fbr-box .fbr-inner { padding: 7px 8px 6px; text-align: center; }
         .fbr-box .fbr-no {
             font-size: 8.5px; font-weight: 800; color: #16262B; letter-spacing: 0.2px;
             word-wrap: break-word; margin-top: 4px; line-height: 1.35;
         }
         .fbr-box .fbr-cap {
-            background: {{ $accent }}; color: {{ $accentText }};
+            background: #0A4D5C; color: #ffffff;
             font-size: 7.5px; font-weight: 800; letter-spacing: 1px;
             text-transform: uppercase; text-align: center; padding: 3px 4px;
+        }
+        .fbr-box .qr-missing {
+            width: 92px; height: 92px; border: 1px dashed #8FA8AD; color: #4A6167;
+            font-size: 7.5px; font-weight: 700; text-align: center; padding-top: 38px;
         }
         .qr-img { width: 92px; height: 92px; }
         .not-filed {
@@ -264,7 +271,9 @@
                 <div style="margin-top: 7px;"><span class="status-pill">{{ $statusLabel }}</span></div>
             </td>
             <td style="width: 38%;">
-                @if($invoice->fbr_invoice_number && !empty($qrBase64))
+                {{-- Filed state is decided by the FBR number alone. A missing QR
+                     image must never make a filed invoice look unfiled. --}}
+                @if($invoice->fbr_invoice_number)
                 <div class="fbr-box">
                     <div class="fbr-cap">FBR Digital Invoice</div>
                     <div class="fbr-inner">
@@ -276,7 +285,11 @@
                                     @endif
                                 </td>
                                 <td style="width: 100px; text-align: center; vertical-align: middle;">
+                                    @if(!empty($qrBase64))
                                     <img src="{{ $qrBase64 }}" alt="QR Code" class="qr-img">
+                                    @else
+                                    <div class="qr-missing">QR unavailable</div>
+                                    @endif
                                 </td>
                             </tr>
                         </table>

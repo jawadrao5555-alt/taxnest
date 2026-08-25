@@ -62,11 +62,20 @@ class InvoicePdfService
             ]);
             // NB: chillerlan v5 picks the renderer by outputType STRING/const —
             // GDIMAGE_PNG here; do not switch to outputInterface (silently SVG).
-            $qrOptions = new \chillerlan\QRCode\QROptions([
-                'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
-                'scale' => 10,
-            ]);
-            $qrBase64 = (new \chillerlan\QRCode\QRCode($qrOptions))->render($qrData);
+            //
+            // A QR failure (e.g. GD missing on a CLI binary) must not take the
+            // whole invoice down: the template falls back to printing the FBR
+            // number on its own, which is what a buyer actually needs.
+            try {
+                $qrOptions = new \chillerlan\QRCode\QROptions([
+                    'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
+                    'scale' => 10,
+                ]);
+                $qrBase64 = (new \chillerlan\QRCode\QRCode($qrOptions))->render($qrData);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Invoice PDF: QR render failed for invoice #' . $invoice->id . ' — ' . $e->getMessage());
+                $qrBase64 = '';
+            }
 
             $logoPath = public_path('images/fbr-digital-invoice-logo.png');
             if (file_exists($logoPath)) {
@@ -127,11 +136,14 @@ class InvoicePdfService
      */
     public static function amountInWords(float $amount): string
     {
+        // A credit note prints a negative figure; the words must not read as a
+        // positive amount next to it.
+        $prefix = $amount < 0 ? 'Minus ' : '';
         $amount = round(abs($amount), 2);
         $rupees = (int) floor($amount);
         $paisa = (int) round(($amount - $rupees) * 100);
 
-        $words = 'Rupees ' . self::wordsForInt($rupees);
+        $words = $prefix . 'Rupees ' . self::wordsForInt($rupees);
         if ($paisa > 0) {
             $words .= ' and ' . self::wordsForInt($paisa) . ' Paisa';
         }

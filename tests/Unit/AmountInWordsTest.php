@@ -48,8 +48,10 @@ class AmountInWordsTest extends TestCase
         $this->assertSame('Rupees One Hundred Only', InvoicePdfService::amountInWords(99.999));
     }
 
-    public function test_a_credit_note_negative_reads_as_its_magnitude(): void
+    /** The figure prints as PKR -500.00, so the words must say so too. */
+    public function test_a_credit_note_negative_is_spelled_as_minus(): void
     {
-        $this->assertSame('Rupees Five Hundred Only', InvoicePdfService::amountInWords(-500));
+        $this->assertSame('Minus Rupees Five Hundred Only', InvoicePdfService::amountInWords(-500));
+        $this->assertSame('Minus Rupees Five Hundred and Twenty Five Paisa Only', InvoicePdfService::amountInWords(-500.25));
     }
 }

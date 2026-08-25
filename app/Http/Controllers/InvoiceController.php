@@ -710,22 +710,26 @@ class InvoiceController extends Controller
     }
 
     /**
-     * How many invoices one bulk run may take. The list page reads this so the
-     * button promises exactly what the batch will really do.
+     * A run itself has no cap — one click covers every eligible invoice, even
+     * several thousand. This only bounds the explicit "these ticked rows"
+     * array, which can never be bigger than one page of the list.
      */
-    public const BULK_MAX = 1000;
+    public const BULK_MAX_SELECTED = 5000;
 
     /**
-     * Task 1245: bulk-submit selected draft invoices to FBR.
-     * Queues one BulkSubmitInvoiceJob per invoice; the list page polls
-     * bulkSubmitStatus() for per-invoice results.
+     * Bulk-submit drafts to FBR (Failed tab reuses this to bulk-retry).
+     *
+     * The request submits nothing and queues no per-invoice work: it creates
+     * the durable batch row and hands off to SeedBulkSubmitBatchJob. That is
+     * what lets a shop press the button on thousands of invoices, close the
+     * page or the phone app, and come back later to a finished run.
      */
     public function bulkSubmit(Request $request)
     {
         $companyId = app('currentCompanyId');
 
         $request->validate([
-            'invoice_ids' => 'nullable|array|max:1000',
+            'invoice_ids' => 'nullable|array|max:' . self::BULK_MAX_SELECTED,
             'invoice_ids.*' => 'integer',
             'select_all_drafts' => 'nullable|boolean',
             'status' => 'nullable|in:draft,failed',
@@ -748,6 +752,23 @@ class InvoiceController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Your subscription has expired. Invoices stay as drafts.'], 422);
         }
 
+        // One run per company at a time; a second click re-attaches to it.
+        $active = \App\Models\InvoiceBulkSubmission::activeFor($companyId);
+        if ($active && !$active->isStale()) {
+            return response()->json([
+                'status' => 'already_running',
+                'message' => 'A bulk submit is already running for your company.',
+                'batch_key' => (string) $active->id,
+                'batch' => $active->toStatusArray(),
+            ], 409);
+        }
+        if ($active) {
+            // Active on paper but nothing has moved for a long time (queue worker
+            // down). Close it off rather than locking the shop out of new runs.
+            $active->update(['state' => 'stalled', 'completed_at' => now()]);
+            \Illuminate\Support\Facades\Log::warning("Bulk submit: batch #{$active->id} marked stalled — no progress since " . optional($active->last_progress_at)->toDateTimeString());
+        }
+
         $query = Invoice::where('company_id', $companyId)
             ->where('status', $status)
             ->where('is_fbr_processing', false)
@@ -755,62 +776,112 @@ class InvoiceController extends Controller
         if (!$selectAll) {
             $query->whereIn('id', $ids);
         }
-        $invoiceIds = $query->orderBy('id')->limit(1000)->pluck('id')->all();
 
-        if (empty($invoiceIds)) {
+        // Freeze the run to what exists right now: invoices created during a
+        // multi-hour run must not be swept into it.
+        $maxInvoiceId = (int) (clone $query)->max('id');
+        $total = (int) (clone $query)->count();
+
+        if ($total === 0) {
             return response()->json(['status' => 'error', 'message' => "No submittable {$noun} invoices in your selection."], 422);
         }
 
-        // One bulk run per company at a time — a second click while a batch
-        // is running just re-attaches to the running batch.
-        $lockKey = \App\Jobs\BulkSubmitInvoiceJob::runningLockKey($companyId);
-        $batchKey = $companyId . '-' . now()->format('YmdHis') . '-' . substr(md5(uniqid('', true)), 0, 8);
-        if (!Cache::add($lockKey, $batchKey, now()->addMinutes(60))) {
-            $existing = Cache::get($lockKey);
-            return response()->json([
-                'status' => 'already_running',
-                'message' => 'A bulk submit is already in progress.',
-                'batch_key' => $existing,
-            ], 409);
-        }
+        $batch = \App\Models\InvoiceBulkSubmission::create([
+            'company_id' => $companyId,
+            'user_id' => auth()->id(),
+            'target_status' => $status,
+            'scope' => $selectAll ? 'all' : 'selected',
+            'state' => 'queued',
+            'invoice_ids' => $selectAll ? null : array_values(array_map('intval', $ids)),
+            'max_invoice_id' => $maxInvoiceId,
+            'total' => $total,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
 
-        \App\Jobs\BulkSubmitInvoiceJob::startBatch($batchKey, $companyId, $invoiceIds);
-        foreach ($invoiceIds as $id) {
-            \App\Jobs\BulkSubmitInvoiceJob::dispatch($id, $batchKey, auth()->id());
-        }
+        \App\Jobs\SeedBulkSubmitBatchJob::dispatch($batch->id);
 
         AuditLogService::log('invoice_bulk_submit_started', 'Invoice', null, null, [
-            'batch_key' => $batchKey,
-            'count' => count($invoiceIds),
+            'batch_id' => $batch->id,
+            'scope' => $batch->scope,
+            'target_status' => $status,
+            'count' => $total,
         ]);
 
         return response()->json([
             'status' => 'queued',
-            'batch_key' => $batchKey,
-            'total' => count($invoiceIds),
+            'batch_key' => (string) $batch->id,
+            'total' => $total,
+            'batch' => $batch->fresh()->toStatusArray(),
         ]);
     }
 
-    /** Task 1245: progress/results of a bulk submit batch (polled by the list). */
+    /**
+     * Progress of a bulk run, polled by the list page.
+     *
+     * With no batch_key this answers the question a returning shop actually
+     * has: is something running for my company right now — and if not, did the
+     * last run finish while I was away?
+     */
     public function bulkSubmitStatus(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $batchKey = (string) $request->query('batch_key', '');
-        if ($batchKey === '') {
-            // Task 1249: no key = "is anything running for my company?" —
-            // resolve the running lock so a reloaded page can re-attach.
-            $batchKey = (string) (Cache::get(\App\Jobs\BulkSubmitInvoiceJob::runningLockKey($companyId)) ?? '');
-        }
-        $batch = $batchKey !== '' ? Cache::get(\App\Jobs\BulkSubmitInvoiceJob::cacheKey($batchKey)) : null;
+        $key = (int) $request->query('batch_key', 0);
 
-        if (!$batch || (int) ($batch['company_id'] ?? 0) !== (int) $companyId) {
+        $batch = $key > 0
+            ? \App\Models\InvoiceBulkSubmission::where('company_id', $companyId)->find($key)
+            : null;
+
+        $batch = $batch
+            ?: \App\Models\InvoiceBulkSubmission::activeFor($companyId)
+            ?: \App\Models\InvoiceBulkSubmission::unseenFinishedFor($companyId);
+
+        if (!$batch) {
             return response()->json(['status' => 'not_found'], 404);
         }
 
-        // Results are stored keyed by invoice id (write-once dedupe) — expose a plain list.
-        $batch['results'] = array_values($batch['results'] ?? []);
+        return response()->json([
+            'status' => 'ok',
+            'batch_key' => (string) $batch->id,
+            'batch' => $batch->toStatusArray(),
+        ]);
+    }
 
-        return response()->json(['status' => 'ok', 'batch_key' => $batchKey, 'batch' => $batch]);
+    /**
+     * Stop a running bulk submit. Invoices already handed to FBR are left
+     * alone — only the queued remainder is skipped, so nothing is half-sent.
+     */
+    public function bulkSubmitCancel(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $batch = \App\Models\InvoiceBulkSubmission::activeFor($companyId);
+
+        if (!$batch) {
+            return response()->json(['status' => 'error', 'message' => 'No bulk submit is running.'], 404);
+        }
+
+        $batch->update(['cancel_requested' => true]);
+
+        AuditLogService::log('invoice_bulk_submit_cancelled', 'Invoice', null, null, [
+            'batch_id' => $batch->id,
+            'done' => $batch->done,
+            'total' => $batch->total,
+        ]);
+
+        return response()->json(['status' => 'ok', 'batch' => $batch->fresh()->toStatusArray()]);
+    }
+
+    /** Shop has seen the finished summary — stop greeting them with it. */
+    public function bulkSubmitAcknowledge(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $batch = \App\Models\InvoiceBulkSubmission::unseenFinishedFor($companyId);
+
+        if ($batch) {
+            $batch->update(['acknowledged_at' => now()]);
+        }
+
+        return response()->json(['status' => 'ok']);
     }
 
     public function submit(Request $request, Invoice $invoice)

@@ -663,26 +663,15 @@
                 @php
                     $bulkNoun = $tab === 'failed' ? 'failed invoice' : 'draft';
                     $bulkTabCount = $tab === 'failed' ? $failedCount : $draftCount;
-                    // One run only takes BULK_MAX invoices, so a shop with more than that
-                    // has to click again. Say that on the button instead of promising "all".
-                    $bulkCap = \App\Http\Controllers\InvoiceController::BULK_MAX;
-                    $bulkCapped = $bulkTabCount > $bulkCap;
-                    $bulkRunLabel = number_format(min($bulkTabCount, $bulkCap));
+                    // No per-run cap: one click covers every eligible invoice, and the
+                    // run continues on the server after this page is closed.
                     $bulkTotalLabel = number_format($bulkTabCount);
                     if ($tab === 'failed') {
-                        $bulkAllLabel = $bulkCapped
-                            ? "Retry next {$bulkRunLabel} of {$bulkTotalLabel} failed"
-                            : "Retry all {$bulkTotalLabel} failed";
-                        $bulkAllConfirm = $bulkCapped
-                            ? "Retry the next {$bulkRunLabel} of {$bulkTotalLabel} failed invoices? Click again for the rest."
-                            : "Retry ALL {$bulkTotalLabel} failed invoices?";
+                        $bulkAllLabel = "Retry all {$bulkTotalLabel} failed";
+                        $bulkAllConfirm = "Retry all {$bulkTotalLabel} failed invoices with FBR? It runs in the background — you can close this page.";
                     } else {
-                        $bulkAllLabel = $bulkCapped
-                            ? "Submit next {$bulkRunLabel} of {$bulkTotalLabel} drafts"
-                            : "Submit all {$bulkTotalLabel} drafts";
-                        $bulkAllConfirm = $bulkCapped
-                            ? "Submit the next {$bulkRunLabel} of {$bulkTotalLabel} drafts to FBR? Click again for the rest."
-                            : "Submit ALL {$bulkTotalLabel} draft invoices to FBR?";
+                        $bulkAllLabel = "Submit all {$bulkTotalLabel} drafts to FBR";
+                        $bulkAllConfirm = "Submit all {$bulkTotalLabel} draft invoices to FBR? It runs in the background — you can close this page and check back later.";
                     }
                 @endphp
                 {{-- The bulk run used to stay hidden until a row was ticked, so shops
@@ -690,7 +679,7 @@
                      submitted one by one. The batch button is now the visible default;
                      ticking rows only adds the narrower "selected" action. --}}
                 @if($bulkTabCount > 0)
-                <div x-show="!bulkBatchKey" x-cloak class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-900/20">
+                <div x-show="!bulkRunning()" x-cloak class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-900/20">
                     <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300">
                         <span x-show="bulkSelected.length > 0"><span x-text="bulkSelected.length"></span> {{ $bulkNoun }}(s) selected</span>
                         <span x-show="bulkSelected.length === 0">{{ $bulkTotalLabel }} {{ $bulkNoun }}(s) ready — send them together, or tick rows to pick your own</span>
@@ -710,12 +699,15 @@
                     <button type="button" x-show="bulkSelected.length > 0" x-cloak @click="bulkSelected = []" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 underline">Clear selection</button>
                 </div>
                 @endif
-                <div x-show="bulkBatchKey" x-cloak class="px-5 py-3.5 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-900/20">
+                {{-- The run outlives this page: the server keeps submitting after the
+                     browser is closed, so this panel is rebuilt from the server on
+                     every visit — live figures while it runs, the summary after. --}}
+                <div x-show="bulkProgress" x-cloak class="px-5 py-3.5 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-900/20">
                     <div class="flex flex-wrap items-center gap-3 mb-2">
-                        <svg x-show="!bulkProgress || !bulkProgress.finished" class="w-4 h-4 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                        <svg x-show="bulkRunning()" class="w-4 h-4 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
                         <p class="text-sm font-bold text-indigo-900 dark:text-indigo-200">
-                            <span x-show="!bulkProgress || !bulkProgress.finished">Submitting to FBR — <span x-text="bulkProgress ? bulkProgress.done : 0"></span> / <span x-text="bulkProgress ? bulkProgress.total : '…'"></span></span>
-                            <span x-show="bulkProgress && bulkProgress.finished" x-cloak>Bulk submit finished</span>
+                            <span x-show="bulkRunning()">Submitting to FBR — <span x-text="bulkProgress ? bulkProgress.done : 0"></span> / <span x-text="bulkProgress ? bulkProgress.total : '…'"></span> <span x-text="'(' + (bulkProgress ? bulkProgress.percent : 0) + '%)'"></span></span>
+                            <span x-show="!bulkRunning()" x-cloak x-text="bulkFinishedTitle()"></span>
                         </p>
                         <template x-if="bulkProgress">
                             <p class="text-xs font-semibold">
@@ -727,22 +719,47 @@
                         </template>
                     </div>
                     <div class="w-full h-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-full overflow-hidden mb-2">
-                        <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-500" :style="'width: ' + (bulkProgress && bulkProgress.total ? Math.round(bulkProgress.done / bulkProgress.total * 100) : 0) + '%'"></div>
+                        <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-500" :style="'width: ' + (bulkProgress ? bulkProgress.percent : 0) + '%'"></div>
                     </div>
-                    <template x-if="bulkProgress && bulkProgress.finished">
-                        <div>
-                            <div x-show="bulkFailures().length" class="mb-2 max-h-40 overflow-y-auto rounded-lg bg-white/70 dark:bg-gray-900/40 border border-red-200 dark:border-red-800 p-2">
-                                <template x-for="r in bulkFailures()" :key="r.invoice_id">
-                                    <p class="text-[11px] text-red-700 dark:text-red-400 py-0.5">
-                                        <a :href="'/invoice/' + r.invoice_id" class="font-bold underline" x-text="r.invoice_number || ('#' + r.invoice_id)"></a>
-                                        — <span x-text="r.message"></span>
-                                    </p>
-                                </template>
+
+                    {{-- The whole point of the background run — say it plainly. --}}
+                    <p x-show="bulkRunning() && !(bulkProgress && bulkProgress.cancel_requested)" class="text-xs text-indigo-800 dark:text-indigo-300 mb-2">
+                        You can close this page or the app — submission keeps running on the server. Come back any time to see how far it got.
+                    </p>
+                    <p x-show="bulkProgress && bulkProgress.cancel_requested && bulkRunning()" x-cloak class="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
+                        Stopping — invoices already sent to FBR are finishing; the rest stay as drafts.
+                    </p>
+                    <p x-show="bulkProgress && bulkProgress.stale" x-cloak class="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
+                        Nothing has processed for a while — the submission queue may be stopped. Contact support if this does not move.
+                    </p>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" x-show="bulkRunning() && !(bulkProgress && bulkProgress.cancel_requested)" @click="stopBulkSubmit()"
+                            class="px-3 py-1.5 bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/30 transition">
+                            Stop run
+                        </button>
+                        <template x-if="!bulkRunning()">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" @click="window.location.reload()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">Refresh list</button>
+                                <button type="button" @click="dismissBulkSummary()" class="px-3 py-1.5 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline">Dismiss</button>
                             </div>
-                            <button type="button" @click="window.location.reload()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">Refresh list</button>
+                        </template>
+                    </div>
+
+                    <template x-if="!bulkRunning() && bulkFailures().length">
+                        <div class="mt-2 max-h-40 overflow-y-auto rounded-lg bg-white/70 dark:bg-gray-900/40 border border-red-200 dark:border-red-800 p-2">
+                            <template x-for="r in bulkFailures()" :key="r.invoice_id">
+                                <p class="text-[11px] text-red-700 dark:text-red-400 py-0.5">
+                                    <a :href="'/invoice/' + r.invoice_id" class="font-bold underline" x-text="r.invoice_number || ('#' + r.invoice_id)"></a>
+                                    — <span x-text="r.message"></span>
+                                </p>
+                            </template>
+                            <p x-show="bulkProgress && bulkProgress.failures_capped" class="text-[11px] text-gray-500 dark:text-gray-400 pt-1 border-t border-red-200 dark:border-red-800 mt-1">
+                                Only the first problems are listed — the counts above cover the whole run.
+                            </p>
                         </div>
                     </template>
-                    <p x-show="bulkError" x-cloak class="text-xs text-red-600 dark:text-red-400 font-semibold" x-text="bulkError"></p>
+                    <p x-show="bulkError" x-cloak class="text-xs text-red-600 dark:text-red-400 font-semibold mt-2" x-text="bulkError"></p>
                 </div>
                 @endif
                 <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800/60 dark:to-gray-900">
@@ -1147,22 +1164,10 @@ function invoiceKeyboardNav() {
         bulkPollTimer: null,
 
         init() {
-            @if($tab === 'draft')
-            // Task 1249: re-attach to a still-running bulk submit after a reload.
-            fetch('/invoices/bulk-submit-status', {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(r => r.ok ? r.json() : Promise.reject())
-            .then(d => {
-                if (d.batch_key && d.batch && !this.bulkBatchKey) {
-                    this.bulkBatchKey = d.batch_key;
-                    this.bulkProgress = d.batch;
-                    if (!d.batch.finished) {
-                        this.bulkPollTimer = setTimeout(() => this.pollBulk(), 2500);
-                    }
-                }
-            })
-            .catch(() => {});
+            @if(in_array($tab, ['draft', 'failed']))
+            // A run lives on the server, not in this page. On every load ask
+            // whether one is in flight — or finished while nobody was watching.
+            this.fetchBulkStatus(true);
             @endif
         },
 
@@ -1170,13 +1175,53 @@ function invoiceKeyboardNav() {
             this.bulkSelected = checked ? [...this.pageDraftIds] : [];
         },
 
+        bulkRunning() {
+            return !!(this.bulkProgress && this.bulkProgress.active);
+        },
+
+        bulkFinishedTitle() {
+            if (!this.bulkProgress) return '';
+            if (this.bulkProgress.state === 'cancelled') return 'Bulk submit stopped';
+            if (this.bulkProgress.state === 'stalled') return 'Bulk submit interrupted';
+            return 'Bulk submit finished';
+        },
+
         bulkFailures() {
-            if (!this.bulkProgress || !this.bulkProgress.results) return [];
-            return this.bulkProgress.results.filter(r => r.status === 'failed' || r.status === 'skipped' || r.status === 'pending');
+            return (this.bulkProgress && this.bulkProgress.failures) || [];
+        },
+
+        bulkHeaders(json) {
+            const h = { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+            if (json) {
+                h['Content-Type'] = 'application/json';
+                h['X-CSRF-TOKEN'] = document.querySelector('meta[name=csrf-token]')?.content || '';
+            }
+            return h;
+        },
+
+        fetchBulkStatus(initial) {
+            const url = '/invoices/bulk-submit-status' + (this.bulkBatchKey ? ('?batch_key=' + encodeURIComponent(this.bulkBatchKey)) : '');
+            return fetch(url, { headers: this.bulkHeaders(false) })
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(d => {
+                    if (!d.batch) return;
+                    this.bulkBatchKey = d.batch_key;
+                    this.bulkProgress = d.batch;
+                    if (d.batch.active) this.scheduleBulkPoll();
+                })
+                .catch(() => {
+                    // 404 on first load just means "nothing has ever run".
+                    if (!initial) this.scheduleBulkPoll(8000);
+                });
+        },
+
+        scheduleBulkPoll(delay) {
+            clearTimeout(this.bulkPollTimer);
+            this.bulkPollTimer = setTimeout(() => this.fetchBulkStatus(false), delay || 4000);
         },
 
         startBulkSubmit(selectAll) {
-            if (this.bulkStarting || this.bulkBatchKey) return;
+            if (this.bulkStarting || this.bulkRunning()) return;
             this.bulkStarting = true;
             this.bulkError = '';
             const body = selectAll
@@ -1184,21 +1229,18 @@ function invoiceKeyboardNav() {
                 : { invoice_ids: this.bulkSelected.map(Number), status: '{{ $tab === 'failed' ? 'failed' : 'draft' }}' };
             fetch('/invoices/bulk-submit', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || ''
-                },
+                headers: this.bulkHeaders(true),
                 body: JSON.stringify(body)
             })
             .then(async r => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }))
             .then(({ ok, status, data }) => {
                 this.bulkStarting = false;
                 if (data.batch_key && (ok || status === 409)) {
-                    // 409 = a batch is already running; re-attach to it.
+                    // 409 = a run is already going; attach to it instead.
                     this.bulkBatchKey = data.batch_key;
-                    this.pollBulk();
+                    if (data.batch) this.bulkProgress = data.batch;
+                    this.bulkSelected = [];
+                    this.scheduleBulkPoll(1200);
                 } else {
                     alert(data.message || 'Could not start bulk submit.');
                 }
@@ -1206,18 +1248,19 @@ function invoiceKeyboardNav() {
             .catch(() => { this.bulkStarting = false; alert('Network error — please try again.'); });
         },
 
-        pollBulk() {
-            if (!this.bulkBatchKey) return;
-            fetch('/invoices/bulk-submit-status?batch_key=' + encodeURIComponent(this.bulkBatchKey), {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(r => r.ok ? r.json() : Promise.reject())
-            .then(d => {
-                if (d.batch) this.bulkProgress = d.batch;
-                if (this.bulkProgress && this.bulkProgress.finished) return;
-                this.bulkPollTimer = setTimeout(() => this.pollBulk(), 2500);
-            })
-            .catch(() => { this.bulkPollTimer = setTimeout(() => this.pollBulk(), 5000); });
+        stopBulkSubmit() {
+            if (!confirm('Stop this run? Invoices already sent to FBR stay submitted — the rest are left as drafts.')) return;
+            fetch('/invoices/bulk-submit-cancel', { method: 'POST', headers: this.bulkHeaders(true) })
+                .then(r => r.json())
+                .then(d => { if (d.batch) this.bulkProgress = d.batch; this.scheduleBulkPoll(1500); })
+                .catch(() => { this.bulkError = 'Could not stop the run — please try again.'; });
+        },
+
+        dismissBulkSummary() {
+            fetch('/invoices/bulk-submit-ack', { method: 'POST', headers: this.bulkHeaders(true) }).catch(() => {});
+            clearTimeout(this.bulkPollTimer);
+            this.bulkProgress = null;
+            this.bulkBatchKey = null;
         },
 
         handleKeydown(e) {

@@ -7,10 +7,10 @@ use App\Jobs\BulkSubmitInvoiceJob;
 use App\Jobs\IntelligenceProcessingJob;
 use App\Models\Company;
 use App\Models\Invoice;
+use App\Models\InvoiceBulkSubmission;
 use App\Models\InvoiceItem;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
@@ -24,6 +24,9 @@ use Tests\TestCase;
  *  3. Expired subscription → 422 up-front, invoices stay draft.
  *  4. Double-click: second request after batch completes finds nothing left
  *     to submit (no double submission); while running it re-attaches (409).
+ *  5. The run is durable: it is tracked on a DB row, not in the cache and not
+ *     in the page, so it survives the browser closing and the shop can come
+ *     back to the finished summary. Stopping and stalling are covered too.
  */
 class InvoiceBulkSubmitTest extends TestCase
 {
@@ -164,6 +167,31 @@ class InvoiceBulkSubmitTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('invoice_bulk_submissions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('target_status', 20)->default('draft');
+            $table->string('scope', 20)->default('all');
+            $table->string('state', 20)->default('queued');
+            $table->json('invoice_ids')->nullable();
+            $table->unsignedBigInteger('max_invoice_id')->default(0);
+            $table->unsignedBigInteger('cursor_id')->default(0);
+            $table->unsignedInteger('total')->default(0);
+            $table->unsignedInteger('dispatched')->default(0);
+            $table->unsignedInteger('done')->default(0);
+            $table->unsignedInteger('success')->default(0);
+            $table->unsignedInteger('failed')->default(0);
+            $table->unsignedInteger('skipped')->default(0);
+            $table->unsignedInteger('pending')->default(0);
+            $table->json('failures')->nullable();
+            $table->boolean('cancel_requested')->default(false);
+            $table->timestamp('started_at')->nullable();
+            $table->timestamp('last_progress_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
+            $table->timestamp('acknowledged_at')->nullable();
+            $table->timestamps();
+        });
         $this->company = Company::create([
             'name' => 'Bulk Test Co',
             'status' => 'approved',
@@ -233,12 +261,10 @@ class InvoiceBulkSubmitTest extends TestCase
         ]);
 
         $res->assertOk()->assertJsonPath('status', 'queued')->assertJsonPath('total', 3);
-        $batchKey = $res->json('batch_key');
-
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($batchKey));
-        $this->assertTrue($batch['finished']);
-        $this->assertSame(3, $batch['success']);
-        $this->assertSame(0, $batch['failed']);
+        $batch = InvoiceBulkSubmission::findOrFail((int) $res->json('batch_key'));
+        $this->assertSame('completed', $batch->state);
+        $this->assertSame(3, (int) $batch->success);
+        $this->assertSame(0, (int) $batch->failed);
 
         foreach ([$a, $b, $c] as $inv) {
             $fresh = $inv->fresh();
@@ -248,8 +274,8 @@ class InvoiceBulkSubmitTest extends TestCase
             $this->assertFalse((bool) $fresh->is_fbr_processing);
         }
 
-        // Running lock released after the batch finished.
-        $this->assertNull(Cache::get(BulkSubmitInvoiceJob::runningLockKey($this->company->id)));
+        // Nothing is left holding the company back from starting another run.
+        $this->assertNull(InvoiceBulkSubmission::activeFor($this->company->id));
     }
 
     public function test_one_ineligible_invoice_does_not_block_the_rest(): void
@@ -267,9 +293,9 @@ class InvoiceBulkSubmitTest extends TestCase
 
         // Controller pre-filters non-drafts, so only 2 are queued.
         $res->assertOk()->assertJsonPath('total', 2);
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($res->json('batch_key')));
-        $this->assertTrue($batch['finished']);
-        $this->assertSame(2, $batch['success']);
+        $batch = InvoiceBulkSubmission::findOrFail((int) $res->json('batch_key'));
+        $this->assertSame('completed', $batch->state);
+        $this->assertSame(2, (int) $batch->success);
         $this->assertSame('FBR-OLD', $alreadySubmitted->fresh()->fbr_invoice_number);
         $this->assertSame('locked', $good->fresh()->status);
         $this->assertSame('locked', $good2->fresh()->status);
@@ -319,15 +345,25 @@ class InvoiceBulkSubmitTest extends TestCase
         $a = $this->makeDraft();
         $b = $this->makeDraft();
 
-        // Simulate a batch already in flight.
-        Cache::add(BulkSubmitInvoiceJob::runningLockKey($this->company->id), 'existing-batch-key', now()->addMinutes(60));
+        // A run already in flight for this company.
+        $running = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'running',
+            'total' => 10,
+            'dispatched' => 10,
+            'done' => 4,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
 
         $res = $this->actingAs($this->user)->postJson('/invoices/bulk-submit', [
             'invoice_ids' => [$a->id, $b->id],
         ]);
 
-        $res->assertStatus(409)->assertJsonPath('batch_key', 'existing-batch-key');
+        $res->assertStatus(409)->assertJsonPath('batch_key', (string) $running->id);
+        $res->assertJsonPath('batch.done', 4);
         $this->assertSame('draft', $a->fresh()->status);
+        $this->assertSame(1, InvoiceBulkSubmission::count(), 'a second click must never start a parallel run');
     }
 
     public function test_status_endpoint_scoped_to_company(): void
@@ -357,90 +393,161 @@ class InvoiceBulkSubmitTest extends TestCase
     }
 
     /**
-     * Concurrency safety of recordResult(): keyed write-once results mean a
-     * duplicate/retried record for the same invoice can never double-count,
-     * counters are recomputed from the results map (no lost increments), the
-     * batch flips to finished exactly when every invoice has a result, and the
-     * company running lock is released exactly once. Real parallel workers are
-     * serialized by the per-batch Cache::lock inside recordResult().
+     * Counters live on the batch row and move with one atomic UPDATE each, so
+     * parallel workers cannot lose an increment, and the run is closed exactly
+     * once — only after dispatching is finished (state 'running').
      */
-    public function test_record_result_is_idempotent_and_finalizes_exactly_once(): void
+    public function test_counters_add_up_and_the_run_closes_exactly_once(): void
     {
-        $batchKey = $this->company->id . '-test-' . uniqid();
-        BulkSubmitInvoiceJob::startBatch($batchKey, $this->company->id, [101, 102, 103]);
-        $runningKey = BulkSubmitInvoiceJob::runningLockKey($this->company->id);
-        Cache::put($runningKey, $batchKey, now()->addHours(2));
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'running',
+            'total' => 3,
+            'dispatched' => 3,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
 
-        // Duplicate delivery for the same invoice — must count once.
-        BulkSubmitInvoiceJob::recordResult($batchKey, 101, 'success', 'ok');
-        BulkSubmitInvoiceJob::recordResult($batchKey, 101, 'success', 'ok (duplicate retry)');
+        BulkSubmitInvoiceJob::recordResult($batch->id, 101, 'success', 'ok');
+        BulkSubmitInvoiceJob::recordResult($batch->id, 102, 'failed', 'FBR rejected');
+        $batch->refresh();
+        $this->assertSame(2, (int) $batch->done);
+        $this->assertSame('running', $batch->state, 'must not finish before every invoice reported');
 
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($batchKey));
-        $this->assertSame(1, $batch['done']);
-        $this->assertSame(1, $batch['success']);
-        $this->assertFalse($batch['finished']);
-        $this->assertSame($batchKey, Cache::get($runningKey), 'running lock must be held until the batch finishes');
+        BulkSubmitInvoiceJob::recordResult($batch->id, 103, 'skipped', 'not eligible');
+        $batch->refresh();
+        $this->assertSame(3, (int) $batch->done);
+        $this->assertSame(1, (int) $batch->success);
+        $this->assertSame(1, (int) $batch->failed);
+        $this->assertSame(1, (int) $batch->skipped);
+        $this->assertSame('completed', $batch->state);
+        $this->assertNotNull($batch->completed_at);
 
-        BulkSubmitInvoiceJob::recordResult($batchKey, 102, 'failed', 'FBR rejected');
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($batchKey));
-        $this->assertSame(2, $batch['done']);
-        $this->assertFalse($batch['finished']);
+        // Only the problems are kept, with their reason.
+        $this->assertCount(2, $batch->failures);
+        $this->assertSame('FBR rejected', $batch->failures[0]['message']);
 
-        BulkSubmitInvoiceJob::recordResult($batchKey, 103, 'skipped', 'not eligible');
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($batchKey));
-        $this->assertSame(3, $batch['done']);
-        $this->assertSame(1, $batch['success']);
-        $this->assertSame(1, $batch['failed']);
-        $this->assertSame(1, $batch['skipped']);
-        $this->assertTrue($batch['finished']);
-        $this->assertNull(Cache::get($runningKey), 'running lock must be released when the batch finishes');
+        // A straggling duplicate after the run closed must not reopen it.
+        $completedAt = $batch->completed_at;
+        BulkSubmitInvoiceJob::recordResult($batch->id, 103, 'skipped', 'late duplicate');
+        $batch->refresh();
+        $this->assertSame('completed', $batch->state);
+        $this->assertEquals($completedAt, $batch->completed_at);
+    }
 
-        // A straggling duplicate after finish must not corrupt counters or re-release.
-        Cache::put($runningKey, 'other-batch', now()->addHours(2));
-        BulkSubmitInvoiceJob::recordResult($batchKey, 103, 'skipped', 'late duplicate');
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($batchKey));
-        $this->assertSame(3, $batch['done']);
-        $this->assertTrue($batch['finished']);
-        $this->assertSame('other-batch', Cache::get($runningKey), 'finished batch must never release a newer running lock');
+    /** While still dispatching, done == total must NOT end the run. */
+    public function test_run_does_not_finish_while_still_dispatching(): void
+    {
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'dispatching',
+            'total' => 1,
+            'dispatched' => 1,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
+
+        BulkSubmitInvoiceJob::recordResult($batch->id, 201, 'success', 'ok');
+
+        $this->assertSame('dispatching', $batch->fresh()->state);
     }
 
     /**
-     * recordResult() must serialize competing writers through the per-batch
-     * cache lock: while another worker holds the lock, the update blocks
-     * (and still lands afterwards) instead of doing an unlocked
-     * read-modify-write that could lose a concurrent increment.
+     * The whole point of the rewrite: the shop starts a run, closes the page,
+     * and the server finishes it. On return, the status endpoint — asked with
+     * no batch key at all — hands back the finished run, and Dismiss clears it.
      */
-    public function test_record_result_waits_for_the_batch_lock(): void
+    public function test_finished_run_is_still_reported_after_the_page_was_closed(): void
     {
-        $batchKey = $this->company->id . '-test2-' . uniqid();
-        BulkSubmitInvoiceJob::startBatch($batchKey, $this->company->id, [201, 202]);
+        Queue::fake([IntelligenceProcessingJob::class]);
+        $this->fakeFbrSuccess();
 
-        $lock = Cache::lock('bulk_submit_batchlock:' . $batchKey, 15);
-        $this->assertTrue($lock->get(), 'test must be able to grab the batch lock');
+        $a = $this->makeDraft();
+        $this->actingAs($this->user)->postJson('/invoices/bulk-submit', ['select_all_drafts' => true])->assertOk();
+        $this->assertSame('locked', $a->fresh()->status);
 
-        $start = microtime(true);
-        try {
-            // Simulate a competing worker holding the lock: release it from a
-            // scheduled "other side" by using a short-lived lock owner.
-            // Since PHPUnit is single-threaded we release before blocking
-            // would time out, then verify the write landed.
-            $lock->release();
-            BulkSubmitInvoiceJob::recordResult($batchKey, 201, 'success', 'ok');
-        } finally {
-            optional($lock)->forceRelease();
-        }
+        // A fresh page load knows nothing — no key, no local state.
+        $res = $this->actingAs($this->user)->getJson('/invoices/bulk-submit-status');
+        $res->assertOk()
+            ->assertJsonPath('batch.state', 'completed')
+            ->assertJsonPath('batch.finished', true)
+            ->assertJsonPath('batch.success', 1);
 
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($batchKey));
-        $this->assertSame(1, $batch['done']);
-        $this->assertLessThan(10, microtime(true) - $start);
+        $this->actingAs($this->user)->postJson('/invoices/bulk-submit-ack')->assertOk();
 
-        // With the lock held and never released, recordResult falls back after
-        // the block timeout rather than silently dropping the result — that
-        // path is exercised implicitly by the LockTimeoutException guard; we
-        // keep the fast path deterministic here.
-        BulkSubmitInvoiceJob::recordResult($batchKey, 202, 'failed', 'boom');
-        $batch = Cache::get(BulkSubmitInvoiceJob::cacheKey($batchKey));
-        $this->assertTrue($batch['finished']);
-        $this->assertSame(['success' => 1, 'failed' => 1], ['success' => $batch['success'], 'failed' => $batch['failed']]);
+        // Once acknowledged it stops greeting them.
+        $this->actingAs($this->user)->getJson('/invoices/bulk-submit-status')->assertStatus(404);
+    }
+
+    /** Stopping leaves already-submitted invoices alone and drains the rest. */
+    public function test_stopping_a_run_skips_the_remaining_invoices(): void
+    {
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'running',
+            'total' => 2,
+            'dispatched' => 2,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
+
+        $this->actingAs($this->user)->postJson('/invoices/bulk-submit-cancel')
+            ->assertOk()
+            ->assertJsonPath('batch.cancel_requested', true);
+
+        $invoice = $this->makeDraft();
+        (new BulkSubmitInvoiceJob($invoice->id, $batch->id, $this->user->id))->handle();
+
+        $this->assertSame('draft', $invoice->fresh()->status, 'a stopped run must not submit anything else');
+        $batch->refresh();
+        $this->assertSame(1, (int) $batch->skipped);
+
+        BulkSubmitInvoiceJob::recordResult($batch->id, 999, 'skipped', 'Run stopped before this invoice was submitted.');
+        $this->assertSame('cancelled', $batch->fresh()->state);
+    }
+
+    /**
+     * A run whose worker died must not lock the shop out forever: the next
+     * click closes the dead run as stalled and starts a fresh one.
+     */
+    public function test_a_stalled_run_does_not_block_a_new_one(): void
+    {
+        Queue::fake([IntelligenceProcessingJob::class]);
+        $this->fakeFbrSuccess();
+
+        $dead = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'running',
+            'total' => 500,
+            'dispatched' => 500,
+            'done' => 12,
+            'started_at' => now()->subHours(3),
+            'last_progress_at' => now()->subHours(2),
+        ]);
+
+        $a = $this->makeDraft();
+        $res = $this->actingAs($this->user)->postJson('/invoices/bulk-submit', ['select_all_drafts' => true]);
+
+        $res->assertOk();
+        $this->assertSame('stalled', $dead->fresh()->state);
+        $this->assertSame('locked', $a->fresh()->status);
+    }
+
+    /** "Submit all" covers every eligible draft — there is no per-run cap. */
+    public function test_select_all_covers_every_draft_with_no_cap(): void
+    {
+        Queue::fake([IntelligenceProcessingJob::class]);
+        $this->fakeFbrSuccess();
+
+        $drafts = collect(range(1, 12))->map(fn () => $this->makeDraft());
+
+        $res = $this->actingAs($this->user)->postJson('/invoices/bulk-submit', ['select_all_drafts' => true]);
+        $res->assertOk()->assertJsonPath('total', 12);
+
+        $batch = InvoiceBulkSubmission::latest('id')->first();
+        $this->assertSame(12, (int) $batch->dispatched);
+        $this->assertSame(12, (int) $batch->success);
+        $this->assertSame('completed', $batch->state);
+        $this->assertTrue($drafts->every(fn ($d) => $d->fresh()->status === 'locked'));
     }
 }

@@ -403,6 +403,10 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         // Task 1245: bulk-submit selected draft invoices to FBR (queued).
         Route::post('/invoices/bulk-submit', [InvoiceController::class, 'bulkSubmit'])->name('invoices.bulk-submit');
         Route::get('/invoices/bulk-submit-status', [InvoiceController::class, 'bulkSubmitStatus'])->name('invoices.bulk-submit-status');
+        // A run can take hours, so the shop must be able to stop it, and to
+        // clear the finished summary it comes back to.
+        Route::post('/invoices/bulk-submit-cancel', [InvoiceController::class, 'bulkSubmitCancel'])->name('invoices.bulk-submit-cancel');
+        Route::post('/invoices/bulk-submit-ack', [InvoiceController::class, 'bulkSubmitAcknowledge'])->name('invoices.bulk-submit-ack');
         Route::post('/invoice/{invoice}/retry', [InvoiceController::class, 'retry']);
         Route::post('/invoice/{invoice}/resubmit-fbr', [InvoiceController::class, 'resubmitToFbr']);
         Route::post('/invoice/{invoice}/validate', [InvoiceController::class, 'validateInvoice']);

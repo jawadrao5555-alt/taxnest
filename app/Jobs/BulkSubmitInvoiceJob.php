@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Http\Controllers\InvoiceController;
 use App\Models\Invoice;
+use App\Models\InvoiceBulkSubmission;
 use App\Models\Subscription;
 use App\Services\AuditLogService;
 use App\Services\HybridComplianceScorer;
@@ -13,7 +14,6 @@ use App\Services\ScheduleEngine;
 use App\Services\VendorRiskEngine;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -24,20 +24,29 @@ use Illuminate\Support\Facades\Log;
  * batch. Mirrors the guard sequence of InvoiceController@submit (smart mode)
  * and reuses submitToFbrSync() — the same shared path the DI push API uses —
  * so no validation/side effect is bypassed. Per-invoice results are collected
- * in a cache-backed batch record that the invoices list polls.
+ * on a durable invoice_bulk_submissions row that the invoices list polls —
+ * so the run survives the browser closing, a restart or a deploy.
  */
 class BulkSubmitInvoiceJob implements ShouldQueue
 {
     use Queueable;
+
+    /**
+     * Own queue. A run of several thousand invoices takes hours; on the default
+     * queue it would park every other background job (mail, POS sync, exports)
+     * behind it for that whole time.
+     */
+    public const QUEUE = 'bulk';
 
     public $tries = 1;
     public $timeout = 180;
 
     public function __construct(
         public int $invoiceId,
-        public string $batchKey,
+        public int $batchId,
         public ?int $userId = null,
     ) {
+        $this->onQueue(self::QUEUE);
     }
 
     public function handle(): void
@@ -46,20 +55,26 @@ class BulkSubmitInvoiceJob implements ShouldQueue
             $this->process();
         } catch (\Throwable $e) {
             Log::error("BulkSubmitInvoiceJob: invoice #{$this->invoiceId} exception: " . $e->getMessage());
-            self::recordResult($this->batchKey, $this->invoiceId, 'failed', 'Unexpected error: ' . $e->getMessage());
+            self::recordResult($this->batchId, $this->invoiceId, 'failed', 'Unexpected error: ' . $e->getMessage());
         }
     }
 
     public function failed(?\Throwable $e = null): void
     {
-        self::recordResult($this->batchKey, $this->invoiceId, 'failed', 'Job failed: ' . ($e ? $e->getMessage() : 'unknown error'));
+        self::recordResult($this->batchId, $this->invoiceId, 'failed', 'Job failed: ' . ($e ? $e->getMessage() : 'unknown error'));
     }
 
     protected function process(): void
     {
+        // The shop pressed Stop: drain the remaining queue instead of submitting.
+        if (self::runCancelled($this->batchId)) {
+            self::recordResult($this->batchId, $this->invoiceId, 'skipped', 'Run stopped before this invoice was submitted.');
+            return;
+        }
+
         $invoice = Invoice::withoutGlobalScopes()->find($this->invoiceId);
         if (!$invoice) {
-            self::recordResult($this->batchKey, $this->invoiceId, 'skipped', 'Invoice not found (may have been deleted).');
+            self::recordResult($this->batchId, $this->invoiceId, 'skipped', 'Invoice not found (may have been deleted).');
             return;
         }
 
@@ -70,12 +85,12 @@ class BulkSubmitInvoiceJob implements ShouldQueue
                 $invoice->status === 'pending_verification' => 'Pending FBR verification.',
                 default => 'Already being processed.',
             };
-            self::recordResult($this->batchKey, $this->invoiceId, 'skipped', $msg, $invoice);
+            self::recordResult($this->batchId, $this->invoiceId, 'skipped', $msg, $invoice);
             return;
         }
 
         if (!empty($invoice->fbr_invoice_number)) {
-            self::recordResult($this->batchKey, $this->invoiceId, 'skipped', 'Already has FBR number: ' . $invoice->fbr_invoice_number, $invoice);
+            self::recordResult($this->batchId, $this->invoiceId, 'skipped', 'Already has FBR number: ' . $invoice->fbr_invoice_number, $invoice);
             return;
         }
 
@@ -84,7 +99,7 @@ class BulkSubmitInvoiceJob implements ShouldQueue
             ->first();
         if ($subscription && ($subscription->isExpired() || ($subscription->trial_ends_at && $subscription->isTrialExpired()))) {
             // Stop cleanly: invoice stays draft with a clear message.
-            self::recordResult($this->batchKey, $this->invoiceId, 'skipped', 'Subscription expired — invoice left as draft.', $invoice);
+            self::recordResult($this->batchId, $this->invoiceId, 'skipped', 'Subscription expired — invoice left as draft.', $invoice);
             return;
         }
 
@@ -110,7 +125,7 @@ class BulkSubmitInvoiceJob implements ShouldQueue
             $errorMsg = trim($submissionCheck['message'] . ' ' . implode(' | ', $submissionCheck['errors']));
             // Invoice stays draft — same as the single-submit path, which
             // rejects before flipping any state.
-            self::recordResult($this->batchKey, $this->invoiceId, 'failed', $errorMsg, $invoice);
+            self::recordResult($this->batchId, $this->invoiceId, 'failed', $errorMsg, $invoice);
             return;
         }
 
@@ -153,7 +168,7 @@ class BulkSubmitInvoiceJob implements ShouldQueue
         });
 
         if (!$locked) {
-            self::recordResult($this->batchKey, $this->invoiceId, 'skipped', 'No longer in a submittable state (submitted by another request).', $invoice->fresh());
+            self::recordResult($this->batchId, $this->invoiceId, 'skipped', 'No longer in a submittable state (submitted by another request).', $invoice->fresh());
             return;
         }
 
@@ -163,7 +178,7 @@ class BulkSubmitInvoiceJob implements ShouldQueue
             'mode' => 'bulk',
             'compliance_score' => $scoreResult['final_score'],
             'risk_level' => $scoreResult['risk_level'],
-            'bulk_batch' => $this->batchKey,
+            'bulk_batch' => $this->batchId,
             'submitted_by' => $this->userId,
         ]);
 
@@ -184,96 +199,119 @@ class BulkSubmitInvoiceJob implements ShouldQueue
 
         $fresh = $invoice->fresh();
         if ($result['status'] === 'success') {
-            self::recordResult($this->batchKey, $this->invoiceId, 'success', 'FBR: ' . ($result['fbr_invoice_number'] ?? ''), $fresh);
+            self::recordResult($this->batchId, $this->invoiceId, 'success', 'FBR: ' . ($result['fbr_invoice_number'] ?? ''), $fresh);
         } elseif ($result['status'] === 'pending_verification') {
-            self::recordResult($this->batchKey, $this->invoiceId, 'pending', 'Ambiguous FBR response — verify on FBR portal.', $fresh);
+            self::recordResult($this->batchId, $this->invoiceId, 'pending', 'Ambiguous FBR response — verify on FBR portal.', $fresh);
         } else {
             $errors = !empty($result['errors']) ? implode(' | ', array_slice($result['errors'], 0, 3)) : 'FBR submission failed';
-            self::recordResult($this->batchKey, $this->invoiceId, 'failed', $errors, $fresh);
+            self::recordResult($this->batchId, $this->invoiceId, 'failed', $errors, $fresh);
         }
     }
 
-    // ── Cache-backed batch progress record ─────────────────────────────────
+    // ── Batch progress (DATABASE-backed) ───────────────────────────────────
+    //
+    // Progress used to live in one cache entry holding every per-invoice
+    // result, read-modify-written under a lock on every completion. That is
+    // what capped a run at 1,000 invoices, and on live (CACHE_STORE=database)
+    // a deploy's `cache:clear` erased a running batch outright. Counters now
+    // move with a single atomic UPDATE on a durable row.
 
-    public static function cacheKey(string $batchKey): string
-    {
-        return "bulk_submit_batch:{$batchKey}";
-    }
+    /** The result buckets — also the counter column names on the batch row. */
+    public const RESULT_BUCKETS = ['success', 'failed', 'skipped', 'pending'];
 
-    public static function runningLockKey(int $companyId): string
+    /** Has the shop asked to stop this run? (checked before each submission) */
+    public static function runCancelled(int $batchId): bool
     {
-        return "bulk_submit_running:{$companyId}";
-    }
-
-    public static function startBatch(string $batchKey, int $companyId, array $invoiceIds): void
-    {
-        Cache::put(self::cacheKey($batchKey), [
-            'company_id' => $companyId,
-            'total' => count($invoiceIds),
-            'done' => 0,
-            'success' => 0,
-            'failed' => 0,
-            'skipped' => 0,
-            'pending' => 0,
-            'finished' => false,
-            'started_at' => now()->toIso8601String(),
-            'results' => [],
-        ], now()->addHours(6));
+        return (bool) DB::table('invoice_bulk_submissions')->where('id', $batchId)->value('cancel_requested');
     }
 
     /**
-     * Atomically record one invoice's outcome in the batch record.
+     * Record one invoice's outcome against the batch row.
      *
-     * Parallel queue workers can finish jobs of the same batch at the same
-     * moment, so the read-modify-write of the batch record is guarded by a
-     * per-batch distributed cache lock (file/database/redis/array stores all
-     * support Cache::lock). Results are keyed by invoice id (write-once) and
-     * every counter is recomputed from the results map, so the update is
-     * idempotent — a retried/duplicate record can never double-count, and
-     * `finished` flips exactly when all invoices have a result. The company
-     * running lock is released exactly once, on the not-finished → finished
-     * transition inside the same critical section.
+     * One UPDATE, so parallel workers can never lose an increment and there is
+     * no lock that can time out. A worker killed mid-job may be retried by the
+     * queue and counted twice; display clamps to the total and completion is a
+     * >= test, so an overcount can never strand a run as "unfinished".
      */
-    public static function recordResult(string $batchKey, int $invoiceId, string $status, string $message, ?Invoice $invoice = null): void
+    public static function recordResult(int $batchId, int $invoiceId, string $status, string $message, ?Invoice $invoice = null): void
     {
-        $apply = function () use ($batchKey, $invoiceId, $status, $message, $invoice) {
-            $key = self::cacheKey($batchKey);
-            $batch = Cache::get($key);
-            if (!$batch) {
-                return;
-            }
+        $bucket = in_array($status, self::RESULT_BUCKETS, true) ? $status : 'skipped';
 
-            $wasFinished = (bool) ($batch['finished'] ?? false);
+        $updated = DB::table('invoice_bulk_submissions')
+            ->where('id', $batchId)
+            ->update([
+                'done' => DB::raw('done + 1'),
+                $bucket => DB::raw($bucket . ' + 1'),
+                'last_progress_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-            $results = $batch['results'] ?? [];
-            $results[(string) $invoiceId] = [
-                'invoice_id' => $invoiceId,
-                'invoice_number' => $invoice ? ($invoice->internal_invoice_number ?? $invoice->invoice_number) : null,
-                'fbr_invoice_number' => $invoice->fbr_invoice_number ?? null,
-                'status' => $status,
-                'message' => mb_substr($message, 0, 500),
-            ];
-            $batch['results'] = $results;
-
-            // Recompute all counters from the keyed results — idempotent.
-            $batch['done'] = count($results);
-            foreach (['success', 'failed', 'skipped', 'pending'] as $bucket) {
-                $batch[$bucket] = count(array_filter($results, fn ($r) => $r['status'] === $bucket));
-            }
-            $batch['finished'] = $batch['done'] >= $batch['total'];
-
-            Cache::put($key, $batch, now()->addHours(6));
-
-            if ($batch['finished'] && !$wasFinished) {
-                Cache::forget(self::runningLockKey($batch['company_id']));
-            }
-        };
-
-        try {
-            Cache::lock('bulk_submit_batchlock:' . $batchKey, 15)->block(10, $apply);
-        } catch (\Illuminate\Contracts\Cache\LockTimeoutException $e) {
-            Log::warning("BulkSubmitInvoiceJob: batch lock timeout for {$batchKey}, invoice #{$invoiceId} — applying without lock.");
-            $apply();
+        if (!$updated) {
+            Log::warning("BulkSubmitInvoiceJob: batch #{$batchId} row missing while recording invoice #{$invoiceId}.");
+            return;
         }
+
+        // Only problems are kept — nobody reads 6,000 success lines, and the
+        // row has to stay small enough to poll every few seconds.
+        if ($bucket !== 'success') {
+            self::appendFailure($batchId, $invoiceId, $bucket, $message, $invoice);
+        }
+
+        self::settleIfComplete($batchId);
+    }
+
+    protected static function appendFailure(int $batchId, int $invoiceId, string $bucket, string $message, ?Invoice $invoice = null): void
+    {
+        try {
+            DB::transaction(function () use ($batchId, $invoiceId, $bucket, $message, $invoice) {
+                $batch = InvoiceBulkSubmission::whereKey($batchId)->lockForUpdate()->first();
+                if (!$batch) {
+                    return;
+                }
+                $failures = $batch->failures ?? [];
+                if (count($failures) >= InvoiceBulkSubmission::MAX_FAILURES_KEPT) {
+                    return; // capped — the counters still tell the full story
+                }
+                $failures[] = [
+                    'invoice_id' => $invoiceId,
+                    'invoice_number' => $invoice ? ($invoice->internal_invoice_number ?? $invoice->invoice_number) : null,
+                    'status' => $bucket,
+                    'message' => mb_substr($message, 0, 300),
+                ];
+                $batch->failures = $failures;
+                $batch->save();
+            });
+        } catch (\Throwable $e) {
+            // A lost failure line must never cost the invoice its counter.
+            Log::warning("BulkSubmitInvoiceJob: could not record failure detail for invoice #{$invoiceId}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Close the run once every dispatched invoice has reported back.
+     *
+     * Only valid while the batch is 'running' — during 'dispatching' the total
+     * is not final yet, so an early done == total must not end the run. The
+     * conditional UPDATE means exactly one worker performs the transition.
+     */
+    public static function settleIfComplete(int $batchId): void
+    {
+        $row = DB::table('invoice_bulk_submissions')->where('id', $batchId)->first();
+        if (!$row || $row->state !== 'running') {
+            return;
+        }
+        if ((int) $row->done < (int) $row->total) {
+            return;
+        }
+
+        DB::table('invoice_bulk_submissions')
+            ->where('id', $batchId)
+            ->where('state', 'running')
+            ->update([
+                'state' => $row->cancel_requested ? 'cancelled' : 'completed',
+                'completed_at' => now(),
+                'last_progress_at' => now(),
+                'updated_at' => now(),
+            ]);
     }
 }

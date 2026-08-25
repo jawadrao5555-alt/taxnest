@@ -1780,28 +1780,6 @@ window.addEventListener('popstate', function() {
                     </div>
                 </div>
                 <div class="px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
-                    {{-- Task 287: Delivery Prepaid toggle — customer already paid online.
-                         Shown ONLY for delivery orders. One click sets deliveryPrepaid=true
-                         which overrides the payment method to qr_payment on every submit path
-                         (processPayment, manual, restaurant hold→pay, offline queue).
-                         Non-delivery orders never see this; it resets on type change + clear. --}}
-                    @if($features->delivery ?? false)
-                    <template x-if="orderType === 'delivery'">
-                        <button type="button"
-                                @click="deliveryPrepaid = !deliveryPrepaid"
-                                class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border-2 transition-all"
-                                :class="deliveryPrepaid ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-400 dark:border-teal-600' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-teal-300 dark:hover:border-teal-700'">
-                            <span class="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all"
-                                  :class="deliveryPrepaid ? 'bg-teal-500 border-teal-500' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'">
-                                <svg x-show="deliveryPrepaid" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                            </span>
-                            <span class="flex-1 text-left text-xs font-bold leading-tight"
-                                  :class="deliveryPrepaid ? 'text-teal-700 dark:text-teal-300' : 'text-gray-600 dark:text-gray-400'"
-                                  x-text="deliveryPrepaid ? (window.TXT.delivery_prepaid_active_hint || 'Online / QR payment') : (window.TXT.delivery_prepaid_toggle || 'Customer already paid online')"></span>
-                            <span x-show="deliveryPrepaid" class="flex-shrink-0 text-[10px] font-black text-teal-700 dark:text-teal-300 bg-teal-100 dark:bg-teal-900/50 border border-teal-300 dark:border-teal-700 px-1.5 py-0.5 rounded-full">PREPAID</span>
-                        </button>
-                    </template>
-                    @endif
                     {{-- ═══ Task 781: IN-PANEL TABLE ACTIONS ═══ (direct-open shops only)
                          Jab table ka order cart mein khula ho (recalled ya claimed waiter),
                          board popup ke saare actions yahin milte hain: Proof Bill, FINAL
@@ -2019,13 +1997,6 @@ window.addEventListener('popstate', function() {
                 <p x-show="modalCardSaving > 0" x-cloak class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1" x-text="payMethodIndex === 1 ? (window.TXT.card_discount_rs + Number(modalCardSaving).toLocaleString() + window.TXT.savings_suffix) : (window.TXT.card_pay_rs_prefix + Number(modalCardSaving).toLocaleString() + window.TXT.saved_amount_sfx)"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">{{ __('pos.processing_payment') }}</p>
-                {{-- Task 287: Prepaid delivery banner in the pay modal --}}
-                <template x-if="deliveryPrepaid && orderType === 'delivery'">
-                    <div class="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-teal-50 dark:bg-teal-900/20 border border-teal-300 dark:border-teal-700 rounded-lg">
-                        <svg class="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span class="text-xs font-bold text-teal-700 dark:text-teal-300" x-text="window.TXT.delivery_prepaid_active_hint || 'Will save as Online / QR payment'"></span>
-                    </div>
-                </template>
             </div>
             {{-- Delivery Riders: rider picker REMOVED from the pay modal (owner, 20 Jul 2026)
                  — rider assignment now happens ONLY on the /pos/deliveries board after
@@ -4687,11 +4658,6 @@ function restaurantPos() {
         // Plain retail (widget hidden, orderType silently 'takeaway') stays ungated.
         typeFlowGate: {{ (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false)) ? 'true' : 'false' }},
         deliveryChargeInput: '',
-        // Task 287: customer already paid online — one-click prepaid toggle for
-        // delivery orders. When true, processPayment() overrides ANY method to
-        // qr_payment so the bill never lands in the rider's cash khata and the
-        // rider app shows the is_prepaid chip. Resets on type-change + cart clear.
-        deliveryPrepaid: false,
         customerAddresses: [],
         selectedDeliveryAddress: '',
         showAddrNew: false,
@@ -7489,7 +7455,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this._recallCartBaseline = null; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -7649,8 +7615,6 @@ function restaurantPos() {
             // Item #3: the delivery-charge line only belongs to Delivery orders —
             // leaving the type removes it so it can never bill on dine-in/takeaway.
             if (type !== 'delivery') this.removeDeliveryCharge();
-            // Task 287: prepaid toggle is delivery-only — reset when leaving delivery.
-            if (type !== 'delivery') this.deliveryPrepaid = false;
             if (type === 'dine_in') {
                 // 26 Jul 2026: table selected ho tab BHI picker khole — pill par
                 // dobara click = table change ka raasta (top Table button retire).
@@ -8982,13 +8946,12 @@ function restaurantPos() {
         // new-customer fields aur saved addresses (+ chuna hua delivery address)
         // le jata hai; yahan uske sath wo delivery state bhi reset hoti hai jo
         // caller flow ne khadi ki thi — delivery-charge line (synthetic manual
-        // fee row, koi bika hua item nahi) aur prepaid toggle. Cart ke asli
-        // items aur order type ko haath nahi lagta.
+        // fee row, koi bika hua item nahi). Cart ke asli items aur order type
+        // ko haath nahi lagta.
         clearAttachedCustomer() {
             const had = !!this.selectedCustomer;
             this.clearCustomerInput();
             this.removeDeliveryCharge();
-            this.deliveryPrepaid = false;
             if (had) { this.showToast(window.TXT.customer_removed, 'info'); }
         },
 
@@ -9579,15 +9542,6 @@ function restaurantPos() {
             // Task 514: per-bill receipt print choice snapshot (checkbox unticked =
             // skip SIRF is bill ki receipt auto-print; KOT/PRA/popup untouched).
             const skipReceipt = !this.payPrintReceipt;
-
-            // Task 287 — Delivery Prepaid: override the method to qr_payment on ALL
-            // paths (held-order pay, manual/direct, restaurant hold→pay, offline queue)
-            // so the bill is never booked as 'cash' and never enters the rider khata.
-            // is_prepaid in the rider app derives from payment_method !== 'cash',
-            // so no separate flag is needed (PosRiderTrackingController line ~252).
-            if (this.deliveryPrepaid && this.orderType === 'delivery') {
-                method = 'qr_payment';
-            }
 
             // Task 1036: reserve the WhatsApp auto-open tab INSIDE this gesture
             // (synchronously, before any await) — provisionals are never shared.

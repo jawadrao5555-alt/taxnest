@@ -1272,8 +1272,6 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'delivery_charges' => 'Delivery Charges',
     'delivery_kot_after_payment_hint' => 'Provisional delivery bills mein KOT hold hota hai — kitchen ticket tabhi print hoti hai jab bill final ho (payment confirm ho jaye).',
     'delivery_kot_after_payment_title' => 'Delivery: Pehle Payment, Phir KOT',
-    'delivery_prepaid_toggle' => 'Customer ne pehle pay kar diya (Online)',
-    'delivery_prepaid_active_hint' => 'Bill Online / QR payment ke tor par save hoga',
     'settle_already_paid_label' => 'Pehle ada ho chuka',
     'settle_already_paid_hint' => 'Online ya QR se ada bill par Pehle ada ho chuka tick karein. Raqam foran rider ke cash total se nikal jayegi.',
     'settle_already_paid_saving' => 'Save ho raha hai…',

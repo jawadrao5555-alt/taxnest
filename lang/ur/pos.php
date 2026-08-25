@@ -1272,8 +1272,6 @@ return [
     'delivery_charges' => 'ڈیلیوری چارجز',
     'delivery_kot_after_payment_hint' => 'عارضی ڈیلیوری بلز میں KOT ہولڈ رہتی ہے — کچن ٹکٹ تبھی پرنٹ ہوگی جب بل فائنل ہو جائے گا (پیمنٹ کنفرم)۔',
     'delivery_kot_after_payment_title' => 'ڈیلیوری: پہلے پیمنٹ، پھر KOT',
-    'delivery_prepaid_toggle' => 'گاہک نے پہلے ادائیگی کر دی (آن لائن)',
-    'delivery_prepaid_active_hint' => 'بل آن لائن / QR پیمنٹ کے طور پر محفوظ ہوگا',
     'settle_already_paid_label' => 'پہلے ادا ہو چکا',
     'settle_already_paid_hint' => 'آن لائن یا فوری رمزی ادائیگی والے بل پر پہلے ادا ہو چکا کا نشان لگائیں۔ رقم فوراً رائیڈر کی نقد میزان سے نکل جائے گی۔',
     'settle_already_paid_saving' => 'محفوظ ہو رہا ہے…',

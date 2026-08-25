@@ -1289,6 +1289,16 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->posCashierBlocked()) { abort(403); }
+
+        // pos/* is CSRF-exempt (agent + sendBeacon paths live under it), so this
+        // endpoint verifies the token itself. Without it a hostile page could
+        // make a logged-in owner's own browser burn the shop's paper roll.
+        $token = (string) ($request->header('X-CSRF-TOKEN') ?: $request->input('_token'));
+        if (!$request->hasSession() || $token === ''
+            || !hash_equals((string) $request->session()->token(), $token)) {
+            abort(419);
+        }
+
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }

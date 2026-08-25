@@ -269,10 +269,25 @@
          the queue's OWN name, ends that guessing in seconds.
          Outside the settings form on purpose (fetch-driven, nothing to save). --}}
     @php
+        // Virtual queues are a trap HERE specifically: "Microsoft Print to PDF"
+        // and friends pop a blocking save dialog in the agent's hidden print
+        // window, and none of them can ever be the shop's thermal printer. The
+        // normal printer pickers still list everything — only the test buttons
+        // filter, and only when something real is left to test.
+        $tpVirtual = static function (string $name): bool {
+            return (bool) preg_match(
+                '/(^fax$|onenote|xps document writer|print to pdf|^adobe pdf$|pdfcreator|^cutepdf|^bullzip|^doro pdf|^pdf(24| architect)|^snagit|^fax$)/i',
+                trim($name)
+            );
+        };
+        $tpKeep = static function (array $names) use ($tpVirtual): array {
+            $real = array_values(array_filter($names, fn($n) => !$tpVirtual($n)));
+            return $real ?: $names; // never hide the only button a shop has
+        };
         $tpGroups = [];
         if (isset($devices) && $devices->count()) {
             foreach ($devices as $tpDevice) {
-                $tpNames = collect($tpDevice->printers ?? [])->pluck('name')->filter()->unique()->values()->all();
+                $tpNames = $tpKeep(collect($tpDevice->printers ?? [])->pluck('name')->filter()->unique()->values()->all());
                 if ($tpNames) {
                     $tpGroups[] = [
                         'uid' => $tpDevice->device_uid,

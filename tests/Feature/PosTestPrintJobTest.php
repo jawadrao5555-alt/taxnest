@@ -181,14 +181,18 @@ class PosTestPrintJobTest extends TestCase
         ]);
 
         Cache::flush();
+        // pos/* is CSRF-exempt, so the endpoint checks the token itself.
+        $this->startSession();
     }
 
     // ── helpers ────────────────────────────────────────────────────────────
 
-    private function testPrint(int $userId, array $body): \Illuminate\Testing\TestResponse
+    private function testPrint(int $userId, array $body, bool $withToken = true): \Illuminate\Testing\TestResponse
     {
+        $headers = $withToken ? ['X-CSRF-TOKEN' => csrf_token()] : [];
+
         return $this->actingAs(User::find($userId), 'pos')
-            ->postJson('/pos/api/print-jobs/test', $body);
+            ->postJson('/pos/api/print-jobs/test', $body, $headers);
     }
 
     private function seedDevice(string $uid, array $printers, bool $online = true): PosAgentDevice
@@ -230,6 +234,15 @@ class PosTestPrintJobTest extends TestCase
     public function test_cashier_cannot_burn_the_shops_paper(): void
     {
         $this->testPrint($this->cashierId, ['printer' => 'XP-80C'])->assertStatus(403);
+        $this->assertSame(0, DB::table('pos_print_jobs')->count());
+    }
+
+    public function test_a_forged_cross_site_post_cannot_burn_the_paper_roll(): void
+    {
+        // Everything under pos/* is CSRF-exempt for the agent + beacon paths,
+        // so a hostile page could otherwise drive a logged-in owner's browser
+        // straight into this endpoint. The token is checked in the controller.
+        $this->testPrint($this->adminId, ['printer' => 'XP-80C'], false)->assertStatus(419);
         $this->assertSame(0, DB::table('pos_print_jobs')->count());
     }
 

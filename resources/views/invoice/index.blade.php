@@ -563,7 +563,7 @@
                  A download nobody can find is a download that does not exist. --}}
             @php $zipScope = ($tab ?? 'draft') === 'completed' ? 'completed' : 'draft'; @endphp
             <div class="mb-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-4"
-                 x-data="invoiceZipExport({{ session('invoice_zip_export_id') ? (int) session('invoice_zip_export_id') : 'null' }})">
+                 x-data="invoiceZipExport({{ ($zipExportId ?? session('invoice_zip_export_id')) ? (int) ($zipExportId ?? session('invoice_zip_export_id')) : 'null' }})">
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div class="text-xs text-gray-600 dark:text-gray-400 max-w-lg">
                         <span class="font-semibold text-gray-800 dark:text-gray-200">Full ZIP Export (no limit):</span>

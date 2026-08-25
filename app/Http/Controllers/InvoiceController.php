@@ -136,7 +136,23 @@ class InvoiceController extends Controller
             'ai_reader'
         );
 
-        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount', 'completedStats', 'aiReaderAllowed'));
+        // A full ZIP of thousands of invoices takes many minutes, so keep the
+        // panel attached to whatever build this company already has. The export
+        // id otherwise lives only in the flash session, and a single refresh
+        // orphans a running build or hides a file that is sitting there ready.
+        $zipExportId = session('invoice_zip_export_id')
+            ?: \App\Models\InvoiceZipExport::where('company_id', $companyId)
+                ->where(function ($q) {
+                    $q->whereIn('status', \App\Models\InvoiceZipExport::ACTIVE_STATUSES)
+                        ->orWhere(function ($ready) {
+                            $ready->where('status', 'ready')
+                                ->where('created_at', '>', now()->subHours(\App\Services\InvoiceZipBuilderService::RETENTION_HOURS));
+                        });
+                })
+                ->latest('id')
+                ->value('id');
+
+        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount', 'completedStats', 'aiReaderAllowed', 'zipExportId'));
     }
 
     public function uniqueBuyers(Request $request)

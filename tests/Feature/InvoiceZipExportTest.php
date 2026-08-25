@@ -446,6 +446,19 @@ class InvoiceZipExportTest extends TestCase
         $this->assertFileExists(InvoiceZipBuilderService::absolutePath($export));
     }
 
+    /**
+     * These jobs ride their own queue because a host's default queue worker can
+     * be a PHP build WITHOUT the zip extension — which is exactly what killed
+     * every export on the live server: the site's own PHP had zip, the cron's
+     * did not, so the build died the moment a worker picked it up. Losing this
+     * assignment in a refactor would strand exports again, silently.
+     */
+    public function test_archive_jobs_are_queued_where_a_zip_capable_worker_listens(): void
+    {
+        $this->assertSame('zip', (new \App\Jobs\BuildInvoiceZipJob(1))->queue);
+        $this->assertSame('zip', (new \App\Jobs\BuildAuditPackJob(1))->queue);
+    }
+
     private function callProtected(string $method, mixed ...$args): mixed
     {
         $ref = new \ReflectionMethod(InvoiceZipBuilderService::class, $method);

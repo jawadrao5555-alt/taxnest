@@ -205,6 +205,21 @@ class InvoiceZipBuilderService
      */
     public static function processNextChunk(InvoiceZipExport $export): string
     {
+        // A CLI worker can be a different PHP build than the one serving the
+        // site, and on cPanel it routinely is: the queue cron's binary had no
+        // zip extension while the site's own PHP did. Such a process must step
+        // ASIDE rather than claim the export and kill it with a fatal error —
+        // the polling fallback runs under the web SAPI and can still finish.
+        // If the WEB process is the one without zip we fall through, because
+        // then nothing here can build an archive and initialize() should say so.
+        if (PHP_SAPI === 'cli' && !class_exists(\ZipArchive::class)) {
+            Log::warning('Invoice ZIP: no zip extension in this CLI build, leaving the export for a capable process', [
+                'export_id' => $export->id,
+                'php' => PHP_VERSION,
+            ]);
+            return 'busy';
+        }
+
         $token = self::claim($export);
         if ($token === null) {
             return 'busy';

@@ -26,12 +26,29 @@ class BuildInvoiceZipJob implements ShouldQueue
 
     public function __construct(public int $exportId)
     {
+        // Building needs the PHP zip extension, and a host's CLI build can
+        // differ from the one serving the site — here the default queue
+        // worker's binary has no zip at all. Its own queue lets a zip-capable
+        // worker take these jobs without moving every other job, and every
+        // extension they rely on, onto a different PHP build.
+        $this->onQueue('zip');
     }
 
     public function handle(): void
     {
         $export = InvoiceZipExport::find($this->exportId);
         if (!$export || !$export->isActive()) {
+            return;
+        }
+
+        // Nothing to gain by claiming work this process cannot do: leave the
+        // export untouched and active so a capable worker — or the polling
+        // fallback running under the web SAPI — can still finish it.
+        if (!class_exists(\ZipArchive::class)) {
+            Log::warning('BuildInvoiceZipJob: no zip extension in this PHP build, leaving the export alone', [
+                'export_id' => $this->exportId,
+                'php' => PHP_VERSION,
+            ]);
             return;
         }
 

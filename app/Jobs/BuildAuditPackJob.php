@@ -26,12 +26,25 @@ class BuildAuditPackJob implements ShouldQueue
 
     public function __construct(public int $packId)
     {
+        // Same reason as BuildInvoiceZipJob: archive building needs the PHP zip
+        // extension, which the default queue worker's binary may not have.
+        $this->onQueue('zip');
     }
 
     public function handle(): void
     {
         $pack = AuditPack::find($this->packId);
         if (!$pack || !$pack->isActive()) {
+            return;
+        }
+
+        // Leave the pack alone rather than failing it from a process that
+        // could never have built it.
+        if (!class_exists(\ZipArchive::class)) {
+            Log::warning('BuildAuditPackJob: no zip extension in this PHP build, leaving the pack alone', [
+                'pack_id' => $this->packId,
+                'php' => PHP_VERSION,
+            ]);
             return;
         }
 

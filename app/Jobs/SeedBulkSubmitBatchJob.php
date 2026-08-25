@@ -86,12 +86,14 @@ class SeedBulkSubmitBatchJob implements ShouldQueue
 
         $batch = InvoiceBulkSubmission::find($this->batchId);
         if ($batch && $batch->isActive()) {
-            // Whatever was already queued keeps running; the run is closed off
-            // at that total so it can still reach a finished state.
-            $batch->total = $batch->dispatched;
-            $batch->state = 'running';
+            // Do NOT rewrite the total down to what was queued: invoices that
+            // were never dispatched would then be presented as "all done" and
+            // the shop would stop chasing them. Interrupted is the honest
+            // state — whatever was already queued keeps going, the untouched
+            // invoices are still drafts, and the next click picks them up.
+            $batch->state = 'stalled';
+            $batch->completed_at = now();
             $batch->save();
-            BulkSubmitInvoiceJob::settleIfComplete($batch->id);
         }
     }
 

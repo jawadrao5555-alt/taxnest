@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\InvoiceController;
 use App\Jobs\BulkSubmitInvoiceJob;
+use App\Jobs\SeedBulkSubmitBatchJob;
 use App\Jobs\IntelligenceProcessingJob;
 use App\Models\Company;
 use App\Models\Invoice;
@@ -531,6 +532,53 @@ class InvoiceBulkSubmitTest extends TestCase
         $res->assertOk();
         $this->assertSame('stalled', $dead->fresh()->state);
         $this->assertSame('locked', $a->fresh()->status);
+    }
+
+    /**
+     * If dispatching dies half way, the run must NOT be reported as finished at
+     * the number it managed to queue — that would hide thousands of invoices
+     * the shop still has to file.
+     */
+    public function test_a_dispatch_failure_is_reported_as_interrupted(): void
+    {
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'dispatching',
+            'total' => 4000,
+            'dispatched' => 500,
+            'done' => 500,
+            'started_at' => now(),
+            'last_progress_at' => now(),
+        ]);
+
+        (new SeedBulkSubmitBatchJob($batch->id))->failed(new \RuntimeException('database went away'));
+
+        $batch->refresh();
+        $this->assertSame('stalled', $batch->state);
+        $this->assertSame(4000, (int) $batch->total, 'the requested total must not shrink to what was queued');
+        $this->assertNull(InvoiceBulkSubmission::activeFor($this->company->id), 'the shop must be able to start again');
+    }
+
+    /** A run whose worker died is released by the page itself, not left hanging. */
+    public function test_status_endpoint_releases_a_dead_run(): void
+    {
+        $dead = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id,
+            'state' => 'running',
+            'total' => 900,
+            'dispatched' => 900,
+            'done' => 40,
+            'started_at' => now()->subHours(2),
+            'last_progress_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($this->user)->getJson('/invoices/bulk-submit-status')
+            ->assertOk()
+            ->assertJsonPath('batch.state', 'stalled')
+            ->assertJsonPath('batch.active', false)
+            ->assertJsonPath('batch.finished', true);
+
+        $this->assertSame('stalled', $dead->fresh()->state);
     }
 
     /** "Submit all" covers every eligible draft — there is no per-run cap. */

@@ -799,6 +799,25 @@ class InvoiceController extends Controller
             'last_progress_at' => now(),
         ]);
 
+        // Two clicks can clear the active-run check in the same instant. The
+        // older row wins, so a company can never have two runs racing over the
+        // same drafts (the per-invoice lock would make the loser mostly skips).
+        $older = \App\Models\InvoiceBulkSubmission::where('company_id', $companyId)
+            ->whereIn('state', \App\Models\InvoiceBulkSubmission::ACTIVE_STATES)
+            ->where('id', '<', $batch->id)
+            ->latest('id')
+            ->first();
+        if ($older) {
+            $batch->update(['state' => 'cancelled', 'completed_at' => now(), 'acknowledged_at' => now()]);
+
+            return response()->json([
+                'status' => 'already_running',
+                'message' => 'A bulk submit is already running for your company.',
+                'batch_key' => (string) $older->id,
+                'batch' => $older->toStatusArray(),
+            ], 409);
+        }
+
         \App\Jobs\SeedBulkSubmitBatchJob::dispatch($batch->id);
 
         AuditLogService::log('invoice_bulk_submit_started', 'Invoice', null, null, [
@@ -838,6 +857,14 @@ class InvoiceController extends Controller
 
         if (!$batch) {
             return response()->json(['status' => 'not_found'], 404);
+        }
+
+        // Nothing has processed for a long time: the worker is gone. Close the
+        // run here, or the page keeps showing "running" forever and the shop
+        // can never reach the button that would start a fresh one.
+        if ($batch->isStale()) {
+            $batch->update(['state' => 'stalled', 'completed_at' => now()]);
+            Log::warning("Bulk submit: batch #{$batch->id} closed as stalled — no progress since " . optional($batch->last_progress_at)->toDateTimeString());
         }
 
         return response()->json([

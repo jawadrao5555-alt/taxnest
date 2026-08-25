@@ -58,6 +58,7 @@ class PosKotReprintPermissionTest extends TestCase
             $table->boolean('inventory_enabled')->default(false);
             // Task 1379 master switch (default ON — existing shops unchanged).
             $table->boolean('kot_reprint_enabled')->default(true);
+            $table->boolean('kot_last_addon_enabled')->default(true);
             // Internal account → planAllows() passes → Custom Access sets are live.
             $table->boolean('is_internal_account')->default(false);
             // Silent-print path (apiCreatePrintJob).

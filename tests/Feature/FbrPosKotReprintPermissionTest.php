@@ -59,6 +59,7 @@ class FbrPosKotReprintPermissionTest extends TestCase
             $table->boolean('inventory_enabled')->default(false);
             // Master switch shared with PRA (default ON — existing shops unchanged).
             $table->boolean('kot_reprint_enabled')->default(true);
+            $table->boolean('kot_last_addon_enabled')->default(true);
             // Internal account → planAllows() passes → plan gates are not the subject here.
             $table->boolean('is_internal_account')->default(false);
             // Silent-print path (fbrApiCreatePrintJob).

@@ -341,6 +341,51 @@ class PosAccessService
     }
 
     /**
+     * "Aakhri Add-on KOT" verdict (owner, 25 Aug 2026).
+     *
+     * Pehle yehi faisla kotReprintAllowed karta tha — ek switch DONO buttons
+     * par. Shop ne farq maanga aur wajah wazeh hai: poora order dobara kitchen
+     * ko bhejna (Re-send) khatarnak hai — 4-5 kitchen wale hain, kisi ko pata
+     * nahi chalta parcha naya hai ya pehle wala, aur cheez DOBARA pak jati hai.
+     * "Aakhri Add-on" is se bilkul mukhtalif hai: wo sirf naye add-on items ka
+     * parcha hai aur rozana ka jaiz kaam. Ab shop Re-send band kar ke Add-on
+     * chalu rakh sakti hai — pehle yeh mumkin nahi tha (sab ya kuch bhi nahi).
+     *
+     * Tarteeb bilkul wohi jo kotReprintAllowed ki hai:
+     *   • pos_kitchen (KDS) hamesha exempt — KDS khud kitchen hai.
+     *   • companies.kot_last_addon_enabled OFF → koi nahi, malik bhi nahi.
+     *   • ON (default; column ghayab = ON) → Custom Access ka wohi kot_reprint
+     *     tick faisla karta hai. STAFF-level ijazat jaan boojh kar ek hi rakhi
+     *     hai; sirf COMPANY-level switch alag hua hai, warna Team screen par
+     *     do lagbhag ek jaise tick shop ko confuse karte.
+     */
+    public static function kotLastAddonAllowed(?User $user, $company = null): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        if (($user->pos_role ?? null) === 'pos_kitchen') {
+            return true;
+        }
+        try {
+            $company = $company ?: \App\Models\Company::find($user->company_id);
+            // hasColumn guard: PROD drift (column missing) → attribute null →
+            // default ON, so a stale schema can never kill kitchen printing.
+            if (!(bool) ($company->kot_last_addon_enabled ?? true)) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            // A company lookup failure must never silently stop the kitchen.
+        }
+        $custom = self::customAllows($user, 'kot_reprint');
+        if ($custom !== null) {
+            return $custom;
+        }
+
+        return true;
+    }
+
+    /**
      * Return / Credit-Note verdict — SINGLE source of truth for the Return
      * buttons (bill detail + transactions list) AND the PosReturnController gate:
      * - Custom Access set (Unlimited/trial) → its explicit 'returns' tick wins,

@@ -1697,7 +1697,14 @@ class PosController extends Controller
 
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
-        $isRestaurant = false;
+        // The PRA dashboard is also used by restaurant-shaped companies. Use
+        // the canonical plan/override gate (not restaurant_mode) so its pending
+        // tile can warn about the same held orders that block day close.
+        $isRestaurant = \App\Services\PosFeatureService::restaurantAllowed($company);
+        [$openOrdersCount, $counterOrdersCount] = $this->pendingRestaurantOrderCounts(
+            $companyId,
+            $isRestaurant
+        );
         $isAdmin = !$isCashier;
 
         // Saaf style extras (lazy — only queried when the clean dashboard is active):
@@ -1783,7 +1790,8 @@ class PosController extends Controller
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
             'dayOpening', 'dayOpeningTotal', 'openingDrawers', 'openingCounters',
             'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
-            'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata',
+            'pendingProvisional', 'openOrdersCount', 'counterOrdersCount',
+            'unclosedPriorDays', 'canDayClose', 'todayKhata',
             'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
             'inactiveRegulars', 'dashTeamMembers', 'dashCashierId', 'riderPending'
         ));
@@ -1800,9 +1808,9 @@ class PosController extends Controller
      * settlement pari hai, click karo to seedha settlement par chala jaye."
      *
      * Predicate PosRider::openCashBills() ka hu-ba-hu aaina hai (archived bills
-     * bhi shamil — warna day-close ke baad khata gayab lagta hai), aur stream
-     * lock PosRiderController::applyStreamScope jaisa, warna dashboard aur
-     * deliveries page do alag raqamein dikhate.
+     * bhi shamil — warna day-close ke baad khata gayab lagta hai). Dashboard
+     * company ki liability reminder hai, reporting-stream report nahi: owner
+     * ya manager ko cash tab tak dikhna chahiye jab tak waqai settle na ho.
      */
     private function pendingRiderKhata($companyId, $company)
     {
@@ -1824,26 +1832,6 @@ class PosController extends Controller
             ->where(function ($s) {
                 $s->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
             });
-
-        // Stream lock (Task 353) — stream-locked staff sirf apni stream ka cash
-        // dekhe; 'both' (owner/admin) ko sab dikhta hai.
-        $scope = auth('pos')->user()?->posBillingScopeExplicit() ?? 'both';
-        if ($scope === 'local') {
-            $q->where(function ($s) {
-                $s->where('invoice_mode', 'local')
-                  ->orWhere(function ($s2) {
-                      $s2->whereNull('pra_status')->whereNull('pra_invoice_number');
-                  });
-            });
-        } elseif ($scope === 'pra') {
-            $q->where(function ($s) {
-                $s->where(function ($s2) {
-                    $s2->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
-                })->where(function ($s2) {
-                    $s2->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
-                });
-            });
-        }
 
         // Ek hi grouped query — rider ke hisaab se ginti, raqam aur sab se
         // purane bill ki tareekh (N+1 se bachne ke liye).
@@ -1871,6 +1859,34 @@ class PosController extends Controller
                 'days'  => $oldest ? (int) $oldest->copy()->startOfDay()->diffInDays(now()->startOfDay()) : 0,
             ];
         })->filter(fn ($r) => $r['owed'] > 0)->sortByDesc('owed')->values();
+    }
+
+    /**
+     * Held restaurant orders shown on the shared dashboard pending-bills tile.
+     * Open orders deliberately have no business-day restriction: yesterday's
+     * forgotten hold still blocks today's close and must remain actionable.
+     */
+    private function pendingRestaurantOrderCounts(int $companyId, bool $isRestaurant): array
+    {
+        if (!$isRestaurant || !\Illuminate\Support\Facades\Schema::hasTable('restaurant_orders')) {
+            return [0, 0];
+        }
+
+        $open = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->count();
+
+        $counter = 0;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'source')
+            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'table_id')) {
+            $counter = RestaurantOrder::where('company_id', $companyId)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->where('source', 'waiter')
+                ->whereNull('table_id')
+                ->count();
+        }
+
+        return [$open, $counter];
     }
 
     /**
@@ -2413,6 +2429,9 @@ class PosController extends Controller
         // all hide their Reprint / Re-send / Last Add-on buttons on this flag;
         // the kitchen-ticket, resend and print-job endpoints re-enforce it.
         $canKotReprint = \App\Services\PosAccessService::kotReprintAllowed($user, $company);
+        // Owner 25 Aug 2026: "Aakhri Add-on" ab apne alag company switch par hai —
+        // shop khatarnak poora Re-send band kar ke yeh jaiz wala chalu rakh sake.
+        $canKotLastAddon = \App\Services\PosAccessService::kotLastAddonAllowed($user, $company);
 
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
@@ -2421,7 +2440,7 @@ class PosController extends Controller
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
             'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated',
-            'recallOrderIdForJs', 'canOrderCancel', 'canKotReprint', 'terminalsForJs'
+            'recallOrderIdForJs', 'canOrderCancel', 'canKotReprint', 'canKotLastAddon', 'terminalsForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('X-TaxNest-Sale-Document', 'pra')
@@ -2488,6 +2507,7 @@ class PosController extends Controller
             // the offline-cached copy, or a cached screen keeps showing (and
             // firing) buttons the server now refuses.
             (bool) \App\Services\PosAccessService::kotReprintAllowed($user, $company),
+            (bool) \App\Services\PosAccessService::kotLastAddonAllowed($user, $company),
             // Caller ID is BAKED as "switch AND plan/add-on gate". The switch
             // alone rides posConfigRev, but a plan change or an add-on purchase
             // moves the verdict WITHOUT touching the column — fold the resolved
@@ -2641,7 +2661,8 @@ class PosController extends Controller
         $fsPresent      = $request->has('fs_present');
         $flagsPresent   = $fsPresent || $request->has('feature_flags');
         $kitchenPresent = $fsPresent || $request->hasAny([
-            'auto_print_kot', 'kot_reprint_enabled', 'pos_guided_flow_enabled',
+            'auto_print_kot', 'kot_reprint_enabled', 'kot_last_addon_enabled',
+            'pos_guided_flow_enabled',
         ]);
 
         $companyUpdates = [
@@ -2700,6 +2721,7 @@ class PosController extends Controller
             // would force it off.
             $companyUpdates['auto_print_kot']          = (bool) $request->input('auto_print_kot', false);
             $companyUpdates['kot_reprint_enabled']     = (bool) $request->input('kot_reprint_enabled', false);
+            $companyUpdates['kot_last_addon_enabled']  = (bool) $request->input('kot_last_addon_enabled', false);
             $companyUpdates['pos_guided_flow_enabled'] = (bool) $request->input('pos_guided_flow_enabled', false);
         }
 

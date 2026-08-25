@@ -31,12 +31,37 @@
 <script src="{{ asset('vendor/leaflet/leaflet.js') }}?v=1"></script>
 @endif
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
-     x-data="{ settleRider: null, settleTotal: 0, settleAmount: '', retBill: null, retBulk: null, retCount: 0, recalcSettle(form) {
+     x-data="{ settleRider: null, settleTotal: 0, settleAmount: '', settlePrepaid: {}, settlePrepaidBusy: {}, retBill: null, retBulk: null, retCount: 0, recalcSettle(form) {
          let t = 0;
          form.querySelectorAll('input[name=\'bill_ids[]\']:checked').forEach(cb => t += parseFloat(cb.dataset.amount || 0));
          this.settleTotal = t;
          this.settleAmount = t > 0 ? t : '';
-     } }">
+      }, settlePrepaidPending() {
+          return Object.values(this.settlePrepaidBusy).some(Boolean);
+      }, async toggleSettlePrepaid(event, form, billId) {
+          const wanted = !!event.target.checked;
+          if (this.settlePrepaidBusy[billId]) return;
+          this.settlePrepaidBusy[billId] = true;
+          try {
+              const res = await fetch(wanted ? event.target.dataset.markUrl : event.target.dataset.unmarkUrl, {
+                  method: 'POST',
+                  headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': {{ Js::from(csrf_token()) }} },
+              });
+              const data = await res.json().catch(() => null);
+              if (!res.ok || !data || !data.success) {
+                  throw new Error((data && data.message) || {{ Js::from(__('pos.settle_already_paid_failed')) }});
+              }
+              this.settlePrepaid[billId] = wanted;
+              const cashBox = form.querySelector('[data-settle-bill=\'' + billId + '\']');
+              if (cashBox) cashBox.checked = !wanted;
+              this.recalcSettle(form);
+          } catch (e) {
+              event.target.checked = !wanted;
+              window.alert(e.message || {{ Js::from(__('pos.settle_already_paid_failed')) }});
+          } finally {
+              this.settlePrepaidBusy[billId] = false;
+          }
+      } }">
 
     {{-- Return / credit-note prompt (Task 570): a PRA-reported bill just came
          back with the rider — nudge the admin/manager straight into the
@@ -198,14 +223,22 @@
                 <div class="absolute inset-0 bg-black/50" @click="settleRider = null"></div>
                 <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-lg p-5 max-h-[85vh] overflow-y-auto">
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — {{ $rider->name }}</h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.settle_cash_hint') }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.settle_cash_hint') }}</p>
+                    @if($isAdminOrManager)
+                    <p class="text-[11px] text-blue-600 dark:text-blue-300 mb-4">{{ __('pos.settle_already_paid_hint') }}</p>
+                    @else
+                    <div class="mb-4"></div>
+                    @endif
                     <form method="POST" action="{{ route('pos.riders.settle', $rider->id) }}" x-init="recalcSettle($el)" @change="if ($event.target.name === 'bill_ids[]') recalcSettle($event.target.closest('form'))">
                         @csrf
                         <div class="space-y-1.5 mb-4">
                             @foreach($open as $b)
                             @php $rem = (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0); @endphp
-                            <label class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer">
-                                <input type="checkbox" name="bill_ids[]" value="{{ $b->id }}" data-amount="{{ $rem }}" checked class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                            <div class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                                 :class="settlePrepaid[{{ $b->id }}] ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : ''">
+                                <input type="checkbox" name="bill_ids[]" value="{{ $b->id }}" data-amount="{{ $rem }}" data-settle-bill="{{ $b->id }}" checked
+                                       :disabled="settlePrepaid[{{ $b->id }}] || settlePrepaidBusy[{{ $b->id }}]"
+                                       class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 disabled:opacity-40">
                                 <span class="flex-1 min-w-0">
                                     <span class="flex items-center gap-1.5 min-w-0">
                                         <span class="block text-xs font-semibold text-gray-900 dark:text-white truncate">{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
@@ -216,8 +249,22 @@
                                     <span class="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ __('pos.partial_paid_note', ['paid' => number_format((float) $b->rider_partial_paid)]) }}</span>
                                     @endif
                                 </span>
-                                <span class="text-xs font-bold text-gray-900 dark:text-white">Rs. {{ number_format($rem) }}</span>
-                            </label>
+                                <span class="text-right flex-shrink-0">
+                                    <span class="block text-xs font-bold text-gray-900 dark:text-white">Rs. {{ number_format($rem) }}</span>
+                                    @if($isAdminOrManager)
+                                    <span class="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
+                                        <input type="checkbox"
+                                               data-mark-url="{{ route('pos.deliveries.mark-prepaid', $b->id) }}"
+                                               data-unmark-url="{{ route('pos.deliveries.unmark-prepaid', $b->id) }}"
+                                               :disabled="settlePrepaidBusy[{{ $b->id }}]"
+                                               @change.stop="toggleSettlePrepaid($event, $event.target.closest('form'), {{ $b->id }})"
+                                               class="rounded border-blue-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40">
+                                        <span x-show="!settlePrepaidBusy[{{ $b->id }}]">{{ __('pos.settle_already_paid_label') }}</span>
+                                        <span x-show="settlePrepaidBusy[{{ $b->id }}]" x-cloak>{{ __('pos.settle_already_paid_saving') }}</span>
+                                    </span>
+                                    @endif
+                                </span>
+                            </div>
                             @endforeach
                         </div>
                         {{-- Partial receive (Task 525): "aadha cash abhi, baqi baad" — cashier
@@ -241,7 +288,10 @@
                             <div class="flex gap-2">
                                 <button type="button" class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="settleRider = null">{{ __('pos.cancel') }}</button>
                                 <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                        :disabled="!(parseFloat(settleAmount) > 0) || parseFloat(settleAmount) > settleTotal + 0.009">{{ __('pos.confirm_settlement') }}</button>
+                                        x-show="settleTotal > 0.009"
+                                        :disabled="settlePrepaidPending() || !(parseFloat(settleAmount) > 0) || parseFloat(settleAmount) > settleTotal + 0.009">{{ __('pos.confirm_settlement') }}</button>
+                                <button type="button" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold shadow-sm hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        x-show="settleTotal <= 0.009" x-cloak :disabled="settlePrepaidPending()" @click="window.location.reload()">{{ __('pos.settle_already_paid_done') }}</button>
                             </div>
                         </div>
                     </form>
@@ -420,6 +470,9 @@
                             @endif
                             @if($b->rider_settlement_id)
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">{{ __('pos.settled_word') }}</span>
+                            @endif
+                            @if(!empty($b->prepaid_converted_at))
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" title="{{ __('pos.settle_already_paid_audit_title', ['date' => $b->prepaid_converted_at->format('d/m/Y h:i A'), 'تاریخ' => $b->prepaid_converted_at->format('d/m/Y h:i A')]) }}">{{ __('pos.settle_already_paid_chip') }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3">

@@ -6,8 +6,10 @@ use Tests\TestCase;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use App\Http\Controllers\PosController;
+use App\Models\User;
 
 /**
  * DASHBOARD "RIDER SETTLEMENT PENDING" ALERT — owner, 25 Aug 2026.
@@ -45,6 +47,16 @@ class PosDashboardRiderPendingTest extends TestCase
             $table->string('name')->default('Test Co');
             $table->boolean('is_internal_account')->default(false);
             $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->string('name')->nullable();
+            $table->string('role')->nullable();
+            $table->string('pos_role')->nullable();
+            $table->string('pos_billing_scope')->nullable();
             $table->timestamps();
         });
 
@@ -139,6 +151,33 @@ class PosDashboardRiderPendingTest extends TestCase
 
         $this->assertCount(1, $out);
         $this->assertSame(550.0, $out[0]['owed']);
+    }
+
+    public function test_archived_local_bill_stays_visible_to_pra_scoped_manager_until_settled(): void
+    {
+        $user = User::create([
+            'company_id' => 1,
+            'name' => 'Manager',
+            'role' => 'user',
+            'pos_role' => 'pos_manager',
+            'pos_billing_scope' => 'pra',
+        ]);
+        Auth::guard('pos')->setUser($user);
+
+        // Day close archives this local rider-cash proof. Fiscal stream scope
+        // must not hide a real company liability from the reminder.
+        $this->bill([
+            'rider_id' => 1,
+            'total_amount' => 550,
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'is_archived' => true,
+        ]);
+
+        $this->assertSame(550.0, $this->pending()->sum('owed'));
+
+        DB::table('pos_transactions')->update(['rider_settlement_id' => 91]);
+        $this->assertTrue($this->pending()->isEmpty());
     }
 
     public function test_settled_returned_and_card_bills_are_excluded(): void

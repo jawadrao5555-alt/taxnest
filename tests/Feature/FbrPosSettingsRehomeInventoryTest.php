@@ -434,6 +434,7 @@ class FbrPosSettingsRehomeInventoryTest extends TestCase
             $t->boolean('kitchen_printer_enabled')->default(false);
             $t->boolean('auto_print_kot')->default(false);
             $t->boolean('kot_reprint_enabled')->default(true);
+            $t->boolean('kot_last_addon_enabled')->default(true);
             $t->text('feature_flags')->nullable();
             $t->boolean('inventory_enabled')->default(false);
             $t->boolean('restaurant_mode')->default(false);

@@ -634,16 +634,21 @@ window.addEventListener('popstate', function() {
             </button>
             @endif
 
-            {{-- Held orders — F3 RETIRED (owner, 26 Jul 2026). Table companies:
-                 held orders ab TABLE board ke andar hain (tiles + "bina table"
-                 chips) — yeh button sirf NON-table companies ke liye bacha hai. --}}
-            @unless($features->tables ?? false)
-            <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.ti_held_orders') }}">
+            {{-- Held orders — F3 RETIRED (owner, 26 Jul 2026).
+                 25 Aug 2026 (ZFC ki shikayat): ab takeaway/delivery bhi hold hote
+                 hain, magar TABLE board sirf table-wali tiles dikhata hai —
+                 bina-table held order counter par kahin nazar hi nahi aata tha
+                 (shop ne scroll kar ke dhoonda). Is liye yeh chip ab TABLE
+                 companies par BHI hai.
+                 Jagah ka jhagra (koi shop upar chahti hai, koi jahan hai wahin)
+                 switch se nahi, KHUD-CHHUPNE se hal hua: table companies par chip
+                 sirf tab aata hai jab koi held order MAUJOOD ho. Zero held =
+                 screen bilkul waisi hi jaisi pehle thi. --}}
+            <button x-show="{{ ($features->tables ?? false) ? 'heldOrders.length > 0' : 'true' }}" x-cloak @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.ti_held_orders') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.held') }}</span>
                 <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
             </button>
-            @endunless
 
             {{-- 🟢/🟡/🔴 Auto-Sync status pill — same logic as the mobile copy --}}
             <button type="button" @click="syncOfflineBills(true)" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition flex-shrink-0"
@@ -1814,10 +1819,14 @@ window.addEventListener('popstate', function() {
                         </div>
                         {{-- Task 1379: kitchen-ticket reprint gate ($canKotReprint =
                              company switch + per-cashier Custom Access tick). --}}
-                        @if((($features->kot ?? false) || ($features->kitchen ?? false)) && $canKotReprint)
-                        <div class="grid grid-cols-2 gap-1.5" x-show="panelKotSent()">
+                        @if((($features->kot ?? false) || ($features->kitchen ?? false)) && ($canKotReprint || $canKotLastAddon))
+                        <div class="grid {{ ($canKotReprint && $canKotLastAddon) ? 'grid-cols-2' : 'grid-cols-1' }} gap-1.5" x-show="panelKotSent()">
+                            @if($canKotReprint)
                             <button @click="panelResendKot()" :disabled="submitting || boardBusy" title="{{ __('pos.kot_resend_btn') }}" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">{{ __('pos.resend_short') }}</button>
+                            @endif
+                            @if($canKotLastAddon)
                             <button @click="panelLastKot()" :disabled="submitting || boardBusy" title="{{ __('pos.ti_kot_last_addon') }}" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-40 transition">{{ __('pos.kot_last_addon_short') }}</button>
+                            @endif
                         </div>
                         @endif
                         <div class="grid grid-cols-2 gap-1.5">
@@ -2215,8 +2224,11 @@ window.addEventListener('popstate', function() {
                             {{-- Task 1379: reprint gate — see $canKotReprint. --}}
                             @if((($features->kot ?? false) || ($features->kitchen ?? false)) && $canKotReprint)
                             <button x-show="boardMenuTable.order.kot_sent_at" @click="boardResendKot()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">{{ __('pos.kot_resend_btn') }}</button>
+                            @endif
                             {{-- Task 753 MISSED-DELTA RECOVERY: akhri add-on (delta) KOT ka reprint —
-                                 physical print fail par slip wapas nikalne ka rasta. --}}
+                                 physical print fail par slip wapas nikalne ka rasta.
+                                 Owner 25 Aug 2026: ab yeh apne alag switch par hai. --}}
+                            @if((($features->kot ?? false) || ($features->kitchen ?? false)) && $canKotLastAddon)
                             <button x-show="boardMenuTable.order.kot_sent_at" @click="boardLastKot()" :disabled="boardBusy" title="{{ __('pos.ti_kot_last_addon') }}" class="w-full py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-40 transition">{{ __('pos.kot_last_addon_btn') }}</button>
                             @endif
                             {{-- Table Shift (owner batch, 26 Jul 2026): har role, sirf
@@ -2486,7 +2498,7 @@ window.addEventListener('popstate', function() {
                         <a x-show="canKotReprint || !heldMenu.kot_sent_at" :href="'/pos/restaurant/orders/' + heldMenu.id + '/kitchen-ticket'" target="_blank" class="py-2 rounded-xl text-xs font-bold text-center text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition">{{ __('pos.kot_dekho') }}</a>
                         <button x-show="canKotReprint" @click="heldMenuResend()" class="py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 hover:bg-orange-100 transition">{{ __('pos.kot_resend_btn') }}</button>
                     </div>
-                    <button x-show="canKotReprint" @click="heldMenuLastKot()" title="{{ __('pos.ti_kot_last_addon') }}" class="w-full py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_btn') }}</button>
+                    <button x-show="canKotLastAddon" @click="heldMenuLastKot()" title="{{ __('pos.ti_kot_last_addon') }}" class="w-full py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_btn') }}</button>
                     @endif
                     <button @click="heldMenuDelete()" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition">{{ __('pos.order_delete_btn') }}</button>
                 </div>
@@ -2534,7 +2546,7 @@ window.addEventListener('popstate', function() {
                             @if($features->kot)
                             <a x-show="canKotReprint || !order.kot_sent_at" :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.ti_view_print_kot') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
                             <button x-show="canKotReprint" @click="resendKitchen(order)" title="Re-send full order ticket to kitchen (marked REPRINT)." class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
-                            <button x-show="canKotReprint" @click="reprintLastKot(order)" title="{{ __('pos.ti_kot_last_addon') }}" class="py-2 px-2 text-xs font-bold text-amber-700 border border-amber-400 rounded-xl bg-amber-50 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_short') }}</button>
+                            <button x-show="canKotLastAddon" @click="reprintLastKot(order)" title="{{ __('pos.ti_kot_last_addon') }}" class="py-2 px-2 text-xs font-bold text-amber-700 border border-amber-400 rounded-xl bg-amber-50 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_short') }}</button>
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
@@ -4790,6 +4802,7 @@ function restaurantPos() {
         // print-job endpoints re-enforce the SAME verdict with a 403, so an old
         // tab or a pasted URL cannot reprint either.
         canKotReprint: {{ !empty($canKotReprint) ? 'true' : 'false' }},
+        canKotLastAddon: {{ !empty($canKotLastAddon) ? 'true' : 'false' }},
         tableBoardOpen: false, // board ab MODAL hai (owner 26 Jul 2026) — load par band, Alt+B / TABLE button se khulta hai
         boardMenuTable: null,   // tile clicked → action menu modal
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
@@ -9373,8 +9386,9 @@ function restaurantPos() {
         // Stamping server par whereNull-guarded hai: kabhi re-number nahi hota.
         reprintLastKot(order) {
             if (!order || !order.id) return;
-            // Task 1379 — see resendKitchen().
-            if (!this.canKotReprint) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; }
+            // Task 1379 — see resendKitchen(). Owner 25 Aug 2026: yeh "Aakhri
+            // Add-on" hai, poora Re-send nahi — is ka apna alag switch hai.
+            if (!this.canKotLastAddon) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; }
             const url = '/pos/restaurant/orders/' + order.id + '/kitchen-ticket?auto_print=1&batch=last';
             const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=380,height=620');
             if (!this.silentKotPrint) { fallback(); return; }
@@ -11924,9 +11938,28 @@ function restaurantPos() {
         // sakht hadd (CAP) jise koi copy paar nahi kar sakti. Repost toofan
         // khamosh rehta hai, magar asli dobara call CAP ke baad zaroor dikhti
         // hai — ring kabhi poori tarah gumti nahi.
+        //
+        // 25 Aug 2026 (dobara, shop ke test ke baad) — do cheezen theek ki gain:
+        //
+        // 1) KEY mein ab SOURCE bhi shamil hai. Pehle key sirf number thi, is
+        //    liye SIM call ki khamoshi USI number ki WhatsApp call ko bhi kha
+        //    jati thi — shop ne yehi pakra ("WhatsApp bhi nahi dikhti"). SIM aur
+        //    WhatsApp do alag lanes hain: ek ki khamoshi doosri par lagni hi
+        //    nahi chahiye.
+        //
+        // 2) CAP 10 minute se 4 minute. Pizza shop par grahak 2-3 minute baad
+        //    hi dobara call karta hai (ek cheez aur add karni hai) — 10 minute
+        //    ki hadd us asli call ko kha rahi thi. SLIDE 90s rakha hai kyunki
+        //    SIM ke doosre detector (dialer notification) ko aane mein 30-60s
+        //    lagte hain; usay zaroor dabana hai. Nateeja: repost toofan dabta
+        //    hai, magar asli dobara call zyada se zyada 4 minute mein dikh jati
+        //    hai. Ek extra popup miss hui call se behtar hai.
         callerMuteKey(ev) {
             const k = ev && (ev.phone || ev.name);
-            return k ? String(k) : '';
+            if (!k) { return ''; }
+            // SIM aur WhatsApp alag lanes — ek ki khamoshi doosri par na lage.
+            const src = (ev && ev.source === 'whatsapp') ? 'wa' : 'sim';
+            return src + '|' + String(k);
         },
         callerMuted(ev) {
             const k = this.callerMuteKey(ev);
@@ -11944,8 +11977,8 @@ function restaurantPos() {
             // Naya popup = khamoshi ka nishan yahin se. Copy ke liye purana
             // nishan hi chalta hai (na mile to abhi se — cap phir bhi lagta hai).
             if (firstPopup || !this._callerMutedFrom[k]) { this._callerMutedFrom[k] = t; }
-            const cap = this._callerMutedFrom[k] + 600000;      // 10 min: sakht hadd
-            this._callerMuted[k] = Math.min(t + 120000, cap);   // 2 min: sarakta window
+            const cap = this._callerMutedFrom[k] + 240000;      // 4 min: sakht hadd
+            this._callerMuted[k] = Math.min(t + 90000, cap);    // 90s: sarakta window
             // Purani entries saaf — warna poori shift ka object banta jata hai.
             Object.keys(this._callerMuted).forEach(x => {
                 if (this._callerMuted[x] < t) {

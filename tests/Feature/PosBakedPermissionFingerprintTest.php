@@ -70,6 +70,13 @@ class PosBakedPermissionFingerprintTest extends TestCase
         return [
             // Task 1379 — kitchen-ticket Reprint / Re-send / Last Add-on.
             'kotReprintAllowed'  => 'kot_reprint',
+            // Last Add-on rides the SAME staff tick but has its own company
+            // master, so a shop can block the dangerous whole-order Re-send
+            // and still let the counter print just the newly added items.
+            // Flip the column, not the tick, or this proves nothing new.
+            'kotLastAddonAllowed' => fn () => DB::table('companies')
+                ->where('id', $this->companyId)
+                ->update(['kot_last_addon_enabled' => false]),
             // Task 643 — restaurant Order Cancel.
             'orderCancelAllowed' => 'order_cancel',
         ];
@@ -98,6 +105,7 @@ class PosBakedPermissionFingerprintTest extends TestCase
             $table->text('pos_printer_settings')->nullable();
             // The company-level switches behind the baked verdicts.
             $table->boolean('kot_reprint_enabled')->default(true);       // Task 1379 master switch
+            $table->boolean('kot_last_addon_enabled')->default(true);
             $table->boolean('pos_cashier_order_cancel')->default(false); // Task 643
             // Internal account → planAllows() passes → Custom Access sets are live.
             $table->boolean('is_internal_account')->default(false);

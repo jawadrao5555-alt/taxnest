@@ -2349,10 +2349,17 @@ class RestaurantPosController extends Controller
         // are gated (see KotPrintService::isReprintRender) — a first fire and
         // every delta stay open, and unauthenticated renders (Desktop Agent
         // print jobs, which are gated at enqueue time) pass through untouched.
+        // Owner 25 Aug 2026: ab do alag company switch hain. "Aakhri Add-on"
+        // (batch=last) sirf naye items ka parcha hai — jaiz rozana ka kaam; poora
+        // Re-send DOBARA-PAKNE wali khatarnak cheez hai. Is liye har render apne
+        // apne switch se guzarta hai, warna Re-send band karne par Add-on bhi mar
+        // jata (aur ulta bhi).
         $kotUser = Auth::guard('pos')->user();
         if ($kotUser
             && \App\Services\KotPrintService::isReprintRender($order, $delta, $batchLast)
-            && !\App\Services\PosAccessService::kotReprintAllowed($kotUser, $company)) {
+            && !($batchLast
+                ? \App\Services\PosAccessService::kotLastAddonAllowed($kotUser, $company)
+                : \App\Services\PosAccessService::kotReprintAllowed($kotUser, $company))) {
             abort(403, __('pos.kot_reprint_not_allowed'));
         }
 

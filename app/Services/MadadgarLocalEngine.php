@@ -312,10 +312,10 @@ class MadadgarLocalEngine
              'a' => "Bill customer ko WhatsApp par bhejne ke liye /pos/transactions se bill kholein → share link banayen — yeh link WhatsApp waghera par bhej sakte hain."],
 
             ['p' => [['restaurant']],
-             'a' => "Restaurant module ke liye Pro ya Unlimited package chahiye (ya active trial), phir /pos/features se restaurant features ON karein — KOT, Table Management, KDS, Kitchen Notes, Recipes. Order types: Dine-In (pehle Hold/KOT, khana banne ke baad payment), Takeaway (seedha final bill), Delivery (final ya provisional dono). Tables /pos/restaurant/table-management par banti hain."],
+             'a' => "Restaurant module ke liye Pro ya Unlimited package chahiye (ya active trial), phir /pos/features se restaurant features ON karein — KOT, Table Management, KDS, Kitchen Notes, Recipes. Dine-In, Takeaway aur Delivery teenon ko Hold ya Send to Kitchen kar sakte hain; Tables ON hon to Dine-In ke liye table zaroori hai. Tables /pos/restaurant/table-management par banti hain."],
 
             ['p' => [['hold']],
-             'a' => "Hold (F5) sirf Dine-In orders ke liye hai — manual items aur deals hold nahi ho saktin. Held orders TABLE board (Alt+B ya TABLE button) ke andar milte hain: table wale orders table ke card par, bina table walay \"Held Orders (bina table)\" amber chips mein — chip par click se Bill Kholo / PAY / KOT options milte hain."],
+             'a' => "Hold (F5) Dine-In, Takeaway aur Delivery teenon ke liye hai — Tables ON hon to Dine-In ke liye table zaroori hai; manual items aur deals hold nahi ho saktin. Held orders TABLE board (Alt+B ya TABLE button) mein milte hain: table wale table card par aur baqi \"Held Orders (bina table)\" amber chips mein — click se Bill Kholo / PAY / KOT options milte hain."],
 
             ['p' => [['agent']],
              'a' => "Desktop Sync Agent Windows PC par chalta hai — bills PRA ko submit karta hai aur silent printing isi se hoti hai. Download /pos/agent page se (\"Download TaxNest Agent\"); wahin agent ka status (Online/Offline, last seen, version) bhi dikhta hai. Agent v1.3.0+ khud update hota hai — dobara download/install ki zaroorat nahi."],
@@ -349,7 +349,7 @@ class MadadgarLocalEngine
              'a' => "Nayi bill Dashboard ke \"Nayi Sale\" button (ya /pos/invoice/create) se banti hai:\n1. (Optional) Customer box mein phone/naam se customer chunein — walk-in ke liye khali chhor dein.\n2. Items dalein — search box, product grid ya barcode scan se.\n3. Qty cart row ke qty box se badlein.\n4. \"PAY\" (F8) → Cash (1) ya Card (2) = FINAL bill; ya \"Save Provisional\" (F9) = local bill.\n5. Receipt popup se P = Print."],
 
             ['p' => [['kot']],
-             'a' => "KOT (Kitchen Order Ticket) kitchen ke liye order ki parchi hai — \"Send to Kitchen\" button Dine-In order ko bina payment ke kitchen bhejta hai aur ticket print hota hai. KOT/kitchen printer ki settings /pos/restaurant/kitchen-settings par hain (KDS, Kitchen Printer, Print KOT on Hold waghera). KOT restaurant module ka feature hai (Pro/Unlimited package) — /pos/features se ON hota hai."],
+             'a' => "KOT (Kitchen Order Ticket) kitchen ke liye order ki parchi hai — \"Send to Kitchen\" button Dine-In, Takeaway ya Delivery order ko bina payment ke kitchen bhejta aur ticket print karta hai. Tables ON hon to Dine-In ke liye table zaroori hai. KOT/kitchen printer settings /pos/restaurant/kitchen-settings par hain; yeh restaurant module ka feature hai (Pro/Unlimited) — /pos/features se ON hota hai."],
 
             ['p' => [['pra']],
              'a' => "PRA integration: har FINAL bill Punjab Revenue Authority ko report hota hai aur POS-YYYY-NNNNN fiscal serial milta hai — receipt par PRA number aur QR aata hai. Settings /pos/pra-settings par (sirf admin): Environment, Connection Mode (Cloud API / PRA Fiscal Device), POS Registration ID, Token — \"Test Connection\" se check karein. Internet na ho to bill offline queue mein ja kar khud retry hota hai, quota dobara nahi katta. Naye PRA registrations ke liye Fiscal Device mode zaroori hai."],

@@ -478,6 +478,7 @@ class PosSettingsStaleFormGuardTest extends TestCase
             // Kitchen / KOT settings
             $t->boolean('auto_print_kot')->default(false);
             $t->boolean('kot_reprint_enabled')->default(false);
+            $t->boolean('kot_last_addon_enabled')->default(false);
             $t->boolean('pos_guided_flow_enabled')->default(false);
             $t->boolean('kds_enabled')->default(false);
             $t->boolean('kitchen_printer_enabled')->default(false);

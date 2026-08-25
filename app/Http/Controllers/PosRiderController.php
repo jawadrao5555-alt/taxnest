@@ -1637,8 +1637,23 @@ class PosRiderController extends Controller
             return back()->with('error', __('pos.mark_prepaid_err_not_delivery'));
         }
 
-        // Idempotent — already non-cash, nothing to do.
+        // Idempotent replay — a double-click / lost-response retry of THIS
+        // conversion is success and must preserve the first actor/time. An
+        // originally non-cash bill (no conversion stamp) is still rejected.
         if ($txn->payment_method !== 'cash') {
+            if ($txn->payment_method === 'qr_payment' && !empty($txn->prepaid_converted_at)) {
+                $message = !empty($txn->pra_invoice_number)
+                    ? __('pos.mark_prepaid_success_pra')
+                    : __('pos.mark_prepaid_success');
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'replayed' => true,
+                        'message' => $message,
+                    ]);
+                }
+                return back()->with('success', $message);
+            }
             return back()->with('error', __('pos.mark_prepaid_err_not_cash'));
         }
 
@@ -1666,7 +1681,33 @@ class PosRiderController extends Controller
             $upd['prepaid_converted_by'] = $user->id;
         }
 
-        $txn->update($upd);
+        // Compare-and-swap makes simultaneous double-clicks idempotent too:
+        // only the request that still sees CASH may stamp the audit fields.
+        // The loser observes the completed conversion and returns the same
+        // success without overwriting the first actor/time.
+        $written = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('id', $txn->id)
+            ->where('payment_method', 'cash')
+            ->update($upd);
+        if ($written === 0) {
+            $txn->refresh();
+            if ($txn->payment_method === 'qr_payment' && !empty($txn->prepaid_converted_at)) {
+                $message = !empty($txn->pra_invoice_number)
+                    ? __('pos.mark_prepaid_success_pra')
+                    : __('pos.mark_prepaid_success');
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'replayed' => true,
+                        'message' => $message,
+                    ]);
+                }
+                return back()->with('success', $message);
+            }
+            return back()->with('error', __('pos.mark_prepaid_err_not_cash'));
+        }
+        $txn->refresh();
 
         // Verify the write landed (memory: eloquent-missing-attribute-null).
         $saved = \DB::table('pos_transactions')->where('id', $txn->id)->value('payment_method');
@@ -1685,6 +1726,14 @@ class PosRiderController extends Controller
         $message = $praSubmitted
             ? __('pos.mark_prepaid_success_pra')
             : __('pos.mark_prepaid_success');
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'replayed' => false,
+                'message' => $message,
+            ]);
+        }
 
         return back()->with('success', $message);
     }
@@ -1776,6 +1825,13 @@ class PosRiderController extends Controller
             'actor_role'  => $user->pos_role,
             'written_pm'  => $saved,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => __('pos.unmark_prepaid_success'),
+            ]);
+        }
 
         return back()->with('success', __('pos.unmark_prepaid_success'));
     }

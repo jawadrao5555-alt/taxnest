@@ -71,6 +71,18 @@ class PosMultiBranchScopeTest extends TestCase
             $table->timestamps();
         });
 
+        // Plan-gate lookup (PosFeatureService::restaurantAllowed, reached from
+        // the dashboard's held-order reminder) reads this table. An EMPTY table
+        // is enough: no row = no plan = Restaurant module off, which is exactly
+        // what these retail-shaped fixtures mean.
+        Schema::create('subscriptions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->unsignedBigInteger('pricing_plan_id')->nullable();
+            $table->boolean('active')->default(false);
+            $table->timestamps();
+        });
+
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name')->nullable();

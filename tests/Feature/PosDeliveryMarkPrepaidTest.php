@@ -574,6 +574,45 @@ class PosDeliveryMarkPrepaidTest extends TestCase
         $this->assertSame(0, (int) $riderModel->openCashBills()->count());
     }
 
+    /** Settlement modal rule: converted bill leaves, ordinary cash bill remains owed. */
+    public function test_already_paid_bill_drops_out_but_normal_cash_bill_still_counts(): void
+    {
+        $cid       = $this->buildSchema();
+        $rider     = $this->makeRider($cid);
+        $admin     = $this->makeUser($cid, 'pos_admin');
+        $prepaidId = $this->makeBill($cid, $rider, ['total_amount' => 1200]);
+        $cashId    = $this->makeBill($cid, $rider, [
+            'invoice_number' => 'INV-CASH-2',
+            'total_amount' => 800,
+        ]);
+
+        $this->postMarkPrepaid($admin, $cid, $prepaidId)->assertSessionHas('success');
+
+        $open = \App\Models\PosRider::findOrFail($rider)->openCashBills()->get();
+        $this->assertSame([$cashId], $open->pluck('id')->all());
+        $this->assertSame(800.0, (float) $open->sum('total_amount'));
+    }
+
+    /** Lost-response retry is a successful no-op and preserves the first audit actor/time. */
+    public function test_mark_prepaid_double_submit_is_safe_and_idempotent(): void
+    {
+        $cid    = $this->buildSchema();
+        $rider  = $this->makeRider($cid);
+        $admin  = $this->makeUser($cid, 'pos_admin');
+        $billId = $this->makeBill($cid, $rider);
+
+        $this->postMarkPrepaid($admin, $cid, $billId)->assertSessionHas('success');
+        $first = DB::table('pos_transactions')->find($billId);
+
+        $this->postMarkPrepaid($admin, $cid, $billId)->assertSessionHas('success');
+        $second = DB::table('pos_transactions')->find($billId);
+
+        $this->assertSame('qr_payment', $second->payment_method);
+        $this->assertSame($first->prepaid_converted_at, $second->prepaid_converted_at);
+        $this->assertSame((int) $first->prepaid_converted_by, (int) $second->prepaid_converted_by);
+        $this->assertNull($second->rider_settlement_id);
+    }
+
     /** 12. Cross-company: admin from company A cannot convert company B's bill → 404. */
     public function test_cross_company_bill_returns_404(): void
     {

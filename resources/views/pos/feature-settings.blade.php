@@ -244,6 +244,18 @@
                                 <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">{{ __('pos.allow_kot_reprint_desc') }}</p>
                             </div>
                         </label>
+                        {{-- Owner 25 Aug 2026: pehle upar wala EK switch dono buttons band karta
+                             tha. Shop ki takleef sirf poore Re-send se hai (kitchen ko pata nahi
+                             chalta parcha naya hai ya purana → cheez DOBARA pak jati hai);
+                             "Aakhri Add-on" sirf naye items ka parcha hai aur rozana ka jaiz kaam.
+                             Ab dono alag hain, taake khatarnak wala band ho aur jaiz wala chale. --}}
+                        <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="kotLastAddon ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'" x-show="flags.kot">
+                            <input type="checkbox" name="kot_last_addon_enabled" value="1" x-model="kotLastAddon" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-bold text-gray-900 dark:text-white">➕ {{ __('pos.allow_kot_last_addon') }}</div>
+                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">{{ __('pos.allow_kot_last_addon_desc') }}</p>
+                            </div>
+                        </label>
                     </div>
                 </div>
 
@@ -354,6 +366,7 @@
                 density: @json($company->pos_ui_density ?? 'standard'),
                 autoPrintKot: @json((bool)($company->auto_print_kot ?? false)),
                 kotReprint: @json((bool)($company->kot_reprint_enabled ?? true)),
+                kotLastAddon: @json((bool)($company->kot_last_addon_enabled ?? true)),
                 guidedFlow: @json((bool)($company->pos_guided_flow_enabled ?? true)),
 
                 presetMeta: @json(\App\Services\PosFeatureService::PRESET_META),

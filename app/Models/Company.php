@@ -136,6 +136,7 @@ class Company extends Model
         'pos_waiter_cancel_enabled',
         'pos_waiter_takeaway_enabled',
         'kot_reprint_enabled',
+        'kot_last_addon_enabled',
         'pos_receipt_show_tax',
         'pos_guided_flow_enabled',
         'pos_tax_rate_cash',
@@ -255,6 +256,7 @@ class Company extends Model
         'pos_waiter_cancel_enabled' => 'boolean',
         'pos_waiter_takeaway_enabled' => 'boolean',
         'kot_reprint_enabled' => 'boolean',
+        'kot_last_addon_enabled' => 'boolean',
         'pos_receipt_show_tax' => 'boolean',
         'pos_guided_flow_enabled' => 'boolean',
         'pos_setup_completed' => 'boolean',
@@ -518,7 +520,7 @@ class Company extends Model
             // Task 779: Tables-first flow flag is BAKED into the sale screen JS —
             // a toggle must refresh cached sale screens.
             // Task 781: table-click direct-open flag is BAKED the same way.
-            'auto_print_kot', 'kot_reprint_enabled', 'dine_in_auto_kot',
+            'auto_print_kot', 'kot_reprint_enabled', 'kot_last_addon_enabled', 'dine_in_auto_kot',
             'tables_first_flow', 'table_click_direct_open',
             'pos_kot_full_mode', 'kot_compact', 'kot_show_customer',
             'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer',

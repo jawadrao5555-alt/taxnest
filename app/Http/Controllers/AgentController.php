@@ -122,6 +122,24 @@ class AgentController extends Controller
             if (!$tag || !preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $tag, $m)) {
                 return null;
             }
+
+            // 25 Aug 2026 (shop: "agent roz update maangta hai") — pehle server
+            // HAR heartbeat par latest release advertise karta tha aur "purana
+            // hai ya nahi" ka faisla poori tarah client par chhorta tha. Yani ek
+            // already-updated agent ko bhi update payload milta rehta tha; agar
+            // kisi bhi surface ne us payload ki MAUJOODGI ko "update available"
+            // samajh liya to shop ko roz prompt dikhta raha, chahe wo latest par
+            // hi kyun na ho. Ab faisla server par bhi lagta hai: version pata ho
+            // aur latest se kam na ho to kuch bhejte hi nahi. (Version na batane
+            // wale purane agents ke liye purana rawaiya barqarar — unka faisla
+            // client hi karega.)
+            $latest = $m[1] . '.' . $m[2] . '.' . $m[3];
+            if ($agentVersion
+                && preg_match('/^v?(\d+)\.(\d+)\.(\d+)/', trim($agentVersion), $cv)
+                && version_compare("{$cv[1]}.{$cv[2]}.{$cv[3]}", $latest, '>=')) {
+                return null;
+            }
+
             $zip = collect($info['assets'] ?? [])
                 ->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))
                 ->sortByDesc('size')

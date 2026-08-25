@@ -1041,6 +1041,7 @@
                 data-label-total="{{ __('pos.dc_confirm_pending_total') }}"
                 data-label-actions="{{ __('pos.dc_confirm_pending_actions') }}"
                 data-label-proceed="{{ __('pos.dc_confirm_pending_proceed') }}"
+                data-label-delete-warning="{{ __('pos.dc_confirm_delete_permanent_warning') }}"
                 data-fallback-count="{{ $dcPendingLocalTotal }}"
                 data-fallback-amount="{{ (float) (($localWash->prov_amount ?? 0) + ($localWash->final_amount ?? 0)) }}"
                 data-fallback-prov-count="{{ (int) ($localWash->prov_count ?? 0) }}"
@@ -1132,6 +1133,10 @@
                 var lbl = labels[action] || action;
                 lines.push('  • ' + lbl + ': ' + agg[action].count + ' ' + btn.getAttribute('data-label-bills-word') + ' (' + fmt(agg[action].amount) + ')');
             });
+            if (agg.delete && agg.delete.count > 0) {
+                lines.push('');
+                lines.push(btn.getAttribute('data-label-delete-warning'));
+            }
             lines.push('');
             lines.push(btn.getAttribute('data-label-proceed'));
             return confirm(lines.join('\n'));

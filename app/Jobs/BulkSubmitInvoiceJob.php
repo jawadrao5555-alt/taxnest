@@ -199,11 +199,22 @@ class BulkSubmitInvoiceJob implements ShouldQueue
         $result = $controller->submitToFbrSync($invoice);
 
         $attempts = 1;
+        $deadline = microtime(true) + self::RETRY_DEADLINE_SECONDS;
         while ($this->isTransientRejection($result) && $attempts < self::MAX_FBR_ATTEMPTS) {
-            if (self::runCancelled($this->batchId)) {
+            if (self::runCancelled($this->batchId) || microtime(true) >= $deadline) {
                 break;
             }
             $this->pause(self::RETRY_BACKOFF_SECONDS[$attempts - 1] ?? 5);
+            // Stop can land during the pause, and FBR itself can be slow enough
+            // that another attempt would run into the job timeout — re-check
+            // both before spending a POST the shop no longer wants.
+            if (self::runCancelled($this->batchId)) {
+                break;
+            }
+            if (microtime(true) >= $deadline) {
+                Log::warning("BulkSubmitInvoiceJob: invoice #{$this->invoiceId} out of time for another FBR attempt.");
+                break;
+            }
             if (!$this->reclaimForRetry($invoice)) {
                 break; // someone else moved it, or it is no longer submittable
             }
@@ -240,6 +251,16 @@ class BulkSubmitInvoiceJob implements ShouldQueue
 
     /** Seconds to wait before each retry — FBR settles within a few seconds. */
     public const RETRY_BACKOFF_SECONDS = [2, 5];
+
+    /**
+     * No new attempt may START after this many seconds of submitting.
+     *
+     * $timeout is 180s. A slow FBR call can take ~45s, so three of them plus
+     * the backoff would run the worker out of time; a job killed mid-POST
+     * leaves the invoice stuck with is_fbr_processing = true, which the shop
+     * cannot clear on its own. 120s leaves a full attempt inside the budget.
+     */
+    public const RETRY_DEADLINE_SECONDS = 120;
 
     /** Wait between attempts (skipped in tests — nothing real is being called). */
     protected function pause(int $seconds): void

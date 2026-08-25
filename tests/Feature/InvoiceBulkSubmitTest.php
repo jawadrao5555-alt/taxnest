@@ -321,6 +321,39 @@ class InvoiceBulkSubmitTest extends TestCase
         $this->assertFalse((bool) $invoice->fresh()->is_fbr_processing);
     }
 
+    public function test_stop_pressed_during_the_backoff_prevents_another_fbr_post(): void
+    {
+        Queue::fake([IntelligenceProcessingJob::class]);
+
+        $seen = 0;
+        $batchId = null;
+        $mock = $this->partialMock(InvoiceController::class);
+        $mock->shouldReceive('submitToFbrSync')->andReturnUsing(function (Invoice $invoice) use (&$seen, &$batchId) {
+            $seen++;
+            // The shop presses Stop while we are waiting to retry.
+            InvoiceBulkSubmission::whereKey($batchId)->update(['cancel_requested' => true]);
+            $invoice->status = 'failed';
+            $invoice->fbr_status = 'failed';
+            $invoice->is_fbr_processing = false;
+            $invoice->save();
+            return ['status' => 'failed', 'failure_type' => 'validation_error', 'errors' => ['[0077] rejected'], 'execution_ms' => 5];
+        });
+
+        $invoice = $this->makeDraft();
+        $batch = InvoiceBulkSubmission::create([
+            'company_id' => $this->company->id, 'user_id' => $this->user->id,
+            'target_status' => 'draft', 'scope' => 'selected', 'state' => 'running',
+            'invoice_ids' => [$invoice->id], 'max_invoice_id' => $invoice->id, 'total' => 1,
+            'started_at' => now(), 'last_progress_at' => now(),
+        ]);
+        $batchId = $batch->id;
+
+        (new BulkSubmitInvoiceJob($invoice->id, $batch->id, $this->user->id))->handle();
+
+        $this->assertSame(1, $seen, 'No further FBR post may happen once Stop is pressed.');
+        $this->assertSame(1, (int) $batch->fresh()->failed);
+    }
+
     public function test_a_network_failure_is_never_re_posted(): void
     {
         // A timeout may mean FBR accepted the invoice and we lost the answer —

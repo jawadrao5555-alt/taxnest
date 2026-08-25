@@ -613,6 +613,9 @@
                         <div class="text-xs text-gray-600 dark:text-gray-400 mb-2">
                             <span x-text="processed.toLocaleString()"></span> invoices ready<span x-show="sizeText"> — <span x-text="sizeText"></span></span>. The download begins as soon as you press the button.
                         </div>
+                        <div x-show="failed > 0" x-cloak class="mb-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
+                            <span x-text="failed.toLocaleString()"></span> invoice(s) could not be prepared and are not in this ZIP — they are named in the _MISSING.txt file inside it.
+                        </div>
                         <div x-show="sizeCapped" x-cloak class="mb-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
                             The archive hit its size limit and stopped early. Download it, then run the rest one month at a time using the date filters.
                         </div>

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\InvoicePdfCacheService;
 use App\Services\InvoiceZipBuilderService;
 use Illuminate\Console\Command;
 
@@ -20,6 +21,14 @@ class PruneInvoiceZipExports extends Command
     {
         $removed = InvoiceZipBuilderService::purgeExpired();
         $this->info("Pruned {$removed} expired invoice ZIP export(s).");
+
+        // Rendered invoice PDFs are kept between downloads, but a company that
+        // stopped downloading half a year ago should not hold disk forever.
+        // Nothing is lost: a pruned invoice renders again on demand.
+        $pdfs = InvoicePdfCacheService::prune();
+        if ($pdfs > 0) {
+            $this->info("Dropped {$pdfs} cached invoice PDF(s) nobody has asked for in months.");
+        }
 
         return self::SUCCESS;
     }

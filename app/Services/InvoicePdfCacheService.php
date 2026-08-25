@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Models\InvoiceZipExport;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -74,6 +75,12 @@ class InvoicePdfCacheService
         Storage::disk('local')->makeDirectory(self::dir((int) $invoice->company_id));
 
         $path = self::path((int) $invoice->company_id, (int) $invoice->id);
+
+        // Stamped with the moment the rendering began, not the moment it
+        // finished. An invoice edited while its PDF was being drawn would
+        // otherwise end up with a file newer than the edit — and that stale
+        // rendering would be handed out as the shop's tax document forever.
+        $readAt = time();
         $bytes = InvoicePdfService::renderBw($invoice)->output();
         $tmp = $path . '.' . getmypid() . '.part';
 
@@ -81,6 +88,8 @@ class InvoicePdfCacheService
             @unlink($tmp);
             throw new \RuntimeException('Could not write the rendered invoice PDF to disk.');
         }
+
+        @touch($path, $readAt);
 
         return ['path' => $path, 'size' => strlen($bytes), 'rendered' => true];
     }
@@ -115,7 +124,20 @@ class InvoicePdfCacheService
         $cutoff = time() - ($days * 86400);
         $removed = 0;
 
+        // A company with a prepared download may be streaming from these files
+        // right now; deleting one mid-download breaks the archive in the
+        // shop's hands. Their PDFs are left alone until the export expires.
+        $busy = InvoiceZipExport::whereIn('status', ['queued', 'processing', 'ready'])
+            ->pluck('company_id')
+            ->unique()
+            ->map(fn ($id) => 'company_' . $id)
+            ->all();
+
         foreach (glob(Storage::disk('local')->path('invoice-pdfs') . '/company_*/*.pdf') ?: [] as $file) {
+            if (in_array(basename(dirname($file)), $busy, true)) {
+                continue;
+            }
+
             if ((int) @filemtime($file) < $cutoff && @unlink($file)) {
                 $removed++;
             }

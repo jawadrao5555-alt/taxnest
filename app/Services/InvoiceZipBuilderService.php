@@ -474,7 +474,7 @@ class InvoiceZipBuilderService
             return;
         }
 
-        [$ready, $bytes, $missing] = self::inventory($export);
+        [$ready, $bytes, $missing, $missingCount] = self::inventory($export);
 
         // A download containing nothing but a manifest is worse than an
         // error: the shop opens it and believes that is all it has.
@@ -494,20 +494,22 @@ class InvoiceZipBuilderService
             'completed_at' => now(),
         ];
 
-        // Invoices whose PDF never made it are recorded as failures, so the
-        // manifest cannot list a document the download does not contain.
-        if ($missing !== []) {
+        // Invoices whose PDF never made it are counted as failures — every
+        // one of them, even when the id list itself is capped. A missing tax
+        // document must never be hidden by quietly shrinking the total.
+        if ($missingCount > 0) {
             $failedIds = array_values(array_unique(array_merge($export->failed_ids ?? [], $missing)));
-            $attrs['failed_ids'] = $failedIds;
-            $attrs['failed_invoices'] = count($failedIds);
+            $attrs['failed_ids'] = array_slice($failedIds, 0, self::MAX_TRACKED_FAILURES);
+            $attrs['failed_invoices'] = max($missingCount, count($failedIds));
         }
 
-        // A build that walked its whole range holds exactly what it holds —
-        // invoices deleted mid-build must not leave the UI reading "9,998 of
-        // 10,000" forever. A size-capped build keeps the real total, because
-        // there genuinely are invoices it did not reach.
+        // The total is what the frozen set still holds: an invoice deleted
+        // mid-build genuinely is not there any more, so it must not sit in the
+        // total forever — but one that exists without a PDF stays counted, and
+        // shows up as a failure. A size-capped build keeps its own total,
+        // because there really are invoices it never reached.
         if (!$export->size_capped) {
-            $attrs['total_invoices'] = $ready;
+            $attrs['total_invoices'] = $ready + $missingCount;
         }
 
         self::writeState($export, $token, $attrs);
@@ -517,23 +519,25 @@ class InvoiceZipBuilderService
      * What this download holds right now: how many PDFs are on disk, what
      * they weigh, and which invoices are still missing one.
      *
-     * @return array{0:int,1:int,2:array<int,int>}
+     * @return array{0:int,1:int,2:array<int,int>,3:int}
      */
     protected static function inventory(InvoiceZipExport $export): array
     {
         $ready = 0;
         $bytes = 0;
         $missing = [];
+        $missingCount = 0;
 
         self::snapshotQuery($export)
             ->where('id', '<=', (int) $export->cursor_id)
             ->orderBy('id')
             ->select(['id', 'company_id', 'created_at', 'updated_at'])
-            ->chunk(1000, function ($rows) use (&$ready, &$bytes, &$missing) {
+            ->chunk(1000, function ($rows) use (&$ready, &$bytes, &$missing, &$missingCount) {
                 foreach ($rows as $invoice) {
                     $path = InvoicePdfCacheService::currentPath($invoice);
 
                     if ($path === null) {
+                        $missingCount++;
                         if (count($missing) < self::MAX_TRACKED_FAILURES) {
                             $missing[] = (int) $invoice->id;
                         }
@@ -545,7 +549,7 @@ class InvoiceZipBuilderService
                 }
             });
 
-        return [$ready, $bytes, $missing];
+        return [$ready, $bytes, $missing, $missingCount];
     }
 
     /**
@@ -577,6 +581,10 @@ class InvoiceZipBuilderService
      */
     public static function writeArchive(InvoiceZipExport $export, $outputStream = null): void
     {
+        // A quarter-gigabyte download over a slow line takes far longer than
+        // any page is allowed to run.
+        @set_time_limit(0);
+
         $zip = new ZipStream(
             outputStream: $outputStream,
             defaultCompressionMethod: CompressionMethod::STORE,
@@ -591,6 +599,7 @@ class InvoiceZipBuilderService
         }
 
         $used = [];
+        $omitted = [];
 
         self::snapshotQuery($export)
             ->where('id', '<=', (int) $export->cursor_id)
@@ -599,7 +608,7 @@ class InvoiceZipBuilderService
                 'id', 'company_id', 'created_at', 'updated_at', 'status',
                 'fbr_invoice_number', 'internal_invoice_number', 'invoice_number',
             ])
-            ->chunk(500, function ($rows) use ($zip, &$used) {
+            ->chunk(500, function ($rows) use ($zip, &$used, &$omitted) {
                 foreach ($rows as $invoice) {
                     $path = InvoicePdfCacheService::currentPath($invoice);
 
@@ -610,15 +619,55 @@ class InvoiceZipBuilderService
                         $path = self::renderMissing((int) $invoice->id);
                     }
 
+                    $label = self::invoiceLabel($invoice);
+
                     if ($path === null) {
+                        $omitted[] = $label;
                         continue;
                     }
 
-                    $zip->addFileFromPath(self::entryName($used, $invoice), $path);
+                    try {
+                        $zip->addFileFromPath(self::entryName($used, $invoice), $path);
+                    } catch (\Throwable $e) {
+                        // The file went away between the check and the read.
+                        // One missing invoice must not kill the download — but
+                        // it does get named in the archive.
+                        $omitted[] = $label;
+                        Log::warning('Invoice ZIP: an invoice dropped out while streaming', [
+                            'export_id' => $export->id,
+                            'invoice_id' => $invoice->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             });
 
+        // Whatever could not be included is named inside the archive itself,
+        // so nobody has to compare six thousand files against a manifest to
+        // discover something is missing.
+        if ($omitted !== []) {
+            $zip->addFile('_MISSING.txt', self::missingNotice($omitted));
+        }
+
         $zip->finish();
+    }
+
+    /** How an invoice is named to a human reading the notice file. */
+    protected static function invoiceLabel(Invoice $invoice): string
+    {
+        return (string) ($invoice->fbr_invoice_number
+            ?: $invoice->internal_invoice_number
+            ?: $invoice->invoice_number
+            ?: ('invoice #' . $invoice->id));
+    }
+
+    /** @param array<int,string> $omitted */
+    protected static function missingNotice(array $omitted): string
+    {
+        return "These invoices could not be included in this download:\r\n\r\n"
+            . implode("\r\n", $omitted)
+            . "\r\n\r\nThey are the only ones missing — everything else in the manifest is here.\r\n"
+            . "Open each of them from the invoice list and download it on its own, or build the ZIP again.\r\n";
     }
 
     /** Last-resort render for one invoice mid-download; null if it cannot be made. */

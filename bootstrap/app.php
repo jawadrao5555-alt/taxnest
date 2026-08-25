@@ -1,5 +1,18 @@
 <?php
 
+// ── Float→JSON precision must match on web AND CLI ────────────────────────
+// The live host ships serialize_precision=100 in the *CLI* php.ini while the
+// web SAPI uses -1. json_encode then turns 360.81 into
+// 360.81000000000000227373675443232059478759765625 in anything a queue worker
+// or artisan command sends. FBR's DI API divides salesTaxApplicable by
+// valueSalesExcludingST to check the declared rate; with those trailing digits
+// it lands on 18.001164% instead of 18% and rejects the line with
+// "[0077] Valid SRO/Schedule No. is mandatory where rate is not 18%".
+// The very same invoice submitted from the browser passes, which is what made
+// this look like bad invoice data instead of a serialisation setting.
+// -1 = shortest round-trip representation, i.e. exactly what the browser sends.
+ini_set('serialize_precision', '-1');
+
 use App\Support\DatabaseDown;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;

@@ -710,6 +710,12 @@ class InvoiceController extends Controller
     }
 
     /**
+     * How many invoices one bulk run may take. The list page reads this so the
+     * button promises exactly what the batch will really do.
+     */
+    public const BULK_MAX = 1000;
+
+    /**
      * Task 1245: bulk-submit selected draft invoices to FBR.
      * Queues one BulkSubmitInvoiceJob per invoice; the list page polls
      * bulkSubmitStatus() for per-invoice results.

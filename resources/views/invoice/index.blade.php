@@ -663,6 +663,27 @@
                 @php
                     $bulkNoun = $tab === 'failed' ? 'failed invoice' : 'draft';
                     $bulkTabCount = $tab === 'failed' ? $failedCount : $draftCount;
+                    // One run only takes BULK_MAX invoices, so a shop with more than that
+                    // has to click again. Say that on the button instead of promising "all".
+                    $bulkCap = \App\Http\Controllers\InvoiceController::BULK_MAX;
+                    $bulkCapped = $bulkTabCount > $bulkCap;
+                    $bulkRunLabel = number_format(min($bulkTabCount, $bulkCap));
+                    $bulkTotalLabel = number_format($bulkTabCount);
+                    if ($tab === 'failed') {
+                        $bulkAllLabel = $bulkCapped
+                            ? "Retry next {$bulkRunLabel} of {$bulkTotalLabel} failed"
+                            : "Retry all {$bulkTotalLabel} failed";
+                        $bulkAllConfirm = $bulkCapped
+                            ? "Retry the next {$bulkRunLabel} of {$bulkTotalLabel} failed invoices? Click again for the rest."
+                            : "Retry ALL {$bulkTotalLabel} failed invoices?";
+                    } else {
+                        $bulkAllLabel = $bulkCapped
+                            ? "Submit next {$bulkRunLabel} of {$bulkTotalLabel} drafts"
+                            : "Submit all {$bulkTotalLabel} drafts";
+                        $bulkAllConfirm = $bulkCapped
+                            ? "Submit the next {$bulkRunLabel} of {$bulkTotalLabel} drafts to FBR? Click again for the rest."
+                            : "Submit ALL {$bulkTotalLabel} draft invoices to FBR?";
+                    }
                 @endphp
                 <div x-show="bulkSelected.length > 0 && !bulkBatchKey" x-cloak class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-900/20">
                     <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300"><span x-text="bulkSelected.length"></span> {{ $bulkNoun }}(s) selected</p>
@@ -673,9 +694,9 @@
                         <span x-show="bulkStarting" x-cloak>Starting...</span>
                     </button>
                     @if($bulkTabCount > 1)
-                    <button type="button" @click="if(confirm('{{ $tab === 'failed' ? "Retry ALL {$bulkTabCount} failed invoices?" : "Submit ALL {$bulkTabCount} draft invoices to FBR?" }}')) startBulkSubmit(true)" :disabled="bulkStarting"
+                    <button type="button" @click="if(confirm('{{ $bulkAllConfirm }}')) startBulkSubmit(true)" :disabled="bulkStarting"
                         class="inline-flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/40 transition disabled:opacity-50">
-                        {{ $tab === 'failed' ? "Retry all {$bulkTabCount} failed" : "Submit all {$bulkTabCount} drafts" }}
+                        {{ $bulkAllLabel }}
                     </button>
                     @endif
                     <button type="button" @click="bulkSelected = []" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 underline">Clear selection</button>

@@ -375,4 +375,72 @@ class InvoiceZipExportTest extends TestCase
         InvoiceZipBuilderService::release($export, $token);
         $this->assertSame('continue', InvoiceZipBuilderService::processNextChunk($export->fresh()));
     }
+
+    /**
+     * MySQL counts the rows an UPDATE actually CHANGED; SQLite counts the rows
+     * it MATCHED. The builder used to infer "do I still hold the lease?" from
+     * that count, so on MySQL a renewal issued inside the same second as the
+     * claim — exactly what finalize() does — looked like a lost lease and the
+     * build bailed out one step short of 'ready'. Every real export froze at
+     * 95% while this suite, on SQLite, stayed green.
+     *
+     * Ownership is a SELECT now, so a write that changes nothing must still
+     * report success. Run this class against MySQL after touching the locking
+     * code; SQLite alone cannot see the failure.
+     */
+    public function test_a_lease_survives_a_renewal_that_changes_nothing(): void
+    {
+        $this->makeInvoice('draft', 'DI00001');
+
+        $export = InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_DRAFT]
+        );
+
+        $token = InvoiceZipBuilderService::claim($export);
+        $this->assertNotNull($token);
+
+        // Same second, re-stamping the value the claim just wrote.
+        $this->assertTrue($this->callProtected('renewLease', $export, $token));
+        $this->assertTrue($this->callProtected('renewLease', $export, $token));
+
+        // A state write whose values the row already holds is still our write.
+        $fresh = $export->fresh();
+        $this->assertTrue($this->callProtected('writeState', $export, $token, [
+            'status' => $fresh->status,
+            'progress' => (int) $fresh->progress,
+        ]));
+
+        // A lease that genuinely moved on must still be refused.
+        InvoiceZipBuilderService::release($export, $token);
+        $this->assertNotNull(InvoiceZipBuilderService::claim($export));
+        $this->assertFalse($this->callProtected('renewLease', $export, $token));
+        $this->assertFalse($this->callProtected('writeState', $export, $token, ['progress' => 42]));
+    }
+
+    /** The whole build, driven end to end without letting the clock advance. */
+    public function test_a_build_finishing_inside_one_second_still_reports_ready(): void
+    {
+        $this->makeInvoice('draft', 'DI00001');
+
+        $export = $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_DRAFT]
+        ));
+
+        $this->assertSame('ready', $export->status);
+        $this->assertSame(100, (int) $export->progress);
+        $this->assertNotNull($export->completed_at);
+        $this->assertFileExists(InvoiceZipBuilderService::absolutePath($export));
+    }
+
+    private function callProtected(string $method, mixed ...$args): mixed
+    {
+        $ref = new \ReflectionMethod(InvoiceZipBuilderService::class, $method);
+        $ref->setAccessible(true);
+
+        return $ref->invoke(null, ...$args);
+    }
 }

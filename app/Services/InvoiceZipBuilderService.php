@@ -143,12 +143,34 @@ class InvoiceZipBuilderService
         $query->update(['locked_at' => null, 'lock_token' => null]);
     }
 
-    /** Extend the lease mid-chunk. False means we lost it and must stop writing. */
-    protected static function renewLease(InvoiceZipExport $export, string $token): bool
+    /**
+     * Do we still hold this exact lease?
+     *
+     * Ownership is decided by a SELECT, never by an update's affected-row
+     * count. MySQL counts rows it actually CHANGED, so re-stamping locked_at
+     * within the same second it was claimed reports 0 affected rows even
+     * though the lease is still ours. SQLite counts rows it MATCHED, which is
+     * why the whole test suite passed while every real MySQL build stalled.
+     */
+    protected static function stillOwns(InvoiceZipExport $export, string $token): bool
     {
         return InvoiceZipExport::where('id', $export->id)
             ->where('lock_token', $token)
-            ->update(['locked_at' => now()]) === 1;
+            ->exists();
+    }
+
+    /** Extend the lease mid-chunk. False means we lost it and must stop writing. */
+    protected static function renewLease(InvoiceZipExport $export, string $token): bool
+    {
+        if (!self::stillOwns($export, $token)) {
+            return false;
+        }
+
+        InvoiceZipExport::where('id', $export->id)
+            ->where('lock_token', $token)
+            ->update(['locked_at' => now()]);
+
+        return true;
     }
 
     /**
@@ -158,17 +180,21 @@ class InvoiceZipBuilderService
      */
     protected static function writeState(InvoiceZipExport $export, string $token, array $attrs): bool
     {
-        $written = InvoiceZipExport::where('id', $export->id)
-            ->where('lock_token', $token)
-            ->update($attrs) === 1;
-
-        if ($written) {
-            $export->forceFill($attrs);
-        } else {
+        if (!self::stillOwns($export, $token)) {
             Log::warning('Invoice ZIP: lease lost, discarding progress write', ['export_id' => $export->id]);
+            return false;
         }
 
-        return $written;
+        // The lock_token guard stays on the write itself, so a lease stolen in
+        // the gap still cannot be overwritten — but the return value now
+        // reflects ownership rather than whether the values happened to differ.
+        InvoiceZipExport::where('id', $export->id)
+            ->where('lock_token', $token)
+            ->update($attrs);
+
+        $export->forceFill($attrs);
+
+        return true;
     }
 
     /**

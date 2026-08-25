@@ -258,11 +258,19 @@
                     @if(($invoice->company->ntn && $dp['show_ntn']) || $invoice->company->registration_no)
                     <br>
                     @endif
-                    @if($invoice->company->phone && $dp['show_mobile'])
-                    Phone: {{ $invoice->company->phone }}
-                    @endif
-                    @if($invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone && $dp['show_mobile'])
-                    &nbsp;| Mobile: {{ $invoice->company->mobile }}
+                    @php
+                        // Built as a list so a missing phone can't leave the
+                        // line starting with a stray separator.
+                        $contactBits = [];
+                        if ($dp['show_mobile'] && $invoice->company->phone) {
+                            $contactBits[] = 'Phone: ' . $invoice->company->phone;
+                        }
+                        if ($dp['show_mobile'] && $invoice->company->mobile && $invoice->company->mobile !== $invoice->company->phone) {
+                            $contactBits[] = 'Mobile: ' . $invoice->company->mobile;
+                        }
+                    @endphp
+                    @if($contactBits)
+                    {{ implode(' | ', $contactBits) }}
                     @endif
                     @if($invoice->company->email && $dp['show_email'])
                     <br>{{ $invoice->company->email }}

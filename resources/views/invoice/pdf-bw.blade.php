@@ -230,17 +230,25 @@
                 @if($diBrand['logo_data_uri'])
                 <div style="margin-bottom: 5px;"><img src="{{ $diBrand['logo_data_uri'] }}" alt="Logo" style="height: 42px; width: auto;"></div>
                 @endif
-                <div class="seller-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
                 @php
-                    // A distributor may trade under a different name in each city.
-                    // The branch on the invoice is that trading identity, so it
-                    // prints under the legal name and supplies the address.
+                    // A distributor may trade under a different name at each
+                    // address. The branch on the invoice IS that trading
+                    // identity, so it headlines the bill it was sold from —
+                    // head office included, because a head office can carry its
+                    // own trading name too. The registered (legal) name still
+                    // prints underneath, since the NTN belongs to it.
                     $invBranch = $invoice->branch;
+                    $legalName = $invoice->company->name ?: 'TaxNest';
+                    $branchName = trim((string) ($invBranch->name ?? ''));
+                    $tidy = static fn($v) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $v)));
+                    $branchIsOwnName = $branchName !== '' && $tidy($branchName) !== $tidy($legalName);
+                    $sellerName = $branchIsOwnName ? $branchName : $legalName;
                     $branchAddress = ($invBranch?->address ?: null) ?: $invoice->company->address;
                     $branchCity = ($invBranch?->city ?: null) ?: $invoice->company->city;
                 @endphp
-                @if($invBranch && !$invBranch->is_head_office)
-                <div class="seller-branch">{{ $invBranch->name }}@if($invBranch->city) &mdash; {{ $invBranch->city }}@endif</div>
+                <div class="seller-name">{{ $sellerName }}</div>
+                @if($branchIsOwnName)
+                <div class="seller-branch">{{ $legalName }}</div>
                 @endif
                 <div class="seller-info">
                     @if($branchAddress && $dp['show_address'])
@@ -476,7 +484,7 @@
         <tr>
             <td style="width: 38%;"><div class="sign-line">Receiver's Signature</div></td>
             <td style="width: 24%;">&nbsp;</td>
-            <td style="width: 38%;"><div class="sign-line">For {{ $invoice->company->name ?? 'TaxNest' }}</div></td>
+            <td style="width: 38%;"><div class="sign-line">For {{ $sellerName ?? ($invoice->company->name ?? 'TaxNest') }}</div></td>
         </tr>
     </table>
 

@@ -1,0 +1,164 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Branch;
+use App\Models\Company;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Services\InvoicePdfService;
+use Tests\TestCase;
+
+/**
+ * A DI invoice must be headlined by the business the buyer actually bought
+ * from.
+ *
+ * Background (reported by a live distributor, Aug 2026): the shop runs two
+ * addresses under ONE NTN and gave each branch its own trading name. The PDF
+ * swapped the address per branch but kept printing the company's legal name,
+ * so an invoice sold from the second address carried the first business's
+ * name. Worse, the branch line was suppressed for a branch flagged as head
+ * office — and that shop's second trading name sat on exactly such a branch,
+ * so its name appeared nowhere on the bill.
+ *
+ * Rules pinned here:
+ *  - A branch whose name differs from the legal name headlines the invoice,
+ *    head office or not, and signs it ("For <trading name>").
+ *  - The registered legal name still prints underneath, because the NTN
+ *    belongs to it — the document must stay traceable to the filer.
+ *  - A branch named the same as the company prints that name ONCE.
+ *  - No branch = company name, exactly as before.
+ *
+ * These render the real Blade with in-memory models (no DB, no HTTP).
+ *
+ * Run:
+ *   php vendor/bin/phpunit tests/Feature/DiInvoiceBranchIdentityTest.php --testdox
+ */
+class DiInvoiceBranchIdentityTest extends TestCase
+{
+    private const LEGAL_NAME = 'AL REHMAN TRADERS';
+
+    private function company(): Company
+    {
+        $company = new Company([
+            'name' => self::LEGAL_NAME,
+            'address' => 'AHMED PUR SHARKIA',
+            'city' => 'AHMED PUR EAST',
+            'ntn' => 'B282410-8',
+            'registration_no' => 'B282410-8',
+            'email' => 'seller@example.test',
+            'mobile' => '03000000000',
+        ]);
+        $company->id = 22;
+
+        return $company;
+    }
+
+    private function branch(string $name, string $address, string $city, bool $headOffice): Branch
+    {
+        $branch = new Branch([
+            'name' => $name,
+            'address' => $address,
+            'city' => $city,
+            'is_head_office' => $headOffice,
+        ]);
+        $branch->id = $headOffice ? 3 : 2;
+        $branch->company_id = 22;
+
+        return $branch;
+    }
+
+    private function render(?Branch $branch): string
+    {
+        $item = new InvoiceItem([
+            'hs_code' => '2402.2000',
+            'description' => 'Morven',
+            'default_uom' => 'Thousand Unit',
+            'quantity' => 0.16,
+            'price' => 9903.77,
+            'tax' => 285.23,
+            'tax_rate' => 18,
+        ]);
+        $item->id = 8001;
+
+        $invoice = new Invoice([
+            'buyer_name' => 'Hassan Super Store',
+            'buyer_address' => 'Ghalla Mandi Road',
+            'buyer_registration_type' => 'Unregistered',
+            'destination_province' => 'Punjab',
+            'supplier_province' => 'Punjab',
+            'document_type' => 'Sale Invoice',
+            'invoice_number' => 'DI-BRANCH-IDENTITY',
+            'status' => 'draft',
+            'total_amount' => 1869.83,
+        ]);
+        $invoice->id = 90211;
+        $invoice->company_id = 22;
+        $invoice->branch_id = $branch?->id;
+        $invoice->created_at = now();
+        $invoice->updated_at = now();
+        $invoice->setRelation('items', collect([$item]));
+        $invoice->setRelation('company', $this->company());
+        $invoice->setRelation('branch', $branch);
+
+        return view('invoice.pdf-bw', InvoicePdfService::buildData($invoice))->render();
+    }
+
+    /** The rendered seller headline, i.e. the big name at the top. */
+    private function headline(string $html): string
+    {
+        preg_match('/class="seller-name">(.*?)<\/div>/s', $html, $m);
+
+        return trim($m[1] ?? '');
+    }
+
+    public function test_a_branch_trading_under_its_own_name_headlines_the_invoice(): void
+    {
+        $html = $this->render($this->branch('AL REHMAN TRADERS ONE', 'OLD POST OFFICE SABZI MANDI ROAD', 'AHMAD PUR EAST', false));
+
+        $this->assertSame('AL REHMAN TRADERS ONE', $this->headline($html));
+        $this->assertStringContainsString('OLD POST OFFICE SABZI MANDI ROAD', $html);
+        $this->assertStringContainsString('For AL REHMAN TRADERS ONE', $html, 'The signature block must name the trading business.');
+    }
+
+    /**
+     * The regression that hid the shop's second name: the branch line used to
+     * render only for a non-head-office branch.
+     */
+    public function test_a_head_office_branch_with_its_own_name_is_not_silently_dropped(): void
+    {
+        $html = $this->render($this->branch('AL REHMAN TRADERS ONE', 'OLD POST OFFICE SABZI MANDI ROAD', 'AHMAD PUR EAST', true));
+
+        $this->assertSame('AL REHMAN TRADERS ONE', $this->headline($html));
+    }
+
+    public function test_the_registered_name_still_prints_under_a_trading_name(): void
+    {
+        $html = $this->render($this->branch('AL REHMAN TRADERS ONE', 'NEW HOUSING SCHEME', 'LIAQATPUR', false));
+
+        $this->assertMatchesRegularExpression(
+            '/class="seller-branch">\s*' . preg_quote(self::LEGAL_NAME, '/') . '\s*<\/div>/',
+            $html,
+            'The NTN belongs to the registered company, so its name must stay on the invoice.'
+        );
+        $this->assertStringContainsString('NTN: B282410-8', $html);
+    }
+
+    public function test_a_branch_named_after_the_company_prints_that_name_once(): void
+    {
+        $html = $this->render($this->branch(self::LEGAL_NAME, 'NEW HOUSING SCHEME', 'LIAQATPUR', false));
+
+        $this->assertSame(self::LEGAL_NAME, $this->headline($html));
+        $this->assertStringNotContainsString('seller-branch">', $html, 'Printing the same name twice reads like a mistake.');
+        $this->assertStringContainsString('NEW HOUSING SCHEME', $html, 'The branch still supplies the address.');
+    }
+
+    public function test_an_invoice_without_a_branch_is_unchanged(): void
+    {
+        $html = $this->render(null);
+
+        $this->assertSame(self::LEGAL_NAME, $this->headline($html));
+        $this->assertStringNotContainsString('seller-branch">', $html);
+        $this->assertStringContainsString('AHMED PUR SHARKIA', $html, 'Falls back to the company address.');
+    }
+}

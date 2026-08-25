@@ -152,6 +152,12 @@ Schedule::command('bulk-ai-images:prune')->dailyAt('04:50');
 // Bulk invoice ZIPs are multi-gigabyte and always rebuildable — the disk
 // quota matters far more than keeping yesterday's archive around.
 Schedule::command('invoice-zips:prune')->hourly();
+// Rendering is the only slow part of a bulk invoice download, so it happens
+// quietly in the background instead: by the time a shop asks for its archive
+// the PDFs are already on disk and the download starts at once. The command
+// stands aside while invoices are being filed, and does nothing once it has
+// caught up.
+Schedule::command('invoices:cache-pdfs --seconds=45')->everyFiveMinutes()->withoutOverlapping();
 // Auto-close prior POS trading days for companies that opted into auto day-close
 // (6 AM next-morning rule, owner 23 Jul 2026 — a day closes at 6:00 AM the next
 // morning if nobody closed it manually; before 6 AM yesterday stays open).

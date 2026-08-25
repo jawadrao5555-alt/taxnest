@@ -567,7 +567,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div class="text-xs text-gray-600 dark:text-gray-400 max-w-lg">
                         <span class="font-semibold text-gray-800 dark:text-gray-200">Full ZIP Export (no limit):</span>
-                        Builds in the background so you can download every invoice at once — 50,000 or more. Drafts included, and any date filters you have applied are used.
+                        Prepares in the background — you can close this page and come back. Once it is ready the download starts straight away, however many invoices it holds, and you can download it again any time. Drafts included, and any date filters you have applied are used.
                         <span class="block mt-1 text-gray-500 dark:text-gray-500">You can close this page — the build carries on, and the finished file waits here for 24 hours.</span>
                     </div>
                     <form method="POST" action="{{ route('invoices.zip-exports.store') }}"
@@ -605,13 +605,13 @@
                     </div>
 
                     <div x-show="building" class="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                        <span x-text="processed.toLocaleString()"></span> of <span x-text="total.toLocaleString()"></span> invoices packed
+                        <span x-text="processed.toLocaleString()"></span> of <span x-text="total.toLocaleString()"></span> invoices prepared
                         <span x-show="failed > 0" class="text-amber-600 dark:text-amber-400">— <span x-text="failed"></span> could not be rendered</span>
                     </div>
 
                     <div x-show="ready" x-cloak class="mt-1">
                         <div class="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                            <span x-text="processed.toLocaleString()"></span> invoices packed<span x-show="sizeText"> — <span x-text="sizeText"></span></span>.
+                            <span x-text="processed.toLocaleString()"></span> invoices ready<span x-show="sizeText"> — <span x-text="sizeText"></span></span>. The download begins as soon as you press the button.
                         </div>
                         <div x-show="sizeCapped" x-cloak class="mb-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
                             The archive hit its size limit and stopped early. Download it, then run the rest one month at a time using the date filters.

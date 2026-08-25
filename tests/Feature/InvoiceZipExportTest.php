@@ -164,13 +164,28 @@ class InvoiceZipExportTest extends TestCase
         return $export->fresh();
     }
 
+    /**
+     * The archive exactly as the browser would receive it.
+     *
+     * Nothing is stored on the server any more, so the only honest way to
+     * assert on a download is to run the stream and read what came out.
+     */
+    private function streamedZip(InvoiceZipExport $export): \ZipArchive
+    {
+        $file = tempnam(sys_get_temp_dir(), 'zipstream');
+        $handle = fopen($file, 'w+b');
+        InvoiceZipBuilderService::writeArchive($export, $handle);
+        fclose($handle);
+
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($file) === true, 'the streamed download is not a readable ZIP');
+
+        return $zip;
+    }
+
     private function entries(InvoiceZipExport $export): array
     {
-        $zip = new \ZipArchive();
-        $this->assertTrue(
-            $zip->open(InvoiceZipBuilderService::absolutePath($export)) === true,
-            'ZIP archive could not be opened'
-        );
+        $zip = $this->streamedZip($export);
 
         $names = [];
         for ($i = 0; $i < $zip->numFiles; $i++) {
@@ -324,8 +339,7 @@ class InvoiceZipExportTest extends TestCase
             null,
             ['scope' => InvoiceZipBuilderService::SCOPE_DRAFT]
         ));
-        $firstPath = InvoiceZipBuilderService::absolutePath($first);
-        $this->assertFileExists($firstPath);
+        $this->assertSame('ready', $first->status);
 
         InvoiceZipBuilderService::start(
             $this->company->id,
@@ -334,9 +348,12 @@ class InvoiceZipExportTest extends TestCase
         );
 
         $this->assertNull(InvoiceZipExport::find($first->id));
-        $this->assertFileDoesNotExist($firstPath);
     }
 
+    /**
+     * Archives built before downloads streamed are real files, and those must
+     * still be swept off the disk when they expire.
+     */
     public function test_expired_exports_are_purged_from_disk(): void
     {
         $this->makeInvoice('draft', 'DI00001');
@@ -346,6 +363,9 @@ class InvoiceZipExportTest extends TestCase
             null,
             ['scope' => InvoiceZipBuilderService::SCOPE_DRAFT]
         ));
+
+        Storage::disk('local')->put('invoice-zips/company_1/legacy.zip', 'old archive');
+        $export->forceFill(['file_path' => 'invoice-zips/company_1/legacy.zip'])->save();
         $path = InvoiceZipBuilderService::absolutePath($export);
         $this->assertFileExists($path);
 
@@ -443,7 +463,7 @@ class InvoiceZipExportTest extends TestCase
         $this->assertSame('ready', $export->status);
         $this->assertSame(100, (int) $export->progress);
         $this->assertNotNull($export->completed_at);
-        $this->assertFileExists(InvoiceZipBuilderService::absolutePath($export));
+        $this->assertContains('drafts/DI00001.pdf', $this->entries($export));
     }
 
     /**
@@ -473,8 +493,7 @@ class InvoiceZipExportTest extends TestCase
             ['scope' => InvoiceZipBuilderService::SCOPE_DRAFT]
         ));
 
-        $zip = new \ZipArchive();
-        $this->assertTrue($zip->open(InvoiceZipBuilderService::absolutePath($export)) === true);
+        $zip = $this->streamedZip($export);
 
         $largestPdf = 0;
         for ($i = 0; $i < $zip->numFiles; $i++) {
@@ -523,8 +542,7 @@ class InvoiceZipExportTest extends TestCase
             ['scope' => InvoiceZipBuilderService::SCOPE_COMPLETED]
         ));
 
-        $zip = new \ZipArchive();
-        $this->assertTrue($zip->open(InvoiceZipBuilderService::absolutePath($export)) === true);
+        $zip = $this->streamedZip($export);
 
         $largestPdf = 0;
         for ($i = 0; $i < $zip->numFiles; $i++) {
@@ -540,6 +558,78 @@ class InvoiceZipExportTest extends TestCase
             60 * 1024,
             $largestPdf,
             'a filed invoice PDF got heavy again — check the embedded FBR logo resolution'
+        );
+    }
+
+    /**
+     * The point of the cache: a filed invoice is rendered once in its life,
+     * not once per download. Re-rendering 6,000 of them was an hour of work
+     * the shop paid for every time it asked for the same archive.
+     */
+    public function test_a_second_download_reuses_the_rendered_pdfs(): void
+    {
+        $invoice = $this->makeInvoice('locked', 'DI00007');
+        Invoice::where('id', $invoice->id)->update([
+            'created_at' => now()->subHour(),
+            'updated_at' => now()->subHour(),
+        ]);
+
+        $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_COMPLETED]
+        ));
+
+        $cached = \App\Services\InvoicePdfCacheService::path($this->company->id, $invoice->id);
+        $this->assertFileExists($cached);
+
+        // Age the rendering, but keep it newer than the invoice, so a second
+        // render would show up as a changed timestamp.
+        $stamp = time() - 300;
+        touch($cached, $stamp);
+        clearstatcache();
+
+        $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_COMPLETED]
+        ));
+
+        clearstatcache();
+        $this->assertSame($stamp, filemtime($cached), 'the invoice was rendered all over again');
+    }
+
+    /** A cached PDF older than its invoice is a stale tax document, never served. */
+    public function test_an_invoice_edited_after_rendering_is_rendered_again(): void
+    {
+        $invoice = $this->makeInvoice('locked', 'DI00008');
+
+        $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_COMPLETED]
+        ));
+
+        $cached = \App\Services\InvoicePdfCacheService::path($this->company->id, $invoice->id);
+        touch($cached, time() - 86400);
+        clearstatcache();
+
+        $this->assertNull(
+            \App\Services\InvoicePdfCacheService::currentPath($invoice->fresh()),
+            'a rendering older than the invoice must not count as current'
+        );
+
+        $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_COMPLETED]
+        ));
+
+        clearstatcache();
+        $this->assertGreaterThanOrEqual(
+            (int) $invoice->fresh()->updated_at->getTimestamp(),
+            (int) filemtime($cached),
+            'the edited invoice was served from the old rendering'
         );
     }
 

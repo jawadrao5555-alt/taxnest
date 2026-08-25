@@ -117,15 +117,21 @@ class InvoiceZipExportController extends Controller
         $this->authorizeExport($export);
         abort_unless($export->isReady(), 404);
 
-        $absolute = InvoiceZipBuilderService::absolutePath($export);
-        abort_unless(is_file($absolute), 404);
+        // Archives prepared before downloads streamed still exist as a file on
+        // disk, and those keep being served from it.
+        if ($export->file_path) {
+            $absolute = InvoiceZipBuilderService::absolutePath($export);
 
-        // Streamed from disk with a real Content-Length: a multi-gigabyte
-        // archive can never be buffered into memory the way the old
-        // synchronous download did.
-        return response()->download($absolute, InvoiceZipBuilderService::downloadName($export), [
-            'Content-Type' => 'application/zip',
-        ]);
+            if (is_file($absolute)) {
+                return response()->download($absolute, InvoiceZipBuilderService::downloadName($export), [
+                    'Content-Type' => 'application/zip',
+                ]);
+            }
+        }
+
+        // Everything else is assembled from the cached PDFs as it is sent, so
+        // the download begins immediately however many invoices it holds.
+        return InvoiceZipBuilderService::stream($export);
     }
 
     public function destroy(InvoiceZipExport $export)

@@ -1,0 +1,130 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Invoice;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+
+/**
+ * Rendered invoice PDFs, kept on disk between downloads.
+ *
+ * Rendering is what makes a bulk download slow. Measured on the live server,
+ * one invoice costs roughly two seconds of CPU while several renderers are
+ * running, so a distributor's 6,000 filed invoices is about an hour of work —
+ * an hour the shop paid again every single time it asked for the same
+ * documents, none of which can change once they are filed.
+ *
+ * So a PDF is rendered once and kept. A cached file counts as current only
+ * while it is newer than the invoice it was made from, which means an edited
+ * invoice re-renders by itself and a stale document can never be handed back.
+ *
+ * The whole cache is small: every filed invoice on the platform is a few
+ * hundred megabytes together, against an unlimited account quota.
+ */
+class InvoicePdfCacheService
+{
+    public static function dir(int $companyId): string
+    {
+        return 'invoice-pdfs/company_' . $companyId;
+    }
+
+    public static function path(int $companyId, int $invoiceId): string
+    {
+        return Storage::disk('local')->path(self::dir($companyId) . '/' . $invoiceId . '.pdf');
+    }
+
+    /** The cached PDF for this invoice, or null when it is missing or stale. */
+    public static function currentPath(Invoice $invoice): ?string
+    {
+        $path = self::path((int) $invoice->company_id, (int) $invoice->id);
+
+        if (!@filesize($path)) {
+            return null;
+        }
+
+        $changedAt = max(
+            (int) ($invoice->updated_at?->getTimestamp() ?? 0),
+            (int) ($invoice->created_at?->getTimestamp() ?? 0)
+        );
+
+        // Rendered before the invoice last changed: what is on disk shows the
+        // old figures, and handing a shop a stale tax document is worse than
+        // making it wait.
+        return @filemtime($path) >= $changedAt ? $path : null;
+    }
+
+    /**
+     * The cached PDF for this invoice, rendering it first if needed.
+     *
+     * The write is atomic: several workers fill this directory while a
+     * download reads from it, and a half-written PDF must never be mistaken
+     * for a finished one.
+     *
+     * @return array{path:string,size:int,rendered:bool}
+     */
+    public static function ensure(Invoice $invoice): array
+    {
+        $existing = self::currentPath($invoice);
+
+        if ($existing !== null) {
+            return ['path' => $existing, 'size' => (int) filesize($existing), 'rendered' => false];
+        }
+
+        Storage::disk('local')->makeDirectory(self::dir((int) $invoice->company_id));
+
+        $path = self::path((int) $invoice->company_id, (int) $invoice->id);
+        $bytes = InvoicePdfService::renderBw($invoice)->output();
+        $tmp = $path . '.' . getmypid() . '.part';
+
+        if (@file_put_contents($tmp, $bytes) === false || !@rename($tmp, $path)) {
+            @unlink($tmp);
+            throw new \RuntimeException('Could not write the rendered invoice PDF to disk.');
+        }
+
+        return ['path' => $path, 'size' => strlen($bytes), 'rendered' => true];
+    }
+
+    public static function forget(int $companyId, int $invoiceId): void
+    {
+        @unlink(self::path($companyId, $invoiceId));
+    }
+
+    /** @return array{files:int,bytes:int} */
+    public static function usage(int $companyId): array
+    {
+        $files = 0;
+        $bytes = 0;
+
+        foreach (glob(Storage::disk('local')->path(self::dir($companyId)) . '/*.pdf') ?: [] as $file) {
+            $files++;
+            $bytes += (int) @filesize($file);
+        }
+
+        return ['files' => $files, 'bytes' => $bytes];
+    }
+
+    /**
+     * Drop cached PDFs nobody has wanted for a long time.
+     *
+     * Nothing is lost by pruning — a pruned invoice simply renders again the
+     * next time somebody asks for it.
+     */
+    public static function prune(int $days = 180): int
+    {
+        $cutoff = time() - ($days * 86400);
+        $removed = 0;
+
+        foreach (glob(Storage::disk('local')->path('invoice-pdfs') . '/company_*/*.pdf') ?: [] as $file) {
+            if ((int) @filemtime($file) < $cutoff && @unlink($file)) {
+                $removed++;
+            }
+        }
+
+        if ($removed > 0) {
+            Log::info('Invoice PDF cache pruned', ['files' => $removed, 'older_than_days' => $days]);
+        }
+
+        return $removed;
+    }
+}

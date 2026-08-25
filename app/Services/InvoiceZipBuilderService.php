@@ -6,6 +6,9 @@ use App\Models\Invoice;
 use App\Models\InvoiceZipExport;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use ZipStream\CompressionMethod;
+use ZipStream\ZipStream;
 use Illuminate\Support\Str;
 
 /**
@@ -289,14 +292,11 @@ class InvoiceZipBuilderService
             return;
         }
 
-        $path = $export->file_path
-            ?: 'invoice-zips/company_' . $export->company_id . '/invoices-' . $export->id . '.zip';
-
-        Storage::disk('local')->makeDirectory(dirname($path));
-
+        // No archive path: the ZIP is assembled while it streams to the
+        // browser, so there is no file to write. Older rows that still carry
+        // one keep downloading from disk.
         self::writeState($export, $token, [
             'status' => 'processing',
-            'file_path' => $path,
             'max_invoice_id' => $maxId,
             'cursor_id' => 0,
             'total_invoices' => $total,
@@ -304,57 +304,6 @@ class InvoiceZipBuilderService
             'failed_invoices' => 0,
             'progress' => 1,
         ]);
-    }
-
-    /** Where this build's rendered PDFs wait until they are packed. */
-    public static function stagingDir(InvoiceZipExport $export): string
-    {
-        return 'invoice-zips/company_' . $export->company_id . '/build-' . $export->id;
-    }
-
-    protected static function stagedFile(InvoiceZipExport $export, int $invoiceId): string
-    {
-        return Storage::disk('local')->path(self::stagingDir($export)) . '/' . $invoiceId . '.pdf';
-    }
-
-    protected static function clearStaging(InvoiceZipExport $export): void
-    {
-        try {
-            Storage::disk('local')->deleteDirectory(self::stagingDir($export));
-        } catch (\Throwable $e) {
-            Log::warning('Invoice ZIP: staging directory could not be cleared', [
-                'export_id' => $export->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Render one invoice into the staging directory and report its size.
-     *
-     * The write is atomic because several processes fill this directory at
-     * once and the packer reads it: a half-written PDF must never be mistaken
-     * for a finished one. An invoice already staged is never re-rendered,
-     * which is what makes both resuming and the parallel helpers cheap.
-     */
-    public static function stageInvoice(InvoiceZipExport $export, Invoice $invoice): int
-    {
-        $target = self::stagedFile($export, (int) $invoice->id);
-
-        $existing = @filesize($target);
-        if ($existing) {
-            return (int) $existing;
-        }
-
-        $bytes = InvoicePdfService::renderBw($invoice)->output();
-        $tmp = $target . '.' . getmypid() . '.part';
-
-        if (@file_put_contents($tmp, $bytes) === false || !@rename($tmp, $target)) {
-            @unlink($tmp);
-            throw new \RuntimeException('Could not write the rendered PDF to disk.');
-        }
-
-        return strlen($bytes);
     }
 
     /**
@@ -372,8 +321,6 @@ class InvoiceZipBuilderService
      */
     public static function prerenderSlice(InvoiceZipExport $export, int $slot, int $slots, int $deadline): int
     {
-        Storage::disk('local')->makeDirectory(self::stagingDir($export));
-
         $rendered = 0;
         $lastId = 0;
 
@@ -392,7 +339,7 @@ class InvoiceZipBuilderService
 
             foreach ($invoices as $invoice) {
                 try {
-                    self::stageInvoice($export, $invoice);
+                    InvoicePdfCacheService::ensure($invoice);
                     $rendered++;
                 } catch (\Throwable $e) {
                     // The chunk loop will try this one again and record it as a
@@ -441,14 +388,12 @@ class InvoiceZipBuilderService
             return;
         }
 
-        Storage::disk('local')->makeDirectory(self::stagingDir($export));
-
         $failedIds = $export->failed_ids ?? [];
         $staged = (int) $export->file_size;
 
         foreach ($invoices as $invoice) {
             try {
-                $staged += self::stageInvoice($export, $invoice);
+                $staged += InvoicePdfCacheService::ensure($invoice)['size'];
             } catch (\Throwable $e) {
                 if (count($failedIds) < self::MAX_TRACKED_FAILURES) {
                     $failedIds[] = (int) $invoice->id;
@@ -510,113 +455,189 @@ class InvoiceZipBuilderService
     }
 
     /**
-     * Pack the staged PDFs into the archive — once.
+     * Finish the preparation.
      *
-     * This used to append each chunk to the ZIP as it went, which reads well
-     * and is quietly quadratic: ZipArchive rewrites the entire file on close,
-     * so every 25 invoices re-wrote the whole archive. Measured on a real
-     * 6,000-invoice export, adding one chunk to a 118 MB archive cost 26
-     * seconds against 176 ms to actually render an invoice — the build spent
-     * over 80% of its life copying bytes it had already written, and got
-     * slower the further it went. One pass at the end is linear.
+     * There is deliberately no archive file here any more. Writing one
+     * measured 0.45 MB/s on the live server, so packing a 250 MB download
+     * cost roughly nine minutes of pure disk write before the shop could
+     * start downloading it — and then the very same bytes had to be read back
+     * out to serve it. The PDFs are already on disk, so the ZIP is assembled
+     * as it streams to the browser instead: the download starts in about a
+     * second, no byte is written twice, and asking for the same archive again
+     * costs nothing at all.
      */
     protected static function finalize(InvoiceZipExport $export, string $token): void
     {
-        @set_time_limit(900);
-        @ini_set('memory_limit', '1024M');
-
-        $absolute = self::absolutePath($export);
+        @set_time_limit(300);
 
         if (!self::renewLease($export, $token)) {
             return;
         }
 
-        // Packing a few hundred megabytes takes a while; do not leave the page
-        // parked on the last rendering percentage as if nothing were happening.
-        self::writeState($export, $token, ['progress' => 96]);
+        [$ready, $bytes, $missing] = self::inventory($export);
 
-        $zip = new \ZipArchive();
-        // OVERWRITE, not CREATE: a pack that died halfway through must start
-        // clean rather than append a second copy of every invoice.
-        if ($zip->open($absolute, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-            throw new \RuntimeException('Could not open the ZIP archive for writing.');
+        // A download containing nothing but a manifest is worse than an
+        // error: the shop opens it and believes that is all it has.
+        if ($ready === 0) {
+            self::writeState($export, $token, [
+                'status' => 'failed',
+                'error_message' => 'The rendered invoices went missing before the download could be prepared. Please run it again.',
+            ]);
+            return;
         }
 
-        $used = [];
-        $packed = 0;
+        $attrs = [
+            'status' => 'ready',
+            'progress' => 100,
+            'processed_invoices' => $ready,
+            'file_size' => $bytes,
+            'completed_at' => now(),
+        ];
+
+        // Invoices whose PDF never made it are recorded as failures, so the
+        // manifest cannot list a document the download does not contain.
+        if ($missing !== []) {
+            $failedIds = array_values(array_unique(array_merge($export->failed_ids ?? [], $missing)));
+            $attrs['failed_ids'] = $failedIds;
+            $attrs['failed_invoices'] = count($failedIds);
+        }
+
+        // A build that walked its whole range holds exactly what it holds —
+        // invoices deleted mid-build must not leave the UI reading "9,998 of
+        // 10,000" forever. A size-capped build keeps the real total, because
+        // there genuinely are invoices it did not reach.
+        if (!$export->size_capped) {
+            $attrs['total_invoices'] = $ready;
+        }
+
+        self::writeState($export, $token, $attrs);
+    }
+
+    /**
+     * What this download holds right now: how many PDFs are on disk, what
+     * they weigh, and which invoices are still missing one.
+     *
+     * @return array{0:int,1:int,2:array<int,int>}
+     */
+    protected static function inventory(InvoiceZipExport $export): array
+    {
+        $ready = 0;
+        $bytes = 0;
         $missing = [];
 
         self::snapshotQuery($export)
             ->where('id', '<=', (int) $export->cursor_id)
             ->orderBy('id')
-            ->select(['id', 'fbr_invoice_number', 'internal_invoice_number', 'invoice_number', 'status'])
-            ->chunk(500, function ($rows) use ($export, $zip, &$used, &$packed, &$missing) {
+            ->select(['id', 'company_id', 'created_at', 'updated_at'])
+            ->chunk(1000, function ($rows) use (&$ready, &$bytes, &$missing) {
                 foreach ($rows as $invoice) {
-                    $file = self::stagedFile($export, (int) $invoice->id);
+                    $path = InvoicePdfCacheService::currentPath($invoice);
 
-                    if (!@filesize($file)) {
-                        // Recorded as a failure so the manifest never lists a
-                        // PDF this archive does not actually contain.
+                    if ($path === null) {
                         if (count($missing) < self::MAX_TRACKED_FAILURES) {
                             $missing[] = (int) $invoice->id;
                         }
                         continue;
                     }
 
-                    $zip->addFile($file, self::entryName($used, $invoice));
-                    $packed++;
+                    $ready++;
+                    $bytes += (int) filesize($path);
                 }
             });
 
-        // An archive holding nothing but a manifest is worse than an error:
-        // the shop downloads it and believes that is all it has.
-        if ($packed === 0) {
-            $zip->close();
-            @unlink($absolute);
-            self::writeState($export, $token, [
-                'status' => 'failed',
-                'error_message' => 'The rendered invoices went missing before they could be packed. Please run the download again.',
-            ]);
-            return;
-        }
+        return [$ready, $bytes, $missing];
+    }
 
-        if ($missing !== []) {
-            $failedIds = array_values(array_unique(array_merge($export->failed_ids ?? [], $missing)));
-            self::writeState($export, $token, [
-                'failed_ids' => $failedIds,
-                'failed_invoices' => count($failedIds),
-            ]);
-        }
+    /**
+     * Send the archive to the browser, assembling it as it goes.
+     *
+     * Nothing is stored: entries are written straight into the response from
+     * the cached PDFs, uncompressed, because PDFs barely deflate and CPU is
+     * the scarce resource on this server. The download therefore begins
+     * within a second and can be repeated as often as the shop likes.
+     */
+    public static function stream(InvoiceZipExport $export): StreamedResponse
+    {
+        return response()->streamDownload(
+            fn () => self::writeArchive($export),
+            self::downloadName($export),
+            [
+                'Content-Type' => 'application/zip',
+                // Nothing in front of us may hold the response back waiting
+                // for a complete body.
+                'X-Accel-Buffering' => 'no',
+            ]
+        );
+    }
 
-        $zip->addFromString('_manifest.csv', self::manifest($export));
+    /**
+     * Write the archive to an output stream, defaulting to the response.
+     *
+     * @param resource|null $outputStream
+     */
+    public static function writeArchive(InvoiceZipExport $export, $outputStream = null): void
+    {
+        $zip = new ZipStream(
+            outputStream: $outputStream,
+            defaultCompressionMethod: CompressionMethod::STORE,
+            sendHttpHeaders: false,
+            flushOutput: $outputStream === null,
+        );
+
+        $zip->addFile('_manifest.csv', self::manifest($export));
 
         if ($export->size_capped) {
-            $zip->addFromString('_READ-ME.txt', self::cappedNotice($export));
+            $zip->addFile('_READ-ME.txt', self::cappedNotice($export));
         }
 
-        if (!$zip->close()) {
-            throw new \RuntimeException('The ZIP archive could not be written to disk.');
+        $used = [];
+
+        self::snapshotQuery($export)
+            ->where('id', '<=', (int) $export->cursor_id)
+            ->orderBy('id')
+            ->select([
+                'id', 'company_id', 'created_at', 'updated_at', 'status',
+                'fbr_invoice_number', 'internal_invoice_number', 'invoice_number',
+            ])
+            ->chunk(500, function ($rows) use ($zip, &$used) {
+                foreach ($rows as $invoice) {
+                    $path = InvoicePdfCacheService::currentPath($invoice);
+
+                    if ($path === null) {
+                        // Edited since the download was prepared. Render it
+                        // now rather than quietly leave a filed document out
+                        // of the shop's archive.
+                        $path = self::renderMissing((int) $invoice->id);
+                    }
+
+                    if ($path === null) {
+                        continue;
+                    }
+
+                    $zip->addFileFromPath(self::entryName($used, $invoice), $path);
+                }
+            });
+
+        $zip->finish();
+    }
+
+    /** Last-resort render for one invoice mid-download; null if it cannot be made. */
+    protected static function renderMissing(int $invoiceId): ?string
+    {
+        try {
+            $full = Invoice::withoutGlobalScopes()
+                ->with(['items', 'company', 'branch'])
+                ->find($invoiceId);
+
+            return $full ? InvoicePdfCacheService::ensure($full)['path'] : null;
+        } catch (\Throwable $e) {
+            Log::warning('Invoice ZIP: could not render an invoice while streaming', [
+                'invoice_id' => $invoiceId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
-
-        self::clearStaging($export);
-        clearstatcache(true, $absolute);
-
-        $attrs = [
-            'status' => 'ready',
-            'progress' => 100,
-            'file_size' => @filesize($absolute) ?: $export->file_size,
-            'completed_at' => now(),
-        ];
-
-        // A build that walked its whole range packed exactly what it packed —
-        // invoices deleted mid-build must not leave the UI reading "9,998 of
-        // 10,000" forever. A size-capped build keeps the real total, because
-        // there genuinely are invoices it did not reach.
-        if (!$export->size_capped) {
-            $attrs['total_invoices'] = (int) $export->processed_invoices;
-        }
-
-        self::writeState($export, $token, $attrs);
     }
 
     /**
@@ -733,10 +754,6 @@ class InvoiceZipBuilderService
 
     public static function delete(InvoiceZipExport $export): void
     {
-        // Half-built exports leave a staging directory of loose PDFs behind,
-        // and that is as much disk as the archive itself.
-        self::clearStaging($export);
-
         if ($export->file_path) {
             try {
                 Storage::disk('local')->delete($export->file_path);

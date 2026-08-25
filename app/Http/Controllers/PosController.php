@@ -1270,6 +1270,84 @@ class PosController extends Controller
     }
 
     /**
+     * Test print — "kaun sa printer asli hai".
+     *
+     * A Windows box that has had the same thermal printer installed a few
+     * times keeps a queue per install: "XP-80C", "XP-80C (copy 2)", "POS-80".
+     * Only one is still bound to the live port; the others accept jobs and
+     * drop them. Windows calls that submission a success, so the agent reports
+     * success and every bill looks printed on the server while the counter
+     * sees no paper at all — the shop can only report "print nahi nikalta".
+     *
+     * This enqueues a tiny slip that carries the QUEUE'S OWN NAME, so whichever
+     * paper physically comes out names the printer to select. Deliberately
+     * independent of the silent-print master switch: the point is to find a
+     * working printer BEFORE printing is turned on. Admin/manager only, and
+     * rate-limited on the route — every press costs the shop paper.
+     */
+    public function apiTestPrintJob(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) { abort(403); }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        $validated = $request->validate([
+            'printer' => 'required|string|max:255',
+            'device_uid' => 'nullable|string|max:64',
+        ]);
+        $printer = trim((string) $validated['printer']);
+        $deviceUid = trim((string) ($validated['device_uid'] ?? ''));
+        $deviceAware = \App\Http\Controllers\AgentController::deviceRoutingReady();
+        $device = null;
+
+        if ($deviceUid !== '' && $deviceAware) {
+            $device = \App\Models\PosAgentDevice::where('company_id', $companyId)
+                ->where('device_uid', $deviceUid)
+                ->first();
+            if (!$device) {
+                return response()->json(['success' => false, 'reason' => 'unknown_device'], 422);
+            }
+            // A counter can only be asked to test a printer IT reported.
+            $own = collect($device->printers ?? [])->pluck('name')->all();
+            if (!in_array($printer, $own, true)) {
+                return response()->json(['success' => false, 'reason' => 'unknown_printer'], 422);
+            }
+            if (!$device->isOnline()) {
+                return response()->json(['success' => false, 'reason' => 'device_offline'], 409);
+            }
+        } else {
+            $deviceUid = '';
+            $known = collect($company->printerSettings()['available_printers'] ?? [])->pluck('name')->all();
+            if (!in_array($printer, $known, true)) {
+                return response()->json(['success' => false, 'reason' => 'unknown_printer'], 422);
+            }
+            if (!$company->agentOnline()) {
+                return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
+            }
+        }
+
+        $payload = [
+            'company_id' => $companyId,
+            'type' => 'test',
+            'target_printer' => $printer,
+            'status' => 'pending',
+            'created_by' => $user->id,
+        ];
+        if ($deviceUid !== '' && $deviceAware) {
+            $payload['device_uid'] = $deviceUid;
+        }
+        $job = \App\Models\PosPrintJob::create($payload);
+
+        return response()->json([
+            'success' => true,
+            'job_id' => $job->id,
+            'printer' => $printer,
+        ]);
+    }
+
+    /**
      * Customize POS — single consolidated settings hub (admin-only).
      * Surfaces every POS customization feature from one place; complex
      * sub-features link out to their existing pages.

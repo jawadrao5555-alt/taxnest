@@ -261,6 +261,147 @@
         @endif
     </form>
 
+    {{-- Test print (Aug 2026, live shop): Windows keeps a separate queue for
+         every install of the same printer — "XP-80C", "XP-80C (copy 2)",
+         "POS-80". Only one is still bound to the live port; the others accept
+         a bill, report success and drop it, so the panel shows every job as
+         printed while the counter gets no paper. One slip per queue, carrying
+         the queue's OWN name, ends that guessing in seconds.
+         Outside the settings form on purpose (fetch-driven, nothing to save). --}}
+    @php
+        $tpGroups = [];
+        if (isset($devices) && $devices->count()) {
+            foreach ($devices as $tpDevice) {
+                $tpNames = collect($tpDevice->printers ?? [])->pluck('name')->filter()->unique()->values()->all();
+                if ($tpNames) {
+                    $tpGroups[] = [
+                        'uid' => $tpDevice->device_uid,
+                        'label' => $tpDevice->label(),
+                        'online' => $tpDevice->isOnline(),
+                        'printers' => $tpNames,
+                    ];
+                }
+            }
+        }
+        if (!$tpGroups) {
+            $tpNames = collect($settings['available_printers'])->pluck('name')->filter()->unique()->values()->all();
+            if ($tpNames) {
+                $tpGroups[] = ['uid' => '', 'label' => null, 'online' => $agentOnline, 'printers' => $tpNames];
+            }
+        }
+        // Duplicate-queue detection: two names that differ only by a trailing
+        // "(copy N)" are the same physical printer installed twice.
+        $tpDuplicate = false;
+        foreach ($tpGroups as $tpGroup) {
+            $tpBases = collect($tpGroup['printers'])
+                ->map(fn($n) => strtolower(trim(preg_replace('/\s*\(\s*copy\s*\d*\s*\)\s*$/i', '', $n))));
+            if ($tpBases->count() !== $tpBases->unique()->count()) {
+                $tpDuplicate = true;
+            }
+        }
+        // Built here, never inside @json(...): a nested __() call inside a
+        // Blade directive argument truncates the compiled view. Relative URL
+        // on purpose — an absolute https route breaks plain-http browsing.
+        $tpUrl = route('pos.api.print-jobs.test', [], false);
+        $tpMsgs = [
+            'sending' => __('pos.test_print_sending'),
+            'sent' => __('pos.test_print_sent'),
+            'failed' => __('pos.test_print_failed'),
+        ];
+        // HEX flags keep quotes/tags safe inside inline JS without the escaping
+        // that a Blade echo would apply (escaped JSON = syntax error = dead button).
+        $tpJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+    @endphp
+    @if(count($tpGroups))
+    <div class="mt-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.test_print_title') }}</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.test_print_sub') }}</p>
+
+        @if($tpDuplicate)
+        <div class="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">
+            {{ __('pos.test_print_dup_warn') }}
+        </div>
+        @endif
+
+        <div class="space-y-3">
+            @foreach($tpGroups as $tpGroup)
+            <div>
+                @if($tpGroup['label'])
+                <p class="text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1.5">
+                    {{ $tpGroup['label'] }}
+                    <span class="{{ $tpGroup['online'] ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400' }}">· {{ $tpGroup['online'] ? __('pos.online') : __('pos.offline') }}</span>
+                </p>
+                @endif
+                <div class="flex flex-wrap gap-2">
+                    @foreach($tpGroup['printers'] as $tpName)
+                    <button type="button"
+                        class="tn-testprint inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:border-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition disabled:opacity-50"
+                        data-printer="{{ $tpName }}" data-device="{{ $tpGroup['uid'] }}">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        <span class="tn-testprint-label">{{ $tpName }}</span>
+                    </button>
+                    @endforeach
+                </div>
+            </div>
+            @endforeach
+        </div>
+
+        <p id="tnTestPrintMsg" class="mt-3 text-xs font-semibold hidden"></p>
+    </div>
+
+    <script>
+    (function () {
+        var url = {!! json_encode($tpUrl, $tpJsonFlags) !!};
+        var token = document.querySelector('meta[name="csrf-token"]');
+        var msgs = {!! json_encode($tpMsgs, $tpJsonFlags) !!};
+        var box = document.getElementById('tnTestPrintMsg');
+        function say(text, ok) {
+            if (!box) return;
+            box.textContent = text;
+            box.classList.remove('hidden');
+            box.classList.toggle('text-emerald-600', !!ok);
+            box.classList.toggle('dark:text-emerald-400', !!ok);
+            box.classList.toggle('text-red-600', !ok);
+            box.classList.toggle('dark:text-red-400', !ok);
+        }
+        document.querySelectorAll('.tn-testprint').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var printer = btn.getAttribute('data-printer') || '';
+                var device = btn.getAttribute('data-device') || '';
+                var label = btn.querySelector('.tn-testprint-label');
+                var original = label ? label.textContent : '';
+                btn.disabled = true;
+                if (label) label.textContent = msgs.sending;
+                say(msgs.sending, true);
+                var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+                if (token) headers['X-CSRF-TOKEN'] = token.getAttribute('content');
+                fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ printer: printer, device_uid: device })
+                }).then(function (r) {
+                    return r.json().catch(function () { return {}; }).then(function (j) {
+                        // A print button must never claim success it did not get.
+                        if (!r.ok || !j || j.success !== true) {
+                            var reason = (j && (j.reason || (j.errors && Object.keys(j.errors)[0]))) || ('HTTP ' + r.status);
+                            say(msgs.failed.replace(':reason', reason), false);
+                        } else {
+                            say(msgs.sent.replace(':printer', printer), true);
+                        }
+                    });
+                }).catch(function () {
+                    say(msgs.failed.replace(':reason', 'network'), false);
+                }).then(function () {
+                    btn.disabled = false;
+                    if (label) label.textContent = original;
+                });
+            });
+        });
+    })();
+    </script>
+    @endif
+
     {{-- Recent failed jobs --}}
     @if($recentFailed->count())
     <div class="mt-6 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">

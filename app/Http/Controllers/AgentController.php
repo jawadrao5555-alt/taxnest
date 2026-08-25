@@ -1203,6 +1203,19 @@ class AgentController extends Controller
                         }
                         continue;
                     }
+                    // A test slip PRINTS THE QUEUE IT WAS SENT TO — moving one
+                    // to another printer would hand the shop a slip that lies
+                    // about which queue produced the paper, which is the exact
+                    // confusion the test print exists to end. Stranded test =
+                    // failed; the shop presses Test again on a live counter.
+                    if ($row->type === 'test') {
+                        DB::table('pos_print_jobs')->where('id', $row->id)->update([
+                            'status' => 'failed',
+                            'error' => 'Counter went offline before the test slip printed — run Test Print again from the counter that is switched on.',
+                            'updated_at' => now(),
+                        ]);
+                        continue;
+                    }
                     $upd = ['device_uid' => null, 'updated_at' => now()];
                     // Task 1285: fbr_bill retargets to the company default receipt
                     // printer exactly like PRA bills — the per-device printer may
@@ -1276,6 +1289,24 @@ class AgentController extends Controller
 
         // Views + nested render logic may read the container binding.
         app()->instance('currentCompanyId', $company->id);
+
+        // Test slip: prints the QUEUE'S OWN NAME. A shop whose Windows carries
+        // several queues for one physical printer ("XP-80C" vs "XP-80C (copy 2)")
+        // cannot otherwise tell which one is still wired to the device — the
+        // dead queue swallows jobs and still reports success.
+        if ($job->type === 'test') {
+            $this->setPrintLocale(null, $job, $company);
+            $requestedBy = null;
+            try {
+                $requestedBy = $job->created_by ? (\App\Models\User::find($job->created_by)?->name) : null;
+            } catch (\Throwable $e) { /* name is decoration — never block the slip */ }
+            return response(view('pos.receipts.test-slip', [
+                'company' => $company,
+                'printerName' => $job->target_printer,
+                'printedAt' => now()->format('d/m/Y h:i A'),
+                'requestedBy' => $requestedBy,
+            ])->render())->header('Content-Type', 'text/html; charset=UTF-8');
+        }
 
         if ($job->type === 'bill') {
             $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')

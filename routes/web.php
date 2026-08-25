@@ -1004,6 +1004,12 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/caller-last-order', [\App\Http\Controllers\PosCallerIdController::class, 'lastOrder'])->name('pos.api.caller-last-order');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
     Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');
+    // Test print (Aug 2026): enqueues a slip that carries the QUEUE'S OWN NAME.
+    // Windows keeps a queue alive after the printer moves ports ("XP-80C" vs
+    // "XP-80C (copy 2)"), accepts jobs for the dead one and reports success —
+    // whichever slip physically comes out names the printer to select.
+    Route::post('/api/print-jobs/test', [PosController::class, 'apiTestPrintJob'])
+        ->middleware('throttle:20,1')->name('pos.api.print-jobs.test');
     // Print-failure telemetry beacon (Task #63 — 30 Jul vanished-bill case):
     // sale screen reports WHY a print didn't fire so server logs carry the root
     // cause next time. sendBeacon-compatible (pos/* is CSRF-exempt).

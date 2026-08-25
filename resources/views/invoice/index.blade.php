@@ -568,7 +568,7 @@
                     <div class="text-xs text-gray-600 dark:text-gray-400 max-w-lg">
                         <span class="font-semibold text-gray-800 dark:text-gray-200">Full ZIP Export (no limit):</span>
                         Builds in the background so you can download every invoice at once — 50,000 or more. Drafts included, and any date filters you have applied are used.
-                        <span class="block mt-1 text-gray-500 dark:text-gray-500">Keep this page open while it builds. The file is kept for 24 hours.</span>
+                        <span class="block mt-1 text-gray-500 dark:text-gray-500">You can close this page — the build carries on, and the finished file waits here for 24 hours.</span>
                     </div>
                     <form method="POST" action="{{ route('invoices.zip-exports.store') }}"
                           class="flex items-center gap-2 flex-wrap" @submit="starting = true">

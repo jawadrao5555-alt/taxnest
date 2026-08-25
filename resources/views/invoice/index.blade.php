@@ -685,22 +685,31 @@
                             : "Submit ALL {$bulkTotalLabel} draft invoices to FBR?";
                     }
                 @endphp
-                <div x-show="bulkSelected.length > 0 && !bulkBatchKey" x-cloak class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-900/20">
-                    <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300"><span x-text="bulkSelected.length"></span> {{ $bulkNoun }}(s) selected</p>
-                    <button type="button" @click="startBulkSubmit(false)" :disabled="bulkStarting"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-bold hover:from-emerald-700 hover:to-teal-700 transition disabled:opacity-50">
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                        <span x-show="!bulkStarting">{{ $tab === 'failed' ? 'Retry selected' : 'Submit selected to FBR' }}</span>
-                        <span x-show="bulkStarting" x-cloak>Starting...</span>
-                    </button>
+                {{-- The bulk run used to stay hidden until a row was ticked, so shops
+                     with thousands of drafts concluded there was no bulk feature and
+                     submitted one by one. The batch button is now the visible default;
+                     ticking rows only adds the narrower "selected" action. --}}
+                @if($bulkTabCount > 0)
+                <div x-show="!bulkBatchKey" x-cloak class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/80 dark:bg-emerald-900/20">
+                    <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                        <span x-show="bulkSelected.length > 0"><span x-text="bulkSelected.length"></span> {{ $bulkNoun }}(s) selected</span>
+                        <span x-show="bulkSelected.length === 0">{{ $bulkTotalLabel }} {{ $bulkNoun }}(s) ready — send them together, or tick rows to pick your own</span>
+                    </p>
                     @if($bulkTabCount > 1)
                     <button type="button" @click="if(confirm('{{ $bulkAllConfirm }}')) startBulkSubmit(true)" :disabled="bulkStarting"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/40 transition disabled:opacity-50">
-                        {{ $bulkAllLabel }}
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-xs font-bold hover:from-emerald-700 hover:to-teal-700 transition disabled:opacity-50">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        <span x-show="!bulkStarting">{{ $bulkAllLabel }}</span>
+                        <span x-show="bulkStarting" x-cloak>Starting...</span>
                     </button>
                     @endif
-                    <button type="button" @click="bulkSelected = []" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 underline">Clear selection</button>
+                    <button type="button" x-show="bulkSelected.length > 0" x-cloak @click="startBulkSubmit(false)" :disabled="bulkStarting"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/40 transition disabled:opacity-50">
+                        {{ $tab === 'failed' ? 'Retry selected' : 'Submit selected only' }}
+                    </button>
+                    <button type="button" x-show="bulkSelected.length > 0" x-cloak @click="bulkSelected = []" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 underline">Clear selection</button>
                 </div>
+                @endif
                 <div x-show="bulkBatchKey" x-cloak class="px-5 py-3.5 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-900/20">
                     <div class="flex flex-wrap items-center gap-3 mb-2">
                         <svg x-show="!bulkProgress || !bulkProgress.finished" class="w-4 h-4 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>

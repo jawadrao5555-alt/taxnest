@@ -440,6 +440,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
             ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.save');
         Route::post('/invoices/review/{type}/{ref}/bulk-fix', [\App\Http\Controllers\BulkDraftReviewController::class, 'bulkFix'])
             ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.bulk-fix');
+        Route::post('/invoices/review/{type}/{ref}/match-branches', [\App\Http\Controllers\BulkDraftReviewController::class, 'matchBranches'])
+            ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.match-branches');
         Route::get('/invoices/review/{type}/{ref}/export', [\App\Http\Controllers\BulkDraftReviewController::class, 'export'])
             ->whereIn('type', ['import', 'ai'])->name('invoices.batch-review.export');
 

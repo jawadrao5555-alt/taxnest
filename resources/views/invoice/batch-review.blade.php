@@ -7,10 +7,12 @@
         'provinces' => $provinces,
         'documentTypes' => $documentTypes,
         'scheduleTypes' => $scheduleTypes,
+        'branches' => $branches,
         'urls' => [
             'rows' => route('invoices.batch-review.rows', [$batch['type'], $batch['ref']], false),
             'save' => route('invoices.batch-review.save', [$batch['type'], $batch['ref']], false),
             'bulkFix' => route('invoices.batch-review.bulk-fix', [$batch['type'], $batch['ref']], false),
+            'matchBranches' => route('invoices.batch-review.match-branches', [$batch['type'], $batch['ref']], false),
             'bulkSubmit' => route('invoices.bulk-submit', [], false),
             'bulkSubmitStatus' => route('invoices.bulk-submit-status', [], false),
             'invoice' => url('/invoice', [], false),
@@ -99,6 +101,11 @@
                 <a :href="exportUrl" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200">
                     Download Excel
                 </a>
+
+                <button type="button" @click="matchBranches()" :disabled="busy"
+                    class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-teal-600 text-teal-700 dark:text-teal-300 disabled:opacity-40 disabled:cursor-not-allowed">
+                    Match branch by city
+                </button>
 
                 <button type="button" @click="submitReady()" :disabled="busy || readyDraftIds().length === 0"
                     class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-700 text-white disabled:opacity-40 disabled:cursor-not-allowed">
@@ -346,6 +353,7 @@
 
                 headerFields: [
                     { key: 'invoice_date', label: 'Invoice date' },
+                    { key: 'branch', label: 'Branch', type: 'select', options: boot.branches || [] },
                     { key: 'buyer_name', label: 'Buyer name' },
                     { key: 'buyer_ntn', label: 'Buyer NTN' },
                     { key: 'buyer_cnic', label: 'Buyer CNIC' },
@@ -597,6 +605,34 @@
                         this.summary = data.summary || this.summary;
                     } catch (e) {
                         /* a failed refresh leaves the last known state on screen */
+                    }
+                },
+
+                async matchBranches() {
+                    if (this.busy) return;
+                    if (this.dirtyCount > 0) {
+                        this.flash('Save your changes before matching branches.', 'error');
+                        return;
+                    }
+
+                    this.busy = true;
+                    try {
+                        var res = await this.post(this.urls.matchBranches, {});
+                        var data = await res.json();
+                        if (!res.ok) {
+                            throw new Error(data.error || data.message || 'Could not match branches.');
+                        }
+                        this.rows = data.rows || [];
+                        this.summary = data.summary || this.summary;
+                        this.flash((data.matched || 0) + ' draft(s) matched to a branch, '
+                            + (data.no_match || 0) + ' had no matching city, '
+                            + (data.ambiguous || 0) + ' matched more than one branch.'
+                            + ((data.already_set || 0) ? ' ' + data.already_set + ' already had a branch.' : '')
+                            + ((data.locked || 0) ? ' ' + data.locked + ' already sent to FBR were left alone.' : ''), 'ok');
+                    } catch (e) {
+                        this.flash(e.message || 'Could not match branches.', 'error');
+                    } finally {
+                        this.busy = false;
                     }
                 },
 

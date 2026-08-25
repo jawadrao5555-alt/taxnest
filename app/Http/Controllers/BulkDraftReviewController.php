@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\Branch;
 use App\Models\Invoice;
+use App\Services\BranchResolver;
 use App\Services\BulkDraftReviewService;
+use App\Services\InvoiceActivityService;
 use App\Services\InvoiceImportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -32,6 +36,14 @@ class BulkDraftReviewController extends Controller
         }
 
         $review = $this->service->buildReview($batch, $company);
+        $branches = [];
+        if (Schema::hasTable('branches')) {
+            $branches = Branch::withoutGlobalScopes()
+                ->where('company_id', $company->id)
+                ->orderBy('name')
+                ->pluck('name')
+                ->all();
+        }
 
         return view('invoice.batch-review', [
             'batch' => $batch,
@@ -42,6 +54,7 @@ class BulkDraftReviewController extends Controller
             'provinces' => InvoiceImportService::VALID_PROVINCES,
             'documentTypes' => InvoiceImportService::VALID_DOC_TYPES,
             'scheduleTypes' => InvoiceImportService::VALID_SCHEDULE_TYPES,
+            'branches' => $branches,
             'maxReview' => BulkDraftReviewService::MAX_REVIEW_INVOICES,
         ]);
     }
@@ -168,6 +181,68 @@ class BulkDraftReviewController extends Controller
             'rows' => $review['rows'],
             'summary' => $review['summary'],
         ]);
+    }
+
+    public function matchBranches(Request $request, string $type, string $ref)
+    {
+        [$company, $batch, $error] = $this->context($type, $ref);
+        if ($error) {
+            return response()->json(['error' => $error], 404);
+        }
+
+        $counts = [
+            'matched' => 0,
+            'already_set' => 0,
+            'ambiguous' => 0,
+            'no_match' => 0,
+            'locked' => 0,
+        ];
+        $resolver = new BranchResolver();
+        $hasStorage = Schema::hasColumn('invoices', 'branch_id') && $resolver->branchesTableExists();
+
+        foreach (array_chunk($this->service->invoiceIdsForBatch($batch, $company->id), 100) as $ids) {
+            $invoices = Invoice::withoutGlobalScopes()
+                ->where('company_id', $company->id)
+                ->whereIn('id', $ids)
+                ->get();
+
+            foreach ($invoices as $invoice) {
+                if (!$this->service->isEditable($invoice)) {
+                    $counts['locked']++;
+                    continue;
+                }
+                if ($hasStorage && $invoice->branch_id) {
+                    $counts['already_set']++;
+                    continue;
+                }
+                if (!$hasStorage) {
+                    $counts['no_match']++;
+                    continue;
+                }
+
+                $result = $resolver->resolveFromText($company, (string) ($invoice->buyer_address ?? ''));
+                if ($result['reason'] !== 'matched') {
+                    $counts[$result['reason'] === 'ambiguous' ? 'ambiguous' : 'no_match']++;
+                    continue;
+                }
+
+                $invoice->branch_id = $result['branch_id'];
+                $invoice->save();
+                $counts['matched']++;
+                InvoiceActivityService::log($invoice->id, $invoice->company_id, 'edited', [
+                    'via' => 'batch_review',
+                    'field' => 'branch',
+                ]);
+            }
+        }
+
+        $review = $this->service->buildReview($batch, $company);
+
+        return response()->json(array_merge([
+            'status' => 'ok',
+            'rows' => $review['rows'],
+            'summary' => $review['summary'],
+        ], $counts));
     }
 
     /** Verification copy — download only, never re-uploaded. */

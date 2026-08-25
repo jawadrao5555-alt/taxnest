@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BulkAiImageBatch;
 use App\Models\BulkAiImageItem;
+use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Invoice;
 use App\Models\InvoiceImportBatch;
@@ -44,6 +45,7 @@ class BulkDraftReviewService
     /** Header fields editable from the review grid. */
     public const HEADER_FIELDS = [
         'invoice_date',
+        'branch',
         'buyer_name',
         'buyer_ntn',
         'buyer_cnic',
@@ -71,6 +73,8 @@ class BulkDraftReviewService
     private const CODE_FIELDS = ['buyer_ntn', 'buyer_cnic', 'hs_code', 'sro_serial_no', 'serial_no', 'reference_invoice_number', 'invoice_date'];
 
     private ?FbrService $fbr = null;
+    private ?BranchResolver $branchResolverInstance = null;
+    private ?bool $branchStorageAvailable = null;
 
     private function fbr(): FbrService
     {
@@ -289,6 +293,7 @@ class BulkDraftReviewService
                 'invoice_date' => $invoice->invoice_date
                     ? \Illuminate\Support\Carbon::parse($invoice->invoice_date)->toDateString()
                     : '',
+                'branch' => $this->branchName($invoice),
                 'buyer_name' => (string) ($invoice->buyer_name ?? ''),
                 'buyer_ntn' => (string) ($invoice->buyer_ntn ?? ''),
                 'buyer_cnic' => (string) ($invoice->buyer_cnic ?? ''),
@@ -527,13 +532,22 @@ class BulkDraftReviewService
             return ['ok' => false, 'message' => $this->lockReason($invoice)];
         }
 
+        $branchId = null;
+        if (array_key_exists('branch', $header)) {
+            $branchResult = $this->resolveBranchValue($company, (string) ($header['branch'] ?? ''));
+            if (!$branchResult['ok']) {
+                return ['ok' => false, 'message' => $branchResult['message']];
+            }
+            $branchId = $branchResult['branch_id'];
+        }
+
         $standardTaxRate = $company->getStandardTaxRateValue() ?? 18.0;
         $before = [
             'buyer_name' => $invoice->buyer_name,
             'total_amount' => $invoice->total_amount,
         ];
 
-        DB::transaction(function () use ($invoice, $company, $header, $items, $standardTaxRate) {
+        DB::transaction(function () use ($invoice, $company, $header, $items, $standardTaxRate, $branchId) {
             $existing = $invoice->items()->orderBy('id')->get()->keyBy('id');
 
             foreach ($items as $payload) {
@@ -548,6 +562,10 @@ class BulkDraftReviewService
             $updates = [];
             foreach (self::HEADER_FIELDS as $field) {
                 if (!array_key_exists($field, $header)) {
+                    continue;
+                }
+                if ($field === 'branch') {
+                    $updates['branch_id'] = $branchId;
                     continue;
                 }
                 $normalized = $this->normalizeHeaderValue($field, $header[$field]);
@@ -617,6 +635,20 @@ class BulkDraftReviewService
             ];
         }
 
+        $bulkBranchId = null;
+        if ($field === 'branch') {
+            $branchResult = $this->resolveBranchValue($company, $value);
+            if (!$branchResult['ok']) {
+                return [
+                    'changed_invoices' => [],
+                    'changed_rows' => 0,
+                    'skipped' => 0,
+                    'error' => $branchResult['message'],
+                ];
+            }
+            $bulkBranchId = $branchResult['branch_id'];
+        }
+
         $standardTaxRate = $company->getStandardTaxRateValue() ?? 18.0;
         $needle = $this->compareKey($matchValue);
 
@@ -639,8 +671,19 @@ class BulkDraftReviewService
 
                 $touched = false;
 
-                DB::transaction(function () use ($invoice, $company, $field, $needle, $value, $isHeader, $standardTaxRate, &$touched, &$changedRows) {
+                DB::transaction(function () use ($invoice, $company, $field, $needle, $value, $isHeader, $standardTaxRate, $bulkBranchId, &$touched, &$changedRows) {
                     if ($isHeader) {
+                        if ($field === 'branch') {
+                            if ($this->compareKey($this->branchName($invoice)) !== $needle) {
+                                return;
+                            }
+                            $invoice->branch_id = $bulkBranchId;
+                            $invoice->save();
+                            $touched = true;
+                            $changedRows++;
+
+                            return;
+                        }
                         if ($this->compareKey((string) ($invoice->{$field} ?? '')) !== $needle) {
                             return;
                         }
@@ -827,6 +870,66 @@ class BulkDraftReviewService
         return rtrim(rtrim(number_format($float, 4, '.', ''), '0'), '.') ?: '0';
     }
 
+    private function branchResolver(): BranchResolver
+    {
+        return $this->branchResolverInstance ??= new BranchResolver();
+    }
+
+    private function branchStorageAvailable(): bool
+    {
+        return $this->branchStorageAvailable ??= Schema::hasColumn('invoices', 'branch_id')
+            && $this->branchResolver()->branchesTableExists();
+    }
+
+    private function branchName(Invoice $invoice): string
+    {
+        if (!$this->branchStorageAvailable() || !$invoice->branch_id) {
+            return '';
+        }
+
+        return (string) (Branch::withoutGlobalScopes()
+            ->where('company_id', $invoice->company_id)
+            ->whereKey($invoice->branch_id)
+            ->value('name') ?? '');
+    }
+
+    /** @return array{ok:bool,branch_id:?int,message?:string} */
+    private function resolveBranchValue(Company $company, string $value): array
+    {
+        if (!$this->branchStorageAvailable()) {
+            return ['ok' => false, 'branch_id' => null, 'message' => 'Branches are not available in this database.'];
+        }
+
+        $raw = trim($value);
+        if ($raw === '') {
+            $lookup = $this->branchResolver()->branchLookup($company);
+            if ($lookup === []) {
+                return ['ok' => true, 'branch_id' => null];
+            }
+            $headId = $this->branchResolver()->headOfficeBranchId($company);
+            if ($headId === null) {
+                return ['ok' => false, 'branch_id' => null, 'message' => 'Branch is blank but no branch is marked as the head office.'];
+            }
+
+            return ['ok' => true, 'branch_id' => $headId];
+        }
+
+        $lookup = $this->branchResolver()->branchLookup($company);
+        $hit = $lookup[$this->branchResolver()->normalizeBranchKey($raw)] ?? null;
+        if ($hit === false) {
+            return ['ok' => false, 'branch_id' => null, 'message' => "Branch '{$raw}' matches more than one branch. Choose the exact branch name."];
+        }
+        if ($hit === null) {
+            return [
+                'ok' => false,
+                'branch_id' => null,
+                'message' => "Branch '{$raw}' did not match any branch. Available: " . $this->branchResolver()->branchChoices($company) . '.',
+            ];
+        }
+
+        return ['ok' => true, 'branch_id' => (int) $hit];
+    }
+
     // ------------------------------------------------------------------
     // Export (download only — this file is never re-uploaded)
     // ------------------------------------------------------------------
@@ -841,6 +944,7 @@ class BulkDraftReviewService
         $columns = [
             'invoice_number', 'status', 'issues',
             'invoice_date',
+            'branch',
             'buyer_name', 'buyer_ntn', 'buyer_cnic', 'buyer_address', 'destination_province',
             'document_type', 'reference_invoice_number',
             'hs_code', 'description', 'quantity', 'price', 'tax', 'tax_rate', 'schedule_type',

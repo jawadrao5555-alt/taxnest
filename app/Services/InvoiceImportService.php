@@ -47,14 +47,10 @@ class InvoiceImportService
     private array $sroSuggestCache = [];
     private array $refExistsCache = [];
 
-    /** company_id => [normalized branch name/city => branch id, or false when two branches share it] */
-    private array $branchLookupCache = [];
+    private ?BranchResolver $branchResolverInstance = null;
 
     /** Cached once per service instance — see invoicesHaveBranchColumn(). */
     private ?bool $invoicesHaveBranch = null;
-
-    /** Cached once per service instance — see branchesTableExists(). */
-    private ?bool $branchesTable = null;
 
     /** Upload size cap in KB (matches route validation). */
     public const MAX_FILE_KB = 10240;
@@ -1165,39 +1161,7 @@ class InvoiceImportService
      */
     private function branchLookup(Company $company): array
     {
-        if (array_key_exists($company->id, $this->branchLookupCache)) {
-            return $this->branchLookupCache[$company->id];
-        }
-
-        if (!$this->branchesTableExists()) {
-            return $this->branchLookupCache[$company->id] = [];
-        }
-
-        $branches = \App\Models\Branch::where('company_id', $company->id)->get(['id', 'name', 'city']);
-
-        $byCity = [];
-        $byName = [];
-        foreach ($branches as $branch) {
-            foreach ([['city', &$byCity], ['name', &$byName]] as [$field, &$bucket]) {
-                $key = self::normalizeBranchKey((string) ($branch->{$field} ?? ''));
-                if ($key !== '') {
-                    $bucket[$key][] = $branch->id;
-                }
-            }
-            unset($bucket);
-        }
-
-        $collapse = static fn (array $ids) => count(array_unique($ids)) === 1 ? $ids[0] : false;
-
-        $lookup = [];
-        foreach ($byCity as $key => $ids) {
-            $lookup[$key] = $collapse($ids);
-        }
-        foreach ($byName as $key => $ids) {
-            $lookup[$key] = $collapse($ids);   // naam city ko dhaanp deta hai
-        }
-
-        return $this->branchLookupCache[$company->id] = $lookup;
+        return $this->branchResolver()->branchLookup($company);
     }
 
     /**
@@ -1209,38 +1173,19 @@ class InvoiceImportService
      */
     private function headOfficeBranchId(Company $company): ?int
     {
-        if (!$this->branchesTableExists()) {
-            return null;
-        }
-
-        $branch = \App\Models\Branch::where('company_id', $company->id)
-            ->where('is_head_office', true)
-            ->orderBy('id')
-            ->first(['id']);
-
-        return $branch?->id;
+        return $this->branchResolver()->headOfficeBranchId($company);
     }
 
     /** Ghalti ke paighaam mein dikhane ke liye: kaun kaun si branch chal sakti hai. */
     private function branchChoices(Company $company): string
     {
-        if (!$this->branchesTableExists()) {
-            return 'none';
-        }
-
-        $choices = \App\Models\Branch::where('company_id', $company->id)
-            ->orderBy('name')
-            ->get(['name', 'city'])
-            ->map(fn ($b) => $b->city ? "{$b->name} ({$b->city})" : $b->name)
-            ->all();
-
-        return $choices ? implode(', ', $choices) : 'none';
+        return $this->branchResolver()->branchChoices($company);
     }
 
     /** Naam/city ka moqabla karne ke liye ek hi shakal. */
     private static function normalizeBranchKey(string $raw): string
     {
-        return trim(preg_replace('/\s+/u', ' ', mb_strtolower($raw)));
+        return (new BranchResolver())->normalizeBranchKey($raw);
     }
 
     /** Purana database jis mein invoices.branch_id na ho — import phir bhi chale. */
@@ -1252,7 +1197,12 @@ class InvoiceImportService
     /** Isi tarah branches table bhi har database mein maujood nahi hoti. */
     private function branchesTableExists(): bool
     {
-        return $this->branchesTable ??= Schema::hasTable('branches');
+        return $this->branchResolver()->branchesTableExists();
+    }
+
+    private function branchResolver(): BranchResolver
+    {
+        return $this->branchResolverInstance ??= new BranchResolver();
     }
 
     public function normalizeProvince(string $raw): ?string

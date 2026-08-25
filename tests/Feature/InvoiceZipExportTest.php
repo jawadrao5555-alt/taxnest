@@ -489,6 +489,46 @@ class InvoiceZipExportTest extends TestCase
         $this->assertLessThan(200 * 1024, $largestPdf, 'invoice PDF looks like it is embedding whole fonts again');
     }
 
+    /**
+     * A filed invoice carries the FBR mark and QR, and the full-size screen
+     * logo was being embedded whole into every one of them — 42 KB a piece,
+     * which is most of a 6,000-invoice archive. The print copy of the mark
+     * must stay in use.
+     */
+    public function test_a_filed_invoice_pdf_does_not_carry_the_full_size_fbr_logo(): void
+    {
+        $invoice = $this->makeInvoice('locked', 'DI00042');
+        $invoice->forceFill([
+            'fbr_invoice_number' => '9876543DI8NAN7W789829',
+            'fbr_status' => 'production',
+        ])->save();
+
+        $export = $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_COMPLETED]
+        ));
+
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open(InvoiceZipBuilderService::absolutePath($export)) === true);
+
+        $largestPdf = 0;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $entry = $zip->statIndex($i);
+            if (str_ends_with(strtolower($entry['name']), '.pdf')) {
+                $largestPdf = max($largestPdf, (int) $entry['size']);
+            }
+        }
+        $zip->close();
+
+        $this->assertGreaterThan(0, $largestPdf, 'no PDF found in the archive');
+        $this->assertLessThan(
+            60 * 1024,
+            $largestPdf,
+            'a filed invoice PDF got heavy again — check the embedded FBR logo resolution'
+        );
+    }
+
     private function callProtected(string $method, mixed ...$args): mixed
     {
         $ref = new \ReflectionMethod(InvoiceZipBuilderService::class, $method);

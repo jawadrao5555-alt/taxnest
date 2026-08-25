@@ -77,7 +77,16 @@ class InvoicePdfService
                 $qrBase64 = '';
             }
 
-            $logoPath = public_path('images/fbr-digital-invoice-logo.png');
+            // The full-size logo is a 42 KB screen asset, and it was being
+            // embedded whole into EVERY filed invoice — three quarters of the
+            // file, and ~250 MB of dead weight in a 6,000-invoice ZIP. The
+            // print copy is the same mark at the resolution the PDF actually
+            // prints it (240px for a ~16mm box ≈ 380 dpi), so it looks
+            // identical on paper for a fifth of the bytes.
+            $logoPath = public_path('images/fbr-digital-invoice-logo-print.png');
+            if (!file_exists($logoPath)) {
+                $logoPath = public_path('images/fbr-digital-invoice-logo.png');
+            }
             if (file_exists($logoPath)) {
                 $fbrLogoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
             }

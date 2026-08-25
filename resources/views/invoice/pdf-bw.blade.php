@@ -56,15 +56,15 @@
         /* ── Title band ──────────────────────────────────────────────── */
         .title-band { width: 100%; border-collapse: collapse; background: {{ $accent }}; }
         .title-band td { padding: 9px 12px; vertical-align: middle; color: {{ $accentText }}; }
-        .title-band .doc-title { font-size: 17px; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; }
+        .title-band .doc-title { font-size: 17px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
         .title-band .doc-meta { font-size: 10px; text-align: right; line-height: 1.5; }
-        .title-band .doc-meta .big { font-size: 12.5px; font-weight: 800; letter-spacing: 0.3px; }
+        .title-band .doc-meta .big { font-size: 12.5px; font-weight: 700; letter-spacing: 0.3px; }
 
         .status-pill {
             display: inline-block;
             padding: 3px 9px;
             font-size: 8.5px;
-            font-weight: 800;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
             background: {{ $statusColor }};
@@ -74,7 +74,7 @@
         /* ── Seller / FBR strip ──────────────────────────────────────── */
         .top-strip { width: 100%; border-collapse: collapse; margin-top: 9px; }
         .top-strip > tbody > tr > td { vertical-align: top; }
-        .seller-name { font-size: 17px; font-weight: 900; color: {{ $accent }}; letter-spacing: 0.3px; }
+        .seller-name { font-size: 17px; font-weight: 700; color: {{ $accent }}; letter-spacing: 0.3px; }
         .seller-branch { font-size: 10px; font-weight: 700; color: {{ $accent }}; margin-top: 1px; }
         .seller-info { font-size: 9.5px; color: #33474C; margin-top: 3px; line-height: 1.5; }
         .seller-info strong { font-weight: 700; color: #16262B; }
@@ -85,12 +85,12 @@
         .fbr-box { border: 1.5px solid #0A4D5C; }
         .fbr-box .fbr-inner { padding: 7px 8px 6px; text-align: center; }
         .fbr-box .fbr-no {
-            font-size: 8.5px; font-weight: 800; color: #16262B; letter-spacing: 0.2px;
+            font-size: 8.5px; font-weight: 700; color: #16262B; letter-spacing: 0.2px;
             word-wrap: break-word; margin-top: 4px; line-height: 1.35;
         }
         .fbr-box .fbr-cap {
             background: #0A4D5C; color: #ffffff;
-            font-size: 7.5px; font-weight: 800; letter-spacing: 1px;
+            font-size: 7.5px; font-weight: 700; letter-spacing: 1px;
             text-transform: uppercase; text-align: center; padding: 3px 4px;
         }
         .fbr-box .qr-missing {
@@ -99,7 +99,7 @@
         }
         .qr-img { width: 92px; height: 92px; }
         .not-filed {
-            border: 1.5px dashed #A3211B; color: #A3211B; font-size: 9px; font-weight: 800;
+            border: 1.5px dashed #A3211B; color: #A3211B; font-size: 9px; font-weight: 700;
             text-align: center; padding: 14px 8px; text-transform: uppercase; letter-spacing: 0.8px;
         }
 
@@ -108,14 +108,14 @@
         .panels > tbody > tr > td { vertical-align: top; }
         .panel-head {
             background: {{ $accent }}; color: {{ $accentText }};
-            font-size: 8.5px; text-transform: uppercase; font-weight: 800;
+            font-size: 8.5px; text-transform: uppercase; font-weight: 700;
             letter-spacing: 1.3px; padding: 5px 9px; display: block;
         }
         .panel-body { padding: 7px 9px; border: 1px solid {{ $accent }}; border-top: none; }
         .panel-row { font-size: 10px; color: #16262B; padding: 1px 0; line-height: 1.5; }
         .panel-label { font-size: 9.5px; color: #4A6167; font-weight: 600; }
-        .buyer-type { font-size: 8.5px; font-weight: 800; letter-spacing: 0.9px; color: #4A6167; text-transform: uppercase; }
-        .buyer-name { font-size: 12.5px; font-weight: 800; color: #16262B; }
+        .buyer-type { font-size: 8.5px; font-weight: 700; letter-spacing: 0.9px; color: #4A6167; text-transform: uppercase; }
+        .buyer-name { font-size: 12.5px; font-weight: 700; color: #16262B; }
 
         .detail-table { width: 100%; border-collapse: collapse; border: 1px solid {{ $accent }}; border-top: none; }
         .detail-table td { padding: 4px 9px; font-size: 9.5px; border-bottom: 1px solid #DCE6E8; }
@@ -130,7 +130,7 @@
         .items-table thead th {
             background: {{ $accent }}; color: {{ $accentText }};
             padding: 7px 6px; font-size: 8.5px; text-transform: uppercase;
-            font-weight: 800; letter-spacing: 0.6px; text-align: left;
+            font-weight: 700; letter-spacing: 0.6px; text-align: left;
             border-right: 1px solid rgba(255,255,255,0.28);
         }
         .items-table thead th:last-child { border-right: none; }
@@ -147,7 +147,7 @@
         .items-table tbody tr:last-child td { border-bottom: 1.5px solid {{ $accent }}; }
         .items-table tbody td.ar { text-align: right; font-weight: 700; }
         .items-table tbody td.ac { text-align: center; }
-        .items-table tbody td.code { font-weight: 800; color: {{ $accent }}; letter-spacing: 0.2px; }
+        .items-table tbody td.code { font-weight: 700; color: {{ $accent }}; letter-spacing: 0.2px; }
         .items-table tbody td.unit { font-size: 8.5px; text-align: center; color: #4A6167; }
         .items-table tbody td.product { font-weight: 600; }
         .items-table tbody tr { page-break-inside: avoid; }
@@ -169,8 +169,8 @@
         .totals-box .t-label { text-align: right; color: #4A6167; font-weight: 600; width: 54%; }
         .totals-box .t-value { text-align: right; color: #16262B; font-weight: 700; width: 46%; white-space: nowrap; }
         .totals-box tr.total-row td { background: {{ $accent }}; border-bottom: none; padding: 8px 10px; }
-        .totals-box tr.total-row .t-label { color: {{ $accentText }}; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; }
-        .totals-box tr.total-row .t-value { color: {{ $accentText }}; font-size: 13.5px; font-weight: 900; }
+        .totals-box tr.total-row .t-label { color: {{ $accentText }}; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; }
+        .totals-box tr.total-row .t-value { color: {{ $accentText }}; font-size: 13.5px; font-weight: 700; }
 
         /* ── Sign-off + footer ───────────────────────────────────────── */
         .signoff { width: 100%; border-collapse: collapse; margin-top: 26px; }
@@ -179,7 +179,7 @@
 
         .footer { margin-top: 14px; padding-top: 7px; border-top: 2px solid {{ $accent }}; text-align: center; }
         .footer-text { font-size: 8px; color: #4A6167; }
-        .footer-brand { font-size: 9px; color: {{ $accent }}; font-weight: 800; margin-top: 2px; }
+        .footer-brand { font-size: 9px; color: {{ $accent }}; font-weight: 700; margin-top: 2px; }
 
         /* Repeated on every page inside the bottom margin. */
         .page-foot {
@@ -400,7 +400,7 @@
                 <td class="unit">{{ $item->default_uom ?? 'PCS' }}</td>
                 <td class="ar">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
                 <td class="ar">{{ number_format($item->price, 2) }}</td>
-                <td class="ar" style="font-weight: 800;">{{ number_format($item->price * $item->quantity, 2) }}</td>
+                <td class="ar" style="font-weight: 700;">{{ number_format($item->price * $item->quantity, 2) }}</td>
                 <td class="ar" style="font-size: 9px;">{{ number_format($item->tax_rate ?? 0, 0) }}%</td>
             </tr>
             @endforeach

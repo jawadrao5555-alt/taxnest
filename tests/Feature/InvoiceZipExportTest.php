@@ -459,6 +459,36 @@ class InvoiceZipExportTest extends TestCase
         $this->assertSame('zip', (new \App\Jobs\BuildAuditPackJob(1))->queue);
     }
 
+    /**
+     * An invoice PDF must not carry entire embedded font files. It did, and it
+     * turned a 5,961-invoice archive into 4.9 GB that no shop could download.
+     */
+    public function test_archived_invoice_pdfs_do_not_embed_whole_fonts(): void
+    {
+        $this->makeInvoice('draft', 'DI00001');
+
+        $export = $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_DRAFT]
+        ));
+
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open(InvoiceZipBuilderService::absolutePath($export)) === true);
+
+        $largestPdf = 0;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $entry = $zip->statIndex($i);
+            if (str_ends_with(strtolower($entry['name']), '.pdf')) {
+                $largestPdf = max($largestPdf, (int) $entry['size']);
+            }
+        }
+        $zip->close();
+
+        $this->assertGreaterThan(0, $largestPdf, 'no PDF found in the archive');
+        $this->assertLessThan(200 * 1024, $largestPdf, 'invoice PDF looks like it is embedding whole fonts again');
+    }
+
     private function callProtected(string $method, mixed ...$args): mixed
     {
         $ref = new \ReflectionMethod(InvoiceZipBuilderService::class, $method);

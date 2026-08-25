@@ -1567,7 +1567,7 @@ class InvoiceController extends Controller
         }
 
         $data = $this->buildPdfData($invoice);
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
+        $pdf = \App\Services\InvoicePdfService::make('invoice.pdf-bw', $data);
         $pdf->setPaper('A4', 'portrait');
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
 
@@ -1582,7 +1582,7 @@ class InvoiceController extends Controller
         }
 
         $data = $this->buildPdfData($invoice);
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
+        $pdf = \App\Services\InvoicePdfService::make('invoice.pdf-bw', $data);
         $pdf->setPaper('A4', 'portrait');
         $filename = 'invoice-bw-preview-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
 
@@ -1597,7 +1597,7 @@ class InvoiceController extends Controller
         }
 
         $data = $this->buildPdfData($invoice);
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
+        $pdf = \App\Services\InvoicePdfService::make('invoice.pdf-bw', $data);
         $pdf->setPaper('A4', 'portrait');
         $filename = 'invoice-' . ($invoice->fbr_invoice_number ?? $invoice->internal_invoice_number ?? $invoice->invoice_number ?? $invoice->id) . '.pdf';
         return $pdf->download($filename);
@@ -1716,7 +1716,7 @@ class InvoiceController extends Controller
         foreach ($invoices as $invoice) {
             try {
                 $data = $this->buildPdfData($invoice);
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
+                $pdf = \App\Services\InvoicePdfService::make('invoice.pdf-bw', $data);
                 $pdf->setPaper('A4', 'portrait');
 
                 $base = $invoice->fbr_invoice_number

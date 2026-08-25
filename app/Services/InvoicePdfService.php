@@ -91,9 +91,28 @@ class InvoicePdfService
     /**
      * Render the A4 B/W PDF (DomPDF instance — call ->stream/->download/->output).
      */
+    /**
+     * Every invoice PDF is built here so they all get font subsetting.
+     *
+     * Without it DomPDF embeds BOTH complete font files into EVERY invoice:
+     * 734 KB of an 881 KB file. One shop's 5,961-invoice archive came to
+     * 4.9 GB, which no shop can download and which blew past the export size
+     * cap. With subsetting the same invoice is 28 KB, byte-identical in text
+     * and pixel-identical on the page.
+     *
+     * Deliberately set here rather than globally in config: POS thermal
+     * receipts embed a Nastaleeq Urdu font through the same library, and its
+     * ligature coverage under subsetting has not been verified.
+     */
+    public static function make(string $view, array $data): \Barryvdh\DomPDF\PDF
+    {
+        return \Barryvdh\DomPDF\Facade\Pdf::setOption('enable_font_subsetting', true)
+            ->loadView($view, $data);
+    }
+
     public static function renderBw(Invoice $invoice, ?float $fallbackWhtRate = null): \Barryvdh\DomPDF\PDF
     {
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', self::buildData($invoice, $fallbackWhtRate));
+        $pdf = self::make('invoice.pdf-bw', self::buildData($invoice, $fallbackWhtRate));
         $pdf->setPaper('A4', 'portrait');
         return $pdf;
     }

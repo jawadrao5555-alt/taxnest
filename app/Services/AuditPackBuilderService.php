@@ -155,7 +155,7 @@ class AuditPackBuilderService
 
                 try {
                     $data = InvoicePdfService::buildData($invoice);
-                    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoice.pdf-bw', $data);
+                    $pdf = InvoicePdfService::make('invoice.pdf-bw', $data);
                     $pdf->setPaper('A4', 'portrait');
 
                     $base = $invoice->fbr_invoice_number

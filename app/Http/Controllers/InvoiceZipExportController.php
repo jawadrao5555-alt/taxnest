@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\BuildInvoiceZipJob;
+use App\Jobs\PrerenderInvoicePdfsJob;
 use App\Models\InvoiceZipExport;
 use App\Services\InvoiceZipBuilderService;
 use Illuminate\Http\Request;
@@ -17,6 +18,9 @@ use Illuminate\Support\Facades\Log;
  */
 class InvoiceZipExportController extends Controller
 {
+    /** Parallel PDF renderers per export. Matches the zip workers the server runs. */
+    private const RENDER_HELPERS = 4;
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -57,6 +61,13 @@ class InvoiceZipExportController extends Controller
         // than stranding it.
         try {
             BuildInvoiceZipJob::dispatch($export->id);
+
+            // Rendering is nearly all of the work and every PDF is independent,
+            // so helpers fill the staging directory alongside the build. They
+            // only ever make it faster: anything they miss the build renders.
+            for ($slot = 0; $slot < self::RENDER_HELPERS; $slot++) {
+                PrerenderInvoicePdfsJob::dispatch($export->id, $slot, self::RENDER_HELPERS);
+            }
         } catch (\Throwable $e) {
             Log::warning('Invoice ZIP: dispatch failed, falling back to poll-driven build', [
                 'export_id' => $export->id,

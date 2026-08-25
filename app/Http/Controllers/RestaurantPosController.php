@@ -3026,6 +3026,12 @@ class RestaurantPosController extends Controller
         // cached service as the retail dashboard (admin/manager-only card).
         $inactiveRegulars = $isAdmin ? \App\Services\PosRepeatCustomerAlert::listFor($companyId) : collect();
 
+        // Owner (25 Aug 2026, voice note): rider ki pari hui settlement bhi is
+        // dashboard par — delivery karne wali shop yahi khol kar baithti hai,
+        // aur day-close ki report mein wo tabhi jati hai jab din band karna ho.
+        // Wahi service jo retail dashboard parhta hai (cashier gate andar hai).
+        $riderPending = \App\Services\PosRiderKhataAlert::pending($companyId, $company);
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
@@ -3037,7 +3043,7 @@ class RestaurantPosController extends Controller
             'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
             'counterOrdersCount', 'heldNoTableCount', 'todayKhata',
             'todayTotalSale', 'yesterdayTotalSale', 'newCustomersToday', 'newCustomersMonth',
-            'inactiveRegulars'
+            'inactiveRegulars', 'riderPending'
         ));
     }
 

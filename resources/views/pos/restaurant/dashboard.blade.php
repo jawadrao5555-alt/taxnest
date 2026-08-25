@@ -18,6 +18,12 @@
 <div class="w-full overflow-x-hidden" x-data="rDash()" x-init="init()">
     <div class="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
         @include('pos.partials.pending-bills-tile')
+        {{-- Owner (25 Aug 2026, voice note): "rider settlement ko bhi idhar
+             pending wali jagah le aayein — banda din bhar dashboard hi khol kar
+             baitha hota hai, day-close ki report mein har waqt to nahi jayega."
+             Alert pehle sirf retail dashboard par tha; delivery to restaurant
+             hi karte hain, is liye dono jagah. --}}
+        @include('pos.partials.rider-settlement-pending')
         @include('pos.partials.inactive-customers')
         @include('pos.partials.today-khata')
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))

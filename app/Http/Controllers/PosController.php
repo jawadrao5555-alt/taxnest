@@ -1903,71 +1903,10 @@ class PosController extends Controller
      */
     private function pendingRiderKhata($companyId, $company)
     {
-        // PROD schema drift: rider columns purane shops par ho sakta hai na hon.
-        if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
-            || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id')) {
-            return collect();
-        }
-
-        // Yeh reminder company ki LIABILITY hai — rider ke naam ke saath kitna
-        // cash bahar phansa hua hai. Settle sirf admin/manager kar sakta hai, is
-        // liye cashier ko poori dukan ka bahar para cash dikhana bhi nahi
-        // chahiye. Gate yahan (call site par nahi) taake koi naya caller ise
-        // ghalti se bypass na kar sake.
-        $viewer = auth('pos')->user();
-        if ($viewer && $viewer->posCashierBlocked()) {
-            return collect();
-        }
-        // Feature/plan gate jaan boojh kar YAHAN nahi lagaya: gate band hone par
-        // bhi rider ke paas para cash phansna nahi chahiye (deliveries board bhi
-        // isi wajah se khula rehta hai — PosRiderController::hasOpenRiderCash).
-        // Khata khali hoga to neeche khud hi khali collection wapas jayegi.
-
-        $q = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->whereNotNull('rider_id')
-            ->where('payment_method', 'cash')
-            ->whereNull('rider_settlement_id')
-            ->where(function ($s) {
-                $s->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
-            });
-
-        // Multi-branch: baqi har dashboard figure ki tarah yeh reminder bhi
-        // active branch ka hi hona chahiye. Warna ek branch ka manager doosri
-        // branch ka rider cash dekhta hai — jis par wo kuch kar bhi nahi sakta,
-        // aur do screenon par ek hi shop ke do alag hindsay aate hain.
-        // Schema guard: purani DB par branch column/table ho hi na (PROD drift).
-        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'branch_id')
-            && \Illuminate\Support\Facades\Schema::hasTable('branches')) {
-            app(\App\Services\BranchContextService::class)->applyToQuery($q, 'branch_id');
-        }
-
-        // Ek hi grouped query — rider ke hisaab se ginti, raqam aur sab se
-        // purane bill ki tareekh (N+1 se bachne ke liye).
-        $rows = $q->groupBy('rider_id')
-            ->selectRaw('rider_id, COUNT(*) as bills, COALESCE(SUM('
-                . \App\Models\PosRider::remainingExpr('pos_transactions')
-                . '), 0) as owed, MIN(created_at) as oldest')
-            ->get();
-
-        if ($rows->isEmpty()) {
-            return collect();
-        }
-
-        $names = \App\Models\PosRider::where('company_id', $companyId)
-            ->whereIn('id', $rows->pluck('rider_id')->all())
-            ->pluck('name', 'id');
-
-        return $rows->map(function ($r) use ($names) {
-            $oldest = $r->oldest ? \Carbon\Carbon::parse($r->oldest) : null;
-            return [
-                'id'    => (int) $r->rider_id,
-                'name'  => $names[$r->rider_id] ?? ('#' . $r->rider_id),
-                'bills' => (int) $r->bills,
-                'owed'  => (float) $r->owed,
-                'days'  => $oldest ? (int) $oldest->copy()->startOfDay()->diffInDays(now()->startOfDay()) : 0,
-            ];
-        })->filter(fn ($r) => $r['owed'] > 0)->sortByDesc('owed')->values();
+        // Hisaab PosRiderKhataAlert mein rehta hai: ek hi shop do alag dashboard
+        // par utar sakti hai (retail /pos/dashboard aur restaurant
+        // /pos/restaurant/dashboard) aur dono ko wahi khata dikhna chahiye.
+        return \App\Services\PosRiderKhataAlert::pending((int) $companyId, $company);
     }
 
     /**

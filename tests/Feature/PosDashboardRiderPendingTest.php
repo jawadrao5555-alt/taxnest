@@ -75,6 +75,9 @@ class PosDashboardRiderPendingTest extends TestCase
             $table->unsignedBigInteger('rider_settlement_id')->nullable();
             $table->string('payment_method')->nullable();
             $table->string('delivery_status')->nullable();
+            $table->string('status')->nullable();
+            $table->string('order_type')->nullable();
+            $table->string('transaction_type')->nullable();
             $table->decimal('total_amount', 12, 2)->default(0);
             $table->decimal('rider_partial_paid', 12, 2)->nullable();
             $table->string('invoice_mode')->nullable();
@@ -122,6 +125,81 @@ class PosDashboardRiderPendingTest extends TestCase
         $m->setAccessible(true);
 
         return collect($m->invoke($c, 1, \App\Models\Company::find(1)));
+    }
+
+    /** Bina rider gaya delivery bill — default: cash, final, abhi khula hua. */
+    private function noRiderBill(array $attrs = []): void
+    {
+        $this->bill(array_merge([
+            'rider_id'        => null,
+            'delivery_status' => null,
+            'order_type'      => 'delivery',
+            'status'          => 'completed',
+            'invoice_mode'    => 'pra',
+            'pra_status'      => 'reported',
+        ], $attrs));
+    }
+
+    private function unassigned(): array
+    {
+        return \App\Services\PosRiderKhataAlert::unassigned(1, \App\Models\Company::find(1));
+    }
+
+    // ── Bina rider wale delivery bills (owner, 25 Aug 2026) ──────────────────
+    // "Rok na lagayein, magar bina rider wale delivery bills ka cash bhi
+    // dashboard par dikhe." Day-close ka blocker inhe aaj bhi nahi ginta.
+
+    public function test_rider_less_delivery_cash_is_counted_for_the_dashboard(): void
+    {
+        $this->noRiderBill(['total_amount' => 80]);
+        $this->noRiderBill(['total_amount' => 120]);
+
+        $out = $this->unassigned();
+
+        $this->assertSame(2, $out['count']);
+        $this->assertSame(200.0, $out['amount']);
+    }
+
+    public function test_a_closed_or_assigned_delivery_is_not_rider_less_cash(): void
+    {
+        // Rider laga hua bill khata alert ka mamla hai, is ginti ka nahi.
+        $this->noRiderBill(['rider_id' => 1, 'delivery_status' => 'assigned', 'total_amount' => 500]);
+        // "Delivered (no rider)" daba diya gaya — cash counter par aa chuka.
+        $this->noRiderBill(['delivery_status' => 'delivered', 'total_amount' => 500]);
+        // Card par gaya bill: drawer se koi cash bahar nahi gaya.
+        $this->noRiderBill(['payment_method' => 'debit_card', 'total_amount' => 500]);
+        // Takeaway/counter bill delivery hi nahi.
+        $this->noRiderBill(['order_type' => 'takeaway', 'total_amount' => 500]);
+        // Provisional (local+local) abhi bika hi nahi — pending-bills tile ka kaam.
+        $this->noRiderBill(['invoice_mode' => 'local', 'pra_status' => 'local', 'total_amount' => 500]);
+        // Return kabhi bahar para cash nahi hota.
+        $this->noRiderBill(['transaction_type' => 'return', 'total_amount' => 500]);
+        // Doosri company ka bill kabhi nahi.
+        $this->noRiderBill(['company_id' => 2, 'total_amount' => 500]);
+
+        $this->assertSame(['count' => 0, 'amount' => 0.0, 'days' => 0], $this->unassigned());
+    }
+
+    public function test_a_week_old_rider_less_bill_stops_nagging(): void
+    {
+        $this->noRiderBill(['total_amount' => 300, 'created_at' => now()->subDays(9)]);
+
+        $this->assertSame(0, $this->unassigned()['count']);
+    }
+
+    /** Chip dono hissay jorta hai: rider ka khata + bina rider gaya cash. */
+    public function test_the_chip_summary_adds_both_kinds_of_open_cash(): void
+    {
+        $this->bill(['rider_id' => 1, 'total_amount' => 550]);
+        $this->noRiderBill(['total_amount' => 80]);
+
+        $sum = \App\Services\PosRiderKhataAlert::summary(1, \App\Models\Company::find(1));
+
+        $this->assertTrue($sum['enabled'], 'Kuch para ho to chip lazmi dikhe');
+        $this->assertSame(2, $sum['bills']);
+        $this->assertSame(630.0, $sum['amount']);
+        $this->assertSame(1, $sum['unassigned']['count']);
+        $this->assertCount(1, $sum['riders']);
     }
 
     public function test_open_cash_is_grouped_per_rider_biggest_first(): void

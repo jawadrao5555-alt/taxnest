@@ -1787,25 +1787,14 @@ class RestaurantPosController extends Controller
         }
     }
 
+    /**
+     * Next FINAL (PRA-stream) serial — short "P-036" since 25 Aug 2026.
+     * Shares PosFinalSeries with the retail sale path; see that service for the
+     * monotonic rule and why legacy POS-YYYY-NNNNN rows still reserve numbers.
+     */
     private function generateInvoiceNumber($companyId)
     {
-        $year = date('Y');
-        $prefix = "POS-{$year}-";
-        // withoutGlobalScope('hide_archived'): archived rows still occupy the
-        // UNIQUE(company_id, invoice_number) index — the counter must see them.
-        $all = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('invoice_mode', 'pra')
-            ->where('invoice_number', 'like', "{$prefix}%")
-            ->pluck('invoice_number');
-
-        $maxNum = 0;
-        foreach ($all as $inv) {
-            if (preg_match('/POS-' . $year . '-(\d+)/', $inv, $m)) {
-                $maxNum = max($maxNum, (int) $m[1]);
-            }
-        }
-        return $prefix . str_pad($maxNum + 1, 5, '0', STR_PAD_LEFT);
+        return \App\Services\PosFinalSeries::issueNext((int) $companyId);
     }
 
     /**
@@ -3031,6 +3020,8 @@ class RestaurantPosController extends Controller
         // aur day-close ki report mein wo tabhi jati hai jab din band karna ho.
         // Wahi service jo retail dashboard parhta hai (cashier gate andar hai).
         $riderPending = \App\Services\PosRiderKhataAlert::pending($companyId, $company);
+        // Chip ke liye poora summary (bina-rider delivery cash bhi isi mein).
+        $riderChip = \App\Services\PosRiderKhataAlert::summary((int) $companyId, $company);
 
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
@@ -3043,7 +3034,7 @@ class RestaurantPosController extends Controller
             'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
             'counterOrdersCount', 'heldNoTableCount', 'todayKhata',
             'todayTotalSale', 'yesterdayTotalSale', 'newCustomersToday', 'newCustomersMonth',
-            'inactiveRegulars', 'riderPending'
+            'inactiveRegulars', 'riderPending', 'riderChip'
         ));
     }
 

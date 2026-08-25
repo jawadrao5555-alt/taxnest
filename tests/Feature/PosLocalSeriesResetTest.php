@@ -714,6 +714,98 @@ class PosLocalSeriesResetTest extends TestCase
         $this->assertSame([], $this->numbers($cid));
     }
 
+    // ── 9. fresh start on an EMPTY series (owner, 25 Aug 2026) ───────────────
+    // "Numbering 1 par reset karne ka option chahiye." Monotonic usool waisa hi
+    // hai — clear/delete/day-close numbering ko peechay nahi le jate. Yeh alag,
+    // admin ka jaan-boojh kar kiya gaya amal hai, aur SIRF khali series par:
+    // ek bhi bill baqi ho to do bill ek hi reference le baithte.
+
+    private function resetNumbering(User $user)
+    {
+        return $this->actingAs($user, 'pos')
+            ->postJson('/pos/settings/local-billing/reset-numbering');
+    }
+
+    public function test_reset_is_offered_only_once_the_series_is_empty(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L-014');
+
+        $this->assertFalse($this->seriesStatus($cid)['can_reset'], 'Bill maujood hai to reset ki paishkash nahi');
+
+        $this->clear($this->makeUser($cid))->assertStatus(200);
+
+        $after = $this->seriesStatus($cid);
+        $this->assertTrue($after['can_reset'], 'Series khali hone par hi option milta hai');
+        $this->assertSame('L-015', $after['next'], 'Reset se PEHLE numbering waisi hi monotonic rehti hai');
+    }
+
+    public function test_a_brand_new_company_is_never_offered_a_pointless_reset(): void
+    {
+        $this->assertFalse($this->seriesStatus($this->makeCompany())['can_reset']);
+    }
+
+    public function test_reset_starts_the_next_local_bill_at_the_first_number(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L-014');
+        $this->makeBill($cid, 'L-015');
+        $this->clear($this->makeUser($cid))->assertStatus(200);
+
+        $this->resetNumbering($this->makeUser($cid))
+            ->assertStatus(200)
+            ->assertJson(['success' => true, 'next_number' => 'L-001']);
+
+        $this->assertSame('L-001', $this->nextPreview($cid), 'Preview wahi kehta hai jo sale screen chhapega');
+        $this->assertSame('L-001', $this->nextRetail($cid));
+        $this->assertSame('L-002', $this->nextRestaurant($cid), 'Dono sale paths ek hi counter par chalte hain');
+    }
+
+    public function test_reset_refuses_while_a_live_bill_still_holds_a_reference(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L-014', ['is_archived' => false]);
+
+        $this->resetNumbering($this->makeUser($cid))->assertStatus(409);
+
+        $this->assertSame('L-015', $this->nextPreview($cid));
+    }
+
+    public function test_reset_refuses_while_an_archived_bill_still_holds_a_reference(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L-014');
+
+        $this->resetNumbering($this->makeUser($cid))->assertStatus(409);
+
+        $this->assertSame('L-015', $this->nextPreview($cid));
+    }
+
+    public function test_cashier_cannot_reset_numbering_even_by_hitting_the_url(): void
+    {
+        $cid = $this->makeCompany();
+        $this->makeBill($cid, 'L-014');
+        $this->clear($this->makeUser($cid))->assertStatus(200);
+
+        $this->resetNumbering($this->makeUser($cid, 'pos_cashier'))->assertStatus(403);
+
+        $this->assertSame('L-015', $this->nextPreview($cid));
+    }
+
+    public function test_reset_never_reaches_another_companys_series(): void
+    {
+        $mine = $this->makeCompany();
+        $theirs = $this->makeCompany();
+        $this->makeBill($theirs, 'L-050', ['is_archived' => false]);
+        $this->makeBill($mine, 'L-014');
+        $this->clear($this->makeUser($mine))->assertStatus(200);
+
+        $this->resetNumbering($this->makeUser($mine))->assertStatus(200);
+
+        $this->assertSame('L-001', $this->nextPreview($mine));
+        $this->assertSame('L-051', $this->nextPreview($theirs));
+    }
+
     // ── 8. one rule behind screen + both printers (Task 1373) ────────────────
 
     /** Preview and both sale paths share one monotonic company counter. */

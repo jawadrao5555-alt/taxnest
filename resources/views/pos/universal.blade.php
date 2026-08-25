@@ -2762,6 +2762,17 @@ window.addEventListener('popstate', function() {
                     <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.pending_deliveries_hint') }}</p>
                 </div>
                 <div class="flex items-center gap-2">
+                    {{-- Owner video (25 Aug 2026): board wala search box yahan bhi —
+                         raat ko lambi list mein ek bill dhoondna. nofill guards per
+                         the sale-screen autofill rule. --}}
+                    <div class="relative">
+                        <input type="text" x-model="pdSearch" name="pdsearch_nofill" autocomplete="off"
+                               data-lpignore="true" data-form-type="other" data-1p-ignore
+                               placeholder="{{ __('pos.del_search_ph') }}"
+                               class="w-28 sm:w-44 md:w-56 pl-7 pr-6 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-800 dark:text-white text-[11px] focus:ring-amber-500 focus:border-amber-500">
+                        <svg class="w-3.5 h-3.5 text-amber-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <button type="button" x-show="pdSearch" x-cloak @click="pdSearch = ''" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold">×</button>
+                    </div>
                     <button @click="loadLocalBills()" :disabled="localBillsLoading" class="text-xs text-amber-600 hover:text-amber-800 font-semibold px-2 py-1 rounded hover:bg-amber-100 disabled:opacity-50" title="{{ __('pos.ti_refresh_list') }}">
                         <svg class="w-4 h-4" :class="localBillsLoading ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     </button>
@@ -2783,7 +2794,14 @@ window.addEventListener('popstate', function() {
                 </template>
                 {{-- x-for cap: server already limits to 100 provisionals; slice keeps the
                      render bounded even if that ever changes (pos-boot-splash-perf rule). --}}
-                <template x-for="bill in pendingDeliveryBills().slice(0, 100)" :key="bill.id">
+                {{-- Search ne sab kuch chhupa diya (list khaali nahi, sirf match nahi) --}}
+                <template x-if="!localBillsLoading && pdSearch.trim() !== '' && pdFiltered(pendingDeliveryBills()).length === 0 && pdFiltered(staleDeliveryBills()).length === 0">
+                    <div class="p-10 text-center text-gray-400">
+                        <p class="text-sm font-medium">{{ __('pos.del_no_match') }}</p>
+                        <button type="button" @click="pdSearch = ''" class="mt-2 text-xs font-bold text-amber-600 hover:text-amber-800 underline">{{ __('pos.clear_word') }}</button>
+                    </div>
+                </template>
+                <template x-for="bill in pdFiltered(pendingDeliveryBills()).slice(0, 100)" :key="bill.id">
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800">
                         <div class="flex items-center justify-between mb-1.5">
                             <div class="flex items-center gap-2 flex-wrap">
@@ -2798,6 +2816,10 @@ window.addEventListener('popstate', function() {
                                 {{-- Task 513: unassigned final delivery bill — rider abhi tak nahi laga --}}
                                 <template x-if="bill.is_final && !bill.rider_id">
                                     <span class="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
+                                </template>
+                                {{-- Cash se Prepaid convert ho chuka bill — wahi chip jo board par hai --}}
+                                <template x-if="bill.is_prepaid_converted">
+                                    <span class="text-[9px] bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-0.5 rounded-full font-bold">{{ __('pos.prepaid_chip') }}</span>
                                 </template>
                             </div>
                             <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
@@ -2910,6 +2932,29 @@ window.addEventListener('popstate', function() {
                             </template>
                         </div>
                         </template>
+                        {{-- Owner video (25 Aug 2026): Prepaid / Back-to-Cash yahin se.
+                             Verdict SERVER se aata hai (can_mark_prepaid /
+                             can_unmark_prepaid = markPrepaid/unmarkPrepaid ke exact
+                             guards), isliye popup wohi button dikhata hai jo POST
+                             manzoor karega. Endpoint bhi board wala hi hai. --}}
+                        <template x-if="bill.can_mark_prepaid || bill.can_unmark_prepaid">
+                            <div class="flex gap-2 mt-2">
+                                <template x-if="bill.can_mark_prepaid">
+                                    <button @click="togglePrepaid(bill, true)" :disabled="prepaidBusyId"
+                                            class="flex-1 py-2 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                        <template x-if="prepaidBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                        {{ __('pos.mark_prepaid_online') }}
+                                    </button>
+                                </template>
+                                <template x-if="bill.can_unmark_prepaid">
+                                    <button @click="togglePrepaid(bill, false)" :disabled="prepaidBusyId"
+                                            class="flex-1 py-2 text-[11px] font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl transition flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                        <template x-if="prepaidBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                        {{ __('pos.unmark_prepaid_btn') }}
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
                     </div>
                 </template>
                 {{-- Task 524: purane (pichhle business days ke) UNASSIGNED delivery
@@ -2929,7 +2974,7 @@ window.addEventListener('popstate', function() {
                         <template x-if="showOldDeliveries">
                             <div>
                                 <p class="px-4 pt-2 text-[10px] text-gray-400">{{ __('pos.old_del_hint') }}</p>
-                                <template x-for="bill in staleDeliveryBills().slice(0, 50)" :key="'old-' + bill.id">
+                                <template x-for="bill in pdFiltered(staleDeliveryBills()).slice(0, 50)" :key="'old-' + bill.id">
                                     <div class="p-4 border-b border-gray-100 dark:border-gray-800">
                                         <div class="flex items-center justify-between mb-1.5">
                                             <div class="flex items-center gap-2 flex-wrap">
@@ -4842,6 +4887,13 @@ function restaurantPos() {
         // bizToday = current business day from the provisional-bills API
         // (00:00–05:59 counts in yesterday — PosBusinessDay, never client date).
         showPendingDeliveries: false,
+        // Owner video (25 Aug 2026): "yeh Prepaid aur search wala option yahan
+        // nahi aa sakta?" — the Deliveries board's search box and its Prepaid /
+        // Back-to-Cash pair now live inside this popup too, so a busy counter
+        // never has to leave the sale screen. Verdicts come from the server
+        // (can_mark_prepaid / can_unmark_prepaid), never guessed here.
+        pdSearch: '',
+        prepaidBusyId: null,
         bizToday: '',
         deliveryFinalBusyId: null,
         riderSettleBusyId: null,
@@ -10754,7 +10806,49 @@ function restaurantPos() {
         },
         openPendingDeliveries() {
             this.showPendingDeliveries = true;
+            this.pdSearch = '';
             this.loadLocalBills();
+        },
+        // Popup search (owner video, 25 Aug 2026) — same haystack as the
+        // Deliveries board row filter: bill number, customer, phone, address,
+        // rider. Filtering only; nothing is hidden from the badge counts.
+        pdFiltered(list) {
+            const q = (this.pdSearch || '').trim().toLowerCase();
+            if (!q) return list;
+            return list.filter(b => [
+                b.invoice_number, b.customer_name, b.customer_phone,
+                b.delivery_address, b.rider_name, b.delivery_status,
+            ].some(v => v && String(v).toLowerCase().includes(q)));
+        },
+        // Prepaid ⇄ Back to Cash from the popup — reuses the SAME endpoints as
+        // the Deliveries board (pos.deliveries.mark-prepaid / unmark-prepaid);
+        // no new write path. The server re-enforces every guard (admin/manager,
+        // delivery+rider, cash-only, unsettled, not returned).
+        async togglePrepaid(bill, toPrepaid) {
+            if (!bill || this.prepaidBusyId) return;
+            const ask = toPrepaid
+                ? @json(__('pos.confirm_mark_prepaid'))
+                : @json(__('pos.confirm_unmark_prepaid'));
+            if (!window.confirm(ask)) return;
+            this.prepaidBusyId = bill.id;
+            try {
+                const path = toPrepaid ? '/mark-prepaid' : '/unmark-prepaid';
+                const res = await fetch('{{ url('/pos/deliveries') }}/' + bill.id + path, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: '{}',
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(data.message || @json(__('pos.saved_word')), 'success');
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.status_update_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.prepaidBusyId = null;
         },
         // One-click final — reuses the EXACT promote path (quota gate, PRA
         // submit/offline fallback, whole-rupee rounding). Receipt print follows

@@ -845,6 +845,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('pos.payment-proof.store')->middleware('throttle:6,1');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
+    // Dark mode (owner video, 25 Aug 2026): per-USER preference, like the
+    // language pick above — the Ctrl+K palette used to flip the class in the
+    // browser only, so it died on the next page load. Deliberately NOT under
+    // /settings/ (those are shop settings a cashier may not touch).
+    Route::post('/set-dark-mode', [PosController::class, 'toggleDarkMode'])->name('pos.set-dark-mode');
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::post('/settings/guided-flow', [PosController::class, 'updateGuidedFlow'])->name('pos.settings.guided-flow');
     // Language system (2 Aug 2026): per-user choice + company default. PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script.
@@ -881,6 +886,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Task 1358: owner-confirmed clear of ARCHIVED local bills so the L-series
     // restarts at L-001 (admin-only, permanent — never runs on its own).
     Route::post('/settings/local-billing/clear-archived', [PosController::class, 'clearArchivedLocalBills'])->name('pos.settings.local-billing.clear-archived');
+    // Owner (25 Aug 2026): fresh start for the L-series once it is empty.
+    Route::post('/settings/local-billing/reset-numbering', [PosController::class, 'resetLocalNumbering'])->name('pos.settings.local-billing.reset-numbering');
+    // Owner (25 Aug 2026): wipe the customer-spend lines left behind by local
+    // bills that were already deleted at day close (admin-only, permanent).
+    Route::post('/settings/local-billing/clear-spend-records', [PosController::class, 'clearCustomerSpendRecords'])->name('pos.settings.local-billing.clear-spend-records');
     Route::post('/settings/auto-dayclose-toggle', [PosController::class, 'toggleAutoDayclose'])->name('pos.settings.auto-dayclose-toggle');
     Route::post('/settings/cashier-dayclose-toggle', [PosController::class, 'toggleCashierDayclose'])->name('pos.settings.cashier-dayclose-toggle');
     Route::post('/settings/cashier-ordercancel-toggle', [PosController::class, 'toggleCashierOrderCancel'])->name('pos.settings.cashier-ordercancel-toggle');

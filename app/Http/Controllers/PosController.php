@@ -44,6 +44,38 @@ class PosController extends Controller
         return response()->json(['success' => true, 'theme' => $theme]);
     }
 
+    /**
+     * Dark mode (owner video, 25 Aug 2026): "sale screen par dark mode on karta
+     * hoon, dashboard par jata hoon to khatam". The Ctrl+K palette only flipped
+     * the <html> class in the browser — nothing was stored, so the very next
+     * page load re-rendered from users.dark_mode (still off) and the choice
+     * vanished on every navigation. The layout already renders the class from
+     * that column, so the fix is to persist the user's pick here.
+     *
+     * Per-USER preference (not a shop setting) — a cashier may set their own,
+     * hence no isPosCashier guard and no /settings/ prefix.
+     *
+     * Saving the row also bumps users.updated_at, which is hashed into the sale
+     * screen's boot fingerprint — an SW-cached copy of the sale screen notices
+     * and refreshes itself instead of staying light forever.
+     */
+    public function toggleDarkMode(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 401);
+        }
+
+        $dark = $request->has('dark')
+            ? $request->boolean('dark')
+            : !$user->dark_mode;
+
+        $user->dark_mode = $dark;
+        $user->save();
+
+        return response()->json(['success' => true, 'dark' => (bool) $dark]);
+    }
+
     public function updateDashboardStyle(Request $request)
     {
         $user = auth('pos')->user();
@@ -1375,6 +1407,10 @@ class PosController extends Controller
         // their L-numbers, so the card explains WHY the series is stuck and offers
         // the clear action. count 0 = nothing to show.
         $localSeries = $this->localSeriesStatus((int) $companyId);
+        // Deleted local bills can leave a customer-spend line behind (owner asked
+        // 25 Aug 2026 "phir delete ka faida kya"): show how many exist so the shop
+        // can wipe the leftovers, not just stop new ones.
+        $localSeries['spend_records'] = $this->customerSpendRecordCount((int) $companyId);
         return view('pos.customize', compact('company', 'localSeries'));
     }
 
@@ -1872,6 +1908,9 @@ class PosController extends Controller
         // dikhni chahiye — "baqi tamam issues dashboard par aa jate hain".
         //
         $riderPending = $this->pendingRiderKhata($companyId, $company);
+        // Owner (25 Aug 2026): banner sirf tab aata hai jab kuch para ho, magar
+        // chip ki jagah pakki honi chahiye — is liye poora summary bhi jata hai.
+        $riderChip = \App\Services\PosRiderKhataAlert::summary((int) $companyId, $company);
 
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
@@ -1882,7 +1921,7 @@ class PosController extends Controller
             'pendingProvisional', 'openOrdersCount', 'counterOrdersCount', 'heldNoTableCount',
             'unclosedPriorDays', 'canDayClose', 'todayKhata',
             'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth',
-            'inactiveRegulars', 'dashTeamMembers', 'dashCashierId', 'riderPending'
+            'inactiveRegulars', 'dashTeamMembers', 'dashCashierId', 'riderPending', 'riderChip'
         ));
     }
 
@@ -3237,9 +3276,10 @@ class PosController extends Controller
                 $invoiceNumber = $transaction->invoice_number;
                 // Serial split (owner rule Jul 2026): re-resolve the serial if the
                 // reporting toggle changed between draft save and finalize. A PRA-bound
-                // final must carry a POS fiscal serial (PRA must never receive an
+                // final must carry a fiscal serial (PRA must never receive an
                 // L-NNN USIN), and a non-PRA bill must not hold a fiscal serial.
-                $isPosSerial = str_starts_with($invoiceNumber, 'POS-');
+                // Both the short "P-036" series and legacy "POS-2026-00035" count.
+                $isPosSerial = \App\Services\PosFinalSeries::isFinalSerial($invoiceNumber);
                 if ($praEnabled && !$isPosSerial) {
                     $invoiceNumber = $this->generateInvoiceNumber($companyId);
                 } elseif (!$praEnabled && $isPosSerial) {
@@ -3766,16 +3806,22 @@ class PosController extends Controller
         }
 
         $goingToPra = $isPipelineEdit || $reportRequested;
-        // Serial split: a bill headed to PRA must carry a real POS fiscal serial
+        // Serial split: a bill headed to PRA must carry a real fiscal serial
         // (PRA must never receive an L-NNN USIN). A local bill KEEPS its L number;
-        // a POS-serial bill never renumbers downward.
+        // a bill that already holds a fiscal serial (short P-036 or legacy
+        // POS-2026-00035) never renumbers downward.
         $invoiceNumberEdit = $transaction->invoice_number;
-        if ($goingToPra && !str_starts_with($invoiceNumberEdit, 'POS-')) {
-            $invoiceNumberEdit = $this->generateInvoiceNumber($companyId);
-        }
 
         DB::beginTransaction();
         try {
+            // Allocate INSIDE the transaction: PosFinalSeries serializes callers on
+            // a row lock, and outside a transaction MySQL drops that lock as soon as
+            // the statement ends — two cashiers promoting bills at the same moment
+            // would then both be handed the same fiscal serial.
+            if ($goingToPra && !\App\Services\PosFinalSeries::isFinalSerial($invoiceNumberEdit)) {
+                $invoiceNumberEdit = $this->generateInvoiceNumber($companyId);
+            }
+
             $transaction->update([
                 'invoice_number' => $invoiceNumberEdit,
                 'terminal_id' => $request->terminal_id,
@@ -4150,7 +4196,7 @@ class PosController extends Controller
                 }
 
                 $locked->update([
-                    'invoice_number' => str_starts_with($locked->invoice_number, 'POS-')
+                    'invoice_number' => \App\Services\PosFinalSeries::isFinalSerial($locked->invoice_number)
                         ? $locked->invoice_number
                         : $this->generateInvoiceNumber($companyId),
                     'pra_status' => 'pending',
@@ -4512,6 +4558,9 @@ class PosController extends Controller
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+        // Prepaid conversion stamp — PROD-drift guarded (older installs may not
+        // have run the prepaid-conversion migration yet).
+        $hasPrepaidCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'prepaid_converted_at');
         // Current business day (00:00–05:59 counts in yesterday) — the Pending
         // Deliveries badge filters bills to THIS date client-side, and Task 524
         // stamps purani unassigned bills server-side against the same date.
@@ -4622,7 +4671,12 @@ class PosController extends Controller
                 ->orderBy('id', 'desc')
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
-                       ...($hasBizDate ? ['business_date'] : [])]);
+                       ...($hasBizDate ? ['business_date'] : []),
+                       // Owner video (25 Aug 2026): the popup now offers the same
+                       // Prepaid / Back-to-Cash pair as the Deliveries board, so it
+                       // needs the conversion stamp to tell a converted bill from
+                       // one that was never cash. Column is PROD-drift guarded.
+                       ...($hasPrepaidCol ? ['prepaid_converted_at'] : [])]);
         }
 
         // Rider names — one batch lookup for the Pending Deliveries panel (rider
@@ -4722,7 +4776,15 @@ class PosController extends Controller
         // Open FINAL delivery bills — same shape as provisionals + is_final flag
         // + delivery_status (panel inhe alag actions deta hai: Delivered mark /
         // khata settle; Final Cash/Card buttons in par render hi nahi hote).
-        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $bizToday, $riderNames, $riderOpen) {
+        // Owner video (25 Aug 2026): "yeh Prepaid aur search wala option yahan
+        // (popup mein) nahi aa sakta?" — the Deliveries board's Prepaid /
+        // Back-to-Cash pair is now offered inside the Pending Deliveries popup
+        // too. The VERDICT is computed here, per bill, mirroring
+        // PosRiderController::markPrepaid / unmarkPrepaid exactly (role,
+        // delivery+rider context, cash-only, unsettled, not returned) — the
+        // popup must never show a button the POST will refuse.
+        $canPrepaidRole = in_array(auth('pos')->user()->pos_role ?? '', ['pos_admin', 'pos_manager'], true);
+        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $bizToday, $riderNames, $riderOpen, $canPrepaidRole, $hasPrepaidCol) {
             // Task 524: purana (pichhle business day ka) UNASSIGNED bill — popup
             // ise alag collapsed "Purani deliveries" group mein dikhata hai aur
             // badge ki ginti se bahar rakhta hai. Flag SERVER par banta hai
@@ -4754,6 +4816,22 @@ class PosController extends Controller
                 // Task 524: purani unassigned = collapsed group + badge se bahar.
                 'is_stale_unassigned' => (bool) ($bizToday && $billDay && !$b->rider_id
                     && !$b->delivery_status && $billDay < $bizToday),
+                // Prepaid pair (owner video, 25 Aug 2026) — verdicts mirror
+                // PosRiderController::markPrepaid / unmarkPrepaid. A cash bill
+                // still on a rider's open khata can be flipped to "paid online";
+                // one that WAS flipped (conversion stamp) can be put back to cash.
+                'is_prepaid_converted' => (bool) ($hasPrepaidCol && !empty($b->prepaid_converted_at)),
+                'can_mark_prepaid' => (bool) ($canPrepaidRole
+                    && $b->order_type === 'delivery'
+                    && $b->rider_id
+                    && $b->payment_method === 'cash'
+                    && empty($b->rider_settlement_id)
+                    && $b->delivery_status !== 'returned'),
+                'can_unmark_prepaid' => (bool) ($canPrepaidRole
+                    && $hasPrepaidCol && !empty($b->prepaid_converted_at)
+                    && $b->rider_id
+                    && empty($b->rider_settlement_id)
+                    && $b->delivery_status !== 'returned'),
             ];
         });
 
@@ -7698,14 +7776,22 @@ class PosController extends Controller
      */
     private function localSeriesStatus(int $companyId): array
     {
-        $empty = ['count' => 0, 'from' => null, 'to' => null, 'next' => 'L-001', 'next_after' => 'L-001'];
+        $empty = ['count' => 0, 'from' => null, 'to' => null, 'next' => 'L-001', 'next_after' => 'L-001', 'can_reset' => false];
         try {
             if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
                 return $empty;
             }
             $rows = $this->archivedLocalSeriesRows($companyId, ['id', 'invoice_number', 'business_date', 'created_at']);
+            // Fresh-start offer (owner, 25 Aug 2026): sirf tab jab series mein ek
+            // bhi bill baqi na ho (archived samet) AUR counter aage barha hua ho.
+            // Bill maujood hote hue reset ka matlab do bilon par ek hi reference.
+            $canReset = !\App\Services\PosLocalSeries::hasIssuedRows($companyId)
+                && $this->previewNextLocalNumber($companyId) !== \App\Services\PosLocalSeries::format(1);
             if ($rows->isEmpty()) {
-                return array_merge($empty, ['next' => $this->previewNextLocalNumber($companyId)]);
+                return array_merge($empty, [
+                    'next' => $this->previewNextLocalNumber($companyId),
+                    'can_reset' => $canReset,
+                ]);
             }
             // business_date is the trading day the bill belongs to; pre-column rows
             // (or NULLs) fall back to the calendar date.
@@ -7719,10 +7805,64 @@ class PosController extends Controller
                 'to' => $dates->last(),
                 'next' => $this->previewNextLocalNumber($companyId),
                 'next_after' => $this->previewNextLocalNumber($companyId, $ids),
+                'can_reset' => $canReset,
             ];
         } catch (\Throwable $e) {
             return $empty;
         }
+    }
+
+    /**
+     * How many customer-spend record lines this company currently carries.
+     *
+     * These are the rows written just before a local bill is DELETED at day
+     * close, so the customer's history keeps the amount even though the bill is
+     * gone. Schema-guarded: a box mid-deploy simply reports 0.
+     */
+    private function customerSpendRecordCount(int $companyId): int
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_customer_spend_snapshots')) {
+                return 0;
+            }
+
+            return (int) \App\Models\PosCustomerSpendSnapshot::where('company_id', $companyId)->count();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Customize POS → Local Billing — permanently remove the leftover
+     * customer-spend record lines of already-deleted local bills.
+     *
+     * The spend switch only stops NEW lines; the owner's point (25 Aug 2026) is
+     * that a daily delete means nothing if yesterday's line is still visible in
+     * customer history. ADMIN/OWNER only, never automatic, and confirmed with a
+     * count first. Real bills are untouched — these rows are not transactions,
+     * carry no items, and appear in no report.
+     */
+    public function clearCustomerSpendRecords(Request $request)
+    {
+        // Same bar as clearArchivedLocalBills: this is a permanent delete, so
+        // custom-access cashiers are out too.
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $companyId = (int) app('currentCompanyId');
+        if (!\Illuminate\Support\Facades\Schema::hasTable('pos_customer_spend_snapshots')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 503);
+        }
+
+        $deleted = (int) \App\Models\PosCustomerSpendSnapshot::where('company_id', $companyId)->delete();
+
+        return response()->json([
+            'success' => true,
+            'deleted' => $deleted,
+            'message' => __('pos.spend_records_cleared', ['count' => $deleted]),
+        ]);
     }
 
     /**
@@ -7867,6 +8007,61 @@ class PosController extends Controller
             'message' => __('pos.local_series_cleared_done', ['count' => $deleted, 'next' => $next]),
             'rider_held' => $riderHeld,
             'rider_held_message' => $riderKeptMessage,
+        ]);
+    }
+
+    /**
+     * Customize POS → Local Billing — start the local reference series over at
+     * L-001 (owner request, 25 Aug 2026).
+     *
+     * Pas-manzar: shop ne saray provisional/local record clear kar diye, token
+     * agle din 1 se shuru hue, magar reference L-016 se aage chalta raha —
+     * "numbering 1 par reset karne ka option chahiye". Monotonic usool waisa hi
+     * hai (clear, delete, day-close, archive — koi bhi cheez numbering peechay
+     * nahi le jati); yeh ek alag, jaan-boojh kar kiya gaya admin amal hai.
+     *
+     * Sakht shart: series KHALI ho — ek bhi L-reference wala bill (archived
+     * samet) baqi ho to reset nahi hota, warna do bill ek hi reference le kar
+     * ghoomenge. PRA/fiscal serial (POS-YYYY-NNNNN) yahan se nahi badalta: wo
+     * mojooda bilon se derive hota hai, aur report-shuda bill delete nahi hote.
+     */
+    public function resetLocalNumbering(Request $request)
+    {
+        // Same bar as the clear: this rewrites how every future bill is
+        // numbered, so custom-access cashiers/managers are out.
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $companyId = (int) app('currentCompanyId');
+        if (!Company::find($companyId)) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 404);
+        }
+
+        // Re-check INSIDE the transaction (and under the sale lock the service
+        // takes): the card the admin clicked may be minutes old, and a cashier
+        // may have billed since.
+        $done = DB::transaction(fn () => \App\Services\PosLocalSeries::resetToStart($companyId));
+
+        if (!$done) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.local_series_reset_blocked'),
+            ], 409);
+        }
+
+        \Illuminate\Support\Facades\Log::info('POS local series reset to L-001', [
+            'company_id' => $companyId,
+            'by' => $user->id,
+        ]);
+
+        $next = $this->previewNextLocalNumber($companyId);
+
+        return response()->json([
+            'success' => true,
+            'next_number' => $next,
+            'message' => __('pos.local_series_reset_done', ['next' => $next]),
         ]);
     }
 
@@ -11112,30 +11307,16 @@ class PosController extends Controller
         return $expanded;
     }
 
+    /**
+     * Next FINAL (PRA-stream) serial — short "P-036" since 25 Aug 2026.
+     *
+     * The whole rule (short format, monotonic counter, legacy POS-YYYY-NNNNN
+     * rows still reserving their numbers) lives in PosFinalSeries so this path
+     * and the restaurant pay path can never drift apart.
+     */
     private function generateInvoiceNumber(int $companyId): string
     {
-        $year = now()->format('Y');
-
-        // Order by the NUMERIC serial, NOT by id: a promoted local bill (old row,
-        // low id) is RENUMBERED to the newest serial — id-ordering would then read
-        // a stale max from the latest row and hand out a DUPLICATE serial.
-        // withoutGlobalScope('hide_archived'): archived rows still occupy the
-        // UNIQUE(company_id, invoice_number) index — the serial counter must see
-        // them or it re-issues their numbers and every new bill 500s on insert.
-        $lastTransaction = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->where('invoice_number', 'like', "POS-{$year}-%")
-            ->orderByRaw(\App\Helpers\DbCompat::cast('SUBSTR(invoice_number, 10)', 'int') . ' DESC')
-            ->lockForUpdate()
-            ->first();
-
-        if ($lastTransaction && preg_match('/POS-\d{4}-(\d+)/', $lastTransaction->invoice_number, $matches)) {
-            $next = (int) $matches[1] + 1;
-        } else {
-            $next = 1;
-        }
-
-        return 'POS-' . $year . '-' . str_pad($next, 5, '0', STR_PAD_LEFT);
+        return \App\Services\PosFinalSeries::issueNext($companyId);
     }
 
     /**

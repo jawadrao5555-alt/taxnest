@@ -100,7 +100,7 @@ class VerifyDiSerials extends Command
             'PRA POS',
             'pos_transactions',
             $companies,
-            ['POS-' . now()->format('Y') . '-', 5],
+            ['P-', 3],
             ['L-', 3]
         );
 

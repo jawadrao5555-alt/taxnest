@@ -777,6 +777,44 @@
                             </button>
                         </div>
 
+                        {{-- Leftover customer-spend lines of ALREADY-deleted local bills
+                             (owner, 25 Aug 2026): the switch above only stops new ones,
+                             so the shop can also wipe what is still sitting in customer
+                             history. Admin-only + confirmed; real bills are untouched. --}}
+                        @if(($localSeries['spend_records'] ?? 0) > 0)
+                        <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
+                             x-data="{ srOpen: false, srBusy: false, srDone: false, srMsg: '', srErr: '',
+                                clearSpend() {
+                                    if (this.srBusy) return;
+                                    this.srBusy = true; this.srErr = '';
+                                    fetch('{{ route('pos.settings.local-billing.clear-spend-records', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:'{}'})
+                                        .then(r=>r.json().then(d=>({ok:r.ok,d})))
+                                        .then(({ok,d})=>{ if (ok && d && d.success === true) { this.srMsg = d.message || ''; this.srDone = true; this.srOpen = false; } else { this.srErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } })
+                                        .catch(()=>{ this.srErr = {{ Js::from(__('pos.setting_save_failed')) }}; })
+                                        .finally(()=>{ this.srBusy = false; });
+                                } }">
+                            <div x-show="!srDone" class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700">
+                                <p class="text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.spend_records_line', ['count' => $localSeries['spend_records']]) }}</p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.spend_records_hint') }}</p>
+                                <button type="button" x-show="!srOpen" @click="srOpen = true"
+                                    class="mt-2.5 px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[12px] font-bold transition">{{ __('pos.spend_records_clear_btn') }}</button>
+                                <div x-show="srOpen" x-cloak class="mt-2.5">
+                                    <p class="text-[11px] font-semibold text-red-700 dark:text-red-300">{{ __('pos.spend_records_confirm', ['count' => $localSeries['spend_records']]) }}</p>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <button type="button" @click="clearSpend()" :disabled="srBusy"
+                                            class="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-[12px] font-bold transition">{{ __('pos.spend_records_confirm_btn') }}</button>
+                                        <button type="button" @click="srOpen = false" :disabled="srBusy"
+                                            class="px-3.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-[12px] font-bold transition">{{ __('pos.spend_records_cancel_btn') }}</button>
+                                    </div>
+                                </div>
+                                <p x-show="srErr" x-cloak class="mt-2 text-[11px] font-semibold text-red-600 dark:text-red-400" x-text="srErr"></p>
+                            </div>
+                            <div x-show="srDone" x-cloak class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700">
+                                <p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300" x-text="srMsg"></p>
+                            </div>
+                        </div>
+                        @endif
+
                         {{-- Archived local-record housekeeping. L-references are now
                              monotonic and never reused, so this clear removes old rows
                              without resetting the company's next number. The clear is
@@ -841,6 +879,36 @@
                                 </div>
                             </div>
                             </template>
+                        </div>
+                        @endif
+
+                        {{-- Fresh start (owner, 25 Aug 2026): jab series bilkul khali
+                             ho to numbering dobara L-001 se shuru karne ka option.
+                             Monotonic usool waisa hi hai — yeh sirf khali series par
+                             jaan-boojh kar kiya gaya amal hai, warna do bill ek hi
+                             reference le baithte. --}}
+                        @if($localSeries['can_reset'] ?? false)
+                        <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
+                             x-data="{ lrBusy: false, lrDone: false, lrMsg: '', lrErr: '',
+                                resetSeries() {
+                                    if (this.lrBusy) return;
+                                    this.lrBusy = true; this.lrErr = '';
+                                    fetch('{{ route('pos.settings.local-billing.reset-numbering', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:'{}'})
+                                        .then(r=>r.json().then(d=>({ok:r.ok,d})))
+                                        .then(({ok,d})=>{ if (ok && d && d.success === true) { this.lrMsg = d.message || ''; this.lrDone = true; } else { this.lrErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } })
+                                        .catch(()=>{ this.lrErr = {{ Js::from(__('pos.setting_save_failed')) }}; })
+                                        .finally(()=>{ this.lrBusy = false; });
+                                } }">
+                            <div x-show="!lrDone" class="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-300 dark:border-teal-700">
+                                <p class="text-[11px] font-bold text-teal-900 dark:text-teal-300">{{ __('pos.local_series_reset_title', ['next' => \App\Services\PosLocalSeries::format(1)]) }}</p>
+                                <p class="text-[11px] text-teal-800 dark:text-teal-400 mt-1">{{ __('pos.local_series_reset_hint') }}</p>
+                                <p x-show="lrErr" x-cloak class="text-[11px] font-bold text-red-700 dark:text-red-400 mt-1.5" x-text="lrErr"></p>
+                                <button type="button" @click="resetSeries()" :disabled="lrBusy" :class="lrBusy && 'opacity-60 cursor-not-allowed'"
+                                    class="mt-2.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[12px] font-bold transition">{{ __('pos.local_series_reset_btn', ['next' => \App\Services\PosLocalSeries::format(1)]) }}</button>
+                            </div>
+                            <div x-show="lrDone" x-cloak class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700">
+                                <p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300" x-text="lrMsg"></p>
+                            </div>
                         </div>
                         @endif
                     </div>

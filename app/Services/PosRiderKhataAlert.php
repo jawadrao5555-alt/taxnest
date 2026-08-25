@@ -102,4 +102,126 @@ class PosRiderKhataAlert
             ];
         })->filter(fn ($r) => $r['owed'] > 0)->sortByDesc('owed')->values();
     }
+
+    /**
+     * Delivery bills that went out WITHOUT a rider and whose cash is still not
+     * accounted for.
+     *
+     * Owner (25 Aug 2026, form answer): "Rok na lagayein, magar bina rider wale
+     * delivery bills ka cash bhi dashboard par dikhe." Rider-less delivery is
+     * the shop's own hand-over, so it deliberately does NOT block the day close
+     * (undispatchedDeliverySummary ka usool waisa hi rehta hai) — but the cash
+     * is out of the drawer all the same, and till now no dashboard figure said
+     * so: rider khata alert sirf un bills ko ginta hai jin par rider laga ho.
+     *
+     * Predicate PosRiderController::index ke "fresh unassigned" pending bills ka
+     * aaina hai (order_type delivery, koi rider nahi, koi delivery_status nahi,
+     * 7 din ki khirki) — us list par "Delivered (no rider)" dabate hi bill yahan
+     * se bhi nikal jata hai, is liye yeh reminder khud saaf hota hai.
+     *
+     * @return array{count:int,amount:float,days:int}
+     */
+    public static function unassigned(int $companyId, ?Company $company = null): array
+    {
+        $none = ['count' => 0, 'amount' => 0.0, 'days' => 0];
+
+        if (!Schema::hasColumn('pos_transactions', 'delivery_status')
+            || !Schema::hasColumn('pos_transactions', 'rider_id')
+            || !Schema::hasColumn('pos_transactions', 'rider_settlement_id')) {
+            return $none;
+        }
+
+        // pending() jaisa hi gate: bahar para cash poori dukan ki liability hai,
+        // cashier ka manzar nahi.
+        $viewer = auth('pos')->user();
+        if ($viewer && $viewer->posCashierBlocked()) {
+            return $none;
+        }
+
+        $q = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('order_type', 'delivery')
+            ->where('payment_method', 'cash')
+            ->whereNull('rider_id')
+            ->whereNull('delivery_status')
+            ->whereNull('rider_settlement_id')
+            ->where('created_at', '>=', now()->subDays(7));
+
+        // Provisional (local+local triple) abhi bikra hi nahi — uska cash bahar
+        // nahi gaya, wo pending-bills tile ka mamla hai.
+        if (Schema::hasColumn('pos_transactions', 'invoice_mode') && Schema::hasColumn('pos_transactions', 'pra_status')) {
+            $q->whereNot(function ($w) {
+                $w->where('invoice_mode', 'local')->where('pra_status', 'local');
+            });
+        }
+        if (Schema::hasColumn('pos_transactions', 'transaction_type')) {
+            $q->where(function ($w) {
+                $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+            });
+        }
+
+        if (Schema::hasColumn('pos_transactions', 'branch_id') && Schema::hasTable('branches')) {
+            app(BranchContextService::class)->applyToQuery($q, 'branch_id');
+        }
+
+        $row = $q->selectRaw('COUNT(*) as c, COALESCE(SUM(total_amount), 0) as amt, MIN(created_at) as oldest')->first();
+
+        $count = (int) ($row->c ?? 0);
+        if ($count < 1) {
+            return $none;
+        }
+
+        $oldest = ($row->oldest ?? null) ? \Carbon\Carbon::parse($row->oldest) : null;
+
+        return [
+            'count'  => $count,
+            'amount' => (float) ($row->amt ?? 0),
+            'days'   => $oldest ? (int) $oldest->copy()->startOfDay()->diffInDays(now()->startOfDay()) : 0,
+        ];
+    }
+
+    /**
+     * Everything the dashboard needs about cash that is out on delivery — the
+     * per-rider khata (banner) plus the rider-less bills, rolled into one chip.
+     *
+     * Owner (25 Aug 2026, voice note): "Main wo FIX button dhoond raha tha —
+     * jaise provisional bill, open orders, cancel orders fix hain, waise hi
+     * rider settlement bhi fix chahiye." The banner only appears when something
+     * is pending; the chip must hold its place in the row even at zero, so the
+     * eye always lands on the same spot. `enabled` decides whether the shop gets
+     * that permanent chip at all — a shop that never delivers must not carry a
+     * dead figure on its dashboard forever.
+     *
+     * @return array{enabled:bool,riders:Collection,bills:int,amount:float,unassigned:array{count:int,amount:float,days:int}}
+     */
+    public static function summary(int $companyId, ?Company $company = null): array
+    {
+        $riders = self::pending($companyId, $company);
+        $unassigned = self::unassigned($companyId, $company);
+
+        $pendingSomething = $riders->isNotEmpty() || $unassigned['count'] > 0;
+
+        // Chip sirf un dukanon par jo waqai delivery karti hain. Feature band ho
+        // magar cash phir bhi bahar para ho to chip lazmi dikhega (paisa gate se
+        // bara hai) — wahi usool pending() aur deliveries board ka hai.
+        $enabled = $pendingSomething;
+        try {
+            $company = $company ?: Company::find($companyId);
+            $viewer = auth('pos')->user();
+            if ($company && !($viewer && $viewer->posCashierBlocked())) {
+                $enabled = $enabled || (bool) (PosFeatureService::forCompany($company)->delivery ?? false);
+            }
+        } catch (\Throwable $e) {
+            // Feature service ka koi bhi masla chip ko chhupa de — figure khud
+            // theek hai, sirf "hamesha dikhao" wali sahulat nahi milegi.
+        }
+
+        return [
+            'enabled'    => $enabled,
+            'riders'     => $riders,
+            'bills'      => (int) $riders->sum('bills') + $unassigned['count'],
+            'amount'     => (float) $riders->sum('owed') + $unassigned['amount'],
+            'unassigned' => $unassigned,
+        ];
+    }
 }

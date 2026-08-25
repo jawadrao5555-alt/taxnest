@@ -62,6 +62,35 @@ class PosDashboardRiderAlertBothDashboardsTest extends TestCase
             $php,
             $controller . ' must pass riderPending to its view.'
         );
+
+        // Owner (25 Aug 2026): banner sirf pending par aata hai, chip ki jagah
+        // pakki honi chahiye — dono dashboard ko summary bhi bhejni hai warna
+        // chip aadhi dukanon par gayab.
+        $this->assertStringContainsString(
+            'PosRiderKhataAlert::summary',
+            $php,
+            $controller . ' must supply $riderChip for the permanent chip.'
+        );
+
+        $this->assertStringContainsString(
+            "'riderChip'",
+            $php,
+            $controller . ' must pass riderChip to its view.'
+        );
+    }
+
+    /** Chip pending-bills row ka mustaqil hissa hai — zero par bhi apni jagah. */
+    public function test_the_pending_bills_row_carries_a_permanent_rider_chip(): void
+    {
+        $tile = file_get_contents(base_path('resources/views/pos/partials/pending-bills-tile.blade.php'));
+
+        $this->assertStringContainsString('pos.pending_rider_settlement', $tile);
+        $this->assertStringContainsString("route('pos.deliveries')", $tile);
+        $this->assertStringContainsString(
+            'riderChip',
+            $tile,
+            'Chip apna figure riderChip se hi leta hai — FBR dashboard yeh tile bina riderChip ke reuse karta hai.'
+        );
     }
 
     /** Both dashboards must read the SAME khata, never a second copy of the query. */

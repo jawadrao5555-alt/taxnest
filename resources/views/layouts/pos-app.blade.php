@@ -1118,9 +1118,34 @@
                         if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(()=>{}); document.body.classList.add('is-fullscreen'); }
                         else { document.exitFullscreen(); document.body.classList.remove('is-fullscreen'); }
                     } else if (item.action === 'darkmode') {
-                        document.documentElement.classList.toggle('dark');
+                        this.toggleDark();
                     } else if (item.url) {
                         window.location.href = item.url;
+                    }
+                },
+                // Owner video (25 Aug 2026): "sale screen par dark mode on karta
+                // hoon, dashboard par jata hoon to khatam" — this used to flip the
+                // class in the browser only, so every navigation re-rendered light
+                // from users.dark_mode. Persist the pick; the layout renders the
+                // class from that column on every page (sale screen included).
+                async toggleDark() {
+                    const el = document.documentElement;
+                    const want = !el.classList.contains('dark');
+                    const paint = (on) => { el.classList.toggle('dark', on); el.style.colorScheme = on ? 'dark' : ''; };
+                    paint(want);
+                    try {
+                        const r = await fetch('{{ route('pos.set-dark-mode', [], false) }}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: JSON.stringify({ dark: want })
+                        });
+                        // Honest toggle: a 403/419/500 or a wrong answer must NOT
+                        // look saved — roll the paint back and say so.
+                        const j = r.ok ? await r.json().catch(() => null) : null;
+                        if (!j || j.success !== true || !!j.dark !== want) throw new Error('save-failed');
+                    } catch (e) {
+                        paint(!want);
+                        alert(@js(__('pos.setting_save_failed')));
                     }
                 }
              }"

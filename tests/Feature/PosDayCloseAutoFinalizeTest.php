@@ -423,7 +423,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertNull($tx->pra_invoice_number);
         $this->assertFalse((bool) $tx->is_archived);
         // Reporting ON → renumbered onto the real fiscal serial.
-        $this->assertSame('POS-' . now()->format('Y') . '-00001', $tx->invoice_number);
+        $this->assertSame('P-001', $tx->invoice_number);
         $this->assertSame(232.0, (float) $tx->total_amount); // whole-rupee re-tax @16%
         // The submit attempt itself was logged (request row written pre-network).
         $this->assertSame(1, DB::table('pra_logs')->where('transaction_id', $bill)->count());
@@ -450,7 +450,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $tx = $this->tx($bill);
         $this->assertSame('pra', $tx->invoice_mode);
         $this->assertSame('pending', $tx->pra_status, 'agent picks the row up — must stay pending');
-        $this->assertSame('POS-' . now()->format('Y') . '-00001', $tx->invoice_number);
+        $this->assertSame('P-001', $tx->invoice_number);
         // No server-side network attempt for Agent-Sync companies.
         $this->assertSame(0, DB::table('pra_logs')->count());
     }

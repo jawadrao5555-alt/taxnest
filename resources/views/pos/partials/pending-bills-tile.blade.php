@@ -15,9 +15,19 @@
     $pbOpen = (int) ($openOrdersCount ?? 0);
     $pbIsRestaurant = (bool) ($isRestaurant ?? false);
     $pbTotal = $pbProv + ($pbIsRestaurant ? $pbOpen : 0);
+    // Rider settlement chip (owner voice note, 25 Aug 2026): "jaise provisional
+    // bill, open orders, cancel orders fix hain, waise hi rider settlement bhi
+    // fix chahiye". Banner (rider-settlement-pending) sirf pending par aata hai;
+    // yeh chip delivery karne wali dukan par HAMESHA apni jagah rehta hai, zero
+    // par bhi — nazar hamesha ek hi jagah parti hai. FBR dashboard yeh tile
+    // reuse karta hai magar riderChip pass nahi karta, is liye wahan chip nahi.
+    $pbRider = is_array($riderChip ?? null) ? $riderChip : null;
+    $pbRiderShow = (bool) ($pbRider['enabled'] ?? false);
+    $pbRiderBills = (int) ($pbRider['bills'] ?? 0);
+    $pbRiderAmount = (float) ($pbRider['amount'] ?? 0);
     // Non-restaurant PRA dashboard: show only when something is actually pending
     // (most retail shops never use provisional bills — avoid permanent clutter).
-    $pbShow = ($isAdmin ?? false) && ($pbIsRestaurant || $pbProv > 0);
+    $pbShow = ($isAdmin ?? false) && ($pbIsRestaurant || $pbProv > 0 || $pbRiderShow);
     // Task 112: FBR POS dashboard reuses this tile — it passes its own
     // local-bills URL (fbrpos.transactions?tab=local). PRA default unchanged.
     $pbLocalUrl = $pendingBillsUrl ?? route('pos.local.index');
@@ -98,6 +108,21 @@
                 <span class="text-left">
                     <span class="block text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.cancelled_orders_tile') }}</span>
                     <span class="block text-[10px] text-gray-400">{{ __('pos.cancelled_orders_tile_sub') }}</span>
+                </span>
+            </a>
+            @endif
+            @if($pbRiderShow)
+            {{-- Rider ke paas para cash + bina rider gaye delivery bills — dono
+                 ek hi ginti mein (PosRiderKhataAlert::summary). Click par
+                 deliveries board, jahan settle/assign dono hota hai. --}}
+            <a href="{{ route('pos.deliveries') }}"
+               class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 {{ $pbRiderBills > 0 ? 'border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700' }} transition">
+                <span class="text-xl font-extrabold {{ $pbRiderBills > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">{{ $pbRiderBills }}</span>
+                <span class="text-left">
+                    <span class="block text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.pending_rider_settlement') }}</span>
+                    <span class="block text-[10px] {{ $pbRiderBills > 0 ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">
+                        {{ $pbRiderBills > 0 ? 'Rs. ' . number_format($pbRiderAmount) : __('pos.pending_rider_settlement_sub') }}
+                    </span>
                 </span>
             </a>
             @endif

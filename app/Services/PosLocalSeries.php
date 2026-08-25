@@ -98,6 +98,54 @@ class PosLocalSeries
     }
 
     /**
+     * Is any L-series number still occupied by a bill (archived rows included)?
+     * The reset below is only ever allowed when this is false — that is the one
+     * guarantee that a restarted sequence can never print a reference some older
+     * bill already carries.
+     */
+    public static function hasIssuedRows(int $companyId): bool
+    {
+        return self::highestRecordedNumber($companyId) > 0;
+    }
+
+    /**
+     * Owner-requested fresh start (25 Aug 2026): send the counter back so the
+     * next local bill is L-001 again.
+     *
+     * The monotonic rule itself is unchanged — numbering still never rewinds on
+     * its own, not on a clear, not on a day close, not on a delete. This is a
+     * deliberate, admin-only act on an EMPTY series: the shop cleared every
+     * local record and asked to begin again. Callers MUST hold the sale lock
+     * (this method takes it) and MUST refuse when hasIssuedRows() is true, or
+     * two different bills end up sharing one reference.
+     *
+     * @return bool false when a bill still occupies a number (nothing changed)
+     */
+    public static function resetToStart(int $companyId): bool
+    {
+        // Same lock the sale path takes, so a cashier billing at this exact
+        // moment either lands before the reset (old number) or after it (L-001),
+        // never in between with a duplicate.
+        DB::table('companies')->where('id', $companyId)->lockForUpdate()->value('id');
+
+        if (self::highestRecordedNumber($companyId) > 0) {
+            return false;
+        }
+
+        if (!Schema::hasTable('pos_local_series_counters')) {
+            // No durable counter yet: the sequence is derived from the rows
+            // alone, and there are none — it already restarts at L-001.
+            return true;
+        }
+
+        DB::table('pos_local_series_counters')
+            ->where('company_id', $companyId)
+            ->update(['last_number' => 0, 'updated_at' => now()]);
+
+        return true;
+    }
+
+    /**
      * Every row of the company that could hold an L-series number: archived
      * rows included, legacy "LOCAL-YYYY-NNNNN" rows excluded.
      */

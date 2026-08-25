@@ -874,7 +874,7 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
 
         $tx = DB::table('pos_transactions')->where('id', $billId)->first();
         $this->assertSame('pending', $tx->pra_status);
-        $this->assertSame('POS-' . now()->format('Y') . '-00001', $tx->invoice_number, 'PRA-bound submit allots the fiscal serial');
+        $this->assertSame('P-001', $tx->invoice_number, 'PRA-bound submit allots the fiscal serial');
         $this->assertSame(1, $this->finalsCount($companyId));
     }
 

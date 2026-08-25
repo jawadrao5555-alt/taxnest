@@ -51,8 +51,8 @@
                     <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                         <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium">Date</p>
                         <p class="text-sm font-semibold text-gray-900">{{ $invoice->created_at->format('d M Y') }}</p>
-                        @if($invoice->fbr_invoice_id)
-                        <p class="text-sm text-green-700 font-medium">FBR: {{ $invoice->fbr_invoice_id }}</p>
+                        @if($invoice->fbr_invoice_id || $invoice->fbr_invoice_number)
+                        <p class="text-sm text-green-700 font-medium">FBR: {{ $invoice->fbr_invoice_id ?: $invoice->fbr_invoice_number }}</p>
                         @endif
                     </div>
                 </div>
@@ -98,14 +98,25 @@
         </div>
 
         @if($invoice->qr_data)
-        @php $qrInfo = json_decode($invoice->qr_data, true); @endphp
+        @php
+            // qr_data is written with FBR's own key names (sellerNTNCNIC /
+            // fbr_invoice_number / invoiceDate / totalValues). Older rows used
+            // short keys, so read both and fall back to the invoice itself —
+            // an empty "FBR Verified" block is what the buyer sees on a filed
+            // invoice, which reads as "yeh invoice fake hai".
+            $qrInfo = json_decode($invoice->qr_data, true) ?: [];
+            $qrNtn = $qrInfo['sellerNTNCNIC'] ?? $qrInfo['ntn'] ?? ($invoice->company->ntn ?? '');
+            $qrFbrId = $qrInfo['fbr_invoice_number'] ?? $qrInfo['fbr_invoice_id'] ?? $invoice->fbr_invoice_id ?? $invoice->fbr_invoice_number ?? '';
+            $qrDate = $qrInfo['invoiceDate'] ?? $qrInfo['date'] ?? $invoice->invoice_date ?? '';
+            $qrTotal = $qrInfo['totalValues'] ?? $qrInfo['total'] ?? $invoice->total_amount ?? 0;
+        @endphp
         <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-green-200 p-6 mb-6">
             <h3 class="text-center text-lg font-bold text-green-800 mb-3">FBR Verified</h3>
             <div class="grid grid-cols-2 gap-2 text-sm">
-                <p class="text-gray-500 dark:text-gray-400">NTN:</p><p class="font-semibold">{{ $qrInfo['ntn'] ?? '' }}</p>
-                <p class="text-gray-500 dark:text-gray-400">FBR ID:</p><p class="font-semibold">{{ $qrInfo['fbr_invoice_id'] ?? '' }}</p>
-                <p class="text-gray-500 dark:text-gray-400">Date:</p><p class="font-semibold">{{ $qrInfo['date'] ?? '' }}</p>
-                <p class="text-gray-500 dark:text-gray-400">Total:</p><p class="font-semibold">PKR {{ number_format($qrInfo['total'] ?? 0, 2) }}</p>
+                <p class="text-gray-500 dark:text-gray-400">NTN:</p><p class="font-semibold">{{ $qrNtn }}</p>
+                <p class="text-gray-500 dark:text-gray-400">FBR ID:</p><p class="font-semibold">{{ $qrFbrId }}</p>
+                <p class="text-gray-500 dark:text-gray-400">Date:</p><p class="font-semibold">{{ $qrDate }}</p>
+                <p class="text-gray-500 dark:text-gray-400">Total:</p><p class="font-semibold">PKR {{ number_format((float) $qrTotal, 2) }}</p>
             </div>
             @if($invoice->qr_image_url)
             <div class="text-center mt-4">

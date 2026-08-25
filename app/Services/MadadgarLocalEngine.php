@@ -352,7 +352,7 @@ class MadadgarLocalEngine
              'a' => "KOT (Kitchen Order Ticket) kitchen ke liye order ki parchi hai — \"Send to Kitchen\" button Dine-In, Takeaway ya Delivery order ko bina payment ke kitchen bhejta aur ticket print karta hai. Tables ON hon to Dine-In ke liye table zaroori hai. KOT/kitchen printer settings /pos/restaurant/kitchen-settings par hain; yeh restaurant module ka feature hai (Pro/Unlimited) — /pos/features se ON hota hai."],
 
             ['p' => [['pra']],
-             'a' => "PRA integration: har FINAL bill Punjab Revenue Authority ko report hota hai aur POS-YYYY-NNNNN fiscal serial milta hai — receipt par PRA number aur QR aata hai. Settings /pos/pra-settings par (sirf admin): Environment, Connection Mode (Cloud API / PRA Fiscal Device), POS Registration ID, Token — \"Test Connection\" se check karein. Internet na ho to bill offline queue mein ja kar khud retry hota hai, quota dobara nahi katta. Naye PRA registrations ke liye Fiscal Device mode zaroori hai."],
+             'a' => "PRA integration: har FINAL bill Punjab Revenue Authority ko report hota hai aur chhota fiscal serial (P-036 style) milta hai — receipt par PRA number aur QR aata hai. Settings /pos/pra-settings par (sirf admin): Environment, Connection Mode (Cloud API / PRA Fiscal Device), POS Registration ID, Token — \"Test Connection\" se check karein. Internet na ho to bill offline queue mein ja kar khud retry hota hai, quota dobara nahi katta. Naye PRA registrations ke liye Fiscal Device mode zaroori hai."],
         ];
     }
 

@@ -216,6 +216,33 @@ class PosQuickReturnLookupTest extends TestCase
         $this->assertFinds('L-1234', $unpadded);
     }
 
+    /**
+     * Short final series (P-036, owner 25 Aug 2026). The whole point of the
+     * short number is that a cashier can type what the customer reads out, so
+     * padded, unpadded and lowercase must all land on the same bill.
+     */
+    public function test_short_final_series_padded_and_unpadded(): void
+    {
+        $this->actAs('pos_manager');
+        $padded = $this->seedBill(['invoice_number' => 'P-036']);
+
+        $this->assertFinds('P-036', $padded);
+        $this->assertFinds('p-36', $padded);
+
+        // Pad grows past 999 — the stored form is then unpadded.
+        $unpadded = $this->seedBill(['invoice_number' => 'P-1234']);
+        $this->assertFinds('P-1234', $unpadded);
+    }
+
+    public function test_bare_digits_match_short_final_series(): void
+    {
+        $this->actAs('pos_manager');
+        $id = $this->seedBill(['invoice_number' => 'P-036']);
+
+        $this->assertFinds('36', $id);
+        $this->assertFinds('0036', $id); // leading zeros normalized
+    }
+
     public function test_bare_digits_match_this_years_pos_series(): void
     {
         $this->actAs('pos_manager');

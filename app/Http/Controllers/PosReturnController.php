@@ -137,14 +137,21 @@ class PosReturnController extends Controller
         $candidates = [$q];
         if (preg_match('/^POS-?(\d{4})-?(\d+)$/', $q, $m)) {
             $candidates[] = 'POS-' . $m[1] . '-' . str_pad($m[2], 5, '0', STR_PAD_LEFT);
+        } elseif (preg_match('/^P-?(\d+)$/', $q, $m)) {
+            // Short final series (P-036). Padded + unpadded, pad grows past 999.
+            $candidates[] = 'P-' . str_pad($m[1], 3, '0', STR_PAD_LEFT);
+            $candidates[] = 'P-' . $m[1];
         } elseif (preg_match('/^L-?(\d+)$/', $q, $m)) {
             $candidates[] = 'L-' . str_pad($m[1], 3, '0', STR_PAD_LEFT);
             $candidates[] = 'L-' . $m[1];
         } elseif (ctype_digit($q)) {
-            // Bare serial digits — this year's + last year's POS series and the
-            // L-series (padded + unpadded; L pad grows past 999 naturally).
+            // Bare serial digits — the short final series, this year's + last
+            // year's legacy POS series, and the L-series (padded + unpadded;
+            // both short pads grow past 999 naturally).
             $n = ltrim($q, '0');
             $n = $n === '' ? '0' : $n;
+            $candidates[] = 'P-' . str_pad($n, 3, '0', STR_PAD_LEFT);
+            $candidates[] = 'P-' . $n;
             foreach ([now()->format('Y'), now()->subYear()->format('Y')] as $yr) {
                 $candidates[] = 'POS-' . $yr . '-' . str_pad($n, 5, '0', STR_PAD_LEFT);
             }

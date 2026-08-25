@@ -195,6 +195,39 @@ class CigaretteCatalogueCommandTest extends TestCase
         $this->assertEquals(0, $placeholder->is_active, 'The zero-rate placeholder is still sellable.');
     }
 
+    public function test_retiring_the_placeholder_never_reaches_another_company(): void
+    {
+        // Every tobacco distributor on the platform can hold a row of the same
+        // name. Retirement is one tenant's decision.
+        $other = self::COMPANY_ID + 1;
+        DB::table('companies')->insert([
+            'id' => $other, 'name' => 'Another Distributor', 'product_type' => 'di',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach ([self::COMPANY_ID, $other] as $companyId) {
+            DB::table('products')->insert([
+                'company_id' => $companyId,
+                'name' => 'ZYN',
+                'hs_code' => '2404.9100',
+                'schedule_type' => 'standard',
+                'uom' => 'Kilograms',
+                'default_price' => 0,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->artisan('di:cigarette-catalogue', ['company' => self::COMPANY_ID]);
+
+        $this->assertEquals(0, $this->catalogue()->where('name', 'ZYN')->value('is_active'));
+        $this->assertEquals(
+            1,
+            DB::table('products')->where('company_id', $other)->where('name', 'ZYN')->value('is_active'),
+            "Retiring one distributor's placeholder deactivated another distributor's product."
+        );
+    }
+
     public function test_a_dry_run_does_not_retire_the_placeholder(): void
     {
         DB::table('products')->insert([

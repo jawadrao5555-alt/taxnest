@@ -409,8 +409,14 @@ class ImportSaleAreaInvoices extends Command
     private function loadCatalogue(int $companyId): array
     {
         $catalogue = [];
+        // Sellable products only. A retired line — an unpriced placeholder
+        // superseded by real variants, say — must fall through to the
+        // missing-product abort instead of quietly filing its stale rate and
+        // UoM onto an FBR draft.
         $products = Product::withoutGlobalScope(CompanyScope::class)
-            ->where('company_id', $companyId)->get();
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->get();
 
         foreach ($products as $product) {
             $catalogue[mb_strtoupper($product->name)] = [

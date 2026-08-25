@@ -124,7 +124,7 @@ const { c, form } = build({
 c.tab = 'pra'; c.sync();
 assert(c.p.tax === true, 'PRA tab preview must read rp_show_tax (got tax=' + c.p.tax + ')');
 assert(c.p.address === true, 'PRA tab preview must read rp_show_address');
-assert(c.serialNow() === 'POS-2026-00817', 'PRA tab must preview a PRA serial');
+assert(c.serialNow() === 'P-817', 'PRA tab must preview a PRA (short P-) serial');
 assert(c.qrNow() === true, 'PRA fiscal (Sahulat) QR must ALWAYS preview on, Menu-QR switch or not');
 
 c.tab = 'local'; c.sync();

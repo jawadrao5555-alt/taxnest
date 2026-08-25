@@ -465,6 +465,10 @@ if [ -n "$(git status --porcelain 2>/dev/null | grep -v '^??' || true)" ]; then
   echo "         (Checkpoint commits happen at turn end; deploy again after commit.)" >&2
 fi
 
+step "Preflight: Blade script-escape check (escaped JSON inside inline <script>)"
+bash scripts/blade-script-escape-check.sh \
+  || fail "escaped JSON inside a <script> block — that page's JavaScript dies with a syntax error (buttons dead, x-cloak stuck hidden). Switch the flagged {{ json_encode(...) }} to @json(...) and re-run."
+
 step "Preflight: POS white-screen check (key pages render + inline JS parses)"
 if [ "${SKIP_WHITE_SCREEN_CHECK:-0}" = "1" ]; then
   echo "SKIPPED (SKIP_WHITE_SCREEN_CHECK=1) — only skip for emergency hotfixes." >&2

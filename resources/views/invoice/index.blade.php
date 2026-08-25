@@ -1137,7 +1137,9 @@ function invoiceKeyboardNav() {
                 }
             }
         @endphp
-        pageDraftIds: {{ json_encode($pageDraftIds) }},
+        {{-- Must stay unescaped: {{ }} turns the JSON quotes into &quot; and a <script>
+             never decodes entities, so the whole component dies with a syntax error. --}}
+        pageDraftIds: @json($pageDraftIds),
         bulkBatchKey: null,
         bulkProgress: null,
         bulkStarting: false,

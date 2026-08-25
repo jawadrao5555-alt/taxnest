@@ -195,17 +195,103 @@ class BulkSubmitInvoiceJob implements ShouldQueue
 
         // Shared submit path — FBR log, ledger entry, integrity hash,
         // compliance recalcs all happen inside.
-        $result = app(InvoiceController::class)->submitToFbrSync($invoice);
+        $controller = app(InvoiceController::class);
+        $result = $controller->submitToFbrSync($invoice);
+
+        $attempts = 1;
+        while ($this->isTransientRejection($result) && $attempts < self::MAX_FBR_ATTEMPTS) {
+            if (self::runCancelled($this->batchId)) {
+                break;
+            }
+            $this->pause(self::RETRY_BACKOFF_SECONDS[$attempts - 1] ?? 5);
+            if (!$this->reclaimForRetry($invoice)) {
+                break; // someone else moved it, or it is no longer submittable
+            }
+            $attempts++;
+            Log::info("BulkSubmitInvoiceJob: invoice #{$this->invoiceId} rejected by FBR, attempt {$attempts}/" . self::MAX_FBR_ATTEMPTS);
+            $result = $controller->submitToFbrSync($invoice);
+        }
 
         $fresh = $invoice->fresh();
+        $tail = $attempts > 1 ? " (attempt {$attempts})" : '';
         if ($result['status'] === 'success') {
-            self::recordResult($this->batchId, $this->invoiceId, 'success', 'FBR: ' . ($result['fbr_invoice_number'] ?? ''), $fresh);
+            self::recordResult($this->batchId, $this->invoiceId, 'success', 'FBR: ' . ($result['fbr_invoice_number'] ?? '') . $tail, $fresh);
         } elseif ($result['status'] === 'pending_verification') {
             self::recordResult($this->batchId, $this->invoiceId, 'pending', 'Ambiguous FBR response — verify on FBR portal.', $fresh);
         } else {
             $errors = !empty($result['errors']) ? implode(' | ', array_slice($result['errors'], 0, 3)) : 'FBR submission failed';
-            self::recordResult($this->batchId, $this->invoiceId, 'failed', $errors, $fresh);
+            $suffix = $attempts > 1 ? " (still rejected after {$attempts} attempts)" : '';
+            self::recordResult($this->batchId, $this->invoiceId, 'failed', $errors . $suffix, $fresh);
         }
+    }
+
+    // ── Transient FBR rejections ───────────────────────────────────────────
+    //
+    // FBR refuses a small share of perfectly good invoices under load: the very
+    // same HS code + UoM + 18% line that clears on thousands of other invoices
+    // comes back as "[0099] Provided UoM is not allowed against the provided HS
+    // Code" or "[0077] Valid SRO/Schedule No. is mandatory where rate is not
+    // 18%". Re-posting them unchanged succeeds — 11 out of 11 on the first live
+    // run. Without this loop the shop has to hunt those rows down by hand after
+    // every batch.
+
+    /** Extra attempts per invoice, including the first. */
+    public const MAX_FBR_ATTEMPTS = 3;
+
+    /** Seconds to wait before each retry — FBR settles within a few seconds. */
+    public const RETRY_BACKOFF_SECONDS = [2, 5];
+
+    /** Wait between attempts (skipped in tests — nothing real is being called). */
+    protected function pause(int $seconds): void
+    {
+        if (!app()->environment('testing')) {
+            sleep($seconds);
+        }
+    }
+
+    /**
+     * Only an explicit rejection is retried.
+     *
+     * A timeout or dropped connection may mean FBR accepted the invoice and we
+     * lost the answer, so re-posting could file it twice; those already end as
+     * 'pending_verification' / a network failure and are left alone here.
+     */
+    protected function isTransientRejection(array $result): bool
+    {
+        if (($result['status'] ?? '') !== 'failed') {
+            return false;
+        }
+
+        return ($result['failure_type'] ?? '') === 'validation_error';
+    }
+
+    /**
+     * Put the invoice back into the processing state for another attempt.
+     *
+     * Same compare-and-swap as the first submission, so a manual submit or a
+     * second worker that grabbed the invoice in between always wins.
+     */
+    protected function reclaimForRetry(Invoice $invoice): bool
+    {
+        $ok = DB::transaction(function () use ($invoice) {
+            $row = Invoice::withoutGlobalScopes()->where('id', $invoice->id)->lockForUpdate()->first();
+            if (!$row || !in_array($row->status, ['draft', 'failed']) || $row->is_fbr_processing || !empty($row->fbr_invoice_number)) {
+                return false;
+            }
+            $row->status = 'draft';
+            $row->fbr_status = null;
+            $row->is_fbr_processing = true;
+            $row->fbr_submission_hash = null; // else the duplicate guard blocks the re-post
+            $row->save();
+            return true;
+        });
+
+        if ($ok) {
+            $invoice->refresh();
+            $invoice->load('items', 'company');
+        }
+
+        return $ok;
     }
 
     // ── Batch progress (DATABASE-backed) ───────────────────────────────────

@@ -98,6 +98,7 @@ class InvoiceBulkSubmitTest extends TestCase
             $table->boolean('is_fbr_processing')->default(false);
             $table->timestamp('submitted_at')->nullable();
             $table->string('fbr_invoice_id')->nullable();
+            $table->string('fbr_submission_hash')->nullable();
             $table->text('qr_data')->nullable();
             $table->string('integrity_hash')->nullable();
             $table->string('share_uuid')->nullable();
@@ -246,6 +247,94 @@ class InvoiceBulkSubmitTest extends TestCase
             $invoice->save();
             return ['status' => 'success', 'fbr_invoice_number' => 'FBR-' . $invoice->id, 'execution_ms' => 5];
         });
+    }
+
+    /**
+     * FBR rejects the first $rejections attempts and then accepts, leaving the
+     * invoice exactly as the real submitToFbrSync does on a validation failure.
+     * $seen counts how many times FBR was actually called.
+     */
+    protected function fakeFbrFlaky(int $rejections, ?int &$seen = null, string $failureType = 'validation_error'): void
+    {
+        $seen = 0;
+        $mock = $this->partialMock(InvoiceController::class);
+        $mock->shouldReceive('submitToFbrSync')->andReturnUsing(function (Invoice $invoice) use (&$seen, $rejections, $failureType) {
+            $seen++;
+            if ($seen <= $rejections) {
+                $invoice->status = 'failed';
+                $invoice->fbr_status = 'failed';
+                $invoice->is_fbr_processing = false;
+                $invoice->save();
+                return [
+                    'status' => 'failed',
+                    'failure_type' => $failureType,
+                    'errors' => ['[0099] Provided UoM is not allowed against the provided HS Code.'],
+                    'execution_ms' => 5,
+                ];
+            }
+            $invoice->status = 'locked';
+            $invoice->fbr_status = 'production';
+            $invoice->is_fbr_processing = false;
+            $invoice->fbr_invoice_number = 'FBR-' . $invoice->id;
+            $invoice->save();
+            return ['status' => 'success', 'fbr_invoice_number' => 'FBR-' . $invoice->id, 'execution_ms' => 5];
+        });
+    }
+
+    public function test_a_transient_fbr_rejection_is_retried_until_it_sticks(): void
+    {
+        Queue::fake([IntelligenceProcessingJob::class]);
+        $this->fakeFbrFlaky(1, $seen);
+
+        $invoice = $this->makeDraft();
+
+        $res = $this->actingAs($this->user)->postJson('/invoices/bulk-submit', [
+            'invoice_ids' => [$invoice->id],
+        ]);
+
+        $res->assertOk();
+        $batch = InvoiceBulkSubmission::findOrFail((int) $res->json('batch_key'));
+        $this->assertSame(1, (int) $batch->success);
+        $this->assertSame(0, (int) $batch->failed);
+        $this->assertSame(2, $seen, 'FBR should have been called twice — one rejection, one retry.');
+        $this->assertSame('locked', $invoice->fresh()->status);
+    }
+
+    public function test_a_rejection_that_never_clears_gives_up_at_the_attempt_cap(): void
+    {
+        Queue::fake([IntelligenceProcessingJob::class]);
+        $this->fakeFbrFlaky(99, $seen);
+
+        $invoice = $this->makeDraft();
+
+        $res = $this->actingAs($this->user)->postJson('/invoices/bulk-submit', [
+            'invoice_ids' => [$invoice->id],
+        ]);
+
+        $res->assertOk();
+        $batch = InvoiceBulkSubmission::findOrFail((int) $res->json('batch_key'));
+        $this->assertSame(0, (int) $batch->success);
+        $this->assertSame(1, (int) $batch->failed);
+        $this->assertSame(BulkSubmitInvoiceJob::MAX_FBR_ATTEMPTS, $seen);
+        $this->assertStringContainsString('still rejected after 3 attempts', $batch->failures[0]['message']);
+        $this->assertSame('failed', $invoice->fresh()->status);
+        $this->assertFalse((bool) $invoice->fresh()->is_fbr_processing);
+    }
+
+    public function test_a_network_failure_is_never_re_posted(): void
+    {
+        // A timeout may mean FBR accepted the invoice and we lost the answer —
+        // re-posting it would file the same invoice twice.
+        Queue::fake([IntelligenceProcessingJob::class]);
+        $this->fakeFbrFlaky(99, $seen, 'network_error');
+
+        $invoice = $this->makeDraft();
+
+        $this->actingAs($this->user)->postJson('/invoices/bulk-submit', [
+            'invoice_ids' => [$invoice->id],
+        ])->assertOk();
+
+        $this->assertSame(1, $seen, 'A network failure must be left alone, not retried.');
     }
 
     public function test_batch_of_drafts_all_submitted(): void

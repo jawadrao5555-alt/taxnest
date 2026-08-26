@@ -59,7 +59,46 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
     const MSG_STILL_DOWNLOADING = @json(__('pos.pwa_still_downloading'));
     const MSG_ON_LATEST = @json(__('pos.pwa_on_latest'));
     const MSG_OFFLINE = @json(__('pos.pwa_offline_no_check'));
+    const MSG_WILL_AUTO_APPLY = @json(__('pos.pwa_will_auto_apply'));
     const LATEST_FLAG = 'tnPwaLatestToast';
+
+    // ONE CLICK = FULLY UPDATED (owner, 26 Aug 2026: "bar bar update click karna
+    // parta hai"). A single deploy could surface as several separate prompts —
+    // the click reloaded, then the new worker finished downloading and raised the
+    // badge again, then the cached sale screen served the OLD copy so nothing
+    // looked different. The click now states an INTENT that survives the reload:
+    // for the next few minutes any update that becomes ready applies itself, and
+    // the reload is guaranteed to land on a freshly fetched page.
+    const ARM_KEY = 'tnPwaAutoApply';
+    const ARM_WINDOW_MS = 90 * 1000;
+    const isArmed = () => { try { return Number(sessionStorage.getItem(ARM_KEY) || 0) > Date.now(); } catch(_) { return false; } };
+    const arm = () => { try { sessionStorage.setItem(ARM_KEY, String(Date.now() + ARM_WINDOW_MS)); } catch(_) {} };
+    const disarm = () => { try { sessionStorage.removeItem(ARM_KEY); } catch(_) {} };
+    // The update toast reads this: while the user's own update is in flight it
+    // must not pop a second, competing "Refresh" prompt.
+    window.tnPwaUpdateArmed = isArmed;
+
+    // A cache-first sale screen would replay the OLD page after the reload, so
+    // the user's update looks like it did nothing. Secure a fresh copy over the
+    // network FIRST and put it into the live sale cache ourselves (same
+    // loop-proof contract as the sale screen's own refresh), then reload. Slow
+    // or dead line: keep the working cached screen, never a blank splash.
+    const SALE_PATHS = ['/pos/invoice/create', '/fbr-pos/create'];
+    const primeFreshPage = async () => {
+        if (!SALE_PATHS.includes(location.pathname) || !window.caches) return;
+        try {
+            const resp = await fetch(location.pathname, { cache: 'reload', credentials: 'same-origin' });
+            if (!resp || !resp.ok || resp.redirected) return;
+            if ((resp.headers.get('content-type') || '').indexOf('text/html') === -1) return;
+            if (window.tnSaleBoot && typeof window.tnSaleBoot.validResponse === 'function') {
+                if (!(await window.tnSaleBoot.validResponse(resp))) return;
+            }
+            const saleName = (await caches.keys()).find(n => n.endsWith('-sale'));
+            if (!saleName) return;
+            const c = await caches.open(saleName);
+            await c.put(new Request(location.pathname), resp.clone());
+        } catch(_) { /* offline / flaky line — cached screen keeps working */ }
+    };
 
     btn.style.display = 'inline-flex';
 
@@ -99,6 +138,9 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
         if (badge) badge.style.display = 'inline-block';
         btn.classList.add('tn-has-update');
         btn.title = TITLE_APPLY;
+        // The user already pressed Update in this tab session — finish the job
+        // instead of making them press it again.
+        if (isArmed()) autoApply();
     };
 
     const clearUpdate = () => {
@@ -129,7 +171,10 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
     });
 
     const applyWaiting = () => {
-        // Apply waiting SW via centralized helper (sets intent flag → posts SKIP_WAITING → reloads)
+        // The waiting worker is about to activate: it purges every cache that is
+        // not on the new version, so the reload after it is network-fresh on its
+        // own — no priming needed here.
+        disarm();
         if (typeof window.tnPwaApplyWaitingUpdate === 'function') {
             window.tnPwaApplyWaitingUpdate();
         } else {
@@ -137,12 +182,26 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
         }
     };
 
+    // An update that became ready AFTER the click (slow line, or it appeared on
+    // the page the click reloaded) applies itself — once, and only when there is
+    // genuinely a worker waiting, so a stale badge can never start a reload loop.
+    const autoApply = async () => {
+        if (busy || !isArmed()) return;
+        const reg = await navigator.serviceWorker.getRegistration().catch(() => null);
+        if (!reg || !reg.waiting || !isArmed()) return;
+        busy = true;
+        btn.classList.add('tn-spinning');
+        btn.title = TITLE_APPLY;
+        applyWaiting();
+    };
+
     // Task 706: the icon's promise is "bring me the latest version" — so the
     // no-SW-update path must STILL reload once (server-side Blade/features ship
     // without sw.js changing on most deploys). This is a direct user action, so
     // the owner's "no auto-reload" rule does not apply here.
-    const reloadFresh = (onLatest) => {
+    const reloadFresh = async (onLatest) => {
         if (onLatest) { try { sessionStorage.setItem(LATEST_FLAG, '1'); } catch(_) {} }
+        await primeFreshPage();
         location.reload();
     };
 
@@ -159,6 +218,9 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
 
         busy = true;
         btn.classList.add('tn-spinning');
+        // One press = keep going until this device is actually up to date, even
+        // across the reload this press causes.
+        arm();
 
         // Remember whether the badge promised an update BEFORE we touch state —
         // decides the stale-badge fallback below (owner report, 7 Aug 2026).
@@ -171,7 +233,7 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
             return;
         }
 
-        if (!reg) { reloadFresh(true); return; }
+        if (!reg) { await reloadFresh(true); return; }
 
         // Force-check. If the check itself fails (server unreachable even though
         // navigator.onLine says true), do NOT reload — the user would lose the
@@ -217,13 +279,12 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
         if (outcome === 'timeout') {
             // Still downloading after 20s (very slow shop internet). Do NOT
             // reload — under the old worker the user could land back on the old
-            // version, the exact failure this button must eliminate. Explicit
-            // non-reloading state instead: the download keeps going in the
-            // background, the statechange watcher above fires the "!" badge the
-            // moment it's ready, and the user taps once more to apply.
-            btn.classList.remove('tn-spinning');
-            btn.title = TITLE_CHECK;
-            showToast(MSG_STILL_DOWNLOADING, 'info');
+            // version, the exact failure this button must eliminate. The press
+            // stays armed instead: the download continues and applies ITSELF the
+            // moment it is ready (owner, 26 Aug 2026 — one press, not several).
+            // Spinner keeps running so the counter can see it is still working.
+            btn.title = MSG_DOWNLOADING;
+            showToast(MSG_WILL_AUTO_APPLY, 'info');
             busy = false;
             return;
         }
@@ -232,7 +293,7 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
             // activated: new SW took over silently → reload to be controlled by it.
             // redundant: install failed → still reload once for fresh server content
             // (panel HTML is network-first, so the reload fetches fresh markup).
-            reloadFresh(false);
+            await reloadFresh(false);
             return;
         }
 
@@ -252,13 +313,13 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
             // e.g. another tab already applied it). The user clicked EXPECTING a
             // refresh (owner hit this: pressed 2-3x, "refresh nahi hua") — reload
             // so the fresh version actually shows.
-            reloadFresh(false);
+            await reloadFresh(false);
             return;
         }
 
         // No SW change at all → still reload once so the server's fresh
         // Blade/features arrive; the post-reload toast confirms "on latest".
-        reloadFresh(true);
+        await reloadFresh(true);
     });
 })();
 </script>

@@ -9,9 +9,15 @@
 //      after "reload" the green "you're on the latest version" toast shows.
 //   C. offline → error toast, NO reload, busy released (a later click works).
 //   D. install slower than the 20s bound → NO reload (old worker would serve
-//      the old version), amber still-downloading toast, spinner cleared, busy
-//      released; when the install finally completes the "!" badge appears and
-//      the next click applies it.
+//      the old version), amber "it will apply itself" toast, spinner KEEPS
+//      running; when the install finally completes it applies WITHOUT a second
+//      click (owner, 26 Aug 2026: one press must finish the whole update).
+//   E. the press survives the reload it caused: an update discovered on the NEXT
+//      page load applies itself — still one press in total.
+//   F. armed but nothing actually waiting (stale badge) → no reload, no apply:
+//      the auto-apply path can never start a reload loop.
+//   G. once the armed window has expired, a waiting update only raises the
+//      badge — no surprise reload while the counter is working.
 // All script timers are scaled 20x faster (20s bound → 1s) so the whole suite
 // runs in a couple of seconds; relative ordering is preserved because the
 // simulated events use the same scaled clock.
@@ -173,7 +179,7 @@ const sleepSim = (ms) => new Promise((r) => setTimeout(r, Math.max(1, ms * SCALE
   ok('C: offline → err toast, no reload; busy released (next online click reloads)');
 }
 
-// ---------- Scenario D: install slower than the 20s bound → non-reloading state ----------
+// ---------- Scenario D: install slower than the 20s bound → keeps going, applies itself ----------
 {
   const reg = makeReg();
   const env = makeEnv({ reg });
@@ -189,21 +195,61 @@ const sleepSim = (ms) => new Promise((r) => setTimeout(r, Math.max(1, ms * SCALE
   await sleepSim(21000); // past the 20s hard bound
   if (env.location.reloads !== 0) fail('D: timeout must NOT reload (old worker would serve the old version)');
   if (env.applyCalls !== 0) fail('D: timeout must not apply');
-  const t = env.toasts.find((x) => x.textContent === 'pwa_still_downloading');
-  if (!t) fail('D: still-downloading toast missing on timeout');
-  if (t.attrs['data-tn-pwa-toast'] !== 'info') fail('D: still-downloading toast is not the info kind');
-  if (env.btn.classes.has('tn-spinning')) fail('D: spinner stuck after timeout');
-  // download finally completes → badge must appear (statechange watcher)
+  const t = env.toasts.find((x) => x.textContent === 'pwa_will_auto_apply');
+  if (!t) fail('D: "it will apply itself" toast missing on timeout');
+  if (t.attrs['data-tn-pwa-toast'] !== 'info') fail('D: timeout toast is not the info kind');
+  if (!env.btn.classes.has('tn-spinning')) fail('D: spinner dropped while the download is still running');
+  // download finally completes → applies ITSELF, no second click
   reg.waiting = worker; reg.installing = null; worker.setState('installed');
-  await sleepSim(100);
-  if (env.badge.style.display !== 'inline-block') fail('D: "!" badge did not appear when the late install completed');
-  if (!env.btn.classes.has('tn-has-update')) fail('D: has-update state missing after late install');
-  // next click applies it (busy was released by the timeout path)
-  env.click();
   await sleepSim(300);
-  if (env.applyCalls !== 1) fail('D: click after late install did not apply the waiting update');
-  ok('D: >20s install → no reload, info toast, spinner/busy released; late install → badge; next click applies');
+  if (env.applyCalls !== 1) fail('D: late install did not apply itself (owner had to click again) applyCalls=' + env.applyCalls);
+  if (env.location.reloads !== 0) fail('D: raw reload instead of apply helper');
+  ok('D: >20s install → no reload, info toast, spinner keeps running; late install applies itself (one press)');
 }
 
-console.log('PWA-REFRESH CHECK PASSED (slow-install wait, no-update reload+toast, offline guard, non-reloading timeout)');
+// ---------- Scenario E: the press survives the reload it caused ----------
+{
+  const store = new Map();
+  const env = makeEnv({ reg: makeReg(), store });   // click finds no update → reload
+  await sleepSim(100);
+  env.click();
+  await sleepSim(1200);
+  if (env.location.reloads !== 1) fail('E: no-update click must reload once');
+  // …the deploy's worker lands on the NEXT page load: it must apply itself.
+  const reg2 = makeReg();
+  reg2.waiting = makeWorker('installed');
+  const env2 = makeEnv({ reg: reg2, store });
+  await sleepSim(300);
+  if (env2.applyCalls !== 1) fail('E: update found after the reload did not apply itself (second click needed) applyCalls=' + env2.applyCalls);
+  if (store.has('tnPwaAutoApply')) fail('E: armed intent not cleared after it was used');
+  ok('E: update appearing after the reload applies itself — still one press');
+}
+
+// ---------- Scenario F: armed + stale badge → never a reload loop ----------
+{
+  const store = new Map([['tnPwaAutoApply', String(Date.now() + 60000)]]);
+  const reg = makeReg(); // nothing waiting — the badge is stale
+  const env = makeEnv({ reg, store });
+  await sleepSim(100);
+  env.document.dispatchEvent(new env.CustomEvent('tn-pwa-update-available'));
+  await sleepSim(400);
+  if (env.location.reloads !== 0) fail('F: stale badge while armed caused a reload (loop risk)');
+  if (env.applyCalls !== 0) fail('F: stale badge while armed applied a non-existent update');
+  if (env.badge.style.display !== 'inline-block') fail('F: badge should still be shown for the user to press');
+  ok('F: armed + nothing waiting → badge only, no reload, no apply');
+}
+
+// ---------- Scenario G: expired arm → badge only, no surprise reload ----------
+{
+  const store = new Map([['tnPwaAutoApply', String(Date.now() - 1000)]]);
+  const reg = makeReg();
+  reg.waiting = makeWorker('installed');
+  const env = makeEnv({ reg, store });
+  await sleepSim(300);
+  if (env.applyCalls !== 0) fail('G: expired arm still auto-applied (counter would be reloaded mid-sale)');
+  if (env.badge.style.display !== 'inline-block') fail('G: waiting update must still raise the badge');
+  ok('G: expired arm → badge only, no automatic reload');
+}
+
+console.log('PWA-REFRESH CHECK PASSED (slow-install wait, no-update reload+toast, offline guard, one-press auto-apply across reload, loop guards)');
 process.exit(0);

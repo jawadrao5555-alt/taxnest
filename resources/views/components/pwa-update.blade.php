@@ -55,6 +55,14 @@ Usage: <x-pwa-update color="emerald" />
     let postponedUntil = 0;
 
     const showBar = () => {
+        // The user already pressed the header Update icon and that press is still
+        // in flight — it applies this very worker by itself. Popping our own
+        // "Refresh" bar here is what made one update feel like several (owner,
+        // 26 Aug 2026). Stay silent; the icon finishes the job.
+        if (typeof window.tnPwaUpdateArmed === 'function' && window.tnPwaUpdateArmed()) {
+            document.dispatchEvent(new CustomEvent('tn-pwa-update-available'));
+            return;
+        }
         if (Date.now() < postponedUntil) return;
         bar.style.display = 'block';
         requestAnimationFrame(() => {

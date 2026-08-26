@@ -4586,6 +4586,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pwa_on_latest' => 'Aap latest version par hain',
     'pwa_offline_no_check' => 'Internet nahi — update check nahi ho saka',
     'pwa_still_downloading' => 'Update abhi download ho rahi hai — tayyar hone par "!" ka nishan aa jayega',
+    'pwa_will_auto_apply' => 'Update download ho rahi hai — tayyar hotay hi khud lag jaye gi',
     'pwa_postpone' => 'Baad mein',
     'pwa_refresh_btn' => 'Refresh',
     'pwa_mi_label' => 'App Install karein',

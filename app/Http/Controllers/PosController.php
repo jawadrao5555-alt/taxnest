@@ -13716,17 +13716,17 @@ class PosController extends Controller
     }
 
     /**
-     * Shared range parsing for the reports analytics surfaces: defaults to the
-     * current month, swaps reversed inputs, caps the window at 366 days.
+     * Shared range parsing for the reports analytics surfaces: a fresh visit
+     * defaults to today, swaps reversed inputs, caps the window at 366 days.
      *
      * @return array{0:\Carbon\Carbon,1:\Carbon\Carbon}
      */
     private function resolveReportRange(Request $request): array
     {
         try {
-            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : now()->startOfMonth();
+            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : now()->startOfDay();
         } catch (\Throwable) {
-            $from = now()->startOfMonth();
+            $from = now()->startOfDay();
         }
         try {
             $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to'))->endOfDay() : now()->endOfDay();

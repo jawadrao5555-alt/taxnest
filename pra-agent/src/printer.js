@@ -88,8 +88,8 @@ async function reportPrinters() {
 // concurrent printHtml calls would race loadFile/did-finish-load and can
 // print the wrong content. Chain every call behind the previous one.
 let printChain = Promise.resolve();
-function printHtml(html, deviceName) {
-  const run = () => printHtmlUnlocked(html, deviceName);
+function printHtml(html, deviceName, jobType = 'bill') {
+  const run = () => printHtmlUnlocked(html, deviceName, jobType);
   const p = printChain.then(run, run);
   // Keep the chain alive regardless of outcome (printHtmlUnlocked never
   // rejects, but belt-and-braces).
@@ -99,7 +99,7 @@ function printHtml(html, deviceName) {
 
 // Load HTML into the hidden window and print silently on `deviceName`.
 // Resolves { success, error }. Never rejects.
-function printHtmlUnlocked(html, deviceName) {
+function printHtmlUnlocked(html, deviceName, jobType = 'bill') {
   return new Promise((resolve) => {
     let settled = false;
     let win;
@@ -129,9 +129,13 @@ function printHtmlUnlocked(html, deviceName) {
       // Task 1287: Urdu tickets use the ~5.5 MB Jameel Noori Nastaleeq web
       // font — on a cold cache a fixed delay would rasterize the fallback
       // Naskh mid-download. Wait for document.fonts (bounded at 8s inside the
-      // page; the 30s hard timer above still guards the whole job), then keep
-      // the original 500 ms settle. English/Roman tickets resolve instantly —
-      // document.fonts.ready is already settled when no faces are pending.
+      // page; the 30s hard timer above still guards the whole job). KOTs have
+      // no customer-logo layout and are time-critical for the kitchen, so once
+      // the document and fonts are ready they use a short 100 ms settle. Bills
+      // and proof prints retain the 500 ms driver-safety settle.
+      // English/Roman tickets resolve instantly — document.fonts.ready is
+      // already settled when no faces are pending.
+      const settleMs = (jobType === 'kot' || jobType === 'kot_void') ? 100 : 500;
       const fontsWait = win.webContents
         .executeJavaScript(
           "(function(){try{if(document.fonts&&document.fonts.ready){return Promise.race([document.fonts.ready,new Promise(function(r){setTimeout(r,8000);})]).then(function(){return 'fonts-ok';});}}catch(e){}return 'no-fontface-api';})()",
@@ -158,7 +162,7 @@ function printHtmlUnlocked(html, deviceName) {
           clearTimeout(timer);
           done(false, `print: ${e.message}`);
         }
-      }, 500));
+      }, settleMs));
     });
 
     // Temp file + loadFile — a data: URL over ~2 MB fails with ERR_INVALID_URL
@@ -235,7 +239,7 @@ async function pollPrintJobs() {
           await reportJobResult(job.id, true, null);
           continue;
         }
-        const { success, error } = await printHtml(contentRes.data, job.target_printer);
+        const { success, error } = await printHtml(contentRes.data, job.target_printer, job.type);
         if (success) {
           printStatus.jobsPrinted += 1;
           printStatus.lastPrintError = null;

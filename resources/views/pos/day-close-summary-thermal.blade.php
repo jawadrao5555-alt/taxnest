@@ -1,66 +1,66 @@
 <!DOCTYPE html>
-<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ur' ? 'rtl' : 'ltr' }}">
+@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
+<html lang="{{ $urduScript ? 'ur' : 'en' }}">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ ($isXReport ?? false) ? __('pos.dc_summary_x') : __('pos.dc_summary_z') }} {{ $report->report_number }}</title>
-    <style>
-        @page { margin: 3mm; }
-        body { width: auto; max-width: 72mm; margin: 0 auto; font-family: Arial, sans-serif; font-size: 10px; color: #000; }
-        .c { text-align: center; } .r { text-align: right; } .head { font-weight: bold; font-size: 13px; } .muted { font-size: 8px; color: #444; }
-        .notice { border: 1px solid #0369a1; padding: 4px; margin: 6px 0; font-weight: bold; text-align: center; }
-        .sec { font-weight: bold; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; margin-top: 7px; text-transform: uppercase; }
-        table { width: 100%; border-collapse: collapse; } td { padding: 2px 0; vertical-align: top; } .total td { font-weight: bold; font-size: 11px; }
-        @media print { body { width: auto; max-width: 72mm; } }
-    </style>
-    @if(app()->getLocale() === 'ur')<style>body, table { font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', Arial, sans-serif; direction: rtl; } .sec { text-transform: none; }</style>@endif
+<meta charset="UTF-8">
+<title>{{ $isXReport ?? false ? __('pos.dc_summary_xreport') : __('pos.dc_summary_zreport') }} {{ $report->report_number }}</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { background:#f3f4f6; font-family:'Courier New',Courier,monospace; color:#000; }
+.toolbar { max-width:340px; margin:10px auto 0; display:flex; gap:8px; }
+.toolbar button,.toolbar a { flex:1; padding:10px; font-size:13px; font-weight:bold; border:0; border-radius:8px; cursor:pointer; text-align:center; text-decoration:none; font-family:inherit; }
+.btn-print { background:#0A4D5C; color:#fff; } .btn-back { background:#e5e7eb; color:#111; }
+.receipt { width:302px; margin:10px auto 30px; background:#fff; padding:10px 8px; font-size:11px; line-height:1.45; }
+.c{text-align:center}.b{font-weight:bold}.lg{font-size:13px}.xl{font-size:15px}.sm{font-size:9px}.hr{border-top:1px dashed #000;margin:5px 0}.hr2{border-top:2px solid #000;margin:5px 0}
+table{width:100%;border-collapse:collapse}td{padding:2px 0;font-size:11px;vertical-align:top}td.r{text-align:right;white-space:nowrap}.sec{font-weight:bold;text-transform:uppercase;font-size:10px;letter-spacing:1px;margin-top:4px}
+@media print { html,body{background:#fff}.toolbar{display:none}.receipt{width:100%;max-width:80mm;margin:0;padding:0 2mm}@page{margin:3mm;size:80mm auto} }
+@if($urduScript)
+@include('partials.urdu-print-font')
+html,body{font-family:'Jameel Noori Nastaleeq','Noto Naskh Arabic','Urdu Typesetting','Courier New',Courier,monospace}.receipt{line-height:1.9}.sec{text-transform:none;letter-spacing:0}
+@endif
+</style>
 </head>
 <body>
-@php
-    $isX = (bool) ($isXReport ?? false);
-    $fmt = fn ($n) => number_format((float) $n, 2);
-    $streams = is_array($streamSplit ?? null) ? $streamSplit : [];
-@endphp
-<div class="c head">{{ $isX ? __('pos.dc_summary_x') : __('pos.dc_summary_z') }}</div>
-<div class="c">{{ $company->name ?? '' }}</div>
-<div class="c muted">{{ \Carbon\Carbon::parse($report->report_date)->format('d M Y') }} · {{ $report->report_number }}</div>
-@if($isX)<div class="notice">{{ __('pos.dc_summary_provisional') }}</div>@endif
-
-<div class="sec">{{ __('pos.dc_summary_overview') }}</div>
-<table>
-<tr><td>{{ __('pos.dc_summary_bills') }}</td><td class="r">{{ number_format((int) ($report->total_invoices ?? 0)) }}</td></tr>
-<tr><td>{{ __('pos.dc_summary_gross') }}</td><td class="r">{{ $fmt($report->gross_sales ?? 0) }}</td></tr>
-<tr><td>{{ __('pos.dc_summary_discount') }}</td><td class="r">{{ $fmt($report->total_discount ?? 0) }}</td></tr>
-<tr><td>{{ __('pos.dc_summary_net') }}</td><td class="r">{{ $fmt($report->net_sales ?? 0) }}</td></tr>
-<tr><td>{{ __('pos.dc_summary_tax') }}</td><td class="r">{{ $fmt($report->total_tax ?? 0) }}</td></tr>
-@if((int) ($report->returns_count ?? 0) > 0)<tr><td>{{ __('pos.dc_summary_returns', ['count' => $report->returns_count]) }}</td><td class="r">-{{ $fmt($report->returns_amount ?? 0) }}</td></tr>@endif
-<tr class="total"><td>{{ __('pos.dc_summary_total') }}</td><td class="r">{{ $fmt($report->total_amount ?? 0) }}</td></tr>
-</table>
-
-<div class="sec">{{ __('pos.dc_summary_payments') }}</div>
-<table>
-<tr><td>{{ __('pos.dc_summary_cash') }}</td><td class="r">{{ $fmt($report->cash_amount ?? 0) }}</td></tr>
-<tr><td>{{ __('pos.dc_summary_card') }}</td><td class="r">{{ $fmt($report->card_amount ?? 0) }}</td></tr>
-<tr><td>{{ __('pos.dc_summary_other') }}</td><td class="r">{{ $fmt($report->other_amount ?? 0) }}</td></tr>
-</table>
-
-@if(!empty($streams['pra']) || !empty($streams['local']))
-<div class="sec">{{ __('pos.dc_summary_streams') }}</div>
-<table>
-@foreach(['pra' => __('pos.dc_summary_pra'), 'local' => __('pos.dc_summary_local')] as $key => $label)
-@if(isset($streams[$key]))<tr><td>{{ $label }} ({{ number_format((int) ($streams[$key]['count'] ?? 0)) }})</td><td class="r">{{ $fmt($streams[$key]['sales'] ?? 0) }}</td></tr>@endif
-@endforeach
-</table>
-@endif
-
-@if($report->expected_cash !== null || $report->counted_cash !== null || $report->opening_float !== null)
-<div class="sec">{{ __('pos.dc_summary_cash_recon') }}</div>
-<table>
-@if($report->opening_float !== null)<tr><td>{{ __('pos.dc_summary_opening') }}</td><td class="r">{{ $fmt($report->opening_float) }}</td></tr>@endif
-@if($report->expected_cash !== null)<tr><td>{{ __('pos.dc_summary_expected') }}</td><td class="r">{{ $fmt($report->expected_cash) }}</td></tr>@endif
-@if($report->counted_cash !== null)<tr><td>{{ __('pos.dc_summary_counted') }}</td><td class="r">{{ $fmt($report->counted_cash) }}</td></tr>@endif
-@if($report->cash_variance !== null)<tr class="total"><td>{{ __('pos.dc_summary_variance') }}</td><td class="r">{{ $fmt($report->cash_variance) }}</td></tr>@endif
-</table>
-@endif
-<p class="c muted" style="margin-top:8px">{{ $isX ? __('pos.dc_xreport_hint') : __('pos.dcp_sys_report_pra') }}</p>
+<div class="toolbar"><button class="btn-print" onclick="window.print()">🖨 {{ __('pos.dc_summary_print') }}</button><a class="btn-back" href="{{ route('pos.day-close', ['date' => $report->report_date->format('Y-m-d')]) }}">{{ __('pos.receipt_back') }}</a></div>
+<div class="receipt">
+    <div class="c b lg">{{ $company->name }}</div>
+    <div class="hr2"></div>
+    <div class="c b xl">{{ $isXReport ?? false ? __('pos.dc_summary_xreport') : __('pos.dc_summary_zreport') }}</div>
+    <div class="c">{{ $report->report_number }}</div>
+    <div class="c">{{ $report->report_date->format('l, d M Y') }}</div>
+    @if($isXReport ?? false)<div style="border:2px solid #000;padding:3px;text-align:center;font-weight:bold;margin:5px 0;">{{ __('pos.dc_provisional_watermark') }}</div>@endif
+    <div class="hr2"></div>
+    <div class="sec">{{ __('pos.dc_summary_totals') }}</div>
+    <table>
+        <tr><td>{{ __('pos.dc_total_invoices') }}</td><td class="r b">{{ $summary['invoice_count'] }}</td></tr>
+        <tr><td>{{ __('pos.dc_gross_sales') }}</td><td class="r">{{ number_format($summary['gross_sales'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_discount') }}</td><td class="r">-{{ number_format($summary['discount'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_net_sales') }}</td><td class="r">{{ number_format($summary['net_sales'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">{{ number_format($summary['tax'], 2) }}</td></tr>
+        <tr><td class="b lg">{{ __('pos.dc_total_revenue') }}</td><td class="r b lg">{{ number_format($summary['total'], 2) }}</td></tr>
+    </table><div class="hr"></div>
+    <div class="sec">{{ __('pos.dc_summary_payments') }}</div>
+    <table>
+        <tr><td>{{ __('pos.dc_cash') }}</td><td class="r">{{ number_format($summary['payments']['cash'] ?? 0, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_card') }}</td><td class="r">{{ number_format($summary['payments']['card'] ?? 0, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_summary_online') }}</td><td class="r">{{ number_format($summary['payments']['online'] ?? 0, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_other') }}</td><td class="r">{{ number_format($summary['payments']['other'] ?? 0, 2) }}</td></tr>
+    </table><div class="hr"></div>
+    <div class="sec">{{ __('pos.dc_summary_streams') }}</div>
+    <table>
+        <tr><td>{{ __('pos.dc_stream_pra') }} ({{ $summary['pra_invoices'] ?? 0 }})</td><td class="r">{{ number_format($summary['pra']['sales'] ?? $summary['total'], 2) }}</td></tr>
+        @if($summary['show_local'] ?? false)<tr><td>{{ __('pos.dc_stream_local') }} ({{ $summary['local_invoices'] ?? 0 }})</td><td class="r">{{ number_format($summary['local']['sales'] ?? 0, 2) }}</td></tr>@endif
+    </table>
+    @if(($summary['returns_count'] ?? 0) > 0)<div class="hr"></div><div class="sec">{{ __('pos.dc_summary_returns') }}</div><table><tr><td>{{ __('pos.dc_summary_return_count') }}</td><td class="r">{{ $summary['returns_count'] }}</td></tr><tr><td>{{ __('pos.dc_summary_refund_amount') }}</td><td class="r">-{{ number_format($summary['returns_amount'], 2) }}</td></tr></table>@endif
+    @if(($summary['cash_recon']['visible'] ?? false))
+    <div class="hr"></div><div class="sec">{{ __('pos.dc_summary_cash_recon') }}</div><table>
+        <tr><td>{{ __('pos.dc_opening_float') }}</td><td class="r">{{ $summary['cash_recon']['opening'] === null ? '-' : number_format($summary['cash_recon']['opening'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dcp_expected_cash_drawer') }}</td><td class="r">{{ $summary['cash_recon']['expected'] === null ? '-' : number_format($summary['cash_recon']['expected'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_counted_cash') }}</td><td class="r">{{ $summary['cash_recon']['counted'] === null ? '-' : number_format($summary['cash_recon']['counted'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_variance') }}</td><td class="r">{{ $summary['cash_recon']['variance'] === null ? '-' : number_format($summary['cash_recon']['variance'], 2) }}</td></tr>
+    </table>
+    @endif
+    <div class="hr2"></div><div class="c sm b">{{ __('pos.dcp_powered_nestpos') }}</div>
+</div>
 </body>
 </html>

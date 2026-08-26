@@ -526,4 +526,71 @@ class PosDayCloseStreamSplitTest extends TestCase
         // silently undercounts to 0 just because the row was archived.
         $this->assertSame(300.0, (float) $split['local']['sales'], 'historical view recovers the wash-archived local final');
     }
+
+    public function test_summary_x_is_live_read_only_and_uses_the_shared_figures(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedMixedDay($companyId, $user->id);
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+
+        $view = (new PosController())->dayCloseReport(Request::create('/pos/day-close/summary', 'GET', [
+            'date' => now()->toDateString(),
+            'report_mode' => 'summary',
+        ]));
+
+        $this->assertSame('pos.day-close-summary', $view->name());
+        $summary = $view->getData()['summary'];
+        $this->assertSame(5, $summary['invoice_count']);
+        $this->assertSame(2572.0, (float) $summary['total']);
+        $this->assertSame(1987.0, (float) $summary['payments']['cash']);
+        $this->assertSame(585.0, (float) $summary['payments']['card']);
+        $this->assertSame(0, DB::table('pos_day_close_reports')->count(), 'Summary X must not create a Z row');
+        $this->assertSame(0, DB::table('pos_transactions')->where('is_archived', true)->count(), 'Summary X must not archive or wash bills');
+    }
+
+    public function test_summary_z_uses_frozen_values_and_renders_thermal_mode(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedMixedDay($companyId, $user->id);
+        $result = (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+        $reportId = $result['report']->id;
+        $frozenSplit = json_decode(DB::table('pos_day_close_reports')->where('id', $reportId)->value('stream_summary'), true);
+        $frozenSplit['summary_payments'] = ['cash' => 999.0, 'card' => 0.0, 'online' => 0.0, 'other' => 0.0];
+        DB::table('pos_day_close_reports')->where('id', $reportId)->update([
+            'total_amount' => 4321.0,
+            'stream_summary' => json_encode($frozenSplit),
+        ]);
+
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+        $view = (new PosController())->dayCloseThermal($reportId, Request::create('/pos/day-close/' . $reportId . '/summary/thermal', 'GET', [
+            'report_mode' => 'summary',
+        ]));
+
+        $this->assertSame('pos.day-close-summary-thermal', $view->name());
+        $summary = $view->getData()['summary'];
+        $this->assertSame(4321.0, (float) $summary['total']);
+        $this->assertSame(999.0, (float) $summary['payments']['cash'], 'Z payment values must come from the frozen snapshot');
+    }
+
+    public function test_legacy_z_without_compact_snapshot_still_renders_summary_pdf(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedMixedDay($companyId, $user->id);
+        $result = (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+        DB::table('pos_day_close_reports')->where('id', $result['report']->id)->update(['stream_summary' => null]);
+
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+        $response = (new PosController())->dayCloseReportPdf($result['report']->id, Request::create('/pos/day-close/1/summary/pdf', 'GET', [
+            'report_mode' => 'summary',
+        ]));
+
+        $this->assertSame('application/pdf', $response->headers->get('content-type'));
+        $this->assertStringContainsString('Summary-Z-Report-', $response->headers->get('content-disposition'));
+    }
 }

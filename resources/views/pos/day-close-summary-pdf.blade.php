@@ -2,86 +2,98 @@
 <html lang="{{ ($pdfUrdu ?? false) ? 'ur' : 'en' }}" dir="{{ ($pdfUrdu ?? false) ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
-    <title>{{ ($isXReport ?? false) ? __('pos.dc_summary_x') : __('pos.dc_summary_z') }} {{ $report->report_number }}</title>
+    <title>{{ $isXReport ?? false ? 'Summary X-Report' : 'Summary Z-Report' }} {{ $report->report_number }}</title>
     <style>
-        @page { margin: 10mm 15mm; }
+        @page { margin: 12mm 15mm; }
         * { box-sizing: border-box; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; color: #111827; font-size: 11px; line-height: 1.45; }
-        .head { background: #1e1b4b; color: #fff; padding: 16px; text-align: center; }
-        .head h1 { margin: 0; font-size: 17px; letter-spacing: 1px; }
-        .head p { margin: 4px 0 0; font-size: 10px; color: #e5e7eb; }
-        .notice { border: 2px solid #0ea5e9; background: #f0f9ff; color: #075985; text-align: center; font-weight: bold; padding: 8px; margin: 12px 0; }
-        .section { color: #312e81; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: .7px; border-bottom: 1px solid #312e81; padding-bottom: 3px; margin: 14px 0 6px; }
-        .headline { width: 100%; border-collapse: separate; border-spacing: 7px; margin: 6px -7px; }
-        .headline td { width: 25%; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 5px; padding: 8px; }
-        .label { display: block; font-size: 8px; color: #4b5563; text-transform: uppercase; }
-        .value { display: block; font-weight: bold; font-size: 14px; color: #1e1b4b; margin-top: 2px; }
-        table.data { width: 100%; border-collapse: collapse; }
-        table.data th { background: #1e1b4b; color: #fff; padding: 6px; text-align: left; font-size: 9px; }
-        table.data td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
-        table.data .r { text-align: right; font-weight: bold; }
-        .foot { margin-top: 16px; color: #6b7280; text-align: center; font-size: 9px; border-top: 1px solid #d1d5db; padding-top: 7px; }
+        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11px; color: #111827; }
+        .header { background: #1e1b4b; color: #fff; padding: 14px 18px; text-align: center; }
+        .header h1 { margin: 0 0 3px; font-size: 16px; }
+        .header p { margin: 2px 0; font-size: 9px; color: #e5e7eb; }
+        .title { text-align: center; margin: 14px 0; }
+        .title h2 { margin: 0; color: #1e1b4b; font-size: 15px; }
+        .title p { margin: 3px 0; font-size: 10px; }
+        .watermark { border: 2px solid #dc2626; color: #dc2626; background: #fef2f2; padding: 7px; text-align: center; font-weight: bold; margin-bottom: 12px; }
+        .hero { background: #1e1b4b; color: #fff; padding: 10px 14px; margin-bottom: 12px; }
+        .hero table, table { width: 100%; border-collapse: collapse; }
+        .hero td:last-child, td.amount { text-align: right; font-weight: bold; }
+        .hero td { padding: 2px 0; }
+        h3 { color: #1e1b4b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1e1b4b; padding-bottom: 3px; margin: 13px 0 5px; }
+        td { padding: 6px 5px; border-bottom: 1px solid #d1d5db; }
+        td.amount { white-space: nowrap; }
+        .grid td { width: 50%; border: 1px solid #d1d5db; }
+        .negative { color: #dc2626; }
+        .footer { margin-top: 18px; text-align: center; border-top: 1px solid #9ca3af; padding-top: 7px; font-size: 9px; color: #4b5563; }
+        @if($pdfUrdu ?? false)
+        body { font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
+        h3 { text-transform: none; letter-spacing: 0; }
+        @endif
     </style>
-    @if($pdfUrdu ?? false)
-    <style>body, table.data { font-family: 'Jameel Noori Nastaleeq', 'XB Riyaz', DejaVu Sans, sans-serif; direction: rtl; } .section, .label { letter-spacing: 0; text-transform: none; }</style>
-    @endif
 </head>
 <body>
-@php
-    $isX = (bool) ($isXReport ?? false);
-    $fmt = fn ($n) => 'PKR ' . number_format((float) $n, 2);
-    $date = \Carbon\Carbon::parse($report->report_date)->format('d M Y');
-    $streams = is_array($streamSplit ?? null) ? $streamSplit : [];
-@endphp
-<div class="head">
-    <h1>{{ $isX ? __('pos.dc_summary_x') : __('pos.dc_summary_z') }}</h1>
-    <p>{{ $company->name ?? '' }} &middot; {{ $date }} &middot; {{ $report->report_number }}</p>
-</div>
-@if($isX)
-<div class="notice">{{ __('pos.dc_summary_provisional') }}</div>
-@endif
+    <div class="header">
+        <h1>{{ $company->name }}</h1>
+        @if($company->address)<p>{{ $company->address }}</p>@endif
+        @if($company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
+    </div>
+    <div class="title">
+        <h2>{{ $isXReport ?? false ? __('pos.dc_summary_xreport') : __('pos.dc_summary_zreport') }}</h2>
+        <p>{{ $report->report_date->format('l, d F Y') }} · {{ $report->report_number }}</p>
+    </div>
+    @if($isXReport ?? false)
+    <div class="watermark">{{ __('pos.dc_provisional_watermark') }}<br><span style="font-size:9px;">{{ __('pos.dc_summary_x_hint') }}</span></div>
+    @endif
 
-<div class="section">{{ __('pos.dc_summary_overview') }}</div>
-<table class="headline"><tr>
-    <td><span class="label">{{ __('pos.dc_summary_bills') }}</span><span class="value">{{ number_format((int) ($report->total_invoices ?? 0)) }}</span></td>
-    <td><span class="label">{{ __('pos.dc_summary_gross') }}</span><span class="value">{{ $fmt($report->gross_sales ?? 0) }}</span></td>
-    <td><span class="label">{{ __('pos.dc_summary_discount') }}</span><span class="value">{{ $fmt($report->total_discount ?? 0) }}</span></td>
-    <td><span class="label">{{ __('pos.dc_summary_total') }}</span><span class="value">{{ $fmt($report->total_amount ?? 0) }}</span></td>
-</tr></table>
-<table class="data">
-    <tr><td>{{ __('pos.dc_summary_net') }}</td><td class="r">{{ $fmt($report->net_sales ?? 0) }}</td></tr>
-    <tr><td>{{ __('pos.dc_summary_tax') }}</td><td class="r">{{ $fmt($report->total_tax ?? 0) }}</td></tr>
-    @if((int) ($report->returns_count ?? 0) > 0)<tr><td>{{ __('pos.dc_summary_returns', ['count' => $report->returns_count]) }}</td><td class="r">-{{ $fmt($report->returns_amount ?? 0) }}</td></tr>@endif
-</table>
+    <div class="hero">
+        <table>
+            <tr><td>{{ __('pos.dc_total_invoices') }}</td><td>{{ $summary['invoice_count'] }}</td></tr>
+            <tr><td>{{ __('pos.dc_total_revenue') }}</td><td>PKR {{ number_format($summary['total'], 2) }}</td></tr>
+        </table>
+    </div>
 
-<div class="section">{{ __('pos.dc_summary_payments') }}</div>
-<table class="data">
-    <tr><td>{{ __('pos.dc_summary_cash') }}</td><td class="r">{{ $fmt($report->cash_amount ?? 0) }}</td></tr>
-    <tr><td>{{ __('pos.dc_summary_card') }}</td><td class="r">{{ $fmt($report->card_amount ?? 0) }}</td></tr>
-    <tr><td>{{ __('pos.dc_summary_other') }}</td><td class="r">{{ $fmt($report->other_amount ?? 0) }}</td></tr>
-</table>
+    <h3>{{ __('pos.dc_summary_totals') }}</h3>
+    <table>
+        <tr><td>{{ __('pos.dc_gross_sales') }}</td><td class="amount">PKR {{ number_format($summary['gross_sales'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_discount') }}</td><td class="amount negative">PKR {{ number_format($summary['discount'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_net_sales') }}</td><td class="amount">PKR {{ number_format($summary['net_sales'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="amount">PKR {{ number_format($summary['tax'], 2) }}</td></tr>
+        <tr><td><strong>{{ __('pos.dc_total_revenue') }}</strong></td><td class="amount"><strong>PKR {{ number_format($summary['total'], 2) }}</strong></td></tr>
+    </table>
 
-@if(!empty($streams['pra']) || !empty($streams['local']))
-<div class="section">{{ __('pos.dc_summary_streams') }}</div>
-<table class="data">
-    <thead><tr><th>{{ __('pos.dc_summary_stream') }}</th><th class="r">{{ __('pos.dc_summary_bills') }}</th><th class="r">{{ __('pos.dc_summary_tax') }}</th><th class="r">{{ __('pos.dc_summary_total') }}</th></tr></thead>
-    <tbody>
-    @foreach(['pra' => __('pos.dc_summary_pra'), 'local' => __('pos.dc_summary_local')] as $key => $label)
-        @if(isset($streams[$key]))<tr><td>{{ $label }}</td><td class="r">{{ number_format((int) ($streams[$key]['count'] ?? 0)) }}</td><td class="r">{{ $fmt($streams[$key]['tax'] ?? 0) }}</td><td class="r">{{ $fmt($streams[$key]['sales'] ?? 0) }}</td></tr>@endif
-    @endforeach
-    </tbody>
-</table>
-@endif
+    <h3>{{ __('pos.dc_summary_payments') }}</h3>
+    <table class="grid">
+        <tr>
+            <td>{{ __('pos.dc_cash') }} <span style="float:right;font-weight:bold;">PKR {{ number_format($summary['payments']['cash'] ?? 0, 2) }}</span></td>
+            <td>{{ __('pos.dc_card') }} <span style="float:right;font-weight:bold;">PKR {{ number_format($summary['payments']['card'] ?? 0, 2) }}</span></td>
+        </tr>
+        <tr>
+            <td>{{ __('pos.dc_summary_online') }} <span style="float:right;font-weight:bold;">PKR {{ number_format($summary['payments']['online'] ?? 0, 2) }}</span></td>
+            <td>{{ __('pos.dc_other') }} <span style="float:right;font-weight:bold;">PKR {{ number_format($summary['payments']['other'] ?? 0, 2) }}</span></td>
+        </tr>
+    </table>
 
-@if($report->expected_cash !== null || $report->counted_cash !== null || $report->opening_float !== null)
-<div class="section">{{ __('pos.dc_summary_cash_recon') }}</div>
-<table class="data">
-    @if($report->opening_float !== null)<tr><td>{{ __('pos.dc_summary_opening') }}</td><td class="r">{{ $fmt($report->opening_float) }}</td></tr>@endif
-    @if($report->expected_cash !== null)<tr><td>{{ __('pos.dc_summary_expected') }}</td><td class="r">{{ $fmt($report->expected_cash) }}</td></tr>@endif
-    @if($report->counted_cash !== null)<tr><td>{{ __('pos.dc_summary_counted') }}</td><td class="r">{{ $fmt($report->counted_cash) }}</td></tr>@endif
-    @if($report->cash_variance !== null)<tr><td>{{ __('pos.dc_summary_variance') }}</td><td class="r">{{ $fmt($report->cash_variance) }}</td></tr>@endif
-</table>
-@endif
-<div class="foot">{{ $isX ? __('pos.dc_xreport_hint') : __('pos.dcp_sys_report_pra') }}</div>
+    <h3>{{ __('pos.dc_summary_streams') }}</h3>
+    <table>
+        <tr><td>{{ __('pos.dc_stream_pra') }} ({{ $summary['pra_invoices'] ?? 0 }})</td><td class="amount">PKR {{ number_format($summary['pra']['sales'] ?? $summary['total'], 2) }}</td></tr>
+        @if($summary['show_local'] ?? false)
+        <tr><td>{{ __('pos.dc_stream_local') }} ({{ $summary['local_invoices'] ?? 0 }})</td><td class="amount">PKR {{ number_format($summary['local']['sales'] ?? 0, 2) }}</td></tr>
+        @endif
+    </table>
+
+    @if(($summary['returns_count'] ?? 0) > 0)
+    <h3>{{ __('pos.dc_summary_returns') }}</h3>
+    <table><tr><td>{{ __('pos.dc_summary_return_count') }}</td><td class="amount">{{ $summary['returns_count'] }}</td></tr><tr><td>{{ __('pos.dc_summary_refund_amount') }}</td><td class="amount negative">PKR {{ number_format($summary['returns_amount'], 2) }}</td></tr></table>
+    @endif
+
+    @if(($summary['cash_recon']['visible'] ?? false))
+    <h3>{{ __('pos.dc_summary_cash_recon') }}</h3>
+    <table>
+        <tr><td>{{ __('pos.dc_opening_float') }}</td><td class="amount">PKR {{ $summary['cash_recon']['opening'] === null ? '—' : number_format($summary['cash_recon']['opening'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dcp_expected_cash_drawer') }}</td><td class="amount">PKR {{ $summary['cash_recon']['expected'] === null ? '—' : number_format($summary['cash_recon']['expected'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_counted_cash') }}</td><td class="amount">PKR {{ $summary['cash_recon']['counted'] === null ? '—' : number_format($summary['cash_recon']['counted'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_variance') }}</td><td class="amount">{{ $summary['cash_recon']['variance'] === null ? '—' : 'PKR ' . number_format($summary['cash_recon']['variance'], 2) }}</td></tr>
+    </table>
+    @endif
+    <div class="footer">{{ __('pos.dcp_powered_nestpos') }} · {{ __('pos.dc_summary_report_title') }}</div>
 </body>
 </html>

@@ -984,6 +984,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // drawer is closed). Reopen is admin/manager-only, enforced in-controller.
     Route::post('/day-close/counter', [PosController::class, 'closeCounter'])->name('pos.counter-close');
     Route::post('/day-close/counter/reopen', [PosController::class, 'reopenCounter'])->name('pos.counter-reopen');
+     // Compact Summary X/Z reports — literal summary paths stay ahead of the
+     // dynamic report-id routes. They are presentation-only views of the same
+     // day-close context; no close or report row is created.
+     Route::get('/day-close/summary', [PosController::class, 'dayCloseReport'])
+         ->defaults('report_mode', 'summary')->name('pos.day-close-summary');
     // Task 660: X-Report — read-only "abhi tak ki report" WITHOUT closing the
     // day (no wash, no hash, no report row). Literal paths registered BEFORE
     // the /day-close/{id}/... routes so {id} never swallows 'x-report'.

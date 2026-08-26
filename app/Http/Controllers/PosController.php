@@ -12149,8 +12149,96 @@ class PosController extends Controller
         // the page just reminds the shop they are still sitting there.
         $parkedBills = \App\Services\PosParkedBills::count(\App\Services\PosParkedBills::PRA_TABLE, $companyId);
 
-        return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcBlockersAllClearable', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
+         $summaryReport = $this->dayCloseReportMode($request) === 'summary';
+         $summary = $this->buildDayCloseSummary(
+             $stats,
+             $streamSplit,
+             $showLocalStream,
+             $existingReport,
+             $counterCashTotals,
+             $this->buildDayCloseSummaryPaymentSplit($dcSaleRows, $dcReturnRows),
+             $existingReport !== null
+         );
+         // X/open-day reconciliation has an opening float but no counted cash
+         // yet. Mirror the detailed page's current-day opening source without
+         // manufacturing a close or a variance.
+         if (!$existingReport && $dayOpeningTotal !== null) {
+             $summary['cash_recon'] = [
+                 'visible' => true,
+                 'opening' => (float) $dayOpeningTotal,
+                 'expected' => round((float) $dayOpeningTotal + (float) ($summary['payments']['cash'] ?? 0), 2),
+                 'counted' => null,
+                 'variance' => null,
+             ];
+         }
+
+         if ($summaryReport) {
+             return view('pos.day-close-summary', compact('company', 'date', 'stats', 'existingReport', 'streamSplit', 'showLocalStream', 'dcIso', 'dcBranchName', 'dcAllBranches', 'counterCashTotals', 'summary'));
+         }
+
+         return view('pos.day-close', compact('parkedBills', 'company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'terminalBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcBlockersAllClearable', 'dcReturnDetail', 'dcReturnParents', 'dcIso', 'dcBranchName', 'dcAllBranches', 'dayOpeningTotal', 'counterCash', 'counterCashTotals', 'counterCashLive'));
     }
+
+     /**
+      * Report mode is selected only by the dedicated route defaults (or the
+      * already validated route value). Unknown values fail closed to detailed.
+      */
+     private function dayCloseReportMode(Request $request): string
+     {
+         $mode = $request->route('report_mode') ?? $request->query('report_mode', 'detailed');
+
+         return in_array($mode, ['detailed', 'summary'], true) ? $mode : 'detailed';
+     }
+
+     /**
+      * Compact report figures are a view over the already-built day-close
+      * figures. This intentionally does not query or recalculate any sales.
+      * Missing fields are normal on old Z-report rows.
+      */
+     private function buildDayCloseSummary($source, array $streamSplit, bool $showLocalStream, ?PosDayCloseReport $report = null, ?array $counterCashTotals = null, ?array $fallbackPayments = null, bool $preferStoredPayments = false): array
+     {
+         $payments = $preferStoredPayments && is_array($streamSplit['summary_payments'] ?? null)
+             ? $streamSplit['summary_payments']
+             : ($fallbackPayments ?: (is_array($streamSplit['summary_payments'] ?? null)
+                 ? $streamSplit['summary_payments']
+                 : [
+                 'cash' => (float) ($source->cash_amount ?? 0),
+                 'card' => (float) ($source->card_amount ?? 0),
+                 'online' => 0.0,
+                 'other' => (float) ($source->other_amount ?? 0),
+                 ]));
+
+         $cashRecon = [
+             'visible' => ($source->opening_float ?? null) !== null
+                 || ($source->counted_cash ?? null) !== null
+                 || ($source->expected_cash ?? null) !== null,
+             'opening' => $source->opening_float ?? null,
+             'expected' => $source->expected_cash ?? null,
+             'counted' => $source->counted_cash ?? null,
+             'variance' => $source->cash_variance ?? null,
+         ];
+
+         return [
+             'invoice_count' => (int) ($source->total_invoices ?? 0),
+             'gross_sales' => (float) ($source->gross_sales ?? 0),
+             'discount' => (float) ($source->total_discount ?? 0),
+             'net_sales' => (float) ($source->net_sales ?? 0),
+             'tax' => (float) ($source->total_tax ?? 0),
+             'total' => (float) ($source->total_amount ?? 0),
+             'returns_count' => (int) ($source->returns_count ?? 0),
+             'returns_amount' => (float) ($source->returns_amount ?? 0),
+             'pra_invoices' => (int) ($source->pra_invoices ?? 0),
+             'local_invoices' => (int) ($source->local_invoices ?? 0),
+             'offline_invoices' => (int) ($source->offline_invoices ?? 0),
+             'payments' => $payments,
+             'pra' => $streamSplit['pra'] ?? ['count' => 0, 'sales' => 0, 'tax' => 0],
+             'local' => $streamSplit['local'] ?? ['count' => 0, 'sales' => 0, 'tax' => 0],
+             'cash_recon' => $cashRecon,
+             'counter_totals' => $counterCashTotals,
+             'show_local' => $showLocalStream,
+             'is_frozen' => $report !== null,
+         ];
+     }
 
     /**
      * Open held-order summary for day-close warnings (ZFC 3 Aug 2026): how many
@@ -14269,9 +14357,13 @@ class PosController extends Controller
             // box was missing them). Split ONLY: every stored report figure
             // stays computed from the PRA set, and PRA-reporting logic is
             // untouched (compliance boundary).
-            $data['stream_summary'] = $this->buildDayCloseStreamSplit(
+             $streamSummary = $this->buildDayCloseStreamSplit(
                 $this->withLocalStreamRows($transactions, $companyId, $date, null, $branchId)
             );
+             // The compact payment split follows the report's PRA figure set,
+             // not the extra local rows included in stream_summary.
+             $streamSummary['summary_payments'] = $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows);
+             $data['stream_summary'] = $streamSummary;
         }
 
         // Returns audit snapshot (Task 682): freeze the per-return detail
@@ -14625,7 +14717,7 @@ class PosController extends Controller
         return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'deleted' => $deletedCount, 'report_number' => $reportNumber, 'summary' => $localSummary, 'finalize_sweep' => $finalizeSweep];
     }
 
-    public function dayCloseReportPdf($id)
+     public function dayCloseReportPdf($id, ?Request $request = null)
     {
         // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
         $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
@@ -14639,6 +14731,8 @@ class PosController extends Controller
         }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+         $request = $request ?: Request::create('/pos/day-close/' . $id . '/pdf', 'GET');
+         $isSummaryReport = $this->dayCloseReportMode($request) === 'summary';
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
         // Task 1360: a branch's Z-report stays that branch's document.
         if (!$this->canSeeBranchReport($report)) {
@@ -14708,11 +14802,23 @@ class PosController extends Controller
         // gets nothing so its PDF is byte-for-byte what it always was.
         $counterCash = $this->dayCloseCounterCash($report, $transactions, $rptBranchId);
         $counterCashTotals = $counterCash->isEmpty() ? null : \App\Services\PosCounterDrawer::totals($counterCash);
+         $summary = $this->buildDayCloseSummary(
+             $report,
+             $streamSplit,
+             $showLocalStream,
+             $report,
+             $counterCashTotals,
+             $this->buildDayCloseSummaryPaymentSplit(
+                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return'),
+                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')
+             ),
+             true
+         );
 
         return $this->renderReportPdf(
-            'pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'counterCash', 'counterCashTotals'),
-            "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
+             $isSummaryReport ? 'pos.day-close-summary-pdf' : 'pos.day-close-pdf',
+             compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'counterCash', 'counterCashTotals', 'summary', 'isSummaryReport'),
+             ($isSummaryReport ? 'Summary-Z-Report-' : 'Day-Close-') . "{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
 
@@ -14721,7 +14827,7 @@ class PosController extends Controller
      * of a CLOSED day for cheap receipt printers — same historical data set as
      * the A4 PDF (archived bills included, local bills excluded).
      */
-    public function dayCloseThermal($id)
+     public function dayCloseThermal($id, ?Request $request = null)
     {
         // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
         $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
@@ -14735,6 +14841,8 @@ class PosController extends Controller
         }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+         $request = $request ?: Request::create('/pos/day-close/' . $id . '/thermal', 'GET');
+         $isSummaryReport = $this->dayCloseReportMode($request) === 'summary';
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
         // Task 1360: a branch's Z-report stays that branch's document.
         if (!$this->canSeeBranchReport($report)) {
@@ -14792,8 +14900,23 @@ class PosController extends Controller
         // Counter-wise cash reconciliation (Task 1375) — same frozen-first rule.
         $counterCash = $this->dayCloseCounterCash($report, $transactions, $rptBranchId);
         $counterCashTotals = $counterCash->isEmpty() ? null : \App\Services\PosCounterDrawer::totals($counterCash);
+         $summary = $this->buildDayCloseSummary(
+             $report,
+             $streamSplit,
+             $showLocalStream,
+             $report,
+             $counterCashTotals,
+             $this->buildDayCloseSummaryPaymentSplit(
+                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return'),
+                 $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')
+             ),
+             true
+         );
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'counterCash', 'counterCashTotals'));
+         return view(
+             $isSummaryReport ? 'pos.day-close-summary-thermal' : 'pos.day-close-thermal',
+             compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'counterCash', 'counterCashTotals', 'summary', 'isSummaryReport')
+         );
     }
 
     /**
@@ -15025,9 +15148,49 @@ class PosController extends Controller
             'local' => round((float) $saleRows->whereIn('pra_status', ['local', null])->sum('total_amount'), 2),
             'offline' => round((float) $saleRows->where('pra_status', 'offline')->sum('total_amount'), 2),
         ];
+         // Compact reports need the online bucket separately. Keep the existing
+         // detailed cash/card/other split unchanged; this extra frozen snapshot
+         // lets a later Z print stay truthful after the wash removes rows.
+         $split['summary_payments'] = $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows);
 
         return $split;
     }
+
+     /**
+      * Compact payment presentation: cash, card, online and remaining other.
+      * The established PosPaymentBuckets definition remains authoritative for
+      * the detailed report; this is only the additional compact presentation
+      * bucket and is frozen inside stream_summary with the Z-report.
+      */
+     private function buildDayCloseSummaryPaymentSplit($saleRows, $returnRows): array
+     {
+         $onlineAliases = array_merge(
+             \App\Support\PosPaymentLabels::ONLINE_ALIASES,
+             ['bank_transfer']
+         );
+         $sums = ['cash' => 0.0, 'card' => 0.0, 'online' => 0.0, 'other' => 0.0];
+
+         foreach ($saleRows as $transaction) {
+             $method = strtolower(trim((string) ($transaction->payment_method ?? '')));
+             $bucket = $method === 'cash'
+                 ? 'cash'
+                 : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
+                     ? 'card'
+                     : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
+             $sums[$bucket] += (float) ($transaction->total_amount ?? 0);
+         }
+         foreach ($returnRows as $transaction) {
+             $method = strtolower(trim((string) ($transaction->payment_method ?? '')));
+             $bucket = $method === 'cash'
+                 ? 'cash'
+                 : (in_array($method, \App\Support\PosPaymentBuckets::CARD_ALIASES, true)
+                     ? 'card'
+                     : (in_array($method, $onlineAliases, true) ? 'online' : 'other'));
+             $sums[$bucket] -= (float) ($transaction->total_amount ?? 0);
+         }
+
+         return array_map(fn ($value) => round($value, 2), $sums);
+     }
 
     /**
      * ═══ X-Report (Task 660, ZFC owner request) ═══
@@ -15127,7 +15290,7 @@ class PosController extends Controller
             $report->rider_summary = $riderFigures;
         }
 
-        $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId));
+         $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId));
 
         // Task 705: X display mode-gating (same rule as the Z page/PDF).
         $showLocalStream = (bool) session('pos_local_check')
@@ -15157,8 +15320,20 @@ class PosController extends Controller
             : [];
         $taxSplit = $this->dayCloseTaxSplit($transactions);
         $isXReport = true;
+         $isSummaryReport = $this->dayCloseReportMode($request) === 'summary';
+         $summary = $this->buildDayCloseSummary($report, $streamSplit, $showLocalStream, null, null, $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows));
+         $openingFloat = \App\Models\PosDayOpening::totalForDate($companyId, $date, $xBranchId);
+         if ($openingFloat !== null) {
+             $summary['cash_recon'] = [
+                 'visible' => true,
+                 'opening' => (float) $openingFloat,
+                 'expected' => round((float) $openingFloat + (float) ($summary['payments']['cash'] ?? 0), 2),
+                 'counted' => null,
+                 'variance' => null,
+             ];
+         }
 
-        return compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'isXReport');
+         return compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'isXReport', 'isSummaryReport', 'summary');
     }
 
     /** X-Report as A4 PDF (Task 660) — read-only, PROVISIONAL watermark. */
@@ -15170,9 +15345,9 @@ class PosController extends Controller
         }
 
         return $this->renderReportPdf(
-            'pos.day-close-pdf',
+             ($ctx['isSummaryReport'] ?? false) ? 'pos.day-close-summary-pdf' : 'pos.day-close-pdf',
             $ctx,
-            "X-Report-{$ctx['report']->report_date->format('Y-m-d')}.pdf"
+             (($ctx['isSummaryReport'] ?? false) ? 'Summary-X-Report-' : 'X-Report-') . $ctx['report']->report_date->format('Y-m-d') . '.pdf'
         );
     }
 
@@ -15184,7 +15359,7 @@ class PosController extends Controller
             return $ctx;
         }
 
-        return view('pos.day-close-thermal', $ctx);
+         return view(($ctx['isSummaryReport'] ?? false) ? 'pos.day-close-summary-thermal' : 'pos.day-close-thermal', $ctx);
     }
 
     /**
@@ -15248,26 +15423,18 @@ class PosController extends Controller
 
     public function dayCloseSummaryPdf($id)
     {
-        $ctx = $this->buildSummaryZReportContext($id);
-        if (!is_array($ctx)) {
-            return $ctx;
-        }
-
-        return $this->renderReportPdf(
-            'pos.day-close-summary-pdf',
-            $ctx,
-            "Summary-Z-Report-{$ctx['report']->report_date->format('Y-m-d')}.pdf"
-        );
+         return $this->dayCloseReportPdf(
+             $id,
+             Request::create('/pos/day-close/' . $id . '/summary/pdf', 'GET', ['report_mode' => 'summary'])
+         );
     }
 
     public function dayCloseSummaryThermal($id)
     {
-        $ctx = $this->buildSummaryZReportContext($id);
-        if (!is_array($ctx)) {
-            return $ctx;
-        }
-
-        return view('pos.day-close-summary-thermal', $ctx);
+         return $this->dayCloseThermal(
+             $id,
+             Request::create('/pos/day-close/' . $id . '/summary/thermal', 'GET', ['report_mode' => 'summary'])
+         );
     }
 
     /**

@@ -35,6 +35,7 @@ class UrduPrintFontCoverageTest extends TestCase
         'resources/views/fbr-pos/kitchen-ticket.blade.php',
         'resources/views/pos/day-close-thermal.blade.php',
         'resources/views/fbr-pos/day-close-thermal.blade.php',
+        'resources/views/pos/day-close-summary-thermal.blade.php',
         'resources/views/public/bill-details.blade.php',
         // (Khata upgrade Aug 2026) Wasooli ki rasid — manual-print thermal slip
         // (no auto_print), so JNN-gated here but intentionally NOT in the

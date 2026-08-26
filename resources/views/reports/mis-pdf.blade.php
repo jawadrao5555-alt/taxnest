@@ -58,7 +58,7 @@
                 <tbody>
                     @foreach($rows as $inv)
                     <tr>
-                        <td class="bold">{{ $inv->internal_invoice_number ?? $inv->invoice_number }}</td>
+                        <td class="bold">{{ $inv->display_invoice_number }}</td>
                         <td>{{ $inv->invoice_date }}</td>
                         <td>{{ $inv->buyer_ntn ?? '-' }}</td>
                         <td class="right">PKR {{ number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2) }}</td>
@@ -99,7 +99,7 @@
                 <tbody>
                     @forelse($invoices as $inv)
                     <tr>
-                        <td class="bold">{{ $inv->internal_invoice_number ?? $inv->invoice_number }}</td>
+                        <td class="bold">{{ $inv->display_invoice_number }}</td>
                         <td>{{ $inv->invoice_date }}</td>
                         <td>{{ $inv->buyer_name }}</td>
                         <td>{{ $inv->buyer_ntn ?? '-' }}</td>

@@ -73,7 +73,7 @@
                         x-data="whtRow_{{ $invoice->id }}()" id="whtRow{{ $invoice->id }}">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-white">
                             <a href="/invoice/{{ $invoice->id }}" class="text-emerald-600 hover:text-emerald-700 hover:underline">
-                                {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#'.$invoice->id }}
+                                {{ $invoice->display_invoice_number }}
                             </a>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $invoice->fbr_invoice_number ?? '-' }}</td>
@@ -114,7 +114,7 @@
                                     <div class="flex items-center justify-between mb-4">
                                         <div>
                                             <p class="text-base font-bold text-gray-800 dark:text-white">Correct WHT Rate</p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }} - {{ $invoice->buyer_name }}</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $invoice->display_invoice_number }} - {{ $invoice->buyer_name }}</p>
                                         </div>
                                         <button @click="showModal = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-400 text-xl leading-none">&times;</button>
                                     </div>

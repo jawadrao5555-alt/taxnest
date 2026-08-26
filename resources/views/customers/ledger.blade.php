@@ -71,7 +71,7 @@
                             </td>
                             <td class="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">
                                 @if($entry->invoice)
-                                <a href="/invoice/{{ $entry->invoice_id }}" class="text-emerald-600 hover:text-emerald-800">{{ $entry->invoice->invoice_number }}</a>
+                                <a href="/invoice/{{ $entry->invoice_id }}" class="text-emerald-600 hover:text-emerald-800">{{ $entry->invoice->display_invoice_number }}</a>
                                 @else
                                 -
                                 @endif

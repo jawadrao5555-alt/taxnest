@@ -114,7 +114,7 @@ class MISController extends Controller
                     foreach ($rows as $inv) {
                         $csv .= '"' . str_replace('"', '""', $party) . '",'
                             . '"' . ($inv->buyer_ntn ?? '') . '",'
-                            . '"' . ($inv->internal_invoice_number ?? $inv->invoice_number) . '",'
+                            . '"' . $inv->display_invoice_number . '",'
                             . '"' . $inv->invoice_date . '",'
                             . number_format($inv->total_value_excluding_st ?? ($inv->total_amount - $inv->total_sales_tax), 2, '.', '') . ','
                             . number_format($inv->total_sales_tax, 2, '.', '') . ','
@@ -127,7 +127,7 @@ class MISController extends Controller
                 $csv = "Invoice Number,Date,Buyer Name,Buyer NTN,Subtotal,Sales Tax,WHT,Total,Status\n";
                 foreach ($invoices as $inv) {
                     $csv .= implode(',', [
-                        '"' . ($inv->internal_invoice_number ?? $inv->invoice_number) . '"',
+                        '"' . $inv->display_invoice_number . '"',
                         '"' . $inv->invoice_date . '"',
                         '"' . str_replace('"', '""', $inv->buyer_name) . '"',
                         '"' . ($inv->buyer_ntn ?? '') . '"',

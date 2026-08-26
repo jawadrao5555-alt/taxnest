@@ -589,7 +589,7 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertCount(2, $invoices);
 
         $invA = $invoices[0];
-        $this->assertSame('D001', $invA->invoice_number);
+        $this->assertSame('D0001', $invA->invoice_number);
         $this->assertSame('draft', $invA->status);
         $this->assertNull($invA->fbr_status);
         $this->assertSame('Registered', $invA->buyer_registration_type);
@@ -598,7 +598,7 @@ class InvoiceBulkImportTest extends TestCase
         $this->assertEqualsWithDelta(2360.0, (float) $invA->total_amount, 0.01);
 
         $invB = $invoices[1];
-        $this->assertSame('D002', $invB->invoice_number);
+        $this->assertSame('D0002', $invB->invoice_number);
         $this->assertSame('4220112345671', $invB->buyer_cnic);
 
         $itemsA = InvoiceItem::where('invoice_id', $invA->id)->get();

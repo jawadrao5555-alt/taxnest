@@ -7,7 +7,7 @@
                     <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <a href="/invoices" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">Invoices</a>
                     <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <a href="/invoice/{{ $invoice->id }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}</a>
+                    <a href="/invoice/{{ $invoice->id }}" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition font-medium">{{ $invoice->display_invoice_number }}</a>
                     <svg class="w-3.5 h-3.5 mx-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     <span class="text-gray-800 dark:text-gray-200 font-semibold">Edit</span>
                 </nav>
@@ -16,7 +16,7 @@
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         Back to Invoice
                     </a>
-                    <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">Edit Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}</h2>
+                    <h2 class="font-extrabold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">Edit Invoice {{ $invoice->display_invoice_number }}</h2>
                 </div>
             </div>
         </div>
@@ -80,7 +80,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Invoice #</label>
-                            <input type="text" value="{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? '#' . $invoice->id }}" disabled
+                            <input type="text" value="{{ $invoice->display_invoice_number }}" disabled
                                 class="w-full rounded-lg border-gray-200 shadow-sm bg-gray-50 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400">
                         </div>
                     </div>

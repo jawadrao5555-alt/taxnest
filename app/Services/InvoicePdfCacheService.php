@@ -39,9 +39,11 @@ class InvoicePdfCacheService
      * which would silently re-render a distributor's whole archive on releases
      * that never touched the invoice.
      *
-     * 2026-08-26: head-office name/address removed from a branch invoice.
+     * 2026-08-26: head-office name/address removed from a branch invoice;
+     * later the same day, the printed invoice number became the short own
+     * number (D0036) instead of the long registration-prefixed one.
      */
-    public const TEMPLATE_CHANGED_AT = 1787729897;
+    public const TEMPLATE_CHANGED_AT = 1787735912;
 
     public static function dir(int $companyId): string
     {

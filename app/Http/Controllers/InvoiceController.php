@@ -80,13 +80,18 @@ class InvoiceController extends Controller
             $digits = preg_replace('/\D/', '', $term);
 
             $exactNumbers = [];
+            $legacySequence = null;
             if ($digits !== '' && strlen($digits) <= 9) {
                 $sequence = (int) $digits;
-                $exactNumbers[] = \App\Services\InvoiceNumberingService::format($sequence);
-                $exactNumbers[] = \App\Services\InvoiceNumberingService::PREFIX . $sequence;
+                // Both pad widths we have issued, plus the unpadded spelling.
+                $exactNumbers = \App\Services\InvoiceNumberingService::spellingsOf($sequence);
+                // Older invoices still STORE the sequence inside the long
+                // "{identifier}DI00036" number while the shop now reads D0036
+                // on screen — typing what it sees has to find that row too.
+                $legacySequence = '%DI' . str_pad((string) $sequence, 5, '0', STR_PAD_LEFT);
             }
 
-            $query->where(function ($q) use ($term, $compact, $exactNumbers, $like) {
+            $query->where(function ($q) use ($term, $compact, $exactNumbers, $legacySequence, $like) {
                 $q->where('internal_invoice_number', $like, "%{$term}%")
                   ->orWhere('fbr_invoice_number', $like, "%{$term}%")
                   ->orWhere('invoice_number', $like, "%{$term}%")
@@ -105,6 +110,11 @@ class InvoiceController extends Controller
                 foreach ($exactNumbers as $number) {
                     $q->orWhere('invoice_number', $number)
                       ->orWhere('internal_invoice_number', $number);
+                }
+
+                if ($legacySequence !== null) {
+                    $q->orWhere('invoice_number', $like, $legacySequence)
+                      ->orWhere('internal_invoice_number', $like, $legacySequence);
                 }
             });
         }

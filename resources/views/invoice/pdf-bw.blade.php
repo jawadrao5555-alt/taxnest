@@ -35,7 +35,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Invoice {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</title>
+    <title>Invoice {{ $invoice->display_invoice_number }}</title>
     <style>
         @page {
             /* Safer margins — most consumer printers can't print to within 12mm of
@@ -205,7 +205,7 @@
 <body>
 
     <div class="page-foot">
-        {{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}
+        {{ $invoice->display_invoice_number }}
         &nbsp;&middot;&nbsp; Page <span class="pno"></span>
     </div>
 
@@ -216,7 +216,7 @@
                 <div class="doc-title">{{ $invoice->document_type ?? 'Sale Invoice' }}</div>
             </td>
             <td style="width: 45%;" class="doc-meta">
-                <div class="big">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</div>
+                <div class="big">{{ $invoice->display_invoice_number }}</div>
                 <div>{{ $invoice->created_at->format('d M Y') }}</div>
             </td>
         </tr>
@@ -343,7 +343,7 @@
                 <table class="detail-table">
                     <tr>
                         <td class="dt-label">Invoice No.</td>
-                        <td class="dt-value">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</td>
+                        <td class="dt-value">{{ $invoice->display_invoice_number }}</td>
                     </tr>
                     <tr>
                         <td class="dt-label">Date</td>

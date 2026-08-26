@@ -447,7 +447,7 @@
 
             <div class="mb-4">
                 <form method="GET" action="/invoices" class="flex flex-col sm:flex-row gap-3" id="invoiceSearchForm">
-                    <input type="text" name="search" id="invoiceSearchInput" value="{{ request('search') }}" placeholder="Search invoice # (just 36 or D036), FBR #, customer, NTN, HS code...  (Press /)" class="premium-input flex-1 px-4 py-2.5 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400">
+                    <input type="text" name="search" id="invoiceSearchInput" value="{{ request('search') }}" placeholder="Search invoice # (just 36 or D0036), FBR #, customer, NTN, HS code...  (Press /)" class="premium-input flex-1 px-4 py-2.5 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400">
                     <input type="hidden" name="tab" value="{{ $tab }}">
                     @foreach(['per_page','fbr_status','date_from','date_to','month','doc_type','sort','dir'] as $p)
                         @if(request($p))
@@ -884,11 +884,12 @@
                                 <td class="px-1 py-2 text-center text-[10px] text-gray-400 font-mono">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $index + 1 }}</td>
                                 @endif
                                 <td class="px-2 py-2 whitespace-nowrap">
+                                    {{-- Our own short number leads the row; FBR's long
+                                         reference sits under it, still readable and still
+                                         searchable, but it is not what the shop scans for. --}}
+                                    <div class="text-xs font-semibold {{ $invoice->fbr_invoice_number ? 'text-emerald-700' : 'text-gray-900 dark:text-gray-100' }}">{{ $invoice->display_invoice_number }}</div>
                                     @if($invoice->fbr_invoice_number)
-                                        <div class="text-xs font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</div>
-                                        <div class="text-[10px] text-gray-400">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number }}</div>
-                                    @else
-                                        <div class="text-xs font-medium text-gray-900 dark:text-gray-100">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-'.$invoice->id }}</div>
+                                        <div class="text-[10px] text-gray-400 break-all">{{ $invoice->fbr_invoice_number }}</div>
                                     @endif
                                 </td>
                                 <td class="px-2 py-2 whitespace-nowrap text-[10px]">

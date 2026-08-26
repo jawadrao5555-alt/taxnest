@@ -90,7 +90,7 @@
                         </div>
                         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                             <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Invoice Details</h4>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->internal_invoice_number ?? $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Internal #: <span class="font-semibold text-gray-900">{{ $invoice->display_invoice_number }}</span></p>
 @if($invoice->fbr_invoice_number)
 <p class="text-sm text-gray-600 dark:text-gray-400">FBR #: <span class="font-semibold text-emerald-700">{{ $invoice->fbr_invoice_number }}</span></p>
 @endif

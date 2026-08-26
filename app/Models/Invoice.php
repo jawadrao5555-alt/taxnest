@@ -60,12 +60,22 @@ class Invoice extends Model
         'net_receivable' => 'float',
     ];
 
+    /**
+     * OUR number for this invoice, in the short form a person can read.
+     *
+     * It is deliberately never FBR's number. The regulator issues a 30-odd
+     * character reference and it used to headline every screen, email and
+     * document, which left the shop reading a wall of digits to find one bill.
+     * FBR's number is still printed and still searchable — but in its own
+     * labelled place, beside the QR that verifies it, not as the invoice's name.
+     */
     public function getDisplayInvoiceNumberAttribute()
     {
-        if ($this->fbr_invoice_number) {
-            return $this->fbr_invoice_number;
-        }
-        return $this->internal_invoice_number ?? $this->invoice_number ?? 'INV-' . $this->id;
+        $own = \App\Services\InvoiceNumberingService::shortNumber(
+            $this->internal_invoice_number ?? $this->invoice_number
+        );
+
+        return $own ?? 'INV-' . $this->id;
     }
 
     protected static function boot()

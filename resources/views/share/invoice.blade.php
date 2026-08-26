@@ -9,7 +9,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
-    <title>Invoice {{ $invoice->invoice_number }}{{ $diBrand['hide_platform'] ? '' : ' - TaxNest' }}</title>
+    <title>Invoice {{ $invoice->display_invoice_number }}{{ $diBrand['hide_platform'] ? '' : ' - TaxNest' }}</title>
     @vite(['resources/css/app.css'])
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -39,7 +39,7 @@
                             @elseif($invoice->status === 'locked') bg-green-100 text-green-800
                             @elseif($invoice->status === 'pending_verification') bg-amber-100 text-amber-800
                             @endif">{{ $invoice->status === 'pending_verification' ? 'Pending Verification' : ucfirst($invoice->status) }}</span>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">#{{ $invoice->invoice_number }}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">#{{ $invoice->display_invoice_number }}</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4">

@@ -584,7 +584,7 @@
                         @forelse($recentInvoices as $invoice)
                         <a href="/invoice/{{ $invoice->id }}" class="block p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-200 dark:hover:border-emerald-800 hover:shadow-md transition-all duration-300 group bg-white dark:bg-gray-900">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs font-mono text-gray-400 dark:text-gray-500 font-medium">{{ $invoice->invoice_number ?? 'INV-' . $invoice->id }}</span>
+                                <span class="text-xs font-mono text-gray-400 dark:text-gray-500 font-medium">{{ $invoice->display_invoice_number }}</span>
                                 <span class="inline-flex px-2 py-0.5 rounded-lg text-xs font-bold
                                     @if($invoice->status === 'draft') bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300
                                     @elseif($invoice->status === 'locked') bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400
@@ -633,7 +633,7 @@
                                 <p class="text-xs text-gray-800 dark:text-gray-200">
                                     <span class="font-bold">{{ $activity->user->name ?? 'System' }}</span>
                                     <span class="text-gray-500 dark:text-gray-400">{{ $activity->action }}</span>
-                                    <a href="/invoice/{{ $activity->invoice_id }}" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold">#{{ $activity->invoice->invoice_number ?? $activity->invoice_id }}</a>
+                                    <a href="/invoice/{{ $activity->invoice_id }}" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold">#{{ $activity->invoice->display_invoice_number ?? $activity->invoice_id }}</a>
                                 </p>
                                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ $activity->created_at->diffForHumans() }}</p>
                             </div>

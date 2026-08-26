@@ -21,7 +21,9 @@
 --}}
 @php
     $diBrand = $diBrand ?? \App\Services\DiBrandingService::forCompany($invoice->company ?? null);
-    $companyName = $invoice->company->name ?? 'TaxNest';
+    // The branch the sale was made from is the business the buyer knows; the
+    // registered company never rides along beside it (InvoiceSellerIdentity).
+    $companyName = \App\Support\InvoiceSellerIdentity::for($invoice)['name'];
     // Default (non-branded) look = the original green buyer-send email.
     $headerBg = $diBrand['accent'] ?? '#059669';
     $headerText = $diBrand['accent'] ? $diBrand['accent_text'] : '#ffffff';

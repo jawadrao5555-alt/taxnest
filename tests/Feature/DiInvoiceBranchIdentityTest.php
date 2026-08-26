@@ -160,6 +160,39 @@ class DiInvoiceBranchIdentityTest extends TestCase
         $this->assertStringContainsString('NTN: B282410-8', $html, 'The NTN still ties the bill to the filer.');
     }
 
+    /**
+     * Branch address and city are one unit. A branch row filled in only
+     * partially (both columns are nullable) must not pair its own city with
+     * the head office's street — that prints an address nobody trades from.
+     */
+    public function test_a_partly_filled_branch_never_mixes_in_the_head_office_street(): void
+    {
+        $branch = $this->branch('CHOUDHRY TRADERS', '', 'LIAQATPUR', false);
+        $html = $this->render($branch);
+
+        $this->assertStringNotContainsString('AHMED PUR SHARKIA', $html, 'The head office street leaked into a branch invoice.');
+        $this->assertStringContainsString('LIAQATPUR', $html);
+    }
+
+    /**
+     * The same identity must reach every buyer-facing channel — the public
+     * share page and the delivery email read it from here too.
+     */
+    public function test_the_shared_seller_identity_names_the_branch(): void
+    {
+        $invoice = new Invoice(['invoice_number' => 'D002']);
+        $invoice->id = 90212;
+        $invoice->company_id = 22;
+        $invoice->setRelation('company', $this->company());
+        $invoice->setRelation('branch', $this->branch('CHOUDHRY TRADERS', 'NEW HOUSING SCHEME', 'LIAQATPUR', false));
+
+        $seller = \App\Support\InvoiceSellerIdentity::for($invoice);
+
+        $this->assertSame('CHOUDHRY TRADERS', $seller['name']);
+        $this->assertSame('NEW HOUSING SCHEME', $seller['address']);
+        $this->assertSame(self::LEGAL_NAME, $seller['legal_name'], 'The legal name stays available, it is just not printed beside the branch.');
+    }
+
     public function test_a_branch_named_after_the_company_prints_that_name_once(): void
     {
         $html = $this->render($this->branch(self::LEGAL_NAME, 'NEW HOUSING SCHEME', 'LIAQATPUR', false));

@@ -17,9 +17,9 @@
         <div class="text-center mb-6">
             @if($diBrand['active'])
                 @if($diBrand['logo_url'])
-                <img src="{{ $diBrand['logo_url'] }}" alt="{{ $invoice->company->name ?? 'Company' }} logo" class="mx-auto mb-3" style="max-height: 64px; width: auto;">
+                <img src="{{ $diBrand['logo_url'] }}" alt="{{ $seller['name'] }} logo" class="mx-auto mb-3" style="max-height: 64px; width: auto;">
                 @endif
-                <h1 class="text-2xl font-bold text-gray-900" @if($diBrand['accent']) style="color: {{ $diBrand['accent'] }};" @endif>{{ $invoice->company->name ?? 'Invoice' }}</h1>
+                <h1 class="text-2xl font-bold text-gray-900" @if($diBrand['accent']) style="color: {{ $diBrand['accent'] }};" @endif>{{ $seller['name'] }}</h1>
             @else
                 <h1 class="text-2xl font-bold text-gray-900">TaxNest Invoice</h1>
             @endif
@@ -30,7 +30,7 @@
             <div class="p-6 border-b border-gray-100">
                 <div class="flex items-center justify-between mb-4">
                     <div>
-                        <h2 class="text-xl font-bold text-gray-900">{{ $invoice->company->name ?? 'Company' }}</h2>
+                        <h2 class="text-xl font-bold text-gray-900">{{ $seller['name'] }}</h2>
                         <p class="text-sm text-gray-500 dark:text-gray-400">NTN: {{ $invoice->company->ntn ?? 'N/A' }}</p>
                     </div>
                     <div class="text-right">

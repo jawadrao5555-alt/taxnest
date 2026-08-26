@@ -31,10 +31,10 @@ class InvoiceShareMail extends Mailable
     {
         // Branding view resolves DiBrandingService::forCompany($invoice->company)
         // at render time — make sure the relation is loaded.
-        $this->invoice->loadMissing('company');
+        $this->invoice->loadMissing('company', 'branch');
 
         $number = $this->invoice->display_invoice_number;
-        $companyName = $this->invoice->company->name ?? 'TaxNest';
+        $companyName = \App\Support\InvoiceSellerIdentity::for($this->invoice)['name'];
 
         $mail = $this->subject("Invoice {$number} from {$companyName}")
             ->view('emails.invoice-delivery')

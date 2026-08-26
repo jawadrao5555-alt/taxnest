@@ -230,30 +230,24 @@
                 <div style="margin-bottom: 5px;"><img src="{{ $diBrand['logo_data_uri'] }}" alt="Logo" style="height: 42px; width: auto;"></div>
                 @endif
                 @php
-                    // A distributor may trade under a different name at each
-                    // address. The branch on the invoice IS that trading
-                    // identity, so it headlines the bill it was sold from —
-                    // head office included, because a head office can carry its
-                    // own trading name too.
-                    //
-                    // ONLY that branch appears here. The registered (legal)
-                    // company name used to print underneath as a traceability
-                    // line; the owner rejected it — a buyer receiving a bill
-                    // from one shop should not see another address's business
-                    // named on it. The NTN below already ties the document to
-                    // the filer, and the FBR payload always carries the
-                    // registered identity.
-                    $invBranch = $invoice->branch;
-                    $legalName = $invoice->company->name ?: 'TaxNest';
-                    $branchName = trim((string) ($invBranch->name ?? ''));
-                    $sellerName = $branchName !== '' ? $branchName : $legalName;
-                    $branchAddress = ($invBranch?->address ?: null) ?: $invoice->company->address;
-                    $branchCity = ($invBranch?->city ?: null) ?: $invoice->company->city;
+                    // Seller identity comes from one place for every
+                    // buyer-facing surface: the branch the sale was made from,
+                    // and nothing beside it. See App\Support\InvoiceSellerIdentity.
+                    $seller = \App\Support\InvoiceSellerIdentity::for($invoice);
+                    $sellerName = $seller['name'];
+                    $branchAddress = $seller['address'];
+                    $branchCity = $seller['city'];
                 @endphp
                 <div class="seller-name">{{ $sellerName }}</div>
                 <div class="seller-info">
-                    @if($branchAddress && $dp['show_address'])
-                    {{ $branchAddress }}@if($branchCity), {{ $branchCity }}@endif<br>
+                    @php
+                        // Joined from whatever the branch actually has: a row
+                        // with only a city must still print that city rather
+                        // than dropping the location line entirely.
+                        $sellerLocation = implode(', ', array_filter([$branchAddress, $branchCity]));
+                    @endphp
+                    @if($sellerLocation && $dp['show_address'])
+                    {{ $sellerLocation }}<br>
                     @endif
                     @if($invoice->company->ntn && $dp['show_ntn'])
                     <strong>NTN: {{ $invoice->company->ntn }}</strong>

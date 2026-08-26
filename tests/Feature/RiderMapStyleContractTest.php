@@ -80,4 +80,27 @@ class RiderMapStyleContractTest extends TestCase
         $this->assertStringNotContainsString('approaches', $public);
         $this->assertStringNotContainsString('placesDataUrl', $public);
     }
+
+    public function test_first_party_delivery_maps_do_not_capture_page_wheel_scroll(): void
+    {
+        $maps = [
+            'rider tracking' => [resource_path('views/pos/rider-tracking.blade.php'), "L.map('rt-map'"],
+            'saved customer places' => [resource_path('views/pos/customer-places.blade.php'), "L.map('places-map'"],
+            'public tracking' => [resource_path('views/pos/track-public.blade.php'), "L.map('map'"],
+            'delivery location' => [resource_path('views/pos/deliveries.blade.php'), "L.map('cl-map'"],
+        ];
+
+        foreach ($maps as $label => [$path, $constructor]) {
+            $view = file_get_contents($path);
+            $start = strpos($view, $constructor);
+
+            $this->assertNotFalse($start, "Missing {$label} map constructor");
+            $config = substr($view, $start, 800);
+            $this->assertStringContainsString(
+                'scrollWheelZoom: false',
+                $config,
+                "{$label} must not capture normal page wheel scrolling"
+            );
+        }
+    }
 }

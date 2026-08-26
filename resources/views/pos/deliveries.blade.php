@@ -961,6 +961,9 @@ function tnCustLoc() {
                 : (shopPin || [31.5204, 74.3587]);
             if (!this.map) {
                 this.map = L.map('cl-map', {
+                    // The map is inside a scrollable delivery workflow; wheel
+                    // scrolling must not be captured as map zoom.
+                    scrollWheelZoom: false,
                     maxBounds: [[22.8, 60.4], [37.5, 77.6]],
                     maxBoundsViscosity: 1.0,
                     minZoom: 5

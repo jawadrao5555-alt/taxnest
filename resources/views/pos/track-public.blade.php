@@ -140,6 +140,8 @@
             dest:  @js($bi('rt_pub_marker_dest'))
         };
         var map = L.map('map', {
+            // Keep the customer's normal page scroll usable over the map.
+            scrollWheelZoom: false,
             maxBounds: [[22.8, 60.4], [37.5, 77.6]],
             maxBoundsViscosity: 1.0,
             minZoom: 5,

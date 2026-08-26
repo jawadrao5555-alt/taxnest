@@ -358,6 +358,10 @@
                 if (mapEl && mapEl._leaflet_id) { mapEl._leaflet_id = null; mapEl.innerHTML = ''; }
                 this.map = L.map('rt-map', {
                     zoomControl: true,
+                    // Let the page consume a normal mouse-wheel scroll. Deliberate
+                    // map zoom remains available through the controls, double-click,
+                    // and touch pinch.
+                    scrollWheelZoom: false,
                     maxBounds: pkBounds,
                     maxBoundsViscosity: 1.0,
                     minZoom: 5,

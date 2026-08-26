@@ -143,6 +143,8 @@
 <script>
 (function () {
     const map = L.map('places-map', {
+        // Do not make a page scroll over the map unexpectedly zoom it.
+        scrollWheelZoom: false,
         maxBounds: [[22.8, 60.4], [37.5, 77.6]],
         maxBoundsViscosity: 1.0,
         minZoom: 5,

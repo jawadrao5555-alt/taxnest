@@ -113,7 +113,7 @@
                     @forelse($paymentBreakdown as $pb)
                     <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
                         <span class="w-3 h-3 rounded-full {{ $pb->payment_method === 'cash' ? 'bg-emerald-500' : 'bg-blue-500' }}"></span>
-                        <div><p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ ucwords(str_replace('_', ' ', $pb->payment_method)) }}</p><p class="text-[9px] text-gray-400">{{ $pb->count }} {{ __("pos.txns_lc") }} — Rs.{{ number_format($pb->total) }}</p></div>
+                        <div><p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ \App\Support\PosPaymentLabels::label($pb->payment_method) }}</p><p class="text-[9px] text-gray-400">{{ $pb->count }} {{ __("pos.txns_lc") }} — Rs.{{ number_format($pb->total) }}</p></div>
                     </div>
                     @empty<p class="text-[11px] text-gray-400">{{ __("pos.no_sales") }}</p>@endforelse
                 </div>

@@ -115,10 +115,11 @@
             <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('pos.ph_search_invoice_customer') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <select name="payment_method" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                 <option value="">{{ __("pos.all_payment_methods") }}</option>
-                <option value="cash" {{ request('payment_method') === 'cash' ? 'selected' : '' }}>{{ __("pos.cash_title") }}</option>
-                <option value="debit_card" {{ request('payment_method') === 'debit_card' ? 'selected' : '' }}>{{ __("pos.debit_card") }}</option>
-                <option value="credit_card" {{ request('payment_method') === 'credit_card' ? 'selected' : '' }}>{{ __("pos.credit_card") }}</option>
-                <option value="qr_payment" {{ request('payment_method') === 'qr_payment' ? 'selected' : '' }}>{{ __("pos.qr_raast") }}</option>
+                <option value="cash" {{ request('payment_method') === 'cash' ? 'selected' : '' }}>{{ __('pos.pm_cash') }}</option>
+                {{-- One Card filter (owner, 26 Aug 2026) — see tax-reports. --}}
+                <option value="debit_card" {{ in_array(request('payment_method'), \App\Support\PosPaymentLabels::CARD_ALIASES, true) ? 'selected' : '' }}>{{ __('pos.pm_card') }}</option>
+                <option value="credit_card" {{ request('payment_method') === 'credit_card' ? 'selected' : '' }}>{{ __('pos.pm_credit_card') }}</option>
+                <option value="qr_payment" {{ request('payment_method') === 'qr_payment' ? 'selected' : '' }}>{{ __('pos.pm_online') }}</option>
             </select>
             @if(!empty($company->restaurant_mode))
             <select name="order_type" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
@@ -233,7 +234,7 @@
                         <td class="px-4 py-3 hidden sm:table-cell">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {{ $txn->payment_method === 'cash' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">
-                                {{ ucwords(str_replace('_', ' ', $txn->payment_method)) }}
+                                {{ \App\Support\PosPaymentLabels::label($txn->payment_method) }}
                             </span>
                         </td>
                         <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ $rowIsReturn ? '−' : '' }}{{ number_format($txn->subtotal) }}</td>

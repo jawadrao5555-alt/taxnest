@@ -39,23 +39,36 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.lbl_period') }}</label>
+                    @php
+                        // Owner (26 Aug 2026): the screen opens on TODAY, not All
+                        // Time. Mirrors PosController::reportPeriod() — a missing
+                        // period means today, an empty one is the legacy All Time
+                        // spelling, and a date range always wins over the period.
+                        $trPeriod = (request()->filled('date_from') || request()->filled('date_to'))
+                            ? 'all'
+                            : (request()->has('period')
+                                ? (trim((string) request('period')) === '' ? 'all' : trim((string) request('period')))
+                                : 'today');
+                    @endphp
                     <select name="period" id="periodSelect" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
-                        <option value="">{{ __('pos.opt_all_time') }}</option>
-                        <option value="today" {{ request('period') == 'today' ? 'selected' : '' }}>{{ __('pos.opt_today') }}</option>
-                        <option value="yesterday" {{ request('period') == 'yesterday' ? 'selected' : '' }}>{{ __('pos.opt_yesterday') }}</option>
-                        <option value="weekly" {{ request('period') == 'weekly' ? 'selected' : '' }}>{{ __('pos.opt_this_week') }}</option>
-                        <option value="monthly" {{ request('period') == 'monthly' ? 'selected' : '' }}>{{ __('pos.opt_this_month') }}</option>
-                        <option value="last_month" {{ request('period') == 'last_month' ? 'selected' : '' }}>{{ __('pos.opt_last_month') }}</option>
+                        <option value="all" {{ $trPeriod === 'all' ? 'selected' : '' }}>{{ __('pos.opt_all_time') }}</option>
+                        <option value="today" {{ $trPeriod === 'today' ? 'selected' : '' }}>{{ __('pos.opt_today') }}</option>
+                        <option value="yesterday" {{ $trPeriod === 'yesterday' ? 'selected' : '' }}>{{ __('pos.opt_yesterday') }}</option>
+                        <option value="weekly" {{ $trPeriod === 'weekly' ? 'selected' : '' }}>{{ __('pos.opt_this_week') }}</option>
+                        <option value="monthly" {{ $trPeriod === 'monthly' ? 'selected' : '' }}>{{ __('pos.opt_this_month') }}</option>
+                        <option value="last_month" {{ $trPeriod === 'last_month' ? 'selected' : '' }}>{{ __('pos.opt_last_month') }}</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.lbl_payment_method') }}</label>
                     <select name="payment_method" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
                         <option value="">{{ __('pos.opt_all_methods') }}</option>
-                        <option value="cash" {{ request('payment_method') == 'cash' ? 'selected' : '' }}>{{ __('pos.cash_title') }}</option>
-                        <option value="debit_card" {{ request('payment_method') == 'debit_card' ? 'selected' : '' }}>{{ __('pos.opt_debit_card') }}</option>
-                        <option value="credit_card" {{ request('payment_method') == 'credit_card' ? 'selected' : '' }}>{{ __('pos.opt_credit_card') }}</option>
-                        <option value="qr_payment" {{ request('payment_method') == 'qr_payment' ? 'selected' : '' }}>{{ __('pos.opt_qr_raast') }}</option>
+                        <option value="cash" {{ request('payment_method') == 'cash' ? 'selected' : '' }}>{{ __('pos.pm_cash') }}</option>
+                        {{-- One Card filter (owner, 26 Aug 2026): every stored card alias
+                             is one thing to the shop, and the rows all read "Card". --}}
+                        <option value="debit_card" {{ in_array(request('payment_method'), \App\Support\PosPaymentLabels::CARD_ALIASES, true) ? 'selected' : '' }}>{{ __('pos.pm_card') }}</option>
+                        <option value="credit_card" {{ request('payment_method') == 'credit_card' ? 'selected' : '' }}>{{ __('pos.pm_credit_card') }}</option>
+                        <option value="qr_payment" {{ request('payment_method') == 'qr_payment' ? 'selected' : '' }}>{{ __('pos.pm_online') }}</option>
                     </select>
                 </div>
                 <div>
@@ -101,18 +114,20 @@
         var dateTo = document.getElementById('dateTo');
 
         periodSelect.addEventListener('change', function() {
-            if (this.value) {
+            if (this.value && this.value !== 'all') {
                 dateFrom.value = '';
                 dateTo.value = '';
             }
         });
 
+        // Picking a date range means "not a canned period" — park the select on
+        // All Time (its blank option is gone since the default became Today).
         dateFrom.addEventListener('change', function() {
-            if (this.value) periodSelect.value = '';
+            if (this.value) periodSelect.value = 'all';
         });
 
         dateTo.addEventListener('change', function() {
-            if (this.value) periodSelect.value = '';
+            if (this.value) periodSelect.value = 'all';
         });
     });
     </script>
@@ -187,6 +202,24 @@
         <span class="text-rose-700 dark:text-rose-300">{{ __('pos.tr_refunded_amount') }}: PKR {{ number_format($summary->return_amount ?? 0, 2) }}</span>
         <span class="text-rose-700 dark:text-rose-300">{{ __('pos.tr_tax_reversed') }}: PKR {{ number_format($summary->return_tax ?? 0, 2) }}</span>
         <span class="text-xs text-rose-600/80 dark:text-rose-400/80 basis-full sm:basis-auto">{{ ($billTypeFilter ?? '') === 'returns' ? __('pos.tr_cn_only_note') : __('pos.tr_cn_netted_note') }}</span>
+        {{-- Which bills? (owner, 26 Aug 2026) — a count alone is untraceable, so
+             the actual credit notes are named with their own date. --}}
+        @if(($creditNoteBills ?? collect())->count())
+        <span class="basis-full flex flex-wrap items-center gap-2 text-xs text-rose-700 dark:text-rose-300 pt-1 border-t border-rose-200/70 dark:border-rose-800/70 mt-1">
+            <span class="font-semibold">{{ __('pos.tr_cn_which_bills') }}</span>
+            @foreach($creditNoteBills as $cnBill)
+            <a href="{{ route('pos.transaction.show', $cnBill->id) }}" class="inline-flex items-center gap-1 rounded-full bg-white dark:bg-gray-900 border border-rose-300 dark:border-rose-700 px-2 py-0.5 font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/40 transition">
+                {{ $cnBill->invoice_number }}
+                <span class="font-normal opacity-80">· {{ \Carbon\Carbon::parse($cnBill->created_at)->format('d M') }} · Rs {{ number_format((float) $cnBill->total_amount, 0) }}</span>
+            </a>
+            @endforeach
+            @if(($summary->return_count ?? 0) > $creditNoteBills->count())
+            <a href="{{ request()->fullUrlWithQuery(['bill_type' => 'returns']) }}" class="underline font-semibold">{{ __('pos.tr_cn_see_all') }}</a>
+            @else
+            <a href="{{ request()->fullUrlWithQuery(['bill_type' => 'returns']) }}" class="underline">{{ __('pos.tr_cn_only_view') }}</a>
+            @endif
+        </span>
+        @endif
     </div>
     @endif
 
@@ -243,7 +276,7 @@
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ $t->customer_name ?? __('pos.walk_in_short') }}</td>
                         <td class="px-4 py-3 whitespace-nowrap">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $t->payment_method === 'cash' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">
-                                {{ ucwords(str_replace('_', ' ', $t->payment_method)) }}
+                                {{ \App\Support\PosPaymentLabels::label($t->payment_method) }}
                             </span>
                         </td>
                         @if($taxRateFilter ?? false)

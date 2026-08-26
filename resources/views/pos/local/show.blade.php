@@ -46,7 +46,7 @@
             @if($bill->discount_amount > 0)<div class="flex justify-between"><span class="text-gray-500">Discount</span><span>- Rs {{ number_format($bill->discount_amount, 2) }}</span></div>@endif
             @if($bill->tax_amount > 0)<div class="flex justify-between"><span class="text-gray-500">Tax</span><span>Rs {{ number_format($bill->tax_amount, 2) }}</span></div>@endif
             <div class="flex justify-between font-bold text-sm border-t border-gray-300 pt-1 mt-1"><span>TOTAL</span><span>Rs {{ number_format($bill->total_amount, 2) }}</span></div>
-            <div class="flex justify-between"><span class="text-gray-500">Payment</span><span class="uppercase">{{ $bill->payment_method }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Payment</span><span class="uppercase">{{ \App\Support\PosPaymentLabels::label($bill->payment_method) }}</span></div>
         </div>
 
         <div class="text-center text-[10px] text-gray-400 mt-4 border-t border-dashed border-gray-300 pt-2">

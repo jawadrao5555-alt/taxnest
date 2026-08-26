@@ -491,7 +491,8 @@
         @if($rcptClosedBy)
         <tr><td class="info-label">{{ __('pos.receipt_closed_by') }}:</td><td class="info-value">{{ $rcptClosedBy }}@if($rcptClosedAt) · {{ $rcptClosedAt }}@endif</td></tr>
         @endif
-        <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value"><strong style="font-weight:bold; text-transform:uppercase;">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</strong></td></tr>
+        {{-- ONE wording everywhere (owner, 26 Aug 2026) — mirrors receipt_80mm. --}}
+        <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value"><strong style="font-weight:bold; text-transform:uppercase;">{{ \App\Support\PosPaymentLabels::label($transaction->payment_method) }}</strong></td></tr>
         @if($transaction->creator && $rp['show_cashier'])
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
@@ -726,9 +727,7 @@
         // Owner update (Pizza Master, Jul 2026): boxed method on DELIVERY bills ONLY
         // (mirrors receipt_80mm; keep in sync).
         $rcptPayRaw = strtolower((string) $transaction->payment_method);
-        $rcptPayLabel = $rcptPayRaw === 'cash' ? 'CASH'
-            : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
-            : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
+        $rcptPayLabel = \App\Support\PosPaymentLabels::upper($transaction->payment_method);
     @endphp
     @if($rcptPayRaw === 'qr_payment')
     {{-- PREPAID marker (Task 291): prominent stamp for riders/customers so no cash is mistakenly collected. --}}

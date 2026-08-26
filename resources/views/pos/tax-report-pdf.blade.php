@@ -110,7 +110,7 @@
                     <td>{{ $t->customer_name ?? __('pos.tr_walk_in') }}</td>
                     <td>
                         <span class="badge {{ $t->payment_method === 'cash' ? 'badge-cash' : 'badge-card' }}">
-                            {{ ucwords(str_replace('_', ' ', $t->payment_method)) }}
+                            {{ \App\Support\PosPaymentLabels::label($t->payment_method) }}
                         </span>
                     </td>
                     @if($taxRateFilter ?? false)

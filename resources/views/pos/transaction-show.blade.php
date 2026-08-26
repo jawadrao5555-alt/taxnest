@@ -314,7 +314,7 @@
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-500">{{ __('pos.payment') }}</span>
-                        <span class="text-gray-900 dark:text-white">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</span>
+                        <span class="text-gray-900 dark:text-white">{{ \App\Support\PosPaymentLabels::label($transaction->payment_method) }}</span>
                     </div>
                     @php
                         $__showTbl = $transaction->restaurantOrder?->table ?? null;

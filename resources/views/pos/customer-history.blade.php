@@ -70,7 +70,7 @@
                                 {{ $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? __('pos.local_record') : __('pos.local_word')) : __('pos.pra_word') }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ ucwords(str_replace('_', ' ', (string) $t->payment_method)) }}</td>
+                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ \App\Support\PosPaymentLabels::label($t->payment_method) }}</td>
                         <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{{ number_format($t->tax_amount, 0) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($t->total_amount, 0) }}</td>
                     </tr>

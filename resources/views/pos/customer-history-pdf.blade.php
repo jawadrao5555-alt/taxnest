@@ -72,7 +72,7 @@
                 <td>{{ $t->created_at->format('d M Y H:i') }}</td>
                 <td>{{ $t->invoice_number }}</td>
                 <td>{{ $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? __('pos.ch_local_record') : __('pos.dc_local')) : 'PRA' }}</td>
-                <td>{{ ucwords(str_replace('_', ' ', (string) $t->payment_method)) }}</td>
+                <td>{{ \App\Support\PosPaymentLabels::label($t->payment_method) }}</td>
                 <td class="r">{{ number_format($t->subtotal, 0) }}</td>
                 <td class="r">{{ number_format($t->discount_amount, 0) }}</td>
                 <td class="r">{{ number_format($t->tax_amount, 0) }}</td>

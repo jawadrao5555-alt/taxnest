@@ -3299,10 +3299,14 @@ class RestaurantPosController extends Controller
     private function cancelledOrdersQuery(Request $request, ?string &$from = null, ?string &$to = null)
     {
         $companyId = app('currentCompanyId');
-        $from = $request->query('from') ?: now()->subDays(6)->toDateString();
+        // Owner (26 Aug 2026): the page used to open on the last 7 days, so
+        // today's screen showed a week's cancellations and the shop could not
+        // tell what happened TODAY. It now opens on today; the 7 / 30 day quick
+        // buttons (and any explicit range) are one click away.
+        $from = $request->query('from') ?: now()->toDateString();
         $to = $request->query('to') ?: now()->toDateString();
         // Guard: swapped/garbage dates → sane defaults
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = now()->subDays(6)->toDateString();
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = now()->toDateString();
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = now()->toDateString();
         if ($from > $to) { [$from, $to] = [$to, $from]; }
 

@@ -47,7 +47,7 @@
                     @endif
                 </div>
                 <div>
-                    <p class="text-[11px] font-semibold text-gray-900 dark:text-white">{{ ucwords(str_replace('_', ' ', $pb->payment_method)) }}</p>
+                    <p class="text-[11px] font-semibold text-gray-900 dark:text-white">{{ \App\Support\PosPaymentLabels::label($pb->payment_method) }}</p>
                     <p class="text-[9px] text-gray-400">{{ $pb->count }} {{ __("pos.transactions_lc") }}</p>
                 </div>
             </div>

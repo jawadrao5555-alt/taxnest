@@ -22,7 +22,7 @@
             <div><div class="text-[11px] text-slate-400 uppercase">Cashier</div><div class="text-white">{{ $bill->creator->name ?? '—' }}</div></div>
             <div><div class="text-[11px] text-slate-400 uppercase">Customer</div><div class="text-white">{{ $bill->customer_name ?: '—' }}</div></div>
             <div><div class="text-[11px] text-slate-400 uppercase">Phone</div><div class="text-white">{{ $bill->customer_phone ?: '—' }}</div></div>
-            <div><div class="text-[11px] text-slate-400 uppercase">Payment</div><div class="text-white capitalize">{{ str_replace('_', ' ', $bill->payment_method) }}</div></div>
+            <div><div class="text-[11px] text-slate-400 uppercase">Payment</div><div class="text-white">{{ \App\Support\PosPaymentLabels::label($bill->payment_method) }}</div></div>
         </div>
 
         <div class="border border-slate-800 rounded-lg overflow-hidden">

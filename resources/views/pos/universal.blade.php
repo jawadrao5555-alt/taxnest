@@ -3231,7 +3231,7 @@ window.addEventListener('popstate', function() {
                             <p class="text-[11px] text-gray-500">
                                 <span x-text="bill.created_time"></span>
                                 <template x-if="bill.customer_name"><span x-text="' • ' + bill.customer_name"></span></template>
-                                <template x-if="bill.payment_method"><span class="uppercase" x-text="' • ' + bill.payment_method.replace('_', ' ')"></span></template>
+                                <template x-if="bill.payment_method"><span class="uppercase" x-text="' • ' + (bill.payment_label || bill.payment_method.replace('_', ' '))"></span></template>
                             </p>
                             {{-- Task 1036: WhatsApp Bill — purana bill dobara bhejna (share link
                                  on-demand mint hota hai). Sirf routable number wale bills par. --}}

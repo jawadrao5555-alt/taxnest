@@ -247,7 +247,16 @@
                         <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ $s->bill_count }}@if($s->isPartial())<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 align-middle">{{ __('pos.partial_badge') }}</span>@endif</td>
                         <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $s->total_amount) }}
                             @if($s->outstanding_after !== null && (float) $s->outstanding_after > 0)
-                            <span class="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ __('pos.baqaya_colon') }} Rs. {{ number_format((float) $s->outstanding_after) }}</span>
+                            {{-- Owner (26 Aug 2026): this figure is a SNAPSHOT taken right
+                                 after that settlement, not money still owed today — the
+                                 shop read old rows as live pending cash while every rider
+                                 card said "clear". Say when it applied, and say plainly
+                                 when the rider has since cleared. --}}
+                            @php $stlNowOwed = (float) (($khata[$s->rider_id]->owed ?? 0)); @endphp
+                            <span class="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ __('pos.stl_baqaya_then') }} Rs. {{ number_format((float) $s->outstanding_after) }}</span>
+                            @if($stlNowOwed <= 0)
+                            <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('pos.stl_now_clear') }}</span>
+                            @endif
                             @endif
                         </td>
                         <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ $s->settledBy->name ?? '—' }}</td>

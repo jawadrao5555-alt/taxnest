@@ -465,7 +465,7 @@
                                         {{ __('pos.prepaid_chip') }}
                                     </span>
                                 @else
-                                    <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ ucwords(str_replace('_',' ', $b->payment_method)) }}</span>
+                                    <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ \App\Support\PosPaymentLabels::label($b->payment_method) }}</span>
                                 @endif
                             @endif
                             @if($b->rider_settlement_id)
@@ -706,7 +706,7 @@
                             @if($b->payment_method === 'cash')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
                             @else
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ ucwords(str_replace('_',' ', $b->payment_method)) }}</span>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ \App\Support\PosPaymentLabels::label($b->payment_method) }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3">

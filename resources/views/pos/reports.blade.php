@@ -587,7 +587,7 @@
                         <td class="py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ $bill->created_at->format('d M Y H:i') }}</td>
                         <td class="py-2.5 font-medium text-gray-900 dark:text-white">{{ $bill->invoice_number }}</td>
                         <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->customer_name ?: __('pos.walk_in_short') }}</td>
-                        <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ ucwords(str_replace('_', ' ', $bill->payment_method)) }}</td>
+                        <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ \App\Support\PosPaymentLabels::label($bill->payment_method) }}</td>
                         <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($bill->total_amount) }}</td>
                         <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->creator?->name ?? '-' }}</td>
                         <td class="py-2.5 text-right whitespace-nowrap">
@@ -673,7 +673,7 @@
                     <tr class="border-b border-gray-50 dark:border-gray-800">
                         <td class="py-2.5">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $ps->payment_method === 'cash' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">
-                                {{ ucwords(str_replace('_', ' ', $ps->payment_method)) }}
+                                {{ \App\Support\PosPaymentLabels::label($ps->payment_method) }}
                             </span>
                         </td>
                         <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ $ps->count }}</td>

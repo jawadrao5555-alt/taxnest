@@ -138,7 +138,7 @@
             @endif
             <div class="info-row">
                 <div class="lbl">{{ __('pos.receipt_payment_mode') }}</div>
-                <div class="val">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</div>
+                <div class="val">{{ \App\Support\PosPaymentLabels::label($transaction->payment_method) }}</div>
             </div>
             {{-- Owner (Jul 2026): PRA and Local bills each have their OWN display set
                  — $rpPdf resolved once at the header above. --}}

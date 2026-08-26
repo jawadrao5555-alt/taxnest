@@ -128,7 +128,7 @@
             <h3 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">{{ __("pos.payments_word") }}</h3>
             @forelse($paymentBreakdown as $pb)
             <div class="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">
-                <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ ucwords(str_replace('_', ' ', $pb->payment_method)) }}</span>
+                <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ \App\Support\PosPaymentLabels::label($pb->payment_method) }}</span>
                 <span class="text-[11px] font-black text-gray-900 dark:text-white">Rs.{{ number_format($pb->total) }}</span>
             </div>
             @empty<p class="text-[11px] text-gray-400 py-4 text-center">{{ __("pos.no_sales") }}</p>@endforelse

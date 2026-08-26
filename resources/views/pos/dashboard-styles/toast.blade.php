@@ -137,7 +137,7 @@
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center {{ $pb->payment_method === 'cash' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-blue-50 dark:bg-blue-900/20' }}">
                     @if($pb->payment_method === 'cash')<svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>@else<svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>@endif
                 </div>
-                <div class="flex-1"><p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ ucwords(str_replace('_', ' ', $pb->payment_method)) }}</p><p class="text-[9px] text-gray-400">{{ $pb->count }} {{ __("pos.txns_lc") }}</p></div>
+                <div class="flex-1"><p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ \App\Support\PosPaymentLabels::label($pb->payment_method) }}</p><p class="text-[9px] text-gray-400">{{ $pb->count }} {{ __("pos.txns_lc") }}</p></div>
                 <p class="text-sm font-black text-gray-900 dark:text-white">Rs.{{ number_format($pb->total) }}</p>
             </div>
             @empty

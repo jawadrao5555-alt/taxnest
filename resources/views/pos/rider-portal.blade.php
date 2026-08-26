@@ -50,7 +50,7 @@
                         @if($b->payment_method === 'cash')
                         <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_collect_prefix') }} Rs. {{ number_format((float) $b->total_amount) }}</span>
                         @else
-                        <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ __('pos.paid_word') }} ({{ ucwords(str_replace('_',' ', $b->payment_method)) }})</span>
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ __('pos.paid_word') }} ({{ \App\Support\PosPaymentLabels::label($b->payment_method) }})</span>
                         @endif
                     </div>
                     <div class="text-xs text-gray-600 dark:text-gray-300 mt-1.5">{{ $b->customer_name ?: __('pos.customer_word') }}@if($b->customer_phone) · <a href="tel:{{ $b->customer_phone }}" class="underline">{{ $b->customer_phone }}</a>@endif</div>

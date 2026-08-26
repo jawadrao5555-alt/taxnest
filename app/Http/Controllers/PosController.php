@@ -4777,6 +4777,11 @@ class PosController extends Controller
                 'delivery_address' => $b->delivery_address,
                 'total_amount'     => (float) $b->total_amount,
                 'payment_method'   => $b->payment_method,
+                // Wording comes from the ONE label authority (owner, 26 Aug
+                // 2026) — the sale screen used to tidy the raw stored value in
+                // JS and printed "QR PAYMENT" where every other screen said
+                // "Online / QR".
+                'payment_label'    => \App\Support\PosPaymentLabels::label($b->payment_method),
                 'items_count'      => PosTransactionItem::where('transaction_id', $b->id)->count(),
                 'created_human'    => $b->created_at?->diffForHumans(),
                 'created_at'       => $b->created_at?->toDateTimeString(),
@@ -4828,6 +4833,11 @@ class PosController extends Controller
                 'delivery_address' => $b->delivery_address,
                 'total_amount'     => (float) $b->total_amount,
                 'payment_method'   => $b->payment_method,
+                // Wording comes from the ONE label authority (owner, 26 Aug
+                // 2026) — the sale screen used to tidy the raw stored value in
+                // JS and printed "QR PAYMENT" where every other screen said
+                // "Online / QR".
+                'payment_label'    => \App\Support\PosPaymentLabels::label($b->payment_method),
                 'items_count'      => PosTransactionItem::where('transaction_id', $b->id)->count(),
                 'created_human'    => $b->created_at?->diffForHumans(),
                 'created_time'     => $b->created_at?->format('h:i A'),
@@ -5029,6 +5039,7 @@ class PosController extends Controller
                 'customer_name'      => $b->customer_name,
                 'total_amount'       => (float) $b->total_amount,
                 'payment_method'     => $b->payment_method,
+                'payment_label'      => \App\Support\PosPaymentLabels::label($b->payment_method),
                 'order_type'         => $b->order_type,
                 'table_number'       => $tableByTx[$b->id] ?? null,
                 'badge'              => $badge,
@@ -5870,8 +5881,8 @@ class PosController extends Controller
             // 'debit_card'). Both values mean the same thing to the shopkeeper,
             // so selecting Debit Card must surface both. Use the canonical alias
             // set from PosPaymentBuckets as the single source of truth.
-            if ($method === 'debit_card') {
-                $query->whereIn('payment_method', ['debit_card', 'card']);
+            if (in_array($method, \App\Support\PosPaymentLabels::CARD_ALIASES, true)) {
+                $query->whereIn('payment_method', \App\Support\PosPaymentLabels::CARD_ALIASES);
             } else {
                 $query->where('payment_method', $method);
             }
@@ -6574,7 +6585,7 @@ class PosController extends Controller
                     $t->created_at->format('d M Y H:i'),
                     $t->invoice_number,
                     $t->customer_name ?: 'Walk-in',
-                    ucwords(str_replace('_', ' ', $t->payment_method)),
+                    \App\Support\PosPaymentLabels::label($t->payment_method),
                     $n($t->subtotal),
                     $n($t->tax_amount),
                     $n($t->total_amount),
@@ -6644,8 +6655,8 @@ class PosController extends Controller
             $method = $request->payment_method;
             // Legacy rows carry 'card' (pre-normalisation alias for 'debit_card').
             // Surface both when the user selects Debit Card.
-            if ($method === 'debit_card') {
-                $query->whereIn('payment_method', ['debit_card', 'card']);
+            if (in_array($method, \App\Support\PosPaymentLabels::CARD_ALIASES, true)) {
+                $query->whereIn('payment_method', \App\Support\PosPaymentLabels::CARD_ALIASES);
             } else {
                 $query->where('payment_method', $method);
             }
@@ -6666,8 +6677,15 @@ class PosController extends Controller
                 $toDate = \Carbon\Carbon::parse($request->date_to)->endOfDay();
                 $query->where('created_at', '<=', $toDate);
             }
-        } elseif ($request->filled('period')) {
-            switch ($request->period) {
+        } else {
+            // Owner (26 Aug 2026): Tax Reports used to open on ALL TIME, so a
+            // credit note from months ago read as if it belonged to today and
+            // the shop could not reconcile it against the day's bills. The
+            // screen now opens on TODAY; All Time stays available as a
+            // deliberate choice (period=all — and the legacy EMPTY period that
+            // old links, bookmarks and export URLs still carry keeps meaning
+            // all time, so nothing silently narrows behind the user's back).
+            switch ($this->reportPeriod($request)) {
                 case 'today':
                     $query->where('created_at', '>=', now()->startOfDay());
                     break;
@@ -6692,6 +6710,24 @@ class PosController extends Controller
         return $query;
     }
 
+    /**
+     * Period actually in force on the tax report.
+     *
+     * Absent parameter (a fresh visit) = TODAY. An explicitly empty period is
+     * the legacy "All Time" spelling and keeps that meaning, as does the new
+     * explicit 'all'. Date range, when present, wins over this everywhere.
+     */
+    private function reportPeriod(Request $request): string
+    {
+        if (!$request->has('period')) {
+            return 'today';
+        }
+
+        $period = trim((string) $request->query('period'));
+
+        return $period === '' ? 'all' : $period;
+    }
+
     private function getReportDateLabel(Request $request): string
     {
         $hasDateRange = $request->filled('date_from') || $request->filled('date_to');
@@ -6710,17 +6746,17 @@ class PosController extends Controller
             }
         }
 
-        if ($request->filled('period')) {
-            return match ($request->period) {
-                'today' => 'Today (' . now()->format('d M Y') . ')',
-                'yesterday' => 'Yesterday (' . now()->subDay()->format('d M Y') . ')',
-                'weekly' => 'This Week (' . now()->startOfWeek()->format('d M') . ' - ' . now()->endOfWeek()->format('d M Y') . ')',
-                'monthly' => 'This Month (' . now()->format('M Y') . ')',
-                'last_month' => 'Last Month (' . now()->subMonth()->format('M Y') . ')',
-                default => 'All Time',
-            };
-        }
-        return 'All Time';
+        // The header must name the SAME period the query used (owner, 26 Aug
+        // 2026) — a fresh visit now means today, so "All Time" here would have
+        // described a day's figures as the shop's whole history.
+        return match ($this->reportPeriod($request)) {
+            'today' => 'Today (' . now()->format('d M Y') . ')',
+            'yesterday' => 'Yesterday (' . now()->subDay()->format('d M Y') . ')',
+            'weekly' => 'This Week (' . now()->startOfWeek()->format('d M') . ' - ' . now()->endOfWeek()->format('d M Y') . ')',
+            'monthly' => 'This Month (' . now()->format('M Y') . ')',
+            'last_month' => 'Last Month (' . now()->subMonth()->format('M Y') . ')',
+            default => 'All Time',
+        };
     }
 
     /**
@@ -6938,7 +6974,22 @@ class PosController extends Controller
         $availableRates = $this->availableTaxRates($companyId, $tab, $company);
         $billTypeReady = $typeReady;
 
-        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter', 'availableRates', 'billTypeFilter', 'billTypeReady'));
+        // Credit-note traceability (owner, 26 Aug 2026): the summary line used to
+        // announce "Credit Notes: 1 — Refunded 750" with no way to tell WHICH
+        // bill or WHEN, so the shop could not match it against the day's sales
+        // (and read it as a cancellation that the cancelled-orders page denied).
+        // The line now names the bills themselves; the table already lists them
+        // in full under Bill Type = Credit Notes Only.
+        $creditNoteBills = collect();
+        if ($typeReady && (int) ($summary->return_count ?? 0) > 0 && $billTypeFilter !== 'returns') {
+            $creditNoteBills = $this->buildTaxReportQuery($request, $tab, true)
+                ->where('transaction_type', 'return')
+                ->reorder('created_at', 'desc')
+                ->limit(5)
+                ->get(['id', 'invoice_number', 'created_at', 'total_amount']);
+        }
+
+        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter', 'availableRates', 'billTypeFilter', 'billTypeReady', 'creditNoteBills'));
     }
 
     public function exportTaxReportCsv(Request $request)
@@ -7030,7 +7081,7 @@ class PosController extends Controller
                         $t->created_at->format('d/m/Y H:i'),
                         $t->customer_name ?? 'Walk-in',
                         $rowIsReturn($t) ? 'Credit Note' : 'Sale',
-                        ucwords(str_replace('_', ' ', $t->payment_method)),
+                        \App\Support\PosPaymentLabels::label($t->payment_method),
                         number_format($itemSub, 2, '.', ''),
                         number_format($itemTax, 2, '.', ''),
                         number_format($itemTotal, 2, '.', ''),
@@ -7076,7 +7127,7 @@ class PosController extends Controller
                         $t->created_at->format('d/m/Y H:i'),
                         $t->customer_name ?? 'Walk-in',
                         $rowIsReturn($t) ? 'Credit Note' : 'Sale',
-                        ucwords(str_replace('_', ' ', $t->payment_method)),
+                        \App\Support\PosPaymentLabels::label($t->payment_method),
                         number_format($sign * $t->subtotal, 2, '.', ''),
                         number_format($sign * $t->discount_amount, 2, '.', ''),
                         number_format($sign * ($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', ''),
@@ -10867,7 +10918,7 @@ class PosController extends Controller
             'date' => optional($transaction->created_at)->format('d M Y, H:i'),
             'is_local' => (bool) $transaction->isLocalBill(),
             'is_return' => ($transaction->transaction_type ?? 'sale') === 'return',
-            'payment' => ucwords(str_replace('_', ' ', (string) $transaction->payment_method)),
+            'payment' => \App\Support\PosPaymentLabels::label($transaction->payment_method),
             'items' => $transaction->items->map(fn ($i) => [
                 'name' => (string) $i->item_name,
                 'qty' => (float) $i->quantity,
@@ -10914,7 +10965,7 @@ class PosController extends Controller
                     $t->created_at->format('d M Y H:i'),
                     $this->csvSafe($t->invoice_number),
                     $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? 'Local (record)' : 'Local') : 'PRA',
-                    ucwords(str_replace('_', ' ', (string) $t->payment_method)),
+                    \App\Support\PosPaymentLabels::label($t->payment_method),
                     number_format($t->subtotal, 2, '.', ''),
                     number_format($t->discount_amount, 2, '.', ''),
                     number_format($t->tax_amount, 2, '.', ''),

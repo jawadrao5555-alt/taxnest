@@ -186,7 +186,7 @@
                         </td>
                         <td class="px-4 py-3 text-center text-xs text-slate-400">{{ $b->items->count() }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-white">Rs {{ number_format($b->total_amount, 2) }}</td>
-                        <td class="px-4 py-3 text-center"><span class="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">{{ $b->payment_method }}</span></td>
+                        <td class="px-4 py-3 text-center"><span class="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">{{ \App\Support\PosPaymentLabels::label($b->payment_method) }}</span></td>
                         <td class="px-4 py-3 text-center">
                             @if($b->is_archived)
                                 {{-- Task 507 (11 Aug 2026): "Archived" ka matlab wazeh —

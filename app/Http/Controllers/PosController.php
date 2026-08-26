@@ -311,6 +311,8 @@ class PosController extends Controller
                 'rp_order_match' => 'nullable|in:off,token,code',
                 'rp_pra_number_style' => 'nullable|in:serial,token',
                 'rp_local_number_style' => 'nullable|in:serial,token',
+                'rp_delivery_receipt_present' => 'nullable|in:1',
+                'rp_delivery_receipt_on_assign' => 'nullable|in:1',
             ]);
             $prefs = $company->invoice_display_prefs ?? [];
             // Stale-form guard, per display set (Task 1377 — owner 21 Aug 2026).
@@ -516,6 +518,13 @@ class PosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'print_on_pay_dinein')
                 && $request->has('rp_dinein_autoprint')) {
                 $companyUpdates['print_on_pay_dinein'] = (bool) $request->input('rp_dinein_autoprint');
+            }
+            // Delivery receipt default is owned by the shop, not whichever
+            // browser last used the sale screen. A fresh marker is required so
+            // an older cached receipt-settings form can never disable it.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'delivery_receipt_print_on_assign')
+                && $request->has('rp_delivery_receipt_present')) {
+                $companyUpdates['delivery_receipt_print_on_assign'] = $request->boolean('rp_delivery_receipt_on_assign');
             }
             // KOT Print Style toggles (Aug 2026): also saveable from receipt-settings
             // so shops without the kitchen module can still control their KOT layout.

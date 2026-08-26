@@ -104,6 +104,21 @@
             </label>
         </div>
 
+        {{-- A shop-wide default replaces the previous browser-only preference.
+             Cashiers may still change the checkbox for an individual delivery. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 flex items-center justify-between gap-4">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">🚚 {{ __('pos.delivery_receipt_default_label') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.delivery_receipt_default_hint') }}</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                <input type="hidden" name="rp_delivery_receipt_present" value="1">
+                <input type="hidden" name="rp_delivery_receipt_on_assign" value="0">
+                <input type="checkbox" name="rp_delivery_receipt_on_assign" value="1" {{ ($company->delivery_receipt_print_on_assign ?? false) ? 'checked' : '' }} class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
+            </label>
+        </div>
+
         {{-- Task 1263: PRA-parity receipt display prefs — stored in the fbrpos
              set. rp_fbr_display_present marker: a stale cached form without
              these checkboxes must never silently flip everything OFF on save.

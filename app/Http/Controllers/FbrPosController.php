@@ -3676,6 +3676,8 @@ class FbrPosController extends Controller
                 'rp_printer_size'        => 'nullable|in:80mm,58mm,a4',
                 'rp_align_center'        => 'nullable|in:0,1',
                 'rp_left_margin_mm'      => 'nullable|integer|min:0|max:30',
+                'rp_delivery_receipt_present' => 'nullable|in:1',
+                'rp_delivery_receipt_on_assign' => 'nullable|in:1',
             ]);
 
             $prefs = $company->invoice_display_prefs ?? [];
@@ -3795,6 +3797,12 @@ class FbrPosController extends Controller
                 $pset = $company->printerSettings();
                 $pset['print_confirm_ask'] = $request->has('rp_print_confirm');
                 $company->pos_printer_settings = $pset;
+            }
+            // Same shop-level delivery default as PRA POS. Do not let a stale
+            // receipt settings form silently turn an owner's choice off.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'delivery_receipt_print_on_assign')
+                && $request->has('rp_delivery_receipt_present')) {
+                $company->delivery_receipt_print_on_assign = $request->boolean('rp_delivery_receipt_on_assign');
             }
 
             $company->save();

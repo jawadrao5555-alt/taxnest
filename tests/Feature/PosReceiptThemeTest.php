@@ -77,6 +77,7 @@ class PosReceiptThemeTest extends TestCase
             $t->integer('kot_left_margin_mm')->default(0);
             $t->boolean('agent_enabled')->default(false);
             $t->timestamp('agent_last_seen')->nullable();
+            $t->boolean('delivery_receipt_print_on_assign')->default(false);
             $t->softDeletes();
             $t->timestamps();
         });
@@ -262,6 +263,33 @@ class PosReceiptThemeTest extends TestCase
             ->assertSessionHasErrors('rp_receipt_theme');
     }
 
+    public function test_pra_delivery_receipt_default_is_saved_only_from_a_fresh_form(): void
+    {
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->from('/pos/receipt-settings')
+            ->post('/pos/receipt-settings', [
+                'rp_delivery_receipt_present' => '1',
+                'rp_delivery_receipt_on_assign' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->assertTrue((bool) Company::findOrFail($this->posCompanyId)->delivery_receipt_print_on_assign);
+
+        // An older receipt-settings page without the marker must preserve the
+        // shop's decision rather than changing it because no checkbox arrived.
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->post('/pos/receipt-settings', ['rp_order_match' => 'off'])
+            ->assertRedirect();
+
+        $this->assertTrue((bool) Company::findOrFail($this->posCompanyId)->delivery_receipt_print_on_assign);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->post('/pos/receipt-settings', ['rp_delivery_receipt_present' => '1'])
+            ->assertRedirect();
+
+        $this->assertFalse((bool) Company::findOrFail($this->posCompanyId)->delivery_receipt_print_on_assign);
+    }
+
     // ── 4. FBR receipt-settings POST ──────────────────────────────────────
 
     public function test_fbr_post_theme_switch_writes_pair_and_preserves_untouched_keys(): void
@@ -313,6 +341,25 @@ class PosReceiptThemeTest extends TestCase
         $style = $this->rawStyle($this->fbrCompanyId);
         $this->assertFalse($style['bold']);
         $this->assertSame('center', $style['logo']);
+    }
+
+    public function test_fbr_delivery_receipt_default_is_saved_per_shop(): void
+    {
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->from('/fbr-pos/receipt-settings')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_delivery_receipt_present' => '1',
+                'rp_delivery_receipt_on_assign' => '1',
+            ])
+            ->assertRedirect();
+
+        $this->assertTrue((bool) Company::findOrFail($this->fbrCompanyId)->delivery_receipt_print_on_assign);
+
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', ['rp_order_match' => 'off'])
+            ->assertRedirect();
+
+        $this->assertTrue((bool) Company::findOrFail($this->fbrCompanyId)->delivery_receipt_print_on_assign);
     }
 
     // ── 5. Blade renders the theme picker on BOTH screens ─────────────────

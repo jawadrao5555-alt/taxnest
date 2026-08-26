@@ -2469,7 +2469,7 @@ window.addEventListener('popstate', function() {
             </div>
             <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
                 <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
-                    <input type="checkbox" x-model="deliveryPrintReceipt" @change="persistDeliveryPrintReceipt()" class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <input type="checkbox" x-model="deliveryPrintReceipt" class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
                     <span>{{ __('pos.delivery_print_receipt') }}</span>
                 </label>
             </div>
@@ -3704,9 +3704,9 @@ function restaurantPos() {
         riderSettleBill: null,
         riderSettleOutstanding: 0,
         riderSettleAmount: '',
-        // Receipt print default = NO (delivery customer isn't at the counter).
-        // Opt-in checkbox persisted per device.
-        deliveryPrintReceipt: (function(){ try { return localStorage.getItem('fbrpos_delivery_final_print') === '1'; } catch(e) { return false; } })(),
+        // Owner-controlled shop default. A cashier may still change this one
+        // delivery before finalizing it or assigning a rider.
+        deliveryPrintReceipt: {{ ($company->delivery_receipt_print_on_assign ?? false) ? 'true' : 'false' }},
         // 🧾 FBR compliance — buyer NTN (optional, B2B) + UoM list (mirrors store() validation)
         customerNtn: '',
         uomOptions: ['U','KG','GM','LTR','ML','MTR','SQM','PCS','PKT','DOZ','BOX','SET','BAG','BTL','CTN','ROL','FT','IN','YDS','TIN','CAN','BUN'],
@@ -3985,9 +3985,6 @@ function restaurantPos() {
         },
         fitLabel() { return this.screenFit === 'auto' ? 'Fit' : Math.round(this.screenFit * 100) + '%'; },
 
-        persistDeliveryPrintReceipt() {
-            try { localStorage.setItem('fbrpos_delivery_final_print', this.deliveryPrintReceipt ? '1' : '0'); } catch (e) {}
-        },
 
         // Generate a fresh idempotency UUID for a new bill. Falls back to a
         // timestamp+random string on older browsers that lack crypto.randomUUID.

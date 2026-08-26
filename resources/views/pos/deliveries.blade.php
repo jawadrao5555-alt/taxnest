@@ -514,7 +514,7 @@
                                     @endforeach
                                 </select>
                                 <label class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 cursor-pointer select-none">
-                                    <input type="checkbox" name="print_receipt" value="1" data-delivery-print-receipt class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                    <input type="checkbox" name="print_receipt" value="1" {{ ($company->delivery_receipt_print_on_assign ?? false) ? 'checked' : '' }} class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
                                     <span>{{ __('pos.receipt_print') }}</span>
                                 </label>
                             </form>
@@ -726,7 +726,7 @@
                                     @endforeach
                                 </select>
                                 <label class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 cursor-pointer select-none">
-                                    <input type="checkbox" name="print_receipt" value="1" data-delivery-print-receipt class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                    <input type="checkbox" name="print_receipt" value="1" {{ ($company->delivery_receipt_print_on_assign ?? false) ? 'checked' : '' }} class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
                                     <span>{{ __('pos.receipt_print') }}</span>
                                 </label>
                             </form>
@@ -1140,27 +1140,6 @@ function tnCustLoc() {
 })();
 </script>
 @endif
-<script>
-// The assignment checkbox uses the same per-device preference as the sale
-// screen's Pending Deliveries popup. A rider may be changed from either place
-// without the two receipt choices drifting apart.
-(function () {
-    var boxes = Array.from(document.querySelectorAll('[data-delivery-print-receipt]'));
-    if (!boxes.length) return;
-    try {
-        var key = 'pos_delivery_final_print';
-        var checked = localStorage.getItem(key) === '1';
-        boxes.forEach(function (box) {
-            box.checked = checked;
-            box.addEventListener('change', function () {
-                var next = !!box.checked;
-                boxes.forEach(function (other) { other.checked = next; });
-                localStorage.setItem(key, next ? '1' : '0');
-            });
-        });
-    } catch (e) { /* Local storage is only a convenience; checkbox still works. */ }
-})();
-</script>
 @if($deliveryReceiptId = session('delivery_receipt_to_print'))
 <script>
 // Form submissions reload the board, so queue the requested receipt after the

@@ -8167,6 +8167,37 @@ class PosController extends Controller
     }
 
     /**
+     * Company policy for delivery bills that were never assigned to a rider.
+     * The same policy is read by the manual close, hourly auto-close, bulk
+     * close and recovery paths.
+     */
+    public function updateUnassignedDeliveryDayclose(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $validated = $request->validate([
+            'action' => 'required|in:allow,block',
+        ]);
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_dayclose_unassigned_delivery_action')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
+        }
+
+        $company->pos_dayclose_unassigned_delivery_action = $validated['action'];
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'action' => $company->pos_dayclose_unassigned_delivery_action,
+            'message' => __('pos.unassigned_delivery_dayclose_saved'),
+        ]);
+    }
+
+    /**
      * Customize POS → persist "Cashier bhi Day Close kar sake" (owner rule,
      * 5 Aug 2026). Default OFF = Day Close is admin/manager work; this switch
      * re-opens it for cashiers on ANY plan (Team Custom Access stays the

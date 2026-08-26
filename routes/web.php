@@ -892,6 +892,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // bills that were already deleted at day close (admin-only, permanent).
     Route::post('/settings/local-billing/clear-spend-records', [PosController::class, 'clearCustomerSpendRecords'])->name('pos.settings.local-billing.clear-spend-records');
     Route::post('/settings/auto-dayclose-toggle', [PosController::class, 'toggleAutoDayclose'])->name('pos.settings.auto-dayclose-toggle');
+    Route::post('/settings/unassigned-delivery-dayclose', [PosController::class, 'updateUnassignedDeliveryDayclose'])->name('pos.settings.unassigned-delivery-dayclose');
     Route::post('/settings/cashier-dayclose-toggle', [PosController::class, 'toggleCashierDayclose'])->name('pos.settings.cashier-dayclose-toggle');
     Route::post('/settings/cashier-ordercancel-toggle', [PosController::class, 'toggleCashierOrderCancel'])->name('pos.settings.cashier-ordercancel-toggle');
     Route::post('/settings/dayclose-cutoff', [PosController::class, 'updateDaycloseCutoff'])->name('pos.settings.dayclose-cutoff');
@@ -1752,6 +1753,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // Task 676 (FBR mirror of PRA Task 661): auto day-close checkbox + cutoff
     // selector on the FBR day-close page — cashier-blocked in the controller.
     Route::post('/settings/auto-dayclose-toggle', [FbrPosController::class, 'toggleAutoDayclose'])->name('fbrpos.settings.auto-dayclose-toggle');
+    Route::post('/settings/unassigned-delivery-dayclose', [FbrPosController::class, 'updateUnassignedDeliveryDayclose'])->name('fbrpos.settings.unassigned-delivery-dayclose');
     Route::post('/settings/dayclose-cutoff', [FbrPosController::class, 'updateDaycloseCutoff'])->name('fbrpos.settings.dayclose-cutoff');
     Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [FbrPosController::class, 'dayCloseThermal'])->name('fbrpos.day-close-thermal');

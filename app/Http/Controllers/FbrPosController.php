@@ -403,6 +403,35 @@ class FbrPosController extends Controller
     }
 
     /**
+     * FBR POS mirror of the shared company-level delivery day-close policy.
+     */
+    public function updateUnassignedDeliveryDayclose(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $validated = $request->validate([
+            'action' => 'required|in:allow,block',
+        ]);
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_dayclose_unassigned_delivery_action')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
+        }
+
+        $company->pos_dayclose_unassigned_delivery_action = $validated['action'];
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'action' => $company->pos_dayclose_unassigned_delivery_action,
+            'message' => __('pos.unassigned_delivery_dayclose_saved'),
+        ]);
+    }
+
+    /**
      * Day-close page → persist the trading-day cutoff (Task 676 — FBR mirror of
      * PosController::updateDaycloseCutoff). Same shared company column
      * (pos_business_day_cutoff) that PosBusinessDay::cutoffFor reads.

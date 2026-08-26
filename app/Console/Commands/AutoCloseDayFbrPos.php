@@ -115,7 +115,7 @@ class AutoCloseDayFbrPos extends Command
                         $company->id,
                         (string) $date,
                         $adminId,
-                        'Auto-closed by system (' . $cutoffTime . ' next day)',
+                        'Auto-closed by system (' . $autoCloseTime . ' next day)',
                         null,
                         true // prior stranded days may close empty (mirror of closeAllPriorDays)
                     );

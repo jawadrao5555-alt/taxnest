@@ -139,7 +139,7 @@ class AutoCloseDayPos extends Command
                             $company->id,
                             $date,
                             $adminId,
-                            'Auto-closed by system (' . $cutoffTime . ' next day)',
+                            'Auto-closed by system (' . $autoCloseTime . ' next day)',
                             null,
                             false,
                             null,

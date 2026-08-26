@@ -12218,12 +12218,10 @@ class PosController extends Controller
      * and make the 6 AM auto-close SKIP the day (same policy as open restaurant
      * orders), because the shop's goods and cash are out with a named person.
      *
-     * NO RIDER = NOT A BLOCKER (owner rule, 23 Aug 2026). If nobody assigned a
-     * rider, the shop handed the order over ITSELF — the cash is already in the
-     * counter drawer and there is nobody to settle with, so such a bill has no
-     * business holding the day open. Frost and Brew's close stayed stuck for
-     * days over exactly these self-delivered bills. They remain assignable on
-     * the Deliveries board (that board is the ASSIGN queue, not settlement).
+     * A company chooses how an unassigned bill behaves: the default means the
+     * shop handed it over itself, so it does not block; a stricter company can
+     * require every fresh delivery to be assigned before a close. The choice
+     * applies identically to manual, bulk, recovery and hourly auto-close.
      *
      * 'dispatched' does NOT block either — the rider has the order; its cash is
      * covered by the khata figures. Rider unsettled cash NEVER blocks (khata
@@ -12251,6 +12249,7 @@ class PosController extends Controller
 
             $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
             $hasType = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
+            $unassignedBlocks = \App\Services\PosDayCloseDeliveryPolicy::unassignedBlocks($company);
             // Default scope (hide_archived) applies: an archived bill is out of
             // the operational stream and must not block a close.
             $rows = PosTransaction::where('company_id', $companyId)
@@ -12261,12 +12260,27 @@ class PosController extends Controller
                 ->when($hasType, fn ($q) => $q->where(function ($w) {
                     $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 }))
-                // Assigned to a rider but never handed over (dispatch pending).
-                // A rider-less delivery bill is the shop's own hand-over and is
-                // deliberately NOT counted here (owner rule, 23 Aug 2026).
-                ->whereNotNull('rider_id')
-                ->where('delivery_status', 'assigned')
-                ->whereNull('rider_settlement_id')
+                ->where(function ($q) use ($unassignedBlocks) {
+                    // Assigned to a rider but never handed over (dispatch pending).
+                    $q->where(function ($assigned) {
+                        $assigned->whereNotNull('rider_id')
+                            ->where('delivery_status', 'assigned')
+                            ->whereNull('rider_settlement_id');
+                    });
+
+                    // The strict company setting only reaches fresh, actually
+                    // unassigned delivery rows. A legacy delivery cannot brick a
+                    // shop indefinitely just because riders did not exist then.
+                    if ($unassignedBlocks) {
+                        $q->orWhere(function ($unassigned) {
+                            $unassigned->whereNull('rider_id')
+                                ->whereNull('delivery_status')
+                                ->whereNull('rider_settlement_id')
+                                ->where('order_type', 'delivery')
+                                ->where('created_at', '>=', now()->subDays(7));
+                        });
+                    }
+                })
                 ->with('rider:id,name')
                 ->orderBy('created_at')
                 ->get(array_merge(
@@ -12460,12 +12474,13 @@ class PosController extends Controller
             if (! $txn || $txn->status !== 'completed' || $txn->order_type !== 'delivery' || $txn->rider_settlement_id) {
                 return false;
             }
-            // The ONE shape the blocker counts: assigned to a rider and never
-            // dispatched. A rider-less bill is the shop's own hand-over — it no
-            // longer blocks the close, so it is not stampable from here either
-            // (owner rule, 23 Aug 2026). Anything already delivered/returned is
-            // left exactly as it is.
-            if ($txn->rider_id === null || $txn->delivery_status !== 'assigned') {
+            $company = Company::find($companyId);
+            $isAssigned = $txn->rider_id !== null && $txn->delivery_status === 'assigned';
+            $isUnassigned = $txn->rider_id === null && $txn->delivery_status === null
+                && \App\Services\PosDayCloseDeliveryPolicy::unassignedBlocks($company)
+                && $txn->created_at >= now()->subDays(7);
+            // Keep the one-click cure exactly as narrow as the blocker query.
+            if (! $isAssigned && ! $isUnassigned) {
                 return false;
             }
 

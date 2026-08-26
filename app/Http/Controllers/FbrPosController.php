@@ -6993,10 +6993,9 @@ class FbrPosController extends Controller
      * HARD-BLOCK the manual close and make the hourly auto-close SKIP the day
      * (skip_alert policy).
      *
-     * NO RIDER = NOT A BLOCKER (owner rule, 23 Aug 2026 — mirrors PRA): an
-     * unassigned delivery bill was handed over by the shop itself, its cash is
-     * already in the drawer and there is nobody to settle with, so it must
-     * never hold the day open.
+     * A company chooses whether a fresh delivery without a rider is treated as
+     * shop-delivered (the safe default) or must block close until assigned.
+     * The shared setting is honoured by manual, bulk and hourly auto-close.
      *
      * 'dispatched' does NOT block either — the rider has the order; its cash is
      * covered by the khata figures. Rider unsettled cash NEVER blocks (khata
@@ -7023,6 +7022,7 @@ class FbrPosController extends Controller
 
             $hasBizDate = $this->hasBizDate();
             $hasType = \Schema::hasColumn('fbr_pos_transactions', 'transaction_type');
+            $unassignedBlocks = \App\Services\PosDayCloseDeliveryPolicy::unassignedBlocks($company);
             $rows = FbrPosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->when($hasBizDate,
@@ -7031,12 +7031,22 @@ class FbrPosController extends Controller
                 ->when($hasType, fn ($q) => $q->where(function ($w) {
                     $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
                 }))
-                // Assigned to a rider but never handed over (dispatch pending).
-                // A rider-less delivery bill is the shop's own hand-over and is
-                // deliberately NOT counted here (owner rule, 23 Aug 2026).
-                ->whereNotNull('rider_id')
-                ->where('delivery_status', 'assigned')
-                ->whereNull('rider_settlement_id')
+                ->where(function ($q) use ($unassignedBlocks) {
+                    $q->where(function ($assigned) {
+                        $assigned->whereNotNull('rider_id')
+                            ->where('delivery_status', 'assigned')
+                            ->whereNull('rider_settlement_id');
+                    });
+                    if ($unassignedBlocks) {
+                        $q->orWhere(function ($unassigned) {
+                            $unassigned->whereNull('rider_id')
+                                ->whereNull('delivery_status')
+                                ->whereNull('rider_settlement_id')
+                                ->where('order_type', 'delivery')
+                                ->where('created_at', '>=', now()->subDays(7));
+                        });
+                    }
+                })
                 ->get(['id', 'rider_id', 'total_amount']);
 
             // Rider unsettled cash khata — warning-only context (whole open

@@ -32,8 +32,6 @@ class PosBusinessDay
 
     /** @var array<int,string> per-request cache: company_id => 'HH:MM' */
     protected static array $cutoffCache = [];
-    /** @var array<int,string> per-request cache: company_id => 'HH:MM' */
-    protected static array $autoCloseTimeCache = [];
 
     /**
      * The company's day-close cutoff time ('HH:MM'). Sales strictly before
@@ -72,10 +70,6 @@ class PosBusinessDay
      */
     public static function autoCloseTimeFor(int $companyId): string
     {
-        if (isset(self::$autoCloseTimeCache[$companyId])) {
-            return self::$autoCloseTimeCache[$companyId];
-        }
-
         $time = self::DEFAULT_AUTO_CLOSE_TIME;
         try {
             if (Schema::hasColumn('companies', 'pos_auto_dayclose_time')) {
@@ -88,12 +82,14 @@ class PosBusinessDay
             // Fall back during the migration/deploy window.
         }
 
-        return self::$autoCloseTimeCache[$companyId] = $time;
+        return $time;
     }
 
     public static function forgetAutoCloseTime(int $companyId): void
     {
-        unset(self::$autoCloseTimeCache[$companyId]);
+        // Kept as the write-side counterpart to forgetCutoff(). Auto-close
+        // time intentionally reads fresh from the database: the hourly worker
+        // must honour a just-saved choice without a cache grace period.
     }
 
     /**

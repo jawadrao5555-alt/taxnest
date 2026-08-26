@@ -15,7 +15,7 @@ class AutoCloseDayPos extends Command
 {
     protected $signature = 'pos:auto-dayclose';
 
-    protected $description = 'Auto-close prior POS trading days for companies that opted into auto day-close (Customize POS → Local Bills). A day closes at 6:00 AM the NEXT morning if nobody closed it manually.';
+    protected $description = 'Auto-close prior POS trading days at each company’s chosen auto-close time after its business-day cutoff.';
 
     public function handle(PosController $pos): int
     {
@@ -34,21 +34,18 @@ class AutoCloseDayPos extends Command
             return self::SUCCESS;
         }
 
-        // NEXT-MORNING rule (owner decision 23 Jul 2026 — replaces the older
-        // "second midnight / 1-day grace" rule): if nobody closed a trading day
-        // manually, it auto-closes at the company's day-close cutoff the NEXT
-        // morning (Pakistan time; app tz = Asia/Karachi; default 06:00, per-company
-        // via Day Close page since 30 Jul 2026). Before the cutoff yesterday stays
-        // OPEN — a late-night shop (or its owner) can still close it manually;
-        // from the cutoff onward everything before TODAY is swept. Command runs
-        // hourly, so a missed cron tick self-heals on the next hour.
+        // NEXT-MORNING rule: the business-day cutoff and auto-close time are
+        // separate company settings. Before the auto-close time yesterday stays
+        // OPEN; from it onward everything before TODAY is swept. The time is
+        // clamped to the cutoff as a safety net for manually edited data.
         $nowTime = now()->format('H:i');
         $closedTotal = 0;
 
         foreach ($companies as $company) {
             try {
-                $cutoffTime = \App\Services\PosBusinessDay::cutoffFor($company->id);
-                $graceCutoff = $nowTime >= $cutoffTime
+                $businessCutoff = \App\Services\PosBusinessDay::cutoffFor($company->id);
+                $autoCloseTime = max(\App\Services\PosBusinessDay::autoCloseTimeFor($company->id), $businessCutoff);
+                $graceCutoff = $nowTime >= $autoCloseTime
                     ? today()->toDateString()            // past cutoff: close everything before today (incl. yesterday)
                     : today()->subDay()->toDateString(); // before cutoff: yesterday keeps its grace window
                 // Prior un-closed trading days before the cutoff. Include archived

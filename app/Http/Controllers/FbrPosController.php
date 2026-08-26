@@ -422,6 +422,9 @@ class FbrPosController extends Controller
         if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_auto_dayclose_time')) {
             return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
         }
+        if ($time < \App\Services\PosBusinessDay::cutoffFor($company->id)) {
+            return response()->json(['success' => false, 'message' => __('pos.auto_dayclose_time_after_cutoff')], 422);
+        }
 
         $company->pos_auto_dayclose_time = $time;
         $company->save();

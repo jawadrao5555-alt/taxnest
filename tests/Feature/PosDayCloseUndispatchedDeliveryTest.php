@@ -63,6 +63,7 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
             $table->string('pos_business_day_cutoff')->nullable();
             $table->string('pos_dayclose_unassigned_delivery_action')->nullable();
             $table->boolean('pos_auto_dayclose_24h')->default(false);
+            $table->string('pos_auto_dayclose_time')->nullable();
             $table->boolean('pos_cashier_dayclose')->default(false);
             $table->boolean('is_internal_account')->default(false);
             $table->boolean('restaurant_mode')->default(false);

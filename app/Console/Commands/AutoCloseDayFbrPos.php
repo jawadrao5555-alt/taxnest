@@ -41,16 +41,18 @@ class AutoCloseDayFbrPos extends Command
             return self::SUCCESS;
         }
 
-        // NEXT-MORNING rule (same as PRA): past the company cutoff, everything
-        // before TODAY is swept; before the cutoff yesterday keeps its grace
-        // window. Hourly runs self-heal a missed cron tick.
+        // NEXT-MORNING rule (same as PRA): past the company's independent
+        // auto-close time, everything before TODAY is swept; before it,
+        // yesterday keeps its grace window. Never run before the business-day
+        // cutoff, even if data was manually edited to an earlier value.
         $nowTime = now()->format('H:i');
         $closedTotal = 0;
 
         foreach ($companies as $company) {
             try {
-                $cutoffTime = \App\Services\PosBusinessDay::cutoffFor($company->id);
-                $graceCutoff = $nowTime >= $cutoffTime
+                $businessCutoff = \App\Services\PosBusinessDay::cutoffFor($company->id);
+                $autoCloseTime = max(\App\Services\PosBusinessDay::autoCloseTimeFor($company->id), $businessCutoff);
+                $graceCutoff = $nowTime >= $autoCloseTime
                     ? today()->toDateString()
                     : today()->subDay()->toDateString();
 

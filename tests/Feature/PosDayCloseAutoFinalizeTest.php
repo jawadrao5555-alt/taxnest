@@ -54,6 +54,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $table->boolean('pos_customer_spend_persist')->default(true);
             $table->string('pos_business_day_cutoff')->nullable();
             $table->boolean('pos_auto_dayclose_24h')->default(false);
+            $table->string('pos_auto_dayclose_time')->nullable();
             $table->boolean('is_internal_account')->default(false);
             $table->integer('invoice_limit_override')->nullable();
             $table->boolean('pra_reporting_enabled')->default(false);

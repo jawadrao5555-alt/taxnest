@@ -158,9 +158,8 @@ Schedule::command('invoice-zips:prune')->hourly();
 // stands aside while invoices are being filed, and does nothing once it has
 // caught up.
 Schedule::command('invoices:cache-pdfs --seconds=45')->everyFiveMinutes()->withoutOverlapping();
-// Auto-close prior POS trading days for companies that opted into auto day-close
-// (6 AM next-morning rule, owner 23 Jul 2026 — a day closes at 6:00 AM the next
-// morning if nobody closed it manually; before 6 AM yesterday stays open).
+// Auto-close prior POS trading days for companies that opted into auto day-close.
+// Each company picks its own auto-close time (never before its business-day cutoff).
 Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();
 // Task 676 — FBR twin: auto-close FBR POS trading days (same checkbox flag,
 // product_type='fbrpos'), with the ZFC undispatched-deliveries skip.

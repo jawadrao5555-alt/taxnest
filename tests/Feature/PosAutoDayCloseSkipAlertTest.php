@@ -48,6 +48,7 @@ class PosAutoDayCloseSkipAlertTest extends TestCase
             $table->boolean('restaurant_mode')->default(false);
             $table->boolean('pos_auto_dayclose_24h')->default(false);
             $table->string('pos_business_day_cutoff')->nullable();
+            $table->string('pos_auto_dayclose_time')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -116,6 +117,27 @@ class PosAutoDayCloseSkipAlertTest extends TestCase
             'restaurant_mode' => true,
             'pos_auto_dayclose_24h' => true,
         ]);
+    }
+
+    public function test_auto_close_time_is_independent_from_business_day_cutoff(): void
+    {
+        $company = $this->makeCompany();
+        $company->update([
+            'pos_business_day_cutoff' => '04:00',
+            'pos_auto_dayclose_time' => '08:30',
+        ]);
+
+        \App\Services\PosBusinessDay::forgetCutoff($company->id);
+        \App\Services\PosBusinessDay::forgetAutoCloseTime($company->id);
+
+        try {
+            $this->assertSame('04:00', \App\Services\PosBusinessDay::cutoffFor($company->id));
+            $this->assertSame('08:30', \App\Services\PosBusinessDay::autoCloseTimeFor($company->id));
+        } finally {
+            // The minimal suites rebuild SQLite with ids starting from one;
+            // clear the existing cutoff cache before another suite reuses it.
+            \App\Services\PosBusinessDay::forgetCutoff($company->id);
+        }
     }
 
     /** An un-closed prior business day so the command has something to sweep. */

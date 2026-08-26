@@ -403,6 +403,38 @@ class FbrPosController extends Controller
     }
 
     /**
+     * Persist FBR POS's independent auto day-close clock. The business-day
+     * cutoff remains controlled by updateDaycloseCutoff().
+     */
+    public function updateAutoDaycloseTime(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $time = (string) $request->input('time', '');
+        if (!preg_match('/^([01]\d):(00|30)$/', $time) || $time >= '12:00') {
+            return response()->json(['success' => false, 'message' => __('pos.dayclose_time_range')], 422);
+        }
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_auto_dayclose_time')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
+        }
+
+        $company->pos_auto_dayclose_time = $time;
+        $company->save();
+        \App\Services\PosBusinessDay::forgetAutoCloseTime($company->id);
+
+        return response()->json([
+            'success' => true,
+            'time' => $company->pos_auto_dayclose_time,
+            'message' => __('pos.auto_dayclose_time_saved'),
+        ]);
+    }
+
+    /**
      * FBR POS mirror of the shared company-level delivery day-close policy.
      */
     public function updateUnassignedDeliveryDayclose(Request $request)
@@ -7042,8 +7074,7 @@ class FbrPosController extends Controller
                             $unassigned->whereNull('rider_id')
                                 ->whereNull('delivery_status')
                                 ->whereNull('rider_settlement_id')
-                                ->where('order_type', 'delivery')
-                                ->where('created_at', '>=', now()->subDays(7));
+                                ->where('order_type', 'delivery');
                         });
                     }
                 })

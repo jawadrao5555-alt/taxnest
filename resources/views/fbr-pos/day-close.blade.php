@@ -762,10 +762,22 @@
                 $cutoffOptions[$val] = \Carbon\Carbon::createFromFormat('H:i', $val)->format('g:i A');
             }
         }
+        $unassignedDeliveryAction = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_dayclose_unassigned_delivery_action')
+            && in_array($company->pos_dayclose_unassigned_delivery_action ?? 'allow', ['allow', 'block'], true)
+            ? $company->pos_dayclose_unassigned_delivery_action
+            : 'allow';
+        $autoCloseTime = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_auto_dayclose_time')
+            && is_string($company->pos_auto_dayclose_time ?? null)
+            && preg_match('/^([01]\d):(00|30)$/', $company->pos_auto_dayclose_time)
+            && $company->pos_auto_dayclose_time < '12:00'
+            ? $company->pos_auto_dayclose_time
+            : '06:00';
     @endphp
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
          x-data="{ cutoff: '{{ $currentCutoff }}', saving: false, msg: '', ok: true,
             autoOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, autoMsg: '', autoOk: true,
+            autoTime: @js($autoCloseTime), autoTimeSaved: @js($autoCloseTime), autoTimeBusy: false, autoTimeMsg: '', autoTimeOk: true,
+            unassignedAction: @js($unassignedDeliveryAction), unassignedSaved: @js($unassignedDeliveryAction), unassignedBusy: false, unassignedMsg: '', unassignedOk: true,
             save() {
                 this.saving = true; this.msg = '';
                 fetch('{{ route('fbrpos.settings.dayclose-cutoff') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ cutoff: this.cutoff }) })
@@ -780,6 +792,34 @@
                     .then(r => r.json())
                     .then(d => { this.autoOk = !!(d && d.success); this.autoMsg = (d && d.message) || (this.autoOk ? @js(__('pos.saved_dot')) : @js(__('pos.setting_save_failed'))); if (!this.autoOk) { this.autoOn = !this.autoOn; } })
                     .catch(() => { this.autoOk = false; this.autoMsg = @js(__('pos.setting_save_failed')); this.autoOn = !this.autoOn; });
+            },
+            saveAutoTime() {
+                const previous = this.autoTimeSaved;
+                this.autoTimeBusy = true; this.autoTimeMsg = '';
+                fetch('{{ route('fbrpos.settings.auto-dayclose-time') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ time: this.autoTime }) })
+                    .then(r => r.json())
+                    .then(d => {
+                        this.autoTimeOk = !!(d && d.success);
+                        if (this.autoTimeOk) { this.autoTimeSaved = d.time || this.autoTime; }
+                        else { this.autoTime = previous; }
+                        this.autoTimeMsg = (d && d.message) || (this.autoTimeOk ? @js(__('pos.saved_dot')) : @js(__('pos.setting_save_failed')));
+                    })
+                    .catch(() => { this.autoTimeOk = false; this.autoTime = previous; this.autoTimeMsg = @js(__('pos.setting_save_failed')); })
+                    .finally(() => { this.autoTimeBusy = false; });
+            },
+            saveUnassigned() {
+                const previous = this.unassignedSaved;
+                this.unassignedBusy = true; this.unassignedMsg = '';
+                fetch('{{ route('fbrpos.settings.unassigned-delivery-dayclose') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ action: this.unassignedAction }) })
+                    .then(r => r.json())
+                    .then(d => {
+                        this.unassignedOk = !!(d && d.success);
+                        if (this.unassignedOk) { this.unassignedSaved = d.action || this.unassignedAction; }
+                        else { this.unassignedAction = previous; }
+                        this.unassignedMsg = (d && d.message) || (this.unassignedOk ? @js(__('pos.saved_dot')) : @js(__('pos.setting_save_failed')));
+                    })
+                    .catch(() => { this.unassignedOk = false; this.unassignedAction = previous; this.unassignedMsg = @js(__('pos.setting_save_failed')); })
+                    .finally(() => { this.unassignedBusy = false; });
             } }" id="dayclose-settings">
         {{-- Task 1403: the Customize hub deep-links here (#dayclose-settings) instead of
              cloning these two controls — one setting, one place, no drift. --}}
@@ -810,7 +850,29 @@
                 <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.auto_dayclose_6am') }}</span>
                 <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.auto_dayclose_6am_sub') }}</span>
             </label>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ __('pos.auto_dayclose_time_label') }}</span>
+                <select x-model="autoTime" @change="saveAutoTime()" :disabled="autoTimeBusy"
+                    class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50">
+                    @foreach($cutoffOptions as $val => $label)
+                    <option value="{{ $val }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
             <span x-show="autoMsg" x-cloak class="text-xs font-semibold shrink-0" :class="autoOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" x-text="autoMsg"></span>
+            <span x-show="autoTimeMsg" x-cloak class="text-xs font-semibold shrink-0" :class="autoTimeOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" x-text="autoTimeMsg"></span>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex-1 min-w-0">
+                <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.unassigned_delivery_dayclose_title') }}</span>
+                <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.unassigned_delivery_dayclose_sub') }}</span>
+            </div>
+            <select x-model="unassignedAction" @change="saveUnassigned()" :disabled="unassignedBusy"
+                class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50">
+                <option value="allow">{{ __('pos.unassigned_delivery_dayclose_allow') }}</option>
+                <option value="block">{{ __('pos.unassigned_delivery_dayclose_block') }}</option>
+            </select>
+            <span x-show="unassignedMsg" x-cloak class="text-xs font-semibold shrink-0" :class="unassignedOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" x-text="unassignedMsg"></span>
         </div>
     </div>
     @endif

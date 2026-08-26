@@ -68,6 +68,7 @@ class FbrPosDayCloseUndispatchedDeliveryTest extends TestCase
             $table->boolean('fbr_pos_enabled')->default(false);
             $table->string('pos_dayclose_provisional_action')->nullable();
             $table->string('pos_business_day_cutoff')->nullable();
+            $table->string('pos_dayclose_unassigned_delivery_action')->nullable();
             $table->boolean('pos_auto_dayclose_24h')->default(false);
             $table->boolean('pos_cashier_dayclose')->default(false);
             $table->softDeletes();
@@ -350,6 +351,20 @@ class FbrPosDayCloseUndispatchedDeliveryTest extends TestCase
         $res->assertSessionHas('success');
         $this->assertSame(1, DB::table('fbr_day_close_reports')->count());
         $this->assertNull(DB::table('fbr_pos_transactions')->find($riderLess)->delivery_status);
+    }
+
+    public function test_company_can_require_unassigned_deliveries_before_close(): void
+    {
+        $cid = $this->makeCompany(true, ['pos_dayclose_unassigned_delivery_action' => 'block']);
+        $this->makeBill($cid, ['order_type' => 'delivery']);
+
+        $sum = $this->summary($cid);
+        $this->assertSame(1, $sum->count);
+        $this->assertSame(1, $sum->unassigned);
+
+        $res = $this->closeDay($this->makeUser($cid));
+        $res->assertSessionHas('error', __('pos.dayclose_blocked_undispatched', ['count' => 1]));
+        $this->assertSame(0, DB::table('fbr_day_close_reports')->count());
     }
 
     // ── 2. dispatched = khata warning only, close allowed ───────────────────

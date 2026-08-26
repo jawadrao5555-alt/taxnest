@@ -61,6 +61,7 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
             $table->string('pos_dayclose_final_local_action')->nullable();
             $table->boolean('pos_customer_spend_persist')->default(true);
             $table->string('pos_business_day_cutoff')->nullable();
+            $table->string('pos_dayclose_unassigned_delivery_action')->nullable();
             $table->boolean('pos_auto_dayclose_24h')->default(false);
             $table->boolean('pos_cashier_dayclose')->default(false);
             $table->boolean('is_internal_account')->default(false);
@@ -347,11 +348,9 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
     }
 
     /**
-     * OWNER RULE (23 Aug 2026): "agar koi delivery rider assign nahi karta to
-     * matlab woh khud utha kar de aaya — woh bill settlement mein jana hi nahi
-     * chahiye." No rider = no hand-over, no rider cash, nothing to settle: the
-     * bill must never hold the day open (nor make the 6 AM sweep skip it).
-     * Archived deliveries stay out too — they left the operational stream.
+     * Default company policy: an unassigned delivery is shop-delivered and
+     * never blocks. Archived deliveries stay out too — they left the
+     * operational stream.
      */
     public function test_rider_less_delivery_never_blocks_the_close(): void
     {
@@ -371,6 +370,20 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         $this->assertSame(1, DB::table('pos_day_close_reports')->count(), 'The day must close.');
         // The bill itself is left exactly as it is — no invented "delivered" stamp.
         $this->assertNull(DB::table('pos_transactions')->find($riderLess)->delivery_status);
+    }
+
+    public function test_company_can_require_unassigned_deliveries_before_close(): void
+    {
+        $cid = $this->makeCompany(true, ['pos_dayclose_unassigned_delivery_action' => 'block']);
+        $this->makeBill($cid, ['order_type' => 'delivery']);
+
+        $sum = $this->summary($cid);
+        $this->assertSame(1, $sum->count);
+        $this->assertSame(1, $sum->unassigned);
+
+        $res = $this->closeDay($this->makeUser($cid));
+        $res->assertSessionHas('error', __('pos.dayclose_blocked_undispatched', ['count' => 1]));
+        $this->assertSame(0, DB::table('pos_day_close_reports')->count());
     }
 
     /**

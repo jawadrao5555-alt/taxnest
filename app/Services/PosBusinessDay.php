@@ -13,9 +13,8 @@ use Illuminate\Support\Facades\Schema;
  * Restaurants that stay open past midnight close their trading day in the
  * early morning. A bill created between 00:00 and the company's day-close
  * cutoff (default 06:00) belongs to the PREVIOUS day's business as long as
- * that day has not been day-closed yet. The cutoff mirrors the auto-dayclose
- * grace rule (before the cutoff yesterday stays open; from the cutoff on it
- * is swept).
+ * that day has not been day-closed yet. The separate auto-close time controls
+ * when the hourly auto-close sweep is allowed to run.
  *
  * The cutoff is per-company: companies.pos_business_day_cutoff ('HH:MM',
  * default '06:00' — set on the Day Close page). PRA / tax reporting ALWAYS
@@ -29,9 +28,12 @@ use Illuminate\Support\Facades\Schema;
 class PosBusinessDay
 {
     public const DEFAULT_CUTOFF = '06:00';
+    public const DEFAULT_AUTO_CLOSE_TIME = '06:00';
 
     /** @var array<int,string> per-request cache: company_id => 'HH:MM' */
     protected static array $cutoffCache = [];
+    /** @var array<int,string> per-request cache: company_id => 'HH:MM' */
+    protected static array $autoCloseTimeCache = [];
 
     /**
      * The company's day-close cutoff time ('HH:MM'). Sales strictly before
@@ -62,6 +64,36 @@ class PosBusinessDay
     public static function forgetCutoff(int $companyId): void
     {
         unset(self::$cutoffCache[$companyId]);
+    }
+
+    /**
+     * Company's independent auto day-close time ('HH:MM'). The same
+     * 00:00–11:30 choices as the business-day cutoff are accepted.
+     */
+    public static function autoCloseTimeFor(int $companyId): string
+    {
+        if (isset(self::$autoCloseTimeCache[$companyId])) {
+            return self::$autoCloseTimeCache[$companyId];
+        }
+
+        $time = self::DEFAULT_AUTO_CLOSE_TIME;
+        try {
+            if (Schema::hasColumn('companies', 'pos_auto_dayclose_time')) {
+                $raw = DB::table('companies')->where('id', $companyId)->value('pos_auto_dayclose_time');
+                if (is_string($raw) && preg_match('/^([01]\d):([0-5]\d)$/', $raw) && $raw < '12:00') {
+                    $time = $raw;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fall back during the migration/deploy window.
+        }
+
+        return self::$autoCloseTimeCache[$companyId] = $time;
+    }
+
+    public static function forgetAutoCloseTime(int $companyId): void
+    {
+        unset(self::$autoCloseTimeCache[$companyId]);
     }
 
     /**

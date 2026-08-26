@@ -8167,6 +8167,38 @@ class PosController extends Controller
     }
 
     /**
+     * Persist the independent clock used by the hourly auto day-close sweep.
+     * This intentionally does not change the business-day cutoff.
+     */
+    public function updateAutoDaycloseTime(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $time = (string) $request->input('time', '');
+        if (!preg_match('/^([01]\d):(00|30)$/', $time) || $time >= '12:00') {
+            return response()->json(['success' => false, 'message' => __('pos.dayclose_time_range')], 422);
+        }
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_auto_dayclose_time')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
+        }
+
+        $company->pos_auto_dayclose_time = $time;
+        $company->save();
+        \App\Services\PosBusinessDay::forgetAutoCloseTime($company->id);
+
+        return response()->json([
+            'success' => true,
+            'time' => $company->pos_auto_dayclose_time,
+            'message' => __('pos.auto_dayclose_time_saved'),
+        ]);
+    }
+
+    /**
      * Company policy for delivery bills that were never assigned to a rider.
      * The same policy is read by the manual close, hourly auto-close, bulk
      * close and recovery paths.
@@ -12268,16 +12300,14 @@ class PosController extends Controller
                             ->whereNull('rider_settlement_id');
                     });
 
-                    // The strict company setting only reaches fresh, actually
-                    // unassigned delivery rows. A legacy delivery cannot brick a
-                    // shop indefinitely just because riders did not exist then.
+                    // Strict companies require every actually unassigned
+                    // delivery to be handled before the trading day can close.
                     if ($unassignedBlocks) {
                         $q->orWhere(function ($unassigned) {
                             $unassigned->whereNull('rider_id')
                                 ->whereNull('delivery_status')
                                 ->whereNull('rider_settlement_id')
-                                ->where('order_type', 'delivery')
-                                ->where('created_at', '>=', now()->subDays(7));
+                                ->where('order_type', 'delivery');
                         });
                     }
                 })
@@ -12477,8 +12507,7 @@ class PosController extends Controller
             $company = Company::find($companyId);
             $isAssigned = $txn->rider_id !== null && $txn->delivery_status === 'assigned';
             $isUnassigned = $txn->rider_id === null && $txn->delivery_status === null
-                && \App\Services\PosDayCloseDeliveryPolicy::unassignedBlocks($company)
-                && $txn->created_at >= now()->subDays(7);
+                && \App\Services\PosDayCloseDeliveryPolicy::unassignedBlocks($company);
             // Keep the one-click cure exactly as narrow as the blocker query.
             if (! $isAssigned && ! $isUnassigned) {
                 return false;

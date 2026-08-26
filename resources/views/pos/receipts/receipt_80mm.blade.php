@@ -402,7 +402,7 @@
         <strong style="font-size:12px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
         @if($rcptBillToken !== null)
         <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span><br>
-        <span style="font-size:9px; color:#000;">{{ __('pos.bill_ref_label') }}: {{ $transaction->invoice_number }}</span>
+        <span style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_ref_label') }}: {{ $transaction->invoice_number }}</span>
         @else
         <span style="font-size:13px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
         @endif
@@ -439,8 +439,8 @@
             </tr>
             @if($rcptBillToken !== null)
             <tr>
-                <td class="inv-label" style="font-size:9px; color:#000;">{{ __('pos.bill_ref_label') }}:</td>
-                <td class="inv-value" style="font-size:9px; color:#000;">{{ $transaction->invoice_number }}</td>
+                <td class="inv-label" style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_ref_label') }}:</td>
+                <td class="inv-value" style="font-size:9px; font-weight:600; color:#000;">{{ $transaction->invoice_number }}</td>
             </tr>
             @else
             <tr>

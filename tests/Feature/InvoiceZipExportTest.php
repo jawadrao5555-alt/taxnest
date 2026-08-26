@@ -583,9 +583,10 @@ class InvoiceZipExportTest extends TestCase
         $cached = \App\Services\InvoicePdfCacheService::path($this->company->id, $invoice->id);
         $this->assertFileExists($cached);
 
-        // Age the rendering, but keep it newer than the invoice, so a second
-        // render would show up as a changed timestamp.
-        $stamp = time() - 300;
+        // Age the rendering, but keep it newer than the invoice AND newer than
+        // the template revision, so a second render would show up as a changed
+        // timestamp rather than as a legitimate re-render.
+        $stamp = max(time() - 300, \App\Services\InvoicePdfCacheService::TEMPLATE_CHANGED_AT + 1);
         touch($cached, $stamp);
         clearstatcache();
 
@@ -597,6 +598,34 @@ class InvoiceZipExportTest extends TestCase
 
         clearstatcache();
         $this->assertSame($stamp, filemtime($cached), 'the invoice was rendered all over again');
+    }
+
+    /**
+     * A redesign of the printed document must reach invoices nobody has
+     * touched since — otherwise two buyers hold the same invoice number in two
+     * different layouts, and a correction to the seller block never lands.
+     */
+    public function test_a_pdf_rendered_before_the_template_revision_is_not_current(): void
+    {
+        $invoice = $this->makeInvoice('locked', 'DI00009');
+
+        $this->build(InvoiceZipBuilderService::start(
+            $this->company->id,
+            null,
+            ['scope' => InvoiceZipBuilderService::SCOPE_COMPLETED]
+        ));
+
+        $cached = \App\Services\InvoicePdfCacheService::path($this->company->id, $invoice->id);
+        $this->assertFileExists($cached);
+
+        // Rendered by the previous template, one second before the revision.
+        touch($cached, \App\Services\InvoicePdfCacheService::TEMPLATE_CHANGED_AT - 1);
+        clearstatcache();
+
+        $this->assertNull(
+            \App\Services\InvoicePdfCacheService::currentPath($invoice->fresh()),
+            'an old-template rendering must not be handed back'
+        );
     }
 
     /** A cached PDF older than its invoice is a stale tax document, never served. */

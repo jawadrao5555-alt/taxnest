@@ -25,6 +25,24 @@ use Illuminate\Support\Facades\Storage;
  */
 class InvoicePdfCacheService
 {
+    /**
+     * When the buyer-facing template last changed in a way the buyer can see.
+     *
+     * A cached PDF is only checked against the invoice it was made from, so a
+     * redesign of the document would otherwise keep being served from disk for
+     * every invoice nobody has edited since — two shops could hold the same
+     * invoice number in two different layouts. Bump this to the moment of the
+     * change (unix seconds) whenever the printed document itself changes, and
+     * every cached file older than it re-renders on its next download.
+     *
+     * Do NOT wire this to the Blade file's mtime: a deploy rewrites file times,
+     * which would silently re-render a distributor's whole archive on releases
+     * that never touched the invoice.
+     *
+     * 2026-08-26: head-office name/address removed from a branch invoice.
+     */
+    public const TEMPLATE_CHANGED_AT = 1787729897;
+
     public static function dir(int $companyId): string
     {
         return 'invoice-pdfs/company_' . $companyId;
@@ -46,7 +64,8 @@ class InvoicePdfCacheService
 
         $changedAt = max(
             (int) ($invoice->updated_at?->getTimestamp() ?? 0),
-            (int) ($invoice->created_at?->getTimestamp() ?? 0)
+            (int) ($invoice->created_at?->getTimestamp() ?? 0),
+            self::TEMPLATE_CHANGED_AT
         );
 
         // Rendered before the invoice last changed: what is on disk shows the

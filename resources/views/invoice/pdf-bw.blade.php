@@ -75,7 +75,6 @@
         .top-strip { width: 100%; border-collapse: collapse; margin-top: 9px; }
         .top-strip > tbody > tr > td { vertical-align: top; }
         .seller-name { font-size: 17px; font-weight: 700; color: {{ $accent }}; letter-spacing: 0.3px; }
-        .seller-branch { font-size: 10px; font-weight: 700; color: {{ $accent }}; margin-top: 1px; }
         .seller-info { font-size: 9.5px; color: #33474C; margin-top: 3px; line-height: 1.5; }
         .seller-info strong { font-weight: 700; color: #16262B; }
 
@@ -235,21 +234,23 @@
                     // address. The branch on the invoice IS that trading
                     // identity, so it headlines the bill it was sold from —
                     // head office included, because a head office can carry its
-                    // own trading name too. The registered (legal) name still
-                    // prints underneath, since the NTN belongs to it.
+                    // own trading name too.
+                    //
+                    // ONLY that branch appears here. The registered (legal)
+                    // company name used to print underneath as a traceability
+                    // line; the owner rejected it — a buyer receiving a bill
+                    // from one shop should not see another address's business
+                    // named on it. The NTN below already ties the document to
+                    // the filer, and the FBR payload always carries the
+                    // registered identity.
                     $invBranch = $invoice->branch;
                     $legalName = $invoice->company->name ?: 'TaxNest';
                     $branchName = trim((string) ($invBranch->name ?? ''));
-                    $tidy = static fn($v) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $v)));
-                    $branchIsOwnName = $branchName !== '' && $tidy($branchName) !== $tidy($legalName);
-                    $sellerName = $branchIsOwnName ? $branchName : $legalName;
+                    $sellerName = $branchName !== '' ? $branchName : $legalName;
                     $branchAddress = ($invBranch?->address ?: null) ?: $invoice->company->address;
                     $branchCity = ($invBranch?->city ?: null) ?: $invoice->company->city;
                 @endphp
                 <div class="seller-name">{{ $sellerName }}</div>
-                @if($branchIsOwnName)
-                <div class="seller-branch">{{ $legalName }}</div>
-                @endif
                 <div class="seller-info">
                     @if($branchAddress && $dp['show_address'])
                     {{ $branchAddress }}@if($branchCity), {{ $branchCity }}@endif<br>

@@ -24,8 +24,11 @@ use Tests\TestCase;
  * Rules pinned here:
  *  - A branch whose name differs from the legal name headlines the invoice,
  *    head office or not, and signs it ("For <trading name>").
- *  - The registered legal name still prints underneath, because the NTN
- *    belongs to it — the document must stay traceable to the filer.
+ *  - ONLY that branch's identity appears: the registered company name is NOT
+ *    printed as a second line. The owner rejected it — a buyer holding a bill
+ *    from one shop must not see another address's business named on it. The
+ *    NTN still ties the document to the filer, and the FBR payload keeps the
+ *    registered identity regardless.
  *  - A branch named the same as the company prints that name ONCE.
  *  - No branch = company name, exactly as before.
  *
@@ -132,16 +135,29 @@ class DiInvoiceBranchIdentityTest extends TestCase
         $this->assertSame('AL REHMAN TRADERS ONE', $this->headline($html));
     }
 
-    public function test_the_registered_name_still_prints_under_a_trading_name(): void
+    /**
+     * The whole point of the change the owner asked for: a bill sold from one
+     * trading name must not carry the other business's name (nor its address)
+     * anywhere on it.
+     */
+    public function test_only_the_selling_branch_appears_no_head_office_reference(): void
     {
-        $html = $this->render($this->branch('AL REHMAN TRADERS ONE', 'NEW HOUSING SCHEME', 'LIAQATPUR', false));
+        // A trading name that is NOT a superstring of the legal name, so the
+        // assertion below is about the legal name really being absent.
+        $html = $this->render($this->branch('CHOUDHRY TRADERS', 'NEW HOUSING SCHEME', 'LIAQATPUR', false));
 
-        $this->assertMatchesRegularExpression(
-            '/class="seller-branch">\s*' . preg_quote(self::LEGAL_NAME, '/') . '\s*<\/div>/',
+        $this->assertStringNotContainsString(
+            self::LEGAL_NAME,
             $html,
-            'The NTN belongs to the registered company, so its name must stay on the invoice.'
+            'The registered company name must not ride along on a branch invoice.'
         );
-        $this->assertStringContainsString('NTN: B282410-8', $html);
+        $this->assertStringNotContainsString(
+            'AHMED PUR SHARKIA',
+            $html,
+            'Nor may the head-office address.'
+        );
+        $this->assertStringContainsString('NEW HOUSING SCHEME', $html);
+        $this->assertStringContainsString('NTN: B282410-8', $html, 'The NTN still ties the bill to the filer.');
     }
 
     public function test_a_branch_named_after_the_company_prints_that_name_once(): void
@@ -149,7 +165,7 @@ class DiInvoiceBranchIdentityTest extends TestCase
         $html = $this->render($this->branch(self::LEGAL_NAME, 'NEW HOUSING SCHEME', 'LIAQATPUR', false));
 
         $this->assertSame(self::LEGAL_NAME, $this->headline($html));
-        $this->assertStringNotContainsString('seller-branch">', $html, 'Printing the same name twice reads like a mistake.');
+        $this->assertSame(1, substr_count($html, 'class="seller-name">'), 'Printing the same name twice reads like a mistake.');
         $this->assertStringContainsString('NEW HOUSING SCHEME', $html, 'The branch still supplies the address.');
     }
 
@@ -158,7 +174,6 @@ class DiInvoiceBranchIdentityTest extends TestCase
         $html = $this->render(null);
 
         $this->assertSame(self::LEGAL_NAME, $this->headline($html));
-        $this->assertStringNotContainsString('seller-branch">', $html);
         $this->assertStringContainsString('AHMED PUR SHARKIA', $html, 'Falls back to the company address.');
     }
 }

@@ -494,6 +494,15 @@ step "Preflight: print-confirm check (\"No\" = receipt-only skip, KOT alive; tab
 node scripts/print-confirm-check.mjs \
   || fail "print-confirm check FAILED — the Yes/No print dialog or the tables-first return regressed (Task 1025); fix before deploying"
 
+step "Preflight: Summary X/Z thermal print check (Roman Urdu + Urdu at 80mm)"
+node scripts/summary-print-check.mjs
+SP_RC=$?
+if [ $SP_RC -eq 2 ]; then
+  fail "Summary X/Z thermal print check could not run (POS server/browser/fixture unavailable) — start the Laravel Server or set SUMMARY_X_URL/SUMMARY_Z_URL"
+elif [ $SP_RC -ne 0 ]; then
+  fail "Summary X/Z thermal print check FAILED — compact report overflow/state header/A4 filename regressed; fix before deploying"
+fi
+
 step "Preflight: final-bill KOT safety net (unseen lines reach the kitchen, no duplicate slips)"
 node scripts/kot-on-final-check.mjs \
   || fail "kot-on-final check FAILED — a finalized bill either leaves the kitchen with no ticket (owner's Table 02 bug, Task 1356) or prints a duplicate slip; fix before deploying"

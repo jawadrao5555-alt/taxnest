@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 @php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
-<html lang="{{ $urduScript ? 'ur' : 'en' }}">
+<html lang="{{ $urduScript ? 'ur' : 'en' }}" dir="{{ $urduScript ? 'rtl' : 'ltr' }}" data-pos-locale="{{ app()->getLocale() }}">
 <head>
 <meta charset="UTF-8">
 <title>{{ $isXReport ?? false ? __('pos.dc_summary_xreport') : __('pos.dc_summary_zreport') }} {{ $report->report_number }}</title>
@@ -28,7 +28,11 @@ html,body{font-family:'Jameel Noori Nastaleeq','Noto Naskh Arabic','Urdu Typeset
     <div class="c b xl">{{ $isXReport ?? false ? __('pos.dc_summary_xreport') : __('pos.dc_summary_zreport') }}</div>
     <div class="c">{{ $report->report_number }}</div>
     <div class="c">{{ $report->report_date->format('l, d M Y') }}</div>
-    @if($isXReport ?? false)<div style="border:2px solid #000;padding:3px;text-align:center;font-weight:bold;margin:5px 0;">{{ __('pos.dc_provisional_watermark') }}</div>@endif
+    @if($isXReport ?? false)
+    <div data-report-state="provisional" style="border:2px solid #000;padding:3px;text-align:center;font-weight:bold;margin:5px 0;">{{ __('pos.dc_provisional_watermark') }}</div>
+    @else
+    <div data-report-state="frozen" style="border:2px solid #166534;padding:3px;text-align:center;font-weight:bold;margin:5px 0;">{{ __('pos.dc_summary_frozen') }}</div>
+    @endif
     <div class="hr2"></div>
     <div class="sec">{{ __('pos.dc_summary_totals') }}</div>
     <table>

@@ -14,6 +14,7 @@
         .title h2 { margin: 0; color: #1e1b4b; font-size: 15px; }
         .title p { margin: 3px 0; font-size: 10px; }
         .watermark { border: 2px solid #dc2626; color: #dc2626; background: #fef2f2; padding: 7px; text-align: center; font-weight: bold; margin-bottom: 12px; }
+        .frozen-state { border: 2px solid #166534; color: #166534; background: #f0fdf4; padding: 7px; text-align: center; font-weight: bold; margin-bottom: 12px; }
         .hero { background: #1e1b4b; color: #fff; padding: 10px 14px; margin-bottom: 12px; }
         .hero table, table { width: 100%; border-collapse: collapse; }
         .hero td:last-child, td.amount { text-align: right; font-weight: bold; }
@@ -41,7 +42,9 @@
         <p>{{ $report->report_date->format('l, d F Y') }} · {{ $report->report_number }}</p>
     </div>
     @if($isXReport ?? false)
-    <div class="watermark">{{ __('pos.dc_provisional_watermark') }}<br><span style="font-size:9px;">{{ __('pos.dc_summary_x_hint') }}</span></div>
+    <div class="watermark" data-report-state="provisional">{{ __('pos.dc_provisional_watermark') }}<br><span style="font-size:9px;">{{ __('pos.dc_summary_x_hint') }}</span></div>
+    @else
+    <div class="frozen-state" data-report-state="frozen">{{ __('pos.dc_summary_frozen') }}</div>
     @endif
 
     <div class="hero">

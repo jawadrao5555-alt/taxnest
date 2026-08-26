@@ -593,4 +593,12 @@ class PosDayCloseStreamSplitTest extends TestCase
         $this->assertSame('application/pdf', $response->headers->get('content-type'));
         $this->assertStringContainsString('Summary-Z-Report-', $response->headers->get('content-disposition'));
     }
+
+    public function test_summary_thermal_templates_keep_provisional_and_frozen_state_markers(): void
+    {
+        $this->assertStringContainsString('data-report-state="provisional"', file_get_contents(resource_path('views/pos/day-close-summary-thermal.blade.php')));
+        $this->assertStringContainsString('data-report-state="frozen"', file_get_contents(resource_path('views/pos/day-close-summary-thermal.blade.php')));
+        $this->assertStringContainsString('data-report-state="provisional"', file_get_contents(resource_path('views/pos/day-close-summary-pdf.blade.php')));
+        $this->assertStringContainsString('data-report-state="frozen"', file_get_contents(resource_path('views/pos/day-close-summary-pdf.blade.php')));
+    }
 }

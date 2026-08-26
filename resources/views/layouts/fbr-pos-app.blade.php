@@ -305,7 +305,6 @@
         </script>
     </head>
     <body class="h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
-        @include('partials.impersonation-banner')
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}')" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
 
@@ -317,6 +316,10 @@
                         <button @click="sidebarOpen = !sidebarOpen" type="button" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_menu_ctrl_m') }}">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         </button>
+
+                        {{-- Admin impersonation marker sits IN the bar (26 Aug 2026):
+                             as a floating pill it covered the nav underneath it. --}}
+                        @include('partials.impersonation-banner')
 
                         <a href="{{ route('fbrpos.dashboard') }}" class="flex items-center gap-2.5 group">
                             <div class="brand-tile-fbr w-8 h-8 rounded-xl flex items-center justify-center transition group-hover:scale-105">

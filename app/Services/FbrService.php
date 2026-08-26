@@ -938,11 +938,37 @@ class FbrService
         $company = $invoice->company;
 
         if ($invoice->document_type === 'Debit Note' && !empty($invoice->reference_invoice_number)) {
+            // The original is looked up by whatever the shop typed. Since our own
+            // number is displayed short, an invoice filed years ago as
+            // "{identifier}DI05962" is read off the screen as "D5962" — so the
+            // sequence, not the exact spelling, has to find the row. Miss it and
+            // the debit note would carry "D5962" to FBR instead of the original's
+            // fiscal number, referencing an invoice the regulator never filed.
+            $reference = trim((string) $invoice->reference_invoice_number);
+            $refSequence = \App\Services\InvoiceNumberingService::sequenceOf($reference);
+            $refSpellings = $refSequence !== null
+                ? \App\Services\InvoiceNumberingService::spellingsOf($refSequence)
+                : [];
+            $refLegacy = $refSequence !== null
+                ? '%DI' . str_pad((string) $refSequence, 5, '0', STR_PAD_LEFT)
+                : null;
+            $like = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
             $refInvoice = \App\Models\Invoice::where('company_id', $invoice->company_id)
-                ->where(function ($q) use ($invoice) {
-                    $q->where('fbr_invoice_number', $invoice->reference_invoice_number)
-                      ->orWhere('internal_invoice_number', $invoice->reference_invoice_number)
-                      ->orWhere('invoice_number', $invoice->reference_invoice_number);
+                ->where(function ($q) use ($reference, $refSpellings, $refLegacy, $like) {
+                    $q->where('fbr_invoice_number', $reference)
+                      ->orWhere('internal_invoice_number', $reference)
+                      ->orWhere('invoice_number', $reference);
+
+                    foreach ($refSpellings as $spelling) {
+                        $q->orWhere('internal_invoice_number', $spelling)
+                          ->orWhere('invoice_number', $spelling);
+                    }
+
+                    if ($refLegacy !== null) {
+                        $q->orWhere('internal_invoice_number', $like, $refLegacy)
+                          ->orWhere('invoice_number', $like, $refLegacy);
+                    }
                 })
                 ->first();
 

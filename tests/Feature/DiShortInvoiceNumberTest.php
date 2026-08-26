@@ -176,6 +176,46 @@ class DiShortInvoiceNumberTest extends TestCase
         $this->assertSame('3120180085013DI00001', $method->invoke($service, $company, $older));
     }
 
+    /**
+     * A debit note is typed against the number the shop can SEE. For a legacy
+     * invoice that is now displayed short, the lookup must still land on the
+     * original row and send FBR the original's fiscal number — not the short
+     * number, which the regulator has never heard of.
+     */
+    public function test_a_debit_note_typed_with_the_short_number_still_finds_the_filed_original(): void
+    {
+        $company = $this->company();
+        app()->instance('currentCompanyId', $company->id);
+
+        Invoice::withoutGlobalScopes()->insert([
+            'company_id' => $company->id,
+            'invoice_number' => '3120180085013DI05962',
+            'internal_invoice_number' => '3120180085013DI05962',
+            'fbr_invoice_number' => '3120180085013DI8I449K417830',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $service = (new \ReflectionClass(\App\Services\FbrService::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod(\App\Services\FbrService::class, 'resolveInvoiceRefNo');
+        $method->setAccessible(true);
+
+        foreach (['D5962', 'D05962', '3120180085013DI05962'] as $typed) {
+            $note = new Invoice([
+                'document_type' => 'Debit Note',
+                'reference_invoice_number' => $typed,
+            ]);
+            $note->company_id = $company->id;
+            $note->setRelation('company', $company);
+
+            $this->assertSame(
+                '3120180085013DI8I449K417830',
+                $method->invoke($service, $note),
+                "reference typed as {$typed}"
+            );
+        }
+    }
+
     /** Another company's D0001 is irrelevant — numbering is per company. */
     public function test_numbering_is_per_company(): void
     {

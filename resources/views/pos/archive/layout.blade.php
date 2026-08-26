@@ -33,6 +33,9 @@
             <div class="flex items-center gap-3">
                 {{-- Which branch's history is on screen (Task 1361). Renders
                      nothing for a single-branch shop. --}}
+                {{-- Exit is the only way out of admin impersonation, so this portal
+                     carries the same chip as the main panels. --}}
+                @include('partials.impersonation-banner')
                 <x-branch-switcher color="blue" :allow-all="true" :show-manage="false" />
                 <a href="{{ route('pos.archive.index') }}" class="text-sm text-slate-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-slate-800/50 transition">Archived Bills</a>
                 <a href="{{ route('pos.archive.export') }}" class="text-sm text-slate-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-slate-800/50 transition">Export CSV</a>

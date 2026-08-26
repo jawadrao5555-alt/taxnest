@@ -479,7 +479,6 @@
         </script>
     </head>
     <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}"@if($posEffStyleLayout === 'saaf') data-saaf="1"@endif>
-        @include('partials.impersonation-banner')
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
 
@@ -496,6 +495,10 @@
                                 <span class="text-[9px] text-white ml-1 hidden lg:inline font-medium">Enterprise</span>
                             </div>
                         </a>
+
+                        {{-- Admin impersonation marker sits IN the bar (26 Aug 2026):
+                             as a floating pill it covered the nav underneath it. --}}
+                        @include('partials.impersonation-banner')
 
                         <div class="h-5 w-px bg-white/10 hidden md:block"></div>
 

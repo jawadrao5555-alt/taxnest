@@ -141,4 +141,4 @@ build = ["bash", "-c", "echo 'holding page: no build needed'"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
-timeoutMs = 180000
+timeoutMs = 360000

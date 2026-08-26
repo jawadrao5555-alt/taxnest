@@ -67,7 +67,15 @@ class PosRepeatCustomerAlertTest extends TestCase
             $table->timestamps();
         });
 
-        // No pos_customer_spend_snapshots table — exercises the hasTable guard.
+        Schema::create('pos_customer_spend_snapshots', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('customer_id')->nullable();
+            $table->string('customer_phone')->nullable();
+            $table->decimal('total_amount', 12, 2)->default(0);
+            $table->timestamp('sold_at')->nullable();
+            $table->timestamps();
+        });
 
         Cache::flush();
     }
@@ -149,6 +157,26 @@ class PosRepeatCustomerAlertTest extends TestCase
         foreach ([120, 110, 100] as $daysAgo) {
             $this->addTxn(['customer_id' => $gone, 'created_at' => now()->subDays($daysAgo)]);
         }
+
+        $this->assertCount(0, $this->fresh());
+    }
+
+    public function test_deleted_local_spend_snapshot_never_becomes_an_order_or_last_order(): void
+    {
+        $cid = $this->makeCustomer(['name' => 'Deleted Local Only']);
+        foreach ([40, 30] as $daysAgo) {
+            $this->addTxn(['customer_id' => $cid, 'created_at' => now()->subDays($daysAgo)]);
+        }
+        // This is retained only as an amount. It must not create a third order
+        // or make the customer appear to have ordered yesterday.
+        DB::table('pos_customer_spend_snapshots')->insert([
+            'company_id' => self::COMPANY,
+            'customer_id' => $cid,
+            'total_amount' => 500,
+            'sold_at' => now()->subDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->assertCount(0, $this->fresh());
     }

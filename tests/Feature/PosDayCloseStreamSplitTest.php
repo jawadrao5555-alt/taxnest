@@ -441,6 +441,30 @@ class PosDayCloseStreamSplitTest extends TestCase
         $this->assertSame(6, DB::table('pos_transactions')->count(), 'no wash — every bill survives');
     }
 
+    public function test_summary_x_and_z_keep_their_matching_live_and_frozen_figures(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedMixedDay($companyId, $user->id);
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+
+        $request = Request::create('/pos/day-close/x-report/summary/thermal', 'GET', ['date' => now()->toDateString()]);
+        $xView = (new PosController())->dayCloseXSummaryThermal($request);
+        $xData = $xView->getData();
+        $this->assertTrue($xData['isXReport']);
+        $this->assertSame(2572.0, (float) $xData['report']->total_amount);
+        $this->assertStringContainsString('Summary X-Report', $xView->render());
+        $this->assertSame(0, DB::table('pos_day_close_reports')->count(), 'summary X must stay read-only');
+
+        $result = (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+        $zView = (new PosController())->dayCloseSummaryThermal($result['report']->id);
+        $zData = $zView->getData();
+        $this->assertSame((float) $result['report']->total_amount, (float) $zData['report']->total_amount);
+        $this->assertSame(1872.0, (float) $zData['streamSplit']['pra']['sales']);
+        $this->assertStringContainsString('Summary Z-Report', $zView->render());
+    }
+
     // ── 3. X-Report refuses an already-closed day ────────────────────────────
 
     public function test_x_report_routes_refuse_an_already_closed_day(): void
@@ -458,7 +482,7 @@ class PosDayCloseStreamSplitTest extends TestCase
 
         // A closed day has a Z-Report (frozen + hashed) — a PROVISIONAL print
         // over it would be a fiscal lie. Both routes must redirect, not render.
-        foreach (['dayCloseXReportThermal', 'dayCloseXReportPdf'] as $method) {
+        foreach (['dayCloseXReportThermal', 'dayCloseXReportPdf', 'dayCloseXSummaryThermal', 'dayCloseXSummaryPdf'] as $method) {
             $response = (new PosController())->{$method}($request);
             $this->assertInstanceOf(
                 \Illuminate\Http\RedirectResponse::class,

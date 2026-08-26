@@ -10873,13 +10873,10 @@ class PosController extends Controller
     /**
      * Full customer purchase history for the history page / CSV / PDF.
      *
-     * When the company's "customer spend persist" setting is ON (default), the
-     * history additionally includes:
-     *   - ARCHIVED local bills (day-close 'save' policy) — via withoutGlobalScope
-     *   - spend SNAPSHOTS of deleted local bills (day-close 'delete' policy) —
-     *     merged as non-persisted PosTransaction stand-ins carrying the original
-     *     figures, flagged is_spend_snapshot so views can annotate them.
-     * When OFF, behaviour is the classic live-bills-only view.
+     * When the company's "customer spend persist" setting is ON (default),
+     * archived local bills (day-close 'save' policy) remain visible through
+     * withoutGlobalScope. Deleted local bills never return here: their snapshots
+     * are amount-only customer-spend records, not purchase-history rows.
      *
      * @return \Illuminate\Support\Collection ordered newest-first
      */
@@ -10894,37 +10891,6 @@ class PosController extends Controller
         }
         $transactions = $query->get();
 
-        if ($persist && \Illuminate\Support\Facades\Schema::hasTable('pos_customer_spend_snapshots')) {
-            $snapshots = \App\Models\PosCustomerSpendSnapshot::where('company_id', $companyId)
-                ->where(function ($q) use ($customer) {
-                    $q->where('customer_id', $customer->id);
-                    if (!empty($customer->phone)) {
-                        $q->orWhere('customer_phone', $customer->phone);
-                    }
-                })
-                ->get()
-                ->map(function ($s) {
-                    $t = (new PosTransaction)->forceFill([
-                        'invoice_number' => $s->invoice_number,
-                        'invoice_mode' => 'local',
-                        'pra_status' => null,
-                        'pra_invoice_number' => null,
-                        'payment_method' => $s->payment_method,
-                        'subtotal' => $s->subtotal,
-                        'discount_amount' => $s->discount_amount,
-                        'tax_amount' => $s->tax_amount,
-                        'total_amount' => $s->total_amount,
-                        'created_at' => $s->sold_at ?? $s->created_at,
-                    ]);
-                    $t->is_spend_snapshot = true;
-                    return $t;
-                });
-
-            $transactions = $transactions->concat($snapshots)
-                ->sortByDesc(fn ($t) => $t->created_at)
-                ->values();
-        }
-
         return $transactions;
     }
 
@@ -10938,9 +10904,12 @@ class PosController extends Controller
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
 
         $transactions = $this->customerHistoryTransactions($companyId, $customer);
-        $totalSpent = $transactions->sum('total_amount');
+        $visibleSpent = (float) $transactions->sum('total_amount');
+        // Deleted local bills add only to the lifetime spend number. They must
+        // not inflate bill count/average or become the customer's "last order".
+        $totalSpent = $visibleSpent + \App\Services\PosCustomerSpend::deletedLocalTotal((int) $companyId, $customer);
         $totalOrders = $transactions->count();
-        $avgOrder = $totalOrders > 0 ? $totalSpent / $totalOrders : 0;
+        $avgOrder = $totalOrders > 0 ? $visibleSpent / $totalOrders : 0;
         $lastOrder = $transactions->first();
 
         // Task 1161: khamosh-repeat chip on the header (same service as dashboard).
@@ -11055,13 +11024,15 @@ class PosController extends Controller
         $company = Company::find($companyId);
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
         $transactions = $this->customerHistoryTransactions($companyId, $customer);
-        $totalSpent = $transactions->sum('total_amount');
+        $visibleSpent = (float) $transactions->sum('total_amount');
+        $totalSpent = $visibleSpent + \App\Services\PosCustomerSpend::deletedLocalTotal((int) $companyId, $customer);
         $totalOrders = $transactions->count();
+        $avgOrder = $totalOrders > 0 ? $visibleSpent / $totalOrders : 0;
 
         $filename = 'Customer_History_' . preg_replace('/[^A-Za-z0-9]+/', '_', $customer->name) . '_' . now()->format('Ymd') . '.pdf';
         return $this->renderReportPdf(
             'pos.customer-history-pdf',
-            compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders'),
+            compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders', 'avgOrder'),
             $filename
         );
     }
@@ -15214,6 +15185,89 @@ class PosController extends Controller
         }
 
         return view('pos.day-close-thermal', $ctx);
+    }
+
+    /**
+     * Summary X is the same read-only live report as detailed X, with a compact
+     * presentation only. buildXReportContext owns the date, branch, isolated
+     * cashier scope, and already-closed guard so figures cannot drift.
+     */
+    public function dayCloseXSummaryPdf(Request $request)
+    {
+        $ctx = $this->buildXReportContext($request);
+        if (!is_array($ctx)) {
+            return $ctx;
+        }
+
+        return $this->renderReportPdf(
+            'pos.day-close-summary-pdf',
+            $ctx,
+            "Summary-X-Report-{$ctx['report']->report_date->format('Y-m-d')}.pdf"
+        );
+    }
+
+    public function dayCloseXSummaryThermal(Request $request)
+    {
+        $ctx = $this->buildXReportContext($request);
+        if (!is_array($ctx)) {
+            return $ctx;
+        }
+
+        return view('pos.day-close-summary-thermal', $ctx);
+    }
+
+    /**
+     * Minimal frozen Z-report context. Financial values come directly from the
+     * stored day-close row; stream split is the already-frozen snapshot when
+     * available. This report deliberately does not rebuild live totals after
+     * the day-close wash has archived/deleted local bills.
+     */
+    private function buildSummaryZReportContext($id)
+    {
+        $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        if ($dayCloseUser && $dayCloseUser->posSalesIsolated()) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
+        if (!$this->canSeeBranchReport($report)) {
+            return redirect()->route('pos.day-close')->with('error', __('pos.dayclose_other_branch_report'));
+        }
+
+        // Old reports predate stream_summary. Their reliable headline figures
+        // remain available above; omit optional stream boxes rather than
+        // reconstructing a washed historical data set.
+        $streamSplit = is_array($report->stream_summary ?? null) ? $report->stream_summary : [];
+        return compact('company', 'report', 'streamSplit');
+    }
+
+    public function dayCloseSummaryPdf($id)
+    {
+        $ctx = $this->buildSummaryZReportContext($id);
+        if (!is_array($ctx)) {
+            return $ctx;
+        }
+
+        return $this->renderReportPdf(
+            'pos.day-close-summary-pdf',
+            $ctx,
+            "Summary-Z-Report-{$ctx['report']->report_date->format('Y-m-d')}.pdf"
+        );
+    }
+
+    public function dayCloseSummaryThermal($id)
+    {
+        $ctx = $this->buildSummaryZReportContext($id);
+        if (!is_array($ctx)) {
+            return $ctx;
+        }
+
+        return view('pos.day-close-summary-thermal', $ctx);
     }
 
     /**

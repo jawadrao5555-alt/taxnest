@@ -989,6 +989,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // the /day-close/{id}/... routes so {id} never swallows 'x-report'.
     Route::get('/day-close/x-report/pdf', [PosController::class, 'dayCloseXReportPdf'])->name('pos.day-close-x-pdf');
     Route::get('/day-close/x-report/thermal', [PosController::class, 'dayCloseXReportThermal'])->name('pos.day-close-x-thermal');
+    Route::get('/day-close/x-report/summary/pdf', [PosController::class, 'dayCloseXSummaryPdf'])->name('pos.day-close-x-summary-pdf');
+    Route::get('/day-close/x-report/summary/thermal', [PosController::class, 'dayCloseXSummaryThermal'])->name('pos.day-close-x-summary-thermal');
+    Route::get('/day-close/{id}/summary/pdf', [PosController::class, 'dayCloseSummaryPdf'])->name('pos.day-close-summary-pdf');
+    Route::get('/day-close/{id}/summary/thermal', [PosController::class, 'dayCloseSummaryThermal'])->name('pos.day-close-summary-thermal');
     Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');

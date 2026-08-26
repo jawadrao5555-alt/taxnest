@@ -49,7 +49,7 @@
         <tr>
             <td><div class="lbl">{{ __('pos.ch_total_orders') }}</div><div class="val">{{ number_format($totalOrders) }}</div></td>
             <td><div class="lbl">{{ __('pos.ch_total_spent') }}</div><div class="val">PKR {{ number_format($totalSpent, 0) }}</div></td>
-            <td><div class="lbl">{{ __('pos.ch_avg_order') }}</div><div class="val">PKR {{ number_format($totalOrders > 0 ? $totalSpent / $totalOrders : 0, 0) }}</div></td>
+            <td><div class="lbl">{{ __('pos.ch_avg_order') }}</div><div class="val">PKR {{ number_format($avgOrder ?? 0, 0) }}</div></td>
         </tr>
     </table>
 

@@ -33,9 +33,6 @@ use Illuminate\Support\Facades\Schema;
  *     Queried via DB::table so ARCHIVED local bills still count (day-close
  *     'save' policy keeps them as real purchases — matches the history page
  *     under the default spend-persist setting).
- *   - pos_customer_spend_snapshots: deleted local bills' spend snapshots
- *     (day-close 'delete' policy) — without these a delete-policy shop's
- *     regulars would look like they never ordered.
  *   - restaurant_orders: completed dine-in/waiter orders, but ONLY rows with
  *     pos_transaction_id NULL — a settled order's linked bill is already
  *     counted from pos_transactions (counting both = double).
@@ -231,29 +228,7 @@ class PosRepeatCustomerAlert
             ->selectRaw('pc.id as cid, COUNT(*) as c, MAX(t.created_at) as last')
             ->get());
 
-        // (c) Spend snapshots of DELETED local bills (day-close 'delete' policy).
-        if (Schema::hasTable('pos_customer_spend_snapshots')) {
-            $merge(DB::table('pos_customer_spend_snapshots')
-                ->where('company_id', $companyId)
-                ->whereNotNull('customer_id')
-                ->groupBy('customer_id')
-                ->selectRaw('customer_id as cid, COUNT(*) as c, MAX(COALESCE(sold_at, created_at)) as last')
-                ->get());
-            $merge(DB::table('pos_customer_spend_snapshots as s')
-                ->join('pos_customers as pc', function ($j) use ($companyId) {
-                    $j->on('pc.phone', '=', 's.customer_phone')
-                        ->where('pc.company_id', '=', $companyId);
-                })
-                ->where('s.company_id', $companyId)
-                ->whereNull('s.customer_id')
-                ->whereNotNull('s.customer_phone')
-                ->where('s.customer_phone', '!=', '')
-                ->groupBy('pc.id')
-                ->selectRaw('pc.id as cid, COUNT(*) as c, MAX(COALESCE(s.sold_at, s.created_at)) as last')
-                ->get());
-        }
-
-        // (d) Completed restaurant orders that never got a linked bill row —
+        // (c) Completed restaurant orders that never got a linked bill row —
         //     linked ones are already counted from pos_transactions.
         if (Schema::hasTable('restaurant_orders')) {
             $merge(DB::table('restaurant_orders')

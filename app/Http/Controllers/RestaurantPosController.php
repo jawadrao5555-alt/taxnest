@@ -11,6 +11,7 @@ use App\Models\PosTransaction;
 use App\Models\PosTransactionItem;
 use App\Models\RestaurantTable;
 use App\Models\RestaurantOrder;
+use App\Services\PosCustomerSpend;
 use App\Models\RestaurantOrderItem;
 use App\Models\ProductRecipe;
 use App\Models\Ingredient;
@@ -1896,7 +1897,7 @@ class RestaurantPosController extends Controller
                 ->where('status', 'completed')
                 ->count();
             $totalOrders = ($posOrders->cnt ?? 0) + $restOrders;
-            $totalSpent = round($posOrders->total ?? 0, 2);
+            $totalSpent = round((float) ($posOrders->total ?? 0) + PosCustomerSpend::deletedLocalTotal((int) $companyId, $c), 2);
             $result[] = [
                 'id' => $c->id,
                 'name' => $c->name,
@@ -2786,6 +2787,7 @@ class RestaurantPosController extends Controller
             ->where('customer_id', $customer->id)
             ->where('status', 'completed')
             ->sum('total_amount');
+        $totalSpent += PosCustomerSpend::deletedLocalTotal((int) $companyId, $customer);
 
         $lastOrder = PosTransaction::where('company_id', $companyId)
             ->where('customer_id', $customer->id)
@@ -3243,6 +3245,7 @@ class RestaurantPosController extends Controller
             ->where('customer_id', $customer->id)
             ->where('status', 'completed')
             ->sum('total_amount');
+        $totalSpent += PosCustomerSpend::deletedLocalTotal((int) $companyId, $customer);
 
         return response()->json([
             'customer_name' => $customer->name,

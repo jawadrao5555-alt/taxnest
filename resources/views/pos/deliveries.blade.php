@@ -494,7 +494,7 @@
                                     @endif
                                 @endif
                             @else
-                            <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}">
+                            <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}" class="space-y-1">
                                 @csrf
                                 <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-purple-500 focus:border-purple-500">
                                     <option value="">{{ __('pos.no_rider_opt') }}</option>
@@ -513,6 +513,10 @@
                                     @endif
                                     @endforeach
                                 </select>
+                                <label class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                                    <input type="checkbox" name="print_receipt" value="1" data-delivery-print-receipt class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                    <span>{{ __('pos.receipt_print') }}</span>
+                                </label>
                             </form>
                             @endif
                         </td>
@@ -710,7 +714,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-3">
-                            <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}">
+                            <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}" class="space-y-1">
                                 @csrf
                                 <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-purple-500 focus:border-purple-500">
                                     <option value="">{{ __('pos.no_rider_opt') }}</option>
@@ -721,6 +725,10 @@
                                     @endif
                                     @endforeach
                                 </select>
+                                <label class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                                    <input type="checkbox" name="print_receipt" value="1" data-delivery-print-receipt class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                    <span>{{ __('pos.receipt_print') }}</span>
+                                </label>
                             </form>
                         </td>
                         <td class="px-4 py-3">
@@ -1129,6 +1137,57 @@ function tnCustLoc() {
         } catch (e) { /* poll must never break the board */ }
     }
     setInterval(tick, 30000);
+})();
+</script>
+@endif
+<script>
+// The assignment checkbox uses the same per-device preference as the sale
+// screen's Pending Deliveries popup. A rider may be changed from either place
+// without the two receipt choices drifting apart.
+(function () {
+    var boxes = Array.from(document.querySelectorAll('[data-delivery-print-receipt]'));
+    if (!boxes.length) return;
+    try {
+        var key = 'pos_delivery_final_print';
+        var checked = localStorage.getItem(key) === '1';
+        boxes.forEach(function (box) {
+            box.checked = checked;
+            box.addEventListener('change', function () {
+                var next = !!box.checked;
+                boxes.forEach(function (other) { other.checked = next; });
+                localStorage.setItem(key, next ? '1' : '0');
+            });
+        });
+    } catch (e) { /* Local storage is only a convenience; checkbox still works. */ }
+})();
+</script>
+@if($deliveryReceiptId = session('delivery_receipt_to_print'))
+<script>
+// Form submissions reload the board, so queue the requested receipt after the
+// redirect. Match the sale screen: Desktop Agent first, auto-print iframe only
+// when silent printing is unavailable.
+(function () {
+    var txnId = {{ (int) $deliveryReceiptId }};
+    var fallback = function () {
+        var frame = document.createElement('iframe');
+        frame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-9999px;top:-9999px';
+        frame.src = '/pos/transaction/' + txnId + '/receipt?auto_print=1';
+        document.body.appendChild(frame);
+        window.setTimeout(function () { frame.remove(); }, 180000);
+    };
+    fetch('{{ route('pos.api.print-jobs') }}', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': {{ Js::from(csrf_token()) }}
+        },
+        body: JSON.stringify({ type: 'bill', transaction_id: txnId })
+    }).then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (data) {
+            if (!response.ok || !data || !data.success) fallback();
+        });
+    }).catch(fallback);
 })();
 </script>
 @endif

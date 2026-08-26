@@ -1331,7 +1331,7 @@ return [
     'settle_already_paid_failed' => 'بل کی ادائیگی تبدیل نہیں ہو سکی۔ دوبارہ کوشش کریں۔',
     'settle_already_paid_chip' => 'حساب کے وقت پہلے ادا شدہ',
     'settle_already_paid_audit_title' => ':date کو پہلے ادا شدہ نشان لگایا',
-    'delivery_print_receipt' => 'رسید بھی پرنٹ کریں (ڈیفالٹ: نہیں — کسٹمر کاؤنٹر پر نہیں)',
+    'delivery_print_receipt' => 'فائنل کرنے یا رائیڈر لگانے پر رسید بھی پرنٹ کریں (ڈیفالٹ: نہیں — کسٹمر کاؤنٹر پر نہیں)',
     'final_print_receipt' => 'رسید پرنٹ کریں (نشان ہٹائیں = کاغذ بچائیں، صرف اس بل کے لیے)',
     'delivery_riders' => 'ڈیلیوری رائیڈرز',
     'delivery_riders_day_summary' => 'ڈیلیوری رائیڈرز — دن کا خلاصہ',

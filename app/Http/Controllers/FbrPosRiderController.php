@@ -482,6 +482,13 @@ class FbrPosRiderController extends Controller
         }
         $txn->update($upd);
 
+        // The optional rider-assignment receipt is for an already-final bill
+        // only. Do not turn an early/provisional rider assignment, or an
+        // unassign action, into an unexpected customer receipt.
+        $printReceipt = (bool) $riderId
+            && $request->boolean('print_receipt')
+            && !$txn->isLocalBill();
+
         // Sale-screen Pending Deliveries popup (Task 517) assigns via fetch —
         // JSON clients get JSON; the Deliveries board form keeps back().
         if ($request->expectsJson()) {
@@ -489,10 +496,16 @@ class FbrPosRiderController extends Controller
                 'success'         => true,
                 'rider_id'        => $riderId,
                 'delivery_status' => $upd['delivery_status'],
+                'print_receipt'   => $printReceipt,
             ]);
         }
 
-        return back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
+        $redirect = back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
+        if ($printReceipt) {
+            $redirect->with('delivery_receipt_to_print', (int) $txn->id);
+        }
+
+        return $redirect;
     }
 
     /** Dispatch / delivered / returned lifecycle. */

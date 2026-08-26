@@ -7512,11 +7512,15 @@ function restaurantPos() {
                 const res = await fetch('{{ url('/fbr-pos/deliveries') }}/' + bill.id + '/assign', {
                     method: 'POST',
                     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ rider_id: riderId }),
+                    // Provisional deliveries can be assigned early, but their
+                    // receipt belongs to finalization. The server repeats this
+                    // guard so an edited browser request cannot bypass it.
+                    body: JSON.stringify({ rider_id: riderId, print_receipt: !!(bill.is_final && this.deliveryPrintReceipt) }),
                 });
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {
                     this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                    if (data.print_receipt) this.printAssignedDeliveryReceipt(bill);
                     this.loadLocalBills();
                 } else {
                     this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
@@ -7525,6 +7529,25 @@ function restaurantPos() {
                 this.showToast(window.TXT.network_error, 'error');
             }
             this.riderAssignBusyId = null;
+        },
+        // Same receipt contract as a normal FBR bill: Desktop Agent first,
+        // then the already-established hidden-iframe fallback.
+        printAssignedDeliveryReceipt(bill) {
+            if (!bill || !bill.id) return;
+            const txnId = bill.id;
+            const url = '/fbr-pos/transaction/' + txnId + '/receipt?auto_print=1';
+            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
+            if (this.silentBillPrint) {
+                this.trySilentPrint({ type: 'fbr_bill', transaction_id: txnId }).then(ok => {
+                    if (ok) {
+                        this.showToast(ok.deduped ? window.TXT.bill_already_printing : window.TXT.receipt_sent_to_printer, ok.deduped ? 'info' : 'success');
+                    } else {
+                        fallback();
+                    }
+                });
+                return;
+            }
+            fallback();
         },
         // ─── Delivered mark from the panel (Task 521 — PRA parity) ──────────
         // FINAL delivery bill ko panel se Delivered mark karna — reuses POST

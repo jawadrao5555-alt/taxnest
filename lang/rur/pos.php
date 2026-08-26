@@ -1331,7 +1331,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'settle_already_paid_failed' => 'Bill ki payment update nahi ho saki. Dobara koshish karein.',
     'settle_already_paid_chip' => 'Settlement par pehle ada shuda',
     'settle_already_paid_audit_title' => ':date ko pehle ada shuda mark kiya',
-    'delivery_print_receipt' => 'Receipt bhi print karein (Default: Nahi — customer counter par nahi)',
+    'delivery_print_receipt' => 'Final karte ya rider assign karte waqt receipt bhi print karein (Default: Nahi — customer counter par nahi)',
     'final_print_receipt' => 'Receipt print karein (untick = kaghaz bachayen, sirf is bill ke liye)',
     'delivery_riders' => 'Delivery Riders',
     'delivery_riders_day_summary' => 'Delivery Riders — din ka summary',

@@ -1124,6 +1124,14 @@ class PosRiderController extends Controller
         }
         $txn->update($upd);
 
+        // Delivery receipts are normally skipped because the customer is away
+        // from the counter. A cashier may explicitly ask for one while handing
+        // a FINAL bill to a rider; a provisional has no customer receipt yet,
+        // and removing a rider must never trigger a print.
+        $printReceipt = (bool) $riderId
+            && $request->boolean('print_receipt')
+            && !$txn->isLocalBill();
+
         // Task #1106: instant FCM push to the newly assigned rider. Fire-and-
         // forget (runs in app()->terminating, all failures swallowed) — the
         // assign itself can never block or fail because of push. The 15-min
@@ -1143,10 +1151,16 @@ class PosRiderController extends Controller
                 'success'         => true,
                 'rider_id'        => $riderId,
                 'delivery_status' => $upd['delivery_status'],
+                'print_receipt'   => $printReceipt,
             ]);
         }
 
-        return back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
+        $redirect = back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
+        if ($printReceipt) {
+            $redirect->with('delivery_receipt_to_print', (int) $txn->id);
+        }
+
+        return $redirect;
     }
 
     /** Dispatch / delivered / returned lifecycle. Returned = khata drop ONLY (never voids the bill). */

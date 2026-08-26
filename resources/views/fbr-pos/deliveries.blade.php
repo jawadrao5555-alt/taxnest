@@ -316,7 +316,7 @@
                                     @endif
                                 @endif
                             @else
-                            <form method="POST" action="{{ route('fbrpos.deliveries.assign', $b->id) }}">
+                            <form method="POST" action="{{ route('fbrpos.deliveries.assign', $b->id) }}" class="space-y-1">
                                 @csrf
                                 <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-blue-500 focus:border-blue-500">
                                     <option value="">{{ __('pos.no_rider_opt') }}</option>
@@ -332,6 +332,10 @@
                                     @endif
                                     @endforeach
                                 </select>
+                                <label class="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                                    <input type="checkbox" name="print_receipt" value="1" data-delivery-print-receipt class="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span>{{ __('pos.receipt_print') }}</span>
+                                </label>
                             </form>
                             @endif
                         </td>
@@ -443,4 +447,52 @@
     });
 })();
 </script>
+<script>
+// Keep the board's optional receipt choice aligned with the FBR sale screen.
+(function () {
+    var boxes = Array.from(document.querySelectorAll('[data-delivery-print-receipt]'));
+    if (!boxes.length) return;
+    try {
+        var key = 'fbrpos_delivery_final_print';
+        var checked = localStorage.getItem(key) === '1';
+        boxes.forEach(function (box) {
+            box.checked = checked;
+            box.addEventListener('change', function () {
+                var next = !!box.checked;
+                boxes.forEach(function (other) { other.checked = next; });
+                localStorage.setItem(key, next ? '1' : '0');
+            });
+        });
+    } catch (e) { /* Local storage is only a convenience; checkbox still works. */ }
+})();
+</script>
+@if($deliveryReceiptId = session('delivery_receipt_to_print'))
+<script>
+// Board assignments redirect before printing; preserve the normal agent-first
+// contract and use the receipt iframe solely as its fallback.
+(function () {
+    var txnId = {{ (int) $deliveryReceiptId }};
+    var fallback = function () {
+        var frame = document.createElement('iframe');
+        frame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-9999px;top:-9999px';
+        frame.src = '/fbr-pos/transaction/' + txnId + '/receipt?auto_print=1';
+        document.body.appendChild(frame);
+        window.setTimeout(function () { frame.remove(); }, 180000);
+    };
+    fetch('{{ route('fbrpos.api.print-jobs') }}', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': {{ Js::from(csrf_token()) }}
+        },
+        body: JSON.stringify({ type: 'fbr_bill', transaction_id: txnId })
+    }).then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (data) {
+            if (!response.ok || !data || !data.success) fallback();
+        });
+    }).catch(fallback);
+})();
+</script>
+@endif
 </x-fbr-pos-layout>

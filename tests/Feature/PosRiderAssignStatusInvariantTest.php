@@ -145,6 +145,21 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         return $this->controller()->assign($this->makeRequest('/pos/deliveries/' . $txnId . '/assign', $payload), $txnId);
     }
 
+    private function assignJson(int $txnId, array $payload)
+    {
+        $this->actAs();
+        $request = Request::create(
+            '/pos/deliveries/' . $txnId . '/assign',
+            'POST',
+            $payload,
+            [],
+            [],
+            ['HTTP_ACCEPT' => 'application/json']
+        );
+        $request->setLaravelSession(app('session.store'));
+        return $this->controller()->assign($request, $txnId);
+    }
+
     private function updateStatus(int $txnId, string $status)
     {
         $this->actAs();
@@ -254,6 +269,35 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertFiscalIdentityUnchanged($before, $bill);
         $this->assertNull($this->tx($bill)->rider_id);
         $this->assertNull($this->tx($bill)->delivery_status);
+    }
+
+    public function test_assignment_receipt_is_only_allowed_for_a_final_bill_with_a_rider(): void
+    {
+        $rider = $this->makeRider();
+
+        $final = $this->makeBill(null, [
+            'invoice_mode' => 'pra',
+            'pra_status' => 'submitted',
+        ]);
+        $finalResponse = $this->assignJson($final, ['rider_id' => $rider, 'print_receipt' => true]);
+        $this->assertSame(200, $finalResponse->getStatusCode());
+        $this->assertTrue((bool) ($finalResponse->getData(true)['print_receipt'] ?? false));
+
+        // Local/provisional rows can be pre-assigned, but no receipt may be
+        // released before the normal Final Cash/Card path finishes.
+        $provisional = $this->makeBill(null, [
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'pra_invoice_number' => null,
+        ]);
+        $provisionalResponse = $this->assignJson($provisional, ['rider_id' => $rider, 'print_receipt' => true]);
+        $this->assertSame(200, $provisionalResponse->getStatusCode());
+        $this->assertFalse((bool) ($provisionalResponse->getData(true)['print_receipt'] ?? true));
+
+        // A checkbox must not make "remove rider" quietly print a receipt.
+        $unassignResponse = $this->assignJson($final, ['print_receipt' => true]);
+        $this->assertSame(200, $unassignResponse->getStatusCode());
+        $this->assertFalse((bool) ($unassignResponse->getData(true)['print_receipt'] ?? true));
     }
 
     // ── 2. assign: settled + terminal bills are locked ──────────────────────

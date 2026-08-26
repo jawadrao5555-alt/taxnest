@@ -11148,11 +11148,15 @@ function restaurantPos() {
                 const res = await fetch('{{ url('/pos/deliveries') }}/' + bill.id + '/assign', {
                     method: 'POST',
                     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ rider_id: riderId }),
+                    // A rider may be pre-assigned while the bill is still
+                    // provisional. Only ask the server to print an already
+                    // final bill; the controller re-checks both conditions.
+                    body: JSON.stringify({ rider_id: riderId, print_receipt: !!(bill.is_final && this.deliveryPrintReceipt) }),
                 });
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {
                     this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                    if (data.print_receipt) this.printAssignedDeliveryReceipt(bill);
                     this.loadLocalBills();
                 } else {
                     this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
@@ -11161,6 +11165,27 @@ function restaurantPos() {
                 this.showToast(window.TXT.network_error, 'error');
             }
             this.riderAssignBusyId = null;
+        },
+        // The Pending Deliveries checkbox deliberately covers BOTH finalization
+        // and rider assignment. This route is the same silent-agent-first,
+        // hidden-iframe-fallback path used by a normal bill receipt.
+        printAssignedDeliveryReceipt(bill) {
+            if (!bill || !bill.id) return;
+            const txnId = bill.id;
+            const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + txnId
+                + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
+            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
+            if (this.silentBillPrint) {
+                this.trySilentPrint({ type: 'bill', transaction_id: txnId }).then(ok => {
+                    if (ok) {
+                        this.showToast(ok.deduped ? window.TXT.bill_already_printing : window.TXT.receipt_sent_to_printer, ok.deduped ? 'info' : 'success');
+                    } else {
+                        fallback();
+                    }
+                });
+                return;
+            }
+            fallback();
         },
         // ─── Rider WHOLE-khata settle from the panel (Task 123) ─────────────
         // Reuses POST /pos/riders/{id}/settle with settle_all — settles EVERY

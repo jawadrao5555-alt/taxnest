@@ -7627,7 +7627,9 @@ function restaurantPos() {
         scrollToCartItem(index) {
             this.$nextTick(() => {
                 const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);
-                if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                // A sale-screen click must feel immediate. Smooth scrolling delays the
+                // visible cart feedback; keep the new/selected row in view instantly.
+                if (el) el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
             });
         },
 

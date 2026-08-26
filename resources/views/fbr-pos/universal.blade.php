@@ -4930,8 +4930,8 @@ function restaurantPos() {
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
             this.scrollToCartItem(this.activeCartIndex);
-            // Smart Upsell — fire-and-forget; never blocks add flow.
-            try { this.triggerUpsell(item); } catch (e) { /* upsell must never break add */ }
+            // Smart Upsell is disabled for retail FBR POS. Do not scan the full
+            // product catalog here: cart feedback must stay immediate.
         },
 
         // ──────────────────────────────────────────────────────────────
@@ -5491,6 +5491,14 @@ function restaurantPos() {
             if (!Number.isFinite(next) || next < min) next = min;
             this.cart[index].quantity = next;
             this.applyPetiRate(index);
+            // A tap can leave the quantity input focused on touch devices. Its
+            // x-effect deliberately avoids overwriting focused text, so mirror the
+            // new model value into the live field right away instead of waiting for
+            // a blur/re-render.
+            this.$nextTick(() => {
+                const el = document.querySelector('input[data-qty-row="' + index + '"]');
+                if (el) el.value = next;
+            });
         },
         setQty(index, val) {
             if (!this.cart[index]) return;
@@ -6132,7 +6140,9 @@ function restaurantPos() {
         scrollToCartItem(index) {
             this.$nextTick(() => {
                 const el = this.$refs.cartList?.querySelector(`[data-cart-index="${index}"]`);
-                if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                // A sale-screen click must feel immediate. Smooth scrolling delays the
+                // visible cart feedback; keep the new/selected row in view instantly.
+                if (el) el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
             });
         },
 

@@ -9,12 +9,12 @@
         "heading": "Ingredients aur Recipes",
         "sub": "Saman ka stock · Recipe banayen · Sale par khud minus"
       },
-      "narration": "अस्सलामु अलैकुम! restaurant में सिर्फ़ khana नहीं बिकता — पीछे chawal, chicken, oil का stock भी ख़र्च होता है। नेस्ट पी ओ एस में recipe बना दें, तो हर sale पर सामान का stock ख़ुद-ब-ख़ुद minus होता है। आइए देखें।",
+      "narration": "अस्सलामु अलैकुम! आज NestPOS में Product, Kitchen Item और Recipe का connection देखें। Product customer को बेचा जाता है। Kitchen Item कच्चा सामान है। Recipe बताती है के एक Product बनाने में कितना सामान लगता है।",
       "minMs": 6000
     },
     {
       "id": "s02_ingredients_page",
-      "narration": "menu से Ingredients खोलें। यहां kitchen का हर ख़ाम saman दर्ज है — chawal, chicken, oil — हर एक का rate, मौजूदा stock, और kam-se-kam limit। stock limit से नीचे जाए तो card ख़ुद ख़बरदार करता है।",
+      "narration": "Menu से Ingredients खोलें। यहां kitchen का कच्चा सामान दर्ज होता है — जैसे चावल, chicken, oil और sauce। हर item का unit, rate, मौजूदा stock और कम से कम stock limit यहां दिखती है। stock limit से नीचे जाए, तो system खबरदार करता है।",
       "actions": [
         {
           "do": "goto",
@@ -58,7 +58,7 @@
     },
     {
       "id": "s03_add_ingredient",
-      "narration": "नया saman add करना आसान है — Add Ingredient दबाएं। नाम लिखें Tamatar, unit kg, rate नब्बे rupay, stock बीस kg, और limit पांच। save — ho गया दर्ज।",
+      "narration": "नया Kitchen Item add करने के लिए Add Ingredient दबाएं। नाम लिखें Tamatar, unit kg चुनें, rate नब्बे रुपये लिखें, stock बीस kg और कम से कम limit पांच रखें। अब Save दबाएं — kitchen का सामान record में शामिल हो गया।",
       "actions": [
         {
           "do": "click",
@@ -108,7 +108,7 @@
     },
     {
       "id": "s04_recipes",
-      "narration": "अब recipe — menu से Recipes खोलें। Beef Pulao की recipe देखें — एक plate में पाव kilo chawal और पचास gram oil। यही वो हिसाब है जिस से system जानता है के एक plate बिकने पर कितना saman ख़र्च हुआ।",
+      "narration": "अब Product को Kitchen Items के साथ जोड़ने के लिए Recipes खोलें। Beef Pulao की recipe देखें। एक plate के लिए पाव kilo चावल और पचास gram oil दर्ज है। एक Product में कई Kitchen Items, और एक Kitchen Item कई Products की recipes में इस्तेमाल हो सकता है।",
       "actions": [
         {
           "do": "goto",
@@ -131,7 +131,7 @@
     },
     {
       "id": "s05_sale_deduction",
-      "narration": "अब कमाल देखें। sale screen से एक Beef Pulao बेचते हैं — CASH। और अब Ingredients पर वापस — Basmati Chawal का stock ख़ुद पाव kilo kam हो गया! ना कोई register, ना गिनती — system ख़ुद hisaab रखता है।",
+      "narration": "अब sale का असर देखें। Sale screen से एक Beef Pulao चुनें और CASH payment करें। Cart में add करने पर stock तुरंत कम नहीं होता। Bill final होने के बाद system recipe पढ़ता है और जितना सामान लगा हो, उतना Kitchen Stock से खुद minus कर देता है।",
       "actions": [
         {
           "do": "goto",
@@ -187,7 +187,7 @@
         "heading": "Shukriya!",
         "sub": "Recipe banayen — stock ka hisaab system par chhoren"
       },
-      "narration": "तो बस एक बार recipes बना लें — फिर हर plate के साथ saman का hisaab ख़ुद होता रहेगा, और ख़त्म होने से पहले ख़बर भी मिल जाएगी। KDS और tables की videos भी देखें। शुक्रिया!",
+      "narration": "याद रखें: Product customer को बेचा जाता है। Kitchen Item बनाने में खर्च होता है। और Recipe दोनों को मिलाती है। Recipe एक बार ठीक बना दें, तो हर final sale पर stock का हिसाब खुद चलता रहेगा। इस तरह manual गिनती नहीं करनी पड़ती। शुक्रिया!",
       "minMs": 5500
     }
   ]

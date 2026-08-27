@@ -5,7 +5,10 @@ const slug = process.argv[2];
 if (!slug) { console.error('usage: assemble.cjs <slug>'); process.exit(1); }
 const OUT = path.join(__dirname, 'out', slug);
 const timeline = JSON.parse(fs.readFileSync(path.join(OUT, 'timeline.json'), 'utf8'));
-const capture = path.join(OUT, 'capture.webm');
+// A voice revision can deliberately extend scene pauses without re-recording
+// the real UI actions. Prefer that retimed master when it is present.
+const retimedCapture = path.join(OUT, 'capture-retimed.mp4');
+const capture = fs.existsSync(retimedCapture) ? retimedCapture : path.join(OUT, 'capture.webm');
 const sh = (c) => { console.log('$', c.length > 220 ? c.slice(0, 220) + '…' : c); execSync(c, { stdio: ['ignore', 'inherit', 'inherit'] }); };
 
 // ── 16:9 master: overlay each scene's mp3 at its recorded offset ──
@@ -24,7 +27,7 @@ if (fs.existsSync(captions)) {
   // Captions are deliberately burned into the master so the social exports
   // inherit them too. Keep a dark strip behind Roman Urdu for readability
   // over both title cards and dense POS screens.
-  filters.unshift(`[0:v]subtitles='${captions}':force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00152A30,BackColour=&HAA0A4D5C,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginL=80,MarginR=80,MarginV=42'[vout]`);
+  filters.unshift(`[0:v]subtitles='${captions}':force_style='FontName=DejaVu Sans,FontSize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00152A30,BackColour=&H880A4D5C,BorderStyle=3,Outline=1,Shadow=0,Alignment=7,MarginL=42,MarginR=500,MarginV=34'[vout]`);
 } else {
   filters.unshift('[0:v]null[vout]');
 }

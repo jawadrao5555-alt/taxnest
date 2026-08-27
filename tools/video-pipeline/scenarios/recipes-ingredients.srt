@@ -1,47 +1,47 @@
 1
-00:00:00,500 --> 00:00:09,500
-Assalam o Alaikum! Restaurant mein sirf khana nahi bikta — peeche chawal, chicken aur oil ka stock bhi kharch hota hai.
+00:00:00,500 --> 00:00:10,870
+Assalam o Alaikum! Aaj NestPOS mein Product, Kitchen Item aur Recipe ka connection dekhein.
 
 2
-00:00:09,500 --> 00:00:18,785
-NestPOS mein recipe bana dein, to har sale par saman ka stock khud-ba-khud minus hota hai. Aaiye dekhte hain.
+00:00:10,870 --> 00:00:21,241
+Product customer ko becha jata hai. Kitchen Item kaccha saman hai. Recipe batati hai ke ek Product banane mein kitna saman lagta hai.
 
 3
-00:00:20,692 --> 00:00:28,646
-Menu se Ingredients kholen. Yahan kitchen ka har kachcha saman darj hai — chawal, chicken aur oil.
+00:00:23,141 --> 00:00:34,648
+Menu se Ingredients kholen. Yahan kitchen ka kaccha saman darj hota hai — chawal, chicken, oil aur sauce.
 
 4
-00:00:28,646 --> 00:00:36,600
-Har item ka rate, maujooda stock aur kam-se-kam limit hoti hai. Stock limit se neeche jaye to card khud khabardar karta hai.
+00:00:34,648 --> 00:00:46,155
+Har item ka unit, rate, maujooda stock aur kam se kam stock limit dikhti hai. Stock limit se neeche jaye, to system khabardar karta hai.
 
 5
-00:00:38,501 --> 00:00:47,187
-Naya saman add karna asaan hai — Add Ingredient dabayein.
+00:00:48,055 --> 00:00:58,635
+Naya Kitchen Item add karne ke liye Add Ingredient dabayein.
 
 6
-00:00:47,187 --> 00:00:55,872
-Naam Tamatar, unit kg, rate nabbe rupay, stock bees kg aur limit paanch. Save — ho gaya darj.
+00:00:58,635 --> 00:01:09,214
+Naam Tamatar, unit kg, rate nabbe rupay, stock bees kg aur kam se kam limit paanch rakhein. Save — kitchen ka saman record mein shamil ho gaya.
 
 7
-00:00:57,772 --> 00:01:05,961
-Ab recipe — menu se Recipes kholen. Beef Pulao ki recipe dekhein.
+00:01:11,114 --> 00:01:22,817
+Ab Product ko Kitchen Items ke saath jorne ke liye Recipes kholen. Beef Pulao ki recipe dekhein.
 
 8
-00:01:05,961 --> 00:01:14,150
-Ek plate mein pao kilo chawal aur pachaas gram oil. Isi hisaab se system jaanta hai ke kitna saman kharch hua.
+00:01:22,817 --> 00:01:34,520
+Ek plate ke liye pao kilo chawal aur pachaas gram oil darj hai. Ek Product mein kai Kitchen Items, aur ek Kitchen Item kai Products mein use ho sakta hai.
 
 9
-00:01:16,052 --> 00:01:25,313
-Ab kamaal dekhein. Sale screen se ek Beef Pulao bechte hain — CASH.
+00:01:36,420 --> 00:01:45,955
+Ab sale ka asar dekhein. Sale screen se ek Beef Pulao chunen aur CASH payment karein.
 
 10
-00:01:25,313 --> 00:01:34,573
-Ingredients par wapas — Basmati Chawal ka stock khud pao kilo kam ho gaya. Na register, na ginti — system khud hisaab rakhta hai.
+00:01:45,955 --> 00:01:55,489
+Cart mein add karne par stock foran kam nahi hota. Bill final hone ke baad recipe ke mutabiq Kitchen Stock khud minus hota hai.
 
 11
-00:01:36,473 --> 00:01:44,427
-To bas ek baar recipes bana dein — phir har plate ke saath saman ka hisaab khud hota rahega,
+00:01:57,389 --> 00:02:07,759
+Yaad rakhein: Product customer ko becha jata hai. Kitchen Item banane mein kharch hota hai. Recipe dono ko milati hai.
 
 12
-00:01:44,427 --> 00:01:52,381
-aur khatam hone se pehle khabar bhi mil jayegi. KDS aur tables ki videos bhi dekhein. Shukriya!
+00:02:07,759 --> 00:02:18,130
+Recipe ek baar theek bana dein, to har final sale par stock ka hisaab khud chalta rahega. Shukriya!

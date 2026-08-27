@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stock, Kitchen Items aur Physical Stock Check - Sawalat</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 17mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #20323b;
+      font-family: Arial, "DejaVu Sans", sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.42;
+      background: #fff;
+    }
+    .cover {
+      min-height: 255mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-bottom: 3px solid #0a4d5c;
+    }
+    .eyebrow {
+      color: #0a4d5c;
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    h1 {
+      color: #0a4d5c;
+      font-size: 30pt;
+      line-height: 1.12;
+      margin: 0 0 14px;
+    }
+    .lead {
+      color: #53666d;
+      font-size: 13pt;
+      max-width: 155mm;
+      margin: 0 0 28px;
+    }
+    .cover-note {
+      background: #f2f7f8;
+      border-left: 5px solid #e7bf3b;
+      padding: 15px 17px;
+      max-width: 170mm;
+      font-size: 11pt;
+    }
+    .details {
+      margin-top: 34px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px 24px;
+      max-width: 170mm;
+    }
+    .line-field { border-bottom: 1px solid #789099; padding: 5px 0; }
+    .section {
+      page-break-before: always;
+      break-before: page;
+    }
+    .section:first-of-type { page-break-before: auto; break-before: auto; }
+    h2 {
+      color: #0a4d5c;
+      font-size: 18pt;
+      margin: 0 0 5px;
+      padding-bottom: 7px;
+      border-bottom: 2px solid #e7bf3b;
+    }
+    .section-intro { color: #60747b; margin: 0 0 16px; }
+    .question {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      margin: 0 0 17px;
+    }
+    .q {
+      font-weight: 700;
+      color: #263f48;
+      margin-bottom: 5px;
+    }
+    .options {
+      margin: 0 0 7px 4px;
+      padding-left: 18px;
+      color: #53666d;
+    }
+    .options li { margin: 2px 0; }
+    .answer {
+      color: #71838a;
+      font-size: 9.5pt;
+      min-height: 26px;
+      border-bottom: 1px solid #a8b6ba;
+      padding: 3px 2px 4px;
+    }
+    .answer + .answer { margin-top: 8px; }
+    .example {
+      background: #f7fafb;
+      border: 1px solid #d7e2e5;
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin: 7px 0 8px;
+      color: #526a72;
+      font-size: 9.5pt;
+    }
+    .footer {
+      color: #7b8d92;
+      font-size: 8.5pt;
+      border-top: 1px solid #d7e2e5;
+      margin-top: 20px;
+      padding-top: 7px;
+    }
+    .closing {
+      page-break-before: always;
+      break-before: page;
+      min-height: 245mm;
+    }
+    .closing h2 { margin-bottom: 18px; }
+    .closing-box {
+      border: 1px solid #c9d8dc;
+      padding: 16px;
+      margin: 12px 0 20px;
+      min-height: 40mm;
+    }
+    .small { font-size: 9.5pt; color: #60747b; }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <div class="eyebrow">NestPOS — Business Requirement Questionnaire</div>
+    <h1>Stock, Kitchen Items<br>aur Physical Stock Check</h1>
+    <p class="lead">
+      Is questionnaire ka maqsad Raw Material, Kitchen Item, Retail/Menu Item,
+      Branch Stock aur Physical Stock Check ka final business flow samajhna hai.
+    </p>
+    <div class="cover-note">
+      <strong>Jawab dene ka tareeqa:</strong><br>
+      Har sawal ke neeche apna jawab likhein. Jahan multiple options hon, jo jo
+      applicable hon sab likh dein. Agar kisi point ka faisla na hua ho to
+      <strong>“Aap apni best recommendation de dein”</strong> likh dein.
+    </div>
+    <div class="details">
+      <div class="line-field"><strong>Company / Shop:</strong></div>
+      <div class="line-field"><strong>Branch:</strong></div>
+      <div class="line-field"><strong>Jawab dene wale ka naam:</strong></div>
+      <div class="line-field"><strong>Date:</strong></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>A. Items ka Basic Structure</h2>
+    <p class="section-intro">Raw Material, Kitchen Item aur Retail/Menu Item ke darmiyan relationship batayein.</p>
+
+    <div class="question">
+      <div class="q">1. Aap ke business mein items ke kitne types honge?</div>
+      <ul class="options">
+        <li>Raw Material — jaise chicken, flour, cheese, sauce</li>
+        <li>Kitchen Item — jaise zinger patty, marinated chicken, prepared sauce</li>
+        <li>Retail/Menu Item — jaise zinger burger, pizza, shawarma</li>
+        <li>Ya sirf Raw Material aur Retail/Menu Item?</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">2. Aap ke business mein item ka normal flow kya hoga?</div>
+      <ul class="options">
+        <li>Raw Material → Kitchen Item → Retail/Menu Item</li>
+        <li>Raw Material → Retail/Menu Item (direct recipe)</li>
+        <li>Dono flows support honge</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">3. 2 ya 3 real examples dein.</div>
+      <div class="example">Misal: 10 kg chicken se kitni patties banti hain? Ek Zinger Burger mein kitni patty, bun aur sauce lagta hai?</div>
+      <div class="answer">Example 1:</div>
+      <div class="answer">Example 2:</div>
+      <div class="answer">Example 3:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">4. Kitchen Item ka matlab exactly kya hoga?</div>
+      <ul class="options">
+        <li>Raw material se kitchen mein prepare hone wali cheez</li>
+        <li>Central kitchen se branch ko ready condition mein bheji jane wali cheez</li>
+        <li>Purchased ready item bhi Kitchen Item hoga</li>
+        <li>In sab mein se applicable rule</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>B. Kitchen Item Banane ka Tareeqa</h2>
+    <p class="section-intro">Production, recipe, yield aur wastage ka rule clear karein.</p>
+
+    <div class="question">
+      <div class="q">5. Kya Kitchen Item ki apni recipe/BOM honi chahiye?</div>
+      <div class="example">Misal: Zinger Patty = Chicken + Spices + Coating. Recipe se raw material automatically consume hoga?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">6. Kitchen Item banane ka record kaise rakhna hai?</div>
+      <ul class="options">
+        <li>Production entry: 10 kg chicken se 80 patties bani; raw material kam aur patties stock zyada</li>
+        <li>Staff sirf manually received quantity enter kare: Patty received 80 pieces</li>
+        <li>Dono tareeqay support hon</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">7. Kya production mein Expected Output aur Actual Output dono record hon?</div>
+      <div class="example">Misal: Expected 100 patties, actual 95 patties. 5 patties ko waste/yield loss dikhana hai?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">8. Kitchen Item ki recipe mein kaun si units use hongi?</div>
+      <ul class="options">
+        <li>Pieces</li><li>Kilogram/gram</li><li>Liter/ml</li><li>Packet/carton</li><li>Mixed units</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>C. Branch aur Stock Transfer</h2>
+    <p class="section-intro">Stock kis location se issue, receive aur return hoga?</p>
+
+    <div class="question">
+      <div class="q">9. Stock issue/transfer kin directions mein chahiye?</div>
+      <ul class="options">
+        <li>Head Office → Branch</li>
+        <li>Central Kitchen → Branch</li>
+        <li>Branch → Branch</li>
+        <li>Branch → Head Office/Central Kitchen return</li>
+        <li>Supplier → Branch</li>
+        <li>Supplier → Head Office, phir Head Office → Branch</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">10. Stock Issue aur Stock Receive ko alag steps rakhna hai?</div>
+      <div class="example">Misal: Head Office ne 100 patties issue ki, branch ne 95 receive ki. Ya issue karte hi branch stock mein quantity add ho?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">11. Agar 100 issue ki aur branch ne 95 receive ki, to 5 ka kya hoga?</div>
+      <ul class="options">
+        <li>Shortage report ho</li>
+        <li>Sender approve kare</li>
+        <li>Receiver approve kare</li>
+        <li>Automatically transfer mein shortage save ho</li>
+        <li>Dono parties ki approval ho</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">12. Kya Raw Materials, Kitchen Items aur Retail Items teeno ko transfer karna hoga?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>D. Retail/Menu Item aur Recipe</h2>
+    <p class="section-intro">Sale hone par components aur stock kaise consume honge?</p>
+
+    <div class="question">
+      <div class="q">13. Retail/Menu Item ki recipe kis cheez se banegi?</div>
+      <ul class="options">
+        <li>Direct Raw Materials se</li>
+        <li>Kitchen Items se</li>
+        <li>Raw Materials aur Kitchen Items dono se</li>
+        <li>Har item ka alag rule hoga</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">14. Sale hone par stock kaise kam hoga?</div>
+      <div class="example">Misal: Zinger Burger sale hua: 1 bun, 1 patty aur sauce kam ho, ya sirf Zinger Burger ka stock kam ho?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">15. Kya sale par raw material bhi automatically kam hoga?</div>
+      <div class="example">Ya raw material sirf Kitchen Item banate waqt consume hoga aur sale par Kitchen Item kam hoga?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">16. Agar menu item ki recipe badal jaye to purani sales ka kya rule hoga?</div>
+      <div class="example">Misal: Pehle burger mein 100 gram patty thi, baad mein 90 gram kar di. Purani sales purani recipe par rahengi?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>E. Physical Stock Check</h2>
+    <p class="section-intro">System quantity aur asal counted quantity ka comparison kaise hoga?</p>
+
+    <div class="question">
+      <div class="q">17. Physical Stock Check kin items par chahiye?</div>
+      <ul class="options">
+        <li>Raw Materials</li><li>Kitchen Items</li><li>Retail/Menu Items</li><li>Teeno categories</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">18. Expected stock kis formula se nikle?</div>
+      <div class="example">Proposed formula: Opening Stock + Received/Issue + Production + Returns − Sales/Consumption − Waste − Transfers</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">19. Zinger example confirm karein:</div>
+      <div class="example">100 patties issue hui − 50 patties sale hui = Expected 50. Physical count 45 ho to Difference = 5 shortage. Kya yahi calculation chahiye?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">20. Physical quantity kis level par enter hogi?</div>
+      <ul class="options">
+        <li>Har item ke liye</li><li>Har branch ke liye</li><li>Har kitchen/station ke liye</li><li>Ek combined stock list mein</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">21. Physical count ke waqt stock movements temporarily lock hon?</div>
+      <div class="example">Ya count chalne ke bawajood sale, transfer aur production normal chalte rahen?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>F. Count Timing aur Variance Action</h2>
+    <p class="section-intro">Count kab hoga aur shortage/excess ke baad kya action hoga?</p>
+
+    <div class="question">
+      <div class="q">22. Physical count kab karna hai?</div>
+      <ul class="options">
+        <li>Roz raat ko</li><li>Day-close se pehle</li><li>Weekly</li><li>Monthly</li><li>Jab manager chahe</li><li>Sirf selected items ka</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">23. Kya Physical Stock Check complete kiye baghair day-close rokna hai?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">24. Expected 50 aur actual 45 ho to system kya kare?</div>
+      <ul class="options">
+        <li>Sirf 5 shortage red color mein show kare</li>
+        <li>Stock automatically 45 kar de</li>
+        <li>Manager approval ke baad stock 45 kare</li>
+        <li>Staff reason enter kare, phir adjustment ho</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">25. Expected 50 aur actual 55 ho to excess ka kya rule hoga?</div>
+      <ul class="options">
+        <li>Excess green color mein show ho</li>
+        <li>Stock automatically 55 ho</li>
+        <li>Approval ke baad 55 ho</li>
+        <li>Excess ke liye bhi reason mandatory ho</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>G. Shortage, Excess aur Approval</h2>
+    <p class="section-intro">Variance ki wajah, approval aur audit record ka rule batayein.</p>
+
+    <div class="question">
+      <div class="q">26. Shortage/excess ke reasons ki list chahiye?</div>
+      <ul class="options">
+        <li>Wastage</li><li>Damage</li><li>Expired</li><li>Staff consumption</li><li>Wrong entry</li><li>Theft/leakage</li><li>Transfer short receive</li><li>Unknown</li><li>Other remarks</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">27. Kya shortage aur excess ka separate adjustment ledger hona chahiye?</div>
+      <div class="example">Ledger mein item, branch, expected, actual, difference, date, counted by, approved by aur reason save ho?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">28. Physical quantity kaun enter karega?</div>
+      <ul class="options">
+        <li>Kitchen staff</li><li>Branch cashier</li><li>Branch manager</li><li>Owner</li><li>Authorized user</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">29. Variance approve kaun karega?</div>
+      <ul class="options">
+        <li>Branch manager</li><li>Owner</li><li>Head Office manager</li><li>Approval ki zaroorat nahi</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">30. Kya staff ko actual count enter karne se pehle expected quantity dikhani hai?</div>
+      <div class="example">Recommendation: Expected quantity pehle hide rahe taake staff system number copy na kare; submit ke baad comparison show ho.</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">31. Count submit hone ke baad edit allowed ho?</div>
+      <ul class="options">
+        <li>Haan, manager edit kare</li><li>Sirf approval se pehle edit ho</li><li>Submit ke baad edit na ho; correction entry banay</li><li>Owner edit kare</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>H. Reports aur Visibility</h2>
+    <p class="section-intro">Reports mein kaunsi detail aur kis role ko nazar aani chahiye?</p>
+
+    <div class="question">
+      <div class="q">32. Physical Stock Report mein kya kya show hona chahiye?</div>
+      <ul class="options">
+        <li>Item name aur item type</li><li>Branch</li><li>Expected quantity</li><li>Actual quantity</li><li>Difference</li><li>Shortage/excess</li><li>Unit</li><li>Count date</li><li>Counted by</li><li>Approved by</li><li>Reason aur remarks</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">33. Kya report mein movement breakdown bhi chahiye?</div>
+      <div class="example">Misal: Opening 20 + Received 100 − Sold 70 − Waste 5 = Expected 45; Actual 40; Shortage 5.</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">34. Report kis format mein download karni hai?</div>
+      <ul class="options"><li>Excel</li><li>PDF</li><li>Dono</li><li>Sirf screen par</li></ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">35. Kya branch manager sirf apni branch aur owner tamam branches dekh sake?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>I. Excel Upload Formats</h2>
+    <p class="section-intro">Excel import/export ka structure final karein.</p>
+
+    <div class="question">
+      <div class="q">36. Excel ka format kaisa chahiye?</div>
+      <ul class="options">
+        <li>Teen alag files: Raw Material, Kitchen Item, Retail/Menu Item</li>
+        <li>Ek workbook ke andar teen sheets</li>
+        <li>Ek combined Excel, jisme Item Type column ho</li>
+        <li>Download ke liye teen formats, import ke liye combined format</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">37. Raw Material Excel mein kaun se columns hon?</div>
+      <div class="example">Proposed: Item Name, Item Code/SKU, Category, Base Unit, Purchase Unit, Conversion Factor, Opening Stock, Minimum Stock, Cost per Unit.</div>
+      <div class="answer">Add/remove karne wale columns:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">38. Kitchen Item Excel mein kaun se columns hon?</div>
+      <div class="example">Proposed: Kitchen Item Name, Item Code/SKU, Category, Unit, Recipe Ingredient Name, Ingredient Code, Quantity Required, Cost per Unit, Expected Yield, Waste/Yield Loss.</div>
+      <div class="answer">Add/remove karne wale columns:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">39. Retail/Menu Item Excel mein kaun se columns hon?</div>
+      <div class="example">Proposed: Product/Menu Item Name, Product Code/SKU/Barcode, Category, Sale Price, Tax Rate, Unit, Recipe Component, Component Type, Quantity Required, Cost per Unit.</div>
+      <div class="answer">Add/remove karne wale columns:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">40. Excel matching naam se ho ya code/SKU se?</div>
+      <div class="example">Recommendation: Pehle code/SKU/barcode; code na mile to exact name; ambiguous name ko error report mein show karein.</div>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>J. Units, Conversion aur Wastage</h2>
+    <p class="section-intro">Purchase, stock aur recipe units ka practical rule batayein.</p>
+
+    <div class="question">
+      <div class="q">41. Kya purchase unit aur stock unit alag ho sakti hai?</div>
+      <div class="example">Misal: 1 carton = 24 bottles; 1 bag = 25 kg; 1 tray = 30 eggs. Kya system automatic conversion kare?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">42. Recipe mein decimal quantity allowed ho?</div>
+      <div class="example">Misal: 0.050 kg cheese, 0.250 liter sauce, 1.5 gram spice.</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">43. Physical count mein decimal quantity allowed ho?</div>
+      <ul class="options">
+        <li>Sirf pieces ke liye whole number</li><li>Weight/liquid ke liye decimal allowed</li><li>Har item ke unit ke mutabiq system decide kare</li>
+      </ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">44. Wastage, damage aur expiry ko separate stock movement rakhna hai?</div>
+      <div class="answer">Jawab:</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>K. Priority aur Final Examples</h2>
+    <p class="section-intro">Pehle kis cheez ki zaroorat hai aur final system kis example par test hoga?</p>
+
+    <div class="question">
+      <div class="q">45. Sab se pehle kaunsa module zaroori hai?</div>
+      <ul class="options">
+        <li>Raw Material setup</li><li>Kitchen Item aur production</li><li>Retail/Menu recipe</li><li>Branch stock issue/receive</li><li>Physical Stock Check</li><li>Excel import</li><li>Reports</li>
+      </ul>
+      <div class="answer">Priority order:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">46. Kya pehle simple Phase 1 banaya jaye?</div>
+      <div class="example">Suggested Phase 1: Teen item types, recipes, branch stock, issue/receive, expected vs physical quantity, shortage/excess report aur Excel import/export. Production batches, approvals aur detailed wastage Phase 2 mein.</div>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">47. Sab se important real-life example kaunsa hai?</div>
+      <ul class="options"><li>Zinger Burger</li><li>Pizza</li><li>Shawarma</li><li>Bakery item</li><li>Cold drink</li><li>General retail product</li><li>Koi aur</li></ul>
+      <div class="answer">Jawab:</div>
+    </div>
+
+    <div class="question">
+      <div class="q">48. Final system ke liye koi aur zaroori rule ya requirement?</div>
+      <div class="answer">Jawab:</div>
+      <div class="answer"></div>
+      <div class="answer"></div>
+    </div>
+  </div>
+
+  <div class="closing">
+    <h2>Additional Notes</h2>
+    <p class="small">Yahan woh points likhein jo upar ke sawalat mein cover nahi hue.</p>
+    <div class="closing-box"></div>
+    <div class="closing-box"></div>
+    <div class="closing-box"></div>
+    <div class="footer">NestPOS — Stock, Kitchen Items aur Physical Stock Check Questionnaire</div>
+  </div>
+</body>
+</html>

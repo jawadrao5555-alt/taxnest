@@ -13,7 +13,7 @@ OUT="tools/video-pipeline/out/$SLUG"
 
 echo "=== SEEDING demo shelf ($(date +%H:%M:%S)) ==="
 env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE \
-  php artisan db:seed --class=VideoStockCheckSeeder --force || exit 1
+  VIDEO_PIPELINE_ALLOW=1 php artisan db:seed --class=VideoStockCheckSeeder --force || exit 1
 
 # Real narration overwrites these later; the capture only needs scene lengths.
 if [ ! -f "$OUT/tts/durations.cjson" ]; then

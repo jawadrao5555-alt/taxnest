@@ -3361,6 +3361,48 @@ window.addEventListener('popstate', function() {
             <span class="text-sm font-semibold" x-text="toast.message"></span>
         </div>
     </div>
+
+    {{-- Deal Choice Picker (Task 1531): fixed-only deals stay one-tap; choice
+         deals must be completed before they can enter the FBR cart. --}}
+    <div x-show="showDealChoiceModal" x-cloak x-transition.opacity
+         @keydown.escape.window="cancelDealChoice()"
+         class="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/60 p-3 sm:p-6">
+        <div @click.outside="cancelDealChoice()" class="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700">
+            <div class="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-100 dark:border-gray-800">
+                <div class="min-w-0 flex-1">
+                    <h3 class="text-base font-extrabold text-gray-900 dark:text-white">{{ __('pos.choose_deal_items') }}</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="pendingDeal?.name || ''"></p>
+                </div>
+                <button type="button" @click="cancelDealChoice()" class="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center" title="{{ __('pos.cancel_esc') }}">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5 space-y-5">
+                <p class="text-xs text-gray-600 dark:text-gray-300">{{ __('pos.choose_deal_items_help') }}</p>
+                <template x-for="group in (pendingDeal?.choice_groups || [])" :key="group.id">
+                    <section>
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <h4 class="text-sm font-bold text-gray-900 dark:text-white" x-text="group.label"></h4>
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" x-text="group.quantity + 'x'"></span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <template x-for="option in group.options" :key="option.product_id">
+                                <button type="button" @click="pendingDealChoices[group.id] = String(option.product_id)"
+                                        :class="String(pendingDealChoices[group.id] || '') === String(option.product_id) ? 'border-blue-600 ring-2 ring-blue-200 dark:ring-blue-900 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'"
+                                        class="text-left px-3 py-2.5 rounded-xl border transition">
+                                    <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100 truncate" x-text="option.name"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </section>
+                </template>
+            </div>
+            <div class="sticky bottom-0 p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-100 dark:border-gray-800 flex gap-2">
+                <button type="button" @click="cancelDealChoice()" class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">{{ __('pos.cancel_esc') }}</button>
+                <button type="button" @click="confirmDealChoice()" class="flex-1 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition">{{ __('pos.add_deal_to_cart') }}</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @php
@@ -3428,6 +3470,8 @@ $dealsJson = collect($activeDeals ?? [])->map(function ($d) {
         'tax_amount' => (float) $d['tax_amount'],
         'description' => $d['description'] ?? '',
         'components' => $d['components'] ?? [],
+        'fixed_components' => $d['fixed_components'] ?? [],
+        'choice_groups' => $d['choice_groups'] ?? [],
         'category' => 'Deals', 'show_on_sale' => true, 'cost_price' => 0.0,
         'is_tax_exempt' => false, 'is_third_schedule' => false, 'tax_rate' => 0,
         'hs_code' => null, 'uom' => 'U', 'barcode' => null,
@@ -3464,6 +3508,11 @@ function restaurantPos() {
         allProducts: {!! $jsEnc($productsJson) !!},
         allServices: {!! $jsEnc($servicesJson) !!},
         allDeals: {!! $jsEnc($dealsJson) !!},
+        // Task 1531 — a choice deal does not enter cart until every required
+        // group has an explicit product selection.
+        showDealChoiceModal: false,
+        pendingDeal: null,
+        pendingDealChoices: {},
         allCustomers: {!! $jsEnc($customersJson) !!},
         // Task 100: TRUE when the shop has more customers than the bake cap —
         // allCustomers is only the most-recently-active subset. Server search is
@@ -4583,8 +4632,9 @@ function restaurantPos() {
                 this.showToast(item.name + ' is out of stock', 'error');
                 return;
             }
-            this.addToCart(item);
-            this.showToast(window.TXT.added_prefix + item.name, 'success');
+            if (this.addToCart(item) !== false) {
+                this.showToast(window.TXT.added_prefix + item.name, 'success');
+            }
         },
 
         getCartQty(item) {
@@ -4894,8 +4944,81 @@ function restaurantPos() {
             this.updateDisplayItems();
         },
 
-        addToCart(item) {
-            const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type);
+        openDealChoice(item) {
+            const deal = this.allDeals.find(d => String(d.id) === String(item.id)) || item;
+            const groups = deal.choice_groups || [];
+            if (!groups.length) return this.addToCart(deal, []);
+            this.pendingDeal = deal;
+            this.pendingDealChoices = {};
+            this.showDealChoiceModal = true;
+            return false;
+        },
+        cancelDealChoice() {
+            this.showDealChoiceModal = false;
+            this.pendingDeal = null;
+            this.pendingDealChoices = {};
+        },
+        /**
+         * Same paisa sequential-remainder allocation as FbrPosController.
+         * This only keeps the pre-payment total honest; store() always locks
+         * the deal and independently recalculates the compliant component rows.
+         */
+        fbrDealPreview(deal, choices) {
+            const rows = [];
+            for (const fixed of (deal.fixed_components || [])) {
+                const product = this.allProducts.find(p => String(p.id) === String(fixed.product_id));
+                if (!product) return null;
+                rows.push({ product, quantity: Number(fixed.quantity) || 1 });
+            }
+            for (const choice of choices) {
+                const product = { id: choice.product_id, name: choice.name, price: choice.price, tax_rate: choice.tax_rate, is_tax_exempt: choice.is_tax_exempt, is_third_schedule: choice.is_third_schedule };
+                rows.push({ product, quantity: Number(choice.quantity) || 1 });
+            }
+            if (!rows.length) return null;
+            let totalWeight = rows.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row.product.price || 0) * 100) * row.quantity), 0);
+            if (totalWeight <= 0) totalWeight = rows.length;
+            let remaining = Math.round(Number(deal.price || 0) * 100);
+            let remainingWeight = totalWeight;
+            let net = 0, tax = 0;
+            const components = rows.map((row, index) => {
+                let weight = Math.max(0, Math.round(Number(row.product.price || 0) * 100) * row.quantity);
+                if (rows.every(r => Math.max(0, Math.round(Number(r.product.price || 0) * 100) * r.quantity) === 0)) weight = 1;
+                const grossPaisa = index === rows.length - 1 ? remaining : Math.max(0, Math.min(remaining, Math.round(remaining * weight / remainingWeight)));
+                remaining -= grossPaisa; remainingWeight -= weight;
+                const gross = grossPaisa / 100;
+                const rate = (row.product.is_tax_exempt || row.product.is_third_schedule) ? 0 : Number(row.product.tax_rate || 18);
+                const lineNet = rate > 0 ? Math.round((gross / (1 + rate / 100)) * 100) / 100 : gross;
+                const lineTax = Math.round((gross - lineNet) * 100) / 100;
+                net += lineNet; tax += lineTax;
+                return { product_id: row.product.id, name: row.product.name, quantity: row.quantity };
+            });
+            return { net: Math.round(net * 100) / 100, tax: Math.round(tax * 100) / 100, components };
+        },
+        confirmDealChoice() {
+            const deal = this.pendingDeal;
+            const groups = deal?.choice_groups || [];
+            const selections = [];
+            for (const group of groups) {
+                const productId = this.pendingDealChoices[group.id];
+                const option = (group.options || []).find(o => String(o.product_id) === String(productId));
+                if (!option) {
+                    this.showToast(window.TXT.deal_choice_required, 'error');
+                    return;
+                }
+                selections.push({ group_id: Number(group.id), product_id: Number(option.product_id), name: option.name, quantity: Number(group.quantity) || 1, price: Number(option.price || 0), tax_rate: Number(option.tax_rate || 0), is_tax_exempt: !!option.is_tax_exempt, is_third_schedule: !!option.is_third_schedule });
+            }
+            const preview = this.fbrDealPreview(deal, selections);
+            if (!preview) { this.showToast(window.TXT.deal_choice_required, 'error'); return; }
+            this.cancelDealChoice();
+            this.addToCart(deal, selections, preview);
+            this.showToast(window.TXT.added_prefix + deal.name, 'success');
+        },
+        addToCart(item, selectedDealChoices = null, dealPreview = null) {
+            const isChoiceDeal = item.type === 'deal' && (item.choice_groups || []).length > 0;
+            if (isChoiceDeal && selectedDealChoices === null) return this.openDealChoice(item);
+            const choiceKey = isChoiceDeal ? selectedDealChoices.map(c => c.group_id + ':' + c.product_id).join('|') : '';
+            const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type
+                && (item.type !== 'deal' || (c._dealChoiceKey || '') === choiceKey));
             if (existing) {
                 existing.quantity++;
                 this.activeCartIndex = this.cart.indexOf(existing);
@@ -4909,7 +5032,8 @@ function restaurantPos() {
                 // deal_tax_unit (server allocation preview), added in taxAmount.
                 // Cashier can never edit the price (no _isQuickCreated, no editor).
                 const d = this.allDeals.find(x => x.id === item.id) || item;
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: d.id, item_type: 'deal', item_name: d.name, quantity: 1, unit_price: parseFloat(d.price), special_notes: '', is_tax_exempt: false, is_third_schedule: false, hs_code: null, uom: 'U', tax_rate: 0, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false, deal_net_unit: parseFloat(d.net_price ?? d.price) || 0, deal_tax_unit: parseFloat(d.tax_amount ?? 0) || 0, deal_components: d.components || [] });
+                const preview = dealPreview || this.fbrDealPreview(d, selectedDealChoices || []) || { net: parseFloat(d.net_price ?? d.price) || 0, tax: parseFloat(d.tax_amount ?? 0) || 0, components: d.components || [] };
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: d.id, item_type: 'deal', item_name: d.name, quantity: 1, unit_price: parseFloat(d.price), special_notes: '', is_tax_exempt: false, is_third_schedule: false, hs_code: null, uom: 'U', tax_rate: 0, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false, deal_net_unit: preview.net, deal_tax_unit: preview.tax, deal_components: preview.components, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey });
                 this.activeCartIndex = this.cart.length - 1;
             } else {
                 // FBR: hydrate compliance fields (hs_code / uom / tax_rate / exemption) from
@@ -4937,6 +5061,7 @@ function restaurantPos() {
             this.scrollToCartItem(this.activeCartIndex);
             // Smart Upsell is disabled for retail FBR POS. Do not scan the full
             // product catalog here: cart feedback must stay immediate.
+            return true;
         },
 
         // ──────────────────────────────────────────────────────────────
@@ -6889,6 +7014,10 @@ function restaurantPos() {
                         // expands it into component rows at the SERVER-enforced price —
                         // the client's unit_price for deal lines is display-only.
                         deal_id: (c.item_type === 'deal' && c.item_id) ? c.item_id : null,
+                        // Choice ids are only a request. The server locks the deal,
+                        // verifies each group/eligible product, then persists actual
+                        // selected product rows for receipts and stock history.
+                        deal_choices: c.item_type === 'deal' ? (c.deal_choices || []) : [],
                         hs_code: c.hs_code || null,
                         uom: c.uom || 'U',
                         tax_rate: this._itemRate(c),

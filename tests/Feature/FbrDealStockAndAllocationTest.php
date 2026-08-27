@@ -182,6 +182,20 @@ class FbrDealStockAndAllocationTest extends TestCase
             $table->unsignedInteger('quantity')->default(1);
             $table->timestamps();
         });
+        Schema::create('fbr_pos_deal_choice_groups', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('deal_id')->index();
+            $table->string('label');
+            $table->unsignedInteger('quantity')->default(1);
+            $table->unsignedInteger('sort_order')->default(0);
+            $table->timestamps();
+        });
+        Schema::create('fbr_pos_deal_choice_options', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('group_id')->index();
+            $table->unsignedBigInteger('product_id');
+            $table->timestamps();
+        });
 
         Schema::create('fbr_pos_deal_usages', function (Blueprint $table) {
             $table->id();
@@ -658,7 +672,7 @@ class FbrDealStockAndAllocationTest extends TestCase
 
     private function allocate(int $dealId): array
     {
-        $deal = FbrPosDeal::with('items')->findOrFail($dealId);
+        $deal = FbrPosDeal::with(['items', 'choiceGroups.options'])->findOrFail($dealId);
         $m = new \ReflectionMethod(FbrPosController::class, 'fbrAllocateDealUnits');
         $m->setAccessible(true);
         return $m->invoke(new FbrPosController(), $deal);
@@ -727,5 +741,50 @@ class FbrDealStockAndAllocationTest extends TestCase
     {
         DB::table('products')->where('id', $this->friesId)->update(['is_active' => false]);
         $this->assertSame([], $this->allocate($this->dealId), 'inactive component = deal unsellable');
+    }
+
+    public function test_choice_product_is_allocated_as_a_real_fbr_component(): void
+    {
+        $groupId = (int) DB::table('fbr_pos_deal_choice_groups')->insertGetId([
+            'deal_id' => $this->dealId, 'label' => 'Drink', 'quantity' => 2,
+            'sort_order' => 0, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('fbr_pos_deal_choice_options')->insert([
+            'group_id' => $groupId, 'product_id' => $this->drinkId,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $deal = FbrPosDeal::with(['items', 'choiceGroups.options'])->findOrFail($this->dealId);
+        $m = new \ReflectionMethod(FbrPosController::class, 'fbrAllocateDealUnits');
+        $m->setAccessible(true);
+        $units = $m->invoke(new FbrPosController(), $deal, [[
+            'group_id' => $groupId, 'product_id' => $this->drinkId,
+        ]]);
+
+        $picked = collect($units)->firstWhere('choice_group_id', $groupId);
+        $this->assertNotNull($picked);
+        $this->assertSame($this->drinkId, (int) $picked['product']->id);
+        $this->assertSame(2, (int) $picked['component_qty']);
+        $this->assertSame('Drink', $picked['choice_group_label']);
+    }
+
+    public function test_choice_product_must_belong_to_its_configured_group(): void
+    {
+        $groupId = (int) DB::table('fbr_pos_deal_choice_groups')->insertGetId([
+            'deal_id' => $this->dealId, 'label' => 'Drink', 'quantity' => 1,
+            'sort_order' => 0, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('fbr_pos_deal_choice_options')->insert([
+            'group_id' => $groupId, 'product_id' => $this->drinkId,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $deal = FbrPosDeal::with(['items', 'choiceGroups.options'])->findOrFail($this->dealId);
+        $m = new \ReflectionMethod(FbrPosController::class, 'fbrAllocateDealUnits');
+        $m->setAccessible(true);
+        $this->expectException(ValidationException::class);
+        $m->invoke(new FbrPosController(), $deal, [[
+            'group_id' => $groupId, 'product_id' => $this->burgerId,
+        ]]);
     }
 }

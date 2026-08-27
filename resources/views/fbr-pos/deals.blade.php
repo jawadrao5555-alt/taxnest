@@ -34,7 +34,7 @@
 
     {{-- Add New Deal --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
-         x-data="{ rows: [{ product_id: '', quantity: 1 }], dealType: 'regular' }">
+         x-data="{ rows: [], choiceGroups: [], dealType: 'regular' }">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.add_new_deal') }}</h3>
         <form method="POST" action="{{ route('fbrpos.deals.store') }}">
             @csrf
@@ -87,17 +87,17 @@
             </div>
 
             <div class="mb-4">
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.deal_items_included') }}</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.deal_items_included') }} <span class="text-gray-400 font-normal">({{ __('pos.paren_optional') }})</span></label>
                 <template x-for="(row, idx) in rows" :key="idx">
                     <div class="flex items-center gap-2 mb-2">
-                        <select :name="'items[' + idx + '][product_id]'" x-model="row.product_id" required class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <select :name="'items[' + idx + '][product_id]'" x-model="row.product_id" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="">{{ __('pos.select_product_dots') }}</option>
                             <template x-for="p in products" :key="p.id">
                                 <option :value="p.id" x-text="p.name + ' — Rs. ' + p.price" :selected="String(row.product_id) === String(p.id)"></option>
                             </template>
                         </select>
-                        <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" required min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" title="{{ __('pos.quantity_label') }}">
-                        <button type="button" @click="rows.splice(idx, 1)" x-show="rows.length > 1" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="{{ __('pos.remove_item') }}">
+                        <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" title="{{ __('pos.quantity_label') }}">
+                        <button type="button" @click="rows.splice(idx, 1)" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="{{ __('pos.remove_item') }}">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
@@ -107,6 +107,35 @@
                     {{ __('pos.add_item') }}
                 </button>
             </div>
+            @if($choiceTableOk ?? false)
+            <div class="mb-5 pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
+                <div class="mb-2">
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.deal_choice_groups') }}</label>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.deal_choice_groups_help') }}</p>
+                </div>
+                <template x-for="(group, groupIdx) in choiceGroups" :key="groupIdx">
+                    <div class="mb-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800">
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" :name="'choice_groups[' + groupIdx + '][label]'" x-model="group.label" required maxlength="100" placeholder="{{ __('pos.deal_choice_label_placeholder') }}" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="number" :name="'choice_groups[' + groupIdx + '][quantity]'" x-model.number="group.quantity" required min="1" max="99" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" title="{{ __('pos.quantity_label') }}">
+                            <button type="button" @click="choiceGroups.splice(groupIdx, 1)" class="p-2 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition" title="{{ __('pos.remove_item') }}">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <select multiple :name="'choice_groups[' + groupIdx + '][product_ids][]'" x-model="group.product_ids" required class="w-full min-h-28 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <template x-for="p in products" :key="p.id">
+                                <option :value="String(p.id)" x-text="p.name + ' — Rs. ' + p.price"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-[10px] text-gray-500 dark:text-gray-400">{{ __('pos.deal_choice_pick_help') }}</p>
+                    </div>
+                </template>
+                <button type="button" @click="choiceGroups.push({ label: '', quantity: 1, product_ids: [] })" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    {{ __('pos.add_deal_choice_group') }}
+                </button>
+            </div>
+            @endif
 
             <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">{{ __('pos.add_deal') }}</button>
         </form>
@@ -125,9 +154,19 @@
             $dealDays = array_map('intval', (array) ($deal->active_days ?? []));
             $componentsText = $deal->items->map(fn($di) => $di->quantity . 'x ' . ($productNames[$di->product_id] ?? 'Product #' . $di->product_id))->implode(', ');
             $dealItemsJson = $deal->items->map(fn($di) => ['product_id' => $di->product_id, 'quantity' => (int) $di->quantity])->values();
+            $dealChoiceGroupsJson = ($choiceTableOk ?? false) ? $deal->choiceGroups->map(fn($group) => [
+                'label' => $group->label,
+                'quantity' => (int) $group->quantity,
+                'product_ids' => $group->options->pluck('product_id')->map(fn($id) => (string) $id)->values(),
+            ])->values() : collect();
+            $choiceText = ($choiceTableOk ?? false) ? $deal->choiceGroups->map(fn($group) =>
+                $group->quantity . 'x ' . $group->label . ' (' . $group->options->map(fn($option) =>
+                    $productNames[$option->product_id] ?? 'Product #' . $option->product_id
+                )->implode(', ') . ')'
+            )->implode(' · ') : '';
         @endphp
         <div x-show="dealFilter === 'all' || dealFilter === @js($deal->deal_type ?: 'regular')" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5"
-             x-data="{ editing: false, dealType: @js($deal->deal_type ?: 'regular'), rows: {{ json_encode($dealItemsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }">
+             x-data="{ editing: false, dealType: @js($deal->deal_type ?: 'regular'), rows: {{ json_encode($dealItemsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}, choiceGroups: {{ json_encode($dealChoiceGroupsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
@@ -144,6 +183,9 @@
                         @endif
                     </div>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{{ $componentsText ?: __('pos.no_items') }}</p>
+                    @if($choiceText)
+                    <p class="text-[11px] text-blue-600 dark:text-blue-300 mt-0.5 truncate">{{ $choiceText }}</p>
+                    @endif
                     <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
                         {{ __('pos.days_colon') }} {{ empty($dealDays) ? __('pos.every_day') : collect($dealDays)->map(fn($d) => $dayNames[$d] ?? $d)->implode(', ') }}
                         @if($deal->starts_on || $deal->ends_on)
@@ -222,17 +264,17 @@
                         <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.daily_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="daily_deal_units_limit" value="{{ $deal->daily_deal_units_limit }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
                     </div>
                     <div class="mb-4">
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.deal_items') }}</label>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.deal_items') }} <span class="text-gray-400 font-normal">({{ __('pos.paren_optional') }})</span></label>
                         <template x-for="(row, idx) in rows" :key="idx">
                             <div class="flex items-center gap-2 mb-2">
-                                <select :name="'items[' + idx + '][product_id]'" x-model="row.product_id" required class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <select :name="'items[' + idx + '][product_id]'" x-model="row.product_id" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                                     <option value="">{{ __('pos.select_product_dots') }}</option>
                                     <template x-for="p in products" :key="p.id">
                                         <option :value="p.id" x-text="p.name + ' — Rs. ' + p.price" :selected="String(row.product_id) === String(p.id)"></option>
                                     </template>
                                 </select>
-                                <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" required min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" title="{{ __('pos.quantity_label') }}">
-                                <button type="button" @click="rows.splice(idx, 1)" x-show="rows.length > 1" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="{{ __('pos.remove_item') }}">
+                                <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" title="{{ __('pos.quantity_label') }}">
+                                <button type="button" @click="rows.splice(idx, 1)" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="{{ __('pos.remove_item') }}">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </div>
@@ -242,6 +284,35 @@
                             {{ __('pos.add_item') }}
                         </button>
                     </div>
+                    @if($choiceTableOk ?? false)
+                    <div class="mb-5 pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
+                        <div class="mb-2">
+                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.deal_choice_groups') }}</label>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.deal_choice_groups_help') }}</p>
+                        </div>
+                        <template x-for="(group, groupIdx) in choiceGroups" :key="groupIdx">
+                            <div class="mb-3 p-3 rounded-xl bg-blue-50/70 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800">
+                                <div class="flex gap-2 mb-2">
+                                    <input type="text" :name="'choice_groups[' + groupIdx + '][label]'" x-model="group.label" required maxlength="100" placeholder="{{ __('pos.deal_choice_label_placeholder') }}" class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" :name="'choice_groups[' + groupIdx + '][quantity]'" x-model.number="group.quantity" required min="1" max="99" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" title="{{ __('pos.quantity_label') }}">
+                                    <button type="button" @click="choiceGroups.splice(groupIdx, 1)" class="p-2 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition" title="{{ __('pos.remove_item') }}">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                                <select multiple :name="'choice_groups[' + groupIdx + '][product_ids][]'" x-model="group.product_ids" required class="w-full min-h-28 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <template x-for="p in products" :key="p.id">
+                                        <option :value="String(p.id)" x-text="p.name + ' — Rs. ' + p.price"></option>
+                                    </template>
+                                </select>
+                                <p class="mt-1 text-[10px] text-gray-500 dark:text-gray-400">{{ __('pos.deal_choice_pick_help') }}</p>
+                            </div>
+                        </template>
+                        <button type="button" @click="choiceGroups.push({ label: '', quantity: 1, product_ids: [] })" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            {{ __('pos.add_deal_choice_group') }}
+                        </button>
+                    </div>
+                    @endif
                     <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">{{ __('pos.save_changes') }}</button>
                 </form>
             </div>

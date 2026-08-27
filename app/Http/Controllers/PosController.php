@@ -10,6 +10,8 @@ use App\Models\PosCustomer;
 use App\Models\PosService;
 use App\Models\PosDeal;
 use App\Models\PosDealItem;
+use App\Models\PosDealChoiceGroup;
+use App\Models\PosDealChoiceOption;
 use App\Models\PosTerminal;
 use App\Models\PosTransaction;
 use App\Models\PosTransactionItem;
@@ -2389,12 +2391,21 @@ class PosController extends Controller
         // (or bills) an off-day deal. Component names resolved company-scoped.
         $dealsForJs = [];
         // Plan gate: Starter shops par deals bake hi nahi hote (buttons na dikhen).
+        $choiceTablesReady = \Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_groups')
+            && \Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_options');
         $activeDeals = PosFeatureService::planAllows($company, 'deals_enabled')
-            ? PosDeal::where('company_id', $companyId)->where('is_active', true)->with('items')->get()
+            ? PosDeal::where('company_id', $companyId)->where('is_active', true)
+                ->with($choiceTablesReady ? ['items', 'choiceGroups.options'] : ['items'])->get()
                 ->filter(fn ($d) => $d->isAvailableAt())
             : collect();
         if ($activeDeals->isNotEmpty()) {
-            $dealProductIds = $activeDeals->flatMap(fn ($d) => $d->items->pluck('pos_product_id'))->unique();
+            $dealProductIds = $activeDeals->flatMap(function ($d) use ($choiceTablesReady) {
+                $fixed = $d->items->pluck('pos_product_id');
+                $choices = $choiceTablesReady
+                    ? $d->choiceGroups->flatMap(fn ($g) => $g->options->pluck('pos_product_id'))
+                    : collect();
+                return $fixed->merge($choices);
+            })->unique();
             $dealProductNames = PosProduct::where('company_id', $companyId)
                 ->whereIn('id', $dealProductIds)->pluck('name', 'id');
             foreach ($activeDeals as $deal) {
@@ -2408,10 +2419,27 @@ class PosController extends Controller
                     'price' => (float) $deal->price,
                     'category' => 'Deals',
                     'components' => $componentsText,
+                    'component_rows' => $deal->items->map(fn ($di) => [
+                        'product_id' => (int) $di->pos_product_id,
+                        'name' => (string) ($dealProductNames[(int) $di->pos_product_id] ?? 'Item'),
+                        'quantity' => (int) $di->quantity,
+                    ])->values(),
                     'is_tax_exempt' => false,
                     'hasRecipe' => false,
                     'image' => null,
                     'stockStatus' => null,
+                    // Required choice slots are baked as a display aid only.
+                    // Checkout locks/revalidates live groups before preserving the
+                    // selected components in the bill snapshot.
+                    'choice_groups' => $choiceTablesReady ? $deal->choiceGroups->map(fn ($group) => [
+                        'id' => (int) $group->id,
+                        'label' => (string) $group->label,
+                        'quantity' => (int) $group->quantity,
+                        'options' => $group->options->map(fn ($option) => [
+                            'product_id' => (int) $option->pos_product_id,
+                            'name' => (string) ($dealProductNames[(int) $option->pos_product_id] ?? 'Item'),
+                        ])->values(),
+                    ])->values() : [],
                     ...$deal->quotaMetadata(),
                 ];
             }
@@ -2584,6 +2612,17 @@ class PosController extends Controller
             return ($row->cnt ?? 0) . ':' . (string) ($row->mx ?? '');
         };
         $dealsAgg = $agg(PosDeal::where('company_id', $companyId));
+        // Choice groups/options are also baked into the cache-first sale screen.
+        // Do not rely solely on parent timestamps: an emergency data correction
+        // may touch an option directly without touching its deal.
+        $choiceGroupsAgg = $this->dealChoiceTablesReady()
+            ? $agg(PosDealChoiceGroup::whereIn('deal_id', PosDeal::where('company_id', $companyId)->select('id')))
+            : '0:';
+        $choiceOptionsAgg = $this->dealChoiceTablesReady()
+            ? $agg(PosDealChoiceOption::whereIn('group_id', PosDealChoiceGroup::whereIn(
+                'deal_id', PosDeal::where('company_id', $companyId)->select('id')
+            )->select('id')))
+            : '0:';
         $dealUsageAgg = \Illuminate\Support\Facades\Schema::hasTable('pos_deal_usages')
             ? $agg(\Illuminate\Support\Facades\DB::table('pos_deal_usages')->where('company_id', $companyId))
             : '0:';
@@ -2591,6 +2630,8 @@ class PosController extends Controller
             $agg(PosProduct::where('company_id', $companyId)),
             $agg(PosService::where('company_id', $companyId)),
             $dealsAgg,
+            $choiceGroupsAgg,
+            $choiceOptionsAgg,
             $dealUsageAgg,
             // Deals carry weekday/date windows — a day change must refresh the
             // screen, but ONLY for companies that actually have deals (ZFC,
@@ -11443,6 +11484,100 @@ class PosController extends Controller
     }
 
     /**
+     * Choice tables are deliberately optional during deploy-before-migrate.
+     * Calling the relations before their tables exist would turn a normal sale
+     * into a 500 on a partially-updated live installation.
+     */
+    private function dealChoiceTablesReady(): bool
+    {
+        return \Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_groups')
+            && \Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_options');
+    }
+
+    /**
+     * Validate an exact one-product selection for every configured choice group
+     * and turn it into ordinary frozen deal_snapshot rows. Keeping the rows
+     * flat means existing receipts, PDFs, stock deduction, recipe consumption,
+     * edit/void and refund restoration automatically use the actual pick.
+     *
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, array<string, int>>}
+     */
+    private function resolveDealChoiceSnapshot(PosDeal $deal, mixed $postedChoices, int $companyId): array
+    {
+        if (!$this->dealChoiceTablesReady()) {
+            return [[], []];
+        }
+
+        $groups = $deal->choiceGroups;
+        $postedChoices = is_array($postedChoices) ? array_values($postedChoices) : [];
+        if ($groups->isEmpty()) {
+            if (!empty($postedChoices)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+            return [[], []];
+        }
+
+        $byGroup = [];
+        foreach ($postedChoices as $choice) {
+            $gid = (int) (is_array($choice) ? ($choice['group_id'] ?? 0) : 0);
+            $pid = (int) (is_array($choice) ? ($choice['product_id'] ?? 0) : 0);
+            // One selection per group only. Dupes and unknown groups make the
+            // full line invalid instead of silently choosing one for cashier.
+            if ($gid <= 0 || $pid <= 0 || isset($byGroup[$gid])) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+            $byGroup[$gid] = $pid;
+        }
+        if (count($byGroup) !== $groups->count()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+            ]);
+        }
+
+        $requiredProductIds = [];
+        foreach ($groups as $group) {
+            $gid = (int) $group->id;
+            $pid = $byGroup[$gid] ?? 0;
+            $eligibleIds = $group->options->pluck('pos_product_id')->map(fn ($id) => (int) $id)->all();
+            if ($pid <= 0 || !in_array($pid, $eligibleIds, true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+            $requiredProductIds[] = $pid;
+        }
+
+        // An option that was deactivated after setup must not remain sellable.
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)
+            ->whereIn('id', array_unique($requiredProductIds))->get(['id', 'name'])->keyBy('id');
+        if ($products->count() !== count(array_unique($requiredProductIds))) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+            ]);
+        }
+
+        $snapshot = [];
+        $normalizedChoices = [];
+        foreach ($groups as $group) {
+            $gid = (int) $group->id;
+            $pid = $byGroup[$gid];
+            $snapshot[] = [
+                'product_id' => $pid,
+                'name' => (string) $products[$pid]->name,
+                'qty' => (int) $group->quantity,
+                'choice_group_id' => $gid,
+                'choice_group_label' => (string) $group->label,
+            ];
+            $normalizedChoices[] = ['group_id' => $gid, 'product_id' => $pid];
+        }
+        return [$snapshot, $normalizedChoices];
+    }
+
+    /**
      * Re-check and consume Special deal bundles inside the invoice transaction.
      * The catalog payload is display-only: the locked row supplies the current
      * schedule, price, components and quota. Regular deals intentionally skip
@@ -11462,7 +11597,7 @@ class PosController extends Controller
             $deal = PosDeal::where('company_id', $companyId)
                 ->where('id', (int) $item['item_id'])
                 ->where('is_active', true)
-                ->with('items')
+                ->with($this->dealChoiceTablesReady() ? ['items', 'choiceGroups.options'] : ['items'])
                 ->lockForUpdate()
                 ->first();
             if (!$deal) {
@@ -11491,17 +11626,24 @@ class PosController extends Controller
                     'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
                 ]);
             }
-            $expectedSnapshot = $deal->items->map(fn ($dealItem) => [
+            $fixedSnapshot = $deal->items->map(fn ($dealItem) => [
                 'product_id' => (int) $dealItem->pos_product_id,
                 'name' => (string) ($componentNames[(int) $dealItem->pos_product_id]->name ?? 'Item'),
                 'qty' => (int) $dealItem->quantity,
             ])->values()->all();
+            [$choiceSnapshot] = $this->resolveDealChoiceSnapshot($deal, $item['deal_choices'] ?? [], $companyId);
+            $expectedSnapshot = array_merge($fixedSnapshot, $choiceSnapshot);
             $postedSnapshot = collect($item['deal_snapshot'] ?? [])->map(fn ($component) => [
                 'product_id' => (int) ($component['product_id'] ?? 0),
                 'name' => (string) ($component['name'] ?? ''),
                 'qty' => (int) ($component['qty'] ?? 0),
             ])->values()->all();
-            if ($postedSnapshot !== $expectedSnapshot) {
+            $expectedComparable = collect($expectedSnapshot)->map(fn ($component) => [
+                'product_id' => (int) $component['product_id'],
+                'name' => (string) $component['name'],
+                'qty' => (int) $component['qty'],
+            ])->values()->all();
+            if ($postedSnapshot !== $expectedComparable) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
                 ]);
@@ -11562,7 +11704,9 @@ class PosController extends Controller
                     // now so receipts + inventory restore stay correct even if the deal
                     // is later edited or deleted. Unresolved → item_id null, client price
                     // (consistent with services).
-                    $deal = PosDeal::where('company_id', $companyId)->where('id', $itemId)->with('items')->first();
+                    $deal = PosDeal::where('company_id', $companyId)->where('id', $itemId)
+                        ->with($this->dealChoiceTablesReady() ? ['items', 'choiceGroups.options'] : ['items'])
+                        ->first();
                     if ($deal) {
             if (!$deal->isAvailableAt()) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -11578,6 +11722,12 @@ class PosController extends Controller
                             'name' => $componentNames[$di->pos_product_id] ?? 'Item',
                             'qty' => (int) $di->quantity,
                         ])->values()->all();
+                        [$choiceSnapshot, $dealChoices] = $this->resolveDealChoiceSnapshot(
+                            $deal,
+                            $item['deal_choices'] ?? [],
+                            $companyId
+                        );
+                        $dealSnapshot = array_merge($dealSnapshot, $choiceSnapshot);
                     } else {
                         // Deal lines are never allowed to degrade into a
                         // client-priced/manual line when a stale or tampered
@@ -11664,6 +11814,10 @@ class PosController extends Controller
                     auth('pos')->user()
                 ),
                 'deal_snapshot' => $dealSnapshot,
+                // Retained only until reserveDealUnitsForInvoice locks/rechecks
+                // the current deal configuration. Nothing client-supplied is
+                // written as historical selection data.
+                'deal_choices' => $dealChoices ?? [],
             ];
         }
         return $resolved;

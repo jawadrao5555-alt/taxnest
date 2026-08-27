@@ -42,6 +42,12 @@ LINES = {
         "Add Item daba kar doosri item: Soft Drink.",
         "Har item ki tadaad bhi likh sakte hain.",
     ],
+    's05b_cashier_choice': [
+        "Customer ki choice ke liye Cashier choice add karein.",
+        "Naam likhein: Apni Drink Chunein — quantity: 2.",
+        "Neeche tamam allowed drinks select karein.",
+        "Fixed items aur choice groups ek deal mein saath chal sakte hain.",
+    ],
     's06_save': [
         "Bas, Add Deal daba dein.",
         "Student Deal tayyar hokar list mein aa gayi.",
@@ -71,15 +77,17 @@ LINES = {
         "Category mein Deals chun lein.",
         "Tamam chalti hui deals samne aa jati hain.",
     ],
-    's11_sell': [
+    's11_choice_sell': [
         "Customer ne Family Deal mangwai? Card par click karein.",
-        "Poori deal apne tamam items ke saath ek line mein cart mein.",
-        "Qeemat system khud lagata hai — ghalat rate mumkin hi nahi.",
+        "Drink choice ho to pehle picker khulta hai.",
+        "Customer ki drink chunein aur Add Deal to Cart dabayein.",
+        "Fixed aur chosen dono items cart aur receipt mein saaf dikhte hain.",
     ],
-    's12_pay': [
+    's12_choice_pay': [
         "Ab payment — wahi ek button, CASH.",
-        "Receipt par deal ke saray items alag alag likhe aate hain.",
-        "Stock bhi har item ka khud-ba-khud minus ho jata hai.",
+        "Receipt par fixed aur chosen items alag alag likhe aate hain.",
+        "Stock aur recipe usi chosen product ka khud-ba-khud minus hota hai.",
+        "Qeemat system khud lagata hai — ghalat rate ya choice mumkin nahi.",
     ],
     's13_outro': [
         "Ek baar deal banayen, din aur waqt tay karein.",

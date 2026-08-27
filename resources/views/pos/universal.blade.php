@@ -1587,6 +1587,9 @@ window.addEventListener('popstate', function() {
                                         <span class="flex-shrink-0 whitespace-nowrap text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
                                     </template>
                                 </p>
+                                 <template x-if="item.item_type === 'deal' && (item.deal_components || []).length">
+                                     <p class="text-[10px] text-purple-600 dark:text-purple-300 mt-0.5 truncate" x-text="item.deal_components.map(c => c.quantity + 'x ' + c.name).join(', ')"></p>
+                                 </template>
                                 {{-- Inline price editor moved OUT of this narrow column to a full-width
                                      panel below the flex row (Aug 2026 overlap fix) — see below. --}}
                                 <template x-if="quickPriceCartUid !== item.cart_uid">
@@ -4383,6 +4386,49 @@ window.addEventListener('popstate', function() {
             <span class="text-sm font-semibold" x-text="toast.message"></span>
         </div>
     </div>
+
+    {{-- Deal Choice Picker (Task 1531): fixed-only deals remain one-tap; a
+         configured choice deal cannot enter cart until every required group
+         has exactly one real catalog product selected. --}}
+    <div x-show="showDealChoiceModal" x-cloak x-transition.opacity
+         @keydown.escape.window="cancelDealChoice()"
+         class="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/60 p-3 sm:p-6">
+        <div @click.outside="cancelDealChoice()" class="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700">
+            <div class="sticky top-0 z-10 flex items-center gap-3 px-5 py-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-100 dark:border-gray-800">
+                <div class="min-w-0 flex-1">
+                    <h3 class="text-base font-extrabold text-gray-900 dark:text-white">{{ __('pos.choose_deal_items') }}</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="pendingDeal?.name || ''"></p>
+                </div>
+                <button type="button" @click="cancelDealChoice()" class="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center" title="{{ __('pos.cancel_esc') }}">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5 space-y-5">
+                <p class="text-xs text-gray-600 dark:text-gray-300">{{ __('pos.choose_deal_items_help') }}</p>
+                <template x-for="group in (pendingDeal?.choice_groups || [])" :key="group.id">
+                    <section>
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <h4 class="text-sm font-bold text-gray-900 dark:text-white" x-text="group.label"></h4>
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300" x-text="group.quantity + 'x'"></span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <template x-for="option in group.options" :key="option.product_id">
+                                <button type="button" @click="pendingDealChoices[group.id] = String(option.product_id)"
+                                        :class="String(pendingDealChoices[group.id] || '') === String(option.product_id) ? 'border-purple-600 ring-2 ring-purple-200 dark:ring-purple-900 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700'"
+                                        class="text-left px-3 py-2.5 rounded-xl border transition">
+                                    <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100 truncate" x-text="option.name"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </section>
+                </template>
+            </div>
+            <div class="sticky bottom-0 p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-100 dark:border-gray-800 flex gap-2">
+                <button type="button" @click="cancelDealChoice()" class="flex-1 py-2.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">{{ __('pos.cancel_esc') }}</button>
+                <button type="button" @click="confirmDealChoice()" class="flex-1 py-2.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition">{{ __('pos.add_deal_to_cart') }}</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @php
@@ -4595,6 +4641,11 @@ function restaurantPos() {
         // date-range checked in universalCreateInvoice) — never cached client-side,
         // so an off-day deal can never linger past midnight via localStorage.
          allDeals: {!! $jsEnc(collect($dealsForJs ?? [])->values()) !!},
+        // Task 1531 — a choice deal is intentionally not added until every
+        // configured group has an explicit selection.
+        showDealChoiceModal: false,
+        pendingDeal: null,
+        pendingDealChoices: {},
         // EDIT PROVISIONAL IN SALE SCREEN (Jul 2026): ?edit_bill={id} → server ships
         // the bill here; init() loads it into the cart. Update goes through
         // updateTransaction (JSON) — bill stays provisional, keeps its L-serial.
@@ -6114,8 +6165,9 @@ function restaurantPos() {
                 this.showToast(item.name + ' is out of stock', 'error');
                 return;
             }
-            this.addToCart(item);
-            this.showToast(window.TXT.added_prefix + item.name, 'success');
+            if (this.addToCart(item) !== false) {
+                this.showToast(window.TXT.added_prefix + item.name, 'success');
+            }
         },
 
         getCartQty(item) {
@@ -6503,19 +6555,65 @@ function restaurantPos() {
             this.updateDisplayItems();
         },
 
-        addToCart(item) {
-            const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type);
+        openDealChoice(item) {
+            const deal = this.allDeals.find(d => String(d.id) === String(item.id)) || item;
+            const groups = deal.choice_groups || [];
+            if (!groups.length) return this.addToCart(deal, []);
+            this.pendingDeal = deal;
+            this.pendingDealChoices = {};
+            this.showDealChoiceModal = true;
+            return false;
+        },
+        cancelDealChoice() {
+            this.showDealChoiceModal = false;
+            this.pendingDeal = null;
+            this.pendingDealChoices = {};
+        },
+        confirmDealChoice() {
+            const deal = this.pendingDeal;
+            const groups = deal?.choice_groups || [];
+            const selections = [];
+            for (const group of groups) {
+                const productId = this.pendingDealChoices[group.id];
+                if (!productId) {
+                    this.showToast(window.TXT.deal_choice_required, 'error');
+                    return;
+                }
+                const option = (group.options || []).find(o => String(o.product_id) === String(productId));
+                if (!option) {
+                    this.showToast(window.TXT.deal_choice_required, 'error');
+                    return;
+                }
+                selections.push({ group_id: Number(group.id), product_id: Number(option.product_id), name: option.name, quantity: Number(group.quantity) || 1, label: group.label });
+            }
+            this.cancelDealChoice();
+            this.addToCart(deal, selections);
+            this.showToast(window.TXT.added_prefix + deal.name, 'success');
+        },
+        addToCart(item, selectedDealChoices = null) {
+            const isChoiceDeal = item.type === 'deal' && (item.choice_groups || []).length > 0;
+            if (isChoiceDeal && selectedDealChoices === null) {
+                return this.openDealChoice(item);
+            }
+            const choiceKey = isChoiceDeal
+                ? selectedDealChoices.map(c => c.group_id + ':' + c.product_id).join('|')
+                : '';
+            const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type
+                && (item.type !== 'deal' || (c._dealChoiceKey || '') === choiceKey));
             if (existing) {
                 existing.quantity++;
                 this.activeCartIndex = this.cart.indexOf(existing);
                 this.animateQty(this.activeCartIndex);
             } else {
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                const fixedComponents = item.type === 'deal' ? (item.component_rows || []) : [];
+                const selectedComponents = (selectedDealChoices || []).map(choice => ({ name: choice.name, quantity: choice.quantity }));
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey, deal_components: [...fixedComponents, ...selectedComponents] });
                 this.activeCartIndex = this.cart.length - 1;
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
             this.scrollToCartItem(this.activeCartIndex);
             // Smart Upsell REMOVED (customer feedback, 25 Jul 2026) — no suggestion fires on add.
+            return true;
         },
 
         // ──────────────────────────────────────────────────────────────
@@ -9746,6 +9844,9 @@ function restaurantPos() {
                         is_tax_exempt: !!c.is_tax_exempt,
                         special_notes: c.special_notes || null,
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
+                        // Choice ids are display hints until the server resolves
+                        // the locked deal configuration and freezes its snapshot.
+                        deal_choices: c.item_type === 'deal' ? (c.deal_choices || []) : [],
                     })),
                     // Payment method is chosen at Make Final time — keep the bill's own.
                     payment_method: (this.editingBillData && this.editingBillData.payment_method) || 'cash',

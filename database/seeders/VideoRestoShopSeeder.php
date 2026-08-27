@@ -284,6 +284,36 @@ class VideoRestoShopSeeder extends Seeder
                     }
                 }
             }
+            // Choice-group demo (Task 1531): deliberately uses ordinary
+            // company products, so the tutorial shows the exact inventory
+            // component the cashier chooses rather than a fake modifier.
+            if (Schema::hasTable('pos_deal_choice_groups') && Schema::hasTable('pos_deal_choice_options')) {
+                $demoDealIds = DB::table('pos_deals')->where('company_id', $companyId)
+                    ->whereIn('name', $keepDeals)->pluck('id');
+                $oldGroupIds = DB::table('pos_deal_choice_groups')->whereIn('deal_id', $demoDealIds)->pluck('id');
+                if ($oldGroupIds->isNotEmpty()) {
+                    DB::table('pos_deal_choice_options')->whereIn('group_id', $oldGroupIds)->delete();
+                }
+                DB::table('pos_deal_choice_groups')->whereIn('deal_id', $demoDealIds)->delete();
+
+                $familyDealId = DB::table('pos_deals')->where('company_id', $companyId)
+                    ->where('name', 'Family Deal')->value('id');
+                if ($familyDealId) {
+                    $drinkGroupId = DB::table('pos_deal_choice_groups')->insertGetId([
+                        'deal_id' => $familyDealId, 'label' => 'Apni Drink Chunein',
+                        'quantity' => 2, 'sort_order' => 0,
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                    foreach (['DRK-001', 'DRK-002'] as $sku) {
+                        if ($productId = $skuId($sku)) {
+                            DB::table('pos_deal_choice_options')->insert([
+                                'group_id' => $drinkGroupId, 'pos_product_id' => $productId,
+                                'created_at' => now(), 'updated_at' => now(),
+                            ]);
+                        }
+                    }
+                }
+            }
 
             // ── Customers ──
             foreach ([

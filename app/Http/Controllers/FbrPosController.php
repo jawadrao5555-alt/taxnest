@@ -380,6 +380,71 @@ class FbrPosController extends Controller
         return response()->json(['success' => true, 'redirect' => route('fbrpos.failQueue')]);
     }
 
+    private function fbrDealChoiceTablesReady(): bool
+    {
+        return \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_choice_groups')
+            && \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_choice_options');
+    }
+
+    /**
+     * Turn a submitted one-product-per-group selection into FBR component
+     * inputs. It is called only with the current, locked deal row, therefore
+     * neither a crafted browser id nor a stale cached picker can invoice an
+     * unconfigured product.
+     */
+    private function fbrDealChoiceComponents(\App\Models\FbrPosDeal $deal, mixed $postedChoices): array
+    {
+        if (!$this->fbrDealChoiceTablesReady()) {
+            return [];
+        }
+        $groups = $deal->choiceGroups;
+        $postedChoices = is_array($postedChoices) ? array_values($postedChoices) : [];
+        if ($groups->isEmpty()) {
+            if (!empty($postedChoices)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+            return [];
+        }
+
+        $byGroup = [];
+        foreach ($postedChoices as $choice) {
+            $gid = (int) (is_array($choice) ? ($choice['group_id'] ?? 0) : 0);
+            $pid = (int) (is_array($choice) ? ($choice['product_id'] ?? 0) : 0);
+            if ($gid <= 0 || $pid <= 0 || isset($byGroup[$gid])) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+            $byGroup[$gid] = $pid;
+        }
+        if (count($byGroup) !== $groups->count()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+            ]);
+        }
+
+        $components = [];
+        foreach ($groups as $group) {
+            $gid = (int) $group->id;
+            $pid = $byGroup[$gid] ?? 0;
+            $eligible = $group->options->pluck('product_id')->map(fn ($id) => (int) $id)->all();
+            if ($pid <= 0 || !in_array($pid, $eligible, true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+            $components[] = (object) [
+                'product_id' => $pid,
+                'quantity' => (int) $group->quantity,
+                'choice_group_id' => $gid,
+                'choice_group_label' => (string) $group->label,
+            ];
+        }
+        return $components;
+    }
+
     /**
      * Day-close page → persist "auto day-close next morning" (Task 676 — FBR
      * mirror of PosController::toggleAutoDayclose). Same company flag
@@ -1310,11 +1375,28 @@ class FbrPosController extends Controller
         // components are missing/inactive are unsellable and never baked.
         $activeDeals = [];
         if ($this->fbrPlanAllows('deals_enabled') && \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')) {
+            $choiceTablesReady = $this->fbrDealChoiceTablesReady();
             $dealRows = \App\Models\FbrPosDeal::where('company_id', $companyId)
-                ->where('is_active', true)->with('items')->orderBy('name')->get()
+                ->where('is_active', true)
+                ->with($choiceTablesReady ? ['items', 'choiceGroups.options'] : ['items'])
+                ->orderBy('name')->get()
                 ->filter(fn ($d) => $d->isAvailableAt());
+            $choiceOptionProductIds = $choiceTablesReady
+                ? $dealRows->flatMap(fn ($deal) => $deal->choiceGroups->flatMap(fn ($group) => $group->options->pluck('product_id')))->unique()
+                : collect();
+            $choiceOptionProducts = $choiceOptionProductIds->isNotEmpty()
+                ? Product::where('company_id', $companyId)->where('is_active', true)->whereIn('id', $choiceOptionProductIds)->get()->keyBy('id')
+                : collect();
             foreach ($dealRows as $dealRow) {
-                $units = $this->fbrAllocateDealUnits($dealRow);
+                // Choice products alter tax/price allocation. Use the first
+                // allowed option only as an initial display preview; the cashier
+                // picker recomputes it from their actual choice before cart add,
+                // and store() recomputes it again from the locked deal.
+                $previewChoices = $choiceTablesReady ? $dealRow->choiceGroups->map(function ($group) {
+                    $option = $group->options->first();
+                    return $option ? ['group_id' => (int) $group->id, 'product_id' => (int) $option->product_id] : null;
+                })->filter()->values()->all() : [];
+                $units = $this->fbrAllocateDealUnits($dealRow, $previewChoices);
                 if (empty($units)) { continue; }
                 $quota = $dealRow->quotaMetadata();
                 $net = 0.0;
@@ -1331,6 +1413,31 @@ class FbrPosController extends Controller
                         'name' => (string) $u['product']->name,
                         'quantity' => (int) $u['component_qty'],
                     ], $units),
+                    // Fixed components are supplied separately from the preview
+                    // list above: choice deals need the browser to recompute its
+                    // display tax preview after the cashier selects a different
+                    // eligible product.
+                    'fixed_components' => $dealRow->items->map(fn ($item) => [
+                        'product_id' => (int) $item->product_id,
+                        'quantity' => (int) $item->quantity,
+                    ])->values(),
+                    'choice_groups' => $choiceTablesReady ? $dealRow->choiceGroups->map(fn ($group) => [
+                        'id' => (int) $group->id,
+                        'label' => (string) $group->label,
+                        'quantity' => (int) $group->quantity,
+                        'options' => $group->options->map(function ($option) use ($choiceOptionProducts) {
+                            $product = $choiceOptionProducts->get((int) $option->product_id);
+                            return $product ? [
+                                'product_id' => (int) $product->id,
+                                'name' => (string) $product->name,
+                                'price' => (float) ($product->default_price ?? 0),
+                                'tax_rate' => (($product->tax_type ?? 'standard') === 'exempt' || (bool) ($product->is_third_schedule ?? false))
+                                    ? 0.0 : (float) ($product->default_tax_rate ?? 18),
+                                'is_tax_exempt' => (($product->tax_type ?? 'standard') === 'exempt'),
+                                'is_third_schedule' => (bool) ($product->is_third_schedule ?? false),
+                            ] : null;
+                        })->filter()->values(),
+                    ])->values() : [],
                     ...$quota,
                 ];
             }
@@ -1391,6 +1498,14 @@ class FbrPosController extends Controller
         $dealAgg = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')
             ? $agg(\App\Models\FbrPosDeal::where('company_id', $companyId))
             : '0:';
+        $choiceGroupsAgg = $this->fbrDealChoiceTablesReady()
+            ? $agg(\App\Models\FbrPosDealChoiceGroup::whereIn('deal_id', \App\Models\FbrPosDeal::where('company_id', $companyId)->select('id')))
+            : '0:';
+        $choiceOptionsAgg = $this->fbrDealChoiceTablesReady()
+            ? $agg(\App\Models\FbrPosDealChoiceOption::whereIn('group_id', \App\Models\FbrPosDealChoiceGroup::whereIn(
+                'deal_id', \App\Models\FbrPosDeal::where('company_id', $companyId)->select('id')
+            )->select('id')))
+            : '0:';
         $dealUsageAgg = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_usages')
             ? $agg(\Illuminate\Support\Facades\DB::table('fbr_pos_deal_usages')->where('company_id', $companyId))
             : '0:';
@@ -1401,6 +1516,8 @@ class FbrPosController extends Controller
             $agg(\App\Models\PosService::where('company_id', $companyId)),
             $promoAgg,
             $dealAgg,
+            $choiceGroupsAgg,
+            $choiceOptionsAgg,
             $dealUsageAgg,
             $agg(\App\Models\FbrPosTerminal::where('company_id', $companyId)),
             // Promotions AND deals carry date windows — a day change must refresh
@@ -1473,9 +1590,9 @@ class FbrPosController extends Controller
      * Returns [] when any component product is missing or inactive (deal is
      * unsellable) — callers skip the deal (create bake) or reject the sale.
      */
-    private function fbrAllocateDealUnits(\App\Models\FbrPosDeal $deal): array
+    private function fbrAllocateDealUnits(\App\Models\FbrPosDeal $deal, mixed $postedChoices = []): array
     {
-        $components = $deal->items;
+        $components = $deal->items->concat($this->fbrDealChoiceComponents($deal, $postedChoices));
         if ($components->isEmpty()) { return []; }
 
         $productIds = $components->pluck('product_id')->map(fn ($v) => (int) $v)->all();
@@ -1494,7 +1611,13 @@ class FbrPosController extends Controller
             // Weight in integer paisa; a zero-priced component gets weight 0
             // (equal-split fallback below covers the all-zero pathological case).
             $w = (int) round(((float) ($product->default_price ?? 0)) * 100) * $qty;
-            $rows[] = ['product' => $product, 'component_qty' => $qty, 'w' => max(0, $w)];
+            $rows[] = [
+                'product' => $product,
+                'component_qty' => $qty,
+                'w' => max(0, $w),
+                'choice_group_id' => $comp->choice_group_id ?? null,
+                'choice_group_label' => $comp->choice_group_label ?? null,
+            ];
             $sumW += max(0, $w);
         }
         if ($sumW <= 0) {
@@ -1531,6 +1654,8 @@ class FbrPosController extends Controller
             $units[] = [
                 'product' => $product,
                 'component_qty' => $r['component_qty'],
+                'choice_group_id' => $r['choice_group_id'],
+                'choice_group_label' => $r['choice_group_label'],
                 'unit_gross' => $gross,
                 'unit_net' => $net,
                 'unit_tax' => $tax,
@@ -1934,7 +2059,9 @@ class FbrPosController extends Controller
                         $dealQty = (int) round($dealQtyRaw);
                         $deal = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')
                             ? \App\Models\FbrPosDeal::where('company_id', $companyId)
-                                ->where('is_active', true)->with('items')->lockForUpdate()->find((int) $item['deal_id'])
+                                ->where('is_active', true)
+                                ->with($this->fbrDealChoiceTablesReady() ? ['items', 'choiceGroups.options'] : ['items'])
+                                ->lockForUpdate()->find((int) $item['deal_id'])
                             : null;
                         if (!$deal || !$deal->isAvailableAt()) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -1942,7 +2069,7 @@ class FbrPosController extends Controller
                             ]);
                         }
                         \App\Services\PosDealQuotaService::reserve($deal, $dealQty);
-                        $dealUnits = $this->fbrAllocateDealUnits($deal);
+                        $dealUnits = $this->fbrAllocateDealUnits($deal, $item['deal_choices'] ?? []);
                         if (empty($dealUnits)) {
                             // A component product was deleted/deactivated mid-sale.
                             throw \Illuminate\Validation\ValidationException::withMessages([

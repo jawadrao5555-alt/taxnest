@@ -1,6 +1,6 @@
 {
   "slug": "deals",
-  "baseUrl": "https://127.0.0.1:5443",
+  "baseUrl": "http://127.0.0.1:5000",
   "title": "Deals — Banana, Handle karna aur Bechna",
   "scenes": [
     {
@@ -51,9 +51,18 @@
       "narration": "अब बताएं deal में मिलेगा क्या। पहली item चुनें Chicken Biryani। फिर Add Item दबा कर दूसरी item डालें — Soft Drink। साथ वाले ख़ाने में हर item की तादाद भी लिख सकते हैं। जितनी चाहें items डाल दें।",
       "actions": [
         { "do": "wait", "ms": 1500 },
-        { "do": "select", "selector": "form[action$='/deals'] select.flex-1 >> nth=0", "label": "Chicken Biryani — Rs. 380", "after": 1800 },
-        { "do": "click", "selector": "form[action$='/deals'] button:has-text('Add Item')", "after": 1300 },
-        { "do": "select", "selector": "form[action$='/deals'] select.flex-1 >> nth=1", "label": "Soft Drink 345ml — Rs. 100", "after": 1800 }
+        { "do": "select", "selector": "form[action$='/deals'] select[name^='items'] >> nth=0", "label": "Chicken Biryani — Rs. 380", "after": 1800 },
+        { "do": "click", "selector": "form[action$='/deals'] button[type='button'] >> nth=0", "after": 1300 },
+        { "do": "select", "selector": "form[action$='/deals'] select[name^='items'] >> nth=1", "label": "Soft Drink 345ml — Rs. 100", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s05b_cashier_choice",
+      "narration": "अगर combo में customer की choice देनी हो, Cashier choice add करें। मिसाल के तौर पर नाम लिखें Apni Drink Chunein, quantity दो रखें, और नीचे वो तमाम drinks select करें जो customer ले सकता है। Fixed items और choice groups एक ही deal में साथ चल सकते हैं।",
+      "actions": [
+        { "do": "click", "selector": "form[action$='/deals'] button[type='button'] >> nth=1", "after": 1200 },
+        { "do": "type", "selector": "form[action$='/deals'] input[name^='choice_groups'][name$='[label]']", "text": "Apni Drink Chunein", "delay": 60, "after": 800 },
+        { "do": "eval", "js": "(() => { const s=document.querySelector(\"form[action$='/deals'] select[name^='choice_groups']\"); if(!s)return; [...s.options].forEach(o=>o.selected=/Fresh Lime|Soft Drink/.test(o.text)); s.dispatchEvent(new Event('change',{bubbles:true})); })()", "after": 2200 }
       ]
     },
     {
@@ -61,7 +70,7 @@
       "narration": "बस, Add Deal दबा दें। लीजिए — Student Deal तैयार होकर list में आ गई। हम ने सिर्फ़ Monday और Tuesday चुने थे, इसलिए ये deal उन्हीं दो दिनों sale screen पर आएगी।",
       "actions": [
         { "do": "wait", "ms": 1000 },
-        { "do": "click", "selector": "form[action$='/deals'] button[type=submit]:has-text('Add Deal')", "after": 2800 },
+        { "do": "click", "selector": "form[action$='/deals'] button[type=submit]", "after": 2800 },
         { "do": "highlight", "selector": "h4:has-text('Student Deal')", "after": 2500 }
       ]
     },
@@ -105,17 +114,19 @@
       ]
     },
     {
-      "id": "s11_sell",
-      "narration": "Customer ने Family Deal मंगवाई? बस उस card पर click करें — पूरी deal अपने तमाम items के साथ एक ही line में cart में आ जाती है, fixed क़ीमत पर। क़ीमत system ख़ुद लगाता है, इसलिए ग़लत rate मुमकिन ही नहीं।",
+      "id": "s11_choice_sell",
+      "narration": "Customer ने Family Deal मंगवाई? Card पर click करें। इस deal में Drink की choice है, इस लिए पहले picker खुलता है। Customer की पसंद की drink choose करें और Add Deal to Cart दबाएं। Fixed items फ़ौरन साथ रहते हैं, जबकि चुनी हुई drink का असल product cart और receipt में साफ़ दिखाई देता है।",
       "actions": [
         { "do": "wait", "ms": 1500 },
         { "do": "click", "selector": ".prod-card:has-text('Family Deal')", "after": 2200 },
+        { "do": "click", "selector": "button:has-text('Soft Drink 345ml')", "after": 1200 },
+        { "do": "click", "selector": "button:has-text('Add Deal to Cart')", "after": 1800 },
         { "do": "highlight", "selector": ".tn-cart-col", "after": 2800 }
       ]
     },
     {
-      "id": "s12_pay",
-      "narration": "अब payment — वही एक बटन, CASH। bill final हो जाता है, receipt पर deal के सारे items अलग-अलग साफ़ लिखे आते हैं, और stock भी हर item का ख़ुद-ब-ख़ुद minus हो जाता है।",
+      "id": "s12_choice_pay",
+      "narration": "अब payment — वही एक button, CASH। Bill final होता है, receipt पर deal के fixed और चुने हुए दोनों items अलग-अलग साफ़ लिखे आते हैं। Stock और recipe भी उसी चुने हुए product का ख़ुद-ब-ख़ुद minus होता है। Deal की क़ीमत system ख़ुद लगाता है, इसलिए cashier browser से rate या choice बदल नहीं सकता।",
       "actions": [
         { "do": "wait", "ms": 1500 },
         { "do": "click", "selector": "button:has-text('CASH')", "after": 3500 },

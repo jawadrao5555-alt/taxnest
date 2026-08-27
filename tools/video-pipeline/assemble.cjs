@@ -17,9 +17,20 @@ withAudio.forEach((t, i) => {
   filters.push(`[${i + 1}:a]adelay=${t.audioAtMs}|${t.audioAtMs}[a${i}]`);
   mixIns.push(`[a${i}]`);
 });
+const captions = fs.existsSync(path.join(OUT, 'captions.srt'))
+  ? path.join(OUT, 'captions.srt')
+  : path.join(__dirname, 'scenarios', `${slug}.srt`);
+if (fs.existsSync(captions)) {
+  // Captions are deliberately burned into the master so the social exports
+  // inherit them too. Keep a dark strip behind Roman Urdu for readability
+  // over both title cards and dense POS screens.
+  filters.unshift(`[0:v]subtitles='${captions}':force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00152A30,BackColour=&HAA0A4D5C,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginL=80,MarginR=80,MarginV=42'[vout]`);
+} else {
+  filters.unshift('[0:v]null[vout]');
+}
 filters.push(`${mixIns.join('')}amix=inputs=${withAudio.length}:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[aout]`);
 const master = path.join(OUT, `${slug}-16x9.mp4`);
-sh(`ffmpeg -y ${inputs} -filter_complex "${filters.join(';')}" -map 0:v -map "[aout]" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 30 -c:a aac -b:a 160k -movflags +faststart "${master}"`);
+sh(`ffmpeg -y ${inputs} -filter_complex "${filters.join(';')}" -map "[vout]" -map "[aout]" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 30 -c:a aac -b:a 160k -movflags +faststart "${master}"`);
 
 // ── 9:16 framed version: teal branded canvas, video centered, readable ──
 // The branded 1080x1920 background is rendered ONCE via make-bg.cjs (Chromium)

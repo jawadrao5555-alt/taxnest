@@ -1,0 +1,202 @@
+{
+  "slug": "stock-check",
+  "baseUrl": "http://127.0.0.1:5000",
+  "title": "Physical Stock Check",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Physical Stock Check",
+        "sub": "System kya kehta hai · Shelf par kya mila · Farq kahan hai"
+      },
+      "narration": "السلام علیکم! آج ہم نیسٹ پی او ایس کا ایک بہت اہم نظام سیکھیں گے — فزیکل اسٹاک چیک۔ یعنی رات کو دکان بند کرتے وقت یہ ملانا کہ سسٹم کے حساب سے مال کتنا ہونا چاہیے، اور شیلف پر گِن کر واقعی کتنا نکلا۔",
+      "minMs": 7000
+    },
+    {
+      "id": "s02_concept",
+      "card": {
+        "heading": "Do number, ek muqabla",
+        "sub": "Should Be  −  Physical Count  =  Difference"
+      },
+      "narration": "بات بہت سیدھی ہے۔ صبح آپ نے مال ڈالا، دن بھر بکری ہوئی، تو سسٹم خود بتا دیتا ہے کہ اب کتنا بچنا چاہیے۔ رات کو بندہ شیلف پر جا کر گِنتا ہے کہ اصل میں کتنا پڑا ہے۔ اِن دو نمبروں کا فرق ہی بتاتا ہے کہ کہیں چوری، ضیاع یا غلط انٹری تو نہیں ہوئی۔",
+      "minMs": 8000
+    },
+    {
+      "id": "s03_open",
+      "narration": "لاگ اِن کے بعد Inventory کے صفحے پر آئیں۔ یہاں اوپر پٹی میں ایک نیا بٹن آ گیا ہے — Physical Stock Check۔ اسی پر کلک کریں۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "{{VIDEO_DEMO_PASS}}", "delay": 45 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1800 },
+        { "do": "goto", "url": "/pos/inventory" },
+        { "do": "wait", "ms": 1200 },
+        { "do": "highlight", "selector": "a:has-text('Physical Stock Check')", "after": 1800 },
+        { "do": "click", "selector": "a:has-text('Physical Stock Check')", "after": 1600 }
+      ]
+    },
+    {
+      "id": "s04_index",
+      "narration": "یہ ہے Stock Check کا صفحہ۔ یہاں آپ کے پچھلے سارے چیک محفوظ رہتے ہیں — کب ہوا، کتنی چیزیں گِنی گئیں، اور کتنے کا فرق نکلا۔ نیچے مختصر وضاحت بھی موجود ہے کہ یہ نظام کام کیسے کرتا ہے۔",
+      "actions": [
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": "h1:has-text('Physical Stock Check')", "after": 1400 },
+        { "do": "scroll", "by": 400, "after": 900 },
+        { "do": "highlight", "selector": "span:has-text('How it works')", "after": 2200 },
+        { "do": "scroll", "by": -400, "after": 800 }
+      ]
+    },
+    {
+      "id": "s05_new",
+      "narration": "نیا چیک شروع کرنے کے لیے New Stock Check پر کلک کریں۔ یہاں سے طے کریں کہ گِننا کیا ہے — بیچنے والی چیزیں، خام مال، یا دونوں۔ اگر آپ چاہیں کہ جن چیزوں کا اسٹاک صفر ہے وہ فہرست میں نہ آئیں تو نیچے والا خانہ لگا دیں۔",
+      "actions": [
+        { "do": "click", "selector": "a:has-text('New Stock Check')", "after": 1600 },
+        { "do": "wait", "ms": 700 },
+        { "do": "highlight", "selector": "label:has-text('What to count')", "after": 1600 },
+        { "do": "highlight", "selector": "label:has-text('Skip items with zero stock')", "after": 1800 },
+        { "do": "click", "selector": "input[name='only_in_stock']", "after": 900 },
+        { "do": "type", "selector": "input[name='notes']", "text": "Raat ki ginti - 27 August", "delay": 55 },
+        { "do": "wait", "ms": 700 }
+      ]
+    },
+    {
+      "id": "s06_start",
+      "narration": "اب Start Counting دبائیں۔ اسی لمحے سسٹم ہر چیز کا موجودہ اسٹاک ایک تصویر کی طرح محفوظ کر لیتا ہے۔ یہی وہ نمبر ہے جس سے آپ کی گِنتی کا مقابلہ ہوگا — اور اگر گِنتی کے دوران کاؤنٹر پر بکری چلتی رہے تب بھی یہ نمبر ہلتا نہیں۔",
+      "actions": [
+        { "do": "click", "selector": "button[type=submit]:has-text('Start Counting')", "after": 2600 },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s07_sheet_tour",
+      "narration": "یہ ہے آپ کی گِنتی کی شیٹ۔ اوپر پانچ خانے ہیں — کتنی چیزیں ہیں، کتنی گِن لی گئیں، کتنے فرق نکلے، اور کمی یا زیادتی کی مالیت کتنی بنی۔ نیچے جدول میں تین اہم کالم ہیں: Should Be یعنی سسٹم کے حساب سے کتنا ہونا چاہیے، Physical Count یعنی آپ نے گِن کر کتنا پایا، اور Difference یعنی فرق۔",
+      "actions": [
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": "p:has-text('Items')", "after": 1100 },
+        { "do": "highlight", "selector": "p:has-text('Gaps')", "after": 1100 },
+        { "do": "highlight", "selector": "p:has-text('Short Value')", "after": 1100 },
+        { "do": "scroll", "by": 620, "after": 900 },
+        { "do": "highlight", "selector": "th:has-text('Should Be')", "after": 1500 },
+        { "do": "highlight", "selector": "th:has-text('Physical Count')", "after": 1500 },
+        { "do": "highlight", "selector": "th:has-text('Difference')", "after": 1600 }
+      ]
+    },
+    {
+      "id": "s08_count_short",
+      "narration": "چلیں گِنتی شروع کرتے ہیں۔ آٹا دس کلو — سسٹم کہہ رہا ہے چوبیس ہونے چاہئیں۔ بندے نے شیلف پر گِنا تو اکیس نکلے۔ جیسے ہی ہم اکیس لکھتے ہیں، سامنے فرق فوراً منفی تین دکھا دیتا ہے۔ یعنی تین تھیلے کم ہیں۔",
+      "actions": [
+        { "do": "highlight", "selector": "tr:has-text('Aata 10kg')", "after": 1200 },
+        { "do": "type", "selector": "tr:has-text('Aata 10kg') input[type=number]", "text": "21", "delay": 320 },
+        { "do": "wait", "ms": 1800 },
+        { "do": "highlight", "selector": "tr:has-text('Aata 10kg')", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s09_count_more",
+      "narration": "اسی طرح باقی چیزیں بھی گِنتے جائیں۔ انڈوں کی اٹھارہ درجن ہونی چاہئیں تھیں، سولہ نکلیں۔ دودھ تیس ہونا چاہیے تھا، پورا تیس ہی ملا — یہاں فرق صفر ہے۔ اور نمکو چھبیس کے بجائے اٹھائیس نکلا، یعنی دو زیادہ — یہ عموماً پرانی غلط انٹری کی نشانی ہوتی ہے۔",
+      "actions": [
+        { "do": "type", "selector": "tr:has-text('Anday (Darjan)') input[type=number]", "text": "16", "delay": 300 },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "tr:has-text('Doodh 1L') input[type=number]", "text": "30", "delay": 260 },
+        { "do": "wait", "ms": 900 },
+        { "do": "scroll", "by": 300, "after": 700 },
+        { "do": "type", "selector": "tr:has-text('Nimko 250g') input[type=number]", "text": "28", "delay": 300 },
+        { "do": "wait", "ms": 1600 },
+        { "do": "highlight", "selector": "tr:has-text('Nimko 250g')", "after": 1600 }
+      ]
+    },
+    {
+      "id": "s10_reason",
+      "narration": "جہاں فرق نکلے وہاں ساتھ ہی وجہ بھی لکھ دیں — ضیاع، ٹوٹ پھوٹ، چوری، غلط انٹری یا عملے کا استعمال۔ یہی وجہ بعد میں رپورٹ میں نظر آتی ہے، اور اسی سے پتہ چلتا ہے کہ کمی کہاں سے آ رہی ہے۔",
+      "actions": [
+        { "do": "scroll", "by": -300, "after": 700 },
+        { "do": "highlight", "selector": "tr:has-text('Aata 10kg') select", "after": 1300 },
+        { "do": "select", "selector": "tr:has-text('Aata 10kg') select", "value": "wastage", "after": 1400 },
+        { "do": "select", "selector": "tr:has-text('Anday (Darjan)') select", "value": "breakage", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s11_save",
+      "narration": "گِنتی کے بعد نیچے Save Counts دبا دیں۔ اسٹاک ابھی تبدیل نہیں ہوا — صرف آپ کی گِنتی محفوظ ہوئی ہے۔ اوپر خانوں میں دیکھیں: کتنی چیزیں گِنی گئیں، کتنے فرق نکلے، اور کمی کی مالیت کتنے روپے بنی۔",
+      "actions": [
+        { "do": "scroll", "by": 900, "after": 800 },
+        { "do": "click", "selector": "button[type=submit]:has-text('Save Counts')", "after": 2800 },
+        { "do": "wait", "ms": 1200 },
+        { "do": "highlight", "selector": "p:has-text('Counted')", "after": 1400 },
+        { "do": "highlight", "selector": "p:has-text('Gaps')", "after": 1400 },
+        { "do": "highlight", "selector": "p:has-text('Short Value')", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s12_excel",
+      "narration": "اگر آپ کی دکان بڑی ہے اور سینکڑوں چیزیں گِننی ہیں تو ایکسل کا طریقہ زیادہ آسان ہے۔ Download Excel Sheet دبائیں — فائل میں ایک کالم میں سسٹم کا نمبر پہلے سے لکھا ہوگا اور ساتھ Physical Count کا خالی کالم ہوگا۔ بندہ گودام میں بیٹھ کر وہ خانے بھرے، اور وہی فائل واپس یہاں اپلوڈ کر دیں — فرق سسٹم خود نکال لے گا۔",
+      "actions": [
+        { "do": "scroll", "by": -1200, "after": 800 },
+        { "do": "highlight", "selector": "a:has-text('Download Excel Sheet')", "after": 2000 },
+        { "do": "highlight", "selector": "button:has-text('Upload Filled Sheet')", "after": 2000 },
+        { "do": "highlight", "selector": "p:has-text('The sheet carries the system quantity')", "after": 2600 }
+      ]
+    },
+    {
+      "id": "s13_filter",
+      "narration": "لمبی فہرست میں صرف مسئلے والی چیزیں دیکھنی ہوں تو اوپر فلٹر سے Has a gap چن لیں — پھر صرف وہی سطریں سامنے آئیں گی جہاں فرق نکلا ہے۔",
+      "actions": [
+        { "do": "select", "selector": "select[name='filter']", "value": "variance", "after": 2600 },
+        { "do": "wait", "ms": 1000 },
+        { "do": "scroll", "by": 600, "after": 1600 }
+      ]
+    },
+    {
+      "id": "s14_post",
+      "narration": "جب آپ مطمئن ہو جائیں کہ گِنتی درست ہے، تو Post and Correct Stock دبائیں۔ اب سسٹم اسٹاک کو آپ کی گِنتی کے مطابق ٹھیک کر دے گا۔ یاد رکھیں — یہ قدم واپس نہیں ہوتا، اس لیے تصدیق مانگی جاتی ہے۔",
+      "actions": [
+        { "do": "scroll", "by": 1400, "after": 900 },
+        { "do": "highlight", "selector": "h3:has-text('Finish this check')", "after": 1800 },
+        { "do": "click", "selector": "button[type=submit]:has-text('Post & Correct Stock')", "after": 3200 },
+        { "do": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "s15_after",
+      "narration": "چیک مکمل ہو گیا۔ اوپر حالت Completed ہو گئی ہے اور نیچے پیغام آ گیا ہے کہ اسٹاک درست کر دیا گیا ہے۔ اہم بات یہ ہے کہ سسٹم نے آپ کا گِنا ہوا نمبر زبردستی نہیں ٹھونسا، بلکہ صرف فرق کے برابر کمی یا اضافہ کیا ہے — تاکہ گِنتی کے دوران ہونے والی کوئی بکری ضائع نہ ہو۔",
+      "actions": [
+        { "do": "scroll", "by": -1600, "after": 900 },
+        { "do": "highlight", "selector": "span:has-text('Completed')", "after": 1800 },
+        { "do": "scroll", "by": 500, "after": 800 },
+        { "do": "highlight", "selector": "p:has-text('Stock has been corrected')", "after": 2600 }
+      ]
+    },
+    {
+      "id": "s16_movements",
+      "narration": "اور ہر درستی کا مکمل حساب Stock Movements میں محفوظ ہو جاتا ہے — کس چیز میں کتنی کمی ہوئی، کس چیک کے تحت ہوئی، اور کیا وجہ لکھی گئی تھی۔ کوئی تعداد خاموشی سے کبھی نہیں بدلتی۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/inventory/movements" },
+        { "do": "wait", "ms": 1400 },
+        { "do": "highlight", "selector": "tr:has-text('Aata 10kg')", "after": 2000 },
+        { "do": "scroll", "by": 400, "after": 1600 }
+      ]
+    },
+    {
+      "id": "s17_report",
+      "narration": "آخر میں، مکمل ہونے والے ہر چیک کی ایک صاف ستھری رپورٹ بھی نکلتی ہے — Variance Report۔ اسے پرنٹ کر کے دستخط کروا لیں اور فائل میں لگا دیں۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/inventory/stock-check" },
+        { "do": "wait", "ms": 1200 },
+        { "do": "highlight", "selector": "table", "after": 1800 },
+        { "do": "click", "selector": "table tbody tr:first-child a:has-text('View')", "after": 2000 },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "a:has-text('Variance Report')", "after": 2200 }
+      ]
+    },
+    {
+      "id": "s18_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Har raat ginti — har farq ka hisaab"
+      },
+      "narration": "تو یہ تھا فزیکل اسٹاک چیک۔ ہر رات دس منٹ کی گِنتی، اور آپ کو فوراً پتہ چل جائے گا کہ مال کہاں سے کم ہو رہا ہے۔ شکریہ!",
+      "minMs": 6000
+    }
+  ]
+}

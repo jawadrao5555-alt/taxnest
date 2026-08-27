@@ -23,6 +23,7 @@
         @if($canTransfer ?? false)
         <a href="{{ route('pos.inventory.transfers') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.branch_transfer') }}</a>
         @endif
+        <a href="{{ route('pos.inventory.stock-check.index') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.stock_check') }}<x-new-badge feature="stock_check" class="ml-1" /></a>
     </div>
 
     @include('pos.inventory.partials.branch-bar')

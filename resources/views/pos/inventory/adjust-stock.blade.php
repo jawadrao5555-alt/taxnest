@@ -17,6 +17,7 @@
         @if($canTransfer ?? false)
         <a href="{{ route('pos.inventory.transfers') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">{{ __('pos.branch_transfer') }}</a>
         @endif
+        <a href="{{ route('pos.inventory.stock-check.index') }}" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">{{ __('pos.stock_check') }}<x-new-badge feature="stock_check" class="ml-1" /></a>
     </div>
 
     @if(session('error'))

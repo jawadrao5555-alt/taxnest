@@ -71,6 +71,13 @@ class NewFeatureBadges
             'panel' => 'pos',
             'pages' => ['pos.customize'],
         ],
+        // 27 Aug 2026 — Physical Stock Check: raat ko hath se gina hua maal
+        // system ke hisaab se milao, farq khud saamne.
+        'stock_check' => [
+            'since' => '2026-08-27',
+            'panel' => 'pos',
+            'pages' => ['pos.inventory.stock-check.index'],
+        ],
     ];
 
     /** Sirf tests ke liye — asli register ki jagah naqli entries. */

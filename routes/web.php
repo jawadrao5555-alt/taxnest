@@ -53,6 +53,7 @@ use App\Http\Controllers\RestaurantTableController;
 use App\Http\Controllers\RestaurantKdsController;
 use App\Http\Controllers\IngredientController;
 use App\Http\Controllers\PosInventoryController;
+use App\Http\Controllers\PosStockCheckController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\HsCodeMappingController;
 use App\Http\Controllers\BranchController;
@@ -1127,6 +1128,20 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/inventory/transfer/{movement}/cancel', [PosInventoryController::class, 'cancelTransfer'])->name('pos.inventory.transfer.cancel');
         Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
         Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
+        // Physical Stock Check — expected vs physically counted, and the gap.
+        // Reads are open to anyone who can see inventory; every WRITE is
+        // owner/manager only (enforced inside the controller, not here, so a
+        // cashier hitting the URL directly gets the same 403).
+        Route::get('/inventory/stock-check', [PosStockCheckController::class, 'index'])->name('pos.inventory.stock-check.index');
+        Route::get('/inventory/stock-check/create', [PosStockCheckController::class, 'create'])->name('pos.inventory.stock-check.create');
+        Route::post('/inventory/stock-check', [PosStockCheckController::class, 'store'])->name('pos.inventory.stock-check.store');
+        Route::get('/inventory/stock-check/{id}', [PosStockCheckController::class, 'show'])->whereNumber('id')->name('pos.inventory.stock-check.show');
+        Route::post('/inventory/stock-check/{id}/counts', [PosStockCheckController::class, 'saveCounts'])->whereNumber('id')->name('pos.inventory.stock-check.counts');
+        Route::get('/inventory/stock-check/{id}/sheet', [PosStockCheckController::class, 'downloadSheet'])->whereNumber('id')->name('pos.inventory.stock-check.sheet');
+        Route::post('/inventory/stock-check/{id}/import', [PosStockCheckController::class, 'importSheet'])->whereNumber('id')->name('pos.inventory.stock-check.import');
+        Route::post('/inventory/stock-check/{id}/post', [PosStockCheckController::class, 'post'])->whereNumber('id')->name('pos.inventory.stock-check.post');
+        Route::post('/inventory/stock-check/{id}/cancel', [PosStockCheckController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-check.cancel');
+        Route::get('/inventory/stock-check/{id}/pdf', [PosStockCheckController::class, 'pdf'])->whereNumber('id')->name('pos.inventory.stock-check.pdf');
         Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');
         Route::post('/team/cashier', [PosController::class, 'storeCashier'])->name('pos.team.store-cashier');
         Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');

@@ -34,9 +34,24 @@ if (fs.existsSync(captions)) {
 } else {
   filters.unshift('[0:v]null[vout]');
 }
-filters.push(`${mixIns.join('')}amix=inputs=${withAudio.length}:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[aout]`);
+// A take can legitimately be assembled before its narration exists (voice
+// pending, TTS quota, revision in flight). amix with zero inputs aborts
+// ffmpeg, so lay down a silent track instead and keep the downstream 9:16
+// and 1:1 encodes — which copy this stream — working unchanged.
+if (withAudio.length) {
+  filters.push(`${mixIns.join('')}amix=inputs=${withAudio.length}:normalize=0,loudnorm=I=-16:TP=-1.5:LRA=11[aout]`);
+} else {
+  // anullsrc never ends, and -shortest does not reliably stop a filtergraph
+  // output, so bound it explicitly to the capture's own length.
+  const captureSecs = execSync(
+    `ffprobe -v error -show_entries format=duration -of csv=p=0 "${capture}"`
+  ).toString().trim();
+  console.warn(`! no per-scene mp3s found — assembling a SILENT master (${captureSecs}s)`);
+  inputs += ` -f lavfi -t ${captureSecs} -i anullsrc=channel_layout=stereo:sample_rate=44100`;
+  filters.push(`[1:a]anull[aout]`);
+}
 const master = path.join(OUT, `${slug}-16x9.mp4`);
-sh(`ffmpeg -y ${inputs} -filter_complex "${filters.join(';')}" -map "[vout]" -map "[aout]" -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 30 -c:a aac -b:a 160k -movflags +faststart "${master}"`);
+sh(`ffmpeg -y ${inputs} -filter_complex "${filters.join(';')}" -map "[vout]" -map "[aout]" ${withAudio.length ? '' : '-shortest '}-c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 30 -c:a aac -b:a 160k -movflags +faststart "${master}"`);
 
 // ── 9:16 framed version: teal branded canvas, video centered, readable ──
 // The branded 1080x1920 background is rendered ONCE via make-bg.cjs (Chromium)

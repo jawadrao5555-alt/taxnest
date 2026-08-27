@@ -117,7 +117,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace && set -a && . .local/qa-creds.env && set +a && export VIDEO_DEMO_PASS=\"${VIDEO_DEMO_PASS:-$DEV_POS_PASS}\" && export CHROMIUM_BIN=/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium && env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE php artisan db:seed --class=VideoRestoShopSeeder --force && node tools/video-pipeline/durations.cjs deals && python3 tools/video-pipeline/scenarios/deals-captions.py && node tools/video-pipeline/record.cjs tools/video-pipeline/scenarios/deals.json && node tools/video-pipeline/assemble.cjs deals && cp tools/video-pipeline/out/deals/deals-16x9.mp4 public/videos/tutorials/deals-tutorial.mp4 && cp tools/video-pipeline/out/deals/deals-16x9.mp4 public/videos/tutorials/deals.mp4"
+args = "bash tools/video-pipeline/batch-stock-check.sh"
 
 [[ports]]
 localPort = 5000

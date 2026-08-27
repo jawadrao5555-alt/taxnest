@@ -89,9 +89,11 @@ LINES = {
         "Stock aur recipe usi chosen product ka khud-ba-khud minus hota hai.",
         "Qeemat system khud lagata hai — ghalat rate ya choice mumkin nahi.",
     ],
-    's13_outro': [
-        "Ek baar deal banayen, din aur waqt tay karein.",
-        "Phir rozana ek click mein bech dein.",
+    's13_choice_outro': [
+        "Ek baar deal banayen, fixed items ya cashier choice groups rakhein.",
+        "Din aur waqt tay karein, phir rozana ek click mein bech dein.",
+        "Ye tareeqa PRA POS aur FBR POS dono mein kaam karta hai.",
+        "Asal chosen product receipt, stock aur recipe mein sahi rehta hai.",
         "Restaurant mode aur Reports ki videos bhi dekhein. Shukriya!",
     ],
 }

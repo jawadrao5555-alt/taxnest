@@ -141,7 +141,12 @@ async function runAction(page, a) {
       await sleep(a.after || 900);
       break;
     }
-    case 'eval': await page.evaluate(a.js); break;
+    case 'eval':
+      await page.evaluate(a.js);
+      // DOM-mutating snippets commonly update Alpine state. Honour their
+      // scenario delay so the next recorded action sees the rendered nodes.
+      await sleep(a.after || 0);
+      break;
     case 'select': {
       // Choose a native <select> option (value or label) with a visible cursor
       // move (e.g. sale-screen category picker).

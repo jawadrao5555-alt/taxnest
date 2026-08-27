@@ -51,18 +51,17 @@
       "narration": "अब बताएं deal में मिलेगा क्या। पहली item चुनें Chicken Biryani। फिर Add Item दबा कर दूसरी item डालें — Soft Drink। साथ वाले ख़ाने में हर item की तादाद भी लिख सकते हैं। जितनी चाहें items डाल दें।",
       "actions": [
         { "do": "wait", "ms": 1500 },
-        { "do": "select", "selector": "form[action$='/deals'] select[name^='items'] >> nth=0", "label": "Chicken Biryani — Rs. 380", "after": 1800 },
-        { "do": "click", "selector": "form[action$='/deals'] button[type='button'] >> nth=0", "after": 1300 },
-        { "do": "select", "selector": "form[action$='/deals'] select[name^='items'] >> nth=1", "label": "Soft Drink 345ml — Rs. 100", "after": 1800 }
+        { "do": "eval", "js": "(async () => { const root=document.querySelector(\"form[action$='/deals']\"); [...root.querySelectorAll(\"button[type='button']\")].find(b=>b.innerText.includes('Add Item')).click(); await new Promise(r=>setTimeout(r,350)); const s=[...root.querySelectorAll('select')].find(s=>s.name.startsWith('items')); const o=[...s.options].find(o=>o.text.includes('Chicken Biryani')); s.value=o.value; s.dispatchEvent(new Event('change',{bubbles:true})); })()", "after": 1800 },
+        { "do": "eval", "js": "(async () => { const root=document.querySelector(\"form[action$='/deals']\"); [...root.querySelectorAll(\"button[type='button']\")].find(b=>b.innerText.includes('Add Item')).click(); await new Promise(r=>setTimeout(r,350)); const a=[...root.querySelectorAll('select')].filter(s=>s.name.startsWith('items')); const s=a.at(-1), o=[...s.options].find(o=>o.text.includes('Soft Drink 345ml')); s.value=o.value; s.dispatchEvent(new Event('change',{bubbles:true})); })()", "after": 1800 }
       ]
     },
     {
       "id": "s05b_cashier_choice",
       "narration": "अगर combo में customer की choice देनी हो, Cashier choice add करें। मिसाल के तौर पर नाम लिखें Apni Drink Chunein, quantity दो रखें, और नीचे वो तमाम drinks select करें जो customer ले सकता है। Fixed items और choice groups एक ही deal में साथ चल सकते हैं।",
       "actions": [
-        { "do": "click", "selector": "form[action$='/deals'] button[type='button'] >> nth=1", "after": 1200 },
-        { "do": "type", "selector": "form[action$='/deals'] input[name^='choice_groups'][name$='[label]']", "text": "Apni Drink Chunein", "delay": 60, "after": 800 },
-        { "do": "eval", "js": "(() => { const s=document.querySelector(\"form[action$='/deals'] select[name^='choice_groups']\"); if(!s)return; [...s.options].forEach(o=>o.selected=/Fresh Lime|Soft Drink/.test(o.text)); s.dispatchEvent(new Event('change',{bubbles:true})); })()", "after": 2200 }
+        { "do": "eval", "js": "document.querySelector(\"form[action$='/deals'] button.bg-purple-100\")?.click()", "after": 1200 },
+        { "do": "type", "selector": "form[action$='/deals'] input[type='text'][maxlength='100']", "text": "Apni Drink Chunein", "delay": 60, "after": 800 },
+        { "do": "eval", "js": "(() => { const s=[...document.querySelectorAll(\"form[action$='/deals'] select[multiple]\")].find(s=>s.offsetParent); [...s.options].forEach(o=>o.selected=/Fresh Lime|Soft Drink/.test(o.text)); s.dispatchEvent(new Event('change',{bubbles:true})); })()", "after": 2200 }
       ]
     },
     {
@@ -134,12 +133,12 @@
       ]
     },
     {
-      "id": "s13_outro",
+      "id": "s13_choice_outro",
       "card": {
         "heading": "Shukriya!",
         "sub": "Ek baar deal banayen — rozana ek click par bechen"
       },
-      "narration": "तो ये थीं Deals — एक बार बनाएं, दिन और वक़्त तय करें, और रोज़ एक click में बेच दें। Restaurant mode और Reports की videos भी ज़रूर देखें। शुक्रिया!",
+      "narration": "तो ये थीं Deals — एक बार बनाएं, fixed items या cashier choice groups रखें, दिन और वक़्त तय करें, और रोज़ एक click में बेच दें। यही तरीका PRA POS और FBR POS दोनों में काम करता है। चुना हुआ असल product receipt, stock और recipe में सही रहता है। Restaurant mode और Reports की videos भी ज़रूर देखें। शुक्रिया!",
       "minMs": 5500
     }
   ]

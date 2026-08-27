@@ -20,14 +20,17 @@ withAudio.forEach((t, i) => {
   filters.push(`[${i + 1}:a]adelay=${t.audioAtMs}|${t.audioAtMs}[a${i}]`);
   mixIns.push(`[a${i}]`);
 });
-const captions = fs.existsSync(path.join(OUT, 'captions.srt'))
+const assCaptions = path.join(__dirname, 'scenarios', `${slug}.ass`);
+const srtCaptions = fs.existsSync(path.join(OUT, 'captions.srt'))
   ? path.join(OUT, 'captions.srt')
   : path.join(__dirname, 'scenarios', `${slug}.srt`);
+const captions = fs.existsSync(assCaptions) ? assCaptions : srtCaptions;
 if (fs.existsSync(captions)) {
-  // Captions are deliberately burned into the master so the social exports
-  // inherit them too. Keep a dark strip behind Roman Urdu for readability
-  // over both title cards and dense POS screens.
-  filters.unshift(`[0:v]subtitles='${captions}':force_style='FontName=DejaVu Sans,FontSize=17,PrimaryColour=&H00FFFFFF,OutlineColour=&H00152A30,BackColour=&H880A4D5C,BorderStyle=3,Outline=1,Shadow=0,Alignment=7,MarginL=42,MarginR=500,MarginV=34'[vout]`);
+  // ASS carries a deterministic compact style. The SRT fallback retains
+  // support for prior scenarios that have no styled caption track.
+  filters.unshift(path.extname(captions) === '.ass'
+    ? `[0:v]ass='${captions}'[vout]`
+    : `[0:v]subtitles='${captions}':force_style='FontName=DejaVu Sans,FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00152A30,BorderStyle=1,Outline=2,Shadow=1,Alignment=9,MarginL=560,MarginR=44,MarginV=42'[vout]`);
 } else {
   filters.unshift('[0:v]null[vout]');
 }

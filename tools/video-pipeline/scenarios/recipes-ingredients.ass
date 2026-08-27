@@ -1,0 +1,34 @@
+[Script Info]
+; Compact Roman Urdu overlay for the Kitchen Items tutorial.
+ScriptType: v4.00+
+PlayResX: 384
+PlayResY: 288
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Caption,DejaVu Sans,5,&H00FFFFFF,&H00FFFFFF,&H00152A30,&H00000000,0,0,0,0,100,100,0,0,1,0.4,0.5,9,110,10,12,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.50,0:00:07.41,Caption,,0,0,0,,Assalam o Alaikum! Aaj NestPOS mein Product, Kitchen Item aur Recipe ka connection dekhein.
+Dialogue: 0,0:00:07.41,0:00:14.33,Caption,,0,0,0,,Product customer ko becha jata hai. Kitchen Item kaccha saman hai.
+Dialogue: 0,0:00:14.33,0:00:21.24,Caption,,0,0,0,,Recipe batati hai ke ek Product banane mein kitna saman lagta hai.
+Dialogue: 0,0:00:23.14,0:00:28.90,Caption,,0,0,0,,Menu se Ingredients kholen. Yahan kitchen ka kaccha saman darj hota hai.
+Dialogue: 0,0:00:28.90,0:00:34.65,Caption,,0,0,0,,Misal: chawal, chicken, oil aur sauce.
+Dialogue: 0,0:00:34.65,0:00:40.41,Caption,,0,0,0,,Har item ka unit, rate, maujooda stock aur kam se kam limit dikhti hai.
+Dialogue: 0,0:00:40.41,0:00:46.16,Caption,,0,0,0,,Stock limit se neeche jaye, to system khabardar karta hai.
+Dialogue: 0,0:00:48.06,0:00:55.11,Caption,,0,0,0,,Naya Kitchen Item add karne ke liye Add Ingredient dabayein.
+Dialogue: 0,0:00:55.11,0:01:02.16,Caption,,0,0,0,,Naam Tamatar, unit kg, rate nabbe rupay aur stock bees kg rakhein.
+Dialogue: 0,0:01:02.16,0:01:09.22,Caption,,0,0,0,,Kam se kam limit paanch rakhein. Save se item record mein shamil ho jata hai.
+Dialogue: 0,0:01:11.11,0:01:16.96,Caption,,0,0,0,,Ab Product ko Kitchen Items ke saath jorne ke liye Recipes kholen.
+Dialogue: 0,0:01:16.96,0:01:22.81,Caption,,0,0,0,,Beef Pulao ki recipe dekhein. Ek plate ke liye pao kilo chawal darj hai.
+Dialogue: 0,0:01:22.82,0:01:28.67,Caption,,0,0,0,,Pachaas gram oil bhi darj hai.
+Dialogue: 0,0:01:28.67,0:01:34.52,Caption,,0,0,0,,Ek Product mein kai Kitchen Items use ho sakte hain.
+Dialogue: 0,0:01:36.42,0:01:42.77,Caption,,0,0,0,,Ab sale ka asar dekhein. Sale screen se ek Beef Pulao chunen.
+Dialogue: 0,0:01:42.77,0:01:49.13,Caption,,0,0,0,,CASH payment karein. Cart mein add karne par stock foran kam nahi hota.
+Dialogue: 0,0:01:49.13,0:01:55.49,Caption,,0,0,0,,Bill final hone ke baad recipe ke mutabiq Kitchen Stock khud minus hota hai.
+Dialogue: 0,0:01:57.39,0:02:04.30,Caption,,0,0,0,,Yaad rakhein: Product customer ko becha jata hai. Kitchen Item banane mein kharch hota hai.
+Dialogue: 0,0:02:04.30,0:02:11.21,Caption,,0,0,0,,Recipe dono ko milati hai. Har final sale par stock ka hisaab khud chalta hai.
+Dialogue: 0,0:02:11.21,0:02:18.13,Caption,,0,0,0,,Is tarah manual ginti nahi karni padti. Shukriya!

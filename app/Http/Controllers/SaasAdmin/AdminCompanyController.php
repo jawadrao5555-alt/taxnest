@@ -1069,7 +1069,7 @@ class AdminCompanyController extends Controller
         // Schema guards keep this safe during the deploy-before-migrate window.
         $orphanTables = [
             'pos_riders', 'pos_rider_settlements', 'pos_day_close_reports',
-            'pos_deals', 'pos_stations', 'pos_menu_items', 'pos_print_jobs',
+            'pos_deals', 'pos_deal_usages', 'pos_stations', 'pos_menu_items', 'pos_print_jobs',
             'pos_customer_addresses', 'pos_customer_spend_snapshots', 'pos_local_series_resets',
             'pos_customer_alert_dismissals',
             'pos_held_sales',
@@ -1078,7 +1078,7 @@ class AdminCompanyController extends Controller
             'fbr_day_close_reports', 'fbr_pos_held_sales',
             'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',
             'fbr_pos_promotions', 'fbr_pos_shifts', 'fbr_pos_terminals',
-            'fbr_pos_deals',
+            'fbr_pos_deals', 'fbr_pos_deal_usages',
             'push_subscriptions', 'payment_proofs', 'feature_suggestions',
             'madadgar_messages', 'invoice_import_batches', 'invoice_import_mappings', 'invoice_deliveries', 'audit_packs',
             // Consultant console: operational rows die with the company (FK

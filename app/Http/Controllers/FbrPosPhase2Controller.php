@@ -533,10 +533,31 @@ class FbrPosPhase2Controller extends Controller
             'active_days.*' => 'integer|min:1|max:7',
             'starts_on' => 'nullable|date',
             'ends_on' => 'nullable|date|after_or_equal:starts_on',
+            'deal_type' => 'nullable|in:regular,special',
+            'special_start_time' => 'nullable|date_format:H:i',
+            'special_end_time' => 'nullable|date_format:H:i',
+            'total_deal_units_limit' => 'nullable|integer|min:1',
+            'daily_deal_units_limit' => 'nullable|integer|min:1',
             'items' => 'required|array|min:1|max:30',
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|integer|min:1|max:999',
         ]);
+
+        $dealType = $data['deal_type'] ?? 'regular';
+        if ($dealType === 'special') {
+            $errors = [];
+            if (empty($data['starts_on'])) $errors['starts_on'] = 'Special deal ke liye start date zaroori hai.';
+            if (empty($data['ends_on'])) $errors['ends_on'] = 'Special deal ke liye end date zaroori hai.';
+            if (empty($data['special_start_time'])) $errors['special_start_time'] = 'Special deal ka start time zaroori hai.';
+            if (empty($data['special_end_time'])) $errors['special_end_time'] = 'Special deal ka end time zaroori hai.';
+            if (!empty($data['special_start_time']) && !empty($data['special_end_time'])
+                && $data['special_end_time'] < $data['special_start_time']) {
+                $errors['special_end_time'] = 'Special deal ka end time start time ke baad hona chahiye.';
+            }
+            if ($errors) {
+                throw \Illuminate\Validation\ValidationException::withMessages($errors);
+            }
+        }
 
         // Tamper-safe: every component product must belong to THIS company.
         $productIds = collect($data['items'])->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
@@ -561,7 +582,18 @@ class FbrPosPhase2Controller extends Controller
             'active_days' => array_values(array_unique(array_map('intval', $data['active_days'] ?? []))),
             'starts_on' => $data['starts_on'] ?? null,
             'ends_on' => $data['ends_on'] ?? null,
+            'deal_type' => $dealType,
+            'special_start_time' => $dealType === 'special' ? ($data['special_start_time'] ?? null) : null,
+            'special_end_time' => $dealType === 'special' ? ($data['special_end_time'] ?? null) : null,
+            'total_deal_units_limit' => $dealType === 'special' ? ($data['total_deal_units_limit'] ?? null) : null,
+            'daily_deal_units_limit' => $dealType === 'special' ? ($data['daily_deal_units_limit'] ?? null) : null,
         ];
+
+        foreach (['deal_type', 'special_start_time', 'special_end_time', 'total_deal_units_limit', 'daily_deal_units_limit'] as $column) {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_deals', $column)) {
+                unset($attrs[$column]);
+            }
+        }
 
         return [$attrs, $components];
     }

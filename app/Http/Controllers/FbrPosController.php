@@ -1312,10 +1312,11 @@ class FbrPosController extends Controller
         if ($this->fbrPlanAllows('deals_enabled') && \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')) {
             $dealRows = \App\Models\FbrPosDeal::where('company_id', $companyId)
                 ->where('is_active', true)->with('items')->orderBy('name')->get()
-                ->filter(fn ($d) => $d->isActiveOn());
+                ->filter(fn ($d) => $d->isAvailableAt());
             foreach ($dealRows as $dealRow) {
                 $units = $this->fbrAllocateDealUnits($dealRow);
                 if (empty($units)) { continue; }
+                $quota = $dealRow->quotaMetadata();
                 $net = 0.0;
                 foreach ($units as $u) { $net += $u['unit_net']; }
                 $activeDeals[] = [
@@ -1330,6 +1331,7 @@ class FbrPosController extends Controller
                         'name' => (string) $u['product']->name,
                         'quantity' => (int) $u['component_qty'],
                     ], $units),
+                    ...$quota,
                 ];
             }
         }
@@ -1389,6 +1391,9 @@ class FbrPosController extends Controller
         $dealAgg = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')
             ? $agg(\App\Models\FbrPosDeal::where('company_id', $companyId))
             : '0:';
+        $dealUsageAgg = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_usages')
+            ? $agg(\Illuminate\Support\Facades\DB::table('fbr_pos_deal_usages')->where('company_id', $companyId))
+            : '0:';
         $catalogRev = md5(implode('|', [
             $agg(Product::where('company_id', $companyId)),
             // Services are baked into the sale screen (Task 1272) — a service
@@ -1396,6 +1401,7 @@ class FbrPosController extends Controller
             $agg(\App\Models\PosService::where('company_id', $companyId)),
             $promoAgg,
             $dealAgg,
+            $dealUsageAgg,
             $agg(\App\Models\FbrPosTerminal::where('company_id', $companyId)),
             // Promotions AND deals carry date windows — a day change must refresh
             // the screen, but ONLY for companies that actually have them (PRA
@@ -1928,13 +1934,14 @@ class FbrPosController extends Controller
                         $dealQty = (int) round($dealQtyRaw);
                         $deal = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deals')
                             ? \App\Models\FbrPosDeal::where('company_id', $companyId)
-                                ->where('is_active', true)->with('items')->find((int) $item['deal_id'])
+                                ->where('is_active', true)->with('items')->lockForUpdate()->find((int) $item['deal_id'])
                             : null;
-                        if (!$deal || !$deal->isActiveOn()) {
+                        if (!$deal || !$deal->isAvailableAt()) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
                                 'items' => [__('pos.deal_unavailable_line', ['name' => (string) ($item['item_name'] ?? 'Deal')])],
                             ]);
                         }
+                        \App\Services\PosDealQuotaService::reserve($deal, $dealQty);
                         $dealUnits = $this->fbrAllocateDealUnits($deal);
                         if (empty($dealUnits)) {
                             // A component product was deleted/deactivated mid-sale.

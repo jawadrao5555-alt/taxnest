@@ -1109,11 +1109,16 @@ window.addEventListener('popstate', function() {
                                         <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
                                         <template x-if="item.is_third_schedule"><span class="px-1.5 py-0.5 bg-blue-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">3rd Sch</span></template>
                                         <template x-if="item.type === 'deal'"><span class="px-1.5 py-0.5 bg-amber-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.deal_badge') }}</span></template>
+                                         <template x-if="item.type === 'deal' && item.deal_type === 'special'"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.special_deal') }}</span></template>
+                                         <template x-if="item.type === 'deal' && item.deal_type !== 'special'"><span class="px-1.5 py-0.5 bg-sky-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">{{ __('pos.regular_deal') }}</span></template>
                                     </div>
                                     {{-- 🍔 Deal tile subtitle (Task 1273): combo contents at a glance --}}
                                     <template x-if="item.type === 'deal' && (item.components || []).length > 0">
                                         <p class="text-[10px] text-amber-600 dark:text-amber-400 truncate leading-tight mt-0.5" x-text="(item.components || []).map(c => c.quantity + 'x ' + c.name).join(', ')"></p>
                                     </template>
+                                     <template x-if="item.type === 'deal' && item.deal_type === 'special'">
+                                         <p class="text-[10px] text-orange-600 dark:text-orange-400 truncate leading-tight mt-0.5" x-text="[(item.remaining_total !== null ? window.TXT.deal_remaining_total + ': ' + item.remaining_total : ''), (item.remaining_daily !== null ? window.TXT.deal_remaining_today + ': ' + item.remaining_daily : ''), (item.special_start_time ? item.special_start_time.slice(0,5) + '–' + item.special_end_time.slice(0,5) : '')].filter(Boolean).join(' · ')"></p>
+                                     </template>
                                 </div>
                                 <span class="price-badge text-sm font-extrabold text-blue-600 dark:text-blue-400 flex-shrink-0" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
                                 <template x-if="getCartQty(item) > 0">

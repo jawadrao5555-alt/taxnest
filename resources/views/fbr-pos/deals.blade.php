@@ -7,7 +7,7 @@
     $productsJson = $products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'price' => (float) ($p->default_price ?? 0)])->values();
 @endphp
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
-     x-data="{ products: {{ json_encode($productsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }">
+     x-data="{ products: {{ json_encode($productsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}, dealFilter: 'all' }">
     <a href="{{ route('fbrpos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition mb-3">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
         {{ __('pos.back_to_customize') }}
@@ -34,7 +34,7 @@
 
     {{-- Add New Deal --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
-         x-data="{ rows: [{ product_id: '', quantity: 1 }] }">
+         x-data="{ rows: [{ product_id: '', quantity: 1 }], dealType: 'regular' }">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.add_new_deal') }}</h3>
         <form method="POST" action="{{ route('fbrpos.deals.store') }}">
             @csrf
@@ -52,8 +52,11 @@
                     <input type="text" name="description" maxlength="255" placeholder="{{ __('pos.ph_deal_desc_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_type') }}</label><select name="deal_type" x-model="dealType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500"><option value="regular">{{ __('pos.regular_deal') }}</option><option value="special">{{ __('pos.special_deal') }}</option></select></div>
+            </div>
 
-            <div class="mb-4">
+            <div class="mb-4" x-show="dealType === 'regular'" x-cloak>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.active_days') }} <span class="text-gray-400">{{ __('pos.none_selected_every_day') }}</span></label>
                 <div class="flex flex-wrap gap-2">
                     @foreach($dayNames as $num => $label)
@@ -68,12 +71,19 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.start_date') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="date" name="starts_on" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" name="starts_on" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.end_date') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="date" name="ends_on" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" name="ends_on" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
+            </div>
+            <div x-show="dealType === 'special'" x-cloak class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_start_time') }}</label><input type="time" name="special_start_time" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_end_time') }}</label><input type="time" name="special_end_time" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.total_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="total_deal_units_limit" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.daily_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="daily_deal_units_limit" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <p class="sm:col-span-2 lg:col-span-4 text-[11px] text-amber-700 dark:text-amber-300">{{ __('pos.special_deal_help') }}</p>
             </div>
 
             <div class="mb-4">
@@ -103,6 +113,12 @@
     </div>
 
     {{-- Deals list --}}
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+        <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ __('pos.deal_type') }}:</span>
+        <button type="button" @click="dealFilter = 'all'" :class="dealFilter === 'all' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'" class="px-3 py-1.5 rounded-full text-xs font-semibold transition">{{ __('pos.all_word') }}</button>
+        <button type="button" @click="dealFilter = 'regular'" :class="dealFilter === 'regular' ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300'" class="px-3 py-1.5 rounded-full text-xs font-semibold transition">{{ __('pos.regular_deal') }}</button>
+        <button type="button" @click="dealFilter = 'special'" :class="dealFilter === 'special' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'" class="px-3 py-1.5 rounded-full text-xs font-semibold transition">{{ __('pos.special_deal') }}</button>
+    </div>
     <div class="space-y-4">
         @forelse($deals as $deal)
         @php
@@ -110,14 +126,15 @@
             $componentsText = $deal->items->map(fn($di) => $di->quantity . 'x ' . ($productNames[$di->product_id] ?? 'Product #' . $di->product_id))->implode(', ');
             $dealItemsJson = $deal->items->map(fn($di) => ['product_id' => $di->product_id, 'quantity' => (int) $di->quantity])->values();
         @endphp
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5"
-             x-data="{ editing: false, rows: {{ json_encode($dealItemsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }">
+        <div x-show="dealFilter === 'all' || dealFilter === @js($deal->deal_type ?: 'regular')" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5"
+             x-data="{ editing: false, dealType: @js($deal->deal_type ?: 'regular'), rows: {{ json_encode($dealItemsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
                         <h4 class="text-sm font-bold text-gray-900 dark:text-white">{{ $deal->name }}</h4>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $deal->isSpecial() ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' }}">{{ $deal->isSpecial() ? __('pos.special_deal') : __('pos.regular_deal') }}</span>
                         @if($deal->is_active)
-                            @if($deal->isActiveOn())
+                            @if($deal->isAvailableAt())
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('pos.live_today') }}</span>
                             @else
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{{ __('pos.active_word') }}</span>
@@ -131,6 +148,12 @@
                         {{ __('pos.days_colon') }} {{ empty($dealDays) ? __('pos.every_day') : collect($dealDays)->map(fn($d) => $dayNames[$d] ?? $d)->implode(', ') }}
                         @if($deal->starts_on || $deal->ends_on)
                             · {{ $deal->starts_on?->format('d M Y') ?? '…' }} → {{ $deal->ends_on?->format('d M Y') ?? '…' }}
+                        @endif
+                        @if($deal->isSpecial())
+                            · {{ $deal->special_start_time ? substr((string) $deal->special_start_time, 0, 5) : '—' }}–{{ $deal->special_end_time ? substr((string) $deal->special_end_time, 0, 5) : '—' }}
+                            @if($deal->total_deal_units_limit || $deal->daily_deal_units_limit)
+                                · {{ __('pos.remaining_colon') }} {{ $deal->quotaMetadata()['remaining_total'] ?? '∞' }}{{ $deal->daily_deal_units_limit ? ' / ' . ($deal->quotaMetadata()['remaining_daily'] ?? '∞') . ' ' . __('pos.today_word') : '' }}
+                            @endif
                         @endif
                     </p>
                 </div>
@@ -162,7 +185,10 @@
                             <input type="text" name="description" maxlength="255" value="{{ $deal->description }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
-                    <div class="mb-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_type') }}</label><select name="deal_type" x-model="dealType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"><option value="regular">{{ __('pos.regular_deal') }}</option><option value="special">{{ __('pos.special_deal') }}</option></select></div>
+                    </div>
+                    <div class="mb-4" x-show="dealType === 'regular'" x-cloak>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.active_days') }} <span class="text-gray-400">{{ __('pos.none_every_day') }}</span></label>
                         <div class="flex flex-wrap gap-2">
                             @foreach($dayNames as $num => $label)
@@ -176,11 +202,11 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.start_date') }}</label>
-                            <input type="date" name="starts_on" value="{{ $deal->starts_on?->format('Y-m-d') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="date" name="starts_on" value="{{ $deal->starts_on?->format('Y-m-d') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.end_date') }}</label>
-                            <input type="date" name="ends_on" value="{{ $deal->ends_on?->format('Y-m-d') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="date" name="ends_on" value="{{ $deal->ends_on?->format('Y-m-d') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div class="flex items-end pb-1">
                             <label class="inline-flex items-center gap-2 cursor-pointer">
@@ -188,6 +214,12 @@
                                 <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ __('pos.active_word') }}</span>
                             </label>
                         </div>
+                    </div>
+                    <div x-show="dealType === 'special'" x-cloak class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_start_time') }}</label><input type="time" name="special_start_time" value="{{ $deal->special_start_time ? substr((string) $deal->special_start_time, 0, 5) : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_end_time') }}</label><input type="time" name="special_end_time" value="{{ $deal->special_end_time ? substr((string) $deal->special_end_time, 0, 5) : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.total_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="total_deal_units_limit" value="{{ $deal->total_deal_units_limit }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.daily_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="daily_deal_units_limit" value="{{ $deal->daily_deal_units_limit }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
                     </div>
                     <div class="mb-4">
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.deal_items') }}</label>

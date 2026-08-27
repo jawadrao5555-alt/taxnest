@@ -19,6 +19,17 @@ NestPOS aik mukammal Point of Sale (POS) system hai jo har qisam ki dukan ke liy
 
 NestPOS browser mein chalta hai — koi bhari software install karne ki zaroorat nahi. Computer, laptop, tablet ya mobile — sab par chalta hai.
 
+### Regular aur Special Deals
+
+Deals ki do qisam hoti hain:
+
+- **Regular:** purani deals isi qisam ki hoti hain. Yeh selected weekdays par repeat hoti hain aur optional start/end dates ke andar sale screen par nazar aati hain.
+- **Special:** limited-time offer. Is ke liye start date, end date aur usi din ka start/end time dena zaroori hai. End time start time ke baad ho; overnight window ke liye do alag specials banayein.
+
+Special deal mein total bundles aur aaj ke bundles ki optional positive limit lag sakti hai. Limit deal ke **bundles** par lagti hai, andar ke component products ki quantity par nahi. Misal: 2 bundles ki deal cart mein quantity 2 ho to limit se 2 units kam honge, chahe us mein 6 products shamil hon.
+
+Sale screen par Special ka waqt aur baqi quantity dikhai jati hai. Checkout par server live deal, current price, schedule, stock aur quota dobara check karta hai; is liye stale cart ya do cashiers ka ek saath aakhri bundle lena oversell nahi karta. Failed checkout rollback hota hai. Deals billing-only hain: hold/KOT aur offline bill mein nahi ja sakti. Deal edit ya delete karne ke baad pehle se banay bills ke frozen components aur returns par koi asar nahi padta.
+
 `[SCREENSHOT: NestPOS dashboard ka overview]`
 
 ---

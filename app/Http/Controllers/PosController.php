@@ -2391,7 +2391,7 @@ class PosController extends Controller
         // Plan gate: Starter shops par deals bake hi nahi hote (buttons na dikhen).
         $activeDeals = PosFeatureService::planAllows($company, 'deals_enabled')
             ? PosDeal::where('company_id', $companyId)->where('is_active', true)->with('items')->get()
-                ->filter(fn ($d) => $d->isActiveOn())
+                ->filter(fn ($d) => $d->isAvailableAt())
             : collect();
         if ($activeDeals->isNotEmpty()) {
             $dealProductIds = $activeDeals->flatMap(fn ($d) => $d->items->pluck('pos_product_id'))->unique();
@@ -2412,6 +2412,7 @@ class PosController extends Controller
                     'hasRecipe' => false,
                     'image' => null,
                     'stockStatus' => null,
+                    ...$deal->quotaMetadata(),
                 ];
             }
         }
@@ -2583,10 +2584,14 @@ class PosController extends Controller
             return ($row->cnt ?? 0) . ':' . (string) ($row->mx ?? '');
         };
         $dealsAgg = $agg(PosDeal::where('company_id', $companyId));
+        $dealUsageAgg = \Illuminate\Support\Facades\Schema::hasTable('pos_deal_usages')
+            ? $agg(\Illuminate\Support\Facades\DB::table('pos_deal_usages')->where('company_id', $companyId))
+            : '0:';
         $catalogRev = md5(implode('|', [
             $agg(PosProduct::where('company_id', $companyId)),
             $agg(PosService::where('company_id', $companyId)),
             $dealsAgg,
+            $dealUsageAgg,
             // Deals carry weekday/date windows — a day change must refresh the
             // screen, but ONLY for companies that actually have deals (ZFC,
             // 28 Jul 2026: the date-flip forced EVERY shop into a morning reload
@@ -2994,6 +2999,16 @@ class PosController extends Controller
         }
 
         $companyItems = $this->resolveItemExemptions($request->items, $companyId);
+        // Deals are billing-only: component stock and the live deal row cannot
+        // be authoritatively checked while a bill is offline. Keep this server
+        // guard alongside the client guard so a stale/crafted offline replay
+        // cannot consume a Special quota later.
+        if ($request->filled('offline_queued_at')
+            && collect($companyItems)->contains(fn ($item) => ($item['type'] ?? 'product') === 'deal')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => [__('pos.deal_offline_block')],
+            ]);
+        }
         $stockItemsForRecipe = $this->expandDealComponentsForStock(array_map(fn ($ri) => [
             'type' => $ri['type'],
             'item_id' => $ri['item_id'],
@@ -3319,6 +3334,12 @@ class PosController extends Controller
         try {
             $draftId = $request->input('draft_id');
             $transaction = null;
+
+            // Special deal quota is part of the same transaction as the bill.
+            // Reloading and locking the live deal here prevents two cashiers
+            // from spending the last bundle simultaneously. Any later stock,
+            // recipe, waiter, or persistence failure rolls this reservation back.
+            $this->reserveDealUnitsForInvoice($companyItems, $companyId);
 
             if ($draftId) {
                 $transaction = PosTransaction::where('company_id', $companyId)
@@ -7426,10 +7447,31 @@ class PosController extends Controller
             'active_days.*' => 'integer|min:1|max:7',
             'starts_on' => 'nullable|date',
             'ends_on' => 'nullable|date|after_or_equal:starts_on',
+            'deal_type' => 'nullable|in:regular,special',
+            'special_start_time' => 'nullable|date_format:H:i',
+            'special_end_time' => 'nullable|date_format:H:i',
+            'total_deal_units_limit' => 'nullable|integer|min:1',
+            'daily_deal_units_limit' => 'nullable|integer|min:1',
             'items' => 'required|array|min:1|max:30',
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|integer|min:1|max:999',
         ]);
+
+        $dealType = $data['deal_type'] ?? 'regular';
+        if ($dealType === 'special') {
+            $errors = [];
+            if (empty($data['starts_on'])) $errors['starts_on'] = 'Special deal ke liye start date zaroori hai.';
+            if (empty($data['ends_on'])) $errors['ends_on'] = 'Special deal ke liye end date zaroori hai.';
+            if (empty($data['special_start_time'])) $errors['special_start_time'] = 'Special deal ka start time zaroori hai.';
+            if (empty($data['special_end_time'])) $errors['special_end_time'] = 'Special deal ka end time zaroori hai.';
+            if (!empty($data['special_start_time']) && !empty($data['special_end_time'])
+                && $data['special_end_time'] < $data['special_start_time']) {
+                $errors['special_end_time'] = 'Special deal ka end time start time ke baad hona chahiye.';
+            }
+            if ($errors) {
+                throw \Illuminate\Validation\ValidationException::withMessages($errors);
+            }
+        }
 
         // Tamper-safe: every component product must belong to THIS company.
         $productIds = collect($data['items'])->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
@@ -7454,7 +7496,20 @@ class PosController extends Controller
             'active_days' => array_values(array_unique(array_map('intval', $data['active_days'] ?? []))),
             'starts_on' => $data['starts_on'] ?? null,
             'ends_on' => $data['ends_on'] ?? null,
+            'deal_type' => $dealType,
+            'special_start_time' => $dealType === 'special' ? ($data['special_start_time'] ?? null) : null,
+            'special_end_time' => $dealType === 'special' ? ($data['special_end_time'] ?? null) : null,
+            'total_deal_units_limit' => $dealType === 'special' ? ($data['total_deal_units_limit'] ?? null) : null,
+            'daily_deal_units_limit' => $dealType === 'special' ? ($data['daily_deal_units_limit'] ?? null) : null,
         ];
+
+        // Deploy-before-migrate safety: the old schema still supports Regular
+        // deals and must not receive unknown columns.
+        foreach (['deal_type', 'special_start_time', 'special_end_time', 'total_deal_units_limit', 'daily_deal_units_limit'] as $column) {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_deals', $column)) {
+                unset($attrs[$column]);
+            }
+        }
 
         return [$attrs, $components];
     }
@@ -11298,6 +11353,95 @@ class PosController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Re-check and consume Special deal bundles inside the invoice transaction.
+     * The catalog payload is display-only: the locked row supplies the current
+     * schedule, price, components and quota. Regular deals intentionally skip
+     * this service so existing recurring-deal behavior remains unchanged.
+     */
+    private function reserveDealUnitsForInvoice(array $items, int $companyId): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('pos_deals')) {
+            return;
+        }
+
+        foreach ($items as $item) {
+            if (($item['type'] ?? 'product') !== 'deal' || empty($item['item_id'])) {
+                continue;
+            }
+
+            $deal = PosDeal::where('company_id', $companyId)
+                ->where('id', (int) $item['item_id'])
+                ->where('is_active', true)
+                ->with('items')
+                ->lockForUpdate()
+                ->first();
+            if (!$deal) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) ($item['name'] ?? 'Deal')])],
+                ]);
+            }
+
+            if (!$deal->isAvailableAt()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+
+            // resolveItemExemptions captured the component snapshot before this
+            // transaction. Compare it with the locked deal row so a deal edit
+            // between catalog load and payment cannot sell a stale component
+            // set or later deduct/restore the wrong products.
+            $componentIds = $deal->items->pluck('pos_product_id')->map(fn ($id) => (int) $id)->values();
+            $componentNames = PosProduct::where('company_id', $companyId)
+                ->whereIn('id', $componentIds)
+                ->get(['id', 'name'])
+                ->keyBy('id');
+            if ($componentNames->count() !== $componentIds->unique()->count()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+            $expectedSnapshot = $deal->items->map(fn ($dealItem) => [
+                'product_id' => (int) $dealItem->pos_product_id,
+                'name' => (string) ($componentNames[(int) $dealItem->pos_product_id]->name ?? 'Item'),
+                'qty' => (int) $dealItem->quantity,
+            ])->values()->all();
+            $postedSnapshot = collect($item['deal_snapshot'] ?? [])->map(fn ($component) => [
+                'product_id' => (int) ($component['product_id'] ?? 0),
+                'name' => (string) ($component['name'] ?? ''),
+                'qty' => (int) ($component['qty'] ?? 0),
+            ])->values()->all();
+            if ($postedSnapshot !== $expectedSnapshot) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+
+            $postedPrice = (float) ($item['price'] ?? $item['unit_price'] ?? 0);
+            if (abs($postedPrice - (float) $deal->price) > 0.005) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+
+            $quantity = (float) ($item['quantity'] ?? 0);
+            if ($quantity < 1 || abs($quantity - round($quantity)) > 0.0001) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => ["Deal quantity must be a whole number ≥ 1 for '{$deal->name}'."],
+                ]);
+            }
+
+            if ($deal->isSpecial() && $deal->items->isEmpty()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                ]);
+            }
+
+            \App\Services\PosDealQuotaService::reserve($deal, (int) round($quantity));
+        }
+    }
+
     private function resolveItemExemptions(array $requestItems, int $companyId): array
     {
         $resolved = [];
@@ -11331,6 +11475,11 @@ class PosController extends Controller
                     // (consistent with services).
                     $deal = PosDeal::where('company_id', $companyId)->where('id', $itemId)->with('items')->first();
                     if ($deal) {
+            if (!$deal->isAvailableAt()) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_unavailable_line', ['name' => (string) ($deal->name ?? $itemName ?: 'Deal')])],
+                            ]);
+                        }
                         $itemPrice = (float) $deal->price;
                         $componentIds = $deal->items->pluck('pos_product_id');
                         $componentNames = PosProduct::where('company_id', $companyId)
@@ -11341,7 +11490,12 @@ class PosController extends Controller
                             'qty' => (int) $di->quantity,
                         ])->values()->all();
                     } else {
-                        $itemId = null;
+                        // Deal lines are never allowed to degrade into a
+                        // client-priced/manual line when a stale or tampered
+                        // deal id cannot be resolved.
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'items' => [__('pos.deal_unavailable_line', ['name' => (string) ($itemName ?: 'Deal')])],
+                        ]);
                     }
                 } else {
                     $obj = PosService::where('company_id', $companyId)->where('id', $itemId)->first();

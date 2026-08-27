@@ -167,6 +167,11 @@ class FbrDealStockAndAllocationTest extends TestCase
             $table->json('active_days')->nullable();
             $table->date('starts_on')->nullable();
             $table->date('ends_on')->nullable();
+            $table->string('deal_type', 20)->default('regular');
+            $table->time('special_start_time')->nullable();
+            $table->time('special_end_time')->nullable();
+            $table->unsignedInteger('total_deal_units_limit')->nullable();
+            $table->unsignedInteger('daily_deal_units_limit')->nullable();
             $table->timestamps();
         });
 
@@ -176,6 +181,16 @@ class FbrDealStockAndAllocationTest extends TestCase
             $table->unsignedBigInteger('product_id');
             $table->unsignedInteger('quantity')->default(1);
             $table->timestamps();
+        });
+
+        Schema::create('fbr_pos_deal_usages', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->index();
+            $table->unsignedBigInteger('deal_id')->index();
+            $table->date('usage_date');
+            $table->unsignedInteger('units_used')->default(0);
+            $table->timestamps();
+            $table->unique(['company_id', 'deal_id', 'usage_date']);
         });
 
         Schema::create('fbr_pos_loyalty_settings', function (Blueprint $table) {
@@ -541,6 +556,46 @@ class FbrDealStockAndAllocationTest extends TestCase
 
         $this->expectStoreRejection($this->dealPayload(1));
         $this->assertSame(0, (int) DB::table('fbr_pos_transactions')->count());
+    }
+
+    public function test_special_deal_quota_is_checked_against_server_price_and_bundle_units(): void
+    {
+        DB::table('fbr_pos_deals')->where('id', $this->dealId)->update([
+            'deal_type' => 'special',
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->toDateString(),
+            'special_start_time' => '00:00',
+            'special_end_time' => '23:59',
+            'total_deal_units_limit' => 2,
+            'daily_deal_units_limit' => 2,
+        ]);
+
+        // A tampered client price is ignored; the server still books the
+        // configured deal price and consumes one bundle, not its components.
+        $res = $this->callStore($this->dealPayload(1, [
+            'items' => [[
+                'item_name' => 'Family Combo',
+                'quantity' => 1,
+                'unit_price' => 1,
+                'deal_id' => $this->dealId,
+                'uom' => 'U',
+                'tax_rate' => 0,
+                'is_tax_exempt' => false,
+                'item_discount' => 0,
+            ]],
+            'cash_received' => 850,
+        ]));
+        $this->assertTrue($res->getData(true)['success']);
+        $this->assertSame(1, (int) DB::table('fbr_pos_deal_usages')->value('units_used'));
+        $this->assertSame('850.00', number_format((float) DB::table('fbr_pos_transactions')->latest('id')->value('total_amount'), 2, '.', ''));
+        $this->assertSame(1, \App\Services\PosDealQuotaService::remainingTotal(
+            \App\Models\FbrPosDeal::findOrFail($this->dealId)
+        ));
+        $res2 = $this->callStore($this->dealPayload(2));
+        $data2 = $res2->getData(true);
+        $this->assertFalse($data2['success']);
+        $this->assertStringContainsString('no remaining', strtolower($data2['message']));
+        $this->assertSame(1, (int) DB::table('fbr_pos_deal_usages')->value('units_used'));
     }
 
     public function test_offline_queued_deal_replay_rejected(): void

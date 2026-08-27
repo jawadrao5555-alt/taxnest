@@ -41,6 +41,7 @@
                     <th>{{ __('pos.th_returned') }}</th>
                     <th>{{ __('pos.th_unit_price') }}</th>
                     <th>{{ __('pos.th_return_qty') }}</th>
+                    <th>Disposition</th>
                 </tr>
             </thead>
             <tbody>
@@ -56,6 +57,17 @@
                             {{-- Owner rule (14 Aug 2026): full remaining qty PREFILLED — most
                                  returns are whole-bill; cashier only edits for partial returns. --}}
                             <input type="number" name="items[{{ $loop->index }}][return_qty]" value="{{ $remaining > 0 ? rtrim(rtrim(number_format($remaining, 3, '.', ''), '0'), '.') : 0 }}" min="0" max="{{ $remaining }}" step="0.001" {{ $remaining <= 0 ? 'disabled' : '' }} class="w-24 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm dark:bg-gray-800 dark:text-white">
+                        </td>
+                        <td class="px-2">
+                            @if($remaining > 0)
+                            <select name="items[{{ $loop->index }}][disposition]" class="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs dark:bg-gray-800 dark:text-white">
+                                <option value="normal_restock">Normal restock</option>
+                                <option value="cooked_resaleable">Cooked resaleable</option>
+                                <option value="wastage">Wastage</option>
+                            </select>
+                            @else
+                            <span class="text-gray-400">—</span>
+                            @endif
                         </td>
                     </tr>
                 @endforeach

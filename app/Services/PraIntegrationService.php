@@ -279,6 +279,29 @@ class PraIntegrationService
             return ['success' => false, 'message' => 'Local invoice cannot be synced to PRA'];
         }
 
+        // A resale of a cooked return is a separate PRA sale, but its parent
+        // credit note must reach PRA first.  Keep the resale pending when the
+        // credit note is queued, offline or rejected; retrying the credit note
+        // then unlocks the sale without ever submitting the wrong order.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'pra_dependency_transaction_id')
+            && $transaction->pra_dependency_transaction_id) {
+            $dependency = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $transaction->company_id)
+                ->find($transaction->pra_dependency_transaction_id);
+            if (!$dependency || $dependency->pra_status !== 'submitted' || !$dependency->pra_invoice_number) {
+                $transaction->update([
+                    'pra_status' => 'pending',
+                    'pra_error_message' => 'Waiting for the related PRA credit note before resale submission.',
+                ]);
+                return [
+                    'success' => false,
+                    'response_code' => 'DEPENDENCY_PENDING',
+                    'queued' => true,
+                    'message' => 'Resale queued until its PRA credit note is submitted.',
+                ];
+            }
+        }
+
         // Task 760 (owner, 15 Aug 2026): exempt items report at 0%, so an
         // all-exempt bill submits like any other (fiscal number + QR, verifies
         // with tax 0.00) — the old 'exempt_internal' short-circuit is GONE for

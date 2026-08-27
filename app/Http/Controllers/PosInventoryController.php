@@ -8,8 +8,10 @@ use App\Models\InventoryStock;
 use App\Models\InventoryMovement;
 use App\Models\InventoryAdjustment;
 use App\Services\BranchStockService;
+use App\Services\RecipeInventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class PosInventoryController extends Controller
@@ -904,6 +906,26 @@ class PosInventoryController extends Controller
 
         $branchId = BranchStockService::writeBranchId($companyId, $branchId);
         $warnings = [];
+        $recipeItems = [];
+        foreach ($items as $item) {
+            if (($item['type'] ?? 'product') === 'product'
+                && RecipeInventoryService::hasRecipe($companyId, (int) ($item['item_id'] ?? 0))) {
+                $recipeItems[] = $item;
+            }
+        }
+        try {
+            // One shared path for retail POS and restaurant settlement.  This
+            // happens before direct-product deduction so a mixed cart remains
+            // atomic from the kitchen ledger's point of view.
+            RecipeInventoryService::consumeForInvoice(
+                $companyId, $recipeItems, $transactionId, $invoiceNumber, $userId, $branchId
+            );
+        } catch (\Throwable $e) {
+            Log::error('Recipe inventory consumption failed', [
+                'company_id' => $companyId, 'transaction_id' => $transactionId, 'error' => $e->getMessage(),
+            ]);
+            return ['skipped' => false, 'warnings' => ['Kitchen stock could not be updated: ' . $e->getMessage()]];
+        }
 
         foreach ($items as $item) {
             if (($item['type'] ?? 'product') !== 'product' || empty($item['item_id'])) {
@@ -913,6 +935,12 @@ class PosInventoryController extends Controller
             $productId = (int) $item['item_id'];
             $qty = (float) ($item['quantity'] ?? 0);
             if ($qty <= 0) continue;
+            if (RecipeInventoryService::hasRecipe($companyId, $productId)) {
+                // A recipe dish consumes ingredients, never a finished-product
+                // stock row.  This also prevents the old restaurant path from
+                // double-counting a dish after it uses the shared service.
+                continue;
+            }
 
             try {
                 $stock = BranchStockService::stockRow($companyId, $productId, $branchId, false);
@@ -993,6 +1021,16 @@ class PosInventoryController extends Controller
 
         $branchId = BranchStockService::writeBranchId($companyId, $branchId);
         $warnings = [];
+        try {
+            RecipeInventoryService::reverseForInvoice(
+                $companyId, $transactionId, $branchId, $userId, $referenceType
+            );
+        } catch (\Throwable $e) {
+            Log::error('Recipe inventory reversal failed', [
+                'company_id' => $companyId, 'transaction_id' => $transactionId, 'error' => $e->getMessage(),
+            ]);
+            $warnings[] = 'Kitchen stock could not be restored: ' . $e->getMessage();
+        }
 
         foreach ($items as $item) {
             if (($item['type'] ?? 'product') !== 'product' || empty($item['item_id'])) {
@@ -1002,6 +1040,9 @@ class PosInventoryController extends Controller
             $productId = (int) $item['item_id'];
             $qty = (float) ($item['quantity'] ?? 0);
             if ($qty <= 0) continue;
+            if (RecipeInventoryService::hasRecipe($companyId, $productId)) {
+                continue;
+            }
 
             try {
                 $stock = BranchStockService::stockRow($companyId, $productId, $branchId, false);

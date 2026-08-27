@@ -1160,6 +1160,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         });
         Route::prefix('restaurant')->middleware('feature:recipes')->group(function () {
             Route::get('/ingredients', [IngredientController::class, 'index'])->name('pos.restaurant.ingredients');
+            Route::get('/kitchen-report', [IngredientController::class, 'kitchenReport'])->name('pos.restaurant.kitchen-report');
             Route::post('/ingredients', [IngredientController::class, 'store'])->name('pos.restaurant.ingredients.store');
             Route::put('/ingredients/{id}', [IngredientController::class, 'update'])->name('pos.restaurant.ingredients.update');
             Route::post('/ingredients/{id}/adjust', [IngredientController::class, 'adjustStock'])->name('pos.restaurant.ingredients.adjust');

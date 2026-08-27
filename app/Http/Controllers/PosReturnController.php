@@ -239,6 +239,7 @@ class PosReturnController extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|integer',
             'items.*.return_qty' => 'required|numeric|min:0',
+            'items.*.disposition' => 'nullable|in:normal_restock,cooked_resaleable,wastage',
             // PRA POS has no khata/credit bills — cash or card refund only.
             'refund_method' => 'required|in:cash,card',
         ]);
@@ -256,7 +257,8 @@ class PosReturnController extends Controller
             (int) $id,
             $r->items,
             $r->refund_method,
-            $user->id
+            $user->id,
+            ['expiry_hours' => $r->input('expiry_hours')]
         );
 
         if (isset($result['error'])) {

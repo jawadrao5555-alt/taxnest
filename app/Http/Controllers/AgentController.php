@@ -444,6 +444,19 @@ class AgentController extends Controller
                 // stuck 'pending' forever). Mirror the FBR loop's loadMissing pattern.
                 $txn->loadMissing(['items', 'company']);
 
+                // Do not hand a cooked-return resale to the desktop agent in
+                // the same poll as its credit note. The next poll will include
+                // it after the dependency has a real PRA number.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'pra_dependency_transaction_id')
+                    && $txn->pra_dependency_transaction_id) {
+                    $dependency = PosTransaction::withoutGlobalScope('hide_archived')
+                        ->where('company_id', $company->id)
+                        ->find($txn->pra_dependency_transaction_id);
+                    if (!$dependency || $dependency->pra_status !== 'submitted' || !$dependency->pra_invoice_number) {
+                        continue;
+                    }
+                }
+
                 // Task 760 (owner, 15 Aug 2026): exempt items are zero-rated —
                 // generatePayload now includes them at TaxRate 0 / TaxCharged 0,
                 // so all-exempt bills go to the agent like any other bill (the

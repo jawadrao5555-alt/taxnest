@@ -132,8 +132,9 @@ class PosReturnService
     public static function createReturn(int $companyId, int $originalId, ?array $items, string $refundMethod, ?int $userId, array $opts = []): array
     {
         $wastage = (bool) ($opts['wastage'] ?? false);
+        $expiryHours = isset($opts['expiry_hours']) ? (int) $opts['expiry_hours'] : null;
 
-        return DB::transaction(function () use ($companyId, $originalId, $items, $refundMethod, $userId, $wastage) {
+        return DB::transaction(function () use ($companyId, $originalId, $items, $refundMethod, $userId, $wastage, $expiryHours) {
             // Re-fetch UNDER LOCK — concurrent returns of the same bill must
             // serialize here or both see the same remaining quantities and
             // double-refund/double-restock.
@@ -192,6 +193,10 @@ class PosReturnService
                     $exemptSum += $sub;
                 }
 
+                $disposition = $wastage
+                    ? RecipeInventoryService::DISPOSITION_WASTAGE
+                    : RecipeInventoryService::normalizeDisposition($row['disposition'] ?? null);
+
                 $returnItems[] = [
                     'parent_item_id' => $orig->id,
                     'item_type' => $orig->item_type,
@@ -207,6 +212,8 @@ class PosReturnService
                     'tax_amount' => $tax,
                     // Informational — the sold line's own item-discount share.
                     'item_discount_amount' => $itemDisc,
+                    'return_disposition' => $disposition,
+                    'disposition' => $disposition,
                 ];
 
                 // Over-return guard state ON the parent line.
@@ -297,13 +304,22 @@ class PosReturnService
             }
             // Wastage flag (Task 586) — schema-drift guard.
             if (Schema::hasColumn('pos_transactions', 'is_wastage')) {
-                $data['is_wastage'] = $wastage;
+                $data['is_wastage'] = $wastage
+                    || collect($returnItems)->contains(fn ($it) =>
+                        ($it['return_disposition'] ?? null) === RecipeInventoryService::DISPOSITION_WASTAGE);
             }
 
             $return = PosTransaction::create($data);
 
             foreach ($returnItems as $it) {
                 $it['transaction_id'] = $return->id;
+                // The return-flow migration is deliberately deploy-safe:
+                // older live/test schemas must keep accepting returns while
+                // the new disposition columns are being rolled out.
+                if (!Schema::hasColumn('pos_transaction_items', 'return_disposition')) {
+                    unset($it['return_disposition']);
+                }
+                unset($it['disposition']);
                 PosTransactionItem::create($it);
             }
 
@@ -322,6 +338,8 @@ class PosReturnService
                 foreach ($returnItems as $it) {
                     if (($it['item_type'] ?? null) === 'product'
                         && !empty($it['item_id'])
+                        && ($it['return_disposition'] ?? RecipeInventoryService::DISPOSITION_NORMAL)
+                            === RecipeInventoryService::DISPOSITION_NORMAL
                         && in_array((int) $it['item_id'], $deductedProductIds, true)
                         && (float) $it['quantity'] > 0) {
                         try {
@@ -350,6 +368,29 @@ class PosReturnService
                         }
                     }
                 }
+            }
+
+            // Recipe products have their own immutable sale snapshot.  Restore
+            // only normal-restock lines; cooked and wastage lines intentionally
+            // leave the consumed ingredients untouched.
+            if ($company && $company->inventory_enabled) {
+                RecipeInventoryService::restoreForReturn(
+                    $companyId,
+                    (int) $original->id,
+                    (int) $return->id,
+                    $returnItems,
+                    $original->branch_id ?? null,
+                    $userId,
+                    $invNum
+                );
+                RecipeInventoryService::recordPreparedReturns(
+                    $companyId,
+                    (int) $return->id,
+                    $original->branch_id ?? null,
+                    $returnItems,
+                    $userId,
+                    $expiryHours
+                );
             }
 
             // ── PRA CREDIT NOTE ELIGIBILITY ──────────────────────────────────

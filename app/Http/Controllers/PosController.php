@@ -2994,6 +2994,28 @@ class PosController extends Controller
         }
 
         $companyItems = $this->resolveItemExemptions($request->items, $companyId);
+        $stockItemsForRecipe = $this->expandDealComponentsForStock(array_map(fn ($ri) => [
+            'type' => $ri['type'],
+            'item_id' => $ri['item_id'],
+            'quantity' => (float) $ri['quantity'],
+            'unit_price' => (float) $ri['price'],
+            'deal_snapshot' => $ri['deal_snapshot'] ?? null,
+        ], $companyItems));
+        $recipeItemsForStock = array_values(array_filter($stockItemsForRecipe, fn ($item) =>
+            ($item['type'] ?? 'product') === 'product'
+            && \App\Services\RecipeInventoryService::hasRecipe($companyId, (int) ($item['item_id'] ?? 0))
+        ));
+        $recipeBranchId = $request->filled('offline_branch_id')
+            ? (int) $request->input('offline_branch_id')
+            : app(\App\Services\BranchContextService::class)->stampBranchId();
+        $recipeStockErrors = \App\Services\RecipeInventoryService::stockErrors($companyId, $recipeItemsForStock, $recipeBranchId);
+        if ($recipeStockErrors) {
+            return response()->json([
+                'success' => false,
+                'stock_error' => true,
+                'message' => 'Insufficient kitchen stock: ' . implode(', ', $recipeStockErrors),
+            ], 400);
+        }
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
         $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));
         $exemptSubtotal = $subtotal - $taxableSubtotal;
@@ -3497,6 +3519,18 @@ class PosController extends Controller
                 }
             }
 
+            // Kitchen consumption belongs to the bill transaction. The
+            // post-commit inventory call below remains for direct products and
+            // is idempotent for these recipe rows.
+            \App\Services\RecipeInventoryService::consumeForInvoice(
+                $companyId,
+                $recipeItemsForStock,
+                (int) $transaction->id,
+                $invoiceNumber,
+                auth('pos')->id(),
+                $transaction->branch_id ?? null
+            );
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -3518,13 +3552,7 @@ class PosController extends Controller
         // Deduct from the RESOLVED items (not raw request): resolved rows carry the
         // frozen deal_snapshot so deal components move stock too (deal lines
         // themselves are type 'deal' → skipped by the deduction loop).
-        $stockItems = $this->expandDealComponentsForStock(array_map(fn ($ri) => [
-            'type' => $ri['type'],
-            'item_id' => $ri['item_id'],
-            'quantity' => (float) $ri['quantity'],
-            'unit_price' => (float) $ri['price'],
-            'deal_snapshot' => $ri['deal_snapshot'] ?? null,
-        ], $companyItems));
+        $stockItems = $stockItemsForRecipe;
         $inventoryResult = PosInventoryController::deductStockForInvoice(
             $companyId,
             $stockItems,

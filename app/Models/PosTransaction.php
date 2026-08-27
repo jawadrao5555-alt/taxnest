@@ -31,6 +31,7 @@ class PosTransaction extends Model
         'prepaid_converted_at', 'prepaid_converted_by',
         // Return / credit-note flow (Task 570, Aug 2026) — 'sale' | 'return' + parent link.
         'transaction_type', 'parent_transaction_id',
+        'pra_dependency_transaction_id',
         // Rider auto-return wastage flag (Task 586) — spoiled goods, stock NOT restored.
         'is_wastage',
         // Customer live tracking (Task 1105) — delivery pin + public track token.

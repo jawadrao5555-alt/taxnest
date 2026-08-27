@@ -8,6 +8,8 @@ use App\Models\PosProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use App\Services\RecipeInventoryService;
 
 class IngredientController extends Controller
 {
@@ -31,26 +33,164 @@ class IngredientController extends Controller
         return view('pos.restaurant.ingredients', compact('ingredients'));
     }
 
+    public function kitchenReport(Request $request)
+    {
+        $request->validate([
+            'from' => 'nullable|date',
+            'to' => 'nullable|date|after_or_equal:from',
+        ]);
+        $companyId = (int) app('currentCompanyId');
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $movements = collect();
+        $prepared = collect();
+        $wastage = collect();
+        $praReturns = collect();
+        $foodCost = collect();
+        $returnSummary = collect();
+        $lowStock = collect();
+
+        if (Schema::hasTable('ingredient_movements')) {
+            $query = DB::table('ingredient_movements as im')
+                ->leftJoin('ingredients as i', function ($join) {
+                    $join->on('i.id', '=', 'im.ingredient_id')
+                        ->on('i.company_id', '=', 'im.company_id');
+                })
+                ->where('im.company_id', $companyId)
+                ->whereIn('im.type', ['recipe_sale', 'recipe_return', 'ingredient_adjustment'])
+                ->select('im.*', 'i.name as ingredient_name', 'i.unit');
+            if ($from) $query->whereDate('im.created_at', '>=', $from);
+            if ($to) $query->whereDate('im.created_at', '<=', $to);
+            $movements = $query->orderByDesc('im.created_at')->limit(500)->get();
+        }
+
+        if (Schema::hasTable('prepared_returns')) {
+            $prepared = DB::table('prepared_returns as pr')
+                ->leftJoin('pos_products as p', function ($join) {
+                    $join->on('p.id', '=', 'pr.product_id')
+                        ->on('p.company_id', '=', 'pr.company_id');
+                })
+                ->where('pr.company_id', $companyId)
+                ->select('pr.*', 'p.name as product_name')
+                ->orderByDesc('pr.created_at')->limit(500)->get();
+        }
+
+        if (Schema::hasTable('ingredients')) {
+            $lowStock = Ingredient::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->whereColumn('current_stock', '<=', 'min_stock_level')
+                ->orderBy('current_stock')
+                ->limit(500)->get();
+        }
+
+        if (Schema::hasTable('recipe_consumptions') && Schema::hasTable('ingredients')) {
+            $query = DB::table('recipe_consumptions as rc')
+                ->join('ingredients as i', function ($join) {
+                    $join->on('i.id', '=', 'rc.ingredient_id')
+                        ->on('i.company_id', '=', 'rc.company_id');
+                })
+                ->where('rc.company_id', $companyId)
+                ->where('rc.ingredient_id', '>', 0)
+                ->select('i.name as ingredient_name', 'i.unit', 'i.cost_per_unit',
+                    DB::raw('SUM(rc.quantity) as quantity'),
+                    DB::raw('SUM(rc.quantity * i.cost_per_unit) as cost'))
+                ->groupBy('i.id', 'i.name', 'i.unit', 'i.cost_per_unit')
+                ->orderByDesc('cost');
+            if ($from) $query->whereDate('rc.created_at', '>=', $from);
+            if ($to) $query->whereDate('rc.created_at', '<=', $to);
+            if (Schema::hasColumn('recipe_consumptions', 'reversed_at')) {
+                $query->whereNull('rc.reversed_at');
+            }
+            $foodCost = $query->limit(500)->get();
+        }
+
+        if (Schema::hasTable('pos_transaction_items') && Schema::hasColumn('pos_transaction_items', 'return_disposition')) {
+            $query = DB::table('pos_transaction_items as ri')
+                ->join('pos_transactions as rt', 'rt.id', '=', 'ri.transaction_id')
+                ->where('rt.company_id', $companyId)
+                ->where('rt.transaction_type', 'return')
+                ->where('ri.return_disposition', RecipeInventoryService::DISPOSITION_WASTAGE)
+                ->select('ri.item_name', 'ri.quantity', 'ri.subtotal', 'ri.created_at', 'rt.invoice_number');
+            if ($from) $query->whereDate('ri.created_at', '>=', $from);
+            if ($to) $query->whereDate('ri.created_at', '<=', $to);
+            $wastage = $query->orderByDesc('ri.created_at')->limit(500)->get();
+
+            if (Schema::hasColumn('pos_transactions', 'transaction_type')) {
+                $returnSummary = DB::table('pos_transaction_items as ri')
+                    ->join('pos_transactions as rt', 'rt.id', '=', 'ri.transaction_id')
+                    ->where('rt.company_id', $companyId)
+                    ->where('rt.transaction_type', 'return')
+                    ->whereNotNull('ri.return_disposition')
+                    ->select('ri.return_disposition', DB::raw('SUM(ri.quantity) as quantity'), DB::raw('SUM(ri.subtotal) as subtotal'))
+                    ->groupBy('ri.return_disposition')
+                    ->orderBy('ri.return_disposition')->get();
+            }
+        }
+
+        if (Schema::hasTable('pos_transactions')
+            && Schema::hasColumn('pos_transactions', 'transaction_type')
+            && Schema::hasColumn('pos_transactions', 'parent_transaction_id')) {
+            $praReturns = DB::table('pos_transactions as rt')
+                ->leftJoin('pos_transactions as parent', 'parent.id', '=', 'rt.parent_transaction_id')
+                ->where('rt.company_id', $companyId)
+                ->where('rt.transaction_type', 'return')
+                ->select('rt.id', 'rt.invoice_number', 'rt.pra_status', 'rt.pra_invoice_number',
+                    'rt.total_amount', 'rt.created_at', 'parent.invoice_number as parent_invoice_number')
+                ->orderByDesc('rt.created_at')->limit(500)->get();
+        }
+
+        $consumedQty = $movements->where('type', 'recipe_sale')->sum('quantity');
+        $returnedQty = $movements->where('type', 'recipe_return')->sum('quantity');
+        $wastageValue = $wastage->sum('subtotal');
+        $foodCostTotal = $foodCost->sum('cost');
+        $returnTotal = $returnSummary->sum('quantity');
+
+        return view('pos.restaurant.kitchen-report', compact(
+            'movements', 'prepared', 'wastage', 'praReturns',
+            'foodCost', 'foodCostTotal', 'returnSummary', 'returnTotal', 'lowStock',
+            'consumedQty', 'returnedQty', 'wastageValue', 'from', 'to'
+        ));
+    }
+
     public function store(Request $request)
     {
         $companyId = app('currentCompanyId');
 
         $request->validate([
+            'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
-            'unit' => 'required|string|max:20',
+            'unit' => 'required|in:' . implode(',', RecipeInventoryService::UNITS),
+            'base_unit' => 'nullable|in:' . implode(',', RecipeInventoryService::UNITS),
+            'conversion_factor' => 'nullable|numeric|gt:0',
             'cost_per_unit' => 'required|numeric|min:0',
             'current_stock' => 'required|numeric|min:0',
             'min_stock_level' => 'required|numeric|min:0',
         ]);
 
-        Ingredient::create([
+        $code = trim((string) $request->input('code', ''));
+        if ($code !== '' && Schema::hasColumn('ingredients', 'code')
+            && Ingredient::where('company_id', $companyId)->whereRaw('LOWER(code) = ?', [strtolower($code)])->exists()) {
+            return back()->withInput()->with('error', 'Yeh ingredient code pehle se mojood hai.');
+        }
+        $ingredient = Ingredient::create([
             'company_id' => $companyId,
+            'code' => $code !== '' && Schema::hasColumn('ingredients', 'code') ? $code : null,
             'name' => $request->name,
             'unit' => $request->unit,
+            'base_unit' => $request->input('base_unit') ?: $request->unit,
+            'conversion_factor' => (float) ($request->input('conversion_factor') ?: 1),
             'cost_per_unit' => $request->cost_per_unit,
-            'current_stock' => $request->current_stock,
+            // Opening stock is posted through the same locked adjustment
+            // ledger below; do not seed it here and count it twice.
+            'current_stock' => 0,
             'min_stock_level' => $request->min_stock_level,
         ]);
+        if ((float) $request->current_stock > 0) {
+            RecipeInventoryService::adjustIngredientStock(
+                (int) $companyId, (int) $ingredient->id, (float) $request->current_stock,
+                auth('pos')->id(), null, 'Opening kitchen stock'
+            );
+        }
 
         return back()->with('success', "Ingredient \"{$request->name}\" added.");
     }
@@ -60,17 +200,29 @@ class IngredientController extends Controller
         $companyId = app('currentCompanyId');
 
         $request->validate([
+            'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
-            'unit' => 'required|string|max:20',
+            'unit' => 'required|in:' . implode(',', RecipeInventoryService::UNITS),
+            'base_unit' => 'nullable|in:' . implode(',', RecipeInventoryService::UNITS),
+            'conversion_factor' => 'nullable|numeric|gt:0',
             'cost_per_unit' => 'required|numeric|min:0',
             'min_stock_level' => 'required|numeric|min:0',
         ]);
 
         $ingredient = Ingredient::where('company_id', $companyId)->findOrFail($id);
+        $code = trim((string) $request->input('code', ''));
+        if ($code !== '' && Schema::hasColumn('ingredients', 'code')
+            && Ingredient::where('company_id', $companyId)->where('id', '!=', $id)
+                ->whereRaw('LOWER(code) = ?', [strtolower($code)])->exists()) {
+            return back()->withInput()->with('error', 'Yeh ingredient code pehle se mojood hai.');
+        }
 
         $ingredient->update([
+            'code' => $code !== '' && Schema::hasColumn('ingredients', 'code') ? $code : null,
             'name' => $request->name,
             'unit' => $request->unit,
+            'base_unit' => $request->input('base_unit') ?: $request->unit,
+            'conversion_factor' => (float) ($request->input('conversion_factor') ?: 1),
             'cost_per_unit' => $request->cost_per_unit,
             'min_stock_level' => $request->min_stock_level,
             'is_active' => $request->boolean('is_active', true),
@@ -89,14 +241,16 @@ class IngredientController extends Controller
         ]);
 
         $ingredient = Ingredient::where('company_id', $companyId)->findOrFail($id);
-        $newStock = $ingredient->current_stock + (float)$request->adjustment;
-        if ($newStock < 0) {
-            return back()->with('error', 'Stock cannot go below zero.');
+        try {
+            $result = RecipeInventoryService::adjustIngredientStock(
+                (int) $companyId, (int) $ingredient->id, (float) $request->adjustment,
+                auth('pos')->id(), null, (string) $request->reason
+            );
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', $e->getMessage());
         }
 
-        $ingredient->update(['current_stock' => $newStock]);
-
-        return back()->with('success', "Stock adjusted. New: {$newStock} {$ingredient->unit}");
+        return back()->with('success', "Stock adjusted. New: {$result['after']} {$ingredient->unit}");
     }
 
     public function destroy($id)
@@ -166,7 +320,11 @@ class IngredientController extends Controller
                 $ingredient = Ingredient::where('company_id', $companyId)->where('id', $row['ingredient_id'])->first();
             } elseif (!empty($row['new_name'])) {
                 $name = trim($row['new_name']);
-                $unit = trim($row['new_unit'] ?? '') ?: 'pcs';
+                $unit = strtolower(trim($row['new_unit'] ?? '')) ?: 'pcs';
+                if (!in_array($unit, RecipeInventoryService::UNITS, true)) {
+                    $skipped[] = "'{$name}' ka unit valid nahi";
+                    continue;
+                }
                 // Reuse existing ingredient if name+unit matches (avoid duplicates)
                 $ingredient = Ingredient::where('company_id', $companyId)
                     ->whereRaw('LOWER(name) = ?', [strtolower($name)])
@@ -200,12 +358,16 @@ class IngredientController extends Controller
                 continue;
             }
 
-            ProductRecipe::create([
+            $recipeData = [
                 'company_id' => $companyId,
                 'product_id' => $request->product_id,
                 'ingredient_id' => $ingredient->id,
                 'quantity_needed' => $row['quantity_needed'],
-            ]);
+            ];
+            if (Schema::hasColumn('product_recipes', 'recipe_version')) {
+                $recipeData['recipe_version'] = 1;
+            }
+            ProductRecipe::create($recipeData);
 
             $added[] = ['id' => $ingredient->id, 'name' => $ingredient->name];
         }
@@ -430,15 +592,23 @@ class IngredientController extends Controller
                 // Upsert: duplicate product+ingredient UPDATES quantity.
                 $key = $product->id . '|' . $ingredient->id;
                 if (isset($recipeByKey[$key])) {
-                    $recipeByKey[$key]->update(['quantity_needed' => $qty]);
+                    $recipeUpdate = ['quantity_needed' => $qty];
+                    if (Schema::hasColumn('product_recipes', 'recipe_version')) {
+                        $recipeUpdate['recipe_version'] = ((int) ($recipeByKey[$key]->recipe_version ?? 1)) + 1;
+                    }
+                    $recipeByKey[$key]->update($recipeUpdate);
                     $updated++;
                 } else {
-                    $recipeByKey[$key] = ProductRecipe::create([
+                    $recipeData = [
                         'company_id' => $companyId,
                         'product_id' => $product->id,
                         'ingredient_id' => $ingredient->id,
                         'quantity_needed' => $qty,
-                    ]);
+                    ];
+                    if (Schema::hasColumn('product_recipes', 'recipe_version')) {
+                        $recipeData['recipe_version'] = 1;
+                    }
+                    $recipeByKey[$key] = ProductRecipe::create($recipeData);
                     $added++;
                 }
             }
@@ -527,7 +697,11 @@ class IngredientController extends Controller
         $request->validate(['quantity_needed' => 'required|numeric|min:0.0001']);
 
         $recipe = ProductRecipe::where('company_id', $companyId)->findOrFail($id);
-        $recipe->update(['quantity_needed' => $request->quantity_needed]);
+        $recipeUpdate = ['quantity_needed' => $request->quantity_needed];
+        if (Schema::hasColumn('product_recipes', 'recipe_version')) {
+            $recipeUpdate['recipe_version'] = ((int) ($recipe->recipe_version ?? 1)) + 1;
+        }
+        $recipe->update($recipeUpdate);
 
         return back()->with('success', 'Recipe updated.');
     }

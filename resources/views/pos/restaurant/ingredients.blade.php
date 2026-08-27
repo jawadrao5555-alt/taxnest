@@ -1,11 +1,14 @@
 <x-pos-layout>
-<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, name: '', unit: '', cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true }, q: '', ingredientNames: {{ json_encode($ingredients->map(fn($i) => mb_strtolower($i->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, code: '', name: '', unit: '', base_unit: '', conversion_factor: 1, cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true }, q: '', ingredientNames: {{ json_encode($ingredients->map(fn($i) => mb_strtolower($i->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.ingredients') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.ingredients_subtitle') }}</p>
         </div>
-        <button @click="showAddModal = true" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">{{ __('pos.add_ingredient_btn') }}</button>
+        <div class="flex gap-2">
+            <a href="{{ route('pos.restaurant.kitchen-report') }}" class="px-4 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-sm font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20">Kitchen report</a>
+            <button @click="showAddModal = true" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700">{{ __('pos.add_ingredient_btn') }}</button>
+        </div>
     </div>
 
     @if(session('success'))
@@ -45,7 +48,7 @@
                 <div class="space-y-2">
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400">{{ __('pos.current_stock') }}</span>
-                        <span class="font-medium {{ $ingredient->isLowStock() ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white' }}">{{ number_format($ingredient->current_stock, 2) }} {{ $ingredient->unit }}</span>
+                        <span class="font-medium {{ $ingredient->isLowStock() ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white' }}">{{ number_format($ingredient->current_stock, 4) }} {{ $ingredient->unit }}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400">{{ __('pos.min_level') }}</span>
@@ -70,7 +73,7 @@
                 </div>
             </div>
             <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex gap-2">
-                <button @click='openEdit({{ json_encode(['id' => $ingredient->id, 'name' => $ingredient->name, 'unit' => $ingredient->unit, 'cost' => (float) $ingredient->cost_per_unit, 'min' => (float) $ingredient->min_stock_level, 'active' => (bool) $ingredient->is_active], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) }})' class="flex-1 py-1.5 text-xs rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-medium">{{ __('pos.edit') }}</button>
+                <button @click='openEdit({{ json_encode(['id' => $ingredient->id, 'code' => $ingredient->code ?? '', 'name' => $ingredient->name, 'unit' => $ingredient->unit, 'base_unit' => $ingredient->base_unit ?? $ingredient->unit, 'conversion_factor' => (float) ($ingredient->conversion_factor ?? 1), 'cost' => (float) $ingredient->cost_per_unit, 'min' => (float) $ingredient->min_stock_level, 'active' => (bool) $ingredient->is_active], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) }})' class="flex-1 py-1.5 text-xs rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-medium">{{ __('pos.edit') }}</button>
                 <button @click="adjustId = {{ $ingredient->id }}; adjustName = {{ json_encode($ingredient->name, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) }}; showAdjustModal = true" class="flex-1 py-1.5 text-xs rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">{{ __('pos.adjust_stock') }}</button>
                 <form method="POST" action="{{ route('pos.restaurant.ingredients.delete', $ingredient->id) }}" onsubmit="return confirm({{ Js::from(__('pos.confirm_delete_q')) }})" class="inline">
                     @csrf @method('DELETE')
@@ -97,6 +100,7 @@
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.name_label') }}</label>
+                    <input type="text" name="code" maxlength="50" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="Code (optional)">
                     <input type="text" name="name" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="{{ __('pos.ph_eg_chicken_breast') }}">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -115,6 +119,18 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.cost_per_unit_rs') }}</label>
                         <input type="number" name="cost_per_unit" step="0.01" min="0" value="0" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Base unit</label>
+                        <select name="base_unit" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                            @foreach(\App\Services\RecipeInventoryService::UNITS as $unit)<option value="{{ $unit }}">{{ $unit }}</option>@endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conversion factor</label>
+                        <input type="number" name="conversion_factor" step="0.0001" min="0.0001" value="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -145,6 +161,7 @@
                 @csrf @method('PUT')
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.name_label') }}</label>
+                    <input type="text" name="code" x-model="edit.code" maxlength="50" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white" placeholder="Code (optional)">
                     <input type="text" name="name" x-model="edit.name" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -169,6 +186,18 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.min_stock_level') }}</label>
                     <input type="number" name="min_stock_level" x-model="edit.min" step="0.01" min="0" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Base unit</label>
+                        <select name="base_unit" x-model="edit.base_unit" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                            @foreach(\App\Services\RecipeInventoryService::UNITS as $unit)<option value="{{ $unit }}">{{ $unit }}</option>@endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conversion factor</label>
+                        <input type="number" name="conversion_factor" x-model="edit.conversion_factor" step="0.0001" min="0.0001" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    </div>
                 </div>
                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                     <input type="hidden" name="is_active" value="0">

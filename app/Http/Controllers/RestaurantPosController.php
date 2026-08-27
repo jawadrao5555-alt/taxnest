@@ -1740,85 +1740,35 @@ class RestaurantPosController extends Controller
 
     private function validateStockForOrder($companyId, $order, $lock = false)
     {
-        $aggregated = [];
-        foreach ($order->items->where('item_type', 'product') as $item) {
-            $recipes = ProductRecipe::where('company_id', $companyId)
-                ->where('product_id', $item->item_id)
-                ->get();
-
-            foreach ($recipes as $recipe) {
-                $needed = round($recipe->quantity_needed * $item->quantity, 4);
-                $ingId = $recipe->ingredient_id;
-                if (!isset($aggregated[$ingId])) {
-                    $aggregated[$ingId] = 0;
-                }
-                $aggregated[$ingId] += $needed;
-            }
-        }
-
-        $errors = [];
-        foreach ($aggregated as $ingredientId => $totalNeeded) {
-            $query = Ingredient::where('id', $ingredientId)->where('company_id', $companyId);
-            $ingredient = $lock ? $query->lockForUpdate()->first() : $query->first();
-            if ($ingredient && $ingredient->current_stock < $totalNeeded) {
-                $errors[] = "{$ingredient->name} (need {$totalNeeded} {$ingredient->unit}, have {$ingredient->current_stock})";
-            }
-        }
-        return $errors;
+        $items = $order->items->map(fn ($item) => [
+            'type' => $item->item_type,
+            'item_id' => $item->item_id,
+            'quantity' => (float) $item->quantity,
+        ])->all();
+        // One validator for universal sales and held-order settlement. This
+        // also subtracts branch-matching prepared returns before checking fresh
+        // kitchen stock.
+        return \App\Services\RecipeInventoryService::stockErrors(
+            (int) $companyId,
+            $items,
+            app(\App\Services\BranchContextService::class)->stampBranchId()
+        );
     }
 
     private function deductInventoryForOrder($companyId, $order, $transactionId, $invoiceNumber, $userId, $branchId = null)
     {
-        $company = Company::find($companyId);
-        if (!$company || !$company->inventory_enabled) return;
-
-        foreach ($order->items as $item) {
-            if ($item->item_type !== 'product') continue;
-
-            $recipes = ProductRecipe::where('company_id', $companyId)
-                ->where('product_id', $item->item_id)
-                ->with('ingredient')
-                ->get();
-
-            if ($recipes->isNotEmpty()) {
-                foreach ($recipes as $recipe) {
-                    $deductQty = round($recipe->quantity_needed * $item->quantity, 4);
-                    $ingredient = Ingredient::where('id', $recipe->ingredient_id)
-                        ->where('company_id', $companyId)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($ingredient) {
-                        $ingredient->update(['current_stock' => $ingredient->current_stock - $deductQty]);
-
-                        InventoryMovement::create([
-                            'company_id' => $companyId,
-                            'product_id' => $item->item_id,
-                            'branch_id' => $branchId,
-                            'type' => 'recipe_sale',
-                            'quantity' => $deductQty,
-                            'unit_price' => $ingredient->cost_per_unit,
-                            'total_price' => round($deductQty * $ingredient->cost_per_unit, 2),
-                            'balance_after' => $ingredient->current_stock,
-                            'reference_type' => 'restaurant_order',
-                            'reference_id' => $order->id,
-                            'reference_number' => $invoiceNumber,
-                            'notes' => "Recipe: {$ingredient->name} for {$item->item_name}",
-                            'created_by' => $userId,
-                        ]);
-                    }
-                }
-            } else {
-                $itemData = [
-                    ['type' => 'product', 'item_id' => $item->item_id, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price]
-                ];
-                // Per-branch stock (Task 1354): a dine-in order empties the
-                // stock of the branch its bill belongs to.
-                \App\Http\Controllers\PosInventoryController::deductStockForInvoice(
-                    $companyId, $itemData, $transactionId, $invoiceNumber, $userId, $branchId
-                );
-            }
-        }
+        $items = $order->items->map(fn ($item) => [
+            'type' => $item->item_type,
+            'item_id' => $item->item_id,
+            'quantity' => $item->quantity,
+            'unit_price' => $item->unit_price,
+        ])->all();
+        // Keep one canonical deduction implementation.  The old restaurant
+        // implementation created a second recipe movement shape and could
+        // diverge from universal POS on retries and prepared returns.
+        \App\Http\Controllers\PosInventoryController::deductStockForInvoice(
+            $companyId, $items, $transactionId, $invoiceNumber, $userId, $branchId
+        );
     }
 
     private function updateCustomerStats($customerId, $amount)

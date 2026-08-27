@@ -14,13 +14,15 @@ class PosTransactionItem extends Model
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
         // Return / credit-note flow (Task 570): link to the original sold line +
         // running returned quantity ON the parent's line (over-return guard).
-        'parent_item_id', 'returned_quantity',
+        'parent_item_id', 'returned_quantity', 'return_disposition', 'prepared_return_id',
     ];
 
     protected $casts = [
         'deal_snapshot' => 'array',
         'quantity' => 'decimal:3',
         'returned_quantity' => 'decimal:3',
+        'return_disposition' => 'string',
+        'prepared_return_id' => 'integer',
         'unit_price' => 'decimal:2',
         'cost_price' => 'decimal:4',
         'subtotal' => 'decimal:2',

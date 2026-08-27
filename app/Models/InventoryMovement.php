@@ -45,6 +45,8 @@ class InventoryMovement extends Model
     const TYPE_TRANSFER_IN = 'transfer_in';
     const TYPE_TRANSFER_OUT = 'transfer_out';
     const TYPE_OPENING = 'opening';
+    const TYPE_RECIPE_SALE = 'recipe_sale';
+    const TYPE_RECIPE_RETURN = 'recipe_return';
 
     // In-transit branch transfers (Task 1434). Only the TRANSFER_OUT row of a
     // branch_transfer carries one of these; every other movement leaves the

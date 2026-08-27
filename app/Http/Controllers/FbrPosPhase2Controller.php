@@ -504,8 +504,11 @@ class FbrPosPhase2Controller extends Controller
         if ($resp = $this->dealsAdminGate()) return $resp;
         if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
         $companyId = $this->companyId();
+        $choiceTableOk = \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_choice_groups')
+            && \Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_choice_options');
+        $with = $choiceTableOk ? ['items', 'choiceGroups.options'] : ['items'];
         $deals = \App\Models\FbrPosDeal::where('company_id', $companyId)
-            ->with('items')
+            ->with($with)
             ->orderBy('name')
             ->get();
         $products = \App\Models\Product::where('company_id', $companyId)
@@ -515,13 +518,12 @@ class FbrPosPhase2Controller extends Controller
         // Company-scoped product-name lookup for the list cards (deal items
         // store only product_id; Product has no global company scope).
         $productNames = $products->pluck('name', 'id');
-        return view('fbr-pos.deals', compact('deals', 'products', 'productNames'));
+        return view('fbr-pos.deals', compact('deals', 'products', 'productNames', 'choiceTableOk'));
     }
 
     /**
      * Shared validation + normalization for storeDeal/updateDeal. Returns
-     * [attrs, components] where components = validated company-scoped
-     * {product_id => quantity} rows (duplicates merged).
+     * [attrs, components, choiceGroups].
      */
     private function validateDealRequest(Request $request, int $companyId): array
     {
@@ -538,10 +540,26 @@ class FbrPosPhase2Controller extends Controller
             'special_end_time' => 'nullable|date_format:H:i',
             'total_deal_units_limit' => 'nullable|integer|min:1',
             'daily_deal_units_limit' => 'nullable|integer|min:1',
-            'items' => 'required|array|min:1|max:30',
+            'items' => 'nullable|array|max:30',
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|integer|min:1|max:999',
+            // Choice groups (Task 1531) — "pick one product" slots such as
+            // "Pizza Flavor" or "Drink". Optional; a deal may keep only fixed
+            // items, only choice groups, or a mix of both.
+            'choice_groups' => 'nullable|array|max:10',
+            'choice_groups.*.label' => 'required|string|max:100',
+            'choice_groups.*.quantity' => 'required|integer|min:1|max:99',
+            'choice_groups.*.product_ids' => 'required|array|min:1|max:50',
+            'choice_groups.*.product_ids.*' => 'integer',
         ]);
+
+        $items = $data['items'] ?? [];
+        $choiceGroupsRaw = $data['choice_groups'] ?? [];
+        if (empty($items) && empty($choiceGroupsRaw)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => ['Deal mein kam az kam ek fixed item ya ek choice group hona chahiye.'],
+            ]);
+        }
 
         $dealType = $data['deal_type'] ?? 'regular';
         if ($dealType === 'special') {
@@ -560,7 +578,7 @@ class FbrPosPhase2Controller extends Controller
         }
 
         // Tamper-safe: every component product must belong to THIS company.
-        $productIds = collect($data['items'])->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
+        $productIds = collect($items)->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
         $ownedIds = \App\Models\Product::where('company_id', $companyId)
             ->whereIn('id', $productIds)
             ->pluck('id');
@@ -570,9 +588,39 @@ class FbrPosPhase2Controller extends Controller
 
         // Merge duplicate product rows (same product picked twice → sum qty).
         $components = [];
-        foreach ($data['items'] as $row) {
+        foreach ($items as $row) {
             $pid = (int) $row['product_id'];
             $components[$pid] = ($components[$pid] ?? 0) + (int) $row['quantity'];
+        }
+
+        // Choice groups: every eligible product across every group must also
+        // belong to THIS company. An empty/ambiguous (no options) group is
+        // rejected outright — the cashier could never complete the deal.
+        $allChoiceProductIds = collect($choiceGroupsRaw)
+            ->flatMap(fn ($g) => $g['product_ids'] ?? [])
+            ->map(fn ($v) => (int) $v)->unique();
+        if ($allChoiceProductIds->isNotEmpty()) {
+            $ownedChoiceIds = \App\Models\Product::where('company_id', $companyId)
+                ->whereIn('id', $allChoiceProductIds)
+                ->pluck('id');
+            if ($ownedChoiceIds->count() !== $allChoiceProductIds->count()) {
+                abort(422, 'Invalid product selected for a deal choice group.');
+            }
+        }
+        $choiceGroups = [];
+        foreach ($choiceGroupsRaw as $group) {
+            $label = trim((string) $group['label']);
+            $pids = array_values(array_unique(array_map('intval', $group['product_ids'])));
+            if ($label === '' || empty($pids)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'choice_groups' => ['Har choice group ka naam aur kam az kam ek product zaroori hai.'],
+                ]);
+            }
+            $choiceGroups[] = [
+                'label' => $label,
+                'quantity' => (int) $group['quantity'],
+                'product_ids' => $pids,
+            ];
         }
 
         $attrs = [
@@ -595,7 +643,40 @@ class FbrPosPhase2Controller extends Controller
             }
         }
 
-        return [$attrs, $components];
+        if (!empty($choiceGroups) && !\Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_choice_groups')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'choice_groups' => ['Choice groups feature abhi upgrade ho raha hai — thodi dair mein dobara koshish karein.'],
+            ]);
+        }
+
+        return [$attrs, $components, $choiceGroups];
+    }
+
+    /**
+     * Replace a deal's choice groups + options with the validated set.
+     * Called inside the same transaction as the deal/items write.
+     */
+    private function saveFbrDealChoiceGroups(\App\Models\FbrPosDeal $deal, array $choiceGroups): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('fbr_pos_deal_choice_groups')) {
+            return;
+        }
+        $existingGroupIds = \App\Models\FbrPosDealChoiceGroup::where('deal_id', $deal->id)->pluck('id');
+        if ($existingGroupIds->isNotEmpty()) {
+            \App\Models\FbrPosDealChoiceOption::whereIn('group_id', $existingGroupIds)->delete();
+            \App\Models\FbrPosDealChoiceGroup::whereIn('id', $existingGroupIds)->delete();
+        }
+        foreach ($choiceGroups as $i => $group) {
+            $g = \App\Models\FbrPosDealChoiceGroup::create([
+                'deal_id' => $deal->id,
+                'label' => $group['label'],
+                'quantity' => $group['quantity'],
+                'sort_order' => $i,
+            ]);
+            foreach ($group['product_ids'] as $pid) {
+                \App\Models\FbrPosDealChoiceOption::create(['group_id' => $g->id, 'product_id' => $pid]);
+            }
+        }
     }
 
     public function storeDeal(Request $request)
@@ -603,9 +684,9 @@ class FbrPosPhase2Controller extends Controller
         if ($resp = $this->dealsAdminGate()) return $resp;
         if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
         $companyId = $this->companyId();
-        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+        [$attrs, $components, $choiceGroups] = $this->validateDealRequest($request, $companyId);
 
-        DB::transaction(function () use ($companyId, $attrs, $components) {
+        DB::transaction(function () use ($companyId, $attrs, $components, $choiceGroups) {
             $deal = \App\Models\FbrPosDeal::create(array_merge($attrs, [
                 'company_id' => $companyId,
                 'is_active' => true,
@@ -613,6 +694,7 @@ class FbrPosPhase2Controller extends Controller
             foreach ($components as $pid => $qty) {
                 \App\Models\FbrPosDealItem::create(['deal_id' => $deal->id, 'product_id' => $pid, 'quantity' => $qty]);
             }
+            $this->saveFbrDealChoiceGroups($deal, $choiceGroups);
         });
 
         return back()->with('success', __('pos.deal_added_success'));
@@ -624,15 +706,16 @@ class FbrPosPhase2Controller extends Controller
         if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
         $companyId = $this->companyId();
         $deal = \App\Models\FbrPosDeal::where('company_id', $companyId)->findOrFail($id);
-        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+        [$attrs, $components, $choiceGroups] = $this->validateDealRequest($request, $companyId);
         $attrs['is_active'] = $request->has('is_active');
 
-        DB::transaction(function () use ($deal, $attrs, $components) {
+        DB::transaction(function () use ($deal, $attrs, $components, $choiceGroups) {
             $deal->update($attrs);
             $deal->items()->delete();
             foreach ($components as $pid => $qty) {
                 \App\Models\FbrPosDealItem::create(['deal_id' => $deal->id, 'product_id' => $pid, 'quantity' => $qty]);
             }
+            $this->saveFbrDealChoiceGroups($deal, $choiceGroups);
         });
 
         return back()->with('success', __('pos.deal_updated_success'));
@@ -646,6 +729,7 @@ class FbrPosPhase2Controller extends Controller
         $deal = \App\Models\FbrPosDeal::where('company_id', $companyId)->findOrFail($id);
         DB::transaction(function () use ($deal) {
             $deal->items()->delete();
+            $this->saveFbrDealChoiceGroups($deal, []);
             $deal->delete();
         });
         // Sold bills keep their own component rows + deal_* snapshot columns —

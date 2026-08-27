@@ -41,6 +41,15 @@ class FbrPosDeal extends Model
     }
 
     /**
+     * Choice groups (Task 1531) — "pick one product" slots such as
+     * "Pizza Flavor" or "Drink", additional to the fixed items() above.
+     */
+    public function choiceGroups()
+    {
+        return $this->hasMany(FbrPosDealChoiceGroup::class, 'deal_id')->orderBy('sort_order');
+    }
+
+    /**
      * Is this deal live on the given date? Active flag + weekday match
      * (ISO 1=Mon..7=Sun; empty = every day) + optional date range.
      */

@@ -7418,8 +7418,13 @@ class PosController extends Controller
             return $r;
         }
         $companyId = app('currentCompanyId');
+        // Choice groups (Task 1531) may not exist yet on a live DB that hasn't
+        // migrated — deploy-before-migrate safety.
+        $choiceTableOk = \Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_groups')
+            && \Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_options');
+        $with = $choiceTableOk ? ['items', 'choiceGroups.options'] : ['items'];
         $deals = PosDeal::where('company_id', $companyId)
-            ->with('items')
+            ->with($with)
             ->orderBy('name')
             ->get();
         $products = PosProduct::where('company_id', $companyId)
@@ -7429,7 +7434,7 @@ class PosController extends Controller
         // Company-scoped product-name lookup for the list table (deal items store
         // only pos_product_id; PosProduct has no global scope).
         $productNames = $products->pluck('name', 'id');
-        return view('pos.deals', compact('deals', 'products', 'productNames'));
+        return view('pos.deals', compact('deals', 'products', 'productNames', 'choiceTableOk'));
     }
 
     /**
@@ -7452,10 +7457,26 @@ class PosController extends Controller
             'special_end_time' => 'nullable|date_format:H:i',
             'total_deal_units_limit' => 'nullable|integer|min:1',
             'daily_deal_units_limit' => 'nullable|integer|min:1',
-            'items' => 'required|array|min:1|max:30',
+            'items' => 'nullable|array|max:30',
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|integer|min:1|max:999',
+            // Choice groups (Task 1531) — "pick one product" slots such as
+            // "Pizza Flavor" or "Drink". Optional; a deal may keep only fixed
+            // items, only choice groups, or a mix of both.
+            'choice_groups' => 'nullable|array|max:10',
+            'choice_groups.*.label' => 'required|string|max:100',
+            'choice_groups.*.quantity' => 'required|integer|min:1|max:99',
+            'choice_groups.*.product_ids' => 'required|array|min:1|max:50',
+            'choice_groups.*.product_ids.*' => 'integer',
         ]);
+
+        $items = $data['items'] ?? [];
+        $choiceGroupsRaw = $data['choice_groups'] ?? [];
+        if (empty($items) && empty($choiceGroupsRaw)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => ['Deal mein kam az kam ek fixed item ya ek choice group hona chahiye.'],
+            ]);
+        }
 
         $dealType = $data['deal_type'] ?? 'regular';
         if ($dealType === 'special') {
@@ -7474,7 +7495,7 @@ class PosController extends Controller
         }
 
         // Tamper-safe: every component product must belong to THIS company.
-        $productIds = collect($data['items'])->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
+        $productIds = collect($items)->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
         $ownedIds = PosProduct::where('company_id', $companyId)
             ->whereIn('id', $productIds)
             ->pluck('id');
@@ -7484,9 +7505,39 @@ class PosController extends Controller
 
         // Merge duplicate product rows (same product picked twice → sum qty).
         $components = [];
-        foreach ($data['items'] as $row) {
+        foreach ($items as $row) {
             $pid = (int) $row['product_id'];
             $components[$pid] = ($components[$pid] ?? 0) + (int) $row['quantity'];
+        }
+
+        // Choice groups: every eligible product across every group must also
+        // belong to THIS company. An empty/ambiguous (no options) group is
+        // rejected outright — the cashier could never complete the deal.
+        $allChoiceProductIds = collect($choiceGroupsRaw)
+            ->flatMap(fn ($g) => $g['product_ids'] ?? [])
+            ->map(fn ($v) => (int) $v)->unique();
+        if ($allChoiceProductIds->isNotEmpty()) {
+            $ownedChoiceIds = PosProduct::where('company_id', $companyId)
+                ->whereIn('id', $allChoiceProductIds)
+                ->pluck('id');
+            if ($ownedChoiceIds->count() !== $allChoiceProductIds->count()) {
+                abort(422, 'Invalid product selected for a deal choice group.');
+            }
+        }
+        $choiceGroups = [];
+        foreach ($choiceGroupsRaw as $group) {
+            $label = trim((string) $group['label']);
+            $pids = array_values(array_unique(array_map('intval', $group['product_ids'])));
+            if ($label === '' || empty($pids)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'choice_groups' => ['Har choice group ka naam aur kam az kam ek product zaroori hai.'],
+                ]);
+            }
+            $choiceGroups[] = [
+                'label' => $label,
+                'quantity' => (int) $group['quantity'],
+                'product_ids' => $pids,
+            ];
         }
 
         $attrs = [
@@ -7511,7 +7562,42 @@ class PosController extends Controller
             }
         }
 
-        return [$attrs, $components];
+        // Choice groups need their own tables — a live DB that hasn't
+        // migrated yet must not silently accept groups it can never store.
+        if (!empty($choiceGroups) && !\Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_groups')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'choice_groups' => ['Choice groups feature abhi upgrade ho raha hai — thodi dair mein dobara koshish karein.'],
+            ]);
+        }
+
+        return [$attrs, $components, $choiceGroups];
+    }
+
+    /**
+     * Replace a deal's choice groups + options with the validated set.
+     * Called inside the same transaction as the deal/items write.
+     */
+    private function saveDealChoiceGroups(PosDeal $deal, array $choiceGroups): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('pos_deal_choice_groups')) {
+            return;
+        }
+        $existingGroupIds = PosDealChoiceGroup::where('deal_id', $deal->id)->pluck('id');
+        if ($existingGroupIds->isNotEmpty()) {
+            PosDealChoiceOption::whereIn('group_id', $existingGroupIds)->delete();
+            PosDealChoiceGroup::whereIn('id', $existingGroupIds)->delete();
+        }
+        foreach ($choiceGroups as $i => $group) {
+            $g = PosDealChoiceGroup::create([
+                'deal_id' => $deal->id,
+                'label' => $group['label'],
+                'quantity' => $group['quantity'],
+                'sort_order' => $i,
+            ]);
+            foreach ($group['product_ids'] as $pid) {
+                PosDealChoiceOption::create(['group_id' => $g->id, 'pos_product_id' => $pid]);
+            }
+        }
     }
 
     public function storeDeal(Request $request)
@@ -7520,9 +7606,9 @@ class PosController extends Controller
             return $r;
         }
         $companyId = app('currentCompanyId');
-        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+        [$attrs, $components, $choiceGroups] = $this->validateDealRequest($request, $companyId);
 
-        DB::transaction(function () use ($companyId, $attrs, $components) {
+        DB::transaction(function () use ($companyId, $attrs, $components, $choiceGroups) {
             $deal = PosDeal::create(array_merge($attrs, [
                 'company_id' => $companyId,
                 'is_active' => true,
@@ -7530,6 +7616,7 @@ class PosController extends Controller
             foreach ($components as $pid => $qty) {
                 PosDealItem::create(['deal_id' => $deal->id, 'pos_product_id' => $pid, 'quantity' => $qty]);
             }
+            $this->saveDealChoiceGroups($deal, $choiceGroups);
         });
 
         return back()->with('success', __('pos.deal_added_success'));
@@ -7542,15 +7629,16 @@ class PosController extends Controller
         }
         $companyId = app('currentCompanyId');
         $deal = PosDeal::where('company_id', $companyId)->findOrFail($id);
-        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+        [$attrs, $components, $choiceGroups] = $this->validateDealRequest($request, $companyId);
         $attrs['is_active'] = $request->has('is_active');
 
-        DB::transaction(function () use ($deal, $attrs, $components) {
+        DB::transaction(function () use ($deal, $attrs, $components, $choiceGroups) {
             $deal->update($attrs);
             $deal->items()->delete();
             foreach ($components as $pid => $qty) {
                 PosDealItem::create(['deal_id' => $deal->id, 'pos_product_id' => $pid, 'quantity' => $qty]);
             }
+            $this->saveDealChoiceGroups($deal, $choiceGroups);
         });
 
         return back()->with('success', __('pos.deal_updated_success'));
@@ -7565,6 +7653,7 @@ class PosController extends Controller
         $deal = PosDeal::where('company_id', $companyId)->findOrFail($id);
         DB::transaction(function () use ($deal) {
             $deal->items()->delete();
+            $this->saveDealChoiceGroups($deal, []);
             $deal->delete();
         });
         // Sold bills keep their own deal_snapshot — deleting a deal never

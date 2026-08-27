@@ -221,6 +221,70 @@ class VideoRestoShopSeeder extends Seeder
                 }
             }
 
+            // ── Deals (combo demo for the deals tutorial video) ──
+            // Only the two pre-existing deals live here; the tutorial itself
+            // creates a third one on camera, so the recording is re-runnable
+            // after `php artisan pos:demo-cleanup` style resets.
+            // Anything the camera created on a previous take (e.g. the
+            // "Student Deal" built on screen) is cleared, so every recording
+            // starts from the same two-deal list.
+            $skuId = fn (string $sku) => DB::table('pos_products')
+                ->where('company_id', $companyId)->where('sku', $sku)->value('id');
+            $keepDeals = ['Family Deal', 'Karahi Night'];
+            $strayDeals = DB::table('pos_deals')->where('company_id', $companyId)
+                ->whereNotIn('name', $keepDeals)->pluck('id');
+            if ($strayDeals->isNotEmpty()) {
+                DB::table('pos_deal_items')->whereIn('deal_id', $strayDeals)->delete();
+                DB::table('pos_deals')->whereIn('id', $strayDeals)->delete();
+            }
+            $dealRows = [
+                [
+                    'name' => 'Family Deal',
+                    'description' => 'Poori family ke liye — karahi, naan aur drinks',
+                    'price' => 1990,
+                    'deal_type' => 'regular',
+                    'active_days' => null,          // every day
+                    'special_start_time' => null,
+                    'special_end_time' => null,
+                    'total_deal_units_limit' => null,
+                    'daily_deal_units_limit' => null,
+                    'items' => [['KAR-001', 1], ['BRD-001', 4], ['DRK-002', 2]],
+                ],
+                [
+                    'name' => 'Karahi Night',
+                    'description' => 'Weekend raat ka special',
+                    'price' => 1290,
+                    'deal_type' => 'special',
+                    'active_days' => [5, 6, 7],     // Fri, Sat, Sun
+                    'special_start_time' => '19:00:00',
+                    'special_end_time' => '23:30:00',
+                    'total_deal_units_limit' => null,
+                    'daily_deal_units_limit' => 20,
+                    'items' => [['KAR-002', 1], ['BRD-002', 2], ['DRK-001', 1]],
+                ],
+            ];
+            foreach ($dealRows as $row) {
+                $items = $row['items'];
+                unset($row['items']);
+                $row['active_days'] = $row['active_days'] === null ? null : json_encode($row['active_days']);
+                DB::table('pos_deals')->updateOrInsert(
+                    ['company_id' => $companyId, 'name' => $row['name']],
+                    array_merge($row, ['is_active' => true, 'updated_at' => now(), 'created_at' => now()])
+                );
+                $dealId = DB::table('pos_deals')->where('company_id', $companyId)
+                    ->where('name', $row['name'])->value('id');
+                DB::table('pos_deal_items')->where('deal_id', $dealId)->delete();
+                foreach ($items as [$sku, $qty]) {
+                    $pid = $skuId($sku);
+                    if ($pid) {
+                        DB::table('pos_deal_items')->insert([
+                            'deal_id' => $dealId, 'pos_product_id' => $pid, 'quantity' => $qty,
+                            'updated_at' => now(), 'created_at' => now(),
+                        ]);
+                    }
+                }
+            }
+
             // ── Customers ──
             foreach ([
                 ['Walk-in Customer', null, null],
@@ -262,6 +326,79 @@ class VideoRestoShopSeeder extends Seeder
                         'client_ts_ms' => (int) (now()->subMinutes(36 - 2 * $i)->valueOf()),
                         'is_offline' => false, 'created_at' => now(),
                     ]);
+                }
+            }
+
+            // ── Close out stranded prior days (the "pichla din band nahi hua"
+            //    popup blocks every click on a re-recording) ──
+            if (Schema::hasTable('pos_day_close_reports')) {
+                $hasBizDate = Schema::hasColumn('pos_transactions', 'business_date');
+                $dayExpr = $hasBizDate ? 'business_date' : 'DATE(created_at)';
+                $openDays = DB::table('pos_transactions')
+                    ->where('company_id', $companyId)
+                    ->selectRaw("$dayExpr as d, COUNT(*) as c, COALESCE(SUM(total_amount), 0) as t")
+                    ->groupBy(DB::raw($dayExpr))
+                    // Repeat the expression (never the SELECT alias) — Postgres
+                    // rejects an alias in HAVING.
+                    ->havingRaw("$dayExpr < ?", [now()->toDateString()])
+                    ->get();
+                foreach ($openDays as $day) {
+                    if (!$day->d) {
+                        continue;
+                    }
+                    $exists = DB::table('pos_day_close_reports')
+                        ->where('company_id', $companyId)->whereDate('report_date', $day->d)->exists();
+                    if ($exists) {
+                        continue;
+                    }
+                    // branch_id / business_date arrived in later migrations —
+                    // only write the columns this schema actually has.
+                    $closeRow = [
+                        'company_id' => $companyId,
+                        'report_date' => $day->d,
+                        'report_number' => 'DEMO-' . str_replace('-', '', $day->d),
+                        'total_invoices' => (int) $day->c,
+                        'gross_sales' => (float) $day->t,
+                        'net_sales' => (float) $day->t,
+                        'total_amount' => (float) $day->t,
+                        'cash_amount' => (float) $day->t,
+                        'created_at' => now(), 'updated_at' => now(),
+                    ];
+                    if (Schema::hasColumn('pos_day_close_reports', 'branch_id')) {
+                        $closeRow['branch_id'] = 0;
+                    }
+                    if (Schema::hasColumn('pos_day_close_reports', 'business_date')) {
+                        $closeRow['business_date'] = $day->d;
+                    }
+                    DB::table('pos_day_close_reports')->insert($closeRow);
+                }
+            }
+
+            // ── Mark the PRA elaan popup seen (it blocks every click) ──
+            if (Schema::hasColumn('users', 'pra_elaan_seen_at')) {
+                DB::table('users')->whereIn('id', array_values($userIds))
+                    ->whereNull('pra_elaan_seen_at')
+                    ->update(['pra_elaan_seen_at' => now()]);
+            }
+
+            // ── Mark POS surveys answered (the popup blocks every click) ──
+            if (Schema::hasTable('surveys') && Schema::hasTable('survey_responses')) {
+                foreach ($userIds as $uid) {
+                    $pending = DB::table('surveys')
+                        ->whereNotIn('id', DB::table('survey_responses')
+                            ->where('user_id', $uid)->whereNotNull('answered_at')->pluck('survey_id'))
+                        ->pluck('id');
+                    foreach ($pending as $surveyId) {
+                        // A "Baad mein" dismiss already leaves a row with a NULL
+                        // answered_at, so this must update-or-insert — a blind
+                        // insert would hit the (survey_id, user_id) unique key
+                        // and roll the whole seed back.
+                        DB::table('survey_responses')->updateOrInsert(
+                            ['survey_id' => $surveyId, 'user_id' => $uid],
+                            ['company_id' => $companyId, 'answers' => json_encode([]),
+                             'answered_at' => now(), 'created_at' => now(), 'updated_at' => now()]
+                        );
+                    }
                 }
             }
 

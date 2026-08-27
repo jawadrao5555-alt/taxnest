@@ -1,0 +1,60 @@
+[Script Info]
+; Compact Roman Urdu overlay for the Deals tutorial.
+ScriptType: v4.00+
+PlayResX: 384
+PlayResY: 288
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Caption,DejaVu Sans,5,&H00FFFFFF,&H00FFFFFF,&H00152A30,&H00000000,0,0,0,0,100,100,0,0,1,0.4,0.5,9,110,10,12,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.50,0:00:04.51,Caption,,0,0,0,,Assalam o Alaikum! Aaj NestPOS mein Deals seekhte hain.
+Dialogue: 0,0:00:04.51,0:00:08.22,Caption,,0,0,0,,Deal yani kai items ka combo — ek fixed qeemat par.
+Dialogue: 0,0:00:08.22,0:00:11.72,Caption,,0,0,0,,Do qism ki deals hoti hain: Regular aur Special.
+Dialogue: 0,0:00:11.72,0:00:15.65,Caption,,0,0,0,,Deal banana, handle karna aur bechna — teeno dekhenge.
+Dialogue: 0,0:00:17.56,0:00:20.32,Caption,,0,0,0,,Customize mein se Deals ka page kholen.
+Dialogue: 0,0:00:20.32,0:00:23.36,Caption,,0,0,0,,Yahan aap ki tamam deals ki list rehti hai.
+Dialogue: 0,0:00:23.36,0:00:27.04,Caption,,0,0,0,,Har deal par items, qeemat, din aur status ka badge.
+Dialogue: 0,0:00:32.84,0:00:35.57,Caption,,0,0,0,,Nai deal ke liye upar wala form bharein.
+Dialogue: 0,0:00:35.57,0:00:38.22,Caption,,0,0,0,,Naam: Student Deal — qeemat: 499 rupay.
+Dialogue: 0,0:00:38.22,0:00:41.36,Caption,,0,0,0,,Description mein likhein deal mein kya milega.
+Dialogue: 0,0:00:43.26,0:00:46.52,Caption,,0,0,0,,Deal type chunein — Regular deal rozana chalti hai.
+Dialogue: 0,0:00:46.52,0:00:50.17,Caption,,0,0,0,,Neeche din ke buttons se tay karein deal kin dinon chale.
+Dialogue: 0,0:00:50.17,0:00:52.86,Caption,,0,0,0,,Misal ke taur par sirf Monday aur Tuesday.
+Dialogue: 0,0:00:52.86,0:00:55.61,Caption,,0,0,0,,Koi din na chunein to deal har roz chalegi.
+Dialogue: 0,0:00:57.51,0:01:00.24,Caption,,0,0,0,,Ab batayein deal mein milega kya.
+Dialogue: 0,0:01:00.24,0:01:02.55,Caption,,0,0,0,,Pehli item: Chicken Biryani.
+Dialogue: 0,0:01:02.55,0:01:06.02,Caption,,0,0,0,,Add Item daba kar doosri item: Soft Drink.
+Dialogue: 0,0:01:06.02,0:01:09.24,Caption,,0,0,0,,Har item ki tadaad bhi likh sakte hain.
+Dialogue: 0,0:01:11.14,0:01:12.97,Caption,,0,0,0,,Bas, Add Deal daba dein.
+Dialogue: 0,0:01:12.97,0:01:16.31,Caption,,0,0,0,,Student Deal tayyar hokar list mein aa gayi.
+Dialogue: 0,0:01:16.31,0:01:21.10,Caption,,0,0,0,,Sirf Mon aur Tue chuna tha — unhi dinon sale screen par aayegi.
+Dialogue: 0,0:01:23.23,0:01:26.94,Caption,,0,0,0,,Doosri qism: Special deal — sirf khaas waqt ki offer.
+Dialogue: 0,0:01:26.94,0:01:30.93,Caption,,0,0,0,,Karahi Night sirf Friday, Saturday aur Sunday chalti hai.
+Dialogue: 0,0:01:30.93,0:01:33.03,Caption,,0,0,0,,Raat 7 baje se 11:30 baje tak.
+Dialogue: 0,0:01:33.03,0:01:35.83,Caption,,0,0,0,,Din mein 20 deals ki limit bhi lagi hai.
+Dialogue: 0,0:01:35.83,0:01:39.19,Caption,,0,0,0,,Waqt guzarte hi deal sale screen se khud ghayab.
+Dialogue: 0,0:01:41.09,0:01:43.77,Caption,,0,0,0,,Bani hui deal ko handle karna bhi asaan hai.
+Dialogue: 0,0:01:43.77,0:01:46.94,Caption,,0,0,0,,All par wapas aayen aur deal ke samne Edit dabayein.
+Dialogue: 0,0:01:46.94,0:01:50.17,Caption,,0,0,0,,Naam, qeemat, items aur din yahan se badal jate hain.
+Dialogue: 0,0:01:50.17,0:01:53.89,Caption,,0,0,0,,Active ka nishan hata dein to deal sale screen se hat jayegi.
+Dialogue: 0,0:01:53.89,0:01:56.09,Caption,,0,0,0,,Magar record mein mehfooz rehti hai.
+Dialogue: 0,0:01:57.98,0:02:01.11,Caption,,0,0,0,,Deal ki zaroorat na rahe to Delete daba dein.
+Dialogue: 0,0:02:01.11,0:02:04.85,Caption,,0,0,0,,Delete karne se puranay bills par koi asar nahi parta.
+Dialogue: 0,0:02:04.85,0:02:08.67,Caption,,0,0,0,,Har bill deal ke items ki copy khud mehfooz rakhta hai.
+Dialogue: 0,0:02:10.57,0:02:13.64,Caption,,0,0,0,,Ab bechte hain — sale screen par aayen.
+Dialogue: 0,0:02:13.64,0:02:16.01,Caption,,0,0,0,,Category mein Deals chun lein.
+Dialogue: 0,0:02:16.01,0:02:19.32,Caption,,0,0,0,,Tamam chalti hui deals samne aa jati hain.
+Dialogue: 0,0:02:21.22,0:02:24.87,Caption,,0,0,0,,Customer ne Family Deal mangwai? Card par click karein.
+Dialogue: 0,0:02:24.87,0:02:28.85,Caption,,0,0,0,,Poori deal apne tamam items ke saath ek line mein cart mein.
+Dialogue: 0,0:02:28.85,0:02:32.77,Caption,,0,0,0,,Qeemat system khud lagata hai — ghalat rate mumkin hi nahi.
+Dialogue: 0,0:02:34.67,0:02:37.14,Caption,,0,0,0,,Ab payment — wahi ek button, CASH.
+Dialogue: 0,0:02:37.14,0:02:41.35,Caption,,0,0,0,,Receipt par deal ke saray items alag alag likhe aate hain.
+Dialogue: 0,0:02:41.35,0:02:45.19,Caption,,0,0,0,,Stock bhi har item ka khud-ba-khud minus ho jata hai.
+Dialogue: 0,0:02:47.09,0:02:49.98,Caption,,0,0,0,,Ek baar deal banayen, din aur waqt tay karein.
+Dialogue: 0,0:02:49.98,0:02:52.24,Caption,,0,0,0,,Phir rozana ek click mein bech dein.
+Dialogue: 0,0:02:52.24,0:02:56.00,Caption,,0,0,0,,Restaurant mode aur Reports ki videos bhi dekhein. Shukriya!

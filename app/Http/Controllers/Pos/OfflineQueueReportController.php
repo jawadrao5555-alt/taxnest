@@ -29,6 +29,22 @@ use Illuminate\Support\Facades\Schema;
  */
 class OfflineQueueReportController extends Controller
 {
+    /**
+     * Cached column checks. Only a POSITIVE answer is ever kept: these outlive a
+     * request in a long-lived worker, so caching "missing" would freeze
+     * telemetry off for that worker's whole life if it happened to serve one
+     * request in the gap between the code landing and the migration running.
+     */
+    private static bool $hasBaseColumns = false;
+    private static bool $hasDeviceColumn = false;
+
+    /** Test seam — the schema is rebuilt between tests. */
+    public static function flushSchemaCache(): void
+    {
+        self::$hasBaseColumns = false;
+        self::$hasDeviceColumn = false;
+    }
+
     public function __invoke(Request $request)
     {
         $data = $request->validate([
@@ -44,45 +60,23 @@ class OfflineQueueReportController extends Controller
 
         // Column guard: a deploy window where code lands before the migration
         // must never 500 the sale screen's background telemetry.
-        static $cols = null;
-        if ($cols === null) {
-            $cols = Schema::hasColumn('companies', 'offline_queue_depth')
+        if (!self::$hasBaseColumns) {
+            self::$hasBaseColumns = Schema::hasColumn('companies', 'offline_queue_depth')
                 && Schema::hasColumn('companies', 'offline_queue_oldest_at')
                 && Schema::hasColumn('companies', 'offline_queue_reported_at');
         }
-        if (!$cols) {
-            return response()->json(['success' => true, 'stored' => false]);
+        if (!self::$hasBaseColumns) {
+            return response()->json(['success' => true, 'stored' => false, 'reason' => 'no_columns']);
         }
         // The device column shipped one migration later than the other three;
         // guard it separately so a half-applied deploy still records depth.
-        static $hasDevice = null;
-        if ($hasDevice === null) {
-            $hasDevice = Schema::hasColumn('companies', 'offline_queue_device');
+        if (!self::$hasDeviceColumn) {
+            self::$hasDeviceColumn = Schema::hasColumn('companies', 'offline_queue_device');
         }
+        $hasDevice = self::$hasDeviceColumn;
 
         $depth = (int) $data['depth'];
-        $device = $hasDevice ? (string) ($data['device'] ?? '') : '';
-
-        // A shop can bill from several counters. Each reports only its OWN
-        // queue, so an idle till must not be allowed to erase a busy till's
-        // stuck bills — that would restore exactly the silence this telemetry
-        // exists to break. A zero therefore only clears the record when it
-        // comes from the device that raised it, when no device is on record,
-        // or when the record is old enough to be worthless anyway.
-        if ($depth === 0 && $hasDevice && $device !== '') {
-            $current = Company::whereKey($companyId)
-                ->first(['offline_queue_depth', 'offline_queue_device', 'offline_queue_reported_at']);
-            if ($current
-                && (int) $current->offline_queue_depth > 0
-                && !empty($current->offline_queue_device)
-                && $current->offline_queue_device !== $device
-                && $current->offline_queue_reported_at
-                && $current->offline_queue_reported_at->gt(now()->subHours(6))
-            ) {
-                // Another counter is still holding bills; leave its report alone.
-                return response()->json(['success' => true, 'stored' => false, 'reason' => 'other_device_pending']);
-            }
-        }
+        $device = $hasDevice ? trim((string) ($data['device'] ?? '')) : '';
 
         $oldest = null;
         if (!empty($data['oldest_at'])) {
@@ -103,7 +97,7 @@ class OfflineQueueReportController extends Controller
             'offline_queue_reported_at' => now(),
         ];
         if ($hasDevice) {
-            // Record WHICH till this came from — the zero-clearing rule above is
+            // Record WHICH till this came from — the zero-clearing rule below is
             // worthless if the device is never actually stored.
             $payload['offline_queue_device'] = $device !== '' ? $device : null;
         }
@@ -111,7 +105,55 @@ class OfflineQueueReportController extends Controller
         // toBase(): a plain query update, no model events. Eloquent's own
         // update() would stamp updated_at on every beat, so a shop's companies
         // row would look freshly edited every thirty seconds on every till.
-        Company::whereKey($companyId)->toBase()->update($payload);
+        // toBase() still applies the soft-delete scope, so a deleted company is
+        // not silently written to.
+        $query = Company::whereKey($companyId)->toBase();
+
+        // A shop bills from several counters, and each one reports only its OWN
+        // queue. An idle till must therefore never erase a busy till's stuck
+        // bills — that would restore exactly the silence this telemetry exists
+        // to break. A zero may only clear the record when it belongs to nobody,
+        // is already empty, is stale enough to be worthless, or is ours.
+        //
+        // The condition rides ON the UPDATE rather than being read first: a
+        // read-then-write leaves a window where another till raises a queue in
+        // between and this zero flattens it anyway.
+        if ($depth === 0 && $hasDevice) {
+            $cutoff = now()->subHours(6);
+            $query->where(function ($w) use ($device, $cutoff) {
+                $w->whereNull('offline_queue_device')
+                    ->orWhere('offline_queue_depth', '<=', 0)
+                    ->orWhereNull('offline_queue_depth')
+                    ->orWhereNull('offline_queue_reported_at')
+                    ->orWhere('offline_queue_reported_at', '<=', $cutoff);
+                // An empty device means an older cached sale screen that predates
+                // the device key. It is still allowed to report a queue, but it
+                // must not be trusted to clear one it may not own.
+                if ($device !== '') {
+                    $w->orWhere('offline_queue_device', $device);
+                }
+            });
+        }
+
+        $affected = $query->update($payload);
+
+        // An update count is not an answer: MySQL reports CHANGED rows and
+        // SQLite MATCHED ones, so a zero here is ambiguous. Resolve it by
+        // reading the row back rather than trusting the number.
+        if ($depth === 0 && $hasDevice && $affected === 0) {
+            $current = Company::whereKey($companyId)
+                ->first(['offline_queue_depth', 'offline_queue_device']);
+            if ($current
+                && (int) $current->offline_queue_depth > 0
+                && (string) $current->offline_queue_device !== $device
+            ) {
+                return response()->json([
+                    'success' => true,
+                    'stored' => false,
+                    'reason' => 'other_device_pending',
+                ]);
+            }
+        }
 
         return response()->json(['success' => true, 'stored' => true]);
     }

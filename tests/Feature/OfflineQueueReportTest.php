@@ -51,6 +51,18 @@ class OfflineQueueReportTest extends TestCase
 
         $this->company = Company::create(['name' => 'Test Shop']);
         app()->instance('currentCompanyId', $this->company->id);
+
+        $this->flushSchemaCaches();
+    }
+
+    /**
+     * The controller caches its column checks so it is not asking the schema on
+     * every beat of a hot path. That cache outlives a test, and each test
+     * rebuilds the table, so it has to be reset between them.
+     */
+    private function flushSchemaCaches(): void
+    {
+        OfflineQueueReportController::flushSchemaCache();
     }
 
     private function report(array $payload): array
@@ -162,13 +174,67 @@ class OfflineQueueReportTest extends TestCase
         $this->assertSame(0, (int) $this->fresh()->offline_queue_depth);
     }
 
-    public function test_a_device_less_report_still_works(): void
+    public function test_a_device_less_report_may_still_raise_a_queue(): void
     {
-        // Older cached sale screens may post without a device key.
+        // Older cached sale screens may post without a device key. Reporting a
+        // queue is always allowed — the restriction is only on clearing one.
         $out = $this->report(['depth' => 6, 'oldest_at' => null]);
 
         $this->assertTrue($out['stored']);
         $this->assertSame(6, (int) $this->fresh()->offline_queue_depth);
+    }
+
+    public function test_a_device_less_zero_cannot_erase_a_busy_tills_stuck_bills(): void
+    {
+        // The whole protection is worthless if simply omitting the device key
+        // walks past it — and old cached sale screens really do post without
+        // one, so this is an everyday request, not a crafted one.
+        $this->report(['depth' => 9, 'oldest_at' => now()->subHour()->toIso8601String(), 'device' => 'till-1']);
+
+        $out = $this->report(['depth' => 0, 'oldest_at' => null]);
+
+        $this->assertFalse($out['stored']);
+        $this->assertSame('other_device_pending', $out['reason']);
+        $this->assertSame(9, (int) $this->fresh()->offline_queue_depth);
+        $this->assertSame('till-1', $this->fresh()->offline_queue_device);
+    }
+
+    public function test_a_device_less_zero_may_clear_an_unowned_record(): void
+    {
+        // Nothing to protect: the record names no device, so no till loses its
+        // alert by letting this through.
+        $this->report(['depth' => 4, 'oldest_at' => null]);
+
+        $out = $this->report(['depth' => 0, 'oldest_at' => null]);
+
+        $this->assertTrue($out['stored']);
+        $this->assertSame(0, (int) $this->fresh()->offline_queue_depth);
+    }
+
+    public function test_it_degrades_quietly_when_the_device_column_is_missing(): void
+    {
+        // A deploy can land the code before the later migration. Telemetry must
+        // still record depth rather than 500 the sale screen's background beat.
+        Schema::table('companies', function (Blueprint $t) {
+            $t->dropColumn('offline_queue_device');
+        });
+        $this->flushSchemaCaches();
+
+        $out = $this->report(['depth' => 3, 'oldest_at' => null, 'device' => 'till-1']);
+
+        $this->assertTrue($out['success']);
+        $this->assertTrue($out['stored']);
+        $this->assertSame(3, (int) $this->fresh()->offline_queue_depth);
+    }
+
+    public function test_it_does_not_write_to_a_soft_deleted_company(): void
+    {
+        $this->company->delete();
+
+        $this->report(['depth' => 5, 'oldest_at' => null, 'device' => 'till-1']);
+
+        $row = \Illuminate\Support\Facades\DB::table('companies')->where('id', $this->company->id)->first();
+        $this->assertNull($row->offline_queue_depth);
     }
 
     public function test_it_refuses_a_nonsense_depth(): void

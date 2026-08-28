@@ -94,6 +94,21 @@
                                 @endif
                             </p>
                         @endif
+                        {{-- Bills still held on a counter device. Shown whether or not
+                             Offline Mode is on: a queue can build up from a dropped
+                             line, a quota block or an expired session too. The shop
+                             used to find this out only when day-close disagreed. --}}
+                        @if(($company->offline_queue_depth ?? 0) > 0)
+                            <p class="text-xs mt-1 {{ $company->offline_queue_depth > 10 ? 'text-rose-200 font-semibold' : 'text-amber-200' }}">
+                                Counter device par ruke hue bill: {{ $company->offline_queue_depth }}
+                                @if($company->offline_queue_oldest_at)
+                                    · sab se purana {{ $company->offline_queue_oldest_at->diffForHumans() }}
+                                @endif
+                                @if($company->offline_queue_reported_at)
+                                    · aakhri report {{ $company->offline_queue_reported_at->diffForHumans() }}
+                                @endif
+                            </p>
+                        @endif
                     </div>
                     <div class="text-right">
                         <div class="text-3xl font-bold">{{ $stats['submitted_today'] }}</div>

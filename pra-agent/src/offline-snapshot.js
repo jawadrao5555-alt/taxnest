@@ -101,9 +101,54 @@ function hasSnapshot() {
   return !!(m && fs.existsSync(pagePath()));
 }
 
+// ─── Snapshot staleness ──────────────────────────────────────────────────────
+// A snapshot never expired and never warned. A shop offline for four days kept
+// billing off a four-day-old catalogue — old rates, missing products — and the
+// screen said nothing beyond a timestamp nobody reads. Silence is the danger,
+// not the outage, so age is now classified and the banner escalates with it.
+//
+// We deliberately do NOT refuse to serve an old snapshot: a shop with a stale
+// screen can still take money, and refusing would turn a rate problem into a
+// shutter-down problem. Warn loudly, never block.
+const SNAPSHOT_STALE_HOURS = 24;  // past this: rates may have moved
+const SNAPSHOT_OLD_HOURS = 72;    // past this: treat as untrustworthy
+
+function snapshotAgeHours(iso) {
+  try {
+    const t = Date.parse(iso);
+    if (!t || Number.isNaN(t)) return null;
+    const h = (Date.now() - t) / 3600000;
+    // A PC clock pushed backwards must read as "fresh", never as negative age.
+    return h > 0 ? h : 0;
+  } catch (e) { return null; }
+}
+
+function snapshotTier(iso) {
+  const h = snapshotAgeHours(iso);
+  if (h === null) return 'unknown';
+  if (h < SNAPSHOT_STALE_HOURS) return 'fresh';
+  if (h < SNAPSHOT_OLD_HOURS) return 'stale';
+  return 'old';
+}
+
+// "3 ghante" / "2 din" — plain Roman Urdu, matches the sale screen's wording.
+function snapshotAgeText(iso) {
+  const h = snapshotAgeHours(iso);
+  if (h === null) return '';
+  if (h < 1) return Math.max(1, Math.floor(h * 60)) + ' minute';
+  if (h < 24) return Math.floor(h) + ' ghante';
+  return Math.floor(h / 24) + ' din';
+}
+
 function snapshotInfo() {
   const m = loadManifest();
-  return m ? { savedAt: m.savedAt, assetCount: Object.keys(m.assets || {}).length } : null;
+  if (!m) return null;
+  return {
+    savedAt: m.savedAt,
+    assetCount: Object.keys(m.assets || {}).length,
+    ageHours: snapshotAgeHours(m.savedAt),
+    tier: snapshotTier(m.savedAt),
+  };
 }
 
 // ─── Capture ─────────────────────────────────────────────────────────────────
@@ -298,16 +343,37 @@ function formatSavedAt(iso) {
 
 function injectOfflineBanner(html, savedAtIso) {
   const when = formatSavedAt(savedAtIso);
+  const tier = snapshotTier(savedAtIso);
+  const ageText = snapshotAgeText(savedAtIso);
+
+  // Escalating honesty. A fresh snapshot is a non-event and should not shout;
+  // a three-day-old one is a rate risk the counter must be told about in words
+  // it will actually act on. Colour carries the same message as the text so it
+  // reads across the shop, not just up close.
+  let bg = '#B45309', lead = '';
+  if (tier === 'old') {
+    bg = '#B91C1C';
+    lead = '&#9888;&#65039; Yeh screen ' + ageText + ' purani hai &mdash; rate aur naye product is mein nahi hain. ' +
+           'Bill ban rahe hain aur mehfooz hain, lekin net jald bahal karein. ';
+  } else if (tier === 'stale') {
+    bg = '#C2410C';
+    lead = '&#9888;&#65039; Offline mode &mdash; screen ' + ageText + ' purani hai, is ke baad ke rate/product shamil nahi. ' +
+           'Bills mehfooz ho rahe hain, net aate hi khud sync honge. ';
+  } else {
+    lead = '&#9888;&#65039; Offline mode &mdash; bills mehfooz ho rahe hain, net aate hi khud sync honge. ';
+  }
+
   const banner =
-    '<div id="tn-offline-banner" style="position:fixed;top:44px;left:50%;transform:translateX(-50%);' +
-    'z-index:2147483647;background:#B45309;color:#fff;font:600 13px/1.4 system-ui,sans-serif;' +
-    'padding:7px 14px;border-radius:9999px;box-shadow:none;display:flex;gap:10px;align-items:center;">' +
-    '<span>&#9888;&#65039; Offline mode &mdash; bills mehfooz ho rahe hain, net aate hi khud sync honge. ' +
-    'Screen ki aakhri update: ' + when + '</span>' +
+    '<div id="tn-offline-banner" data-tn-tier="' + tier + '" style="position:fixed;top:44px;left:50%;transform:translateX(-50%);' +
+    'z-index:2147483647;background:' + bg + ';color:#fff;font:600 13px/1.4 system-ui,sans-serif;' +
+    'padding:7px 14px;border-radius:9999px;box-shadow:none;display:flex;gap:10px;align-items:center;' +
+    'max-width:94vw;">' +
+    '<span>' + lead + 'Screen ki aakhri update: ' + when + '</span>' +
     '<button onclick="location.reload()" style="background:#0A4D5C;color:#fff;border:0;border-radius:9999px;' +
-    'padding:4px 12px;font:600 12px system-ui,sans-serif;cursor:pointer;">Dobara Try</button>' +
+    'padding:4px 12px;font:600 12px system-ui,sans-serif;cursor:pointer;flex-shrink:0;">Dobara Try</button>' +
     '</div>' +
-    '<script>window.__tnOfflineSnapshot={savedAt:' + JSON.stringify(savedAtIso) + '};' +
+    '<script>window.__tnOfflineSnapshot={savedAt:' + JSON.stringify(savedAtIso) +
+    ',tier:' + JSON.stringify(tier) + ',ageHours:' + JSON.stringify(snapshotAgeHours(savedAtIso)) + '};' +
     'window.addEventListener("online",function(){setTimeout(function(){try{location.reload()}catch(e){}},1500)});' +
     '<\/script>';
   const idx = html.toLowerCase().lastIndexOf('</body>');
@@ -389,6 +455,11 @@ module.exports = {
   hasSnapshot,
   snapshotInfo,
   // exported for tests
+  snapshotAgeHours,
+  snapshotTier,
+  snapshotAgeText,
+  SNAPSHOT_STALE_HOURS,
+  SNAPSHOT_OLD_HOURS,
   extractAssetPaths,
   extractEmbeddedImagePaths,
   extractCssUrls,

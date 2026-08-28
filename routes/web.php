@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Pos\OfflineQueueReportController;
 use Illuminate\Support\Facades\Route;
 
 // ── Stateless machine endpoints (Task 1090) ─────────────────────────────────
@@ -936,6 +937,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('pos.api.customer-addresses.delete');
     Route::get('/api/failed-bills', [PosController::class, 'apiFailedBills'])->name('pos.api.failed-bills');
     Route::post('/api/failed-bills/{id}/retry', [PosController::class, 'apiRetryFailed'])->name('pos.api.failed.retry');
+    // Offline queue telemetry — the sale screen reports bills still held on the
+    // device. An offline shop cannot report; the dangerous case is a device that
+    // is ONLINE while bills stay stuck, and that used to be invisible.
+    Route::post('/api/offline-queue-report', OfflineQueueReportController::class)->name('pos.api.offline-queue-report');
     // Reprint modal (Alt+R) — read-only list of ALL of today's completed bills.
     Route::get('/api/todays-bills', [PosController::class, 'apiTodaysBills'])->name('pos.api.todays-bills');
     Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
@@ -1818,6 +1823,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // 🔄 Auto-Sync engine — silent 30-sec frontend poller + manual Failed modal
     Route::get('/api/failed-bills', [FbrPosController::class, 'apiFailedBills'])->name('fbrpos.api.failed-bills');
     Route::post('/api/failed-bills/{id}/retry', [FbrPosController::class, 'apiRetryFailed'])->name('fbrpos.api.failed.retry');
+    // Offline queue telemetry — same single controller as the PRA screen.
+    Route::post('/api/offline-queue-report', OfflineQueueReportController::class)->name('fbrpos.api.offline-queue-report');
 
     // 🌐 Universal sale screen APIs — customer + quick product (PRA-shape mirrors)
     Route::get('/api/customer-search', [FbrPosController::class, 'apiCustomerSearch'])->name('fbrpos.api.customer-search');

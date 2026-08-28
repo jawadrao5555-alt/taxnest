@@ -461,7 +461,7 @@ window.addEventListener('popstate', function() {
 
             {{-- 🟢/🟡/🔴 Auto-Sync status pill — same logic as the mobile copy.
                  Click = manual offline-queue sync (Aug 2026 offline billing). --}}
-            <button type="button" @click="syncOfflineBills(true)" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition flex-shrink-0"
+            <button type="button" @click="openOfflineQueue()" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition flex-shrink-0"
                  :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
                  :title="offlineNeedsLogin ? window.TXT.ti_session_expired_sync : (syncStatus === 'online' ? (window.TXT.ti_auto_sync_online + ((failedBills.length + offlineQueueCount) ? ' · ' + (failedBills.length + offlineQueueCount) + window.TXT.ti_pending_click_sync : '')) : (syncStatus === 'syncing' ? window.TXT.ti_syncing_pending_fbr : window.TXT.ti_offline_auto_sync_fbr))">
                 <span class="w-2 h-2 rounded-full"
@@ -946,7 +946,7 @@ window.addEventListener('popstate', function() {
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
         {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator.
              Click = manual offline-queue sync (Aug 2026 offline billing). --}}
-        <button type="button" @click="syncOfflineBills(true)" class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
+        <button type="button" @click="openOfflineQueue()" class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
              :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
              :title="offlineNeedsLogin ? window.TXT.ti_session_expired_sync : (syncStatus === 'online' ? (window.TXT.ti_auto_sync_online + ((failedBills.length + offlineQueueCount) ? ' · ' + (failedBills.length + offlineQueueCount) + window.TXT.ti_pending_click_sync : '')) : (syncStatus === 'syncing' ? window.TXT.ti_syncing_pending_fbr : window.TXT.ti_offline_auto_sync_fbr))">
             <span class="w-2 h-2 rounded-full"
@@ -3403,6 +3403,7 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
     </div>
+@include('pos.partials.offline-queue-modal')
 </div>
 
 @php
@@ -3794,6 +3795,18 @@ function restaurantPos() {
         offlineQueueCount: 0,
         offlineSyncing: false,
         offlineNeedsLogin: false,
+        // ── Offline queue visibility ── (kept identical to the PRA screen)
+        // The Auto-Sync pill used to show ONE number that added queued-offline
+        // bills to server-REJECTED ones, and neither list could be opened. A
+        // shop billing into an invisible queue cannot reconcile its till, so
+        // the queue is now openable, printable, and the outage has a clock.
+        showOfflineQueue: false,
+        offlineQueueList: [],
+        // ms epoch of the moment the network went away. Persisted per company
+        // so an F5 — or a cold boot off the agent's offline snapshot — does not
+        // reset the clock and silently under-report a long outage.
+        offlineSince: null,
+        _offlineSinceKey: 'tn_offline_since_' + {{ (int) (app('currentCompanyId') ?? 0) }},
         // Plan gate (pricing_plans.offline_enabled) — gates NEW queueing only;
         // syncOfflineBills (replay of already-queued bills) never checks this:
         // queued bills kabhi reject nahi hote.
@@ -4138,8 +4151,8 @@ function restaurantPos() {
         // and silently retry the OLDEST one. One bill per tick = no FBR flood.
         _startAutoSync() {
             if (this._syncTimer) return;
-            window.addEventListener('online', () => { this.syncStatus = 'online'; this.offlineLockDismissed = false; this.syncOfflineBills(); this._autoSyncTick(true); });
-            window.addEventListener('offline', () => { this.syncStatus = 'offline'; });
+            window.addEventListener('online', () => { this.syncStatus = 'online'; this._markConnectivity(true); this.offlineLockDismissed = false; this.syncOfflineBills(); this._autoSyncTick(true); });
+            window.addEventListener('offline', () => { this.syncStatus = 'offline'; this._markConnectivity(false); });
             this.refreshOfflineCount();
             this.syncOfflineBills();
             this._autoSyncTick();
@@ -4154,10 +4167,11 @@ function restaurantPos() {
             if (this._autoSyncBusy) return;
             // Respect navigator.onLine but don't trust it 100% — we still try
             // a lightweight count fetch which doubles as a connectivity probe.
-            if (!navigator.onLine) { this.syncStatus = 'offline'; return; }
+            if (!navigator.onLine) { this.syncStatus = 'offline'; this._markConnectivity(false); return; }
             // Offline-first queue drains FIRST — device-local bills must reach the
             // server before failed-bill FBR retries (they're older by definition).
             if (this.offlineQueueCount > 0) await this.syncOfflineBills();
+            this._reportOfflineQueue();
             this._autoSyncBusy = true;
             try {
                 // Lightweight refresh of pending count (also serves as ping).
@@ -4245,6 +4259,154 @@ function restaurantPos() {
         async refreshOfflineCount() {
             try { this.offlineQueueCount = (await this.idbAllMine()).length; } catch (e) {}
         },
+        // ── OFFLINE QUEUE VISIBILITY ── (kept identical to the PRA screen)
+        // Records WHEN the outage began. Driven by the browser's online/offline
+        // events, the auto-sync tick, and — more importantly — the two moments
+        // that PROVE connectivity either way: a bill being queued (offline) and
+        // a bill reaching the server (online). navigator.onLine lies on captive
+        // portals and dead uplinks, so proof beats the flag wherever we have it.
+        _markConnectivity(online) {
+            if (online) {
+                if (this.offlineSince !== null) {
+                    this.offlineSince = null;
+                    try { localStorage.removeItem(this._offlineSinceKey); } catch (e) {}
+                }
+                return;
+            }
+            if (this.offlineSince !== null) return;
+            let saved = 0;
+            try { saved = parseInt(localStorage.getItem(this._offlineSinceKey) || '0', 10) || 0; } catch (e) {}
+            // Trust a stored start only if it is sane (not in the future, not
+            // absurdly old) — a PC clock change must not invent a 40-day outage.
+            const now = Date.now();
+            this.offlineSince = (saved > 0 && saved <= now && (now - saved) < 30 * 86400000) ? saved : now;
+            try { localStorage.setItem(this._offlineSinceKey, String(this.offlineSince)); } catch (e) {}
+        },
+        // Plain elapsed text — "2 ghante 15 minute". No library, no locale data.
+        offlineSinceText() {
+            if (!this.offlineSince) return '';
+            const mins = Math.floor((Date.now() - this.offlineSince) / 60000);
+            if (mins < 1) return window.TXT.offq_just_now;
+            if (mins < 60) return mins + ' ' + window.TXT.offq_unit_min;
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) {
+                const rem = mins % 60;
+                return hrs + ' ' + window.TXT.offq_unit_hour + (rem ? ' ' + rem + ' ' + window.TXT.offq_unit_min : '');
+            }
+            const days = Math.floor(hrs / 24), remH = hrs % 24;
+            return days + ' ' + window.TXT.offq_unit_day + (remH ? ' ' + remH + ' ' + window.TXT.offq_unit_hour : '');
+        },
+        async openOfflineQueue() {
+            try {
+                this.offlineQueueList = (await this.idbAllMine())
+                    .sort((a, b) => (a.queued_at || 0) - (b.queued_at || 0));
+            } catch (e) { this.offlineQueueList = []; }
+            this.offlineQueueCount = this.offlineQueueList.length;
+            this.showOfflineQueue = true;
+        },
+        offlineQueueSum() {
+            return (this.offlineQueueList || []).reduce((s, b) => s + Math.round(b.total || 0), 0);
+        },
+        // Report how many bills this device is still holding. An OFFLINE device
+        // cannot report — its silence (and the agent's missing heartbeat) is the
+        // signal. The case this exists for is the opposite one: ONLINE, but bills
+        // still stuck (poisoned bill, quota block, expired session). That queue
+        // used to be invisible until the day-close totals disagreed.
+        // Fire-and-forget: telemetry must never be able to disturb billing.
+        _lastQueueReport: null,
+        // A stable id for THIS counter device. The server uses it so an idle
+        // till reporting zero cannot erase a busy till's stuck bills.
+        _deviceKey() {
+            try {
+                const k = 'tn_pos_device_id';
+                let v = localStorage.getItem(k);
+                if (!v) {
+                    v = (window.crypto && crypto.randomUUID)
+                        ? crypto.randomUUID()
+                        : (String(Date.now()) + Math.random().toString(16).slice(2));
+                    localStorage.setItem(k, v);
+                }
+                return v;
+            } catch (e) { return ''; }
+        },
+        async _reportOfflineQueue() {
+            if (!navigator.onLine) return;
+            const depth = this.offlineQueueCount || 0;
+            const sig = depth + '|' + (this.offlineSince || 0);
+            // Speak at least ONCE per page session, even to say zero. Staying
+            // silent on a healthy screen sounds tidy, but if the queue drained
+            // before we ever spoke, the last number the server heard was the old
+            // positive one — and it would sit there as a false alarm forever.
+            if (this._lastQueueReport !== null && this._lastQueueReport === sig) return;
+            this._lastQueueReport = sig;
+            let oldest = null;
+            try {
+                const all = await this.idbAllMine();
+                const t = all.reduce((m, b) => (b.queued_at && (!m || b.queued_at < m)) ? b.queued_at : m, 0);
+                oldest = t ? new Date(t).toISOString() : null;
+            } catch (e) { /* unreadable queue is not worth a failed sale */ }
+            try {
+                await fetch('{{ route('fbrpos.api.offline-queue-report', [], false) }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ depth: depth, oldest_at: oldest, device: this._deviceKey() }),
+                });
+            } catch (e) { /* telemetry must never break billing */ }
+        },
+        // Paper trail: an outage worth worrying about is an outage the shop wants
+        // to tally against the cash drawer by hand. Prints from the in-memory
+        // list only — it must never need the network to render.
+        printOfflineQueueList() {
+            const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const rows = (this.offlineQueueList || []).map(b =>
+                '<tr><td>' + esc(b.queued_at ? new Date(b.queued_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-') + '</td>' +
+                '<td>' + esc(b.customer || window.TXT.offq_walkin) + '</td>' +
+                '<td class="r">' + esc(Number(b.total || 0).toLocaleString()) + '</td></tr>'
+            ).join('');
+            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(window.TXT.offq_print_title) + '</title><style>' +
+                '@page{margin:6mm;}body{font-family:Arial,sans-serif;font-size:12px;color:#000;}' +
+                'h1{font-size:15px;margin:0 0 2px;}p{margin:2px 0;font-size:11px;}' +
+                'table{width:100%;border-collapse:collapse;margin-top:8px;}' +
+                'th,td{border-bottom:1px solid #999;padding:4px 3px;text-align:left;}' +
+                'th{font-size:11px;}.r{text-align:right;}' +
+                'tfoot td{font-weight:bold;border-top:2px solid #000;border-bottom:none;}' +
+                '</style></head><body>' +
+                '<h1>' + esc(window.TXT.offq_print_title) + '</h1>' +
+                '<p>' + esc(new Date().toLocaleString()) + '</p>' +
+                (this.offlineSince ? '<p>' + esc(window.TXT.offq_offline_for) + ' ' + esc(this.offlineSinceText()) + '</p>' : '') +
+                '<table><thead><tr><th>' + esc(window.TXT.offq_col_time) + '</th><th>' + esc(window.TXT.offq_col_customer) +
+                '</th><th class="r">' + esc(window.TXT.offq_col_amount) + '</th></tr></thead><tbody>' + rows + '</tbody>' +
+                '<tfoot><tr><td colspan="2">' + esc(window.TXT.offq_total) + '</td><td class="r">' +
+                esc(Number(this.offlineQueueSum()).toLocaleString()) + '</td></tr></tfoot></table></body></html>';
+            const fr = document.createElement('iframe');
+            fr.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;';
+            document.body.appendChild(fr);
+            fr.srcdoc = html;
+            fr.onload = () => {
+                // Same bounded font wait as the interim receipt: in Urdu mode the
+                // sheet's @font-face may still be loading at iframe onload.
+                let printed = false;
+                const go = () => {
+                    if (printed) return;
+                    printed = true;
+                    try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) {}
+                    // Focus MUST come back or the screen's plain-letter shortcuts
+                    // stay trapped in the dead iframe for the rest of the shift.
+                    try { window.focus(); } catch (e) {}
+                    setTimeout(() => { try { fr.remove(); } catch (e) {} }, 60000);
+                };
+                let waited = false;
+                try {
+                    const fd = fr.contentDocument && fr.contentDocument.fonts;
+                    if (fd && fd.load) {
+                        fd.load("16px 'Jameel Noori Nastaleeq'", '\u0627\u0631\u062F\u0648').then(go, go);
+                        setTimeout(go, 8000);
+                        waited = true;
+                    }
+                } catch (e) {}
+                if (!waited) go();
+            };
+        },
         // Queue a bill that could NOT reach the server (no internet). Mirrors the
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
@@ -4288,6 +4450,9 @@ function restaurantPos() {
                 last_error: '',
             };
             await this.idbPut(rec);
+            // A bill only ever lands here because the network refused it — that is
+            // harder proof of an outage than navigator.onLine, so start the clock.
+            this._markConnectivity(false);
             await this.refreshOfflineCount();
             this.lastIsOffline = true;
             this.lastOfflineRec = rec;
@@ -4381,6 +4546,8 @@ function restaurantPos() {
             this.syncStatus = navigator.onLine ? 'online' : 'offline';
             await this.refreshOfflineCount();
             if (ok > 0) {
+                // A bill reached the server: the outage is genuinely over.
+                this._markConnectivity(true);
                 this.showToast(ok + ' offline bill' + (ok === 1 ? '' : 's') + ' synced ✓', 'success');
                 this.loadLocalBills();
                 this.loadFailedBills();

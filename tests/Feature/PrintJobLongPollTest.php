@@ -77,6 +77,15 @@ class PrintJobLongPollTest extends TestCase
         ]);
     }
 
+    /**
+     * Mark the shop as "currently printing". Holding a worker is only offered
+     * inside this window (see config/print.php) — a quiet shop short-polls.
+     */
+    private function armPrintingActivity(): void
+    {
+        Cache::put('print_recent_activity_1', 1, now()->addMinutes(20));
+    }
+
     private function enqueueJob(): int
     {
         return DB::table('pos_print_jobs')->insertGetId([
@@ -107,6 +116,7 @@ class PrintJobLongPollTest extends TestCase
 
     public function test_empty_queue_with_wait_holds_and_reports_held(): void
     {
+        $this->armPrintingActivity();
         $start = microtime(true);
         $res = $this->poll('?wait=1');
         $elapsed = microtime(true) - $start;
@@ -117,6 +127,11 @@ class PrintJobLongPollTest extends TestCase
 
     public function test_concurrency_cap_falls_back_to_instant_short_poll(): void
     {
+        // Must be an ACTIVELY printing shop, otherwise the quiet-shop gate
+        // answers before slot acquisition is ever reached and this test would
+        // pass even with admission control removed entirely.
+        $this->armPrintingActivity();
+
         // Occupy all 10 slots (atomic Cache::add slot keys on non-mysql).
         for ($i = 0; $i < 10; $i++) {
             Cache::add('print_jobs_longpoll_slot_' . $i, 1, 60);
@@ -163,7 +178,34 @@ class PrintJobLongPollTest extends TestCase
         for ($i = 0; $i < 5; $i++) {
             $granted[] = $m->invoke($controller);
         }
-        $this->assertCount(3, array_filter($granted), 'default cap must hold at most 3 workers');
+        $this->assertCount(1, array_filter($granted), 'default cap must hold at most ONE worker');
+    }
+
+    public function test_quiet_shop_is_never_held(): void
+    {
+        // No recent print activity: the shared host's tiny worker pool must not
+        // be tied up by an agent polling a closed shop through the night.
+        $start = microtime(true);
+        $res = $this->poll('?wait=5');
+        $elapsed = microtime(true) - $start;
+
+        $res->assertOk()->assertJson(['ok' => true, 'count' => 0, 'held' => false]);
+        $this->assertLessThan(0.9, $elapsed, 'a quiet shop must be answered instantly, never held');
+    }
+
+    public function test_claiming_a_job_arms_the_holding_window(): void
+    {
+        // A real job proves the shop is printing, so the NEXT empty poll may
+        // hold — that is what keeps a busy rush printing instantly.
+        $this->enqueueJob();
+        $this->poll()->assertOk()->assertJson(['count' => 1]);
+
+        $start = microtime(true);
+        $res = $this->poll('?wait=1');
+        $elapsed = microtime(true) - $start;
+
+        $res->assertOk()->assertJson(['count' => 0, 'held' => true]);
+        $this->assertGreaterThanOrEqual(0.9, $elapsed);
     }
 
     public function test_wait_zero_config_disables_holding(): void
@@ -178,6 +220,7 @@ class PrintJobLongPollTest extends TestCase
 
     public function test_hold_slot_is_released_after_the_hold(): void
     {
+        $this->armPrintingActivity();
         $this->poll('?wait=1')->assertOk()->assertJson(['held' => true]);
         for ($i = 0; $i < 10; $i++) {
             $this->assertNull(Cache::get('print_jobs_longpoll_slot_' . $i), "slot $i must be free after the hold");
@@ -223,6 +266,7 @@ class PrintJobLongPollTest extends TestCase
             \App\Http\Controllers\AgentController::class,
             MidHoldEnqueueAgentController::class
         );
+        $this->armPrintingActivity();
 
         $start = microtime(true);
         $res = $this->poll('?wait=5');
@@ -236,6 +280,7 @@ class PrintJobLongPollTest extends TestCase
 
     public function test_done_rows_do_not_end_the_hold(): void
     {
+        $this->armPrintingActivity();
         DB::table('pos_print_jobs')->insert([
             'company_id' => 1, 'type' => 'bill', 'target_printer' => 'T',
             'transaction_id' => 2, 'status' => 'done', 'attempts' => 1,

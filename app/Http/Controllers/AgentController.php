@@ -1015,6 +1015,29 @@ class AgentController extends Controller
             ->where($deviceScope)
             ->exists();
         $hasPending = $pendingExists();
+
+        // Activity gate (Aug 2026 — "server bohat slow" incident). A held poll
+        // occupies one PHP worker for up to $wait seconds. The shared cPanel
+        // host runs a TINY lsphp pool (observed: 4), so agents that long-poll
+        // around the clock were sleeping on most of it while a counter's own
+        // page request queued behind them — invisible to the slow-request log,
+        // because the wait happens BEFORE PHP boots.
+        //
+        // Holding is therefore allowed only while a company is actually
+        // printing: the marker is (re)armed whenever a poll sees a real job,
+        // and expires after a quiet spell. An idle/closed shop short-polls
+        // instead, which costs ~40ms of worker time per poll instead of 8s.
+        // Cost to print latency is at most one short-poll interval on the
+        // FIRST job after a quiet spell — that job is picked up by the very
+        // next short-poll anyway, and the rush that follows prints instantly.
+        $activeKey = 'print_recent_activity_' . $company->id;
+        $activeMinutes = max(1, (int) config('print.active_window_minutes', 20));
+        if ($hasPending) {
+            \Illuminate\Support\Facades\Cache::put($activeKey, 1, now()->addMinutes($activeMinutes));
+        }
+        if ($wait > 0 && !$hasPending && !\Illuminate\Support\Facades\Cache::has($activeKey)) {
+            $wait = 0; // quiet shop — never tie up a worker
+        }
         if ($wait > 0 && !$hasPending) {
             // Bounded admission: each held long-poll occupies one PHP worker
             // (sleeping) for up to $wait seconds. Cap concurrent holds so a
@@ -1087,8 +1110,8 @@ class AgentController extends Controller
      */
     protected function longPollMaxHolds(): int
     {
-        $v = config('print.longpoll_max_holds', 3);
-        return max(1, is_numeric($v) ? (int) $v : 3);
+        $v = config('print.longpoll_max_holds', 1);
+        return max(1, is_numeric($v) ? (int) $v : 1);
     }
 
     /**
@@ -1141,7 +1164,11 @@ class AgentController extends Controller
      */
     protected function longPollPause(): void
     {
-        usleep(250000);
+        // 500ms, not 250ms: the inner re-check is a DB round trip, so a held
+        // 8s poll used to cost ~32 queries. Printing does not feel any
+        // different at half the cadence, and it halves the polling load the
+        // shared MySQL sees during a rush.
+        usleep(500000);
     }
 
     /**

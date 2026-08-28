@@ -17,7 +17,26 @@
  *   PRINT_LONGPOLL_MAX_WAIT   — max seconds a poll may be held (0 disables
  *                               holding entirely -> pure short-poll fallback)
  */
+/*
+ * Aug 2026 revision — "server bohat slow" incident.
+ *
+ * The live shared cPanel host was observed running a pool of only FOUR lsphp
+ * workers. With the old cap of 3, round-the-clock agent polling could sleep on
+ * three quarters of it, so a counter's own page request queued behind sleeping
+ * pollers. That wait happens before PHP boots, so nothing showed up in the
+ * slow-request log even though the shop felt the site crawl.
+ *
+ * Two guards now apply, and both must stay in place on small shared hosting:
+ *   - at most ONE worker may ever be held, leaving the rest of the pool free;
+ *   - holds are only offered while a shop is actually printing (see
+ *     `active_window_minutes`), so a closed shop holds nothing at all.
+ * Raise `longpoll_max_holds` only on a host with a known, larger pool.
+ */
 return [
-    'longpoll_max_holds' => (int) env('PRINT_LONGPOLL_MAX_HOLDS', 3),
+    'longpoll_max_holds' => (int) env('PRINT_LONGPOLL_MAX_HOLDS', 1),
     'longpoll_max_wait' => (int) env('PRINT_LONGPOLL_MAX_WAIT', 8),
+
+    // How long after the last real print job a shop still counts as "printing"
+    // and may be offered a held poll.
+    'active_window_minutes' => (int) env('PRINT_ACTIVE_WINDOW_MINUTES', 20),
 ];

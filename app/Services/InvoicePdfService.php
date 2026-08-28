@@ -17,6 +17,16 @@ use App\Models\Invoice;
 class InvoicePdfService
 {
     /**
+     * Have we already reported that the QR cannot be drawn in this process?
+     *
+     * A QR failure is practically never about one invoice — it is the whole
+     * environment (a PHP build without GD, most often), so the background
+     * warmer would otherwise log the identical line for every invoice it
+     * touches. Once is enough to diagnose it.
+     */
+    private static bool $qrFailureLogged = false;
+
+    /**
      * View data for invoice.pdf-bw.
      *
      * @param float|null $fallbackWhtRate used only when the invoice has no
@@ -71,8 +81,19 @@ class InvoicePdfService
             // is what a buyer actually needs.
             $qrBase64 = \App\Support\QrImage::dataUri(trim((string) $invoice->fbr_invoice_number), 8);
 
-            if ($qrBase64 === '') {
-                \Illuminate\Support\Facades\Log::warning('Invoice PDF: QR render failed for invoice #' . $invoice->id);
+            if ($qrBase64 === '' && !self::$qrFailureLogged) {
+                // Once per process, not once per invoice. When the cause is
+                // environmental every invoice fails identically, and the
+                // background warmer walks thousands of them: this line alone
+                // once contributed 7,603 copies of itself to a 105 MB log.
+                self::$qrFailureLogged = true;
+                \Illuminate\Support\Facades\Log::warning('Invoice PDF: QR render failed', [
+                    'first_invoice_id' => $invoice->id,
+                    // Almost always the answer, and the one thing the message
+                    // never used to say.
+                    'gd_loaded' => extension_loaded('gd'),
+                    'php_binary' => PHP_BINARY,
+                ]);
             }
 
             // The full-size logo is a 42 KB screen asset, and it was being
@@ -85,7 +106,16 @@ class InvoicePdfService
             if (!file_exists($logoPath)) {
                 $logoPath = public_path('images/fbr-digital-invoice-logo.png');
             }
-            if (file_exists($logoPath)) {
+            // DomPDF cannot place an image of ANY kind without GD — its PNG
+            // and SVG paths both end in Cpdf::addPngFromFile(), which throws
+            // on its first line when the extension is missing. So dropping
+            // only the QR above would not save the document: this logo would
+            // kill it three lines later, in exactly the same way.
+            //
+            // An invoice without the FBR mark still shows the FBR number and
+            // is still a valid document. An invoice that will not render is
+            // nothing at all.
+            if (file_exists($logoPath) && function_exists('imagecreatefrompng')) {
                 $fbrLogoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
             }
         }

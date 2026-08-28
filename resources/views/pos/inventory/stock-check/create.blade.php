@@ -39,7 +39,7 @@
             <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.stock_check_what_to_count') }}</label>
             <div class="space-y-2">
                 <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                    <input type="radio" name="scope" value="products" checked class="mt-1 text-purple-600 focus:ring-purple-500">
+                    <input type="radio" name="scope" value="products" @checked(!$hasIngredients) class="mt-1 text-purple-600 focus:ring-purple-500">
                     <span>
                         <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.stock_check_scope_products') }}</span>
                         <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.stock_check_scope_products_hint') }}</span>
@@ -54,7 +54,7 @@
                     </span>
                 </label>
                 <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                    <input type="radio" name="scope" value="both" class="mt-1 text-purple-600 focus:ring-purple-500">
+                    <input type="radio" name="scope" value="both" checked class="mt-1 text-purple-600 focus:ring-purple-500">
                     <span>
                         <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.stock_check_scope_both') }}</span>
                         <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.stock_check_scope_both_hint') }}</span>

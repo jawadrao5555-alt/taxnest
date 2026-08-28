@@ -40,9 +40,25 @@ class QrImage
      * Generate a self-contained QR code as a base64 data URI.
      *
      * Renders entirely server-side so it works in the browser, in DomPDF and
-     * fully offline — no dependency on any external image API. Prefers a PNG
-     * (best DomPDF / thermal-print fidelity) and falls back to an inline SVG,
-     * returning an empty string only if QR generation is impossible.
+     * fully offline — no dependency on any external image API. Always a PNG,
+     * and an empty string when a PNG cannot be produced.
+     *
+     * There is deliberately NO SVG fallback. DomPDF cannot draw an image of
+     * any kind without the GD extension — its PNG and SVG paths both end in
+     * `Cpdf::addPngFromFile()`, which throws "The PHP GD extension is
+     * required" on its very first line. So on a PHP build without GD an SVG
+     * QR does not rescue the document, it destroys it: the QR "succeeds",
+     * DomPDF then dies on it, and the whole invoice fails to render.
+     *
+     * That is not hypothetical. The live cron ran on a PHP build without GD
+     * while the website ran on one with it, so every background render of an
+     * invoice PDF threw, cached nothing, and was retried on the next pass —
+     * for four days, leaking one orphaned DomPDF temp file per attempt until
+     * half a million of them had eaten 7.9 GB of the account's disk quota.
+     *
+     * Returning an empty string instead is what every caller already expects:
+     * the templates print the invoice number on its own. A document with no
+     * QR is a small loss. A document that will not render is a total one.
      */
     /**
      * @param int|null $minVersion QR version floor (ZFC 13 Aug 2026): receipts
@@ -76,13 +92,9 @@ class QrImage
                 'imageTransparent' => false,
             ])))->render($data);
         } catch (\Throwable $e) {
-            try {
-                return (new QRCode(new QROptions($base + [
-                    'outputType' => QROutputInterface::MARKUP_SVG,
-                ])))->render($data);
-            } catch (\Throwable $e2) {
-                return '';
-            }
+            // See the note above: no SVG second chance. A QR we cannot draw as
+            // a PNG is a QR this document does without.
+            return '';
         }
     }
 }

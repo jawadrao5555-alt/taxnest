@@ -102,7 +102,22 @@ class InvoicePdfCacheService
         // otherwise end up with a file newer than the edit — and that stale
         // rendering would be handed out as the shop's tax document forever.
         $readAt = time();
-        $bytes = InvoicePdfService::renderBw($invoice)->output();
+
+        // DomPDF copies every embedded image (our QR and the FBR mark both
+        // arrive as data URIs) into a temp file, and only deletes them at the
+        // very END of a successful render. A render that throws leaves them
+        // behind for good, and nothing else ever cleans them up.
+        //
+        // That is how a broken render turned into a disk emergency once
+        // already: the orphans were invisible inside the account's private
+        // /tmp, and half a million of them reached 7.9 GB. Whatever happens
+        // below, the images this render pulled in go with it.
+        try {
+            $bytes = InvoicePdfService::renderBw($invoice)->output();
+        } finally {
+            \Dompdf\Image\Cache::clear();
+        }
+
         $tmp = $path . '.' . getmypid() . '.part';
 
         if (@file_put_contents($tmp, $bytes) === false || !@rename($tmp, $path)) {
@@ -112,7 +127,47 @@ class InvoicePdfCacheService
 
         @touch($path, $readAt);
 
+        // It rendered, so whatever was wrong before is over.
+        @unlink(self::failMarkerPath((int) $invoice->company_id, (int) $invoice->id));
+
         return ['path' => $path, 'size' => strlen($bytes), 'rendered' => true];
+    }
+
+    /**
+     * Where a failed render leaves its note.
+     *
+     * The background warmer walks every invoice on the platform every few
+     * minutes. Without a memory of failure it re-attempts an invoice that
+     * cannot render, forever — which is not merely wasted CPU: each attempt
+     * costs a leaked temp file and a line in the log. One unrenderable
+     * invoice filled a 105 MB log file with the same sentence.
+     */
+    public static function failMarkerPath(int $companyId, int $invoiceId): string
+    {
+        return self::path($companyId, $invoiceId) . '.fail';
+    }
+
+    /** Note that this invoice would not render, so the warmer can leave it alone for a while. */
+    public static function markFailed(Invoice $invoice): void
+    {
+        Storage::disk('local')->makeDirectory(self::dir((int) $invoice->company_id));
+        @file_put_contents(self::failMarkerPath((int) $invoice->company_id, (int) $invoice->id), (string) time());
+    }
+
+    /**
+     * Has this invoice failed to render recently enough that retrying now is
+     * just going to fail again?
+     *
+     * A real fix (a missing extension restored, a bad character removed) is a
+     * deploy or a support call away, not seconds away — so the cooldown is
+     * measured in hours. Anyone who actually asks for the document still gets
+     * a fresh attempt; this only holds back the background pass.
+     */
+    public static function recentlyFailed(int $companyId, int $invoiceId, int $cooldownSeconds = 21600): bool
+    {
+        $at = @filemtime(self::failMarkerPath($companyId, $invoiceId));
+
+        return $at !== false && $at > (time() - $cooldownSeconds);
     }
 
     public static function forget(int $companyId, int $invoiceId): void
@@ -161,6 +216,15 @@ class InvoicePdfCacheService
 
             if ((int) @filemtime($file) < $cutoff && @unlink($file)) {
                 $removed++;
+            }
+        }
+
+        // Failure notes are tiny, but they must not outlive their usefulness:
+        // a stale one would keep an invoice out of the warmer long after
+        // whatever broke it was fixed.
+        foreach (glob(Storage::disk('local')->path('invoice-pdfs') . '/company_*/*.fail') ?: [] as $file) {
+            if ((int) @filemtime($file) < (time() - 86400)) {
+                @unlink($file);
             }
         }
 

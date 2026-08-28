@@ -38,6 +38,8 @@ class CacheInvoicePdfs extends Command
         $rendered = 0;
         $failed = 0;
         $lastId = 0;
+        $reasons = [];
+        $firstFailedId = null;
 
         while (time() < $deadline) {
             // Cheap pass first: ids and timestamps are all it takes to know
@@ -60,7 +62,8 @@ class CacheInvoicePdfs extends Command
             $lastId = (int) $rows->last()->id;
 
             $todo = $rows
-                ->filter(fn ($row) => InvoicePdfCacheService::currentPath($row) === null)
+                ->filter(fn ($row) => InvoicePdfCacheService::currentPath($row) === null
+                    && !InvoicePdfCacheService::recentlyFailed((int) $row->company_id, (int) $row->id))
                 ->pluck('id');
 
             if ($todo->isEmpty()) {
@@ -82,12 +85,27 @@ class CacheInvoicePdfs extends Command
                     $rendered++;
                 } catch (\Throwable $e) {
                     $failed++;
-                    Log::warning('Invoice PDF cache: one invoice could not be rendered', [
-                        'invoice_id' => $invoice->id,
-                        'error' => $e->getMessage(),
-                    ]);
+                    // Do not write a line per invoice. When the cause is
+                    // environmental — a missing extension, a full disk — every
+                    // invoice on the platform fails with the identical
+                    // sentence, and the log becomes the second problem: this
+                    // exact loop once wrote 529,562 copies of one message into
+                    // a 105 MB file. One example per run says the same thing.
+                    $reasons[$e->getMessage()] = ($reasons[$e->getMessage()] ?? 0) + 1;
+                    InvoicePdfCacheService::markFailed($invoice);
+                    $firstFailedId ??= (int) $invoice->id;
                 }
             }
+        }
+
+        if ($failed > 0) {
+            Log::warning('Invoice PDF cache: some invoices could not be rendered', [
+                'failed' => $failed,
+                'rendered' => $rendered,
+                'first_invoice_id' => $firstFailedId,
+                // Distinct causes only, with how many invoices hit each.
+                'reasons' => $reasons,
+            ]);
         }
 
         $this->info("Rendered {$rendered} invoice PDFs" . ($failed ? ", {$failed} failed" : '') . '.');

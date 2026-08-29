@@ -59,16 +59,24 @@ if errorlevel 1 (
 )
 
 echo.
-echo ================================================
-echo   HO GAYA
-echo ================================================
-echo.
-echo Installer yahan bana hai:
-echo   %~dp0dist
-echo.
+echo Installer ban gaya:
 dir /b "%~dp0dist\*.exe" 2>nul
 echo.
-echo Koi bhi key dabayen - yeh folder khul jayega.
-pause >nul
-start "" "%~dp0dist"
+
+echo ------------------------------------------------
+echo  [3 / 3]  Release zip bhi banai ja rahi hai...
+echo ------------------------------------------------
+echo.
+echo Shops ke agent khud ko ZIP se update karte hain, EXE se nahi -
+echo is liye zip banana bhi zaroori hai.
+echo.
+if not exist "%~dp0make-zip.bat" (
+    echo [ITTELA] make-zip.bat nahi mila - zip nahi banai ja saki.
+    echo          Sirf installer bana hai. Yeh baat bata dein.
+    echo.
+    pause
+    start "" "%~dp0dist"
+    exit /b 0
+)
+call "%~dp0make-zip.bat"
 exit /b 0

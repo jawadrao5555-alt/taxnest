@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('agentAPI', {
   saveLanSettings: (s) => ipcRenderer.invoke('save-lan-settings', s),
   getLanStatus: () => ipcRenderer.invoke('get-lan-status'),
   lanForgetDevices: () => ipcRenderer.invoke('lan-forget-devices'),
+  lanListDevices: () => ipcRenderer.invoke('lan-list-devices'),
+  lanRemoveDevice: (id) => ipcRenderer.invoke('lan-remove-device', id),
   getPosSettings: () => ipcRenderer.invoke('get-pos-settings'),
   savePosSettings: (s) => ipcRenderer.invoke('save-pos-settings', s),
   openPosWindow: () => ipcRenderer.invoke('open-pos-window'),

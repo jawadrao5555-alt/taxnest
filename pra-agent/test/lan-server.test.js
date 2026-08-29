@@ -305,6 +305,57 @@ function j(res) { return res.json(); }
         assert.strictEqual(server.status().pending_events, 0);
     });
 
+    await it('the device list names every tablet, and never leaks a token', async function () {
+        const list = server.listDevices();
+        assert.ok(list.length >= 1, 'the paired tablet must appear in the list');
+        const row = list[0];
+        ['id', 'name', 'kind', 'paired_at', 'last_seen'].forEach(function (k) {
+            assert.ok(k in row, 'a row must carry ' + k);
+        });
+        const blob = JSON.stringify(list);
+        assert.ok(blob.indexOf(token) === -1, 'the pairing token must never reach the renderer');
+        assert.notStrictEqual(row.id, token, 'the row id must not be the token itself');
+        assert.strictEqual(row.id, server.listDevices()[0].id, 'the id must be stable between reads');
+    });
+
+    await it('removing one device leaves the others paired', async function () {
+        // Pair a second device with whatever code is current now.
+        const second = await fetch(base + '/lan/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: server.status().pair_code, device: 'Waiter Tablet 2', kind: 'waiter' }),
+        });
+        assert.strictEqual(second.status, 200, 'the second tablet must pair');
+        const secondToken = (await j(second)).token;
+        assert.strictEqual(server.listDevices().length, 2);
+
+        const victim = server.listDevices().find(function (d) { return d.name === 'Waiter Tablet 2'; });
+        assert.strictEqual(server.removeDevice(victim.id), true, 'removing a real device must report success');
+        assert.strictEqual(server.listDevices().length, 1, 'only the removed device may disappear');
+
+        const dead = await fetch(base + '/lan/whoami', { headers: { Authorization: 'Bearer ' + secondToken } });
+        assert.strictEqual(dead.status, 401, 'the removed device must have to pair again');
+        const alive = await fetch(base + '/lan/whoami', { headers: { Authorization: 'Bearer ' + token } });
+        assert.strictEqual(alive.status, 200, 'the OTHER tablet must stay paired');
+    });
+
+    await it('an unknown device id removes nothing', function () {
+        const before = server.listDevices().length;
+        [null, '', 'not-a-real-id', '0'].forEach(function (bad) {
+            assert.strictEqual(server.removeDevice(bad), false, String(bad) + ' must not report a removal');
+        });
+        assert.strictEqual(server.listDevices().length, before, 'a bad id must not touch the store');
+    });
+
+    await it('the device list is never readable over the LAN', async function () {
+        for (const p of ['/lan/devices', '/lan/device-list']) {
+            const anon = await fetch(base + p);
+            assert.strictEqual(anon.status, 401, p + ' must not answer an unpaired caller');
+            const paired = await fetch(base + p, { headers: { Authorization: 'Bearer ' + token } });
+            assert.strictEqual(paired.status, 404, p + ' must not exist even for a paired device');
+        }
+    });
+
     await it('pairing survives an agent restart', async function () {
         await server.stop();
         const again = createLanServer({ dataDir: dataDir, port: 0, version: '9.9.9', log: function () {} });

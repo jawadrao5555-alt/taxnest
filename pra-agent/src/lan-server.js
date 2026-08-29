@@ -106,6 +106,19 @@ function makeToken() {
     return crypto.randomBytes(24).toString('hex');
 }
 
+/**
+ * A stable, one-way name for a paired device, used by the agent window to list
+ * and remove devices.
+ *
+ * The device store is keyed by the pairing TOKEN, and that token is the
+ * device's password — it must never leave this process. A hash gives the UI
+ * something stable to point at without handing the renderer a live credential
+ * that would then sit in the DOM and in devtools.
+ */
+function deviceIdFor(token) {
+    return crypto.createHash('sha256').update(String(token || '')).digest('hex').slice(0, 12);
+}
+
 // Constant-time compare so a paired token cannot be discovered byte by byte.
 function safeEqual(a, b) {
     const x = Buffer.from(String(a || ''));
@@ -573,6 +586,46 @@ function createLanServer(options) {
         log('LAN devices cleared — every tablet must pair again');
     }
 
+    /**
+     * The paired devices, for the agent window only.
+     *
+     * A count alone ("3 devices connected") is useless the moment a tablet is
+     * lost, sold or reset: the owner's only remedy was "forget everything",
+     * which punishes every other tablet in the shop. Newest contact first, so
+     * the device someone is holding is at the top.
+     *
+     * Deliberately NOT exposed over HTTP. Nothing about the shop's devices may
+     * be readable from the LAN, least of all before a caller has paired.
+     */
+    function listDevices() {
+        return Object.keys(state.devices).map(function (token) {
+            const d = state.devices[token] || {};
+            return {
+                id: deviceIdFor(token),
+                name: d.name || 'device',
+                kind: d.kind || 'waiter',
+                paired_at: d.paired_at || null,
+                last_seen: d.last_seen || null,
+            };
+        }).sort(function (a, b) { return (b.last_seen || 0) - (a.last_seen || 0); });
+    }
+
+    /** Unplug ONE device. Every other tablet keeps its token and stays paired. */
+    function removeDevice(id) {
+        const want = String(id || '');
+        if (!want) { return false; }
+        const token = Object.keys(state.devices).find(function (t) { return deviceIdFor(t) === want; });
+        if (!token) { return false; }
+        const gone = state.devices[token] || {};
+        delete state.devices[token];
+        persistDevices();
+        // The pairing code is NOT rotated here: it is single-use already, and
+        // rotating it would invalidate a code the owner may have just read out
+        // to a tablet that is standing in front of him.
+        log('LAN device removed: ' + (gone.name || want) + ' — it must pair again to come back');
+        return true;
+    }
+
     // Cloud sync (Phase 3) drains from here and marks what it managed to push.
     function pendingEvents() {
         return state.events.filter(function (e) { return !e.synced; }).map(function (e) { return Object.assign({}, e); });
@@ -588,6 +641,8 @@ function createLanServer(options) {
         stop: stop,
         status: status,
         forgetDevices: forgetDevices,
+        listDevices: listDevices,
+        removeDevice: removeDevice,
         pendingEvents: pendingEvents,
         markSynced: markSynced,
         get running() { return !!state.server; },

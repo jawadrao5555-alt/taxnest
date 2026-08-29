@@ -25,7 +25,7 @@
         android:icon="@drawable/ic_caller"
         android:theme="@style/Theme.TaxNestCaller"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".LoginActivity"
@@ -40,5 +40,12 @@
         <activity
             android:name=".MainActivity"
             android:exported="false" />
+
+        <!-- LAN Mode pairing (v1.7.0). exported=false: sirf apni app is ko
+             khol sakti hai — pairing ek dafa ka andar ka kaam hai. -->
+        <activity
+            android:name=".LanPairActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

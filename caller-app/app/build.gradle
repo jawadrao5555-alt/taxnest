@@ -36,8 +36,13 @@ android {
         //           nahi batati ke call aa rahi hai ya ja rahi hai (call milne
         //           ke baad sirf naam + timer bachta hai), is liye telephony se
         //           faisla: bina RINGING ke OFFHOOK = hum ne khud milai hai.
-        versionCode 7
-        versionName "1.6.0"
+        //   1.7.0 = LAN Mode. Internet band hone par ring shop ke apne PC
+        //           (NestPOS agent) ko jati hai, taake counter par popup phir
+        //           bhi aaye. Har ring ke saath ab ek uuid jata hai — dono
+        //           raston par wohi — warna line wapas aane par agent ka
+        //           replay usi call ka doosra popup bana deta.
+        versionCode 8
+        versionName "1.7.0"
     }
 
     // ── Builds (Task 1345 + 1346) — ek hi package id, ek hi keystore ────────

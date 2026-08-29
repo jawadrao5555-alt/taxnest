@@ -156,6 +156,27 @@
             android:textColor="#FFFFFF"
             android:backgroundTint="#0A4D5C" />
 
+        <!-- LAN Mode (v1.7.0): shop ke apne PC se juRne ka raasta. Yahan is
+             liye ke internet band hone par asal sawal yehi hota hai —
+             "counter par popup kyun nahi aaya". -->
+        <TextView
+            android:id="@+id/lanRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:textSize="13sp"
+            android:textColor="#344054" />
+
+        <Button
+            android:id="@+id/lanBtn"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="6dp"
+            android:text="@string/lan_btn"
+            android:textSize="14sp"
+            android:textColor="#0A4D5C"
+            android:backgroundTint="#E6F4F1" />
+
         <TextView
             android:id="@+id/lastSentRow"
             android:layout_width="match_parent"

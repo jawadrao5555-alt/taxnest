@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/lanRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F6F8F9"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/lan_title"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="#0A4D5C" />
+
+        <include
+            layout="@layout/view_lang_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginTop="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/lan_intro"
+            android:textSize="13sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="#475467" />
+
+        <TextView
+            android:id="@+id/lanStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="#FFFFFF"
+            android:padding="16dp"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#0A4D5C" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="@string/lan_ip_label"
+            android:textSize="13sp"
+            android:textColor="#344054" />
+
+        <EditText
+            android:id="@+id/lanIpInput"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="4dp"
+            android:background="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:hint="@string/lan_ip_hint"
+            android:inputType="text"
+            android:digits="0123456789.:"
+            android:maxLength="21"
+            android:textSize="15sp"
+            android:textColor="#101828"
+            android:textColorHint="#98A2B3"
+            android:importantForAutofill="no"
+            android:autofillHints=""
+            android:contentDescription="@string/lan_ip_label" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/lan_code_label"
+            android:textSize="13sp"
+            android:textColor="#344054" />
+
+        <EditText
+            android:id="@+id/lanCodeInput"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="4dp"
+            android:background="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:hint="@string/lan_code_hint"
+            android:inputType="number"
+            android:maxLength="6"
+            android:textSize="18sp"
+            android:letterSpacing="0.3"
+            android:textColor="#101828"
+            android:textColorHint="#98A2B3"
+            android:importantForAutofill="no"
+            android:autofillHints=""
+            android:contentDescription="@string/lan_code_label" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/lan_name_label"
+            android:textSize="13sp"
+            android:textColor="#344054" />
+
+        <EditText
+            android:id="@+id/lanNameInput"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="4dp"
+            android:background="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:inputType="text"
+            android:maxLength="60"
+            android:textSize="15sp"
+            android:textColor="#101828"
+            android:textColorHint="#98A2B3"
+            android:importantForAutofill="no"
+            android:autofillHints=""
+            android:contentDescription="@string/lan_name_label" />
+
+        <Button
+            android:id="@+id/lanPairBtn"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="20dp"
+            android:text="@string/lan_pair_btn"
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A4D5C" />
+
+        <Button
+            android:id="@+id/lanUnpairBtn"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="10dp"
+            android:text="@string/lan_unpair_btn"
+            android:textSize="13sp"
+            android:textColor="#B42318"
+            android:backgroundTint="#FEE4E2"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/lan_note"
+            android:textSize="12sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="#667085" />
+    </LinearLayout>
+</ScrollView>

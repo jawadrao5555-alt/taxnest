@@ -43,6 +43,8 @@ class MainActivity : BaseActivity() {
     private lateinit var permRow: TextView
     private lateinit var batteryRow: TextView
     private lateinit var lastSentRow: TextView
+    private lateinit var lanRow: TextView
+    private lateinit var lanBtn: Button
     private lateinit var permBtn: Button
     private lateinit var batteryBtn: Button
     private lateinit var testBtn: Button
@@ -71,6 +73,8 @@ class MainActivity : BaseActivity() {
         permRow = findViewById(R.id.permRow)
         batteryRow = findViewById(R.id.batteryRow)
         lastSentRow = findViewById(R.id.lastSentRow)
+        lanRow = findViewById(R.id.lanRow)
+        lanBtn = findViewById(R.id.lanBtn)
         permBtn = findViewById(R.id.permBtn)
         batteryBtn = findViewById(R.id.batteryBtn)
         testBtn = findViewById(R.id.testBtn)
@@ -81,6 +85,8 @@ class MainActivity : BaseActivity() {
         permBtn.setOnClickListener { Detector.request(this) }
 
         batteryBtn.setOnClickListener { openBatterySettings() }
+
+        lanBtn.setOnClickListener { startActivity(Intent(this, LanPairActivity::class.java)) }
 
         testBtn.setOnClickListener {
             testBtn.isEnabled = false
@@ -182,6 +188,15 @@ class MainActivity : BaseActivity() {
 
     private fun renderState() {
         welcomeText.text = getString(R.string.welcome_fmt, Prefs.userName(this), Prefs.companyName(this))
+
+        // LAN Mode: shop ko saaf nazar aaye ke internet band hone par kya hoga.
+        // Juda na ho to yeh line khamosh nahi rehti — usi lamhe pata chalna
+        // chahiye, na ke line girne ke baad.
+        lanRow.text = if (LanClient.isPaired(this)) {
+            getString(R.string.lan_row_on_fmt, Prefs.lanHost(this) ?: "")
+        } else {
+            getString(R.string.lan_row_off)
+        }
 
         val permOn = Detector.granted(this)
         permRow.text = if (permOn) getString(R.string.perm_on) else getString(R.string.perm_off)

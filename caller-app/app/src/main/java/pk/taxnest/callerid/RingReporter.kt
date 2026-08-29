@@ -2,6 +2,7 @@ package pk.taxnest.callerid
 
 import android.content.Context
 import org.json.JSONObject
+import java.util.UUID
 import kotlin.concurrent.thread
 
 /**
@@ -39,20 +40,76 @@ object RingReporter {
         val now = System.currentTimeMillis()
         if (!claim(ctx, (phone ?: "") + "|" + (name ?: ""), now)) return
 
+        // The ring's identity, minted ONCE and sent down whichever lane (or
+        // lanes) this call takes. Both the cloud and the shop PC dedupe on it,
+        // so a cloud POST whose reply was lost — followed by the LAN fallback —
+        // still shows the cashier exactly one popup. Without it the counter
+        // pops twice for one call the moment the line comes back.
+        val uuid = UUID.randomUUID().toString()
+
+        val lanReady = LanClient.isPaired(ctx)
+
+        // Lane order. During an outage the WiFi is still connected, so asking
+        // Android whether this network is validated is what stops every ring
+        // from burning the cloud's full timeout before trying a PC one metre
+        // away — the detector does not live that long. It is only a hint: if
+        // the lane we picked fails, the other one is still tried.
+        val cloudFirst = !lanReady || LanClient.looksOnline(ctx)
+
+        val delivered = if (cloudFirst) {
+            postCloud(ctx, token, uuid, phone, name, source, now) ||
+                (lanReady && postLan(ctx, uuid, phone, name, source, now))
+        } else {
+            postLan(ctx, uuid, phone, name, source, now) ||
+                postCloud(ctx, token, uuid, phone, name, source, now)
+        }
+
+        if (delivered) Prefs.setLastSentAt(ctx, now)
+    }
+
+    /** Cloud lane. true = the server took it. */
+    private fun postCloud(
+        ctx: Context,
+        token: String,
+        uuid: String,
+        phone: String?,
+        name: String?,
+        source: String,
+        now: Long,
+    ): Boolean {
         val payload = JSONObject()
             .put("phone", phone ?: JSONObject.NULL)
             .put("name", name ?: JSONObject.NULL)
             .put("source", source)
             .put("at", now)
+            .put("uuid", uuid)
 
         val (code, _) = ApiClient.post("/ring", payload, token)
         if (code == 401) {
             // Token rotate ho gaya (device revoke / dusre phone se login) —
             // yahan clear, agli app-open par login screen.
             Prefs.setToken(ctx, null)
-        } else if (code in 200..299) {
-            Prefs.setLastSentAt(ctx, now)
+            return false
         }
+        return code in 200..299
+    }
+
+    /** LAN lane — the shop's own PC. true = the PC took it. */
+    private fun postLan(
+        ctx: Context,
+        uuid: String,
+        phone: String?,
+        name: String?,
+        source: String,
+        now: Long,
+    ): Boolean {
+        val ok = try {
+            LanClient.ring(ctx, uuid, phone, name, source)
+        } catch (_: Exception) {
+            false // the fallback lane must never be the thing that crashes a detector
+        }
+        if (ok) Prefs.setLanLastOkAt(ctx, now)
+        return ok
     }
 
     /** Fire-and-forget wrapper for callers that are already alive (the listener service). */

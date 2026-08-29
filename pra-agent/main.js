@@ -937,6 +937,15 @@ ipcMain.handle('lan-forget-devices', () => {
   return lanInstance().status();
 });
 
+// The paired-device list never leaves this PC — it is IPC only, never a LAN
+// route, so a device on the shop WiFi cannot enumerate the shop's tablets.
+ipcMain.handle('lan-list-devices', () => lanInstance().listDevices());
+
+ipcMain.handle('lan-remove-device', (event, id) => {
+  const removed = lanInstance().removeDevice(id);
+  return { ok: removed, devices: lanInstance().listDevices(), status: lanInstance().status() };
+});
+
 // Silent-print bridge for the POS window (window.nestposDesktop.printHtml).
 // Accepts calls ONLY from the POS window itself — a stray/child page can
 // never feed paper to the shop printer.

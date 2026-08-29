@@ -366,6 +366,33 @@ class PosCallerIdController extends Controller
     }
 
     /** POST /api/caller-app/v1/ring {number?, name?, source, at?} */
+    /**
+     * Is pos_caller_events.offline_uuid actually there?
+     *
+     * Only a POSITIVE answer is remembered. A shop mid-migration would
+     * otherwise cache "no" into a long-lived worker and keep dropping ring
+     * identities long after the column landed (PROD schema drift, Aug 2026).
+     */
+    private static ?bool $callerUuidColumn = null;
+
+    private static function callerUuidColumn(): bool
+    {
+        if (self::$callerUuidColumn === true) {
+            return true;
+        }
+        $has = \Illuminate\Support\Facades\Schema::hasColumn('pos_caller_events', 'offline_uuid');
+        if ($has) {
+            self::$callerUuidColumn = true;
+        }
+        return $has;
+    }
+
+    /** Test seam — a schema change inside one process must be visible. */
+    public static function flushCallerUuidColumnCache(): void
+    {
+        self::$callerUuidColumn = null;
+    }
+
     public function appRing(Request $request)
     {
         $company = $this->companyFromToken($request);
@@ -376,6 +403,11 @@ class PosCallerIdController extends Controller
             'name' => 'nullable|string|max:120',
             'source' => 'nullable|string|in:sim,whatsapp',
             'at' => 'nullable|numeric',
+            // LAN Mode: the phone stamps every ring with its own identity and
+            // sends the SAME one down whichever lane it can reach. Without it a
+            // cloud POST that timed out but actually landed, followed by the
+            // LAN fallback, pops the same call twice on the counter.
+            'uuid' => 'nullable|string|max:64',
         ]);
 
         $this->touchDevice($company);
@@ -425,6 +457,29 @@ class PosCallerIdController extends Controller
         // pehli copy mein naam nahi tha aur baad wali mein hai to naam wahin
         // bhar do. "Haaliya calls" list ko naam mil jata hai, cashier ko doosra
         // popup nahi.
+        // Identity dedupe comes FIRST and is not time-boxed the way the
+        // heuristic below is: the uuid is a fact, not a guess. It is also the
+        // only thing that can catch the same ring arriving on the other lane.
+        $uuid = trim((string) $request->input('uuid', ''));
+        $uuidColumn = self::callerUuidColumn();
+        if ($uuid !== '' && $uuidColumn) {
+            $twin = DB::table('pos_caller_events')
+                ->where('company_id', $company->id)
+                ->where('offline_uuid', $uuid)
+                ->orderByDesc('id')
+                ->first();
+            if ($twin) {
+                // A later copy of the same ring often carries the name the
+                // first one lacked (telephony fires before the dialer's
+                // notification). Fill it in rather than dropping it.
+                if ($name !== null && trim((string) ($twin->caller_name ?? '')) === '') {
+                    DB::table('pos_caller_events')->where('id', $twin->id)
+                        ->update(['caller_name' => $name]);
+                }
+                return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'duplicate']);
+            }
+        }
+
         $recent = DB::table('pos_caller_events')
             ->where('company_id', $company->id)
             ->where('created_at', '>=', now()->subSeconds(self::DEDUPE_SECONDS))
@@ -440,14 +495,20 @@ class PosCallerIdController extends Controller
             return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'duplicate']);
         }
 
-        DB::table('pos_caller_events')->insert([
+        $row = [
             'company_id' => $company->id,
             'phone' => $phone,
             'caller_name' => $name,
             'source' => $request->input('source') === 'whatsapp' ? 'whatsapp' : 'sim',
             'ring_at' => $ringAt,
             'created_at' => now(),
-        ]);
+        ];
+        // Written only when the phone supplied one AND the column exists, so an
+        // older app and a pre-migration shop both keep working.
+        if ($uuid !== '' && $uuidColumn) {
+            $row['offline_uuid'] = $uuid;
+        }
+        DB::table('pos_caller_events')->insert($row);
 
         // Opportunistic purge (no cron dependency) — 1-in-10 lottery.
         if (random_int(1, 10) === 1) {

@@ -71,6 +71,31 @@ object Prefs {
     fun outgoingCallAt(c: Context): Long = sp(c).getLong("outgoing_call_at", 0L)
     fun setOutgoingCallAt(c: Context, v: Long) { sp(c).edit().putLong("outgoing_call_at", v).commit() }
 
+    /**
+     * LAN Mode (shop ka apna PC) — v1.7.0.
+     *
+     * Internet band ho to ring yahan jati hai. Teeno keys commit() par hain,
+     * apply() par nahi: ring ek BroadcastReceiver se bheji jati hai jiska
+     * process goAsync() khatam hote hi mar sakta hai — wohi wajah jo
+     * ringDedupe ki hai. Un-flushed apply() ka matlab hota: naya port ya
+     * mara hua token yaad hi na rehta.
+     *
+     * lan_host sirf private IPv4 hota hai (LanClient ka pehra). Port yaad
+     * rakha jata hai kyunki agent ka port shop badal sakti hai.
+     */
+    fun lanHost(c: Context): String? = sp(c).getString("lan_host", null)
+    fun setLanHost(c: Context, v: String?) { sp(c).edit().putString("lan_host", v).commit() }
+
+    fun lanPort(c: Context): Int = sp(c).getInt("lan_port", 8531)
+    fun setLanPort(c: Context, v: Int) { sp(c).edit().putInt("lan_port", v).commit() }
+
+    fun lanToken(c: Context): String? = sp(c).getString("lan_token", null)
+    fun setLanToken(c: Context, v: String?) { sp(c).edit().putString("lan_token", v).commit() }
+
+    /** Aakhri kamyab LAN ring — settings screen sach bol sake. */
+    fun lanLastOkAt(c: Context): Long = sp(c).getLong("lan_last_ok_at", 0L)
+    fun setLanLastOkAt(c: Context, v: Long) { sp(c).edit().putLong("lan_last_ok_at", v).commit() }
+
     /** Runtime permission maangi ja chuki hai? ("don't ask again" detect karne ke liye) */
     fun permAsked(c: Context): Boolean = sp(c).getBoolean("perm_asked", false)
     fun setPermAsked(c: Context, v: Boolean) = sp(c).edit().putBoolean("perm_asked", v).apply()

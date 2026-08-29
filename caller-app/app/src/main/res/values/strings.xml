@@ -95,4 +95,29 @@
     <string name="status_need_permission">Allow call permission first — tap the button below</string>
 
     <string name="howto_body">This app sends the number of every normal (SIM) call that reaches the shop\'s phone to your POS — a popup appears on the sale screen right away showing which customer is calling and what they bought before. You do not have to keep the app open, the phone just has to be on.\n\nThis build does not catch WhatsApp calls. If you need WhatsApp calls too, get the \"WhatsApp\" app from the download page on the website.</string>
+
+    <!-- ── LAN Mode (v1.7.0): shop ka apna PC ────────────────────────────── -->
+    <string name="lan_title">Shop PC (LAN Mode)</string>
+    <string name="lan_intro">If the shop internet goes down, this phone can send calls straight to the shop computer over the same WiFi — the popup keeps appearing on the counter. On that PC, open the NestPOS agent window and turn LAN Mode on; it shows an address and a 6-digit code. Type both here, once.</string>
+    <string name="lan_status_off">Not paired with any PC. Calls go to the cloud only.</string>
+    <string name="lan_status_on_fmt">Paired with %1$s (port %2$d). If the line goes down, calls go to this PC.</string>
+    <string name="lan_pairing">Pairing…</string>
+    <string name="lan_ip_label">Shop PC address (as shown in the agent window)</string>
+    <string name="lan_code_label">6-digit code</string>
+    <string name="lan_name_label">Name for this phone (optional)</string>
+    <string name="lan_pair_btn">Pair with the PC</string>
+    <string name="lan_unpair_btn">Unpair this PC</string>
+    <string name="lan_paired">Paired. This phone can now reach the counter even with the line down.</string>
+    <string name="lan_unpaired">Unpaired. Calls will go to the cloud only.</string>
+    <string name="lan_err_not_private">That is not a shop-network address. Type it exactly as the agent window shows it, for example 192.168.1.17.</string>
+    <string name="lan_err_no_agent">No NestPOS found at that address. Check that the PC is on, the agent window is open with LAN Mode turned on, and this phone is on the same WiFi.</string>
+    <string name="lan_err_bad_code">Wrong code. The agent window shows a fresh 6-digit code — use the one on the screen right now.</string>
+    <string name="lan_err_too_many">Too many wrong tries. Wait a few minutes, then try again.</string>
+    <string name="lan_note">The cloud stays in charge. While the internet is working the app uses it exactly as before — the PC is only the backup lane. The owner can unplug this phone at any time from the agent window on the PC.</string>
+    <string name="lan_row_off">Shop PC: not paired — calls stop if the internet goes down</string>
+    <string name="lan_row_on_fmt">✔ Shop PC paired (%1$s) — calls keep working without internet</string>
+    <string name="lan_btn">Shop PC (works without internet)</string>
+
+    <string name="lan_ip_hint" translatable="false">192.168.1.17</string>
+    <string name="lan_code_hint" translatable="false">144038</string>
 </resources>

@@ -56,4 +56,26 @@
     <string name="status_need_permission">Pehle call ki ijazat dein — neeche button dabayein</string>
 
     <string name="howto_body">Yeh app shop ke phone par aane wali aam (SIM) call ka number POS ko bhej deti hai — sale screen par foran popup aata hai ke kaun sa gaahak call kar raha hai aur us ki purani khareedari kya hai. App ko khula rakhne ki zaroorat nahi, bas phone on rahe.\n\nWhatsApp calls yeh build nahi pakadti. Agar WhatsApp calls bhi chahiyen to website ke download safhe se \"WhatsApp wali\" app lein.</string>
+
+    <!-- ── LAN Mode (v1.7.0): shop ka apna PC ────────────────────────────── -->
+    <string name="lan_title">Shop ka PC (LAN Mode)</string>
+    <string name="lan_intro">Shop ka internet band ho jaye to yeh phone calls seedha shop ke computer ko usi WiFi par bhej sakta hai — counter par popup aata rehta hai. Us PC par NestPOS agent ki window kholein aur LAN Mode on karein; wahan ek address aur 6 hindson ka code likha aata hai. Dono cheezein yahan ek dafa daal dein.</string>
+    <string name="lan_status_off">Kisi PC se juda nahi. Calls sirf cloud par ja rahi hain.</string>
+    <string name="lan_status_on_fmt">%1$s se juda hai (port %2$d). Line band ho to calls isi PC par jayengi.</string>
+    <string name="lan_pairing">Jorha ja raha hai…</string>
+    <string name="lan_ip_label">Shop ke PC ka address (jaisa agent window mein likha hai)</string>
+    <string name="lan_code_label">6 hindson ka code</string>
+    <string name="lan_name_label">Is phone ka naam (marzi ki baat)</string>
+    <string name="lan_pair_btn">PC se joRein</string>
+    <string name="lan_unpair_btn">Is PC se alag karein</string>
+    <string name="lan_paired">Jur gaya. Ab line band ho tab bhi yeh phone counter tak pohanch sakta hai.</string>
+    <string name="lan_unpaired">Alag kar diya. Ab calls sirf cloud par jayengi.</string>
+    <string name="lan_err_not_private">Yeh shop ke network ka address nahi hai. Bilkul wohi likhein jo agent window dikhati hai, misal ke tor par 192.168.1.17.</string>
+    <string name="lan_err_no_agent">Is address par NestPOS nahi mila. Dekh lein ke PC on hai, agent ki window khuli hai aur LAN Mode on hai, aur yeh phone usi WiFi par hai.</string>
+    <string name="lan_err_bad_code">Code ghalat hai. Agent window par har baar naya 6 hindson ka code aata hai — abhi jo screen par hai wohi daalein.</string>
+    <string name="lan_err_too_many">Bohat dafa ghalat code daala gaya. Chand minute rukein, phir koshish karein.</string>
+    <string name="lan_note">Cloud hi asal hai. Jab tak internet chal raha hai app usi par kaam karti hai — PC sirf backup raasta hai. Malik jab chahe PC ki agent window se is phone ko alag kar sakta hai.</string>
+    <string name="lan_row_off">Shop ka PC: juda nahi — internet band hote hi calls ruk jayengi</string>
+    <string name="lan_row_on_fmt">✔ Shop ka PC juda hai (%1$s) — internet ke baghair bhi calls chalti rahengi</string>
+    <string name="lan_btn">Shop ka PC (internet ke baghair chalta hai)</string>
 </resources>

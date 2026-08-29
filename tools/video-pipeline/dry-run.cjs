@@ -71,6 +71,13 @@ async function run(page, scene, a) {
         await page.evaluate((by) => window.scrollBy(0, by), a.by || 0);
         await page.waitForTimeout(250);
         break;
+      case 'clearCookies':
+        // Match record.cjs exactly for multi-role scenarios (waiter → cashier).
+        // Without this, /pos/login redirects back to the first logged-in role
+        // and every selector after the switch reports a misleading failure.
+        await page.context().clearCookies();
+        await page.waitForTimeout(200);
+        break;
       default: break;
     }
   } catch (e) {

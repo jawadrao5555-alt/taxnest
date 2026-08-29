@@ -1,0 +1,90 @@
+{
+  "slug": "waiter-to-sale",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Waiter se Cashier tak — Order aur Sale",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Waiter se Sale Complete",
+        "sub": "Table · Menu · Counter · Payment"
+      },
+      "narration": "السلام علیکم! آج ہم دیکھیں گے کہ ویٹر اپنی آئی ڈی سے ٹیبل کا آرڈر کیسے بناتا ہے، اور کیشیئر اسے وصول کر کے ادائیگی کے ساتھ سیل کیسے مکمل کرتا ہے۔",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_waiter_login",
+      "narration": "سب سے پہلے ویٹر اپنے موبائل یا ٹیبلٹ پر نیسٹ پی او ایس کھولے۔ اپنی ویٹر آئی ڈی اور پاس ورڈ لکھ کر سائن اِن کریں۔ ویٹر کی اپنی سادہ آرڈر اسکرین فوراً کھل جائے گی۔",
+      "actions": [
+        { "do": "clearCookies" },
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videowaiter@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "{{VIDEO_DEMO_PASS}}", "delay": 45 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1300 },
+        { "do": "waitFor", "selector": "button:has-text('SEND ORDER')" },
+        { "do": "wait", "ms": 900 }
+      ]
+    },
+    {
+      "id": "s03_table_and_items",
+      "narration": "آرڈر شروع کرنے سے پہلے ٹیبل منتخب کریں۔ ہم ٹیبل تین چنتے ہیں۔ اب گاھک کی پسند کے مینو آئٹمز شامل کریں۔ یہاں بیف پلاؤ، چکن ٹکہ اور فریش لائم آرڈر میں شامل ہو رہے ہیں، اور ٹوٹل خود بنتا جا رہا ہے۔",
+      "actions": [
+        { "do": "highlight", "selector": "button:has-text('Choose Table')", "after": 1200 },
+        { "do": "click", "selector": "button:has-text('Choose Table')", "after": 900 },
+        { "do": "waitFor", "selector": "div[x-show='showTables'] button:has-text('T-3')" },
+        { "do": "click", "selector": "div[x-show='showTables'] button:has-text('T-3')", "after": 900 },
+        { "do": "click", "selector": "button:visible:has-text('Beef Pulao')", "after": 850 },
+        { "do": "click", "selector": "button:visible:has-text('Chicken Tikka')", "after": 850 },
+        { "do": "click", "selector": "button:visible:has-text('Fresh Lime')", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s04_send_order",
+      "narration": "آرڈر مکمل ہو تو سینڈ آرڈر دبائیں۔ بس، آرڈر ٹیبل نمبر اور ویٹر کے نام کے ساتھ کاؤنٹر تک پہنچ گیا۔ کمزور انٹرنیٹ پر بھی ٹیبل کی اسکرین اب مسلسل لوڈنگ میں نہیں پھنسے گی، بلکہ واضح ری ٹرائی دکھائے گی۔",
+      "actions": [
+        { "do": "highlight", "selector": "button:has-text('SEND ORDER')", "after": 1400 },
+        { "do": "click", "selector": "button:has-text('SEND ORDER')", "after": 2200 },
+        { "do": "highlight", "selector": "button:has-text('My Orders')", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s05_cashier_opens",
+      "narration": "اب کیشیئر اپنے کاؤنٹر پر لاگ اِن کرتا ہے۔ ڈائن اِن کے ساتھ نیا ویٹر آرڈر نظر آ رہا ہے۔ ٹیبل لسٹ کھولیں، جامنی ٹیبل تین پر ویٹر کا نام اور رقم دیکھیں، پھر اسے کھولیں۔ پورا آرڈر فوراً کیشیئر کے کارٹ میں آ جاتا ہے۔",
+      "actions": [
+        { "do": "clearCookies" },
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "{{VIDEO_DEMO_PASS}}", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1400 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1600 },
+        { "do": "click", "selector": "button:visible:has-text('Dine In')", "after": 900 },
+        { "do": "waitFor", "selector": "div[x-show='showTablePicker'] button:has-text('T-3')" },
+        { "do": "highlight", "selector": "div[x-show='showTablePicker'] button:has-text('T-3')", "after": 1800 },
+        { "do": "click", "selector": "div[x-show='showTablePicker'] button:has-text('T-3')", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s06_payment",
+      "narration": "اب نیچے پے کا بٹن دبائیں۔ ادائیگی کی قسم منتخب کریں، مثلاً کیش۔ نیسٹ پی او ایس سیل مکمل کر دے گا، رسید تیار ہو جائے گی، اور اسی رسید پر ویٹر کا نام بھی محفوظ نظر آئے گا۔",
+      "actions": [
+        { "do": "highlight", "selector": "button:visible[\\@click='showPayModal = true']", "after": 1300 },
+        { "do": "click", "selector": "button:visible[\\@click='showPayModal = true']", "after": 900 },
+        { "do": "highlight", "selector": "div[x-show='showPayModal'] button:visible[\\@click*=\"processPayment('cash')\"]", "after": 1500 },
+        { "do": "click", "selector": "div[x-show='showPayModal'] button:visible[\\@click*=\"processPayment('cash')\"]", "after": 2600 },
+        { "do": "waitFor", "selector": "div[x-show='showReceipt']" },
+        { "do": "highlight", "selector": "div[x-show='showReceipt'] h3:has-text('Payment Complete')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": {
+        "heading": "آرڈر سے رسید تک",
+        "sub": "ویٹر اور کیشیئر، ایک ہی آسان فلو"
+      },
+      "narration": "یہ تھا ویٹر سے کیشیئر تک مکمل فلو۔ ویٹر ٹیبل پر آرڈر بنائے، کاؤنٹر اسے وصول کرے، ادائیگی چنے، اور سیل مکمل۔ نیسٹ پی او ایس کے ساتھ ریسٹورنٹ کا ہر آرڈر صاف اور تیز۔ شکریہ!",
+      "minMs": 5000
+    }
+  ]
+}

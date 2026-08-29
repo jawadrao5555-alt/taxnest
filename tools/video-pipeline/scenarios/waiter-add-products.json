@@ -1,0 +1,136 @@
+{
+  "slug": "waiter-add-products",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Waiter Order mein Mazeed Items — PRA POS",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Order mein Mazeed Items",
+        "sub": "PRA POS · Same order · One final bill"
+      },
+      "narration": "अस्सलामु अलैकुम! अगर customer order send होने के बाद कोई और item मांगे, waiter उसी order में mazeed products add कर सकता है। अलग billing नहीं बनेगी; cashier आखिर में एक ही PRA bill complete करेगा।",
+      "minMs": 6500
+    },
+    {
+      "id": "s02_waiter_login",
+      "narration": "सब से पहले waiter अपनी ID से login करे। यहां videowaiter की ID है। Login के बाद Waiter Tablet खुलता है और waiter table का order ले सकता है।",
+      "actions": [
+        { "do": "viewport", "width": 760, "height": 1000, "after": 500 },
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videowaiter@nestpos.pk", "delay": 50 },
+        { "do": "type", "selector": "#password", "text": "{{VIDEO_DEMO_PASS}}", "delay": 50 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1800 },
+        { "do": "waitFor", "selector": "h1:has-text('Waiter Tablet')" },
+        { "do": "highlight", "selector": "h1:has-text('Waiter Tablet')", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s03_first_order",
+      "narration": "पहले T-3 table चुनें और customer का पहला order बनाएं। Beef Pulao, Chicken Karahi Full और Fresh Lime select करके order तैयार है।",
+      "actions": [
+        { "do": "click", "selector": "[data-video='waiter-choose-table']", "after": 1200 },
+        { "do": "click", "selector": "div[x-show='showTables'] button[data-video='waiter-table']:has-text('T-3')", "after": 1300 },
+        { "do": "click", "selector": ".tn-waiter-grid button:has-text('Beef Pulao')", "after": 900 },
+        { "do": "click", "selector": ".tn-waiter-grid button:has-text('Chicken Karahi (Full)')", "after": 1100 },
+        { "do": "click", "selector": ".tn-waiter-grid button:has-text('Fresh Lime')", "after": 1100 },
+        { "do": "highlight", "selector": "[data-video='waiter-send-order']", "after": 1600 }
+      ]
+    },
+    {
+      "id": "s04_send_first",
+      "narration": "اب ORDER SEND KAREIN دبائیں۔ پہلا order counter کو چلا گیا اور T-3 occupied ہو گئی۔ اب customer کو Garlic Naan اور Soft Drink بھی چاہیے، تو اسی order میں واپس جا کر items add کریں گے۔",
+      "actions": [
+        { "do": "click", "selector": "[data-video='waiter-send-order']", "after": 3000 },
+        { "do": "click", "selector": "[data-video='waiter-my-orders']", "after": 1600 },
+        { "do": "waitFor", "selector": "div[x-show='showMyOrders']" },
+        { "do": "highlight", "selector": "div[x-show='showMyOrders']", "after": 1900 }
+      ]
+    },
+    {
+      "id": "s05_open_add_items",
+      "narration": "My Orders میں اسی order کے سامنے Add Items دبائیں۔ Waiter Tablet اب New Items mode میں آ گیا ہے، اور اوپر amber banner میں صاف لکھا ہے کہ items اسی order میں add ہوں گے۔",
+      "actions": [
+        { "do": "waitFor", "selector": "div[x-show='showMyOrders'] button:has-text('Add Items')" },
+        { "do": "highlight", "selector": "div[x-show='showMyOrders'] button:has-text('Add Items')", "after": 1800 },
+        { "do": "click", "selector": "div[x-show='showMyOrders'] button:has-text('Add Items')", "after": 1600 },
+        { "do": "waitFor", "selector": "[data-video='waiter-send-order']" },
+        { "do": "highlight", "selector": "[data-video='waiter-send-order']", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s06_add_products",
+      "narration": "اب صرف نئے items select کریں: Garlic Naan اور Soft Drink 345ml۔ پرانا order دوبارہ بنانے کی ضرورت نہیں۔ Cart میں صرف نئے items آ رہے ہیں اور button کا نام Add Items to Order ہو گیا ہے۔",
+      "actions": [
+        { "do": "click", "selector": ".tn-waiter-grid button:has-text('Garlic Naan')", "after": 1200 },
+        { "do": "click", "selector": ".tn-waiter-grid button:has-text('Soft Drink 345ml')", "after": 1200 },
+        { "do": "highlight", "selector": "[data-video='waiter-send-order']", "after": 2200 }
+      ]
+    },
+    {
+      "id": "s07_send_additions",
+      "narration": "اب Add Items to Order دبائیں۔ نئے products اسی held order میں شامل ہو گئے، kitchen کے لیے صرف نئی لائنوں کا delta KOT جائے گا، اور الگ bill نہیں بنے گا۔",
+      "actions": [
+        { "do": "click", "selector": "[data-video='waiter-send-order']", "after": 3200 },
+        { "do": "click", "selector": "[data-video='waiter-my-orders']", "after": 1500 },
+        { "do": "waitFor", "selector": "div[x-show='showMyOrders']" },
+        { "do": "highlight", "selector": "div[x-show='showMyOrders']", "after": 2200 }
+      ]
+    },
+    {
+      "id": "s08_cashier_login",
+      "narration": "اب cashier اپنی ID سے login کرے۔ وہ incoming waiter order کھولے گا۔ Waiter نے دو مرحلوں میں items بھیجے ہیں، مگر cashier کو پورا updated order ایک ہی sale میں ملے گا۔",
+      "actions": [
+        { "do": "clearCookies", "after": 300 },
+        { "do": "viewport", "width": 1920, "height": 1080, "after": 500 },
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 50 },
+        { "do": "type", "selector": "#password", "text": "{{VIDEO_DEMO_PASS}}", "delay": 50 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1800 },
+        { "do": "goto", "url": "/pos/invoice/create" },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1800 }
+      ]
+    },
+    {
+      "id": "s09_open_updated_order",
+      "narration": "Sale screen پر Dine In کھولیں اور T-3 select کریں۔ اب cart میں پہلا order اور بعد میں add کیے گئے دونوں products موجود ہیں۔ یہ ایک ہی updated order ہے۔",
+      "actions": [
+        { "do": "highlight", "selector": "button[data-video='counter-dine-in']", "after": 1800 },
+        { "do": "click", "selector": "button[data-video='counter-dine-in']", "after": 1500 },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "div[x-show='showTablePicker'] button[data-video='counter-table']", "after": 2100 },
+        { "do": "click", "selector": "div[x-show='showTablePicker'] button[data-video='counter-table']:has-text('T-3')", "after": 2800 }
+      ]
+    },
+    {
+      "id": "s10_one_pra_payment",
+      "narration": "Cashier پورا updated bill check کرے اور CASH دبائے۔ PRA POS اس پورے order کی ایک final billing بنائے گا؛ پہلے یا نئے item کے لیے الگ bill نہیں بنتا۔",
+      "actions": [
+        { "do": "highlight", "selector": "button[data-video='open-payment']", "after": 1800 },
+        { "do": "click", "selector": "button[data-video='open-payment']", "after": 1300 },
+        { "do": "highlight", "selector": "button[data-video='cash-payment']", "after": 1800 },
+        { "do": "click", "selector": "button[data-video='cash-payment']", "after": 4500 }
+      ]
+    },
+    {
+      "id": "s11_complete",
+      "narration": "Sale complete! ایک ہی receipt میں سارے items محفوظ ہیں، waiter order settle ہو گیا، اور T-3 available ہے۔ یہی طریقہ ہے customer کی بعد والی request کو اسی PRA bill میں شامل کرنے کا۔",
+      "actions": [
+        { "do": "wait", "ms": 1500 },
+        { "do": "highlight", "selector": "div[x-show='showReceipt']", "after": 2300 }
+      ]
+    },
+    {
+      "id": "s12_outro",
+      "card": {
+        "heading": "Mazeed Items, Same PRA Bill",
+        "sub": "Add Items · Delta KOT · One final payment"
+      },
+      "narration": "یاد رکھیں: Send Order کے بعد My Orders سے Add Items کھولیں، نئے products select کریں، اور Add Items to Order دبائیں۔ Final payment cashier لے گا اور PRA POS میں صرف ایک مکمل bill بنے گا۔ شکریہ!",
+      "minMs": 6500
+    }
+  ]
+}

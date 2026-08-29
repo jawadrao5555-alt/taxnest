@@ -797,6 +797,20 @@ function waiterApp() {
             }
         },
 
+        // A weak/briefly interrupted shop connection used to leave the table
+        // picker on "Loading..." forever because fetch() has no browser timeout.
+        // Keep the old list (if any), then let the existing offline/retry state
+        // explain the problem instead of making the waiter tap a dead screen.
+        async _fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        },
+
         async checkVersion() {
             if (this.updateAvailable || document.hidden) return;
             try {
@@ -1042,7 +1056,7 @@ function waiterApp() {
             try {
                 const headers = { 'Accept': 'application/json' };
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
-                const res = await fetch('/pos/waiter/api/tables', { headers });
+                const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
                 if (res.status !== 304) {
                     if (!res.ok) {
                         // Net/server down: purani list ZINDA rakho aur saaf batao ke
@@ -1224,7 +1238,7 @@ function waiterApp() {
             try {
                 const headers = { 'Accept': 'application/json' };
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
-                const res = await fetch('/pos/waiter/api/tables', { headers });
+                const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
                 if (res.status !== 304 && res.ok) {
                     const etag = res.headers.get('ETag');
                     if (etag) this._tableEtag = etag;
@@ -1407,7 +1421,7 @@ function waiterApp() {
             try {
                 const headers = { 'Accept': 'application/json' };
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
-                const res = await fetch('/pos/waiter/api/tables', { headers });
+                const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
                 if (res.status === 304) { this.tablesError = false; return; }
                 if (!res.ok) { this.tablesError = true; return; }
                 const etag = res.headers.get('ETag');

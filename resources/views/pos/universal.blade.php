@@ -8248,12 +8248,24 @@ function restaurantPos() {
         },
         // Task 1109: If-None-Match ETag fast-path — 304 means floor hasn't
         // changed; skip the body parse and leave tableFloors untouched.
+        // A weak/briefly interrupted shop connection must not leave the table
+        // board on "Loading..." forever. Preserve the last board and surface
+        // the existing retry state when the request exceeds the timeout.
+        async _fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        },
         async loadTableStatus() {
             this.tablesLoading = true;
             try {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._tableEtag) hdrs['If-None-Match'] = this._tableEtag;
-                const res = await fetch('/pos/restaurant/api/table-status', { headers: hdrs });
+                const res = await this._fetchWithTimeout('/pos/restaurant/api/table-status', { headers: hdrs });
                 if (res.status === 304) { this.tablesError = false; this.tablesLoading = false; return; }
                 if (!res.ok) { this.tablesError = true; this.tablesLoading = false; return; }
                 const etag = res.headers.get('ETag');
@@ -10881,7 +10893,7 @@ function restaurantPos() {
             try {
                 const hdrs = { 'Accept': 'application/json' };
                 if (this._incomingEtag) hdrs['If-None-Match'] = this._incomingEtag;
-                const res = await fetch('/pos/api/incoming-orders', { headers: hdrs });
+                const res = await this._fetchWithTimeout('/pos/api/incoming-orders', { headers: hdrs });
                 // Always capture KDS liveness — it's present on both 200 and 304.
                 const kdsAlive = res.headers.get('X-KDS-Alive');
                 if (kdsAlive !== null) this.kitchenSettings.kds_alive = (kdsAlive === '1');

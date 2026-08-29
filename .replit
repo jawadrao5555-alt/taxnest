@@ -117,11 +117,15 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash tools/video-pipeline/batch-stock-check.sh"
+args = "bash tools/video-pipeline/batch-lan-mode.sh"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8531
+externalPort = 3002
 
 [[ports]]
 localPort = 9000

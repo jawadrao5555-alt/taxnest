@@ -16,3 +16,4 @@ pra-agent/dist/taxnest-pra-agent-1.3.0-x64.nsis.7z filter=lfs diff=lfs merge=lfs
 pra-agent/dist/TaxNest-PRA-Agent-Windows-BETA.zip filter=lfs diff=lfs merge=lfs -text
 pra-agent/dist/linux-unpacked/taxnest-pra-agent filter=lfs diff=lfs merge=lfs -text
 pra-agent/dist/TaxNest-PRA-Agent-Windows-1.5.3.zip filter=lfs diff=lfs merge=lfs -text
+caller-app/TaxNest-PRA-Agent-Windows.zip filter=lfs diff=lfs merge=lfs -text

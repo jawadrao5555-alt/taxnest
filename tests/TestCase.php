@@ -16,6 +16,14 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        // Some app code arms a PHP execution timer for long web work
+        // (@set_time_limit(300) in the ZIP/audit-pack builders). Under PHPUnit
+        // that timer keeps running for the REST of the process, so every test
+        // after the one that touched such a builder dies with "Maximum
+        // execution time of 300 seconds exceeded" once the suite passes that
+        // mark. Disarm it per test — the runner, not the app, owns time here.
+        @set_time_limit(0);
+
         $this->assertTestEnvironmentIsIsolated();
     }
 

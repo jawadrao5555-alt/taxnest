@@ -30,6 +30,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const lanUi = require('./lan-ui');
 
 const DEFAULT_PORT = 8531;
 const MAX_EVENTS = 200;          // caller ring buffer cap (memory + disk)
@@ -37,6 +38,19 @@ const EVENT_TTL_MS = 6 * 60 * 60 * 1000;   // 6h — a stale ring is noise
 const PAIR_WINDOW_MS = 10 * 60 * 1000;
 const PAIR_MAX_TRIES = 10;       // per IP per window — a 6-digit code must not be brute-forceable
 const BODY_LIMIT = 256 * 1024;   // 256KB is plenty for an order payload
+
+// Every path that belongs to the JSON API. A browser GET to anything OUTSIDE
+// this list is treated as "someone typed the address wrong" and lands on the
+// pairing page; a browser GET to a path INSIDE it keeps answering exactly the
+// JSON it always did (the counter's caller lane must not change shape).
+const API_PATHS = [
+    '/lan/health',
+    '/lan/pair',
+    '/lan/unpair',
+    '/lan/whoami',
+    '/lan/caller/ring',
+    '/lan/caller/events',
+];
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -132,6 +146,9 @@ function writeJsonFile(file, value) {
  *   log       {function} (message, meta) sink
  *   version   {string}   agent version, reported by /lan/health
  *   shopName  {string}   label shown while pairing
+ *   isEnabled {function} optional () => bool — LAN Mode switch. Only the HTML
+ *                        door consults it (a disabled server is not listening
+ *                        at all, so this is belt-and-braces honesty).
  */
 function createLanServer(options) {
     const opts = options || {};
@@ -144,6 +161,11 @@ function createLanServer(options) {
     const extraOrigins = (Array.isArray(opts.allowedOrigins) ? opts.allowedOrigins : [])
         .map(function (o) { return String(o || '').trim().toLowerCase().replace(/\/+$/, ''); })
         .filter(Boolean);
+    // LAN Mode switch, asked fresh every request. Missing = enabled (the
+    // server only ever listens when the shop turned it on anyway).
+    const isEnabled = typeof opts.isEnabled === 'function'
+        ? function () { try { return !!opts.isEnabled(); } catch (e) { return true; } }
+        : function () { return true; };
 
     const state = {
         server: null,
@@ -185,6 +207,30 @@ function createLanServer(options) {
         Object.keys(headers || {}).forEach(function (k) { base[k] = headers[k]; });
         res.writeHead(status, base);
         res.end(body);
+    }
+
+    // The browser door. Same-origin only by construction: the page carries its
+    // own CSS/JS/icon inline, so nothing is fetched from anywhere else and the
+    // CSP below can stay tight. No CORS header — a page on ANOTHER origin must
+    // not be able to read this, exactly like the JSON API.
+    function sendHtml(res, status, html) {
+        res.writeHead(status, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Referrer-Policy': 'no-referrer',
+            'Content-Security-Policy':
+                "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; " +
+                "script-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
+        });
+        res.end(html);
+    }
+
+    // "Is this a human with a browser?" — a navigation always asks for HTML.
+    // fetch()/XHR from the POS or a phone app does not, so API callers keep
+    // getting JSON even on a path that would otherwise render the page.
+    function wantsHtml(req) {
+        return String((req.headers && req.headers.accept) || '').indexOf('text/html') !== -1;
     }
 
     // Which web pages may READ this server from a browser. Deliberately a tiny
@@ -372,9 +418,38 @@ function createLanServer(options) {
         // Rule 3: a request from outside the shop's own network never gets in.
         if (!isPrivateAddress(ip)) {
             log('LAN request refused from non-private address ' + ip);
+            if (req.method === 'GET' && wantsHtml(req)) {
+                sendHtml(res, 403, lanUi.messagePage(
+                    'Yeh address sirf shop ke WiFi se khulta hai',
+                    'Aap shop ke apne network se bahar hain, is liye yeh page nahi khul sakta.',
+                    'Shop ki apni WiFi se juri hui device par yeh address kholein.'
+                ));
+                return;
+            }
             send(res, 403, { ok: false, error: 'lan_only' });
             return;
         }
+
+        // The human door. A browser navigation to the address the agent
+        // advertises (or to any path that is not part of the JSON API) lands on
+        // the pairing/status page instead of a raw JSON blob. Everything on
+        // API_PATHS answers byte-identically to before.
+        if (req.method === 'GET' && API_PATHS.indexOf(route_) === -1 && (route_ === '/' || wantsHtml(req))) {
+            if (!isEnabled()) {
+                sendHtml(res, 503, lanUi.messagePage(
+                    'LAN Mode band hai',
+                    'Shop ke PC par NestPOS agent mein LAN Mode band kar diya gaya hai.',
+                    'Agent window kholein aur "LAN Mode chalu karein" par tick lagayein.'
+                ));
+                return;
+            }
+            sendHtml(res, 200, lanUi.appPage());
+            return;
+        }
+
+        // Browsers ask for this on every page load — answer quietly instead of
+        // logging a 404 for it.
+        if (route_ === '/favicon.ico' && req.method === 'GET') { send(res, 204, null); return; }
 
         // Discovery ping — deliberately says nothing about the shop.
         if (route_ === '/lan/health' && req.method === 'GET') {
@@ -416,6 +491,16 @@ function createLanServer(options) {
         }
         if (route_ === '/lan/whoami' && req.method === 'GET') {
             send(res, 200, { ok: true, name: auth.device.name, kind: auth.device.kind });
+            return;
+        }
+        // A device drops ITSELF (status page button). Only its own token goes —
+        // never anyone else's; clearing every device stays an agent-window job.
+        if (route_ === '/lan/unpair' && req.method === 'POST') {
+            const name = auth.device.name;
+            delete state.devices[auth.token];
+            persistDevices();
+            log('LAN device removed itself: ' + name);
+            send(res, 200, { ok: true });
             return;
         }
 

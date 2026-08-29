@@ -338,6 +338,10 @@ function lanInstance() {
       dataDir: app.getPath('userData'),
       port: getLanSettings().port,
       version: app.getVersion(),
+      // Asked fresh on every browser hit, so a device that opens the address
+      // right after the shop switched LAN Mode off reads a plain sentence
+      // instead of a half-alive page.
+      isEnabled: () => getLanSettings().enabled,
       log: (m) => console.log('[lan]', m),
     });
   }

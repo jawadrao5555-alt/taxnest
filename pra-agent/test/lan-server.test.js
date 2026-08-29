@@ -174,6 +174,129 @@ function j(res) { return res.json(); }
         assert.strictEqual(after.events.length, 0, 'cursor must not replay');
     });
 
+    /* ---- the browser door (Task 1533) ----------------------------------- */
+
+    const HTML = { Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' };
+
+    await it('the advertised address opens a page, never raw JSON', async function () {
+        const res = await fetch(base + '/', { headers: HTML });
+        assert.strictEqual(res.status, 200);
+        assert.match(String(res.headers.get('content-type')), /text\/html/);
+        const html = await res.text();
+        assert.match(html, /NestPOS/);
+        assert.match(html, /Pairing code/i, 'the page must ask for the code');
+        assert.match(html, /id="pairForm"/);
+        // Rule: nothing about the shop before pairing.
+        assert.ok(html.indexOf(server.status().pair_code) === -1, 'the page must never contain the code itself');
+        assert.ok(!/juday huay devices/i.test(html), 'no device count before pairing');
+    });
+
+    await it('a mistyped path still lands on the page, and a bare probe still gets JSON', async function () {
+        const page = await fetch(base + '/waiter', { headers: HTML });
+        assert.strictEqual(page.status, 200);
+        assert.match(String(page.headers.get('content-type')), /text\/html/);
+
+        // No Accept: text/html = not a browser navigation = the old JSON
+        // contract, byte for byte (an unpaired caller still hits the token
+        // gate before it can reach the 404).
+        const probe = await fetch(base + '/waiter', { headers: { Accept: 'application/json' } });
+        assert.strictEqual(probe.status, 401);
+        assert.strictEqual((await j(probe)).error, 'pair_required');
+
+        const known = await fetch(base + '/nope?t=' + token, { headers: { Accept: 'application/json' } });
+        assert.strictEqual(known.status, 404, 'a paired caller still gets the plain 404');
+        assert.strictEqual((await j(known)).error, 'not_found');
+    });
+
+    await it('API paths keep their exact JSON even from a browser', async function () {
+        const health = await fetch(base + '/lan/health', { headers: HTML });
+        assert.match(String(health.headers.get('content-type')), /application\/json/);
+        const body = await j(health);
+        assert.strictEqual(body.app, 'nestpos-lan');
+        assert.ok(!('devices' in body) && !('pair_code' in body), 'health must stay anonymous');
+
+        const who = await fetch(base + '/lan/whoami', { headers: HTML });
+        assert.strictEqual(who.status, 401);
+        assert.strictEqual((await j(who)).error, 'pair_required');
+    });
+
+    await it('LAN Mode switched off reads as a sentence, not a blob', async function () {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-off-'));
+        let on = false;
+        const off = createLanServer({
+            dataDir: dir, port: 0, version: '9.9.9', log: function () {},
+            isEnabled: function () { return on; },
+        });
+        const s = await off.start();
+        const res = await fetch('http://127.0.0.1:' + s.port + '/', { headers: HTML });
+        assert.strictEqual(res.status, 503);
+        const html = await res.text();
+        assert.match(html, /LAN Mode band hai/);
+        assert.ok(html.indexOf('{') === -1 || !/"ok"\s*:/.test(html), 'no JSON blob on the page');
+        // The switch is read fresh, not cached at construction.
+        on = true;
+        assert.strictEqual((await fetch('http://127.0.0.1:' + s.port + '/', { headers: HTML })).status, 200);
+        await off.stop();
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    await it('pairing from the page works end to end, and a wrong code is counted', async function () {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-page-'));
+        const srv = createLanServer({ dataDir: dir, port: 0, version: '9.9.9', log: function () {} });
+        const s = await srv.start();
+        const at = 'http://127.0.0.1:' + s.port;
+        const post = function (payload) {
+            return fetch(at + '/lan/pair', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        };
+
+        // What the page does when the shopkeeper fat-fingers the code.
+        const wrong = await post({ code: '000001', device: 'Tablet', kind: 'waiter' });
+        assert.strictEqual(wrong.status, 403);
+        assert.strictEqual((await j(wrong)).error, 'bad_code');
+
+        const code = srv.status().pair_code;
+        const good = await post({ code: code, device: 'Waiter Tablet 2', kind: 'waiter' });
+        assert.strictEqual(good.status, 200);
+        const tok = (await j(good)).token;
+        assert.ok(tok, 'token issued to the page');
+        assert.strictEqual(srv.status().devices, 1, 'agent window count goes up');
+        assert.notStrictEqual(srv.status().pair_code, code, 'a fresh code waits for the next device');
+
+        // Re-opening the address on THIS device: the page asks whoami first and
+        // goes straight to status.
+        const who = await fetch(at + '/lan/whoami', { headers: { 'X-Lan-Token': tok } });
+        assert.strictEqual(who.status, 200);
+        assert.strictEqual((await j(who)).name, 'Waiter Tablet 2');
+        // …and the status page can read this PC's recent calls with its token.
+        assert.strictEqual((await fetch(at + '/lan/caller/events?after=0', {
+            headers: { 'X-Lan-Token': tok },
+        })).status, 200);
+
+        // The device drops ITSELF from the status page.
+        const bye = await fetch(at + '/lan/unpair', { method: 'POST', headers: { 'X-Lan-Token': tok } });
+        assert.strictEqual(bye.status, 200);
+        assert.strictEqual(srv.status().devices, 0);
+        assert.strictEqual((await fetch(at + '/lan/whoami', { headers: { 'X-Lan-Token': tok } })).status, 401);
+        // An unpair with no token can never remove somebody else's device.
+        assert.strictEqual((await fetch(at + '/lan/unpair', { method: 'POST' })).status, 401);
+
+        await srv.stop();
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    await it('the page itself is same-origin only — no CORS, no outside assets', async function () {
+        const res = await fetch(base + '/', { headers: { Accept: 'text/html', Origin: 'https://taxnest.com.pk' } });
+        assert.strictEqual(res.headers.get('access-control-allow-origin'), null,
+            'the page must not be readable from another origin');
+        const html = await res.text();
+        assert.ok(!/src="https?:\/\//.test(html) && !/href="https?:\/\//.test(html),
+            'the page must not load anything from outside this server');
+    });
+
     await it('pending rings survive for the cloud sync, and clear once pushed', function () {
         const pending = server.pendingEvents();
         assert.strictEqual(pending.length, 1);

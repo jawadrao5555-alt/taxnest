@@ -252,7 +252,9 @@
     <p style="font-size:12px; color:#c4b5fd; margin-bottom:12px; line-height:1.6;">
       Internet band ho jaye tab bhi waiter tablet aur Caller ID phone isi PC se juday rehte hain —
       wohi WiFi, sirf IP ke zariye. Net wapas aate hi sab kuch khud-ba-khud cloud par chala jata hai.
-      Yeh switch band ho to agent bilkul pehle jaisa chalta hai.
+      Yeh switch band ho to agent bilkul pehle jaisa chalta hai.<br>
+      <b style="color:#ede9fe;">Device jorne ka tareeqa:</b> device ke browser mein neeche diya gaya address kholein —
+      NestPOS ka pairing page khulega jo neeche wala 6 hindson ka code maangega. Bas wohi code daal dein.
     </p>
     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:10px; font-size:13px; color:#fff;">
       <input type="checkbox" id="lanEnabled" style="width:auto; margin:0;">
@@ -626,12 +628,20 @@
         (st.error ? ' (' + st.error + ')' : '') + ' — koi doosra program yeh port istemal kar raha ho sakta hai.</span>';
       return;
     }
-    const urls = (st.urls || []).map((u) => '<b>' + u + '</b>').join('<br>') || '<b>(is PC ka koi network address nahi mila)</b>';
+    const urls = (st.urls || [])
+      .map((u) => '<b style="font-size:15px; color:#fff; letter-spacing:.3px;">' + u + '</b>')
+      .join('<br>') || '<b style="color:#fca5a5;">(is PC ka koi network address nahi mila)</b>';
     box.innerHTML =
       '<span style="color:#10b981;">Local server chal raha hai.</span><br>' +
-      'Tablet par yeh address kholein:<br>' + urls + '<br>' +
-      'Pairing code: <b style="font-size:15px; letter-spacing:2px;">' + (st.pair_code || '------') + '</b> ' +
-      '<span style="color:#c4b5fd;">(har device ke liye naya code banta hai)</span><br>' +
+      '<span style="color:#c4b5fd;">1.</span> Tablet ya phone ke browser mein yeh address kholein ' +
+      '<span style="color:#c4b5fd;">(wohi WiFi par):</span><br>' +
+      '<div style="margin:4px 0 8px 14px;">' + urls + '</div>' +
+      '<span style="color:#c4b5fd;">2.</span> Wahan NestPOS ka pairing page khulega aur yeh code maangega:<br>' +
+      '<div style="margin:4px 0 8px 14px;">' +
+      '<b style="font-size:24px; letter-spacing:6px; color:#fff;">' + (st.pair_code || '------') + '</b>' +
+      '</div>' +
+      '<span style="color:#c4b5fd;">Code sirf ek device ke liye hai — pair hote hi agla naya code ban jata hai. ' +
+      'Ek baar juda device dobara code nahi maangta.</span><br>' +
       'Juday huay devices: <b>' + (st.devices || 0) + '</b>';
   }
 

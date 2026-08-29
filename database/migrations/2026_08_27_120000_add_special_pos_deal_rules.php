@@ -40,14 +40,17 @@ return new class extends Migration
             if (Schema::hasTable($tableName)) {
                 continue;
             }
-            Schema::create($tableName, function (Blueprint $table) {
+            Schema::create($tableName, function (Blueprint $table) use ($tableName) {
                 $table->id();
                 $table->unsignedBigInteger('company_id')->index();
                 $table->unsignedBigInteger('deal_id')->index();
                 $table->date('usage_date');
                 $table->unsignedInteger('units_used')->default(0);
                 $table->timestamps();
-                $table->unique(['company_id', 'deal_id', 'usage_date'], 'deal_usage_day_unique');
+                // Index names are per-table in MySQL but GLOBAL in SQLite, so one
+                // shared name for both usage tables blows up the second create on
+                // the test database ("index deal_usage_day_unique already exists").
+                $table->unique(['company_id', 'deal_id', 'usage_date'], $tableName . '_day_unique');
             });
         }
     }

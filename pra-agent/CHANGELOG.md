@@ -1,5 +1,16 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.10.0 (2026-08-29)
+**LAN Mode: ab tablet/phone par asal pairing screen khulti hai (Task 1533)**
+
+- **Nayi pairing screen**: LAN Mode chalu hone par agent jo address batata hai (masalan `http://192.168.1.17:8531`) — usay tablet ya phone ke browser mein kholne par ab NestPOS ka apna, phone-size pairing page khulta hai. Pehle wahan sirf `{"ok":false,"error":"pair_required"}` jaisa raw JSON aata tha, is liye koi device pair ho hi nahi sakti thi.
+- Page par 6 hindson ka code, device ka naam aur device ka kaam (waiter tablet / Caller ID phone / counter) poochha jata hai. Sahi code daaltay hi device pair ho jati hai, agent window mein "Juday huay devices" barh jata hai aur agle device ke liye naya code ban jata hai.
+- **Ek dafa pair, hamesha pair**: wohi device dobara yeh address kholay to seedha uska status page khulta hai — code dobara nahi maanga jata.
+- **Status page**: agent version, is device ka naam, server theek chal raha hai ya nahi, aur is PC par aayi hui recent calls (khud ba khud refresh hoti hain). Sath hi "Is device ko hata dein" — device khud ko unpair kar ke naye sire se pair kar sakti hai.
+- **Har masla saada jumlay mein**: ghalat code, bar bar ghalat koshishein (10 minute ka lock), LAN Mode band, server band, aur shop ke network se bahar se aaya hua request — sab ka jawab ab ek chhota sa Roman Urdu jumla hai, JSON blob nahi.
+- **Security waisi hi**: pair honay se pehle page shop ka naam, device count ya code — kuch nahi batata; page ka poora CSS/JS isi server se aata hai (bahar se kuch load nahi hota); JSON API, uske CORS rules aur counter ka caller-popup lane bilkul pehle jaisa hai.
+- Agent window ka LAN card ab saaf batata hai ke device par kya hoga: address kholein → page code maangega → wohi code daal dein. Address aur code dono bara kar ke dikhaye jate hain.
+
 ## v1.9.1 (2026-08-19)
 **Setup-form Save hardening — unchanged re-save never re-activates silent printing**
 

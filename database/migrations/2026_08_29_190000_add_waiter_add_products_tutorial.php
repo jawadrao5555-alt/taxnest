@@ -26,7 +26,7 @@ return new class extends Migration
             'min_role' => 'any',
             'required_feature' => 'restaurant',
             'show_public' => true,
-            'duration_seconds' => 170,
+            'duration_seconds' => 190,
         ];
 
         $existing = DB::table('tutorial_videos')->where('slug', $row['slug'])->first();

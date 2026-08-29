@@ -1,10 +1,25 @@
 # TaxNest Caller ID APK — Build & Release Runbook
 
-Last updated: 24 Aug 2026 (v1.5.0 — the real number comes back on the plus
-build; v1.4.0 added call back from the POS, website builds only; v1.3.0 was the
-English / Roman Urdu / Urdu language switch)
+Last updated: 29 Aug 2026 (v1.7.0 — LAN Mode: the ring reaches the counter over
+the shop's own WiFi when the internet is down; v1.6.0 stopped the popup on
+OUTGOING calls; v1.5.0 brought the real number back on the plus build)
 
-> **Hosted right now: v1.5.0 (versionCode 6), since 23 Aug 2026.**
+> **BUILT BUT NOT YET THE DEFAULT: v1.7.0 (versionCode 8), 29 Aug 2026.**
+> Only the two **versioned** files are on the server —
+> `taxnest-caller-1.7.0.apk` and `taxnest-caller-plus-1.7.0.apk`. The canonical
+> names (`taxnest-caller.apk` / `taxnest-caller-plus.apk`) and both admin
+> version settings are deliberately **still on 1.5.0**, so no shop phone is
+> prompted to update yet: 1.7.0's LAN lane cannot be proved in this container
+> (it needs a real phone, a real counter PC and the line actually pulled), so
+> the owner tests the versioned URLs on his own phone first. Finishing the
+> rollout afterwards is three commands: `cp` the versioned files over the
+> canonical names, flip both settings to `1.7.0`, run
+> `php artisan apps:check-release-drift --app=caller --app=caller_plus`.
+>
+> **v1.6.0 (versionCode 7) was never hosted at all** — it goes to shops inside
+> the 1.7.0 rollout, exactly the way 1.2.0 and 1.3.0 rode out inside 1.4.0.
+
+> **Previously hosted: v1.5.0 (versionCode 6), since 23 Aug 2026.**
 > Both website APKs (`taxnest-caller.apk` + `taxnest-caller-plus.apk`) and both
 > admin version settings are on 1.5.0, so a phone on any older build sees the
 > update prompt. 1.5.0 is what fixed `No phone` on the plus build; the 1.4.0
@@ -422,7 +437,12 @@ H=taxnestc@cpanel.taxnest.com.pk
 # keep a versioned copy (the previous build stays as a rollback file), then
 # point the canonical names the download page uses at the new builds.
 # V = the versionName you just built — never re-use the previous release's name.
-V=1.4.0
+#
+# BETA UPLOAD (what 1.7.0 did on 29 Aug 2026): run ONLY the two scp lines and
+# stop. The versioned URLs are then downloadable for a real-phone test while
+# every shop stays on the canonical file it already has. Run the ssh line and
+# flip the settings only AFTER that test passes.
+V=1.7.0
 scp $SCP caller-app/app/build/outputs/apk/sim/release/app-sim-release.apk   $H:public_html/public/downloads/taxnest-caller-$V.apk
 scp $SCP caller-app/app/build/outputs/apk/plus/release/app-plus-release.apk $H:public_html/public/downloads/taxnest-caller-plus-$V.apk
 ssh ${SCP/-P/-p} $H "cd public_html/public/downloads \
@@ -445,10 +465,26 @@ cd /home/runner/workspace && bash scripts/apk-release-check.sh \
   /tmp/taxnest-caller.apk /tmp/taxnest-caller-plus.apk
 ```
 
+During a beta upload the canonical names still hold the OLD build, so download
+the **versioned** URLs instead and expect the new numbers — that is what proves
+the upload, e.g. for 1.7.0:
+
+```bash
+cd /tmp && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller-1.7.0.apk \
+        && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller-plus-1.7.0.apk
+cd /home/runner/workspace && bash scripts/apk-release-check.sh \
+  --expect-version 1.7.0 --expect-code 8 \
+  /tmp/taxnest-caller-1.7.0.apk /tmp/taxnest-caller-plus-1.7.0.apk
+```
+
 md5 the downloads against the build outputs too — equal md5 is the only proof
 the canonical name points at the new build and not at a half-finished upload.
 
-v1.4.0 is hosted and live (21 Aug 2026, Task 1362): `taxnest-caller.apk` serves
+As of 29 Aug 2026 the canonical names serve **1.5.0** and the newest files on
+the server are the versioned `taxnest-caller-1.7.0.apk` /
+`taxnest-caller-plus-1.7.0.apk` (beta upload — see the box at the top).
+
+v1.4.0 was hosted and live (21 Aug 2026, Task 1362): `taxnest-caller.apk` served
 the clean build, `taxnest-caller-plus.apk` the plus build, `taxnest-caller-1.4.0.apk`
 / `taxnest-caller-plus-1.4.0.apk` are the versioned copies, and the 1.1.0 (and
 clean-only 1.0.0) files stay beside them as rollback.
@@ -574,6 +610,8 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 
 | Version | versionCode | Notes |
 |---------|-------------|-------|
+| 1.7.0 | 8 | **LAN Mode — the ring survives a dead internet line.** Until now a ring only ever went to the cloud, so the moment the shop's line dropped the counter popup stopped with it. The phone can now also post the ring **straight to the shop's own PC** over the same router: new `LanClient` (agent discovery across the paired host's ports, pairing with a 6-digit code shown in the NestPOS agent window), `LanPairActivity` + its screen, `Prefs` fields for the paired host/token, and a `RingReporter` that tries LAN and cloud as two lanes for the same ring. Three rules that must not be "simplified" later: (1) **the LAN lane is capped at a fixed 8 s wall clock** (`RING_BUDGET_MS`) — a ring is reported from a detector Android will not wait on forever, and the cloud lane still needs its turn afterwards; (2) the phone only ever talks to a **private** address (`10.x`, `172.16–31.x`, `192.168.x`, `169.254.x` link-local) — `127.x` is deliberately **not** on the list, because another app on the same phone could otherwise stand up a listener, harvest the LAN token and read customer numbers in cleartext; (3) every ring carries an `offline_uuid` so the same call arriving on both lanes is stored once — server side that is a unique key on `pos_caller_events`, and the insert catches the lost race and answers `duplicate` instead of a 500 the phone would retry. The uuid is checked **first**, the ~20 s number/name heuristic second, and that order must stay: a uuid is minted per *report attempt*, not per call, so Android's telephony-then-notification reposts legitimately carry different uuids and only the heuristic catches those. Needs the desktop agent on **v1.11.0+** (LAN Mode switch + named device list). Cable or WiFi makes no difference — only "same router" does. **Built 29 Aug 2026, versioned files uploaded, canonical names and both settings still on 1.5.0** pending the owner's real cable-pull test. |
+| 1.6.0 | 7 | **No popup on an OUTGOING call.** A dialer notification does not say which direction the call is going — once it connects, all that is left on it is a name and a timer, which reads exactly like an incoming call, so the counter got a customer popup every time the shop rang somebody. Telephony now decides: `OFFHOOK` with no `RINGING` before it means **we** dialled, and that call reports nothing. The code had already landed earlier but never reached a build — the APKs were stuck on versionCode 6, which is the whole reason this row exists separately. **Never hosted on its own**; it reaches shops inside the 1.7.0 rollout. |
 | 1.4.0 | 5 | **Call back from the POS** (Task 1381) — website builds only. New `CallerApp` + `DialWatchService` (foreground `dataSync`, ~5 s poll of `GET /dial-requests`, interval server-tunable via `poll_ms`) + `DialActivity` (tap → `ACTION_DIAL`, never `CALL_PHONE`) + `DialBootReceiver`, all in `src/web/`. Four new permissions, **none** on Play Protect's blocked list. The poll carries a `notif` flag (notifications enabled + offer channel not muted) — a muted phone stays `dial_seen_at`-fresh but loses `supports_dial`, so POS falls back to the copy-number card instead of a silent "sent", and the app toasts the reason once per launch. `/dial-result` is bound to the device that claimed the row. **`src/play/` untouched — the Play build gets no call back and no new permission.** Server side: `pos_caller_dial_requests` queue + `called_back_at` on ring events. Bump `caller_app_latest_version` **and** `caller_app_plus_latest_version` to `1.4.0` so signed-in website phones self-update — until then a phone on an older build makes POS show the "app purani hai" fallback, which is expected, not a bug. **Built, hosted and both settings flipped on 21 Aug 2026 (Task 1362)** — this is the build the website serves today, and it is the first hosted APK to carry the 1.2.0 disclosure screen and the 1.3.0 language switch. |
 | 1.5.0 | 6 | **The number comes back on the plus build.** A shop that installed the plus APK started seeing `No phone` on ordinary SIM calls: the plus build had no telephony detector, so a SIM ring was only ever read from the dialer's *notification*, and a dialer shows the saved contact's **name** where the number would be. Two changes, both plus-only: (1) `PhoneStateReceiver` moved out of `src/sim/java` into a new shared `src/telephony/java` source set that `sim` **and** `plus` compile (the whole `src/sim/java` could not be added — `Detector.kt` exists in both sets and would be a redeclaration), so the plus build reports SIM rings from Android telephony with the real number; `CallListenerService` now drops dialer notifications whenever those telephony permissions are granted, or one ring would post twice. (2) WhatsApp still gives a name and no number for saved contacts, so `ContactNumberLookup` (new, `src/plus/java`, `READ_CONTACTS`) resolves that name against the phone's own contact list — exact display-name match only, and only when every match shares one number, otherwise it stays name-only. `ExtraPerms` (in `src/main`) asks for whatever of `READ_PHONE_STATE` / `READ_CALL_LOG` / `READ_CONTACTS` **this APK actually declares**, so the clean and Play builds are untouched by it. **`src/play/` gets none of it** — no telephony source set, no contacts permission, a no-op `ContactNumberLookup` beside the no-op `Updater`; `scripts/play-build-check.sh` already fails the AAB on `PhoneStateReceiver` or `READ_CALL_LOG`, so the guard covers the regression. Contacts never leave the phone: only the caller's own number is posted. |
 | 1.3.0 | 4 | **Language switch** (Task 1382): the whole app is now English / Roman Urdu / Urdu, picked from a compact three-way selector on the login **and** main screens. **A fresh install opens in English** whatever the phone's language is; the choice is saved on the phone and survives app restarts, logout/login and updates. Every user-visible line is translated — login and its errors, status, battery and permission lines with their toasts, the test-ring button and toast, "Last call sent: …", the update prompts and their download toasts, log out, and the whole "how does this work" paragraph — plus the notification-access **disclosure screen** in both notification builds, saying exactly the same five things in all three languages. The two-line build badge became one translated line per build (the old Roman recap lines are gone — the user picks a language now). Detection, permissions and the POS payload are untouched. **Never hosted under its own version number** — it reached shops inside the 1.4.0 rollout (Task 1362), and the What's New elaan telling shops the app now speaks all three languages went out on 21 Aug 2026 (Task 1387). |

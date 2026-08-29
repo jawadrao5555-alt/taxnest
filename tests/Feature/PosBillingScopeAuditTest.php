@@ -54,6 +54,11 @@ class PosBillingScopeAuditTest extends TestCase
             $table->string('company_status')->default('active');
             $table->boolean('is_internal_account')->default(false);
             $table->string('product_type')->nullable();
+            // PRA reporting switch — user-level value overrides this company
+            // default when a cashier is assigned Online/Offline.
+            $table->boolean('pra_reporting_enabled')->default(true);
+            $table->string('ntn')->nullable();
+            $table->string('pos_integration_mode')->default('pra');
             // Billing scope permission switch (07 Aug 2026)
             $table->boolean('billing_scope_admin_enabled')->default(false);
             $table->softDeletes();
@@ -204,6 +209,89 @@ class PosBillingScopeAuditTest extends TestCase
         $controller->storeCashier($request);
 
         $this->assertSame(0, AuditLog::count(), 'No audit row when no scope is passed');
+    }
+
+    public function test_togglePra_writes_audit_log_for_the_acting_user(): void
+    {
+        $this->makeCompany(['ntn' => '1234567890123']);
+        $owner = $this->loginAs([
+            'role' => 'company_admin',
+            'pos_role' => 'pos_admin',
+            'pra_reporting_enabled' => true,
+        ]);
+        $this->bindCompany();
+
+        $response = (new PosController())->togglePra($this->makeRequest('POST'));
+
+        $this->assertTrue($response->getData(true)['success']);
+        $this->assertFalse($response->getData(true)['enabled']);
+        $this->assertSame(1, AuditLog::count());
+
+        $log = AuditLog::first();
+        $this->assertSame('pos_pra_reporting_changed', $log->action);
+        $this->assertSame('User', $log->entity_type);
+        $this->assertSame($owner->id, (int) $log->entity_id);
+        $this->assertSame($owner->id, (int) $log->user_id);
+        $this->assertSame(true, $log->old_values['pra_reporting_enabled']);
+        $this->assertSame(false, $log->new_values['pra_reporting_enabled']);
+        $this->assertSame(true, $log->old_values['effective_pra_reporting_enabled']);
+        $this->assertSame(false, $log->new_values['effective_pra_reporting_enabled']);
+        $this->assertSame(self::COMPANY_ID, (int) $log->company_id);
+    }
+
+    public function test_setCashierPra_writes_audit_log_with_actor_and_target(): void
+    {
+        $this->makeCompany(['ntn' => '1234567890123']);
+        $owner = $this->loginAs(['role' => 'company_admin', 'pos_role' => 'pos_admin']);
+        $cashier = User::forceCreate([
+            'name' => 'Cashier Online',
+            'email' => 'online_' . uniqid() . '@shop.test',
+            'password' => bcrypt('pass'),
+            'company_id' => self::COMPANY_ID,
+            'role' => 'employee',
+            'pos_role' => 'pos_cashier',
+            'pra_reporting_enabled' => true,
+            'is_active' => true,
+        ]);
+        $this->bindCompany();
+
+        (new PosController())->setCashierPra(
+            $this->makeRequest('POST', ['enabled' => false]),
+            $cashier->id
+        );
+
+        $this->assertSame(1, AuditLog::count());
+        $log = AuditLog::first();
+        $this->assertSame('pos_pra_reporting_changed', $log->action);
+        $this->assertSame($cashier->id, (int) $log->entity_id);
+        $this->assertSame($owner->id, (int) $log->user_id);
+        $this->assertSame(true, $log->old_values['pra_reporting_enabled']);
+        $this->assertSame(false, $log->new_values['pra_reporting_enabled']);
+        $this->assertSame('Cashier Online', $log->new_values['target_name']);
+    }
+
+    public function test_setCashierPra_does_not_audit_when_value_is_unchanged(): void
+    {
+        $this->makeCompany(['ntn' => '1234567890123']);
+        $this->loginAs(['role' => 'company_admin', 'pos_role' => 'pos_admin']);
+        $cashier = User::forceCreate([
+            'name' => 'Cashier Already Offline',
+            'email' => 'offline_' . uniqid() . '@shop.test',
+            'password' => bcrypt('pass'),
+            'company_id' => self::COMPANY_ID,
+            'role' => 'employee',
+            'pos_role' => 'pos_cashier',
+            'pra_reporting_enabled' => false,
+            'is_active' => true,
+        ]);
+        $this->bindCompany();
+
+        (new PosController())->setCashierPra(
+            $this->makeRequest('POST', ['enabled' => false]),
+            $cashier->id
+        );
+
+        $this->assertSame(0, AuditLog::count());
     }
 
     // ══════════════════════════════════════════════════════════════════════

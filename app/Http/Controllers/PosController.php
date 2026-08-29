@@ -7735,6 +7735,46 @@ class PosController extends Controller
         return redirect()->route('pos.pra-settings')->with('success', __('pos.pra_integration_enabled'));
     }
 
+    /**
+     * Keep a tamper-evident trail whenever a POS user's PRA reporting switch
+     * changes. The raw value is important because NULL means "inherit the
+     * company setting"; the effective value tells the audit reader what the
+     * sale screen actually used before and after the change.
+     */
+    private function auditPraReportingChange(
+        User $target,
+        mixed $oldRaw,
+        bool $oldEffective,
+        bool $newEffective,
+        int $companyId
+    ): void {
+        $newRaw = $target->getAttribute('pra_reporting_enabled');
+        $oldRaw = $oldRaw === null ? null : (bool) $oldRaw;
+        $newRaw = $newRaw === null ? null : (bool) $newRaw;
+
+        if ($oldRaw === $newRaw && $oldEffective === $newEffective) {
+            return;
+        }
+
+        AuditLogService::log(
+            'pos_pra_reporting_changed',
+            'User',
+            $target->id,
+            [
+                'pra_reporting_enabled' => $oldRaw,
+                'effective_pra_reporting_enabled' => $oldEffective,
+                'target_name' => $target->name,
+            ],
+            [
+                'pra_reporting_enabled' => $newRaw,
+                'effective_pra_reporting_enabled' => $newEffective,
+                'target_name' => $target->name,
+            ],
+            $companyId,
+            auth('pos')->id()
+        );
+    }
+
     public function togglePra(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -7790,8 +7830,16 @@ class PosController extends Controller
             ], 422);
         }
 
+        $oldPraReporting = $togglingUser->getRawOriginal('pra_reporting_enabled');
         $togglingUser->pra_reporting_enabled = !$effectiveNow;
         $togglingUser->save();
+        $this->auditPraReportingChange(
+            $togglingUser,
+            $oldPraReporting,
+            (bool) $effectiveNow,
+            (bool) $togglingUser->pra_reporting_enabled,
+            $companyId
+        );
 
         return response()->json([
             'success' => true,
@@ -9124,8 +9172,17 @@ class PosController extends Controller
             return back()->with('error', __('pos.billing_scope_pra_locked'));
         }
 
+        $oldPraReporting = $cashier->getRawOriginal('pra_reporting_enabled');
+        $oldEffectivePraReporting = (bool) $cashier->praReportingEnabled($company);
         $cashier->pra_reporting_enabled = $enable;
         $cashier->save();
+        $this->auditPraReportingChange(
+            $cashier,
+            $oldPraReporting,
+            $oldEffectivePraReporting,
+            $enable,
+            $companyId
+        );
 
         return back()->with('success', $enable
             ? __('pos.cashier_online_now', ['name' => $cashier->name])
@@ -9195,6 +9252,7 @@ class PosController extends Controller
         }
 
         $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])->findOrFail($id);
+        $company = Company::find($companyId);
 
         $request->validate([
             'name' => 'required|string|max:100',
@@ -9252,16 +9310,31 @@ class PosController extends Controller
                 $newScope = null; // NULL = derived default (cashier); manager NULL = 'both'
             }
             $oldScope = $cashier->pos_billing_scope;
+            $oldPraReporting = $cashier->getRawOriginal('pra_reporting_enabled');
+            $oldEffectivePraReporting = (bool) $cashier->praReportingEnabled($company);
+            $newPraReporting = null;
             $cashier->pos_billing_scope = $newScope;
             // Scope ↔ reporting alignment: 'pra' lock forces reporting ON,
             // 'local' lock forces it OFF — otherwise the scope guard on the
             // sale paths would brick the account. 'both' keeps the current flag.
             if ($newScope === 'pra') {
+                $newPraReporting = true;
                 $cashier->pra_reporting_enabled = true;
             } elseif ($newScope === 'local') {
+                $newPraReporting = false;
                 $cashier->pra_reporting_enabled = false;
             }
             $cashier->save();
+            if ($newPraReporting !== null
+                && ($oldPraReporting === null || (bool) $oldPraReporting !== $newPraReporting)) {
+                $this->auditPraReportingChange(
+                    $cashier,
+                    $oldPraReporting,
+                    $oldEffectivePraReporting,
+                    $newPraReporting,
+                    $companyId
+                );
+            }
             // Audit: only log when the scope value actually changed.
             if ($oldScope !== $newScope) {
                 AuditLogService::log(

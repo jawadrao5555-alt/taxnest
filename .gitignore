@@ -37,3 +37,4 @@ tools/video-pipeline/out/
 .env.*
 !.env.example
 attached_assets/
+pra-agent-*.zip

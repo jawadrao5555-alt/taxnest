@@ -9,6 +9,7 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\PkPhone;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -508,7 +509,21 @@ class PosCallerIdController extends Controller
         if ($uuid !== '' && $uuidColumn) {
             $row['offline_uuid'] = $uuid;
         }
-        DB::table('pos_caller_events')->insert($row);
+        try {
+            DB::table('pos_caller_events')->insert($row);
+        } catch (QueryException $e) {
+            // Reading for a twin and then inserting is not one step, and this
+            // ring can arrive on both lanes in the same instant (the phone
+            // posts to the cloud and to the shop PC; the agent replays later).
+            // The unique key on (company_id, offline_uuid) is the real referee.
+            // Losing that race means the ring IS recorded — so answer like any
+            // other duplicate instead of handing the phone a 500 it will
+            // dutifully retry.
+            if ($uuid !== '' && $uuidColumn) {
+                return response()->json(['ok' => true, 'accepted' => false, 'reason' => 'duplicate']);
+            }
+            throw $e;
+        }
 
         // Opportunistic purge (no cron dependency) — 1-in-10 lottery.
         if (random_int(1, 10) === 1) {

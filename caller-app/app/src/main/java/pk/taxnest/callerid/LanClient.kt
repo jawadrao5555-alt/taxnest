@@ -40,6 +40,18 @@ object LanClient {
     private const val CONNECT_MS = 2000
     private const val READ_MS = 3000
 
+    /**
+     * The whole LAN attempt for one ring must fit in this.
+     *
+     * A ring is reported from inside a detector Android does not wait on
+     * forever, and the cloud lane still needs its own turn afterwards. Left
+     * unbounded, one dead PC could spend a failed attempt plus a five-port
+     * sweep plus a retry before the cloud even starts — and the detector would
+     * be gone. So the LAN lane gets a fixed slice of wall clock and stops
+     * probing when it is spent.
+     */
+    const val RING_BUDGET_MS = 8000L
+
     /** What the agent's health endpoint says it is. Anything else is not ours. */
     private const val LAN_APP = "nestpos-lan"
 
@@ -62,10 +74,16 @@ object LanClient {
         if (n.any { it < 0 || it > 255 }) return false
         return when {
             n[0] == 10 -> true
-            n[0] == 127 -> true
             n[0] == 192 && n[1] == 168 -> true
             n[0] == 172 && n[1] in 16..31 -> true
+            // Link-local: a real peer address when the shop's router hands out
+            // no lease. The PC is reachable there; the phone is not talking to
+            // itself.
             n[0] == 169 && n[1] == 254 -> true
+            // 127.x is deliberately NOT here. It can never be the shop's PC,
+            // and allowing it would let anything else installed on this same
+            // phone listen on a port and collect the LAN token plus every
+            // customer's number in the clear.
             else -> false
         }
     }
@@ -145,9 +163,13 @@ object LanClient {
      * Find the port the agent is actually on: the one we remembered first, then
      * the default and its neighbours.
      */
-    fun findPort(host: String, remembered: Int): Int? {
+    fun findPort(host: String, remembered: Int, deadlineAt: Long = Long.MAX_VALUE): Int? {
         val ordered = (listOf(remembered) + PROBE_PORTS).filter { it in 1..65535 }.distinct()
         for (p in ordered) {
+            // Pairing passes no deadline (it runs on a screen the owner is
+            // watching); a ring does, and gives up rather than outlive its
+            // detector.
+            if (System.currentTimeMillis() >= deadlineAt) return null
             if (isAgentAt(host, p)) return p
         }
         return null
@@ -211,7 +233,14 @@ object LanClient {
      *
      * Returns true only when the PC actually took it.
      */
-    fun ring(ctx: Context, uuid: String, phone: String?, name: String?, source: String): Boolean {
+    fun ring(
+        ctx: Context,
+        uuid: String,
+        phone: String?,
+        name: String?,
+        source: String,
+        deadlineAt: Long = System.currentTimeMillis() + RING_BUDGET_MS,
+    ): Boolean {
         if (phone.isNullOrBlank()) {
             // The agent stores rings by number; a name-only ring has nothing to
             // match a customer on. The cloud lane still carries it.
@@ -232,8 +261,8 @@ object LanClient {
 
         // The shop moved the agent's port, or the PC was restarted onto another
         // one. Re-probe once rather than going silent for the rest of the day.
-        if (status == -1) {
-            val found = findPort(host, port)
+        if (status == -1 && System.currentTimeMillis() < deadlineAt) {
+            val found = findPort(host, port, deadlineAt)
             if (found != null && found != port) {
                 port = found
                 Prefs.setLanPort(ctx, port)

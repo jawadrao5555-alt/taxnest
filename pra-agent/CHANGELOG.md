@@ -1,5 +1,15 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.11.0 (2026-08-29)
+**LAN Mode: juday huay devices ab naam ke sath dikhte hain, har ek alag hataya ja sakta hai**
+
+- Pehle agent window sirf ginti batata tha ("Juday huay devices: 3"). Kaunsi device hai, ye pata nahi chalta tha — aur ek ghalat device hatane ka wahid tareeqa "sab bhool jayen" tha, jis ke baad baqi tamam devices dobara pair karni parti thin.
+- Ab har device apni line par hai: device ka naam, uska kaam (waiter tablet / Caller ID phone / counter), aur uske samne "Hatayen". "Sab bhool jayen" pehle ki tarah mojood hai.
+- Device ka shanakhti number uske pairing token ka one-way hash hai — token khud na window mein dikhta hai, na kisi jawab mein jata hai.
+- Ye fehrist sirf agent ki apni window mein hai. LAN par iska koi address banaya hi nahi gaya, is liye shop ke WiFi par lagi hui koi cheez shop ki devices ginn nahi sakti (ek test isi baat ki pehradari karta hai).
+- Device hatane se pairing code nahi badalta — code waise hi ek dafa ka hai, aur badal dene se wo code kharab ho jata jo owner ne abhi kisi ko likhwaya ho.
+- Sath hi: naya `build-win.bat` — Windows PC par sirf double-click karne se installer ban jata hai, command type karne ki zaroorat nahi.
+
 ## v1.10.0 (2026-08-29)
 **LAN Mode: ab tablet/phone par asal pairing screen khulti hai (Task 1533)**
 

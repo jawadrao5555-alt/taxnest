@@ -33,8 +33,19 @@ return new class extends Migration
                 // stay distinct under a unique index in both MySQL and SQLite,
                 // so live rings never collide with each other.
                 $table->string('offline_uuid', 64)->nullable()->after('company_id');
+            });
+        }
+
+        // The index is added on its own pass, NOT inside the column guard: a
+        // drifted database can already carry the column without it, and then
+        // the whole uuid contract is only as strong as a read-then-write race.
+        // Adding it twice throws — which is the "already correct" case.
+        try {
+            Schema::table('pos_caller_events', function (Blueprint $table) {
                 $table->unique(['company_id', 'offline_uuid'], 'pos_caller_events_offline_uuid_unique');
             });
+        } catch (\Throwable $e) {
+            // Index already present.
         }
     }
 

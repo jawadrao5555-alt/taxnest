@@ -32,6 +32,12 @@ async function run(page, scene, a) {
       case 'viewport':
         await page.setViewportSize({ width: a.width || 1600, height: a.height || 900 });
         break;
+      case 'clearCookies':
+        // Keep dry-runs faithful to record.cjs when a scenario switches
+        // between waiter, kitchen, and cashier sessions mid-video.
+        await page.context().clearCookies();
+        await page.waitForTimeout(200);
+        break;
       case 'wait': await page.waitForTimeout(Math.min(a.ms || 500, 800)); break;
       case 'waitFor':
       case 'highlight':

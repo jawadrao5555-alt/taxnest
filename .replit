@@ -117,7 +117,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash tools/video-pipeline/batch-lan-mode.sh"
+args = "bash tools/video-pipeline/batch-waiter-order-sale.sh"
 
 [[ports]]
 localPort = 5000

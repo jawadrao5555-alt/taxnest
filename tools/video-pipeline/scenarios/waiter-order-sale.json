@@ -1,0 +1,263 @@
+{
+  "slug": "waiter-order-sale",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Waiter Order se Sale — Table se Counter Tak",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Waiter Order se Sale",
+        "sub": "Waiter tablet · Table order · Cashier payment"
+      },
+      "narration": "अस्सलामु अलैकुम! आज हम NestPOS में waiter से order लेने का पूरा तरीका देखेंगे। waiter अपनी ID से login करेगा, table चुनेगा, items भेजेगा — और counter पर cashier वही order खोल कर payment लेगा।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_waiter_login",
+      "narration": "सब से पहले waiter अपने mobile या tablet पर login करे। यहां waiter की अपनी ID है — videowaiter — login के बाद सीधे Waiter Tablet खुल गया। इस screen पर waiter को सिर्फ़ order लेने के ज़रूरी controls नज़र आते हैं।",
+      "actions": [
+        {
+          "do": "viewport",
+          "width": 760,
+          "height": 1000,
+          "after": 500
+        },
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videowaiter@nestpos.pk",
+          "delay": 50
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "{{VIDEO_DEMO_PASS}}",
+          "delay": 50
+        },
+        {
+          "do": "click",
+          "selector": "form[action*='login'] button[type=submit]",
+          "after": 1800
+        },
+        {
+          "do": "waitFor",
+          "selector": "h1:has-text('Waiter Tablet')"
+        },
+        {
+          "do": "highlight",
+          "selector": "h1:has-text('Waiter Tablet')",
+          "after": 2200
+        }
+      ]
+    },
+    {
+      "id": "s03_choose_table",
+      "narration": "اب customer کی table دیکھ کر پہلے table منتخب کریں۔ Table choose karein دبائیں، خالی table T-3 چنیں — اب order اسی table کے نام سے جائے گا، اس لیے counter کو بھی صاف پتا رہے گا کہ bill کس table کا ہے۔",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "[data-video='waiter-choose-table']",
+          "after": 1800
+        },
+        {
+          "do": "highlight",
+          "selector": "div[x-show='showTables'] button[data-video='waiter-table']:has-text('T-3')",
+          "after": 1800
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='showTables'] button[data-video='waiter-table']:has-text('T-3')",
+          "after": 1800
+        }
+      ]
+    },
+    {
+      "id": "s04_build_order",
+      "narration": "اب customer کا order بنائیں۔ Beef Pulao، Chicken Karahi Full، اور Fresh Lime پر tap کریں۔ ہر item cart میں آ رہا ہے، quantity اور total ساتھ साथ بن رہے ہیں — waiter को rate ya hisaab alag se नहीं करना।",
+      "actions": [
+        {
+          "do": "click",
+          "selector": ".tn-waiter-grid button:has-text('Beef Pulao')",
+          "after": 1300
+        },
+        {
+          "do": "click",
+          "selector": ".tn-waiter-grid button:has-text('Chicken Karahi (Full)')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": ".tn-waiter-grid button:has-text('Fresh Lime')",
+          "after": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "[data-video='waiter-send-order']",
+          "after": 2200
+        }
+      ]
+    },
+    {
+      "id": "s05_send_order",
+      "narration": "Order mukammal ہے۔ اب ORDER SEND KAREIN دبائیں۔ order counter کو چلا گیا، table occupied ہو گئی، اور KOT بھی بن گیا — cashier کو اب یہی order payment کے لیے نظر آئے گا۔",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "[data-video='waiter-send-order']",
+          "after": 3200
+        },
+        {
+          "do": "click",
+          "selector": "[data-video='waiter-my-orders']",
+          "after": 1800
+        },
+        {
+          "do": "highlight",
+          "selector": "div[x-show='showMyOrders']",
+          "after": 2200
+        }
+      ]
+    },
+    {
+      "id": "s06_counter_login",
+      "narration": "اب counter کا cashier اپنی screen پر login کرے۔ Waiter کا کام order bhejna ہے؛ payment cashier لے گا۔ ہم waiter session سے logout کر کے counter user کی ID سے sale screen کھولتے ہیں۔",
+      "actions": [
+        {
+          "do": "clearCookies",
+          "after": 300
+        },
+        {
+          "do": "viewport",
+          "width": 1920,
+          "height": 1080,
+          "after": 500
+        },
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videoresto@nestpos.pk",
+          "delay": 50
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "{{VIDEO_DEMO_PASS}}",
+          "delay": 50
+        },
+        {
+          "do": "click",
+          "selector": "form[action*='login'] button[type=submit]",
+          "after": 1800
+        },
+        {
+          "do": "goto",
+          "url": "/pos/invoice/create"
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "wait",
+          "ms": 1800
+        }
+      ]
+    },
+    {
+      "id": "s07_open_incoming",
+      "narration": "Sale screen par Dine In ka table picker kholen۔ T-3 par naya waiter order nazar aa raha hai — waiter ka naam, order aur amount bhi. Cashier isi table ko tap kare، system atomic claim ke zariye order ko bill mein load kar dega۔",
+      "actions": [
+        {
+          "do": "highlight",
+          "selector": "button[data-video='counter-dine-in']",
+          "after": 2200
+        },
+        {
+          "do": "click",
+          "selector": "button[data-video='counter-dine-in']",
+          "after": 1800
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "highlight",
+          "selector": "div[x-show='showTablePicker'] button[data-video='counter-table']",
+          "after": 2400
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='showTablePicker'] button[data-video='counter-table']:has-text('T-3')",
+          "after": 2600
+        }
+      ]
+    },
+    {
+      "id": "s08_take_payment",
+      "narration": "Ab cashier bill check کرے — waiter کا بھیجا ہوا table aur items cart میں موجود ہیں۔ Customer se payment لے کر CASH دبائیں۔ یہی normal payment path ہے، اور payment کے ساتھ waiter order settle ہو کر table دوبارہ خالی ہو جاتی ہے۔",
+      "actions": [
+        {
+          "do": "highlight",
+          "selector": "button[data-video='open-payment']",
+          "after": 2200
+        },
+        {
+          "do": "click",
+          "selector": "button[data-video='open-payment']",
+          "after": 1400
+        },
+        {
+          "do": "highlight",
+          "selector": "button[data-video='cash-payment']",
+          "after": 2200
+        },
+        {
+          "do": "click",
+          "selector": "button[data-video='cash-payment']",
+          "after": 4500
+        }
+      ]
+    },
+    {
+      "id": "s09_sale_complete",
+      "narration": "Sale complete! Receipt تیار ہے، waiter order incoming list سے ہٹ گیا، اور T-3 پھر available ہے۔ اس طرح waiter صرف order لیتا ہے، counter payment لیتا ہے، اور پورا حساب ایک ہی bill میں محفوظ رہتا ہے۔",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "div[x-show='showReceipt']",
+          "after": 2200
+        }
+      ]
+    },
+    {
+      "id": "s10_outro",
+      "card": {
+        "heading": "Waiter se Counter Tak",
+        "sub": "Order bhejein · Cashier payment le · Sale mukammal"
+      },
+      "narration": "بس یہی NestPOS کا waiter flow ہے — waiter tablet سے order، counter پر incoming order، aur CASH payment کے baad sale complete۔ اپنی restaurant team کو یہ آسان tareeqa आज़माने के लिए दें۔ शुक्रिया!",
+      "minMs": 6000
+    }
+  ]
+}

@@ -90,6 +90,22 @@ class VideoRestoShopSeeder extends Seeder
                 ]);
             }
 
+            // Video takes must be resettable: remove only restaurant orders
+            // belonging to this fictional internal demo company. This clears
+            // stranded waiter/counter orders from a previous take before the
+            // next recording; real companies can never match this seeder's
+            // canonical company/login pair.
+            if (Schema::hasTable('restaurant_orders')) {
+                $demoOrderIds = DB::table('restaurant_orders')
+                    ->where('company_id', $companyId)
+                    ->pluck('id');
+                if ($demoOrderIds->isNotEmpty() && Schema::hasTable('pos_print_jobs')
+                    && Schema::hasColumn('pos_print_jobs', 'restaurant_order_id')) {
+                    DB::table('pos_print_jobs')->whereIn('restaurant_order_id', $demoOrderIds)->delete();
+                }
+                DB::table('restaurant_orders')->where('company_id', $companyId)->delete();
+            }
+
             // ── Users ──
             $users = [
                 ['Demo Owner (Resto)', self::LOGIN_EMAIL, 'company_admin', 'pos_admin'],

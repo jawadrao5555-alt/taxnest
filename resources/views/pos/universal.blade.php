@@ -961,7 +961,7 @@ window.addEventListener('popstate', function() {
                  Teal count chip = waiter orders waiting in the picker (Table-se-Bill
                  badge — top Table button ke saath yahan shift hua; INLINE chip,
                  absolute nahi — parent div overflow-hidden badge kaat deta). --}}
-            <button @click="setOrderType('dine_in')" class="flex items-center gap-1 px-3.5 py-2 text-xs font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">
+            <button data-video="counter-dine-in" @click="setOrderType('dine_in')" class="flex items-center gap-1 px-3.5 py-2 text-xs font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">
                 <span x-text="selectedTable ? window.TXT.dine_in_t_prefix + selectedTable.table_number : window.TXT.dine_in"></span>
                 <span x-show="incomingOrders.length > 0" x-cloak class="min-w-[16px] h-[16px] px-1 bg-teal-600 text-white text-[9px] rounded-full inline-flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
             </button>
@@ -1871,7 +1871,7 @@ window.addEventListener('popstate', function() {
                             <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">F9</kbd>
                         </button>
                         @endif
-                        <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple {{ $uBillScope !== 'pra' ? 'col-span-3' : 'col-span-5' }} min-w-0 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
+                        <button data-video="open-payment" @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple {{ $uBillScope !== 'pra' ? 'col-span-3' : 'col-span-5' }} min-w-0 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
                             <span class="flex items-center justify-center gap-1.5">
                                 <svg x-show="submitting" class="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 <svg x-show="!submitting" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -2010,7 +2010,7 @@ window.addEventListener('popstate', function() {
                  — rider assignment now happens ONLY on the /pos/deliveries board after
                  payment; cash bills enter the rider khata the moment a rider is assigned. --}}
             <div class="p-4 grid grid-cols-2 gap-3">
-                <button @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
+                <button data-video="cash-payment" @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? window.TXT.processing_ellipsis : window.TXT.cash_title"></span>
@@ -2116,7 +2116,7 @@ window.addEventListener('popstate', function() {
                                      DISABLED button NAHI — chup-chaap dead tile se cashier samjha
                                      table hamesha ke liye PHANS gaya; ab click chalta hai aur
                                      selectTable() hint deta hai (view-only rule barqarar). --}}
-                                <button @click="selectTable(t)" class="py-3 px-2 rounded-xl text-center border-2 transition"
+                                <button data-video="counter-table" @click="selectTable(t)" class="py-3 px-2 rounded-xl text-center border-2 transition"
                                     :class="(incomingForTable(t) ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-500 hover:scale-105' : (t.status === 'occupied' ? (cart.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : 'border-red-300 bg-red-50 dark:bg-red-900/20 hover:border-red-500 hover:scale-105') : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105'))) + (tablePickerFlat()[tablePickerIndex]?.id === t.id ? ' ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-gray-900' : '')">
                                     {{-- Top-view table + chairs diagram (color = status) --}}
                                     <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1" :class="incomingForTable(t) ? 'text-purple-500' : (t.status === 'occupied' ? 'text-red-500' : (t.status === 'reserved' ? 'text-amber-500' : 'text-green-500 dark:text-green-400'))" fill="currentColor" aria-hidden="true">
@@ -10995,6 +10995,17 @@ function restaurantPos() {
             this.incomingOrderId = o.id;
             this.incomingOrderInfo = o; // Task #643: waiter/order badge + cart-cancel modal data
             // Table stays attached to the RESTAURANT order — settlement frees it.
+            // Carry the same table snapshot onto the billing cart as well. The
+            // universal final-sale payload uses selectedTable for its Dine-In
+            // guard and table linkage; without this, a claimed waiter order
+            // reaches payment looking table-less and is rejected.
+            if (o.table_id && o.table) {
+                this.selectedTable = {
+                    id: o.table_id,
+                    table_number: o.table,
+                    seats: o.table_seats || null,
+                };
+            }
             // Carry the waiter order's type onto the bill: pos_transactions.order_type
             // snapshot drives the DINE-IN / TAKE AWAY / DELIVERY receipt badge, so a
             // claimed dine-in must NOT bill as the default 'takeaway'. (Direct final

@@ -69,7 +69,7 @@
             <button @click="hardRefresh()" title="{{ __('pos.ti_refresh_app') }}" class="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-500 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             </button>
-            <button @click="openMyOrders()" class="relative px-4 py-2 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition">
+            <button data-video="waiter-my-orders" @click="openMyOrders()" class="relative px-4 py-2 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition">
                 {{ __('pos.my_orders') }}
                 <span x-show="myOrders.length > 0" x-cloak class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-amber-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="myOrders.length"></span>
             </button>
@@ -277,7 +277,7 @@
             {{-- SADA MODE (owner, 4 Aug 2026): table SAB SE PEHLE — bada button
                  panel ke top par (mobile par panel khud top par hai). Dine-in
                  default; Takeaway ab "Mazeed" fold ke andar hai (hataya NahiN). --}}
-            <button x-show="!appendOrderId && orderType === 'dine_in'" @click="openTables()"
+            <button data-video="waiter-choose-table" x-show="!appendOrderId && orderType === 'dine_in'" @click="openTables()"
                     class="w-full py-3 rounded-xl text-base font-black border-2 border-dashed transition"
                     :class="selectedTable ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' : 'border-amber-400 bg-amber-50 dark:bg-amber-900/15 text-amber-700 dark:text-amber-300'"
                     x-text="selectedTable ? ({{ Js::from(__('pos.table_t_prefix2')) }} + selectedTable.table_number + ' · ' + selectedTable.floor) : {{ Js::from(__('pos.choose_table')) }}"></button>
@@ -402,7 +402,7 @@
                 </div>
             </template>
 
-            <button @click="send()" :disabled="sending || !cart.length"
+            <button data-video="waiter-send-order" @click="send()" :disabled="sending || !cart.length"
                     class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-base font-black transition"
                     x-text="sending ? {{ Js::from(__('pos.sending_ellipsis')) }} : (appendOrderId ? {{ Js::from(__('pos.add_items_to_order')) }} : {{ Js::from(__('pos.send_order')) }})"></button>
         </div>
@@ -426,7 +426,7 @@
                              ZFC 6 Aug 2026: occupied tile AB HAMESHA tap-able — held
                              order na bhi ho to action modal khul kar table ke maujooda
                              items READ-ONLY dikhata hai (counter/desktop ke orders bhi). --}}
-                        <button @click="t.status === 'occupied' ? (tableActionFor = t) : pickTable(t)"
+                        <button data-video="waiter-table" @click="t.status === 'occupied' ? (tableActionFor = t) : pickTable(t)"
                                 :class="t.status === 'occupied' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500 dark:text-red-300' : (t.status === 'reserved' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500')"
                                 class="rounded-xl border-2 p-3 text-center transition">
                             <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>

@@ -103,9 +103,23 @@ async function center(page, selector) {
 }
 
 async function runAction(page, a) {
+  // `optional: true` = "dismiss it if it is there". Nag popups (day-close
+  // reminder, What's New) are the single biggest cause of a dead take, and a
+  // take must not abort just because one of them did not show up this time.
+  if (a.optional) {
+    try { await runOne(page, a); } catch (e) { console.log('  (optional skipped: ' + a.do + ' ' + (a.selector || '') + ')'); }
+    return;
+  }
+  return runOne(page, a);
+}
+
+async function runOne(page, a) {
   switch (a.do) {
     case 'goto':
-      await page.goto(scenario.baseUrl + a.url, { waitUntil: 'networkidle' });
+      // An absolute URL escapes the scenario's baseUrl — the LAN tutorial has
+      // to visit the agent window and the tablet pairing page, which are
+      // served by their own local harness, not by the POS app.
+      await page.goto(/^https?:\/\//i.test(a.url) ? a.url : scenario.baseUrl + a.url, { waitUntil: 'networkidle' });
       await page.evaluate(CURSOR_JS);
       break;
     case 'wait': await sleep(a.ms || 500); break;
@@ -124,7 +138,17 @@ async function runAction(page, a) {
       await moveCursorTo(page, p.x, p.y, 400);
       await page.evaluate(([x, y]) => window.__tnRipple(x, y), [p.x, p.y]);
       await p.loc.click();
-      await p.loc.pressSequentially(a.text, { delay: a.delay || 70 });
+      // `textFrom` types a value the app minted moments ago on camera — the
+      // LAN pairing code rotates every pair, so it cannot live in the
+      // scenario file. Node fetches it directly (no CORS in the way).
+      let text = a.text;
+      if (a.textFrom) {
+        const r = await fetch(a.textFrom.url);
+        const body = await r.json();
+        text = String(body[a.textFrom.key] || '');
+        if (!text) throw new Error('textFrom got nothing for ' + a.textFrom.key);
+      }
+      await p.loc.pressSequentially(text, { delay: a.delay || 70 });
       await sleep(a.after || 300);
       break;
     }

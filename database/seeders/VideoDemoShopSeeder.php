@@ -32,9 +32,27 @@ class VideoDemoShopSeeder extends Seeder
 
     public function run(): void
     {
+        // Fail closed. This seeder rewrites a company, its login and its whole
+        // catalogue — a stray `db:seed --class=VideoDemoShopSeeder` anywhere
+        // near a real database must do nothing. APP_ENV is 'production' even in
+        // the dev workspace, so it proves nothing; the recording pipeline opts
+        // in explicitly instead (same guard as VideoStockCheckSeeder).
+        if (!filter_var(env('VIDEO_PIPELINE_ALLOW', false), FILTER_VALIDATE_BOOLEAN)) {
+            $this->command?->error('Refusing to run: set VIDEO_PIPELINE_ALLOW=1 (recording pipeline only).');
+            return;
+        }
+
         DB::beginTransaction();
         try {
             $company = DB::table('companies')->where('name', self::COMPANY_NAME)->first();
+            // An existing row with this name must still be the internal demo
+            // account before we overwrite anything inside it.
+            if ($company && !($company->is_internal_account ?? false)) {
+                DB::rollBack();
+                $this->command?->error("Refusing to run: company #{$company->id} is not an internal account.");
+
+                return;
+            }
             if ($company) {
                 $companyId = $company->id;
             } else {
@@ -75,7 +93,15 @@ class VideoDemoShopSeeder extends Seeder
                 ]);
             }
 
+            // Scope by company too: if that email ever belongs to a real user
+            // on some other company, we must not reassign or re-password it.
             $user = DB::table('users')->where('email', self::LOGIN_EMAIL)->first();
+            if ($user && (int) ($user->company_id ?? 0) !== 0 && (int) $user->company_id !== (int) $companyId) {
+                DB::rollBack();
+                $this->command?->error('Refusing to run: ' . self::LOGIN_EMAIL . ' already belongs to another company.');
+
+                return;
+            }
             $userData = [
                 'name' => 'Demo Cashier',
                 'password' => Hash::make(self::loginPassword()),

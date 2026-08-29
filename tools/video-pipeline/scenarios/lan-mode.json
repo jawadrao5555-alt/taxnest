@@ -1,0 +1,195 @@
+{
+  "slug": "lan-mode",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "LAN Mode + Offline — Net band, shop chalti rahe",
+  "note": "Needs tools/video-pipeline/lan-demo-server.cjs running on 8600 (agent window) with the real LAN server on 8531.",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "LAN Mode + Offline",
+        "sub": "Net band ho — shop phir bhi chalti rahe"
+      },
+      "narration": "अस्सलामु अलैकुम! आज दो बड़ी बातें सीखेंगे। पहली — इंटरनेट बंद हो जाए तो काउंटर पर बिलिंग कैसे चलती रहती है। और दूसरी — नया लैन मोड, जिस से आपकी शॉप का कंप्यूटर ख़ुद एक छोटा सर्वर बन जाता है, और फ़ोन या टैबलेट सीधा उसी से जुड़ जाता है। शुरू करते हैं।",
+      "minMs": 7000
+    },
+    {
+      "id": "s02_login",
+      "narration": "पहले सेल स्क्रीन पर आते हैं। ऊपर ये हरा बटन देखें — इस पर ऑनलाइन लिखा है, यानी इस वक़्त इंटरनेट चल रहा है और हर बिल फ़ौरन सर्वर पर जा रहा है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 800 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "{{VIDEO_DEMO_PASS}}", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]:not([name=language])", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "click", "selector": "button:has-text('Later')", "optional": true, "after": 1200 },
+        { "do": "wait", "ms": 1500 },
+        { "do": "highlight", "selector": "button:has-text('Online'):has(span.w-2)", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s03_go_offline",
+      "narration": "अब हम सच में इंटरनेट बंद कर देते हैं — जैसे शॉप में तार निकल गई हो, या डी एस एल बैठ गया हो। देखें, वही बटन फ़ौरन लाल हो गया और उस पर ऑफ़लाइन लिखा आ गया। यही आपको बताता है कि लाइन गई है।",
+      "actions": [
+        { "do": "offline", "on": true, "after": 2500 },
+        { "do": "highlight", "selector": "button:has-text('Offline'):has(span.w-2)", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s04_bill_offline",
+      "narration": "अब बग़ैर इंटरनेट के बिल बनाते हैं। प्रोडक्ट चुनें, और कैश का बटन दबा दें — बिल्कुल वैसे ही जैसे आप रोज़ बनाते हैं। कुछ अलग नहीं करना पड़ता।",
+      "actions": [
+        { "do": "click", "selector": ".prod-card:has-text('Chawal Basmati 5kg')", "after": 900 },
+        { "do": "click", "selector": ".prod-card:has-text('Cooking Oil 1L')", "after": 1200 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s05_receipt",
+      "narration": "देखें — बिल बन गया। रसीद पर साफ़ लिखा है कि ये बिल आपकी इसी डिवाइस पर महफ़ूज़ हो गया है, और इंटरनेट वापस आते ही ख़ुद सर्वर पर चला जाएगा। कस्टमर को रसीद अभी प्रिंट कर के दे दें।",
+      "actions": [
+        { "do": "wait", "ms": 600 },
+        { "do": "highlight", "selector": "div.fixed p.border-dashed", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s06_second_bill",
+      "narration": "एक और बिल बनाते हैं। ये भी उसी तरह डिवाइस पर महफ़ूज़ हो गया। और अब ऊपर उसी लाल बटन पर गिनती देखें — दो बिल सिंक के इंतिज़ार में हैं। यानी आपका हिसाब कहीं गुम नहीं हुआ, सिर्फ़ क़तार में लगा है।",
+      "actions": [
+        { "do": "click", "selector": "div.fixed button:has-text('Close')", "optional": true, "after": 900 },
+        { "do": "click", "selector": ".prod-card:has-text('Doodh 1L')", "after": 800 },
+        { "do": "click", "selector": ".prod-card:has-text('Anday (Darjan)')", "after": 800 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 2500 },
+        { "do": "wait", "ms": 9000 },
+        { "do": "highlight", "selector": "button:has-text('Offline'):has(span.w-2)", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s07_back_online",
+      "narration": "अब इंटरनेट वापस आ जाता है। ग़ौर से देखें — बटन पहले पीला हुआ, यानी रुके हुए बिल सर्वर पर जा रहे हैं, और फिर हरा हो गया। गिनती ख़त्म। आपको कुछ भी दबाना नहीं पड़ा।",
+      "actions": [
+        { "do": "offline", "on": false, "after": 3000 },
+        { "do": "wait", "ms": 4000 },
+        { "do": "highlight", "selector": "button:has-text('Online'):has(span.w-2)", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s08_verify",
+      "narration": "यक़ीन करने के लिए बिलों की लिस्ट खोल लेते हैं — दोनों ऑफ़लाइन बिल अपने नंबर के साथ यहाँ मौजूद हैं। यही है ऑफ़लाइन बिलिंग: लाइन जाए या आए, काउंटर रुकता नहीं।",
+      "actions": [
+        { "do": "goto", "url": "/pos/transactions" },
+        { "do": "click", "selector": "button:has-text('Later')", "optional": true, "after": 1000 },
+        { "do": "wait", "ms": 2500 }
+      ]
+    },
+    {
+      "id": "s09_lan_card",
+      "card": {
+        "heading": "LAN Mode",
+        "sub": "Shop ka apna local server"
+      },
+      "narration": "अब आते हैं नई चीज़ पर — लैन मोड। मसला ये था: आपका काउंटर, वेटर का टैबलेट और कॉलर आई डी वाला फ़ोन — सब एक ही वाई फ़ाई पर, चंद फ़ुट के फ़ासले पर बैठे होते हैं, मगर बात एक दूसरे से नहीं, दूर बादल यानी क्लाउड से करते हैं। लाइन गई तो आपस का राब्ता भी टूट गया। लैन मोड बिल्कुल यही ठीक करता है।",
+      "minMs": 9000
+    },
+    {
+      "id": "s10_agent_window",
+      "narration": "ये है शॉप के कंप्यूटर पर चलने वाली एजेंट विंडो। थोड़ा नीचे आएँ तो लैन मोड का कार्ड मिलेगा। यहाँ लिखा भी है — इंटरनेट बंद हो तब भी वेटर टैबलेट और कॉलर आई डी फ़ोन इसी कंप्यूटर से जुड़े रहते हैं, और नेट आते ही सब कुछ ख़ुद क्लाउड पर चला जाता है।",
+      "actions": [
+        { "do": "goto", "url": "http://127.0.0.1:8600/agent" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "scroll", "selector": "#lanEnabled", "after": 800 },
+        { "do": "highlight", "selector": "h3:has-text('LAN Mode')", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s11_switch_on",
+      "narration": "स्विच ऑन करते हैं। बस इतना ही करना है। देखें — नीचे लिखा आ गया कि लोकल सर्वर चल रहा है। साथ ही दो चीज़ें ज़ाहिर हो गईं: एक पता, यानी एड्रेस, और छह हिंदसों का एक कोड। ये एड्रेस हर कंप्यूटर का अपना होता है — आपकी शॉप में जो लिखा हो, वही इस्तेमाल करना है।",
+      "actions": [
+        { "do": "click", "selector": "#lanEnabled", "after": 2500 },
+        { "do": "highlight", "selector": "#lanStatus", "after": 4000 }
+      ]
+    },
+    {
+      "id": "s12_phone_open",
+      "narration": "अब फ़ोन या टैबलेट उठाएँ — शर्त सिर्फ़ इतनी है कि वो उसी वाई फ़ाई पर हो। उसके ब्राउज़र में वही एड्रेस लिखें जो एजेंट विंडो पर दिख रहा था। देखें, नेस्ट पी ओ एस का जोड़ने वाला सफ़्हा खुल गया।",
+      "actions": [
+        { "do": "goto", "url": "http://127.0.0.1:8531/" },
+        { "do": "eval", "js": "(() => { document.documentElement.style.background = '#0d0a1c'; const st = document.createElement('style'); st.textContent = 'body{max-width:430px !important;margin:0 auto !important;min-height:100vh !important;box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 40px 110px rgba(0,0,0,.6) !important;}'; document.head.appendChild(st); })()", "after": 600 },
+        { "do": "waitFor", "selector": "#viewPair h1" },
+        { "do": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "s13_pair_code",
+      "narration": "यहाँ तीन ख़ाने हैं। पहले ख़ाने में वही छह हिंदसों का कोड डालें जो एजेंट विंडो पर लिखा था।",
+      "actions": [
+        {
+          "do": "type",
+          "selector": "#code",
+          "textFrom": { "url": "http://127.0.0.1:8600/demo/lan/status", "key": "pair_code" },
+          "delay": 200,
+          "after": 1200
+        }
+      ]
+    },
+    {
+      "id": "s14_pair_submit",
+      "narration": "फिर इस डिवाइस का कोई नाम रखें — मसलन काउंटर फ़ोन। और नीचे चुनें कि ये डिवाइस किस काम के लिए है: वेटर टैबलेट, कॉलर आई डी फ़ोन, या काउंटर। हम कॉलर आई डी फ़ोन चुनते हैं, और पेयर करें दबा देते हैं। हो गया।",
+      "actions": [
+        { "do": "type", "selector": "#device", "text": "Counter Phone", "delay": 90, "after": 800 },
+        { "do": "select", "selector": "#kind", "value": "caller", "after": 1500 },
+        { "do": "click", "selector": "#pairBtn", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s15_paired",
+      "narration": "अब यही सफ़्हा बदल गया — लिखा है, ये डिवाइस जुड़ चुका है। नीचे डिवाइस का नाम, उसका काम, एजेंट का वर्जन, और ये कि राब्ता ठीक चल रहा है। एक बार जुड़ जाने के बाद ये फ़ोन दोबारा कोड नहीं माँगेगा।",
+      "actions": [
+        { "do": "waitFor", "selector": "#viewStatus ul.rows" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "highlight", "selector": "#viewStatus ul.rows", "after": 3500 }
+      ]
+    },
+    {
+      "id": "s16_call_arrives",
+      "narration": "अब मान लीजिए शॉप के नंबर पर किसी की कॉल आती है। कॉलर ऐप उस कॉल को सीधे इसी कंप्यूटर तक पहुँचा देता है — बीच में इंटरनेट की ज़रूरत नहीं। देखें, कॉल यहाँ लिस्ट में आ गई: नंबर, नाम और वक़्त। और काउंटर पर जो सेल स्क्रीन खुली होती है, वो इसी कंप्यूटर से यही कॉल उठा कर आपको पॉप अप दिखा देती है।",
+      "actions": [
+        {
+          "do": "eval",
+          "js": "(async () => { const t = localStorage.getItem('nestpos_lan_token'); await fetch('/lan/caller/ring', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Lan-Token': t }, body: JSON.stringify({ number: '03007654321', name: 'Bilal Ahmed', source: 'whatsapp' }) }); })()",
+          "after": 6500
+        },
+        { "do": "highlight", "selector": "#callsBox", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s17_devices",
+      "narration": "वापस एजेंट विंडो पर आते हैं। यहाँ अब जुड़े हुए डिवाइस की लिस्ट बन गई है — नाम, काम, और आख़िरी बार कब राब्ता हुआ। कोई फ़ोन गुम हो जाए या बदल जाए, तो सिर्फ़ उसी के सामने हटाएँ दबा दें; बाक़ी सब जुड़े रहेंगे। और अगर सब कुछ नए सिरे से करना हो तो सारे डिवाइस भूल जाएँ वाला बटन मौजूद है। हर नए डिवाइस के लिए नया कोड ख़ुद बन जाता है।",
+      "actions": [
+        { "do": "goto", "url": "http://127.0.0.1:8600/agent" },
+        { "do": "wait", "ms": 2500 },
+        { "do": "scroll", "selector": "#lanDevices", "after": 1000 },
+        { "do": "highlight", "selector": "#lanDevices", "after": 4000 }
+      ]
+    },
+    {
+      "id": "s18_limits",
+      "card": {
+        "heading": "Teen zaroori baatein",
+        "sub": "LAN Mode se pehle yeh yaad rakhein"
+      },
+      "narration": "आख़िर में तीन बातें याद रखें। पहली — सब डिवाइस उसी वाई फ़ाई पर हों, और शॉप का कंप्यूटर चलता रहे; कंप्यूटर बंद तो लोकल सर्वर भी बंद। दूसरी — इस वर्जन में लैन पर कॉलर आई डी चलती है; वेटर टैबलेट का ऑर्डर लैन पर भेजने वाला हिस्सा अभी बन रहा है, वो अगले अपडेट में मिलेगा। और तीसरी — कैशियर बदलने और डे क्लोज़ के लिए इंटरनेट चाहिए, इसलिए लाइन बंद होने के दौरान ये दो काम न करें। बिल बनाते रहें — बाक़ी सब नेट आते ही ख़ुद हो जाएगा।",
+      "minMs": 11000
+    },
+    {
+      "id": "s19_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Net band — kaam band nahi"
+      },
+      "narration": "तो ये था नेस्ट पी ओ एस का ऑफ़लाइन और लैन मोड। एजेंट को नए वर्जन पर रखें, स्विच ऑन करें, और अपने डिवाइस जोड़ लें। अगली वीडियो में मिलते हैं। शुक्रिया!",
+      "minMs": 6000
+    }
+  ]
+}

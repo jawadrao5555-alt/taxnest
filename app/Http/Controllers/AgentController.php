@@ -405,7 +405,14 @@ class AgentController extends Controller
     {
         $company = $request->attributes->get('agent_company');
 
-        $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+        // Agents poll this endpoint much more often than they heartbeat. Do not
+        // turn every poll into a write against the shared companies table; the
+        // regular heartbeat already refreshes this value, and a 30-second
+        // freshness window preserves the online/offline signal.
+        if (!$company->agent_last_seen
+            || $company->agent_last_seen->lt(now()->subSeconds(30))) {
+            $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
+        }
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {

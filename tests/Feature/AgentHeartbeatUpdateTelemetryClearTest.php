@@ -7,6 +7,7 @@ use App\Models\Company;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 
 /**
  * Task #1209 — self-update telemetry lifecycle on the agent heartbeat.
@@ -31,6 +32,7 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
             $table->string('name');
             $table->string('product_type')->nullable();
             $table->boolean('agent_enabled')->default(true);
+            $table->boolean('agent_submits_pra')->default(false);
             $table->string('agent_api_key')->nullable();
             $table->string('agent_version')->nullable();
             $table->timestamp('agent_last_seen')->nullable();
@@ -137,5 +139,41 @@ class AgentHeartbeatUpdateTelemetryClearTest extends TestCase
         $company->refresh();
         $this->assertSame('1.9.1', $company->agent_update_target);
         $this->assertSame('download', $company->agent_update_stage);
+    }
+
+    public function test_pending_invoice_poll_does_not_write_a_fresh_last_seen(): void
+    {
+        $company = $this->makeCompany([
+            'agent_submits_pra' => false,
+            'agent_last_seen' => now()->subSeconds(5),
+        ]);
+        $request = Request::create('/api/agent/pending-invoices', 'GET');
+        $request->attributes->set('agent_company', $company);
+
+        (new \App\Http\Controllers\AgentController())->pendingInvoices($request);
+
+        $company->refresh();
+        $this->assertEqualsWithDelta(
+            now()->subSeconds(5)->timestamp,
+            $company->agent_last_seen->timestamp,
+            2,
+            'A frequent poll must not rewrite a fresh last-seen timestamp'
+        );
+    }
+
+    public function test_pending_invoice_poll_refreshes_an_old_last_seen(): void
+    {
+        $company = $this->makeCompany([
+            'agent_submits_pra' => false,
+            'agent_last_seen' => now()->subMinute(),
+        ]);
+        $oldTimestamp = $company->agent_last_seen->timestamp;
+        $request = Request::create('/api/agent/pending-invoices', 'GET');
+        $request->attributes->set('agent_company', $company);
+
+        (new \App\Http\Controllers\AgentController())->pendingInvoices($request);
+
+        $company->refresh();
+        $this->assertGreaterThan($oldTimestamp, $company->agent_last_seen->timestamp);
     }
 }

@@ -2137,7 +2137,14 @@ window.addEventListener('popstate', function() {
                                     </template>
                                     <template x-if="!incomingForTable(t)">
                                         <span>
-                                            <p class="text-[10px] text-gray-400" x-text="t.seats + window.TXT.sfx_seats"></p>
+                                            {{-- ZFC (31 Aug 2026): counter par punch kiye gaye order ki RAKAM
+                                                 is tile par ghayab thi — sirf "Occupied • 5m" dikhta tha, jabke
+                                                 waiter order saaf "naam • Rs 400" dikhata hai. Table Board ka
+                                                 tile (boardTileSub) hamesha rakam dikhata raha, is liye do
+                                                 surfaces aapas mein mutazad thay aur cashier ko har table
+                                                 kholni parti thi. Ab dono ek hi formula par hain. --}}
+                                            <p x-show="!t.order" class="text-[10px] text-gray-400" x-text="t.seats + window.TXT.sfx_seats"></p>
+                                            <span x-show="t.order" class="block text-[9px] font-bold text-red-600 dark:text-red-300 truncate" x-text="tableOrderLine(t)"></span>
                                             <span x-show="t.status === 'occupied'" class="text-[9px] text-red-500 font-medium" x-text="window.TXT.occupied_word + (elapsedSince(t.occupied_since) ? ' • ' + elapsedSince(t.occupied_since) : '')"></span>
                                             <span x-show="t.status === 'reserved'" class="text-[9px] text-amber-600 font-medium" x-text="window.TXT.reserved_word + (elapsedSince(t.locked_at) ? ' • ' + elapsedSince(t.locked_at) : '')"></span>
                                         </span>
@@ -8612,11 +8619,18 @@ function restaurantPos() {
             if (t.status === 'reserved') return this.elapsedSince(t.locked_at);
             return '';
         },
+        // "Kis ne punch kiya • kitne ka" — Table Board tile AUR "Select Table"
+        // picker dono yahi formula istemal karte hain (ZFC, 31 Aug 2026). Pehle
+        // sirf board ke paas tha, is liye picker counter-order ki rakam chupa
+        // leta tha. Ek hi jagah rakhne se dono kabhi alag nahi ho saktay.
+        // parseFloat: live PDO total_amount ko STRING deta hai.
+        tableOrderLine(t) {
+            if (!t || !t.order) return '';
+            const who = t.order.staff_name ? String(t.order.staff_name).split(' ')[0] : '';
+            return (who ? who + ' • ' : '') + 'Rs ' + Math.round(parseFloat(t.order.total_amount) || 0).toLocaleString();
+        },
         boardTileSub(t) {
-            if (t.order) {
-                const who = t.order.staff_name ? String(t.order.staff_name).split(' ')[0] : '';
-                return (who ? who + ' • ' : '') + 'Rs ' + Math.round(t.order.total_amount || 0).toLocaleString();
-            }
+            if (t.order) return this.tableOrderLine(t);
             if (t.status === 'reserved') return window.TXT.reserved_word;
             return 'Free' + (t.seats ? ' • ' + t.seats + window.TXT.sfx_seats : '');
         },

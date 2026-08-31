@@ -270,6 +270,12 @@ class KotPrintService
             // kabhi chhapti hi nahi, hamesha unprinted reh kar khali (204)
             // print job banwati rehti.
             \App\Support\PosKitchenLines::pruneOrder($order);
+            // Sirf delivery fee wala order (koi dish hi nahi) — bawarchi ke liye
+            // is parchi par kuch nahi. Koi job na banao, warna agent har baar
+            // ek khali (204) job uthata rehta hai.
+            if ($order->items->isEmpty()) {
+                return ['printed' => false, 'reason' => 'no_kitchen_items'];
+            }
             $deltaQ = $delta ? '&delta=1' : '';
             // Delta snapshot (Pizza Master edit-path bug, Aug 2026): bake the
             // unprinted row ids into EVERY job of this send — result-time

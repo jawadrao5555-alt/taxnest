@@ -1152,6 +1152,11 @@ class PosController extends Controller
         // station mapping aur "kuch bhi chhapna hai ya nahi" sab is ke BAAD.
         // Wahi qaida jo KotPrintService::enqueueForOrder par hai.
         \App\Support\PosKitchenLines::pruneOrder($order);
+        // Order par bawarchi ke liye kuch bacha hi nahi (sirf delivery fee) —
+        // koi job na banao. Wahi qaida jo KotPrintService par hai.
+        if ($order->items->isEmpty()) {
+            return response()->json(['success' => false, 'reason' => 'no_kitchen_items'], 200);
+        }
         $deltaQ = $delta ? '&delta=1' : '';
         // Delta snapshot (Pizza Master edit-path bug, Aug 2026): compute the
         // unprinted rows ONCE and bake their ids into EVERY job of this send
@@ -11926,10 +11931,13 @@ class PosController extends Controller
                 // resolver ke andar manual line woh hai jiska koi item_id resolve
                 // na hua ho (ya client ne saaf saaf manual kaha ho).
                 'item_type'     => (!$itemId || !empty($item['_manual'])) ? 'manual' : 'product',
-                'is_tax_exempt' => $isExempt,
+                'item_name'     => $itemName,
             ], $orderType, $skipUsed);
             if ($skipKitchenLine) {
                 $skipUsed = true;
+                // Delivery fee ki exemption bhi server khud lagata hai — usay
+                // shart banana matlab shart cashier ke haath mein de dena.
+                $isExempt = true;
             }
 
             $resolved[] = [

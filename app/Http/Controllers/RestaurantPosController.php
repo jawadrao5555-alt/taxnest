@@ -308,6 +308,9 @@ class RestaurantPosController extends Controller
         // na ho to nishan chhod do, hold phir bhi kaam kare.
         $hasSkipKitchenCol = Schema::hasColumn('restaurant_order_items', 'skip_kitchen');
 
+        // Poore order mein sirf EK line kitchen se chhup sakti hai (delivery fee).
+        $skipKitchenUsed = false;
+
         $resolvedItems = [];
         foreach ($request->items as $item) {
             $qty = (int)$item['quantity'];
@@ -329,6 +332,18 @@ class RestaurantPosController extends Controller
                     $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
                 }
                 $itemExempt = array_key_exists('is_tax_exempt', $item) ? (bool)$item['is_tax_exempt'] : false;
+                // Kitchen se chhupne ka faisla SERVER ka — client ka flag sirf
+                // darkhwast hai. Delivery fee ki exemption bhi server khud lagata
+                // hai, warna woh shart cashier ke apne haath mein hoti.
+                $skipThisLine = \App\Support\PosKitchenLines::allowSkip([
+                    'skip_kitchen' => $item['skip_kitchen'] ?? false,
+                    'item_type'    => 'manual',
+                    'item_name'    => $manualName,
+                ], $request->input('order_type'), $skipKitchenUsed);
+                if ($skipThisLine) {
+                    $skipKitchenUsed = true;
+                    $itemExempt = true;
+                }
                 $manualRow = [
                     'item_type' => 'manual',
                     'item_id' => null,
@@ -344,7 +359,7 @@ class RestaurantPosController extends Controller
                     'item_discount_amount' => $itemDiscountAmount,
                 ];
                 if ($hasSkipKitchenCol) {
-                    $manualRow['skip_kitchen'] = (bool) ($item['skip_kitchen'] ?? false);
+                    $manualRow['skip_kitchen'] = $skipThisLine;
                 }
                 $resolvedItems[] = $manualRow;
             } elseif ($item['item_type'] === 'product') {
@@ -2485,6 +2500,12 @@ class RestaurantPosController extends Controller
         // ticket dobara chhapwa deta. Column na ho (purana schema) to null →
         // false, yani purana bartao jyon ka tyon.
         \App\Support\PosKitchenLines::pruneOrder($order);
+        // Bawarchi ke liye is order par kuch hai hi nahi (sirf delivery fee) —
+        // koi parcha nahi. Khali render bhejna matlab agent/browser ke paas ek
+        // bemani slip; blank-print guard usay waise bhi phenk deta hai.
+        if ($order->items->isEmpty()) {
+            return response('', 204);
+        }
 
         // P7 (F6) delta-KOT: ?delta=1 renders ONLY not-yet-printed items (appended
         // rows) so the kitchen never re-fires dishes already on the pass.

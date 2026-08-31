@@ -87,7 +87,48 @@ class PosKitchenLines
     }
 
     /**
+     * Delivery fee ke naam — SERVER ke apne, har zaban mein. Client jo bhi
+     * bheje, line ko chhupne ke liye INHI mein se ek hona parta hai.
+     *
+     * Yeh jaan bujh kar `is_tax_exempt` par bharosa nahi karta: manual line par
+     * woh flag cashier ka bheja hua hai, to us par shart lagana koi shart nahi
+     * thi — cashier kisi bhi dish ko exempt keh kar kitchen se ghayab kar sakta
+     * tha (code review, 1 Sep 2026).
+     *
+     * @return string[] lowercase, trimmed
+     */
+    public static function feeNames(): array
+    {
+        static $names = null;
+        if ($names !== null) {
+            return $names;
+        }
+        $names = ['delivery charges']; // client ka literal (setDeliveryCharge)
+        foreach (['en', 'rur', 'ur'] as $loc) {
+            try {
+                $label = trim((string) __('pos.delivery_charges', [], $loc));
+                if ($label !== '' && $label !== 'pos.delivery_charges') {
+                    $names[] = mb_strtolower($label);
+                }
+            } catch (\Throwable $e) {
+                // zaban file na mile to literal hi kaafi hai
+            }
+        }
+
+        return $names = array_values(array_unique($names));
+    }
+
+    /**
      * Server-side faisla: kya YEH line kitchen se chhup sakti hai?
+     *
+     * Char shartein, aur charon server ki apni:
+     *   • line MANUAL ho (koi product/service/deal resolve na hua ho),
+     *   • order DELIVERY ho,
+     *   • line ka naam server ke apne delivery-fee naamon mein se ho,
+     *   • poore order mein aisi SIRF EK line ho.
+     *
+     * Client ka `skip_kitchen` sirf ek darkhwast hai. Exemption bhi is line par
+     * server KHUD lagata hai (dekho forceExempt) — usay shart nahi banaya jata.
      *
      * @param  array  $item        client ki bheji hui cart line
      * @param  string|null $orderType  order ka type (delivery / dine_in / takeaway…)
@@ -108,7 +149,8 @@ class PosKitchenLines
             return false;
         }
 
-        // Delivery fee hamesha tax-exempt manual line hoti hai (setDeliveryCharge).
-        return (bool) ($item['is_tax_exempt'] ?? false);
+        $name = mb_strtolower(trim((string) ($item['item_name'] ?? $item['name'] ?? '')));
+
+        return $name !== '' && in_array($name, self::feeNames(), true);
     }
 }

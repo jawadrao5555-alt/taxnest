@@ -350,12 +350,8 @@
         // (all items tax-exempt, never reported) follow the LOCAL number style —
         // they never get a PRA fiscal, so the PRA style would mislead.
         $rcptIsLocalStream = $transaction->isLocalBill() || $transaction->isExemptStream();
-        try {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
-                $rcptNumStyle = $rcptIsLocalStream ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
-                if ($rcptNumStyle === 'token') { $rcptBillToken = (int) $transaction->bill_token; }
-            }
-        } catch (\Throwable $e) { $rcptBillToken = null; }
+        // Aik hi faisla-gah (PosBillNumberStyle) — 'token' = 7, 'daily' = L007.
+        $rcptBillToken = \App\Support\PosBillNumberStyle::bigNumber($company, $transaction);
     @endphp
 
     {{-- Order-number early lookup: for fiscal top box (code-style restaurant bills

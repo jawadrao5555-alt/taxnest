@@ -356,6 +356,7 @@
         @endif
         {{-- ─── /PROFIT + BI WIDGETS ─── --}}
 
+        @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')
         @include('pos.partials.rider-settlement-pending')
         @include('pos.partials.inactive-customers')

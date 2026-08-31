@@ -44,19 +44,29 @@ class RestaurantKdsController extends Controller
     {
         $rescueSince = $this->rescueWindowStart($companyId);
 
-        return RestaurantOrder::where('company_id', $companyId)
+        // Delivery Charges jaisi non-kitchen lines KDS ki koi cheez nahi.
+        // Do jagah asar: (a) "kabhi na dekha gaya" rescue shart — yeh row kabhi
+        // print-stamp nahi khati, is liye bina is guard ke har paid delivery
+        // order hamesha board par latka rehta; (b) khud cards ke items.
+        // Wahid qaida: App\Support\PosKitchenLines.
+        $orders = RestaurantOrder::where('company_id', $companyId)
             ->whereNull('kitchen_cleared_at')
             ->where(function ($q) use ($rescueSince) {
                 $q->whereIn('status', ['held', 'preparing', 'ready'])
                     ->orWhere(function ($paid) use ($rescueSince) {
                         $paid->where('status', 'completed')
                             ->where('created_at', '>=', $rescueSince)
-                            ->whereHas('items', fn ($i) => $i->whereNull('kot_printed_at'));
+                            ->whereHas('items', fn ($i) => \App\Support\PosKitchenLines::scope($i)->whereNull('kot_printed_at'));
                     });
             })
             ->with(['table', 'items', 'creator'])
             ->orderBy('created_at', 'asc')
             ->get();
+
+        // Cards ke andar bhi na dikhe (aur unprinted ginti mein bhi na aaye).
+        $orders->each(fn ($o) => $o->setRelation('items', \App\Support\PosKitchenLines::only($o->items)));
+
+        return $orders;
     }
 
     public function index()

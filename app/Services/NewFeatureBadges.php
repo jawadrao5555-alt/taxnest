@@ -42,6 +42,25 @@ class NewFeatureBadges
     public const DEFAULT_DAYS = 21;
 
     /**
+     * "Yeh dekh liya" ki yaadasht — ZFC feedback, 1 Sep 2026.
+     *
+     * Shikayat: "NEW bar bar aa raha hai." Sach yeh tha ke nishan sirf tareekh
+     * se chalta tha, is liye jab tak window khuli rehti woh HAR page load par
+     * chamakta rehta — chahe shop us switch tak ja bhi chuki ho.
+     *
+     * Hal: jis din shop us switch wale page par pohanch jaye, us feature ki
+     * yaadasht is COOKIE mein likh do aur aainda uska nishan khamosh. Cookie is
+     * liye (na ke naya column): PROD par naye column hi drift karte hain aur yeh
+     * mehez cosmetic cheez kisi settings page ko tor nahi sakti (memory:
+     * prod-schema-drift-selfheal). Yaadasht per-DEVICE hai, is liye counter ke
+     * doosre computer/staff ko nishan ab bhi milta hai — wahi asal maqsad tha.
+     */
+    public const SEEN_COOKIE = 'tn_new_seen';
+
+    /** Yaadasht kitni der chale (din). Window se lamba — warna faida hi khatam. */
+    public const SEEN_COOKIE_DAYS = 400;
+
+    /**
      * Naye features ka register. Purani entries yahin rehne dena bhi theek hai
      * (window guzar chuki hoti hai to woh khud khamosh hain), magar safai ke
      * liye har chand mahine baad nikal dena behtar hai.
@@ -78,6 +97,13 @@ class NewFeatureBadges
             'panel' => 'pos',
             'pages' => ['pos.inventory.stock-check.index'],
         ],
+        // 1 Sep 2026 — local bill par roz L001 se shuru hone wala number
+        // (Bill Number Style → "Roz ka local number").
+        'local_daily_number' => [
+            'since' => '2026-09-01',
+            'panel' => 'pos',
+            'pages' => ['pos.receipt-settings'],
+        ],
     ];
 
     /** Sirf tests ke liye — asli register ki jagah naqli entries. */
@@ -105,15 +131,57 @@ class NewFeatureBadges
      */
     public static function active(?string $panel = null): array
     {
+        $seen = self::seenKeys();
         $out = [];
         foreach (self::registry() as $key => $entry) {
             if (!self::windowOpen($entry)) {
+                continue;
+            }
+            if (in_array($key, $seen, true)) {
                 continue;
             }
             if ($panel !== null && !self::panelMatches($entry, $panel)) {
                 continue;
             }
             $out[$key] = $entry;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Is device ne kin features ko "dekh liya" hai. Cookie kharab/ghair-mojood
+     * ho to khali list — nishan dikhana kabhi crash na bane.
+     */
+    public static function seenKeys(): array
+    {
+        try {
+            $raw = request()?->cookie(self::SEEN_COOKIE);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', $raw)), fn ($k) => $k !== ''));
+    }
+
+    /**
+     * Is route par baithe hue woh naye features jo abhi tak "dekhe" nahi gaye.
+     * Middleware isi se faisla karta hai ke cookie mein kya likhna hai — panel
+     * ki tafreeq yahan nahi, kyunke shop usi panel ka page khol kar aayi hai.
+     */
+    public static function keysForRoute(?string $routeName): array
+    {
+        if ($routeName === null || $routeName === '') {
+            return [];
+        }
+        $out = [];
+        foreach (self::active() as $key => $entry) {
+            if (in_array($routeName, (array) ($entry['pages'] ?? []), true)) {
+                $out[] = $key;
+            }
         }
 
         return $out;
@@ -126,8 +194,11 @@ class NewFeatureBadges
             return false;
         }
         $entry = self::registry()[$key] ?? null;
+        if ($entry === null || !self::windowOpen($entry)) {
+            return false;
+        }
 
-        return $entry !== null && self::windowOpen($entry);
+        return !in_array($key, self::seenKeys(), true);
     }
 
     /** Is page (route name) par koi naya switch hai? */

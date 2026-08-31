@@ -8,6 +8,9 @@ class PosTransactionItem extends Model
 {
     protected $fillable = [
         'transaction_id', 'item_type', 'item_id', 'item_name',
+        // Kitchen ki parchi par na chhapne wali line (Delivery Charges) — dekho
+        // RestaurantOrderItem par isi naam ka field.
+        'skip_kitchen',
         'special_notes', 'deal_snapshot',
         'quantity', 'unit_price', 'cost_price', 'subtotal',
         'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount',
@@ -27,6 +30,7 @@ class PosTransactionItem extends Model
         'cost_price' => 'decimal:4',
         'subtotal' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
+        'skip_kitchen' => 'boolean',
         'is_third_schedule' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',

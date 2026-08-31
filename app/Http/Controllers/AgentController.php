@@ -1413,6 +1413,12 @@ class AgentController extends Controller
             }
             // Refine with the order creator's language now that we have it.
             $this->setPrintLocale($order->creator?->language, $job, $company);
+            // Delivery Charges (aur koi bhi non-kitchen line) KOT par nahi jati —
+            // kitchenTicket route ka hu-ba-hu aaina. Chhant-phatak yahin, delta/
+            // batch/full-mode ka hisaab lagne se PEHLE, warna yeh kabhi na
+            // chhapne wali row "hamesha unprinted" ban kar full-mode delta ko
+            // har baar poora ticket dobara chhapwa deti.
+            \App\Support\PosKitchenLines::pruneOrder($order);
             parse_str($job->render_query ?? '', $q);
             $delta = ($q['delta'] ?? null) == '1';
             // KOT Full Mode (ZFC feedback, Jul 2026): mirror of the kitchenTicket

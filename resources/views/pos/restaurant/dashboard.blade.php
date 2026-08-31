@@ -17,6 +17,7 @@
 
 <div class="w-full overflow-x-hidden" x-data="rDash()" x-init="init()">
     <div class="px-4 sm:px-6 py-4 max-w-7xl mx-auto">
+        @include('pos.partials.pra-coverage-alert')
         @include('pos.partials.pending-bills-tile')
         {{-- Owner (25 Aug 2026, voice note): "rider settlement ko bhi idhar
              pending wali jagah le aayein — banda din bhar dashboard hi khol kar

@@ -40,13 +40,7 @@
     $isProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
     // Big token only when this bill's stream style is token (mirrors receipts).
     $pageBillToken = null;
-    try {
-        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
-            $isLocalStream = $transaction->isLocalBill() || $transaction->isExemptStream();
-            $numStyle = $isLocalStream ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
-            if ($numStyle === 'token') { $pageBillToken = (int) $transaction->bill_token; }
-        }
-    } catch (\Throwable $e) { $pageBillToken = null; }
+    $pageBillToken = \App\Support\PosBillNumberStyle::bigNumber($company, $transaction);
 @endphp
 <div class="card">
     @if($showBusinessName)

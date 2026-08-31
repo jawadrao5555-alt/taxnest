@@ -333,11 +333,7 @@
                         ->find($order->pos_transaction_id);
                     if ($kotBillTxn && $kotBillTxn->invoice_number) {
                         $kotBillNum = $kotBillTxn->invoice_number;
-                        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $kotBillTxn->bill_token) {
-                            $kotBillIsLocal = $kotBillTxn->isLocalBill() || $kotBillTxn->isExemptStream();
-                            $kotBillStyle = $kotBillIsLocal ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
-                            if ($kotBillStyle === 'token') { $kotBillToken = (int) $kotBillTxn->bill_token; }
-                        }
+                        $kotBillToken = \App\Support\PosBillNumberStyle::bigNumber($company, $kotBillTxn);
                     }
                 }
             } catch (\Throwable $e) { $kotBillToken = null; $kotBillNum = null; }

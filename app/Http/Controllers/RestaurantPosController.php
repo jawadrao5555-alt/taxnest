@@ -170,6 +170,10 @@ class RestaurantPosController extends Controller
             'items.*.item_discount_type' => 'nullable|in:percentage,amount',
             'items.*.item_discount_value' => 'nullable|numeric|min:0|max:999999',
             'items.*.is_tax_exempt' => 'nullable|boolean',
+            // Delivery Charges jaisi line jo bill par to hai magar bawarchi ke
+            // liye koi dish nahi. Sirf MANUAL lines par mana jata hai (neeche) —
+            // asli product/service kabhi kitchen se chhupaya nahi ja sakta.
+            'items.*.skip_kitchen' => 'nullable|boolean',
             'order_type' => 'required|in:dine_in,takeaway,delivery',
             'discount_type' => 'nullable|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0|max:999999',
@@ -300,6 +304,10 @@ class RestaurantPosController extends Controller
         }
         cache()->put($cacheKey, true, 5);
 
+        // Deploy-before-migrate window safety (prod schema-drift memory): column
+        // na ho to nishan chhod do, hold phir bhi kaam kare.
+        $hasSkipKitchenCol = Schema::hasColumn('restaurant_order_items', 'skip_kitchen');
+
         $resolvedItems = [];
         foreach ($request->items as $item) {
             $qty = (int)$item['quantity'];
@@ -321,7 +329,7 @@ class RestaurantPosController extends Controller
                     $itemDiscountAmount = min($lineTotal, round($itemDiscountValue, 2));
                 }
                 $itemExempt = array_key_exists('is_tax_exempt', $item) ? (bool)$item['is_tax_exempt'] : false;
-                $resolvedItems[] = [
+                $manualRow = [
                     'item_type' => 'manual',
                     'item_id' => null,
                     'item_name' => $manualName,
@@ -335,6 +343,10 @@ class RestaurantPosController extends Controller
                     'item_discount_value' => $itemDiscountValue,
                     'item_discount_amount' => $itemDiscountAmount,
                 ];
+                if ($hasSkipKitchenCol) {
+                    $manualRow['skip_kitchen'] = (bool) ($item['skip_kitchen'] ?? false);
+                }
+                $resolvedItems[] = $manualRow;
             } elseif ($item['item_type'] === 'product') {
                 $product = PosProduct::where('company_id', $companyId)->where('id', $item['item_id'])->first();
                 if (!$product) {
@@ -704,7 +716,12 @@ class RestaurantPosController extends Controller
             }
 
             if ($request->table_id) {
-                $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
+                // lockForUpdate (code review, 1 Sep 2026): settleRecalledOrder bhi
+                // mez khali karne se pehle isi row ka taala leta hai. Dono ko ek
+                // qataar mein rakhna zaroori hai warna settle ki "khali hai"
+                // ginti aur is hold ke "occupied" likhne ke darmiyan mez chori
+                // ho jati hai.
+                $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->lockForUpdate()->first();
                 // Int-cast both sides: some MySQL/PDO setups (emulated prepares on
                 // shared hosting) return integer columns as STRINGS, so a strict !==
                 // against the int user id false-positives "another user" for the SAME
@@ -1274,7 +1291,7 @@ class RestaurantPosController extends Controller
         $billTokenFields = [];
         $billStream = $initialPraStatus === 'pending' ? 'pra' : 'local';
         $billStyleCol = $billStream === 'pra' ? 'pra_number_style' : 'local_number_style';
-        if (($company->{$billStyleCol} ?? 'serial') === 'token'
+        if (\App\Support\PosBillNumberStyle::needsToken($company->{$billStyleCol} ?? 'serial')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token')) {
             $payBillToken = \App\Services\OrderTokenService::nextBillToken($companyId, $billStream);
             if ($payBillToken !== null) {
@@ -2365,6 +2382,92 @@ class RestaurantPosController extends Controller
         return back()->with('success', 'Kitchen settings updated successfully.');
     }
 
+    /**
+     * Parked (recalled) restaurant order ko bill ke saath band karo.
+     *
+     * ZFC (1 Sep 2026): delivery order ab hold ho sakta hai. Delivery fee ek
+     * manual line hai, is liye us cart ki adaigi restaurant ke apne payOrder se
+     * nahi balke universal storeInvoice se guzarti hai — aur wahan pehle parked
+     * order band karne ka koi raasta nahi tha. Nateeja: bill ban jata, order
+     * khula reh jata, aur khula order rozana ka day-close hard-block kar deta.
+     *
+     * settleWaiterOrder ka bhai hai magar DOOSRE stream ke liye:
+     *  - sirf cashier ke apne parked orders (source 'waiter' ko haath nahi lagata
+     *    — woh apne sakht assignment guard ke sath usi apne raste se band hota
+     *    hai; yahan se guzarna us guard ko chura lena hota).
+     *  - claim ATOMIC hai (aik hi UPDATE), is liye do counter aik hi order do
+     *    baar band nahi kar sakte; nakami par caller apna poora bill roll back
+     *    kar deta hai.
+     *  - online-adaigi ka nishan bhi wahin claim par lagta hai, warna race window
+     *    mein laga hua nishan chup chaap nazar-andaz ho jata.
+     *
+     * @return bool false = order pehle hi band/ghaib (caller bill roll back kare)
+     */
+    public static function settleRecalledOrder(int $companyId, int $orderId, \App\Models\PosTransaction $txn, ?\App\Models\User $user, bool $onlineConfirmed = false): bool
+    {
+        if (!$user || $orderId <= 0) {
+            return false;
+        }
+
+        $claim = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $orderId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->where(function ($w) {
+                $w->whereNull('source')->orWhere('source', '!=', 'waiter');
+            });
+
+        if (!$onlineConfirmed && Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+            $claim->whereNull('online_payment_awaited_at');
+        }
+
+        $fields = [
+            'status' => 'completed',
+            'pos_transaction_id' => $txn->id,
+            'payment_method' => $txn->payment_method,
+            'updated_at' => now(),
+        ];
+        if (Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+            $fields['online_payment_awaited_at'] = null;
+        }
+
+        if (!$claim->update($fields)) {
+            return false;
+        }
+
+        // Mez khali karo — sirf tab jab us par koi aur zinda order na bacha ho.
+        // Ghair-zaroori kaam hai, is liye try/catch: iski nakami se bill ka
+        // transaction kabhi roll back na ho (settleWaiterOrder wala hi usool).
+        $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
+        if ($order && $order->table_id) {
+            try {
+                // MEZ KI QATAAR (code review, 1 Sep 2026): pehle mez ki row par
+                // taala, phir ginti. Bina taale ke ek doosra counter isi lamhe
+                // usi mez par naya hold laga sakta tha — hamari "koi zinda order
+                // nahi" ginti us se pehle guzar jati aur hum ZINDA mez ko khali
+                // likh dete (mez dobara kisi aur ko de di jati). holdOrder bhi
+                // isi row ka taala leta hai, is liye dono ek qataar mein hain.
+                RestaurantTable::where('id', $order->table_id)->lockForUpdate()->first();
+                $stillActive = RestaurantOrder::where('company_id', $companyId)
+                    ->where('table_id', $order->table_id)
+                    ->where('id', '!=', $order->id)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->exists();
+                if (!$stillActive) {
+                    RestaurantTable::where('id', $order->table_id)
+                        ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('settleRecalledOrder: table-free failed (non-fatal)', [
+                    'order_id' => $orderId,
+                    'table_id' => $order->table_id,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return true;
+    }
+
     public function kitchenTicket(Request $request, $orderId)
     {
         $companyId = app('currentCompanyId');
@@ -2373,6 +2476,15 @@ class RestaurantPosController extends Controller
             ->findOrFail($orderId);
 
         $company = Company::find($companyId);
+
+        // Delivery Charges (aur aaindah koi bhi non-kitchen line) KOT par kabhi
+        // nahi jati — bawarchi ke liye woh koi dish nahi hai. Chhant-phatak
+        // YAHIN, sab kuch hone se PEHLE: agar isay neeche prepareTicket par
+        // chhoda jata to yeh row kabhi kot_printed_at stamp na khati aur
+        // "hamesha unprinted" ban kar KOT Full Mode ka delta har baar poora
+        // ticket dobara chhapwa deta. Column na ho (purana schema) to null →
+        // false, yani purana bartao jyon ka tyon.
+        \App\Support\PosKitchenLines::pruneOrder($order);
 
         // P7 (F6) delta-KOT: ?delta=1 renders ONLY not-yet-printed items (appended
         // rows) so the kitchen never re-fires dishes already on the pass.
@@ -2529,7 +2641,10 @@ class RestaurantPosController extends Controller
         $order->setRelation('table', null);
         $order->setRelation('creator', $transaction->creator);
 
-        $ticketItems = $transaction->items->map(function ($it) {
+        // Wahi qaida jo order-KOT par hai: Delivery Charges kitchen ki parchi
+        // par nahi chhapti (bill par bilkul rehti hai).
+        $ticketItems = \App\Support\PosKitchenLines::only($transaction->items)
+            ->map(function ($it) {
             $row = new \App\Models\RestaurantOrderItem([
                 'item_type' => $it->item_type,
                 'item_id' => $it->item_id,
@@ -2551,18 +2666,7 @@ class RestaurantPosController extends Controller
         // the shim KOT prints the bill token big with the serial as small ref,
         // so the kitchen slip matches the receipt's calling number. Both the
         // browser route and the Agent print path go through this render.
-        $shimBillToken = null;
-        try {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
-                $shimIsLocal = $transaction->isLocalBill() || $transaction->isExemptStream();
-                $shimStyle = $shimIsLocal ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
-                if ($shimStyle === 'token') {
-                    $shimBillToken = (int) $transaction->bill_token;
-                }
-            }
-        } catch (\Throwable $e) {
-            $shimBillToken = null;
-        }
+        $shimBillToken = \App\Support\PosBillNumberStyle::bigNumber($company, $transaction);
 
         // "Payment First, Then KOT" v2 (Aug 2026): stamp the txn the first time its
         // kitchen ticket is rendered — the F10 "Send KOT" button and the promote-time
@@ -3142,68 +3246,104 @@ class RestaurantPosController extends Controller
         return response()->json(['success' => true, 'reprint' => false]);
     }
 
+    /**
+     * Sale-screen customer history (ZFC PIZZA POINT, 31 Aug 2026).
+     *
+     * Pehle yeh sirf RestaurantOrder parhti thi, is liye counter par kata hua
+     * har bill — LOCAL (L-series), reporting-OFF final, aur koi bhi retail sale
+     * jo kabhi restaurant order bani hi nahi — grahak ki history se ghayab tha.
+     * Owner ko lagta tha "local bill delete ho jate hain"; asal wajah yeh thi ke
+     * source hi ghalat table tha (owner wale History PAGE par sab theek dikhta
+     * raha, sirf sale screen ka popup adhoora tha).
+     *
+     * Ab wohi source hai jo owner ke history page ka hai: PosTransaction —
+     * customer_id YA phone se milan (walk-in sale par sirf phone hota hai), aur
+     * company ki "spend persist" setting ON ho to day-close ke ARCHIVED local
+     * bills bhi shamil (warna woh bhi ghayab rehte the).
+     *
+     * Jawab ki shakl bilkul wohi hai jo pehle thi — sale screen ka modal aur
+     * Reorder button bina kisi tabdeeli ke chalte hain.
+     */
     public function customerHistory($customerId)
     {
         $companyId = app('currentCompanyId');
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($customerId);
 
-        $recentOrders = RestaurantOrder::where('company_id', $companyId)
-            ->where('customer_id', $customer->id)
-            ->where('status', 'completed')
-            // 'transaction' eager-loaded: live par lazy-loading STRICT hai —
-            // asal bill number (L-xx) + View Receipt ke liye (owner, 3 Aug 2026).
-            ->with(['items', 'transaction:id,invoice_number'])
-            ->orderBy('created_at', 'desc')
+        $company = Company::find($companyId);
+        $persist = (bool) ($company->pos_customer_spend_persist ?? true);
+
+        // Aik hi jagah se milan ka qaida (id YA phone) — dono jagah bilkul
+        // barabar rehna chahiye, warna popup aur history page alag alag ginti
+        // dikhane lagte hain.
+        $match = function ($q) use ($customer) {
+            $q->where('customer_id', $customer->id);
+            if (!empty($customer->phone)) {
+                $q->orWhere('customer_phone', $customer->phone);
+            }
+        };
+
+        $baseQuery = function () use ($companyId, $match, $persist) {
+            $q = PosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where($match);
+            if ($persist) {
+                $q->withoutGlobalScope('hide_archived');
+            }
+
+            return $q;
+        };
+
+        // 'items' eager-loaded: live par lazy-loading STRICT hai.
+        $recentOrders = $baseQuery()
+            ->with('items')
+            ->orderByDesc('created_at')
             ->limit(5)
             ->get()
-            ->map(function ($o) {
+            ->map(function ($t) {
                 return [
-                    'id' => $o->id,
-                    'order_number' => $o->order_number,
-                    // Asal POS bill number + receipt link target (NULL jab order
-                    // kabhi bill nahi bana — modal ORD- number par fallback karta hai).
-                    'txn_id' => $o->pos_transaction_id ? (int) $o->pos_transaction_id : null,
-                    'invoice_number' => $o->transaction?->invoice_number,
-                    'total' => (float)$o->total_amount,
-                    'date' => $o->created_at->format('M d, g:i A'),
-                    'items' => $o->items->map(fn($i) => [
+                    // Modal ki :key aur receipt link — dono transaction id par.
+                    'id' => (int) $t->id,
+                    'order_number' => $t->invoice_number,
+                    'txn_id' => (int) $t->id,
+                    'invoice_number' => $t->invoice_number,
+                    'total' => (float) $t->total_amount,
+                    'date' => $t->created_at->format('M d, g:i A'),
+                    'items' => $t->items->map(fn($i) => [
                         'item_id' => $i->item_id,
                         'item_type' => $i->item_type,
                         'name' => $i->item_name,
-                        'qty' => (float)$i->quantity,
-                        'price' => (float)$i->unit_price,
-                    ]),
+                        'qty' => (float) $i->quantity,
+                        'price' => (float) $i->unit_price,
+                    ])->values(),
                 ];
             });
 
-        $favorites = RestaurantOrderItem::whereHas('order', function ($q) use ($companyId, $customer) {
-            $q->where('company_id', $companyId)
-              ->where('customer_id', $customer->id)
-              ->where('status', 'completed');
-        })
+        $favorites = PosTransactionItem::whereIn(
+            'transaction_id',
+            $baseQuery()->select('id')
+        )
+        // Manual/synthetic lines (delivery charge waghera) "pasandeeda dish"
+        // nahi hain — inhen favourites se bahar rakho.
+        ->whereIn('item_type', ['product', 'service', 'deal'])
         ->select('item_id', 'item_type', 'item_name', DB::raw('SUM(quantity) as total_qty'), DB::raw('COUNT(*) as order_count'))
         ->groupBy('item_id', 'item_type', 'item_name')
         ->orderByDesc('total_qty')
         ->limit(5)
         ->get();
 
-        $totalOrders = RestaurantOrder::where('company_id', $companyId)
-            ->where('customer_id', $customer->id)
-            ->where('status', 'completed')
-            ->count();
-        $totalSpent = RestaurantOrder::where('company_id', $companyId)
-            ->where('customer_id', $customer->id)
-            ->where('status', 'completed')
-            ->sum('total_amount');
+        $totalOrders = $baseQuery()->count();
+        $totalSpent = (float) $baseQuery()->sum('total_amount');
+        // Mite hue local bills sirf lifetime kharch mein jurte hain — ginti,
+        // average ya "aakhri order" ko nahi chhoote (history page ka wohi qaida).
         $totalSpent += PosCustomerSpend::deletedLocalTotal((int) $companyId, $customer);
 
         return response()->json([
             'customer_name' => $customer->name,
             'customer_phone' => $customer->phone,
             'total_orders' => $totalOrders,
-            'total_spent' => round((float)$totalSpent, 2),
+            'total_spent' => round((float) $totalSpent, 2),
             'recent_orders' => $recentOrders,
-            'favorites' => $favorites->map(fn($f) => ['name' => $f->item_name, 'count' => (int)$f->total_qty]),
+            'favorites' => $favorites->map(fn($f) => ['name' => $f->item_name, 'count' => (int) $f->total_qty]),
         ]);
     }
 

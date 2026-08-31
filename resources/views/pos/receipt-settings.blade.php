@@ -449,10 +449,16 @@
                     <select name="rp_local_number_style" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
                         <option value="serial" {{ $localNumPref === 'serial' ? 'selected' : '' }}>{{ __('pos.number_style_serial') }}</option>
                         <option value="token" {{ $localNumPref === 'token' ? 'selected' : '' }}>{{ __('pos.number_style_token') }}</option>
+                        {{-- ZFC, 1 Sep 2026: "L series roz L001 se shuru ho." Asal serial
+                             roz reset nahi ho sakti (archived bill apna number rokay
+                             rakhte hain), is liye CHHAPNE wala number roz ka hai aur
+                             asal serial neechay salamat. --}}
+                        <option value="daily" {{ $localNumPref === 'daily' ? 'selected' : '' }}>{{ __('pos.number_style_daily') }}</option>
                     </select>
                 </div>
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ __('pos.number_style_hint') }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.number_style_daily_hint') }} <x-new-badge feature="local_daily_number" class="ml-1" /></p>
         </div>
 
         {{-- PDF Download Paper (customer video Jul 2026): downloaded PDFs printed on

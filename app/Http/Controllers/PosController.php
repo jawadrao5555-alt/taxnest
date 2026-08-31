@@ -312,7 +312,10 @@ class PosController extends Controller
                 'rp_pdf_paper' => 'nullable|in:thermal,a4',
                 'rp_order_match' => 'nullable|in:off,token,code',
                 'rp_pra_number_style' => 'nullable|in:serial,token',
-                'rp_local_number_style' => 'nullable|in:serial,token',
+                // 'daily' = roz L001 se shuru hone wala local number (ZFC farmaish,
+                // 1 Sep 2026). PRA stream ko yeh shakal nahi milti — fiscal bill par
+                // "L" wala number chhapna galat-fehmi paida karta.
+                'rp_local_number_style' => 'nullable|in:serial,token,daily',
                 'rp_delivery_receipt_present' => 'nullable|in:1',
                 'rp_delivery_receipt_on_assign' => 'nullable|in:1',
             ]);
@@ -565,7 +568,7 @@ class PosController extends Controller
                 $companyUpdates['pra_number_style'] = $request->input('rp_pra_number_style');
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'local_number_style')
-                && in_array($request->input('rp_local_number_style'), ['serial', 'token'], true)) {
+                && in_array($request->input('rp_local_number_style'), ['serial', 'token', 'daily'], true)) {
                 $companyUpdates['local_number_style'] = $request->input('rp_local_number_style');
             }
             $company->update($companyUpdates);
@@ -1145,6 +1148,10 @@ class PosController extends Controller
         }
 
         $delta = $request->boolean('delta');
+        // Non-kitchen lines (Delivery Charges) yahin nikal do — delta ids,
+        // station mapping aur "kuch bhi chhapna hai ya nahi" sab is ke BAAD.
+        // Wahi qaida jo KotPrintService::enqueueForOrder par hai.
+        \App\Support\PosKitchenLines::pruneOrder($order);
         $deltaQ = $delta ? '&delta=1' : '';
         // Delta snapshot (Pizza Master edit-path bug, Aug 2026): compute the
         // unprinted rows ONCE and bake their ids into EVERY job of this send
@@ -2964,6 +2971,12 @@ class PosController extends Controller
             // it server-side BEFORE the response so the receipt can print the
             // waiter's name on the very first (auto-)print.
             'incoming_order_id' => 'nullable|integer',
+            // ZFC (1 Sep 2026): ab delivery order bhi park (hold) ho sakta hai, aur
+            // delivery fee ek manual line hone ki wajah se uski adaigi ISI raste se
+            // aati hai. Parked order ki id sath aati hai taake bill ke saath hi
+            // (aik hi transaction mein) woh order band ho jaye — warna woh khula
+            // reh kar rozana ka day-close block karta.
+            'recalled_order_id' => 'nullable|integer',
         ]);
 
         // ── ONLINE-PAYMENT GATE, waiter-order settle path (owner, 26 Aug 2026) ──
@@ -2972,7 +2985,13 @@ class PosController extends Controller
         // rule, same 422 contract — so the sale screen shows the very same
         // "paisay aa gaye?" confirmation and retries with the flag. Provisionals
         // are exempt: they are not final bills and never settle the waiter order.
-        $incomingOrderIdIn = (int) $request->input('incoming_order_id', 0);
+        // Parked (recalled) order bhi isi gate se guzarta hai — nishan waiter aur
+        // cashier dono ke orders par lag sakta hai, is liye qaida aik hi rehna
+        // chahiye. Dono ek saath kabhi nahi aate (cart mein ya to waiter order
+        // hai ya parked), is liye pehla mojood id hi asal hai.
+        $settleOrderIdIn = (int) $request->input('incoming_order_id', 0)
+            ?: (int) $request->input('recalled_order_id', 0);
+        $incomingOrderIdIn = $settleOrderIdIn;
         if ($incomingOrderIdIn > 0
             && !$request->boolean('save_as_provisional')
             && !$request->boolean('online_payment_confirmed')
@@ -3039,7 +3058,7 @@ class PosController extends Controller
             }
         }
 
-        $companyItems = $this->resolveItemExemptions($request->items, $companyId);
+        $companyItems = $this->resolveItemExemptions($request->items, $companyId, $request->input('order_type'));
         // Deals are billing-only: component stock and the live deal row cannot
         // be authoritatively checked while a bill is offline. Keep this server
         // guard alongside the client guard so a stale/crafted offline replay
@@ -3284,7 +3303,7 @@ class PosController extends Controller
         $billTokenFields = [];
         $billStream = $initialPraStatus === 'pending' ? 'pra' : 'local';
         $billStyleCol = $billStream === 'pra' ? 'pra_number_style' : 'local_number_style';
-        if (($company->{$billStyleCol} ?? 'serial') === 'token'
+        if (\App\Support\PosBillNumberStyle::needsToken($company->{$billStyleCol} ?? 'serial')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token')) {
             $billToken = \App\Services\OrderTokenService::nextBillToken($companyId, $billStream);
             if ($billToken !== null) {
@@ -3531,6 +3550,7 @@ class PosController extends Controller
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 $thirdSchemaExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
+                $skipKitchenExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'skip_kitchen');
                 // Freeze cost snapshot: only product-type items with a known cost.
                 $frozenCost = null;
                 if ($hasCostPriceCol && $ri['type'] === 'product' && !empty($ri['item_id'])) {
@@ -3551,6 +3571,7 @@ class PosController extends Controller
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
                 ], $thirdSchemaExists ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
+                   $skipKitchenExists ? ['skip_kitchen' => $ri['skipKitchen'] ?? false] : [],
                    $hasCostPriceCol ? ['cost_price' => $frozenCost] : []));
             }
 
@@ -3577,6 +3598,23 @@ class PosController extends Controller
                     $request->boolean('online_payment_confirmed')
                 );
                 if (!$waiterOrderSettled) {
+                    throw new \RuntimeException(__('pos.waiter_order_already_settled'));
+                }
+            }
+
+            // Parked (recalled) restaurant order — wahi usool, sirf cashier ke
+            // apne stream ke liye. Delivery fee wale cart ki adaigi is raste se
+            // guzarti hai; agar order yahin band na ho to woh khula reh kar
+            // day-close rok deta. Claim atomic hai: do counter ek hi parked order
+            // ko do baar band nahi kar sakte — nakami par poora bill roll back.
+            if (!$saveAsProvisional
+                && $request->filled('recalled_order_id')
+                && !$request->filled('incoming_order_id')) {
+                $recalledSettled = RestaurantPosController::settleRecalledOrder(
+                    $companyId, (int) $request->input('recalled_order_id'), $transaction, auth('pos')->user(),
+                    $request->boolean('online_payment_confirmed')
+                );
+                if (!$recalledSettled) {
                     throw new \RuntimeException(__('pos.waiter_order_already_settled'));
                 }
             }
@@ -3853,7 +3891,7 @@ class PosController extends Controller
             }
         }
 
-        $companyItems = $this->resolveItemExemptions($request->items, $companyId);
+        $companyItems = $this->resolveItemExemptions($request->items, $companyId, $request->input('order_type'));
         $subtotal = array_sum(array_column($companyItems, 'lineTotal'));
         $taxableSubtotal = array_sum(array_map(fn($i) => $i['isExempt'] ? 0 : $i['lineTotal'], $companyItems));
 
@@ -3995,6 +4033,7 @@ class PosController extends Controller
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 $thirdSchemaExistsEdit = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
+                $skipKitchenExistsEdit = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'skip_kitchen');
                 $frozenCostEdit = null;
                 if ($hasCostPriceColEdit && $ri['type'] === 'product' && !empty($ri['item_id'])) {
                     $cpEdit = (float) ($editCostMap[$ri['item_id']]?->cost_price ?? 0);
@@ -4014,6 +4053,7 @@ class PosController extends Controller
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
                 ], $thirdSchemaExistsEdit ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
+                   $skipKitchenExistsEdit ? ['skip_kitchen' => $ri['skipKitchen'] ?? false] : [],
                    $hasCostPriceColEdit ? ['cost_price' => $frozenCostEdit] : []));
             }
 
@@ -7833,6 +7873,8 @@ class PosController extends Controller
         $oldPraReporting = $togglingUser->getRawOriginal('pra_reporting_enabled');
         $togglingUser->pra_reporting_enabled = !$effectiveNow;
         $togglingUser->save();
+        // Dashboard ka "staff PRA se bahar" alert foran sach bole.
+        \App\Services\PraReportingCoverage::forget($companyId);
         $this->auditPraReportingChange(
             $togglingUser,
             $oldPraReporting,
@@ -9176,6 +9218,8 @@ class PosController extends Controller
         $oldEffectivePraReporting = (bool) $cashier->praReportingEnabled($company);
         $cashier->pra_reporting_enabled = $enable;
         $cashier->save();
+        // Dashboard ka "staff PRA se bahar" alert foran sach bole.
+        \App\Services\PraReportingCoverage::forget($companyId);
         $this->auditPraReportingChange(
             $cashier,
             $oldPraReporting,
@@ -11746,9 +11790,15 @@ class PosController extends Controller
         }
     }
 
-    private function resolveItemExemptions(array $requestItems, int $companyId): array
+    /**
+     * @param string|null $orderType  Bill ka order type. SIRF is liye chahiye ke
+     *   "kitchen se chhupi hui line" (Delivery Charges) ka faisla server khud
+     *   kare — dekho App\Support\PosKitchenLines::allowSkip().
+     */
+    private function resolveItemExemptions(array $requestItems, int $companyId, ?string $orderType = null): array
     {
         $resolved = [];
+        $skipUsed = false; // ek bill mein sirf EK line kitchen se chhup sakti hai
         foreach ($requestItems as $item) {
             $itemType = $item['type'] ?? 'product';
             $itemId = $item['item_id'] ?? null;
@@ -11870,6 +11920,18 @@ class PosController extends Controller
             // Third Schedule implies exempt (belt-and-suspenders at billing time)
             if ($isThirdSchedule) { $isExempt = true; }
 
+            // Kitchen se chhupne ki ijazat — poora faisla server ka.
+            $skipKitchenLine = \App\Support\PosKitchenLines::allowSkip([
+                'skip_kitchen'  => $item['skip_kitchen'] ?? false,
+                // resolver ke andar manual line woh hai jiska koi item_id resolve
+                // na hua ho (ya client ne saaf saaf manual kaha ho).
+                'item_type'     => (!$itemId || !empty($item['_manual'])) ? 'manual' : 'product',
+                'is_tax_exempt' => $isExempt,
+            ], $orderType, $skipUsed);
+            if ($skipKitchenLine) {
+                $skipUsed = true;
+            }
+
             $resolved[] = [
                 'type' => $itemType,
                 'item_id' => $itemId,
@@ -11879,6 +11941,12 @@ class PosController extends Controller
                 'lineTotal' => round($qty * $itemPrice, 2),
                 'isExempt' => $isExempt,
                 'isThirdSchedule' => $isThirdSchedule,
+                // Kitchen ki parchi par na chhapne wali line (abhi sirf Delivery
+                // Charges). Faisla SERVER ka hai, client ki darkhwast sirf ek
+                // ishara: manual + delivery order + tax-exempt + poore bill
+                // mein sirf EK. Warna ek cashier apni marzi ki chargeable dish
+                // bawarchi se ghayab kar sakta tha (code review, 1 Sep 2026).
+                'skipKitchen' => $skipKitchenLine,
                 // Task 636: same identity-autofill note discard as the waiter path —
                 // a note that is EXACTLY the cashier's login email/username/name/phone
                 // is browser autofill garbage, never a kitchen instruction.

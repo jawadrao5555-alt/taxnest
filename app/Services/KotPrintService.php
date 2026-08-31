@@ -83,9 +83,15 @@ class KotPrintService
             return 0;
         }
         try {
-            return (int) \App\Models\RestaurantOrderItem::where('order_id', $order->id)
-                ->whereNull('kot_printed_at')
-                ->count();
+            // Non-kitchen lines (Delivery Charges) is ginti se BAHAR. Woh kabhi
+            // chhapti hi nahi, is liye kabhi kot_printed_at stamp nahi khati —
+            // ginti mein rehti to har delivery bill hamesha "kitchen ne dekha
+            // hi nahi" kehta aur safety-net KOT baar baar chalta. Wahid qaida:
+            // App\Support\PosKitchenLines.
+            $q = \App\Models\RestaurantOrderItem::where('order_id', $order->id)
+                ->whereNull('kot_printed_at');
+
+            return (int) \App\Support\PosKitchenLines::scope($q)->count();
         } catch (\Throwable $e) {
             return 0; // never let the signal break a committed bill
         }
@@ -151,7 +157,12 @@ class KotPrintService
             return false;
         }
         try {
-            $row = \App\Models\RestaurantOrderItem::where('order_id', $order->id)
+            // Sirf kitchen wali lines (PosKitchenLines) — warna ek Delivery
+            // Charges row hamesha unseen reh kar har full ticket ko "pehla
+            // fire" bana deti aur reprint gate kabhi band na hota.
+            $row = \App\Support\PosKitchenLines::scope(
+                \App\Models\RestaurantOrderItem::where('order_id', $order->id)
+            )
                 ->selectRaw('COUNT(*) AS total, SUM(CASE WHEN kot_printed_at IS NULL THEN 1 ELSE 0 END) AS unseen')
                 ->first();
             $total = (int) ($row->total ?? 0);
@@ -253,6 +264,12 @@ class KotPrintService
             }
 
             $order->loadMissing('items');
+            // Delivery Charges jaisi non-kitchen lines yahin, SAB HISAAB SE
+            // PEHLE nikal do: delta ids, station mapping aur "kuch chhapna hai
+            // ya nahi" — sab isi chhanti hui list par. Warna ek aisi row jo
+            // kabhi chhapti hi nahi, hamesha unprinted reh kar khali (204)
+            // print job banwati rehti.
+            \App\Support\PosKitchenLines::pruneOrder($order);
             $deltaQ = $delta ? '&delta=1' : '';
             // Delta snapshot (Pizza Master edit-path bug, Aug 2026): bake the
             // unprinted row ids into EVERY job of this send — result-time

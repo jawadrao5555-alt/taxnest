@@ -1838,7 +1838,7 @@ window.addEventListener('popstate', function() {
                     </div>
                     <div class="grid gap-2 {{ ($features->tables ?? false) ? 'grid-cols-2' : 'grid-cols-3' }}">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
-                        <button @click="retailHold ? retailHoldStart() : holdOrder()" :disabled="cart.length === 0 || submitting || (!retailHold && (hasManualItems() || hasDealItems()))" :title="(!retailHold && (hasManualItems() || hasDealItems())) ? window.TXT.ti_manual_deals_pay_first : window.TXT.hs_hold_title" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button @click="retailHold ? retailHoldStart() : holdOrder()" :disabled="cart.length === 0 || submitting || (!retailHold && (holdBlockedByManual() || hasDealItems()))" :title="(!retailHold && (holdBlockedByManual() || hasDealItems())) ? window.TXT.ti_manual_deals_pay_first : window.TXT.hs_hold_title" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -1856,7 +1856,7 @@ window.addEventListener('popstate', function() {
                          Jul 2026 redesign: Send to Kitchen (KOT companies) joins this row —
                          it was removed from the action bar so all bill actions live here. ─── -->
                     @if($features->kot ?? false)
-                    <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first_cart : window.TXT.ti_kot_saves_no_payment" class="w-full py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition flex items-center justify-center gap-1.5">
+                    <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || holdBlockedByManual() || hasDealItems()" :title="(holdBlockedByManual() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first_cart : window.TXT.ti_kot_saves_no_payment" class="w-full py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition flex items-center justify-center gap-1.5">
                         <span class="text-sm leading-none">🍳</span>
                         <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.send_to_kitchen"></span>
                         <kbd class="text-[9px] bg-orange-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">Alt+K</kbd>
@@ -4679,6 +4679,13 @@ function restaurantPos() {
         // but the restaurant Hold/Send-to-Kitchen endpoints require a real
         // item_id, so we gate those actions while a manual line is in cart.
         hasManualItems() { return (this.cart || []).some(i => i && i.item_type === 'manual'); },
+        // ZFC feedback (1 Sep 2026): Delivery order ab HOLD ho sakta hai. Delivery
+        // fee ek synthetic manual line hai — pehle woh poore cart ka Hold/KOT rok
+        // deti thi, halankay delivery order park karna bilkul rozana ka kaam hai.
+        // Hold/Send-to-Kitchen ke liye SIRF asli cashier-typed manual lines rokti
+        // hain; Pay ki routing (hasManualItems) waise hi rehti hai kyunke manual
+        // line bhi to storeInvoice hi samajhta hai.
+        holdBlockedByManual() { return (this.cart || []).some(i => i && i.item_type === 'manual' && !i._delivery); },
         // Deals are billing-only like manual items: the restaurant hold endpoint
         // validates item_type in:product,service,manual → a deal line would 422.
         // Gate Hold/Send-to-Kitchen AND route Pay through processPaymentManual.
@@ -7551,7 +7558,7 @@ function restaurantPos() {
             if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
                 e.preventDefault();
                 if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showRetailHeld || this.retailHoldNaming || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
-                if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems()) return;
+                if (this.cart.length === 0 || this.submitting || this.holdBlockedByManual() || this.hasDealItems()) return;
                 this.sendToKitchen();
                 return;
             }
@@ -7959,7 +7966,7 @@ function restaurantPos() {
         // (unke async loaders bina-tabdeeli recall par false-positive bana dete).
         cartEditFingerprint() {
             return JSON.stringify({
-                items: this.cart.map(i => [i.item_id ?? null, i.item_type || '', i.item_name || '', Number(i.quantity) || 0, Number(i.unit_price) || 0, i.special_notes || '', !!i.is_tax_exempt, i.item_discount_type || 'percentage', Number(i.item_discount_value) || 0]),
+                items: this.cart.map(i => [i.item_id ?? null, i.item_type || '', i.item_name || '', Number(i.quantity) || 0, Number(i.unit_price) || 0, i.special_notes || '', !!i.is_tax_exempt, i.item_discount_type || 'percentage', Number(i.item_discount_value) || 0, !!i.skip_kitchen]),
                 notes: this.kitchenNotes || '',
                 priority: !!this.priorityOrder,
                 dtype: this.discountType || 'percentage',
@@ -7986,7 +7993,7 @@ function restaurantPos() {
         // order latak kar roz day-close block karega. Pehle wo settlement banao.
         canSaveRecalledEdits() {
             return !!this.recalledOrderId && !this.incomingOrderId && !this.editingBillId
-                && !this.hasManualItems() && !this.hasDealItems()
+                && !this.holdBlockedByManual() && !this.hasDealItems()
                 && !(this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable);
         },
         // Enter → action mapping (document handler + search-input race path dono
@@ -8126,7 +8133,11 @@ function restaurantPos() {
                 this.cart[idx].unit_price = amt;
                 this.cart[idx].quantity = 1;
             } else {
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: null, item_type: 'manual', _delivery: true, item_name: 'Delivery Charges', quantity: 1, unit_price: amt, special_notes: '', is_tax_exempt: true, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+                // skip_kitchen: yeh line bill par to chhapti hai magar KOT/KDS par
+                // KABHI nahi — bawarchi ke liye "Delivery Charges" koi dish nahi.
+                // Nishan row ke saath DB tak jata hai, is liye reprint aur purane
+                // orders bhi wahi sach parhte hain.
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: null, item_type: 'manual', _delivery: true, skip_kitchen: true, item_name: 'Delivery Charges', quantity: 1, unit_price: amt, special_notes: '', is_tax_exempt: true, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
             }
         },
         removeDeliveryCharge() {
@@ -8382,18 +8393,31 @@ function restaurantPos() {
                 this.showToast(window.TXT.type_switch_order_safe, 'info');
             }
             if (inc) {
-                if (table.order) {
-                    // Task 867 (Aug 2026): table-status poll stale ho sakta hai — table.order
-                    // purana dine-in show kare jabke waiter ka NAYA order bell-panel mein already
-                    // aa chuka ho. inc (incomingOrders se, har 20s refresh) HAMESHA fresher hai.
-                    // Task 940 (Aug 2026): stale occupied + fresh inc → HAMESHA claimAndLoadIncoming
-                    // (tableClickDirectOpen ka check hatao — warna default cashiers ke liye tile
-                    // purple dikhta hai lekin click par openBoardMenu khulta tha, claim hota hi
-                    // nahi tha). Non-empty cart: warning barqarar (cart kabhi silently discard na ho).
-                    if (this.cart.length === 0) { this._dineTypeRevert = null; this.showTablePicker = false; await this.claimAndLoadIncoming(inc); return; }
+                // Bhara cart: warning barqarar (cart kabhi silently discard na ho).
+                if (this.cart.length !== 0) {
                     this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
                 }
-                await this.claimAndLoadIncoming(inc); return;
+                this._dineTypeRevert = null;
+                this.showTablePicker = false;
+                // Task 940 ne yahan HAMESHA seedha claim laga diya tha, kyunke us
+                // waqt openBoardMenu waiter order ko claim hi nahi karta tha —
+                // tile purple dikhta, click par popup khulta, aur kuch na hota.
+                // Woh khaami ab nahi rahi: boardViewEdit / boardAskFinal /
+                // boardFinalPay teeno waiter-source order ko pehle ATOMIC claim
+                // karte hain (single-winner invariant barqarar).
+                //
+                // ZFC (31 Aug 2026, owner video): is liye waiter wala table ab
+                // wohi options menu kholta hai jo counter-punched table kholta
+                // hai — Open/Edit, Proof Bill, Online adaigi, Make FINAL, Table
+                // Badlein. Pehle waiter table seedha cart mein utar jata tha:
+                // proof bill ka rasta hi nahi tha aur ek ghalat click FINAL kar
+                // deta tha. Jis dukan ne "popup skip" chuna hua hai (
+                // tableClickDirectOpen) us ke liye purana seedha claim hi rahega.
+                if (this.tableClickDirectOpen) { await this.claimAndLoadIncoming(inc); return; }
+                // table.order stale ya ghayab ho sakta hai (poll lag) — inc
+                // hamesha fresher hai, is liye menu ISI par khulta hai.
+                this.openBoardMenu(this.waiterMenuTable(table, inc));
+                return;
             }
             if (table.status === 'occupied') {
                 // 26 Jul 2026 (owner item 5): khali cart + occupied tile = board
@@ -8439,7 +8463,7 @@ function restaurantPos() {
             // waiter order is loaded, or with manual/deal lines (billing-only —
             // hold would 422). On failure fall through to the normal flow so the
             // cashier keeps the cart and can press Hold/F5 manually.
-            if (this.kitchenSettings.dine_in_auto_kot && this.cart.length > 0 && !this.editingBillId && !this.incomingOrderId && !this.hasManualItems() && !this.hasDealItems()) {
+            if (this.kitchenSettings.dine_in_auto_kot && this.cart.length > 0 && !this.editingBillId && !this.incomingOrderId && !this.holdBlockedByManual() && !this.hasDealItems()) {
                 const held = await this.holdOrder({ forcePrintKot: true, successMessage: 'T-' + table.table_number + ' — KOT sent, bill saved in Recall' });
                 if (held) return;
             }
@@ -8600,6 +8624,20 @@ function restaurantPos() {
         },
         boardIsWaiter(t) {
             return !!(t && t.order && t.order.source === 'waiter' && this.incomingForTable(t));
+        },
+        // Waiter ke bhejay hue order ke liye board-menu ka table object.
+        // table-status poll pichhe reh sakta hai (table.order purana ya ghayab),
+        // jabke `inc` bell-panel se har 20s taza hota hai — is liye menu HAMESHA
+        // inc par banta hai. source:'waiter' zaroori hai: boardViewEdit /
+        // boardAskFinal / boardFinalPay isi se pehchante hain ke pehle atomic
+        // claim karna hai. Asal table object ko chhoota nahi (copy banti hai),
+        // warna agla poll ise wapas likh deta.
+        waiterMenuTable(table, inc) {
+            return Object.assign({}, table, {
+                status: 'occupied',
+                occupied_since: table.occupied_since || inc.created_at || null,
+                order: Object.assign({}, table.order || {}, inc, { source: 'waiter' }),
+            });
         },
         boardTileClass(t) {
             const urgent = this.boardTileUrgent(t); // solid stronger tint — no glow (design rule)
@@ -9805,7 +9843,7 @@ function restaurantPos() {
             // and item_type in product,service. Synthetic manual lines (item_id=null,
             // item_type='manual') would 422. Block the action client-side too so the
             // cashier doesn't lose the cart on a server reject.
-            if (this.hasManualItems() || this.hasDealItems()) {
+            if (this.holdBlockedByManual() || this.hasDealItems()) {
                 this.showToast(window.TXT.manual_deals_billing_only_hold, 'error');
                 return null;
             }
@@ -10037,6 +10075,8 @@ function restaurantPos() {
                         is_tax_exempt: !!c.is_tax_exempt,
                         special_notes: c.special_notes || null,
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
+                        // KOT par na chhapne wali line (Delivery Charges).
+                        skip_kitchen: !!c.skip_kitchen,
                         // Choice ids are display hints until the server resolves
                         // the locked deal configuration and freezes its snapshot.
                         deal_choices: c.item_type === 'deal' ? (c.deal_choices || []) : [],
@@ -10305,6 +10345,9 @@ function restaurantPos() {
                         // Flag manual cart lines so the backend doesn't auto-
                         // create a permanent product for them.
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
+                        // KOT par na chhapne wali line (Delivery Charges) — server
+                        // isay sirf manual lines par manta hai.
+                        skip_kitchen: !!c.skip_kitchen,
                     })),
                     payment_method: method,
                     // Cash Received / Wapsi — server stores cash_received + change_due
@@ -10332,9 +10375,15 @@ function restaurantPos() {
                     // BEFORE responding: the very first receipt print can then show
                     // the "Waiter:" line. Provisionals never consume the order.
                     incoming_order_id: (!provisional && this.incomingOrderId) ? this.incomingOrderId : null,
+                    // Parked (recalled) restaurant order — ab delivery order bhi
+                    // hold ho sakta hai, aur delivery fee ki wajah se uski adaigi
+                    // ISI manual raste se aati hai. Bina is id ke woh parked order
+                    // khula reh jata aur roz ka day-close block kar deta.
+                    // Provisionals kabhi settle nahi karte (bill final hi nahi).
+                    recalled_order_id: (!provisional && this.recalledOrderId) ? this.recalledOrderId : null,
                     // Online-adaigi ki tasdeeq isi waiter order ke saath jati hai,
                     // warna server (jaiz taur par) dobara rok deta hai.
-                    online_payment_confirmed: !!(this.incomingOrderId && this._onlineOkByOrder[this.incomingOrderId]),
+                    online_payment_confirmed: (() => { const oid = this.incomingOrderId || this.recalledOrderId; return !!(oid && this._onlineOkByOrder[oid]); })(),
                     // OFFLINE-FIRST dedupe key rides on EVERY attempt (online too).
                     // If the response is lost mid-flight (flaky WiFi: server saved
                     // the bill but the reply never arrived), the queued replay
@@ -10420,7 +10469,10 @@ function restaurantPos() {
                     if (res.status === 422 && data && data.code === 'online_payment_awaited') {
                         this.submitting = false;
                         this.onlineConfirm = {
-                            orderId: this.incomingOrderId,
+                            // Parked order bhi isi gate se rukta hai (delivery fee
+                            // wala cart yahin se pay hota hai) — HAAN wale nishan ko
+                            // usi order par lagao jo asal mein settle hoga.
+                            orderId: this.incomingOrderId || this.recalledOrderId,
                             total: savedTotal,
                             retry: async () => {
                                 this.lastPayTime = 0; // deliberate retry — 3s debounce bypass
@@ -12278,7 +12330,14 @@ function restaurantPos() {
 
         recallOrder(order) {
             if (this.cart.length > 0 && !confirm(window.TXT.replace_cart_with_recalled)) return;
-            this.cart = order.items.map(i => ({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0 }));
+            // skip_kitchen wapas cart par: yehi nishan Delivery Charges line ko
+            // dobara "_delivery" banata hai, warna recall ke baad woh aam manual
+            // line ban kar re-hold rok deti aur KOT par chhap jati.
+            this.cart = order.items.map(i => ({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: i.item_id, item_type: i.item_type, item_name: i.item_name, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price), special_notes: i.special_notes || '', is_tax_exempt: i.is_tax_exempt || false, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: parseFloat(i.item_discount_value) > 0, skip_kitchen: !!i.skip_kitchen, _delivery: !!i.skip_kitchen }));
+            // Delivery-fee input bhi bhar do, warna cashier ko lagta hai fee gayab
+            // hai aur dobara type karne par doosri line ban jati.
+            const recalledFee = this.cart.find(c => c && c._delivery);
+            this.deliveryChargeInput = recalledFee ? recalledFee.unit_price : '';
             this.kitchenNotes = order.kitchen_notes || '';
             this.recalledOrderId = order.id;
             this.priorityOrder = order.priority || false;

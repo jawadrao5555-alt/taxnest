@@ -1566,7 +1566,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/settings/whatsapp', [AdminSettingsController::class, 'updateWhatsApp'])->name('saas.admin.settings.whatsapp');
     Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
 
-    // Support Inbox — support@taxnest.com.pk (super admin only, guarded in controller)
+    // Support Inbox — support@taxnest.pk (super admin only, guarded in controller)
     Route::get('/support-inbox', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'index'])->name('saas.admin.support-inbox');
     Route::post('/support-inbox/send', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'send'])->middleware('throttle:20,1')->name('saas.admin.support-inbox.send');
     Route::get('/support-inbox/unread', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'unread'])->name('saas.admin.support-inbox.unread');

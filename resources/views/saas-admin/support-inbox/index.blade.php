@@ -3,7 +3,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
             <h1 class="text-2xl font-bold text-white">Support Inbox</h1>
-            <p class="text-xs text-gray-500 dark:text-gray-400">support@taxnest.com.pk — emails yahin parhein aur jawab dein</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">support@taxnest.pk — emails yahin parhein aur jawab dein</p>
         </div>
         <button @click="compose = !compose" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Compose Email</button>
     </div>

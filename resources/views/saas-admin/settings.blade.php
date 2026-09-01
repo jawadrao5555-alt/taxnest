@@ -239,7 +239,7 @@
                 <div>
                     <label class="block text-xs font-medium text-gray-400 mb-1">Username (email account)</label>
                     <input type="text" name="smtp_username" value="{{ old('smtp_username', $smtp['username']) }}"
-                           placeholder="e.g. noreply@taxnest.com.pk" autocomplete="off"
+                           placeholder="e.g. noreply@taxnest.pk" autocomplete="off"
                            class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
                     @error('smtp_username') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
                 </div>

@@ -7,7 +7,7 @@ use App\Services\SupportMailService;
 use Illuminate\Http\Request;
 
 /**
- * Support Inbox — read/reply support@taxnest.com.pk inside the admin panel.
+ * Support Inbox — read/reply support@taxnest.pk inside the admin panel.
  * Super-admin only (guarded in each action; admin.auth handles login).
  */
 class SupportInboxController extends Controller

@@ -41,8 +41,8 @@ android {
         //           bhi aaye. Har ring ke saath ab ek uuid jata hai — dono
         //           raston par wohi — warna line wapas aane par agent ka
         //           replay usi call ka doosra popup bana deta.
-        versionCode 8
-        versionName "1.7.0"
+        versionCode 9
+        versionName "1.7.1"
     }
 
     // ── Builds (Task 1345 + 1346) — ek hi package id, ek hi keystore ────────

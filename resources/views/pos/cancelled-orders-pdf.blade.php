@@ -26,7 +26,7 @@
     <table>
         <thead>
             <tr>
-                <th>Order #</th><th>Order Date</th><th>Table</th><th>Type</th><th>Items</th><th>Rs</th><th>KOT</th><th>Punched By</th><th>Cancelled By</th>
+                <th>Order #</th><th>Order Date</th><th>Table</th><th>Type</th><th>Items</th><th>Rs</th><th>KOT</th><th>Punched By</th><th>Cancelled By</th><th>Cancelled At</th>
             </tr>
         </thead>
         <tbody>
@@ -42,6 +42,8 @@
                 <td>@if ($o->kot_sent_at)<span class="kot">YES</span>@else - @endif</td>
                 <td>{{ $o->creator?->name ?? '-' }}</td>
                 <td>{{ $o->canceller?->name ?? 'System' }}</td>
+                {{-- The row is DATED by the order it belongs to, but the audit trail still needs the moment cancel was pressed. --}}
+                <td>{{ optional($o->cancelled_at ?? $o->updated_at)->format('d M Y, h:i A') }}</td>
             </tr>
             @empty
             <tr><td colspan="9">No cancelled orders in this period.</td></tr>

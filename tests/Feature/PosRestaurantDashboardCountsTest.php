@@ -281,6 +281,16 @@ class PosRestaurantDashboardCountsTest extends TestCase
             'cancelled_at' => $now->copy()->setTime(10, 0),
         ]);
 
+        // A row dated past the closing edge (clock skew on a till, a hand-edited
+        // date) must fall OUTSIDE the tile exactly as it falls outside the
+        // report — the tile is bounded at both ends, not just the opening one.
+        $this->order([
+            'status' => 'cancelled',
+            'created_at' => $now->copy()->addDay()->setTime(12, 0),
+            'updated_at' => $now->copy()->setTime(13, 0),
+            'cancelled_at' => $now->copy()->setTime(13, 0),
+        ]);
+
         $this->assertSame(1, $this->dashboardData()['cancelledTodayCount']);
     }
 

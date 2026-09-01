@@ -25,7 +25,9 @@
             <input type="date" name="to" value="{{ $to }}" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white">
         </div>
         <button class="px-4 py-2 rounded-lg text-xs font-bold bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 transition">{{ __('pos.apply_filter') }}</button>
-        @foreach ([['t' => __('pos.today_word'), 'f' => now()->toDateString(), 'e' => now()->toDateString()], ['t' => '7 ' . (__('pos.days_word')), 'f' => now()->subDays(6)->toDateString(), 'e' => now()->toDateString()], ['t' => '30 ' . (__('pos.days_word')), 'f' => now()->subDays(29)->toDateString(), 'e' => now()->toDateString()]] as $q)
+        {{-- Ranges anchor on the BUSINESS day, not the clock: before the cutoff (e.g. 02:00) the calendar has rolled over but the shop's day has not, so a now()-based "Today" would open an empty tomorrow. --}}
+        @php $qd = \Illuminate\Support\Carbon::parse($todayBiz); @endphp
+        @foreach ([['t' => __('pos.today_word'), 'f' => $qd->toDateString(), 'e' => $qd->toDateString()], ['t' => '7 ' . (__('pos.days_word')), 'f' => $qd->copy()->subDays(6)->toDateString(), 'e' => $qd->toDateString()], ['t' => '30 ' . (__('pos.days_word')), 'f' => $qd->copy()->subDays(29)->toDateString(), 'e' => $qd->toDateString()]] as $q)
             <a href="{{ route('pos.restaurant.cancelled-orders', ['from' => $q['f'], 'to' => $q['e']]) }}" class="px-3 py-2 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 transition">{{ $q['t'] }}</a>
         @endforeach
     </form>

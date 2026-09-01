@@ -3014,9 +3014,18 @@ class RestaurantPosController extends Controller
         // Owner (1 Sep 2026): counted by the order's OWN punch time, not by
         // when cancel was pressed — otherwise last night's order cancelled
         // after this morning's cutoff was counted against today.
+        // Both bounds come from the SAME helper the report uses, so the tile and
+        // the report can never disagree (an open-ended ">= today" also let a
+        // future-dated row into the tile that the report itself excluded).
+        [$cxFrom, $cxTo] = \App\Services\PosBusinessDay::windowFor(
+            $companyId,
+            \Illuminate\Support\Carbon::parse($today)->toDateString(),
+            \Illuminate\Support\Carbon::parse($today)->toDateString()
+        );
         $cancelledTodayCount = RestaurantOrder::where('company_id', $companyId)
             ->genuineCancelled()
-            ->where('created_at', '>=', $today)
+            ->where('created_at', '>=', $cxFrom)
+            ->where('created_at', '<', $cxTo)
             ->count();
 
         $totalTables = RestaurantTable::where('company_id', $companyId)->count();
@@ -3478,7 +3487,11 @@ class RestaurantPosController extends Controller
                     ->sum('subtotal')
                 : 0.0,
         ];
-        return view('pos.cancelled-orders', compact('company', 'orders', 'from', 'to', 'summary'));
+        // The quick-range links must be anchored on the current BUSINESS day too,
+        // or before the cutoff the "Today" button asks for a different day than
+        // the one the page just opened on.
+        $todayBiz = \App\Services\PosBusinessDay::current(app('currentCompanyId'));
+        return view('pos.cancelled-orders', compact('company', 'orders', 'from', 'to', 'summary', 'todayBiz'));
     }
 
     public function cancelledOrdersCsv(Request $request)

@@ -41,6 +41,16 @@ class PosRestaurantOrderCancelTest extends TestCase
     {
         parent::setUp();
 
+        // These tests are about WHAT the cancel writes and what the report
+        // shows — not about which day a row lands on. The report now groups by
+        // the shop's business day, so between midnight and the 06:00 cutoff an
+        // order punched at "now" belongs to YESTERDAY and the fixtures would
+        // look empty. Pin the clock to mid-afternoon so the suite behaves the
+        // same at 02:00 as it does at noon; the date rule has its own tests.
+        \Illuminate\Support\Carbon::setTestNow(
+            \Illuminate\Support\Carbon::create(2026, 9, 2, 14, 0, 0)
+        );
+
         Schema::dropAllTables();
 
         Schema::create('companies', function (Blueprint $table) {
@@ -125,6 +135,7 @@ class PosRestaurantOrderCancelTest extends TestCase
     protected function tearDown(): void
     {
         Auth::guard('pos')->logout();
+        \Illuminate\Support\Carbon::setTestNow();
         parent::tearDown();
     }
 

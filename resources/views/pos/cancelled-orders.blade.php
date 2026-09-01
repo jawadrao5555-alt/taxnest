@@ -64,7 +64,11 @@
                 @forelse ($orders as $o)
                 <tr class="border-b border-gray-100 dark:border-gray-800 {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}">
                     <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ $o->order_number }}</td>
-                    <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ optional($o->cancelled_at ?? $o->updated_at)->format('d M, h:i A') }}</td>
+                    {{-- Owner (1 Sep 2026): the ORDER's own date — the day whose
+                         sale this cancellation belongs to. It used to print the
+                         moment cancel was pressed, so a 31 Aug order cancelled
+                         during the next morning's day-close read "01 Sep". --}}
+                    <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ optional($o->created_at)->format('d M, h:i A') }}</td>
                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '—' }}</td>
                     <td class="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell max-w-xs truncate">{{ $o->items->map(fn ($i) => $i->quantity . '× ' . $i->item_name . ($i->was_made ? ' ✓' : ''))->implode(', ') }}</td>
                     <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{{ number_format($o->total_amount) }}</td>
@@ -76,7 +80,12 @@
                         @endif
                     </td>
                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $o->creator?->name ?? '—' }}</td>
-                    <td class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">{{ $o->canceller?->name ?? __('pos.system_word') }}</td>
+                    <td class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">
+                        {{ $o->canceller?->name ?? __('pos.system_word') }}
+                        {{-- when cancel was pressed — kept here so moving the Date
+                             column onto the order's own day loses no information --}}
+                        <span class="block text-[11px] font-normal text-gray-400">{{ optional($o->cancelled_at ?? $o->updated_at)->format('d M, h:i A') }}</span>
+                    </td>
                 </tr>
                 @empty
                 <tr><td colspan="8" class="px-4 py-10 text-center text-sm text-gray-400">{{ __('pos.no_cancelled_orders') }}</td></tr>

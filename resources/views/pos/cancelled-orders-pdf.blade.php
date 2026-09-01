@@ -26,14 +26,15 @@
     <table>
         <thead>
             <tr>
-                <th>Order #</th><th>Cancelled At</th><th>Table</th><th>Type</th><th>Items</th><th>Rs</th><th>KOT</th><th>Punched By</th><th>Cancelled By</th>
+                <th>Order #</th><th>Order Date</th><th>Table</th><th>Type</th><th>Items</th><th>Rs</th><th>KOT</th><th>Punched By</th><th>Cancelled By</th>
             </tr>
         </thead>
         <tbody>
             @forelse ($orders as $o)
             <tr>
                 <td>{{ $o->order_number }}</td>
-                <td>{{ optional($o->cancelled_at ?? $o->updated_at)->format('d M Y, h:i A') }}</td>
+                {{-- the ORDER's own day (the sale it belongs to), not the cancel moment --}}
+                <td>{{ optional($o->created_at)->format('d M Y, h:i A') }}</td>
                 <td>{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '-' }}</td>
                 <td>{{ $o->order_type }}</td>
                 <td>{{ $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name . ($i->was_made ? ' [MADE]' : ''))->implode(', ') }}</td>

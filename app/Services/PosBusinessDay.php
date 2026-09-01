@@ -151,4 +151,28 @@ class PosBusinessDay
     {
         return self::forMomentFbr($companyId, now());
     }
+
+    /**
+     * Timestamp window [start, endExclusive) covering business days
+     * $fromDate..$toDate for a company whose trading day starts at the cutoff.
+     *
+     * Some tables (notably restaurant_orders) have no business_date column, so
+     * "which day does this row belong to?" has to be derived from a real
+     * timestamp. Every such surface must derive it HERE, through one helper, or
+     * a report and the day-close it is meant to explain will disagree.
+     *
+     * Half-open on purpose: the next day's cutoff belongs to the next day.
+     *
+     * @return array{0:\Carbon\Carbon,1:\Carbon\Carbon}
+     */
+    public static function windowFor(int $companyId, string $fromDate, string $toDate): array
+    {
+        $tz = config('app.timezone');
+        $cutoff = self::cutoffFor($companyId);
+
+        return [
+            \Carbon\Carbon::parse($fromDate . ' ' . $cutoff, $tz),
+            \Carbon\Carbon::parse($toDate . ' ' . $cutoff, $tz)->addDay(),
+        ];
+    }
 }

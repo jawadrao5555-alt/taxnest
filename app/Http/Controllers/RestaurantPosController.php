@@ -3008,13 +3008,15 @@ class RestaurantPosController extends Controller
 
         // Task 113 (ZFC, 2 Aug 2026): Cancelled Orders tile — current BUSINESS
         // day's cancelled count, same cutoff window the dashboard's "today"
-        // metrics use ($today = bizDate + cutoff). cancelled_at NULL fallback
-        // (column nayi hai) → updated_at, matching the report's query.
+        // metrics use ($today = bizDate + cutoff).
         // Task 506: genuineCancelled scope — recall-supersede ghosts excluded,
         // same predicate as the Cancelled Orders report.
+        // Owner (1 Sep 2026): counted by the order's OWN punch time, not by
+        // when cancel was pressed — otherwise last night's order cancelled
+        // after this morning's cutoff was counted against today.
         $cancelledTodayCount = RestaurantOrder::where('company_id', $companyId)
             ->genuineCancelled()
-            ->whereRaw('COALESCE(cancelled_at, updated_at) >= ?', [$today])
+            ->where('created_at', '>=', $today)
             ->count();
 
         $totalTables = RestaurantTable::where('company_id', $companyId)->count();
@@ -3417,21 +3419,33 @@ class RestaurantPosController extends Controller
         // today's screen showed a week's cancellations and the shop could not
         // tell what happened TODAY. It now opens on today; the 7 / 30 day quick
         // buttons (and any explicit range) are one click away.
-        $from = $request->query('from') ?: now()->toDateString();
-        $to = $request->query('to') ?: now()->toDateString();
+        // "Today" must be the current BUSINESS day, not the calendar date, or a
+        // shop still trading at 02:00 opens this page on an empty tomorrow.
+        $todayBiz = \App\Services\PosBusinessDay::current($companyId);
+        $from = $request->query('from') ?: $todayBiz;
+        $to = $request->query('to') ?: $todayBiz;
         // Guard: swapped/garbage dates → sane defaults
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = now()->toDateString();
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = now()->toDateString();
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = $todayBiz;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = $todayBiz;
         if ($from > $to) { [$from, $to] = [$to, $from]; }
+
+        // Owner (1 Sep 2026): a cancelled order belongs to the business day it
+        // was PUNCHED on — NOT the moment someone pressed cancel. Orders rung up
+        // on 31 Aug and cancelled during the next morning's day-close were
+        // landing on 1 Sep, so this report (and its Rs total) contradicted the
+        // day-close and the sale figures it exists to explain.
+        // restaurant_orders has no business_date column, so the window is
+        // derived from created_at via the one shared helper.
+        [$dayStart, $dayEnd] = \App\Services\PosBusinessDay::windowFor($companyId, $from, $to);
 
         return RestaurantOrder::where('company_id', $companyId)
             // Task 506: sirf asli (human) cancels — recall+re-hold ke
             // system-supersede ghosts is shared scope se bahar rehte hain.
             ->genuineCancelled()
-            // cancelled_at NULL fallback (column abhi nayi hai) → updated_at
-            ->whereRaw('DATE(COALESCE(cancelled_at, updated_at)) BETWEEN ? AND ?', [$from, $to])
+            ->where('created_at', '>=', $dayStart)
+            ->where('created_at', '<', $dayEnd)
             ->with(['items', 'table', 'creator', 'canceller'])
-            ->orderByDesc(DB::raw('COALESCE(cancelled_at, updated_at)'));
+            ->orderByDesc('created_at');
     }
 
     private function cancelledOrdersGate()
@@ -3475,13 +3489,13 @@ class RestaurantPosController extends Controller
         return response()->streamDownload(function () use ($orders) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel)
-            fputcsv($out, ['Order #', 'Date/Time Cancelled', 'Table', 'Order Type', 'Items', 'Made Items', 'Amount (Rs)', 'KOT Sent', 'Punched By', 'Cancelled By']);
+            fputcsv($out, ['Order #', 'Order Date/Time', 'Table', 'Order Type', 'Items', 'Made Items', 'Amount (Rs)', 'KOT Sent', 'Punched By', 'Cancelled By', 'Cancelled At']);
             foreach ($orders as $o) {
                 $items = $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
                 $made = $o->items->where('was_made', true)->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
                 fputcsv($out, [
                     $o->order_number,
-                    optional($o->cancelled_at ?? $o->updated_at)->format('Y-m-d H:i'),
+                    optional($o->created_at)->format('Y-m-d H:i'),
                     $o->table?->table_number ? 'T-' . $o->table->table_number : '-',
                     $o->order_type,
                     $items,
@@ -3490,6 +3504,7 @@ class RestaurantPosController extends Controller
                     $o->kot_sent_at ? 'YES' : 'no',
                     $o->creator?->name ?? '-',
                     $o->canceller?->name ?? 'System',
+                    optional($o->cancelled_at ?? $o->updated_at)->format('Y-m-d H:i'),
                 ]);
             }
             fclose($out);

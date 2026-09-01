@@ -23,8 +23,9 @@ use Tests\TestCase;
  *      the count is NOT limited to today (a table left open from before the
  *      cutoff is still pending).
  *   2. cancelledTodayCount counts ONLY the current business day's cancelled
- *      orders (COALESCE(cancelled_at, updated_at) window) and is NEVER part
- *      of the tile's pending total badge.
+ *      orders — by the day each order was PUNCHED (created_at window), not by
+ *      when cancel was pressed (owner, 1 Sep 2026) — and is NEVER part of the
+ *      tile's pending total badge.
  *   3. The rendered tile links open tables to pos.restaurant.tables and
  *      cancelled orders to pos.restaurant.cancelled-orders.
  *
@@ -250,6 +251,37 @@ class PosRestaurantDashboardCountsTest extends TestCase
         $this->assertStringNotContainsString('>3</span>', $html);
         // Cancelled count renders in its own card.
         $this->assertStringContainsString('>2</span>', $html);
+    }
+
+    /**
+     * Owner (1 Sep 2026): the tile follows the day an order was PUNCHED, not
+     * the day someone pressed cancel. Orders rung up on the 31st and voided
+     * during the next morning's day-close were being counted against the 1st,
+     * contradicting the day-close the shop had just printed.
+     */
+    public function test_cancelled_count_follows_the_order_day_not_the_cancel_moment(): void
+    {
+        $this->actAs('pos_admin');
+        $now = $this->freezeAfternoon();
+
+        // Yesterday's order, cancelled this morning AFTER today's 06:00 cutoff.
+        // It belongs to YESTERDAY's business — must NOT be counted today.
+        $this->order([
+            'status' => 'cancelled',
+            'created_at' => $now->copy()->subDay()->setTime(20, 0),
+            'updated_at' => $now->copy()->setTime(8, 30),
+            'cancelled_at' => $now->copy()->setTime(8, 30),
+        ]);
+
+        // Today's own order, cancelled today — counted.
+        $this->order([
+            'status' => 'cancelled',
+            'created_at' => $now->copy()->setTime(9, 0),
+            'updated_at' => $now->copy()->setTime(10, 0),
+            'cancelled_at' => $now->copy()->setTime(10, 0),
+        ]);
+
+        $this->assertSame(1, $this->dashboardData()['cancelledTodayCount']);
     }
 
     // ── today-sales business-day window (Task 167) ──────────────────────────

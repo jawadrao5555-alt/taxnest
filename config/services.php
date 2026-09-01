@@ -56,9 +56,11 @@ return [
         // APP_URL: dev/staging point APP_URL at the workspace, and the watchdog
         // must always measure the real live site.
         'url' => env('UPTIME_WATCH_URL', 'https://taxnest.pk/up'),
-        // Origin IP for the Cloudflare-bypass probe. Left empty it is resolved
-        // from the cPanel hostname (never Cloudflare-proxied), so a hosting IP
-        // change needs no redeploy.
+        // Origin IP for the Cloudflare-bypass probe. Since the move to our own
+        // Islamabad server there is no cPanel hostname to resolve, so this must
+        // be pinned in .env — the old fallback would guess a name that either
+        // does not exist or points somewhere else entirely, and the watchdog
+        // would then cry ORIGIN-DOWN while the site is perfectly healthy.
         'origin_ip' => env('UPTIME_WATCH_ORIGIN_IP', ''),
     ],
 

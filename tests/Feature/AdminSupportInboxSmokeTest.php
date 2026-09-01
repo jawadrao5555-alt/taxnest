@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * SMOKE TEST — Support Inbox (support@taxnest.com.pk inside admin panel).
+ * SMOKE TEST — Support Inbox (support@taxnest.pk inside admin panel).
  * The SupportMailService is mocked (no real IMAP/SMTP in tests).
  */
 class AdminSupportInboxSmokeTest extends TestCase
@@ -58,7 +58,7 @@ class AdminSupportInboxSmokeTest extends TestCase
         return [
             'messages' => [[
                 'uid' => 7, 'subject' => 'Login masla', 'from_name' => 'Ali Khan',
-                'from_email' => 'ali@example.com', 'to_email' => 'support@taxnest.com.pk',
+                'from_email' => 'ali@example.com', 'to_email' => 'support@taxnest.pk',
                 'date' => now(), 'seen' => false, 'has_attachments' => true,
             ]],
             'total' => 1, 'page' => 1, 'last_page' => 1,
@@ -131,7 +131,7 @@ class AdminSupportInboxSmokeTest extends TestCase
         $this->mock(SupportMailService::class, function ($m) {
             $m->shouldReceive('getMessage')->with('inbox', 7)->andReturn([
                 'uid' => 7, 'subject' => 'Login masla', 'from_name' => 'Ali Khan',
-                'from_email' => 'ali@example.com', 'to_email' => 'support@taxnest.com.pk',
+                'from_email' => 'ali@example.com', 'to_email' => 'support@taxnest.pk',
                 'date' => now(), 'seen' => true, 'has_attachments' => false,
                 'html' => null, 'text' => 'Mera login nahi chal raha.',
                 'message_id' => '<abc@example.com>', 'references' => '',

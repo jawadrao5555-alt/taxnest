@@ -5,7 +5,7 @@
  * Password comes ONLY from env (SUPPORT_MAIL_PASSWORD) — never hardcode.
  */
 return [
-    'host' => env('SUPPORT_MAIL_HOST', 'mail.taxnest.com.pk'),
+    'host' => env('SUPPORT_MAIL_HOST', 'mail.taxnest.pk'),
     'imap_port' => (int) env('SUPPORT_MAIL_IMAP_PORT', 993),
     'smtp_port' => (int) env('SUPPORT_MAIL_SMTP_PORT', 465),
     'username' => env('SUPPORT_MAIL_USERNAME', 'support@taxnest.pk'),

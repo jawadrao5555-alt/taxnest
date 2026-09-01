@@ -7,6 +7,7 @@ Deep module invariants live in `.agents/memory/` topic files — this file is th
 
 ## User Preferences & Business Rules
 - **Issue-log workflow (owner, 28 Jul 2026)**: jab owner issues bataye, sirf NOTE karo (`.local/issue-log.md` mein) — build/fix mat karo. "Summary do" kahe to logged issues ki summary do; "kaam karo" kahe tab hi implement karo.
+- **Strict feature-update isolation (owner, 2 Sep 2026)**: kisi feature ko update karte waqt sirf us feature ka behavior/settings change hon. Existing company settings, per-branch values, staff permissions, feature toggles, saved preferences aur legacy data kabhi silently overwrite/reset nahi honge. Har change se pehle relevant before-state capture, OFF/ON + old-data regression tests, targeted migration checks, aur live post-deploy verification lazmi hai.
 - **CURRENT FOCUS (owner, 18 Jul 2026): work ONLY on NestPOS PRA (PRA POS) for now** — DI, FBR POS, admin/SaaS surfaces sirf tab touch karo jab owner kahe.
 - ZIA CORPORATION is a REAL production account (not demo) — NTN 3620291786117, Digital Invoice ONLY (no POS data).
 - NestPOS Enterprise Store (company_id 11) = dedicated POS test company; Test Trading Company (company_id 12) = admin-approval-workflow testing. All dev/QA logins live in untracked `.local/qa-creds.env` — repo is PUBLIC, never write passwords into tracked files.

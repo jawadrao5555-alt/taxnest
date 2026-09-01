@@ -19,12 +19,12 @@
 # proof) and falls back to prefix checks when the state file is absent.
 #
 # Credentials: LIVE_FBR_QA_LOGIN / LIVE_FBR_QA_PASS from env or .local/qa-creds.env.
-# Usage: bash scripts/fbr-qa-seed.sh            # against https://taxnest.com.pk
+# Usage: bash scripts/fbr-qa-seed.sh            # against https://taxnest.pk
 #        BASE_URL=... bash scripts/fbr-qa-seed.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE_URL="${BASE_URL:-https://taxnest.com.pk}"
+BASE_URL="${BASE_URL:-https://taxnest.pk}"
 QA_COMPANY_NAME="${QA_COMPANY_NAME:-QA FBR Audit Store}"
 STATE_FILE="${QA_STATE_FILE:-.local/fbr-qa-seed-state.env}"
 if [ -f .local/qa-creds.env ]; then . .local/qa-creds.env; fi

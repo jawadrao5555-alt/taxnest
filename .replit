@@ -19,7 +19,7 @@ CACHE_STORE = "file"
 QUEUE_CONNECTION = "sync"
 PRA_PROXY_URL = "https://nestpay.replit.app/api/pra-proxy/submit"
 VAPID_SUBJECT = "mailto:admin@taxnest.com.pk"
-CPANEL_SSH_HOST = "taxnest.com.pk"
+CPANEL_SSH_HOST = "taxnest.pk"
 CPANEL_SSH_PORT = "22"
 CPANEL_SSH_USERNAME = "taxnestc"
 

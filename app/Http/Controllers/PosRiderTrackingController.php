@@ -56,7 +56,7 @@ class PosRiderTrackingController extends Controller
     // APK hosted on OUR server (never a GitHub
     // release — desktop agents auto-update from this repo's releases/latest).
     // Latest version lives in the rider_app_latest_version SystemSetting (Task 443).
-    private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-rider.apk';
+    private const APP_DOWNLOAD_URL = 'https://taxnest.pk/downloads/taxnest-rider.apk';
 
     // ─── Shared gates ───────────────────────────────────────────────────────
 

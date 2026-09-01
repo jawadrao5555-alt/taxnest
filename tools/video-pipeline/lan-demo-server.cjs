@@ -74,7 +74,7 @@ const SHIM = `<script>
   window.agentAPI = {
     getConfig: function () {
       return Promise.resolve({
-        serverUrl: 'https://taxnest.com.pk', companyId: '9904',
+        serverUrl: 'https://taxnest.pk', companyId: '9904',
         apiKey: '****************', pcName: 'COUNTER-PC',
         receiptPrinter: 'EPSON TM-T82 Receipt',
       });

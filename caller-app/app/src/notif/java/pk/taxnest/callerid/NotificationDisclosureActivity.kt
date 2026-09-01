@@ -26,7 +26,7 @@ import android.widget.TextView
 class NotificationDisclosureActivity : BaseActivity() {
 
     companion object {
-        const val PRIVACY_URL = "https://taxnest.com.pk/privacy"
+        const val PRIVACY_URL = "https://taxnest.pk/privacy"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

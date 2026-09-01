@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const src = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
-const ORIGIN = 'https://taxnest.com.pk';
+const ORIGIN = 'https://taxnest.pk';
 const listeners = {};
 const cacheStores = new Map();
 let networkHandler;

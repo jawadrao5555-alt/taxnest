@@ -9,7 +9,7 @@
 
         <title>TaxNest — Pakistan FBR &amp; PRA Tax Compliance Platform</title>
         <meta name="robots" content="noindex">
-        <link rel="canonical" href="https://taxnest.com.pk/">
+        <link rel="canonical" href="https://taxnest.pk/">
 
         <!-- Fonts -->
         {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}

@@ -11,14 +11,14 @@
 #   LIVE_FBR_QA_LOGIN / LIVE_FBR_QA_PASS   (repo is PUBLIC — never hardcode)
 #
 # Usage:
-#   bash scripts/fbr-live-spot-check.sh                 # against https://taxnest.com.pk
+#   bash scripts/fbr-live-spot-check.sh                 # against https://taxnest.pk
 #   BASE_URL=http://127.0.0.1:5000 LIVE_FBR_QA_LOGIN=... LIVE_FBR_QA_PASS=... bash scripts/fbr-live-spot-check.sh
 #
 # Exit codes: 0 = all good, 1 = a page failed, 2 = could not run (login/server)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-BASE_URL="${BASE_URL:-https://taxnest.com.pk}"
+BASE_URL="${BASE_URL:-https://taxnest.pk}"
 # Explicit env vars take precedence over the creds file (documented usage above).
 _ENV_LOGIN="${LIVE_FBR_QA_LOGIN:-}"; _ENV_PASS="${LIVE_FBR_QA_PASS:-}"
 if [ -f .local/qa-creds.env ]; then . .local/qa-creds.env; fi

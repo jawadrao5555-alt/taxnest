@@ -514,7 +514,7 @@ return [
     'bold_receipt_hint' => 'پورے بل کو موٹے، گہرے فونٹ میں پرنٹ کریں (جیسے کچن ٹکٹ)۔ اگر تھرمل پرنٹر بہت ہلکا یا پتلا پرنٹ کرتا ہے تو یہ استعمال کریں۔',
     'bold_receipt_print' => 'بولڈ رسید پرنٹ',
     'box_type' => 'باکس کی قسم',
-    'brand_developed_by' => 'تیار کردہ از: taxnest.com.pk',
+    'brand_developed_by' => 'تیار کردہ از: taxnest.pk',
     'buffer_colon' => 'بفر:',
     'bulk_discount_pct' => 'بلک ڈسکاؤنٹ %',
     'bulk_discount_qty' => 'بلک ڈسکاؤنٹ مقدار',

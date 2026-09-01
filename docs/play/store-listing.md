@@ -21,9 +21,9 @@ flavor ka AAB (`caller-app/app/build/outputs/bundle/playRelease/app-play-release
 | Tags (up to 5) | Business, Productivity tools, Point of sale, Customer management, Retail |
 | Contact email | wohi jo website ke Contact page par hai (admin → settings mein set) |
 | Contact phone | shop support number (optional but bharna behtar) |
-| Website | `https://taxnest.com.pk/pos` |
-| Privacy policy URL | `https://taxnest.com.pk/privacy` |
-| Data deletion URL | `https://taxnest.com.pk/data-deletion` |
+| Website | `https://taxnest.pk/pos` |
+| Privacy policy URL | `https://taxnest.pk/privacy` |
+| Data deletion URL | `https://taxnest.pk/data-deletion` |
 
 > Dono URLs public hain (login ke baghair khulte hain) — reviewer ye khud kholta hai.
 
@@ -90,7 +90,7 @@ stored, not sent.
 
 WHAT IS SENT, AND WHERE
 
-Only four things, and only to your own shop account on taxnest.com.pk over a
+Only four things, and only to your own shop account on taxnest.pk over a
 secure HTTPS connection: the caller's number, the caller's name if the phone
 shows one, the time, and whether it was a SIM call or a WhatsApp call. That is
 what draws the pop-up on your sale screen. Nothing goes to any third party.
@@ -114,9 +114,9 @@ REQUIREMENTS
 • Android 8.0 or newer
 • Internet on the shop phone
 
-Privacy Policy: https://taxnest.com.pk/privacy
-Delete your data: https://taxnest.com.pk/data-deletion
-Support: https://taxnest.com.pk/contact
+Privacy Policy: https://taxnest.pk/privacy
+Delete your data: https://taxnest.pk/data-deletion
+Support: https://taxnest.pk/contact
 ```
 
 Approx 2,700 characters — Play ki 4,000 ki hadd ke andar.
@@ -195,7 +195,7 @@ Steps to see the main feature:
    disclosure explaining what is read and where it is sent. Tap agree, then
    enable "TaxNest Caller ID" in the Android list.
 3. Back in the app, tap the "Send test call" button (the third button).
-4. Open https://taxnest.com.pk/login in a browser, sign in with the same
+4. Open https://taxnest.pk/login in a browser, sign in with the same
    account, open POS -> Sale screen: the caller pop-up appears there.
    (The pop-up is the whole point of the app; it is shown on the merchant's
    POS screen, not inside the app.)

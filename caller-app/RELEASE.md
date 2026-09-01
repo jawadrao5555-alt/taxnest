@@ -426,7 +426,7 @@ downgrade, and swapping builds is a same-signature in-place update.
 APKs are **never committed** (public repo, disk quota) and **never published to
 GitHub Releases** (desktop agents self-update from `releases/latest`).
 
-> SSH/scp must target **`cpanel.taxnest.com.pk`** (DNS-only). `taxnest.com.pk`
+> SSH/scp must target **`cpanel.taxnest.com.pk`** (DNS-only). `taxnest.pk`
 > is Cloudflare-proxied — port 22 there just times out and looks like "live is
 > unreachable". Note `scp` takes `-P 22`, `ssh` takes `-p 22`.
 
@@ -458,8 +458,8 @@ local check say nothing about what the website actually serves, so re-download
 the two canonical URLs and run the same guard over the downloaded bytes:
 
 ```bash
-cd /tmp && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller.apk \
-        && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller-plus.apk
+cd /tmp && curl -sLO https://taxnest.pk/downloads/taxnest-caller.apk \
+        && curl -sLO https://taxnest.pk/downloads/taxnest-caller-plus.apk
 cd /home/runner/workspace && bash scripts/apk-release-check.sh \
   --expect-version 1.4.0 --expect-code 5 \
   /tmp/taxnest-caller.apk /tmp/taxnest-caller-plus.apk
@@ -470,8 +470,8 @@ the **versioned** URLs instead and expect the new numbers — that is what prove
 the upload, e.g. for 1.7.0:
 
 ```bash
-cd /tmp && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller-1.7.0.apk \
-        && curl -sLO https://taxnest.com.pk/downloads/taxnest-caller-plus-1.7.0.apk
+cd /tmp && curl -sLO https://taxnest.pk/downloads/taxnest-caller-1.7.0.apk \
+        && curl -sLO https://taxnest.pk/downloads/taxnest-caller-plus-1.7.0.apk
 cd /home/runner/workspace && bash scripts/apk-release-check.sh \
   --expect-version 1.7.0 --expect-code 8 \
   /tmp/taxnest-caller-1.7.0.apk /tmp/taxnest-caller-plus-1.7.0.apk

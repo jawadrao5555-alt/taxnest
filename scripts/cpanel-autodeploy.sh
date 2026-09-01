@@ -36,7 +36,7 @@ set -u
 
 DEPLOYPATH="/home/$USER/public_html"
 PHP="/usr/local/bin/php"
-LIVE_URL="https://taxnest.com.pk"
+LIVE_URL="https://taxnest.pk"
 # Task 1053: derive the repo-clone dir from THIS script's own location (it
 # always lives at <clone>/scripts/), falling back to cwd — so a caller with a
 # wrong working directory (e.g. cron's $HOME default) can never make us stage
@@ -233,9 +233,9 @@ for TRY in 1 2 3; do
   OP_OUT=$(curl -s --max-time 15 "$LIVE_URL/$RPROBE" || true)
   case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
   # Origin-direct fallback: bypasses Cloudflare, still a real PHP-FPM hit.
-  OP_OUT=$(curl -sk --max-time 15 -H "Host: taxnest.com.pk" "https://127.0.0.1/$RPROBE" || true)
+  OP_OUT=$(curl -sk --max-time 15 -H "Host: taxnest.pk" "https://127.0.0.1/$RPROBE" || true)
   case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
-  OP_OUT=$(curl -s --max-time 15 -H "Host: taxnest.com.pk" "http://127.0.0.1/$RPROBE" || true)
+  OP_OUT=$(curl -s --max-time 15 -H "Host: taxnest.pk" "http://127.0.0.1/$RPROBE" || true)
   case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
   sleep 3
 done

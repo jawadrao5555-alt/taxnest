@@ -37,12 +37,12 @@ done
 cd "$(dirname "$0")/.."
 
 KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
-# Cloudflare (Aug 2026): taxnest.com.pk A record is proxied — SSH must go to
+# Cloudflare (Aug 2026): taxnest.pk A record is proxied — SSH must go to
 # the origin cPanel box directly. cpanel.taxnest.com.pk is DNS-only (grey cloud).
 HOST="taxnestc@cpanel.taxnest.com.pk"
 PORT=22
 LIVE_DIR="/home/taxnestc/public_html"
-LIVE_URL="https://taxnest.com.pk"   # NOT taxnest.pk (different server, 403)
+LIVE_URL="https://taxnest.pk"   # NOT taxnest.pk (different server, 403)
 SSH_OPTS=(-i "$KEY" -p "$PORT" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
 
 fail() { echo ""; echo "DEPLOY FAILED: $*" >&2; exit 1; }
@@ -189,9 +189,9 @@ echo "REMOTE_STEP: web OPcache reset"
 echo '<?php opcache_reset(); echo "OPCACHE_RESET_OK ".__DIR__; ?>' > "public/$RPROBE" || exit 95
 OP_OK=0
 for TRY in 1 2 3; do
-  OP_OUT=$(curl -s --max-time 15 "https://taxnest.com.pk/$RPROBE" || true)
+  OP_OUT=$(curl -s --max-time 15 "https://taxnest.pk/$RPROBE" || true)
   case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
-  OP_OUT=$(curl -sk --max-time 15 -H "Host: taxnest.com.pk" "https://127.0.0.1/$RPROBE" || true)
+  OP_OUT=$(curl -sk --max-time 15 -H "Host: taxnest.pk" "https://127.0.0.1/$RPROBE" || true)
   case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
   sleep 3
 done

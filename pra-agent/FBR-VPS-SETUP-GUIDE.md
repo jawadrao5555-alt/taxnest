@@ -30,10 +30,10 @@ billing 100% web par hoti hai; VPS sirf bills ko FBR tak pohnchata hai.
 
 ## Qadam 2 — Har client ke liye TaxNest side ON karna (ye web par hota hai)
 
-1. taxnest.com.pk par us client ke **FBR POS → Settings** kholein.
+1. taxnest.pk par us client ke **FBR POS → Settings** kholein.
 2. **POS ID** dalein, Environment **Production**, Submission Mode **Fiscal Device** → Save.
 3. Screen par 3 values aayengi — copy kar lein:
-   - Server URL: `https://taxnest.com.pk/api/agent`
+   - Server URL: `https://taxnest.pk/api/agent`
    - Company ID: (number)
    - API Key: `tnk_...`
 

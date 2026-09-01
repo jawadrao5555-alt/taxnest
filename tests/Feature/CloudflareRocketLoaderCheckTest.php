@@ -23,7 +23,7 @@ class CloudflareRocketLoaderCheckTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const URL = 'https://taxnest.com.pk/';
+    private const URL = 'https://taxnest.pk/';
 
     protected function setUp(): void
     {

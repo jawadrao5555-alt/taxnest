@@ -36,4 +36,4 @@ Invoice، FBR reporting، PDF، email، QR code، اور AI reader — سب ای
 آج ہی مفت trial شروع کریں۔
 
 # seg12 — end card (~2.3s)
-taxnest.com.pk
+taxnest.pk

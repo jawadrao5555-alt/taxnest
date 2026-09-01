@@ -1,7 +1,7 @@
 # Android WebView shells — blank-screen recovery (shared contract)
 
 **Applies to:** `pos-app`, `fbr-pos-app`, `di-app`, `waiter-app` — the four thin
-WebView shells around `taxnest.com.pk`. They are deliberate clones of one
+WebView shells around `taxnest.pk`. They are deliberate clones of one
 another: `pos-app/app/src/main/java/pk/taxnest/pos/MainActivity.kt` is the
 template, the other three differ only in package, start URL, user-agent tag,
 icon, brand colour and (POS/FBR only) the push hooks.

@@ -55,7 +55,7 @@ test par rakhein, 14 din baad production ki darkhwast dein.
 3. **Verification:** Google identity documents maangta hai —
    - Personal: CNIC/passport ki tasveer, address, phone.
    - Organization: D-U-N-S, business ka legal naam/address, website
-     (`taxnest.com.pk`), aur us website ki milkiyat ki tasdeeq, plus ek
+     (`taxnest.pk`), aur us website ki milkiyat ki tasdeeq, plus ek
      "authorised representative" ki identity.
 4. Contact email par jo verification link aaye usay foran kholein.
 
@@ -86,7 +86,7 @@ Phir **Main store listing** (`docs/play/store-listing.md` se paste):
 
 Console → **Policy → App content**. Har item green tick hona chahiye:
 
-- [ ] **Privacy policy** → `https://taxnest.com.pk/privacy`
+- [ ] **Privacy policy** → `https://taxnest.pk/privacy`
 - [ ] **App access** → "All or some functionality is restricted" + demo login
       aur steps (store-listing.md §6 ka matn). Pehle QA shop ka password reset
       kar ke Unlimited plan + Caller ID ON karein.
@@ -97,7 +97,7 @@ Console → **Policy → App content**. Har item green tick hona chahiye:
 - [ ] **Financial features** → No (app koi payment nahi karti)
 - [ ] **Health apps** → No
 - [ ] **Data safety** → `docs/play/data-safety.md` ka har jawab
-- [ ] **Account deletion** → `https://taxnest.com.pk/data-deletion` (Data safety
+- [ ] **Account deletion** → `https://taxnest.pk/data-deletion` (Data safety
       ke andar "users can request data deletion" ke saath)
 
 ---
@@ -139,7 +139,7 @@ Console → **Policy → App content**. Har item green tick hona chahiye:
 
 | Reject ki wajah | Kya karna hai |
 |---|---|
-| **Privacy policy missing / doesn't cover the app** | `https://taxnest.com.pk/privacy` ka link dobara dein aur §3 (Caller ID section) ki taraf ishara karein — usmein data, maqsad, retention aur deletion sab likha hai |
+| **Privacy policy missing / doesn't cover the app** | `https://taxnest.pk/privacy` ka link dobara dein aur §3 (Caller ID section) ki taraf ishara karein — usmein data, maqsad, retention aur deletion sab likha hai |
 | **Data safety mismatch** | `docs/play/data-safety.md` ke mutabiq form dobara check karein; aksar wajah yeh hoti hai ke koi type "collected" nahi kiya gaya. Zyada declare karna mehfooz hai |
 | **Prominent disclosure missing** | App mein pehle se hai — disclosure screen ka screenshot bhejein aur likhein ke woh notification-access maangne se pehle aati hai, agree/not-now dono ke saath |
 | **Notification access / Call Log policy** | `docs/play/data-safety.md` §3 ka poora justification bhejein. Zor is baat par: app Call Log ya SMS permission maangti hi nahi, aur "Caller ID" Google ki apni policy mein manzoor-shuda use case hai. Na chale to §4 ka Plan B (sirf-SIM build) |
@@ -147,7 +147,7 @@ Console → **Policy → App content**. Har item green tick hona chahiye:
 | **Minimum functionality** | Jawab: yeh companion app hai jo mojooda NestPOS subscription ke saath kaam karti hai; iska apna UI (login, status, disclosure, test call) mojood hai aur yeh WebView shell nahi |
 | **Metadata / keyword spam** | Title "TaxNest Caller ID" saaf hai; description mein koi "best/#1" jaisa dawa na daalein |
 | **Target API level** | Play build pehle se Android 16 (API 36) par hai — yeh nahi aana chahiye |
-| **Account deletion URL** | `https://taxnest.com.pk/data-deletion` |
+| **Account deletion URL** | `https://taxnest.pk/data-deletion` |
 
 Har appeal Console ke "Appeal" button se hoti hai. Ek hi baar mein poora
 justification bhejein, tukron mein nahi.

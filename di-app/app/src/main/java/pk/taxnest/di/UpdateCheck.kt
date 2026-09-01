@@ -33,7 +33,7 @@ object UpdateCheck {
 
     /** Server-side app key for /api/app-version?app=… */
     private const val APP_KEY = "di"
-    private const val ENDPOINT = "https://taxnest.com.pk/api/app-version?app=$APP_KEY"
+    private const val ENDPOINT = "https://taxnest.pk/api/app-version?app=$APP_KEY"
 
     /** once-per-process guard (configChanges covers rotation, this covers re-launches of the activity in the same process) */
     @Volatile private var checked = false
@@ -56,7 +56,7 @@ object UpdateCheck {
                 if (latest.isEmpty() || apkUrl.isEmpty()) return@Thread
                 // Sirf first-party https APK — kabhi kisi aur host se install nahi.
                 val u = Uri.parse(apkUrl)
-                if (u.scheme != "https" || u.host != "taxnest.com.pk") return@Thread
+                if (u.scheme != "https" || u.host != "taxnest.pk") return@Thread
                 if (!isNewer(latest, BuildConfig.VERSION_NAME)) return@Thread
                 activity.runOnUiThread {
                     if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread

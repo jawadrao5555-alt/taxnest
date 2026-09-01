@@ -18,7 +18,7 @@
 #
 # Usage:
 #   bash scripts/live-screen-smoke.sh
-#   LIVE_URL=https://taxnest.com.pk SMOKE_LOGIN=... SMOKE_PASS=... bash scripts/live-screen-smoke.sh
+#   LIVE_URL=https://taxnest.pk SMOKE_LOGIN=... SMOKE_PASS=... bash scripts/live-screen-smoke.sh
 #
 # Credentials: qa.fullaudit@taxnest.com.pk + LIVE_QA_PASS from the untracked
 # .local/qa-creds.env (repo is PUBLIC — never hardcode passwords here).
@@ -29,7 +29,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-LIVE_URL="${LIVE_URL:-https://taxnest.com.pk}"
+LIVE_URL="${LIVE_URL:-https://taxnest.pk}"
 if [ -f .local/qa-creds.env ]; then . .local/qa-creds.env; fi
 LOGIN="${SMOKE_LOGIN:-qa.fullaudit@taxnest.com.pk}"
 PASS="${SMOKE_PASS:-${LIVE_QA_PASS:-}}"
@@ -90,7 +90,7 @@ fetch() {
 # live's caches ONCE over SSH and retry that page; only a second miss FAILs.
 # No SSH key (owner machine) => old behavior (fail on first miss) unchanged.
 SSH_KEY="${SMOKE_SSH_KEY:-/home/runner/workspace/.local/ssh/cpanel_deploy_key}"
-SSH_HOST="taxnestc@cpanel.taxnest.com.pk"   # DNS-only host; taxnest.com.pk is Cloudflare-proxied (port 22 dead)
+SSH_HOST="taxnestc@cpanel.taxnest.com.pk"   # DNS-only host; taxnest.pk is Cloudflare-proxied (port 22 dead)
 SANITIZE_DONE=0   # 0 = not attempted, 1 = succeeded, 2 = attempted & failed (don't retry again)
 
 # sanitize_live_caches -> 0 if the sanitize ran & OPcache reset confirmed
@@ -112,7 +112,7 @@ $PHP84 artisan view:clear 2>&1 || exit 94
 $PHP84 artisan view:cache 2>&1 || exit 94
 echo '<?php opcache_reset(); echo "OPCACHE_RESET_OK"; ?>' > "public/$RPROBE" || exit 95
 for TRY in 1 2 3; do
-  OP_OUT=$(curl -s --max-time 15 "https://taxnest.com.pk/$RPROBE" || true)
+  OP_OUT=$(curl -s --max-time 15 "https://taxnest.pk/$RPROBE" || true)
   case "$OP_OUT" in *OPCACHE_RESET_OK*) echo "SANITIZE_OK"; exit 0 ;; esac
   sleep 3
 done

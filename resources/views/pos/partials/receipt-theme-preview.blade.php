@@ -163,7 +163,7 @@
                 <div style="font-weight:bold;">FBR POS INTEGRATED</div>
                 <div>Powered by TaxNest FBR POS</div>
                 @else
-                <div x-show="p.devby">Developed by: taxnest.com.pk</div>
+                <div x-show="p.devby">Developed by: taxnest.pk</div>
                 <div>14/08/2026 07:45:12 PM</div>
                 @endif
             </div>

@@ -104,7 +104,7 @@ const cards = {
     <h1 style="font-size:68px" dir="rtl">آج ہی <span class="gold">MUFT trial</span><br>شروع کریں</h1>
     <div class="bar"></div>
     <div class="gold" style="font-size:48px;font-weight:800;
-         font-family:system-ui,'DejaVu Sans',sans-serif;letter-spacing:1px">taxnest.com.pk</div>
+         font-family:system-ui,'DejaVu Sans',sans-serif;letter-spacing:1px">taxnest.pk</div>
   </div>`,
 
   end: `<div class="wrap">
@@ -112,7 +112,7 @@ const cards = {
     <div class="wm" style="font-size:96px;margin-top:-8px">INVOICE</div>
     <div class="faint" style="font-size:22px;letter-spacing:5px;margin-top:4px">BY TAXNEST</div>
     <div class="bar"></div>
-    <div class="faint" style="font-size:30px;margin-top:12px">taxnest.com.pk</div>
+    <div class="faint" style="font-size:30px;margin-top:12px">taxnest.pk</div>
   </div>`,
 };
 

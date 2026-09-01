@@ -20,7 +20,7 @@
 #
 # The reverse regression is just as expensive: "clean up the Play build" edits
 # that strip self-update or bump `targetSdk` for the WEBSITE flavors too. Then
-# every phone that installed from taxnest.com.pk silently stops self-updating
+# every phone that installed from taxnest.pk silently stops self-updating
 # (there is no store to fall back on) and their runtime behaviour changes under
 # them. So this script asserts BOTH directions.
 #
@@ -560,7 +560,7 @@ def check_website_apk(path, flavor):
             out("OK: REQUEST_INSTALL_PACKAGES still declared (self-update).")
         else:
             bad(label, "REQUEST_INSTALL_PACKAGES is GONE. Website phones install from "
-                       "taxnest.com.pk and have no store to fall back on — without it the "
+                       "taxnest.pk and have no store to fall back on — without it the "
                        "in-app update can download the APK but never install it, and every "
                        "shop is stuck on this version for good. Only the `play` flavor may "
                        "remove it.")

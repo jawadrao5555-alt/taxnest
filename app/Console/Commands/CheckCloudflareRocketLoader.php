@@ -32,11 +32,11 @@ use Illuminate\Support\Facades\Mail;
 class CheckCloudflareRocketLoader extends Command
 {
     protected $signature = 'cloudflare:check-rocket-loader
-        {--url= : Override the page to check (default: https://taxnest.com.pk/)}';
+        {--url= : Override the page to check (default: https://taxnest.pk/)}';
 
     protected $description = 'Alert admins if Cloudflare Rocket Loader is detected ON for the live site.';
 
-    private const DEFAULT_URL = 'https://taxnest.com.pk/';
+    private const DEFAULT_URL = 'https://taxnest.pk/';
 
     /** SystemSetting key holding the last admin-alert timestamp. */
     private const ALERT_AT_KEY = 'rocket_loader_last_alert_at';
@@ -241,7 +241,7 @@ class CheckCloudflareRocketLoader extends Command
                     . "Rocket Loader delays/rewrites inline scripts and BREAKS the POS sale screen\n"
                     . "(Alpine x-data stops booting — cashiers cannot add items to bills).\n\n"
                     . "Fix NOW:\n"
-                    . "1. https://dash.cloudflare.com -> taxnest.com.pk -> Speed -> Optimization\n"
+                    . "1. https://dash.cloudflare.com -> taxnest.pk -> Speed -> Optimization\n"
                     . "2. Turn Rocket Loader OFF\n"
                     . "3. Hard-refresh a POS sale screen to confirm items register again\n\n"
                     . "(See docs/cloudflare-setup-guide.md — Rocket Loader must stay OFF.)\n\n"

@@ -38,7 +38,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 
 /**
- * TaxNest DI (Digital Invoicing) — thin WebView shell around https://taxnest.com.pk.
+ * TaxNest DI (Digital Invoicing) — thin WebView shell around https://taxnest.pk.
  *
  * Deliberately "dumb": ALL product logic lives on the server, so web deploys
  * update the app instantly and this APK almost never needs a re-release.
@@ -46,7 +46,7 @@ import android.widget.Toast
  * own role-based screen — server-side routing decides, not the app.
  *
  * What the shell DOES handle natively:
- *  - keeping navigation inside taxnest.com.pk (everything else → system apps:
+ *  - keeping navigation inside taxnest.pk (everything else → system apps:
  *    tel:, WhatsApp, external sites)
  *  - target=_blank popups (invoice PDFs etc.) routed back into the same view
  *  - file downloads (PDF/Excel exports) via DownloadManager WITH session
@@ -83,8 +83,8 @@ import android.widget.Toast
 class MainActivity : Activity() {
 
     companion object {
-        const val BASE_HOST = "taxnest.com.pk"
-        const val START_URL = "https://taxnest.com.pk/login"
+        const val BASE_HOST = "taxnest.pk"
+        const val START_URL = "https://taxnest.pk/login"
         const val FILE_PICK_REQUEST = 71
 
         // ── Blank-screen recovery tuning (Task #1491) ─────────────────────

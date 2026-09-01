@@ -81,7 +81,7 @@ Server ka poora chain test ho chuka hai. Neeche wali baatein **asli phone**
 ke baghair prove nahi hoti — please ek baar khud chala kar dekh lein.
 
 **Pehle: install aur sign in**
-1. Phone par `taxnest.com.pk/download` kholein → **TaxNest Caller ID** APK download karein.
+1. Phone par `taxnest.pk/download` kholein → **TaxNest Caller ID** APK download karein.
 2. Install karein (Android "unknown sources" ki ijazat maangay to allow kar dein).
 3. App kholein → apni **POS admin login** (wohi email aur password) se sign in karein.
 4. App **notification access** maangay ga → Allow kar dein. Yeh na dein to WhatsApp calls detect nahi hongi.

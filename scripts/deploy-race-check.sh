@@ -13,7 +13,7 @@
 # bash scripts/deploy-live.sh) in another, and read the verdict.
 set -u
 
-BASE_URL="${BASE_URL:-https://taxnest.com.pk}"
+BASE_URL="${BASE_URL:-https://taxnest.pk}"
 DURATION="${DURATION:-60}"
 PATHS=("/pos/login" "/fbr-pos/login" "/")
 

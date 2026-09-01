@@ -123,8 +123,8 @@ AAB phone par seedha install nahi hota. Do raste hain:
         Task 1362 — is liye purane phone par ab banner aana CHAHIYE)
 
 ### D. Website ke naye safhay (kisi bhi phone/computer par)
-18. [ ] `taxnest.com.pk/privacy` bina login khule aur Caller ID ka hissa saaf ho
-19. [ ] `taxnest.com.pk/data-deletion` bina login khule
+18. [ ] `taxnest.pk/privacy` bina login khule aur Caller ID ka hissa saaf ho
+19. [ ] `taxnest.pk/data-deletion` bina login khule
 20. [ ] Kisi bhi marketing safhe ke footer mein dono link mojood aur chalu hon
 
 ---

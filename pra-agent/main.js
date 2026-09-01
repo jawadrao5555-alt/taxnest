@@ -363,7 +363,7 @@ async function applyLanSettings() {
 // Zero-config default (v1.5.0): the POS window can open BEFORE the agent is
 // configured — it just loads the live POS on the default server. After login,
 // autoConfigureAgent() below feeds the agent credentials automatically.
-const DEFAULT_SERVER_URL = 'https://taxnest.com.pk/api/agent';
+const DEFAULT_SERVER_URL = 'https://taxnest.pk/api/agent';
 
 function openPos() {
   try {

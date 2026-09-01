@@ -24,11 +24,11 @@ class AppUrlSchemeFallbackTest extends TestCase
 
     public function test_production_web_request_keeps_https_fallback_when_proxy_omits_proto(): void
     {
-        $urls = $this->productUrlGenerator('http://taxnest.com.pk/fbr-pos/products', 'fpm-fcgi');
+        $urls = $this->productUrlGenerator('http://taxnest.pk/fbr-pos/products', 'fpm-fcgi');
 
         $this->assertTrue(AppServiceProvider::shouldApplyAppUrlSchemeFallback('fpm-fcgi'));
         $this->assertSame(
-            'https://taxnest.com.pk/fbr-pos/products/create',
+            'https://taxnest.pk/fbr-pos/products/create',
             $urls->route('fbrpos.products.create')
         );
     }

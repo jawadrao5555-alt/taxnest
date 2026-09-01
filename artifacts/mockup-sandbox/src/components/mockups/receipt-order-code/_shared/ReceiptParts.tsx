@@ -137,7 +137,7 @@ export function Footer() {
     <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 700 }}>
       <div>PRA Sahulat App se scan kar ke verify karein</div>
       <div style={{ marginTop: 3 }}>Khareedari ka shukriya!</div>
-      <div style={{ marginTop: 3 }}>Developed by: taxnest.com.pk</div>
+      <div style={{ marginTop: 3 }}>Developed by: taxnest.pk</div>
       <div style={{ marginTop: 3 }}>10/08/2026 09:39:08 AM</div>
     </div>
   );

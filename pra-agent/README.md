@@ -7,7 +7,7 @@ A standalone Windows desktop application that auto-syncs your NestPOS invoices t
 ```
 ┌──────────────────┐    HTTPS     ┌──────────────────┐    HTTPS    ┌─────────────┐
 │  TaxNest Server  │  ◄────────►  │  Your PC (PK IP) │  ────────►  │   PRA API   │
-│ taxnest.com.pk   │   poll/30s   │  TaxNest Agent   │  submit     │  pra.gop.pk │
+│ taxnest.pk   │   poll/30s   │  TaxNest Agent   │  submit     │  pra.gop.pk │
 └──────────────────┘              └──────────────────┘             └─────────────┘
 ```
 
@@ -66,7 +66,7 @@ Companies download it from the **POS → PRA Sync Agent** page.
 2. Double-click to install (accepts standard NSIS installer)
 3. Launch **TaxNest PRA Agent** from Start Menu / Desktop
 4. Paste the **3 credentials** shown on the POS panel:
-   - **Server URL:** `https://taxnest.com.pk/api/agent`
+   - **Server URL:** `https://taxnest.pk/api/agent`
    - **Company ID:** (your numeric ID, e.g. `13`)
    - **API Key:** (the `tnk_…` key you generated)
 5. Click **Test Connection** → should show ✅

@@ -17,8 +17,8 @@ lagu hi nahi hota.
 | Sawal | Jawab |
 |---|---|
 | Does your app collect or share any of the required user data types? | **Yes** |
-| Is all of the user data collected by your app encrypted in transit? | **Yes** — sab kuch HTTPS/TLS par jata hai (`https://taxnest.com.pk/api/caller-app/v1`) |
-| Do you provide a way for users to request that their data is deleted? | **Yes** — `https://taxnest.com.pk/data-deletion` |
+| Is all of the user data collected by your app encrypted in transit? | **Yes** — sab kuch HTTPS/TLS par jata hai (`https://taxnest.pk/api/caller-app/v1`) |
+| Do you provide a way for users to request that their data is deleted? | **Yes** — `https://taxnest.pk/data-deletion` |
 
 ---
 
@@ -115,7 +115,7 @@ number and display name; notifications for outgoing, ongoing, missed or ended
 calls are discarded as well.
 
 Data flow: number, display name, timestamp, and call type are sent over HTTPS
-to the merchant's own account on taxnest.com.pk, which draws the pop-up on the
+to the merchant's own account on taxnest.pk, which draws the pop-up on the
 merchant's POS screen. Nothing is sent anywhere else, nothing is sold, and the
 record is deleted automatically after about 48 hours.
 
@@ -123,7 +123,7 @@ User consent: before the permission is requested the app shows a full-screen
 prominent disclosure that states exactly what is read, what is ignored, where
 it is sent and why, with an explicit agree / not now choice. Declining leaves
 the app usable and the permission unrequested. The same information is in our
-privacy policy at https://taxnest.com.pk/privacy.
+privacy policy at https://taxnest.pk/privacy.
 
 Alternatives considered: telephony APIs (cannot see VoIP calls),
 CallScreeningService and the CallRedirection APIs (SIM calls only),

@@ -11,9 +11,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'NestPOS — Keyboard-Fast POS with PRA Compliance',
         'ogDescription' => 'A lightning-fast point-of-sale system built for Pakistani retailers. PRA-integrated billing, inventory, and daily reports — all in one keyboard-driven screen.',
-        'ogUrl'         => 'https://taxnest.com.pk/pos',
+        'ogUrl'         => 'https://taxnest.pk/pos',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/pos">
+    <link rel="canonical" href="https://taxnest.pk/pos">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700'])
     @include('partials.fast-first-paint')
@@ -98,18 +98,18 @@
     {
         "@@context": "https://schema.org",
         "@@type": "SoftwareApplication",
-        "@@id": "https://taxnest.com.pk/pos#software",
+        "@@id": "https://taxnest.pk/pos#software",
         "name": "NestPOS",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
         "description": "NestPOS is a keyboard-fast, PRA-compliant point-of-sale system for Pakistani retail and restaurant businesses, with automatic fiscal integration and offline billing support.",
         "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
-        "url": "https://taxnest.com.pk/pos",
+        "url": "https://taxnest.pk/pos",
         "publisher": {
             "@@type": "Organization",
-            "@@id": "https://taxnest.com.pk/#organization",
+            "@@id": "https://taxnest.pk/#organization",
             "name": "TaxNest",
-            "url": "https://taxnest.com.pk/"
+            "url": "https://taxnest.pk/"
         }
     }
     </script>

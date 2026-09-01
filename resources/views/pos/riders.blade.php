@@ -50,7 +50,7 @@
             </div>
             <p class="text-xs text-indigo-700 dark:text-indigo-300">{{ __('pos.rider_app_card_desc') }}</p>
         </div>
-        <a href="https://taxnest.com.pk/downloads/taxnest-rider.apk"
+        <a href="https://taxnest.pk/downloads/taxnest-rider.apk"
            class="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
            download>
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>

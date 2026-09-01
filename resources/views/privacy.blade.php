@@ -22,9 +22,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'Privacy Policy — TaxNest',
         'ogDescription' => 'What data TaxNest and the TaxNest Caller ID Android app collect, why, how it is protected, and how to have it deleted.',
-        'ogUrl'         => 'https://taxnest.com.pk/privacy',
+        'ogUrl'         => 'https://taxnest.pk/privacy',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/privacy">
+    <link rel="canonical" href="https://taxnest.pk/privacy">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -90,7 +90,7 @@
 
             <div id="who" class="scroll-mt-24 legal-prose">
                 <h3 class="text-2xl font-serif text-[#052730] mb-4">1. Who we are</h3>
-                <p>This policy is issued by {{ $legalName }} ("TaxNest", "we", "us"), Pakistan. It covers the TaxNest web platform at taxnest.com.pk (FBR Digital Invoicing, NestPOS for PRA, and FBR POS) and the TaxNest Android applications, including <strong>TaxNest Caller ID</strong> (package <code>pk.taxnest.callerid</code>).</p>
+                <p>This policy is issued by {{ $legalName }} ("TaxNest", "we", "us"), Pakistan. It covers the TaxNest web platform at taxnest.pk (FBR Digital Invoicing, NestPOS for PRA, and FBR POS) and the TaxNest Android applications, including <strong>TaxNest Caller ID</strong> (package <code>pk.taxnest.callerid</code>).</p>
                 <p>TaxNest is business software sold to registered businesses. In almost every case the person using our apps is a shop owner or their staff member, using the software for their own shop.</p>
             </div>
 
@@ -121,7 +121,7 @@
                 <table>
                     <thead><tr><th>Data</th><th>Why</th><th>Where it goes</th></tr></thead>
                     <tbody>
-                        <tr><td>Caller's phone number of an <em>incoming</em> call</td><td>To match the caller to a customer record in the shop's own POS and show the pop-up</td><td>Only to the shop's own TaxNest account on taxnest.com.pk, over HTTPS</td></tr>
+                        <tr><td>Caller's phone number of an <em>incoming</em> call</td><td>To match the caller to a customer record in the shop's own POS and show the pop-up</td><td>Only to the shop's own TaxNest account on taxnest.pk, over HTTPS</td></tr>
                         <tr><td>Caller's display name, when the phone shows one</td><td>Shown in the pop-up when the number is not yet a saved customer</td><td>Same</td></tr>
                         <tr><td>Time of the call and its type (SIM call or WhatsApp call)</td><td>To show the pop-up for the right call and drop stale ones</td><td>Same</td></tr>
                         <tr><td>Sign-in email, device model, build type, and a device token</td><td>To sign in, to show the shop owner which phones are linked, and to let the owner revoke a phone</td><td>Same</td></tr>

@@ -17,10 +17,10 @@
     <string name="disclosure_lead">Ijazat dene se pehle yeh parh lein. TaxNest Caller ID aap ke phone ki notifications is tarah istemal karti hai:</string>
     <string name="disclosure_read">1) App sirf aane wali call wali notification parhti hai, aur woh bhi sirf do jagahon se: aap ke phone ki apni call wali app (dialer) se, aur WhatsApp / WhatsApp Business se. Us mein se sirf call karne wale ka number aur naam liya jata hai.</string>
     <string name="disclosure_ignore">2) Baqi har notification nazar-andaz kar di jati hai — paighamat, chat, email, aur doosri apps ki calls bhi (Messenger, Telegram, Viber, Skype waghaira) — na parhi jati hai, na mehfooz hoti hai, na kahin bheji jati hai.</string>
-    <string name="disclosure_send">3) Sirf chaar cheezein aap hi ke TaxNest shop account ko (taxnest.com.pk par, mehfooz HTTPS connection se) bheji jati hain: number, naam, waqt, aur call SIM ki thi ya WhatsApp ki. Kisi teesre fareeq ko kuch nahi diya jata.</string>
+    <string name="disclosure_send">3) Sirf chaar cheezein aap hi ke TaxNest shop account ko (taxnest.pk par, mehfooz HTTPS connection se) bheji jati hain: number, naam, waqt, aur call SIM ki thi ya WhatsApp ki. Kisi teesre fareeq ko kuch nahi diya jata.</string>
     <string name="disclosure_purpose">4) Maqsad sirf ek hai: aap ki POS sale screen par foran popup aa jaye ke kaun sa gaahak call kar raha hai aur us ki pichli khareedari kya hai.</string>
     <string name="disclosure_control">5) Call ka yeh record taqreeban 48 ghante baad khud mit jata hai. Ijazat aap jab chahen phone ki settings se wapas le sakte hain, ya POS → Customize se feature band / phone revoke kar sakte hain — app phir bhi chalti rahegi.</string>
-    <string name="disclosure_privacy">Privacy policy parhein (taxnest.com.pk/privacy)</string>
+    <string name="disclosure_privacy">Privacy policy parhein (taxnest.pk/privacy)</string>
     <string name="disclosure_agree">Main samajh gaya — ijazat dein</string>
     <string name="disclosure_decline">Abhi nahi</string>
 </resources>

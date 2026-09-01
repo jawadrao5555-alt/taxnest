@@ -35,12 +35,12 @@ use Illuminate\Support\Facades\Http;
 class CheckAppReleaseDrift extends Command
 {
     protected $signature = 'apps:check-release-drift
-        {--base= : Site base URL (default: https://taxnest.com.pk)}
+        {--base= : Site base URL (default: https://taxnest.pk)}
         {--app=* : Limit to these app keys (default: all)}';
 
     protected $description = 'Reconcile each Android app version: build.gradle vs live /api/app-version vs the hosted APK.';
 
-    private const DEFAULT_BASE = 'https://taxnest.com.pk';
+    private const DEFAULT_BASE = 'https://taxnest.pk';
 
     /**
      * app key => [human name, build.gradle path, api key].

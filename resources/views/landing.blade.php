@@ -11,9 +11,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'TaxNest — Tax Compliance Platform for Pakistan',
         'ogDescription' => 'Pakistan\'s all-in-one FBR and PRA compliance platform. Issue FBR Digital Invoices and PRA-integrated POS receipts — all from one account.',
-        'ogUrl'         => 'https://taxnest.com.pk/',
+        'ogUrl'         => 'https://taxnest.pk/',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/">
+    <link rel="canonical" href="https://taxnest.pk/">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @include('partials.fast-first-paint')
@@ -133,12 +133,12 @@
         "@@graph": [
             {
                 "@@type": "Organization",
-                "@@id": "https://taxnest.com.pk/#organization",
+                "@@id": "https://taxnest.pk/#organization",
                 "name": "TaxNest",
-                "url": "https://taxnest.com.pk/",
+                "url": "https://taxnest.pk/",
                 "logo": {
                     "@@type": "ImageObject",
-                    "url": "https://taxnest.com.pk/images/brand/taxnest-logo.svg"
+                    "url": "https://taxnest.pk/images/brand/taxnest-logo.svg"
                 },
                 "description": "Pakistan's FBR and PRA compliant tax, invoicing, and point-of-sale platform for retailers, restaurants, and wholesalers.",
                 "areaServed": "PK",
@@ -146,21 +146,21 @@
             },
             {
                 "@@type": "WebSite",
-                "@@id": "https://taxnest.com.pk/#website",
-                "url": "https://taxnest.com.pk/",
+                "@@id": "https://taxnest.pk/#website",
+                "url": "https://taxnest.pk/",
                 "name": "TaxNest",
-                "publisher": { "@@id": "https://taxnest.com.pk/#organization" }
+                "publisher": { "@@id": "https://taxnest.pk/#organization" }
             },
             {
                 "@@type": "SoftwareApplication",
-                "@@id": "https://taxnest.com.pk/#software",
+                "@@id": "https://taxnest.pk/#software",
                 "name": "TaxNest",
                 "applicationCategory": "BusinessApplication",
                 "operatingSystem": "Web",
                 "description": "Pakistan's FBR and PRA compliant tax, invoicing, and point-of-sale platform for retailers, restaurants, and wholesalers.",
                 "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
-                "url": "https://taxnest.com.pk/",
-                "publisher": { "@@id": "https://taxnest.com.pk/#organization" }
+                "url": "https://taxnest.pk/",
+                "publisher": { "@@id": "https://taxnest.pk/#organization" }
             }
         ]
     }

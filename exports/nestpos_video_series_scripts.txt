@@ -13,7 +13,7 @@ TAREEQA (kaise banayein):
 VIDEO 1 - SHURUAAT: Company Register Kaise Karein (~90 seconds)
 ----------------------------------------------
 
-Make a 90-second animated TUTORIAL video (not a promo) for NestPOS, a Pakistani PRA-verified POS billing software. This is Video 1 of a 5-part "How to use NestPOS" series for new clients. Style: clean step-by-step walkthrough with animated UI mockups, numbered steps, and short Roman Urdu + English text. Brand: teal #0A4D5C primary, gold #E7BF3B accent, white/light backgrounds, geometric sans font. Every video in this series opens with the same 3-second series intro: "NestPOS Tutorials - Part 1: Shuruaat" on teal background with logo, and ends with the same 4-second outro: NestPOS logo + "Agli video: Pehla Bill Banayein" + taxnest.com.pk.
+Make a 90-second animated TUTORIAL video (not a promo) for NestPOS, a Pakistani PRA-verified POS billing software. This is Video 1 of a 5-part "How to use NestPOS" series for new clients. Style: clean step-by-step walkthrough with animated UI mockups, numbered steps, and short Roman Urdu + English text. Brand: teal #0A4D5C primary, gold #E7BF3B accent, white/light backgrounds, geometric sans font. Every video in this series opens with the same 3-second series intro: "NestPOS Tutorials - Part 1: Shuruaat" on teal background with logo, and ends with the same 4-second outro: NestPOS logo + "Agli video: Pehla Bill Banayein" + taxnest.pk.
 
 Steps to show (each as an animated mockup screen with a step number badge):
 1. STEP 1 - "Website kholein" - a browser mockup opening the NestPOS registration page.
@@ -75,7 +75,7 @@ Tutorial pacing, readable, 16:9, works on mute.
 VIDEO 5 - REPORTS AUR HISAAB: Din Ka Day-Close (~90 seconds)
 ----------------------------------------------
 
-Make a 90-second animated TUTORIAL video for NestPOS, Video 5 of 5: "Reports aur Hisaab". Same series style: teal #0A4D5C + gold #E7BF3B, step badges, Roman Urdu + English, intro "NestPOS Tutorials - Part 5: Reports aur Hisaab", and a FINAL series outro: NestPOS logo, "Shukriya! Aaj hi shuru karein", packages line "Starter Rs 9,999/saal se", taxnest.com.pk.
+Make a 90-second animated TUTORIAL video for NestPOS, Video 5 of 5: "Reports aur Hisaab". Same series style: teal #0A4D5C + gold #E7BF3B, step badges, Roman Urdu + English, intro "NestPOS Tutorials - Part 5: Reports aur Hisaab", and a FINAL series outro: NestPOS logo, "Shukriya! Aaj hi shuru karein", packages line "Starter Rs 9,999/saal se", taxnest.pk.
 
 Content:
 1. STEP 1 - "Sales Reports" - dashboard mockup with animated bar chart rising, date filter, top products list. Text: "Kis din kitni sale - sab saamne".

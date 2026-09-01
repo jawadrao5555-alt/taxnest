@@ -209,7 +209,7 @@ function createLanServer(options) {
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Max-Age': '600',
         };
-        // The POS page is https://taxnest.com.pk but talks to
+        // The POS page is https://taxnest.pk but talks to
         // http://127.0.0.1:<port> (browsers treat loopback as a secure origin,
         // so this is not blocked as mixed content). That call only lands if we
         // send CORS back — but a blanket '*' would let ANY site the shop PC

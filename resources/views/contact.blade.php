@@ -19,9 +19,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'Contact & Legal — TaxNest',
         'ogDescription' => 'Get in touch with TaxNest support. Also find our Privacy Policy, Terms & Conditions, and a clear breakdown of responsibilities between TaxNest and your business.',
-        'ogUrl'         => 'https://taxnest.com.pk/contact',
+        'ogUrl'         => 'https://taxnest.pk/contact',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/contact">
+    <link rel="canonical" href="https://taxnest.pk/contact">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])

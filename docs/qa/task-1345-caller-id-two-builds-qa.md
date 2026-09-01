@@ -111,7 +111,7 @@ karne ki zaroorat nahi — dono ek doosri par update ho jati hain.
 
 | # | Kya karna hai | Theek hone ka matlab |
 | --- | --- | --- |
-| 1 | Phone par Chrome se `taxnest.com.pk/download` kholein → **TaxNest Caller ID** APK download karein | Download shuru ho jaye |
+| 1 | Phone par Chrome se `taxnest.pk/download` kholein → **TaxNest Caller ID** APK download karein | Download shuru ho jaye |
 | 2 | File par tap kar ke **Install** karein (Play Protect **ON** rehne dein) | **Koi "App blocked to protect your device" nahi** — app seedhi install ho jaye. Yeh is poore task ka asal maqsad hai. |
 | 3 | App kholen → apni POS admin login se sign in | Shop ka naam upar dikhe |
 | 4 | Pehli screen par likha padhein | Badge: *"یہ بلڈ: صرف سِم (عام) کالیں پکڑتی ہے"* + Roman line — yani build apni had khud bata rahi hai |

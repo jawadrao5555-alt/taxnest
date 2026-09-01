@@ -1,4 +1,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://taxnest.com.pk/sitemap.xml
+Sitemap: https://taxnest.pk/sitemap.xml

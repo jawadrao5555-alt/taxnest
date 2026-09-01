@@ -62,7 +62,7 @@ function deriveOrigin(config) {
   try {
     return new URL(config.serverUrl).origin;
   } catch (e) {
-    return 'https://taxnest.com.pk';
+    return 'https://taxnest.pk';
   }
 }
 

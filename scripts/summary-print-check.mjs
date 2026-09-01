@@ -15,7 +15,7 @@
  *
  * Usage:
  *   node scripts/summary-print-check.mjs
- *   BASE_URL=https://taxnest.com.pk POS_CHECK_LOGIN=... \
+ *   BASE_URL=https://taxnest.pk POS_CHECK_LOGIN=... \
  *     POS_CHECK_PASSWORD=... node scripts/summary-print-check.mjs
  *   SUMMARY_X_URL=... SUMMARY_Z_URL=... node scripts/summary-print-check.mjs
  *

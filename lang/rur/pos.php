@@ -514,7 +514,7 @@ return [
     'bold_receipt_hint' => 'Poora bill bold aur dark font mein print karein (jaise kitchen ticket). Agar thermal printer halka print kar raha ho, to ye best hai.',
     'bold_receipt_print' => 'Bold Receipt Print',
     'box_type' => 'Box Type',
-    'brand_developed_by' => 'Developed by: taxnest.com.pk',
+    'brand_developed_by' => 'Developed by: taxnest.pk',
     'buffer_colon' => 'Buffer:',
     'bulk_discount_pct' => 'Bulk Discount %',
     'bulk_discount_qty' => 'Bulk Discount Qty',

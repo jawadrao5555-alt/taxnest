@@ -11,8 +11,8 @@ import java.net.URL
  * Returns (httpCode, body) — code -1 means network failure.
  */
 object ApiClient {
-    const val BASE = "https://taxnest.com.pk/api/rider-app/v1"
-    const val DOWNLOAD_PAGE = "https://taxnest.com.pk/downloads/taxnest-rider.apk"
+    const val BASE = "https://taxnest.pk/api/rider-app/v1"
+    const val DOWNLOAD_PAGE = "https://taxnest.pk/downloads/taxnest-rider.apk"
 
     fun post(path: String, body: JSONObject, token: String? = null): Pair<Int, JSONObject?> =
         request("POST", path, body, token)

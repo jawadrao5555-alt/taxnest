@@ -22,9 +22,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'Account & Data Deletion — TaxNest',
         'ogDescription' => 'Request deletion of your TaxNest account and data, including TaxNest Caller ID app data.',
-        'ogUrl'         => 'https://taxnest.com.pk/data-deletion',
+        'ogUrl'         => 'https://taxnest.pk/data-deletion',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/data-deletion">
+    <link rel="canonical" href="https://taxnest.pk/data-deletion">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])

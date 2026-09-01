@@ -77,9 +77,9 @@ function j(res) { return res.json(); }
 
     await it('only our own pages may read this server from a browser', async function () {
         const ours = await fetch(base + '/lan/caller/events', {
-            headers: { Origin: 'https://taxnest.com.pk' },
+            headers: { Origin: 'https://taxnest.pk' },
         });
-        assert.strictEqual(ours.headers.get('access-control-allow-origin'), 'https://taxnest.com.pk');
+        assert.strictEqual(ours.headers.get('access-control-allow-origin'), 'https://taxnest.pk');
 
         // Anything else gets no CORS header, so the browser refuses to hand it
         // the shop's caller list: a random site, a laptop-hosted page on the
@@ -87,7 +87,7 @@ function j(res) { return res.json(); }
         const hostile = [
             'https://evil.example.com',
             'http://192.168.1.50:3000',
-            'https://taxnest.com.pk.evil.com',
+            'https://taxnest.pk.evil.com',
             'https://someone.replit.dev',
         ];
         for (const origin of hostile) {
@@ -289,7 +289,7 @@ function j(res) { return res.json(); }
     });
 
     await it('the page itself is same-origin only — no CORS, no outside assets', async function () {
-        const res = await fetch(base + '/', { headers: { Accept: 'text/html', Origin: 'https://taxnest.com.pk' } });
+        const res = await fetch(base + '/', { headers: { Accept: 'text/html', Origin: 'https://taxnest.pk' } });
         assert.strictEqual(res.headers.get('access-control-allow-origin'), null,
             'the page must not be readable from another origin');
         const html = await res.text();

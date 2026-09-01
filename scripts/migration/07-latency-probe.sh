@@ -24,7 +24,7 @@ TIMEOUT=8
 TARGETS=(
   "PRA IMS (POS)|https://ims.pral.com.pk"
   "FBR gateway (Digital Invoice)|https://gw.fbr.gov.pk"
-  "our own site (control)|https://taxnest.com.pk"
+  "our own site (control)|https://taxnest.pk"
 )
 
 command -v curl >/dev/null 2>&1 || { echo "curl missing — install curl and re-run" >&2; exit 2; }

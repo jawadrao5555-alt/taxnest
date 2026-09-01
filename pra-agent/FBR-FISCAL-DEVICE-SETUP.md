@@ -22,7 +22,7 @@ Sync Agent** — the exact same agent NestPOS already uses for PRA.
 ```
 ┌──────────────────┐    HTTPS      ┌───────────────────────────┐      HTTP        ┌───────────────────┐
 │  TaxNest Server  │  ◄─────────►  │  Shop PC (Pakistan)        │  ─────────────►  │  FBR IMS Fiscal   │
-│  taxnest.com.pk  │   poll/30s    │  TaxNest Desktop Agent     │  localhost:8524  │  Component (FBRIMS)│
+│  taxnest.pk  │   poll/30s    │  TaxNest Desktop Agent     │  localhost:8524  │  Component (FBRIMS)│
 └──────────────────┘               └───────────────────────────┘                  └───────────────────┘
 ```
 
@@ -81,7 +81,7 @@ The **same** agent used for PRA is reused — no separate FBR build.
    (Tip: you can install the agent FIRST and let its "FBR IMS Fiscal Service" card
    install the FBR component for you — see the shortcut in Step 2.)
 3. Paste the three credentials:
-   - **Server URL:** `https://taxnest.com.pk/api/agent`
+   - **Server URL:** `https://taxnest.pk/api/agent`
    - **Company ID:** your numeric company ID
    - **API Key:** the `tnk_…` key from Step 1
 4. Click **Test Connection** → should show ✅.

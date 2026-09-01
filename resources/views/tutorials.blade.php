@@ -11,9 +11,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'Video Tutorials — NestPOS aur FBR POS | TaxNest',
         'ogDescription' => 'Short Urdu video tutorials for TaxNest — from creating your first bill to managing products, customers, and reports. Learn every feature step by step.',
-        'ogUrl'         => 'https://taxnest.com.pk/tutorials',
+        'ogUrl'         => 'https://taxnest.pk/tutorials',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/tutorials">
+    <link rel="canonical" href="https://taxnest.pk/tutorials">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])

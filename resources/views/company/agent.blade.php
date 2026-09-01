@@ -148,7 +148,7 @@
                             <div class="font-bold text-gray-900 dark:text-white">Direct Production</div>
                         </div>
                         <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 leading-relaxed">
-                            Server taxnest.com.pk PRA pe directly invoice submit karega. Koi desktop agent install karne ki zaroorat nahi.
+                            Server taxnest.pk PRA pe directly invoice submit karega. Koi desktop agent install karne ki zaroorat nahi.
                         </p>
                         <ul class="text-[11px] text-gray-600 dark:text-gray-300 space-y-1 mb-3">
                             <li>✓ Tezi se setup — bus toggle ON</li>

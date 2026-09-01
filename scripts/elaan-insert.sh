@@ -161,6 +161,6 @@ else
   echo "ELAAN OK: AppUpdate row #${CREATED_ID} created on live."
   echo "          Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
   echo "          POS bell badge + popup will appear on next page load."
-  echo "          Verify: https://taxnest.com.pk/admin/app-updates"
+  echo "          Verify: https://taxnest.pk/admin/app-updates"
   echo "---------------------------------------------------------------"
 fi

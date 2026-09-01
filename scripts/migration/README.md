@@ -139,7 +139,7 @@ gitignored — the repo is public.
 
 ## Gotchas already handled
 
-- **`cpanel.taxnest.com.pk`, never `taxnest.com.pk`** — the main record is
+- **`cpanel.taxnest.com.pk`, never `taxnest.pk`** — the main record is
   proxied by Cloudflare, so port 22 is dead on it.
 - **Live `.env` values are quoted** — parsed by hand and trimmed, or the
   username comes out mangled and MySQL says "access denied".

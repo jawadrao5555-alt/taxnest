@@ -346,7 +346,7 @@ Sale screen ki mazeed cheezein:
 - Offline mode: pages cache hote hain; net wapas aane par offline bills khud sync ho jate hain.
 - Sale screen (Jul 2026 se): pehli dafa load hone ke baad computer par mehfooz ho jati hai — agli har dafa TURANT khulti hai, slow internet ya net band hone par bhi. Products/rates/settings badlein to screen khud taaza ho jati hai; logout ya user change par purani copy khud saaf ho jati hai. Agar screen purani lage to sirf refresh karein (F5) ya logout/login karein.
 - App khud update hota hai — update par chhota toast aata hai aur app refresh hota hai (bill banate waqt kabhi beech mein refresh nahi hota).
-- ANDROID APPS (asli install hone wali, taxnest.com.pk/download se): "TaxNest POS App" — poora POS panel mobile par, har team member (owner/admin/cashier/waiter/rider) apne normal login se; "TaxNest Rider App" — riders ke liye duty + live location; Waiter app — waiter tablets ke liye. APK download kar ke install karein (Play Store par nahi — "unknown apps" ka poch aaye to Allow karein, app TaxNest ki signed hai).
+- ANDROID APPS (asli install hone wali, taxnest.pk/download se): "TaxNest POS App" — poora POS panel mobile par, har team member (owner/admin/cashier/waiter/rider) apne normal login se; "TaxNest Rider App" — riders ke liye duty + live location; Waiter app — waiter tablets ke liye. APK download kar ke install karein (Play Store par nahi — "unknown apps" ka poch aaye to Allow karein, app TaxNest ki signed hai).
 - App ka naya version aaye to download page se APK dobara download kar ke install karein — purane app ke UPAR hi install ho jata hai, uninstall ya data delete ki zaroorat nahi.
 - Tutorial videos ab mobile app mein POORI SCREEN par chalti hain (POS app v1.0.3 / FBR POS app v1.0.1 se).
 

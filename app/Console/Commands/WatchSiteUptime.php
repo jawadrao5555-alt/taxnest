@@ -273,7 +273,7 @@ class WatchSiteUptime extends Command
         Log::info('Uptime watch: site recovered', ['kind' => $kind, 'down_minutes' => $minutes]);
 
         $this->mailAdmins(
-            'RECOVERED: taxnest.com.pk is reachable again',
+            'RECOVERED: taxnest.pk is reachable again',
             "The site is answering normally again.\n\n"
             . "Outage type : {$kind}\n"
             . "Started     : " . $this->localTime($since) . "\n"
@@ -335,7 +335,7 @@ class WatchSiteUptime extends Command
             };
 
             $delivered = $this->mailAdmins(
-                "DOWN: taxnest.com.pk unreachable ({$kind})",
+                "DOWN: taxnest.pk unreachable ({$kind})",
                 "The uptime watchdog failed {$fails} checks in a row.\n\n"
                 . "Type          : {$kind}\n"
                 . "First failure : " . $this->localTime($since) . "\n"

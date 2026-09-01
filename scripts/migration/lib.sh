@@ -22,7 +22,7 @@ mkdir -p "$WORK"
 # ---------------------------------------------------------------- source
 # The current live server (shared cPanel, Phoenix USA).
 SRC_KEY="${SRC_KEY:-$REPO_ROOT/.local/ssh/cpanel_deploy_key}"
-SRC_HOST="${SRC_HOST:-cpanel.taxnest.com.pk}"   # never taxnest.com.pk: proxied by Cloudflare, port 22 dead
+SRC_HOST="${SRC_HOST:-cpanel.taxnest.pk}"   # never taxnest.pk: proxied by Cloudflare, port 22 dead
 SRC_USER="${SRC_USER:-taxnestc}"
 SRC_PORT="${SRC_PORT:-22}"
 SRC_APP="${SRC_APP:-/home/taxnestc/public_html}"

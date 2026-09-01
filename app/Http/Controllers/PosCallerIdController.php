@@ -56,8 +56,8 @@ class PosCallerIdController extends Controller
     //                        permissions mein se koi nahi → bina rukawat install
     //   plus               = SIM + WhatsApp (notification listener), install ke
     //                        liye Play Protect waqti tor par band karna parta hai
-    private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-caller.apk';
-    private const APP_DOWNLOAD_URL_PLUS = 'https://taxnest.com.pk/downloads/taxnest-caller-plus.apk';
+    private const APP_DOWNLOAD_URL = 'https://taxnest.pk/downloads/taxnest-caller.apk';
+    private const APP_DOWNLOAD_URL_PLUS = 'https://taxnest.pk/downloads/taxnest-caller-plus.apk';
     private const DEVICE_CAP = 3;              // paired phones per shop (v2)
     // "Offline" = no ring/API contact for this long. The app has NO periodic
     // heartbeat (contacts only on rings + app-open /me), so keep this lenient

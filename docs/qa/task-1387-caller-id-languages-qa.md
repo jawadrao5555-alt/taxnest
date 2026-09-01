@@ -41,7 +41,7 @@ phone test hi bata sakta hai.
 
 ## 2. Phone test — owner ko yeh chalana hai
 
-Dono builds chahiyen: `taxnest.com.pk/download` se **default (clean)** APK aur
+Dono builds chahiyen: `taxnest.pk/download` se **default (clean)** APK aur
 **"WhatsApp wali"** APK.
 
 ### A. Install / update ka raasta

@@ -11,9 +11,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'Digital Invoice — FBR Invoicing by TaxNest',
         'ogDescription' => 'Issue FBR-compliant Digital Invoices in seconds. TaxNest Digital Invoice automates your FBR reporting so you stay compliant without the paperwork.',
-        'ogUrl'         => 'https://taxnest.com.pk/digital-invoice',
+        'ogUrl'         => 'https://taxnest.pk/digital-invoice',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/digital-invoice">
+    <link rel="canonical" href="https://taxnest.pk/digital-invoice">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     
@@ -175,18 +175,18 @@
     {
         "@@context": "https://schema.org",
         "@@type": "SoftwareApplication",
-        "@@id": "https://taxnest.com.pk/digital-invoice#software",
+        "@@id": "https://taxnest.pk/digital-invoice#software",
         "name": "TaxNest Digital Invoice",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web",
         "description": "FBR-compliant digital invoicing platform for Pakistani businesses — submit, track, and manage sales tax invoices with automated HS code assistance and sandbox testing.",
         "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
-        "url": "https://taxnest.com.pk/digital-invoice",
+        "url": "https://taxnest.pk/digital-invoice",
         "publisher": {
             "@@type": "Organization",
-            "@@id": "https://taxnest.com.pk/#organization",
+            "@@id": "https://taxnest.pk/#organization",
             "name": "TaxNest",
-            "url": "https://taxnest.com.pk/"
+            "url": "https://taxnest.pk/"
         }
     }
     </script>

@@ -259,7 +259,7 @@ class CheckCloudflareSettings extends Command
                 $body = "WARNING: the nightly Cloudflare settings guard could not verify/fix some\n"
                     . "dangerous Cloudflare settings via the API — manual check needed NOW:\n\n"
                     . $details . "\n\n"
-                    . "Fix NOW in https://dash.cloudflare.com -> taxnest.com.pk:\n"
+                    . "Fix NOW in https://dash.cloudflare.com -> taxnest.pk:\n"
                     . "1. Speed -> Optimization: Auto Minify — ALL OFF (HTML/CSS/JS)\n"
                     . "2. SSL/TLS: mode Full (strict)\n"
                     . "3. Caching: Browser Cache TTL = \"Respect Existing Headers\"\n\n"

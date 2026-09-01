@@ -2,7 +2,7 @@
 /**
  * Replit deployment holding page.
  *
- * The real TaxNest production site lives on cPanel at https://taxnest.com.pk.
+ * The real TaxNest production site lives on cPanel at https://taxnest.pk.
  * The Replit deployment (laravel-setup.replit.app) is intentionally NOT a
  * running copy of the app (production is MySQL-only; see the PRODUCTION DB
  * GUARD in AppServiceProvider). Instead we publish this tiny page so:
@@ -23,8 +23,8 @@ header('X-Robots-Tag: noindex, nofollow');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="refresh" content="3;url=https://taxnest.com.pk/">
-<title>TaxNest — taxnest.com.pk</title>
+<meta http-equiv="refresh" content="3;url=https://taxnest.pk/">
+<title>TaxNest — taxnest.pk</title>
 <style>
   body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:#0A4D5C;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center}
   .card{padding:2.5rem 1.5rem;max-width:32rem}
@@ -35,10 +35,10 @@ header('X-Robots-Tag: noindex, nofollow');
 </head>
 <body>
 <div class="card">
-  <h1>TaxNest ab yahan hai: taxnest.com.pk</h1>
+  <h1>TaxNest ab yahan hai: taxnest.pk</h1>
   <p>This page has moved. TaxNest &amp; NestPOS now live at our official website.</p>
   <p>Aap ko 3 second mein khud-ba-khud wahan bhej diya jayega.</p>
-  <a class="btn" href="https://taxnest.com.pk/">taxnest.com.pk kholain</a>
+  <a class="btn" href="https://taxnest.pk/">taxnest.pk kholain</a>
 </div>
 </body>
 </html>

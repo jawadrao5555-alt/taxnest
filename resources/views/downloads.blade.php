@@ -63,9 +63,9 @@
     @include('partials.meta-og', [
         'ogTitle'       => 'Downloads — TaxNest',
         'ogDescription' => 'Download the NestPOS Desktop Agent for Windows, the TaxNest POS app for Android, and the TaxNest Rider app — everything you need to run TaxNest on your devices.',
-        'ogUrl'         => 'https://taxnest.com.pk/download',
+        'ogUrl'         => 'https://taxnest.pk/download',
     ])
-    <link rel="canonical" href="https://taxnest.com.pk/download">
+    <link rel="canonical" href="https://taxnest.pk/download">
     {{-- Fonts: non-blocking loader — never link a font stylesheet directly (see partials/font-css). --}}
     @include('partials.font-css', ['fontFamilies' => 'playfair-display:400,600,700|inter:400,500,600,700,800'])
     @vite(['resources/css/app.css', 'resources/js/app.js'])

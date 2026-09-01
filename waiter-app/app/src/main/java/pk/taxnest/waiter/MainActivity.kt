@@ -38,7 +38,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 
 /**
- * TaxNest Waiter — thin WebView shell around https://taxnest.com.pk/pos/waiter.
+ * TaxNest Waiter — thin WebView shell around https://taxnest.pk/pos/waiter.
  *
  * Cloned from pos-app (TaxNest POS) — same design contract: all product logic
  * lives on the server, so web deploys update the app instantly. The waiter logs
@@ -83,8 +83,8 @@ import android.widget.Toast
 class MainActivity : Activity() {
 
     companion object {
-        const val BASE_HOST = "taxnest.com.pk"
-        const val START_URL = "https://taxnest.com.pk/pos/waiter"
+        const val BASE_HOST = "taxnest.pk"
+        const val START_URL = "https://taxnest.pk/pos/waiter"
         const val FILE_PICK_REQUEST = 71
 
         // ── Blank-screen recovery tuning (Task #1491) ─────────────────────

@@ -514,7 +514,7 @@ return [
     'bold_receipt_hint' => 'Print the whole bill in a bold, dark font (like the kitchen ticket). Recommended if your thermal printer prints too light or thin.',
     'bold_receipt_print' => 'Bold Receipt Print',
     'box_type' => 'Box Type',
-    'brand_developed_by' => 'Developed by: taxnest.com.pk',
+    'brand_developed_by' => 'Developed by: taxnest.pk',
     'buffer_colon' => 'Buffer:',
     'bulk_discount_pct' => 'Bulk Discount %',
     'bulk_discount_qty' => 'Bulk Discount Qty',

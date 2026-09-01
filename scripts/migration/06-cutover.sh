@@ -157,7 +157,7 @@ cat <<EOF
   The OLD site is still in maintenance mode and its crontab is paused.
   Nothing is live on the new server yet. Now, by hand:
 
-  1. Cloudflare -> DNS: change the A record for taxnest.com.pk
+  1. Cloudflare -> DNS: change the A record for taxnest.pk
                         66.29.138.229  ->  $DST_HOST
      (proxied, so it applies instantly — no TTL wait)
 

@@ -152,10 +152,11 @@ the POS and FBR POS shells too).
    `unzip -p <apk> resources.arsc | strings | grep -E "AIza|:android:"` —
    **silence there means push is dead and the APK must NOT be hosted.**
 
-7. **Deploy to live** (owner runs on their cPanel machine):
+7. **Deploy to live** (host/path per `scripts/lib/live-host.sh` — the retired
+   cPanel box still answers, so an upload aimed there succeeds and reaches nobody):
    ```bash
-   scp rider-app/app/build/outputs/apk/release/app-release.apk \
-       taxnestc@taxnest.com.pk:public_html/public/downloads/taxnest-rider.apk
+   scp -i .local/ssh/nayatel_vps_key rider-app/app/build/outputs/apk/release/app-release.apk \
+       jawadrao5555@115.186.164.126:/var/www/taxnest/public/downloads/taxnest-rider.apk
    ```
 
 8. **Deploy PHP changes**:

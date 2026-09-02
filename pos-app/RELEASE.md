@@ -77,7 +77,7 @@ breaks in-place updates for everything. NEVER commit it (public repo).
 1. **Code merged & version bumped** — `pos-app/app/build.gradle`:
    `versionCode` N+1 (never reuse), `versionName "X.Y.Z"`.
 2. **Server side deployed** — push to origin (then deploy with `bash scripts/deploy-live.sh`),
-   `ea-php84 artisan migrate --force` on live, verify the live commit.
+   (deploy-live.sh runs `migrate --force` itself), verify the live commit.
 3. **Build the signed APK** (above); `apksigner verify --print-certs` must show
    the shared key. Then verify it before it leaves the box — one command, no
    SDK needed:

@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AgentCoreEventBatchRequest;
+use App\Models\PosAgentDevice;
 use App\Services\AgentCoreEventConflictException;
 use App\Services\AgentCoreEventInboxService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class AgentCoreController extends Controller
 {
@@ -27,9 +29,30 @@ class AgentCoreController extends Controller
     public function storeEvents(AgentCoreEventBatchRequest $request, AgentCoreEventInboxService $inbox): JsonResponse
     {
         $data = $request->validated();
+        $company = $request->attributes->get('agent_company');
+
+        // The shared company key authenticates the shop, while the registry
+        // proves this device UID has completed a successful legacy heartbeat.
+        // Never let a caller manufacture an arbitrary device namespace to
+        // bypass per-device idempotency or impersonate another counter.
+        try {
+            if (!Schema::hasTable('pos_agent_devices')) {
+                return response()->json(['ok' => false, 'error' => 'device_registry_unavailable'], 503);
+            }
+            $registered = PosAgentDevice::query()
+                ->where('company_id', $company->id)
+                ->where('device_uid', $data['device_uid'])
+                ->exists();
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'error' => 'device_registry_unavailable'], 503);
+        }
+        if (!$registered) {
+            return response()->json(['ok' => false, 'error' => 'device_not_registered'], 403);
+        }
+
         try {
             $result = $inbox->accept(
-                $request->attributes->get('agent_company'),
+                $company,
                 $data['device_uid'],
                 $data['events']
             );

@@ -8,11 +8,12 @@
  */
 
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { createLanServer, isPrivateAddress } = require('../src/lan-server');
+const { createLanServer, isPrivateAddress, isLoopbackAddress } = require('../src/lan-server');
 const { EventStore } = require('../src/local-core/event-store');
 const { capabilities: coreCapabilities } = require('../src/local-core/protocol');
 
@@ -40,8 +41,18 @@ function j(res) { return res.json(); }
             .forEach(function (a) { assert.strictEqual(isPrivateAddress(a), false, String(a) + ' should NOT be private'); });
     });
 
+    await it('keeps sensitive Core traffic on loopback until pinned TLS exists', function () {
+        ['127.0.0.1', '127.22.1.4', '::1', '::ffff:127.0.0.1']
+            .forEach(function (a) { assert.strictEqual(isLoopbackAddress(a), true, a); });
+        ['192.168.1.20', '10.0.0.2', '172.16.1.2', '::ffff:192.168.1.20', '']
+            .forEach(function (a) { assert.strictEqual(isLoopbackAddress(a), false, String(a)); });
+    });
+
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-test-'));
-    const coreStore = new EventStore({ dataDir: path.join(dataDir, 'core') });
+    const coreStore = new EventStore({
+        dataDir: path.join(dataDir, 'core'),
+        encryptionKey: Buffer.alloc(32, 7),
+    });
     const server = createLanServer({
         dataDir: dataDir, port: 0, version: '9.9.9', log: function () {},
         coreProvider: function () {
@@ -133,6 +144,57 @@ function j(res) { return res.json(); }
         fs.rmSync(dir, { recursive: true, force: true });
     });
 
+    await it('global pairing failures stop distributed brute force attempts', async function () {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-global-brute-'));
+        const victim = createLanServer({
+            dataDir: dir, port: 0, log: function () {}, pairGlobalMaxTries: 3,
+        });
+        const s = await victim.start();
+        const url = 'http://127.0.0.1:' + s.port + '/lan/pair';
+        const attempt = function (code) {
+            return fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, device: 'attacker' }),
+            });
+        };
+        for (let i = 0; i < 3; i++) {
+            assert.strictEqual((await attempt('000000')).status, 403);
+        }
+        assert.strictEqual((await attempt(victim.status().pair_code)).status, 429,
+            'the global wall must engage before this IP reaches its per-IP limit');
+        await victim.stop();
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    await it('plaintext device stores migrate atomically to token hashes', async function () {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-migrate-'));
+        const legacyToken = 'legacy-plaintext-bearer-token';
+        const file = path.join(dir, 'lan-devices.json');
+        const legacy = {};
+        legacy[legacyToken] = {
+            name: 'Old Tablet', kind: 'waiter', paired_at: 1, last_seen: 2,
+        };
+        fs.writeFileSync(file, JSON.stringify(legacy), 'utf8');
+        const migrated = createLanServer({ dataDir: dir, port: 0, log: function () {} });
+        const disk = fs.readFileSync(file, 'utf8');
+        const parsed = JSON.parse(disk);
+        const expectedHash = crypto.createHash('sha256').update(legacyToken).digest('hex');
+        assert.strictEqual(disk.indexOf(legacyToken), -1, 'migration must remove the bearer secret');
+        assert.deepStrictEqual(Object.keys(parsed), [expectedHash]);
+        if (process.platform !== 'win32') {
+            assert.strictEqual(fs.statSync(file).mode & 0o777, 0o600, 'device store must be owner-only');
+        }
+        const s = await migrated.start();
+        const who = await fetch('http://127.0.0.1:' + s.port + '/lan/whoami', {
+            headers: { Authorization: 'Bearer ' + legacyToken },
+        });
+        assert.strictEqual(who.status, 200, 'the migrated device must remain paired');
+        assert.strictEqual((await j(who)).name, 'Old Tablet');
+        await migrated.stop();
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
     let token = null;
     await it('the real code pairs a tablet and then rotates', async function () {
         const before = server.status().pair_code;
@@ -148,9 +210,49 @@ function j(res) { return res.json(); }
         assert.notStrictEqual(server.status().pair_code, before, 'code must rotate after use');
         assert.strictEqual(server.status().devices, 1);
 
+        const devicesFile = path.join(dataDir, 'lan-devices.json');
+        const persisted = fs.readFileSync(devicesFile, 'utf8');
+        assert.strictEqual(persisted.indexOf(token), -1, 'bearer token must never be persisted');
+        Object.keys(JSON.parse(persisted)).forEach(function (key) {
+            assert.match(key, /^[a-f0-9]{64}$/, 'only SHA-256 token hashes may be persisted');
+        });
+        if (process.platform !== 'win32') {
+            assert.strictEqual(fs.statSync(devicesFile).mode & 0o777, 0o600);
+        }
+
         const who = await fetch(base + '/lan/whoami', { headers: { Authorization: 'Bearer ' + token } });
         assert.strictEqual(who.status, 200);
         assert.strictEqual((await j(who)).name, 'Waiter Tablet 1');
+        assert.strictEqual((await fetch(base + '/lan/whoami?t=' + encodeURIComponent(token))).status, 401,
+            'query-string credentials must never authenticate');
+    });
+
+    await it('the paired-device cap rejects additional pairing', async function () {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-cap-'));
+        const capped = createLanServer({ dataDir: dir, port: 0, log: function () {}, maxDevices: 1 });
+        const s = await capped.start();
+        const at = 'http://127.0.0.1:' + s.port;
+        const pair = function (code, name) {
+            return fetch(at + '/lan/pair', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, device: name }),
+            });
+        };
+        const first = await pair(capped.status().pair_code, 'Only Tablet');
+        assert.strictEqual(first.status, 200);
+        const firstToken = (await j(first)).token;
+        const currentCode = capped.status().pair_code;
+        const over = await pair(currentCode, 'Extra Tablet');
+        assert.strictEqual(over.status, 409);
+        assert.strictEqual((await j(over)).error, 'device_limit');
+        assert.strictEqual(capped.status().devices, 1);
+        assert.strictEqual(capped.status().pair_code, currentCode, 'rejected pairing must not consume the code');
+        assert.strictEqual((await fetch(at + '/lan/whoami', {
+            headers: { 'X-Lan-Token': firstToken },
+        })).status, 200);
+        await capped.stop();
+        fs.rmSync(dir, { recursive: true, force: true });
     });
 
     await it('a paired phone can push a ring, and a retry does not double it', async function () {
@@ -187,15 +289,56 @@ function j(res) { return res.json(); }
         assert.strictEqual(status.status.pending_count, 1);
     });
 
+    await it('returns a retriable response when Core storage is full', async function () {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-core-full-'));
+        const full = createLanServer({
+            dataDir: dir,
+            port: 0,
+            version: '9.9.9',
+            log: function () {},
+            coreProvider: function () {
+                return {
+                    append: function () {
+                        const error = new Error('full');
+                        error.code = 'storage_full';
+                        throw error;
+                    },
+                    status: function () { return {}; },
+                    capabilities: function () { return {}; },
+                };
+            },
+        });
+        const started = await full.start();
+        const at = 'http://127.0.0.1:' + started.port;
+        const paired = await j(await fetch(at + '/lan/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: full.status().pair_code, device: 'Counter', kind: 'counter' }),
+        }));
+        const response = await fetch(at + '/core/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + paired.token },
+            body: JSON.stringify({}),
+        });
+        assert.strictEqual(response.status, 507);
+        assert.strictEqual((await j(response)).error, 'storage_full');
+        await full.stop();
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
     await it('the POS can poll rings with a cursor', async function () {
-        const res = await fetch(base + '/lan/caller/events?after=0&t=' + token);
+        const res = await fetch(base + '/lan/caller/events?after=0', {
+            headers: { Authorization: 'Bearer ' + token },
+        });
         assert.strictEqual(res.status, 200);
         const body = await j(res);
         assert.strictEqual(body.events.length, 1);
         assert.strictEqual(body.events[0].number, '03001234567', 'number normalised');
         assert.strictEqual(body.events[0].source, 'sim');
 
-        const after = await j(await fetch(base + '/lan/caller/events?after=' + body.last_id + '&t=' + token));
+        const after = await j(await fetch(base + '/lan/caller/events?after=' + body.last_id, {
+            headers: { 'X-Lan-Token': token },
+        }));
         assert.strictEqual(after.events.length, 0, 'cursor must not replay');
     });
 
@@ -228,7 +371,13 @@ function j(res) { return res.json(); }
         assert.strictEqual(probe.status, 401);
         assert.strictEqual((await j(probe)).error, 'pair_required');
 
-        const known = await fetch(base + '/nope?t=' + token, { headers: { Accept: 'application/json' } });
+        const queryCredential = await fetch(base + '/nope?t=' + token, {
+            headers: { Accept: 'application/json' },
+        });
+        assert.strictEqual(queryCredential.status, 401, 'query-string tokens must be ignored');
+        const known = await fetch(base + '/nope', {
+            headers: { Accept: 'application/json', Authorization: 'Bearer ' + token },
+        });
         assert.strictEqual(known.status, 404, 'a paired caller still gets the plain 404');
         assert.strictEqual((await j(known)).error, 'not_found');
     });

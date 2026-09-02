@@ -37,6 +37,8 @@ const MAX_EVENTS = 200;          // caller ring buffer cap (memory + disk)
 const EVENT_TTL_MS = 6 * 60 * 60 * 1000;   // 6h — a stale ring is noise
 const PAIR_WINDOW_MS = 10 * 60 * 1000;
 const PAIR_MAX_TRIES = 10;       // per IP per window — a 6-digit code must not be brute-forceable
+const PAIR_GLOBAL_MAX_TRIES = 50; // one distributed LAN must not bypass the per-IP wall
+const DEFAULT_MAX_DEVICES = 25;
 const BODY_LIMIT = 256 * 1024;   // 256KB is plenty for an order payload
 
 // Every path that belongs to the JSON API. A browser GET to anything OUTSIDE
@@ -76,6 +78,12 @@ function isPrivateAddress(addr) {
     return false;
 }
 
+function isLoopbackAddress(addr) {
+    const value = String(addr || '').trim().toLowerCase();
+    return value === '::1' || value === '::' || value.startsWith('127.') ||
+        value.startsWith('::ffff:127.');
+}
+
 // Private IPv4s this PC owns — shown in the agent window so the owner can type
 // http://<ip>:8531 into a tablet.
 function localAddresses() {
@@ -113,13 +121,16 @@ function makeToken() {
  * A stable, one-way name for a paired device, used by the agent window to list
  * and remove devices.
  *
- * The device store is keyed by the pairing TOKEN, and that token is the
- * device's password — it must never leave this process. A hash gives the UI
- * something stable to point at without handing the renderer a live credential
- * that would then sit in the DOM and in devtools.
+ * The device store is keyed by a SHA-256 token hash. Its first bytes are the
+ * same stable identifier older versions exposed for plaintext-token entries,
+ * so migrating the store does not invalidate IDs held by the agent window.
  */
-function deviceIdFor(token) {
-    return crypto.createHash('sha256').update(String(token || '')).digest('hex').slice(0, 12);
+function deviceIdForHash(tokenHash) {
+    return String(tokenHash || '').slice(0, 12);
+}
+
+function tokenHash(token) {
+    return crypto.createHash('sha256').update(String(token || '')).digest('hex');
 }
 
 // Constant-time compare so a paired token cannot be discovered byte by byte.
@@ -140,17 +151,56 @@ function readJsonFile(file, fallback) {
     }
 }
 
-// tmp + rename: a half-written devices file must never brick pairing.
+// tmp + rename: a half-written devices file must never brick pairing. Device
+// credentials are especially sensitive, so both new and replacement files are
+// owner-only and durable before the rename is considered complete.
 function writeJsonFile(file, value) {
+    const tmp = file + '.tmp';
+    let fd = null;
     try {
         fs.mkdirSync(path.dirname(file), { recursive: true });
-        const tmp = file + '.tmp';
-        fs.writeFileSync(tmp, JSON.stringify(value), 'utf8');
+        try { fs.unlinkSync(tmp); } catch (e) {}
+        fd = fs.openSync(tmp, 'wx', 0o600);
+        fs.writeFileSync(fd, JSON.stringify(value), 'utf8');
+        fs.fsyncSync(fd);
+        fs.closeSync(fd);
+        fd = null;
+        try { fs.chmodSync(tmp, 0o600); } catch (e) { /* unsupported filesystem */ }
         fs.renameSync(tmp, file);
+        try { fs.chmodSync(file, 0o600); } catch (e) { /* unsupported filesystem */ }
+        let dirFd = null;
+        try {
+            dirFd = fs.openSync(path.dirname(file), 'r');
+            fs.fsyncSync(dirFd);
+        } catch (e) {
+            // Windows and some filesystems do not permit fsync on directories.
+        } finally {
+            if (dirFd !== null) { try { fs.closeSync(dirFd); } catch (e) {} }
+        }
         return true;
     } catch (e) {
+        if (fd !== null) { try { fs.closeSync(fd); } catch (ignored) {} }
+        try { fs.unlinkSync(tmp); } catch (ignored) {}
         return false;
     }
+}
+
+function loadDevices(file) {
+    const raw = readJsonFile(file, {});
+    const devices = {};
+    let migrated = false;
+    Object.keys(raw).forEach(function (key) {
+        const hashed = /^[a-f0-9]{64}$/.test(key) ? key : tokenHash(key);
+        if (hashed !== key) { migrated = true; }
+        devices[hashed] = raw[key];
+    });
+    if (migrated && !writeJsonFile(file, devices)) {
+        throw new Error('LAN device credential migration failed');
+    }
+    if (!migrated && Object.keys(devices).length) {
+        try { fs.chmodSync(file, 0o600); } catch (e) { /* unsupported filesystem */ }
+    }
+    return devices;
 }
 
 /* ------------------------------------------------------------------ server */
@@ -162,6 +212,8 @@ function writeJsonFile(file, value) {
  *   log       {function} (message, meta) sink
  *   version   {string}   agent version, reported by /lan/health
  *   shopName  {string}   label shown while pairing
+ *   maxDevices {number}  paired-device cap (default 25)
+ *   pairGlobalMaxTries {number} optional global failure threshold
  *   isEnabled {function} optional () => bool — LAN Mode switch. Only the HTML
  *                        door consults it (a disabled server is not listening
  *                        at all, so this is belt-and-braces honesty).
@@ -185,23 +237,30 @@ function createLanServer(options) {
     // Local Core is deliberately separate from LAN Mode. Its provider is lazy
     // so merely starting the established LAN listener never creates journals.
     const coreProvider = typeof opts.coreProvider === 'function' ? opts.coreProvider : function () { return null; };
+    const configuredMaxDevices = Number(opts.maxDevices == null ? opts.maxPairedDevices : opts.maxDevices);
+    const maxDevices = Number.isInteger(configuredMaxDevices) && configuredMaxDevices >= 1
+        ? configuredMaxDevices : DEFAULT_MAX_DEVICES;
+    const configuredGlobalTries = Number(opts.pairGlobalMaxTries);
+    const pairGlobalMaxTries = Number.isInteger(configuredGlobalTries) && configuredGlobalTries >= 1
+        ? configuredGlobalTries : PAIR_GLOBAL_MAX_TRIES;
 
     const state = {
         server: null,
         port: normalizePort(opts.port, DEFAULT_PORT),
         starting: false,
-        devices: readJsonFile(devicesFile, {}),        // token -> { name, kind, paired_at, last_seen }
+        devices: loadDevices(devicesFile),             // token hash -> { name, kind, paired_at, last_seen }
         events: (readJsonFile(eventsFile, { events: [] }).events || []),
         nextEventId: 1,
         pairCode: makePairCode(),
         pairFails: {},                                  // ip -> { count, until }
+        pairGlobalFails: { count: 0, until: Date.now() + PAIR_WINDOW_MS },
         lastError: null,
     };
     state.nextEventId = state.events.reduce(function (max, e) {
         return Math.max(max, Number(e && e.id) || 0);
     }, 0) + 1;
 
-    function persistDevices() { writeJsonFile(devicesFile, state.devices); }
+    function persistDevices() { return writeJsonFile(devicesFile, state.devices); }
     function persistEvents() { writeJsonFile(eventsFile, { events: state.events }); }
 
     /* -- request plumbing -- */
@@ -297,29 +356,36 @@ function createLanServer(options) {
         });
     }
 
-    function tokenFrom(req, url) {
+    function tokenFrom(req) {
         const auth = req.headers['authorization'] || '';
         if (/^bearer\s+/i.test(auth)) { return auth.replace(/^bearer\s+/i, '').trim(); }
         if (req.headers['x-lan-token']) { return String(req.headers['x-lan-token']).trim(); }
-        // Tablets open a plain URL in a WebView; a query token keeps that simple.
-        const q = url.searchParams.get('t');
-        return q ? String(q).trim() : '';
+        return '';
     }
 
-    function deviceFor(req, url) {
-        const token = tokenFrom(req, url);
+    function deviceFor(req) {
+        const token = tokenFrom(req);
         if (!token) { return null; }
-        // Constant-time match against every known token (a handful at most).
-        const hit = Object.keys(state.devices).find(function (t) { return safeEqual(t, token); });
+        const presentedHash = tokenHash(token);
+        // Compare fixed-length hashes in constant time; plaintext credentials
+        // are never retained in state or read back from disk.
+        let hit = null;
+        Object.keys(state.devices).forEach(function (hash) {
+            if (safeEqual(hash, presentedHash)) { hit = hash; }
+        });
         if (!hit) { return null; }
         const dev = state.devices[hit];
         dev.last_seen = Date.now();
-        return { token: hit, device: dev };
+        return { hash: hit, device: dev };
     }
 
     /* -- pairing -- */
 
     function pairBlocked(ip) {
+        if (Date.now() > state.pairGlobalFails.until) {
+            state.pairGlobalFails = { count: 0, until: Date.now() + PAIR_WINDOW_MS };
+        }
+        if (state.pairGlobalFails.count >= pairGlobalMaxTries) { return true; }
         const rec = state.pairFails[ip];
         if (!rec) { return false; }
         if (Date.now() > rec.until) { delete state.pairFails[ip]; return false; }
@@ -331,6 +397,10 @@ function createLanServer(options) {
         rec.count += 1;
         if (Date.now() > rec.until) { rec.count = 1; rec.until = Date.now() + PAIR_WINDOW_MS; }
         state.pairFails[ip] = rec;
+        if (Date.now() > state.pairGlobalFails.until) {
+            state.pairGlobalFails = { count: 0, until: Date.now() + PAIR_WINDOW_MS };
+        }
+        state.pairGlobalFails.count += 1;
     }
 
     function handlePair(req, res, body, ip) {
@@ -345,20 +415,30 @@ function createLanServer(options) {
             send(res, 403, { ok: false, error: 'bad_code' });
             return;
         }
+        if (Object.keys(state.devices).length >= maxDevices) {
+            send(res, 409, { ok: false, error: 'device_limit' });
+            return;
+        }
         const token = makeToken();
-        state.devices[token] = {
+        const hash = tokenHash(token);
+        state.devices[hash] = {
             name: String((body && body.device) || 'device').slice(0, 60),
             kind: String((body && body.kind) || 'waiter').slice(0, 20),
             paired_at: Date.now(),
             last_seen: Date.now(),
         };
-        persistDevices();
+        if (!persistDevices()) {
+            delete state.devices[hash];
+            send(res, 500, { ok: false, error: 'storage_error' });
+            return;
+        }
         delete state.pairFails[ip];
+        state.pairGlobalFails = { count: 0, until: Date.now() + PAIR_WINDOW_MS };
         // One code = one device. The next tablet gets a fresh code, so a code
         // seen over someone's shoulder cannot be replayed later.
         state.pairCode = makePairCode();
-        log('LAN device paired: ' + state.devices[token].name + ' (' + state.devices[token].kind + ')');
-        send(res, 200, { ok: true, token: token, name: state.devices[token].name });
+        log('LAN device paired: ' + state.devices[hash].name + ' (' + state.devices[hash].kind + ')');
+        send(res, 200, { ok: true, token: token, name: state.devices[hash].name });
     }
 
     /* -- caller id ring buffer -- */
@@ -491,18 +571,26 @@ function createLanServer(options) {
         // into the POS. Asking a cashier to pair the counter with itself would
         // buy nothing. Everything that WRITES still needs a paired device, and
         // a browser on another PC still cannot read the answer (CORS above).
-        const loopback = /^(::1|::ffff:127\.|127\.)/.test(String(ip));
+        const loopback = isLoopbackAddress(ip);
         if (route_ === '/lan/caller/events' && req.method === 'GET' && loopback) {
             handleEvents(res, url);
             return;
         }
 
-        const auth = deviceFor(req, url);
+        const auth = deviceFor(req);
         if (!auth) { send(res, 401, { ok: false, error: 'pair_required' }); return; }
 
-        // Core endpoints deliberately live behind the same private-address and
-        // paired-device gates as caller writes above. They do not start another
-        // listener and never return cloud credentials or pairing credentials.
+        // Core payloads can contain bills, customer balances and stock. Until
+        // native clients support certificate pinning, never put that data on
+        // cleartext shop WiFi: Core stays loopback-only. Existing paired LAN
+        // caller/waiter contracts continue unchanged.
+        if (route_.startsWith('/core/') && !loopback) {
+            send(res, 426, { ok: false, error: 'secure_transport_required' });
+            return;
+        }
+
+        // Core endpoints do not start another listener and never return cloud
+        // credentials or pairing credentials.
         if (route_ === '/core/capabilities' && req.method === 'GET') {
             let core = null;
             try { core = coreProvider(); } catch (e) {}
@@ -535,7 +623,7 @@ function createLanServer(options) {
                 });
             } catch (e) {
                 const code = e && e.code;
-                const status = code === 'store_read_only' ? 503 : 422;
+                const status = code === 'storage_full' ? 507 : (code === 'store_read_only' ? 503 : 422);
                 // The validation code is stable protocol information; the
                 // exception message can contain filesystem detail and stays local.
                 send(res, status, { ok: false, error: code || 'invalid_event' });
@@ -559,7 +647,7 @@ function createLanServer(options) {
         // never anyone else's; clearing every device stays an agent-window job.
         if (route_ === '/lan/unpair' && req.method === 'POST') {
             const name = auth.device.name;
-            delete state.devices[auth.token];
+            delete state.devices[auth.hash];
             persistDevices();
             log('LAN device removed itself: ' + name);
             send(res, 200, { ok: true });
@@ -647,10 +735,10 @@ function createLanServer(options) {
      * be readable from the LAN, least of all before a caller has paired.
      */
     function listDevices() {
-        return Object.keys(state.devices).map(function (token) {
-            const d = state.devices[token] || {};
+        return Object.keys(state.devices).map(function (hash) {
+            const d = state.devices[hash] || {};
             return {
-                id: deviceIdFor(token),
+                id: deviceIdForHash(hash),
                 name: d.name || 'device',
                 kind: d.kind || 'waiter',
                 paired_at: d.paired_at || null,
@@ -663,10 +751,10 @@ function createLanServer(options) {
     function removeDevice(id) {
         const want = String(id || '');
         if (!want) { return false; }
-        const token = Object.keys(state.devices).find(function (t) { return deviceIdFor(t) === want; });
-        if (!token) { return false; }
-        const gone = state.devices[token] || {};
-        delete state.devices[token];
+        const hash = Object.keys(state.devices).find(function (h) { return deviceIdForHash(h) === want; });
+        if (!hash) { return false; }
+        const gone = state.devices[hash] || {};
+        delete state.devices[hash];
         persistDevices();
         // The pairing code is NOT rotated here: it is single-use already, and
         // rotating it would invalidate a code the owner may have just read out
@@ -701,6 +789,7 @@ function createLanServer(options) {
 module.exports = {
     createLanServer: createLanServer,
     isPrivateAddress: isPrivateAddress,
+    isLoopbackAddress: isLoopbackAddress,
     localAddresses: localAddresses,
     DEFAULT_PORT: DEFAULT_PORT,
 };

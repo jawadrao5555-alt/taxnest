@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, dialog, safeStorage } = require('electron');
 
 // Silent printing from a hidden window renders BLANK pages on some Windows
 // GPUs/drivers when hardware acceleration is on (live failure: ZFC Pizza
@@ -19,6 +19,7 @@ const { createLanServer } = require('./src/lan-server');
 const { EventStore } = require('./src/local-core/event-store');
 const { capabilities: coreCapabilities } = require('./src/local-core/protocol');
 const { CloudSyncClient } = require('./src/local-core/cloud-sync');
+const { loadOrCreateCoreKey } = require('./src/local-core/key-store');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
@@ -320,6 +321,7 @@ let lanServer = null;
 let localCore = null;
 let coreRuntime = null;
 let coreTimer = null;
+let coreStartupError = null;
 
 // Core is server-gated, not controlled by a hidden local preference. Until an
 // authenticated heartbeat explicitly advertises it, no journal, timer or cloud
@@ -355,7 +357,11 @@ function scheduleCoreSync(delay) {
 }
 
 function startCoreForHeartbeat(config, heartbeat) {
-  if (!config || !heartbeatAllowsCore(heartbeat)) { stopCoreRuntime(); return; }
+  if (!config || !heartbeatAllowsCore(heartbeat)) {
+    stopCoreRuntime();
+    coreStartupError = null;
+    return;
+  }
   const companyId = String(config.companyId || '');
   const deviceUid = String(config.deviceUid || '');
   if (!companyId || !deviceUid || !config.apiKey || !config.serverUrl) { stopCoreRuntime(); return; }
@@ -371,7 +377,30 @@ function startCoreForHeartbeat(config, heartbeat) {
     return;
   }
   stopCoreRuntime();
-  const store_ = new EventStore({ dataDir: path.join(app.getPath('userData'), 'local-core', partition) });
+  let store_;
+  try {
+    const encryption = loadOrCreateCoreKey({
+      dataDir: path.join(app.getPath('userData'), 'local-core'),
+      safeStorage,
+    });
+    store_ = new EventStore({
+      dataDir: path.join(app.getPath('userData'), 'local-core', partition),
+      encryptionKey: encryption.key,
+      encryptionKeyId: encryption.keyId,
+      // No released shop build wrote the v1 format, but this allows internal
+      // pilot/dev data to be upgraded once instead of silently discarded.
+      allowPlaintextMigration: true,
+    });
+    coreStartupError = null;
+  } catch (e) {
+    coreStartupError = {
+      code: 'core_secure_storage_unavailable',
+      message: String((e && e.message) || 'Local Core secure storage failed').slice(0, 240),
+      at: new Date().toISOString(),
+    };
+    console.log('[local-core] startup refused:', coreStartupError.message);
+    return;
+  }
   const runtime = {
     key,
     failures: 0,
@@ -775,6 +804,16 @@ if (!gotInstanceLock) {
         out.update_stage = lastUpdateAttempt.stage || null;
         out.update_error = lastUpdateAttempt.error || null;
         out.update_attempted_at = lastUpdateAttempt.at || null;
+      }
+      if (coreStartupError) {
+        out.local_core_error_code = coreStartupError.code;
+        out.local_core_error = coreStartupError.message;
+        out.local_core_error_at = coreStartupError.at;
+      } else if (coreRuntime && coreRuntime.store) {
+        const coreStatus = coreRuntime.store.status();
+        out.local_core_pending = coreStatus.pending_count;
+        out.local_core_read_only = coreStatus.read_only ? 1 : 0;
+        out.local_core_storage_full = coreStatus.storage_full ? 1 : 0;
       }
       return out;
     });

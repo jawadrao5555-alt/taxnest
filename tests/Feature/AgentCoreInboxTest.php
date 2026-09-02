@@ -40,6 +40,13 @@ class AgentCoreInboxTest extends TestCase
             $table->unique(['company_id', 'device_uid', 'event_id'], 'agent_core_events_idempotency');
             $table->unique(['company_id', 'device_uid', 'idempotency_key'], 'agent_core_events_idempotency_key');
         });
+        Schema::create('pos_agent_devices', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('device_uid', 64);
+            $table->timestamps();
+            $table->unique(['company_id', 'device_uid']);
+        });
 
         DB::table('companies')->insert([
             [
@@ -52,6 +59,11 @@ class AgentCoreInboxTest extends TestCase
                 'agent_enabled' => true, 'agent_core_enabled' => true,
                 'created_at' => now(), 'updated_at' => now(),
             ],
+        ]);
+        DB::table('pos_agent_devices')->insert([
+            ['company_id' => 1, 'device_uid' => 'counter-1', 'created_at' => now(), 'updated_at' => now()],
+            ['company_id' => 1, 'device_uid' => 'counter-2', 'created_at' => now(), 'updated_at' => now()],
+            ['company_id' => 2, 'device_uid' => 'counter-1', 'created_at' => now(), 'updated_at' => now()],
         ]);
     }
 
@@ -109,6 +121,25 @@ class AgentCoreInboxTest extends TestCase
 
         $this->assertSame(3, DB::table('agent_core_events')->count());
         $this->assertSame(1, DB::table('agent_core_events')->where('company_id', 1)->where('device_uid', 'counter-1')->count());
+    }
+
+    public function test_events_require_a_device_registered_to_the_authenticated_company(): void
+    {
+        $this->request(self::KEY_ONE, [$this->event()], 'unknown-counter')
+            ->assertForbidden()
+            ->assertJson(['ok' => false, 'error' => 'device_not_registered']);
+
+        DB::table('pos_agent_devices')->where('company_id', 1)->where('device_uid', 'counter-2')->delete();
+        $this->request(self::KEY_ONE, [$this->event()], 'counter-2')
+            ->assertForbidden()
+            ->assertJsonPath('error', 'device_not_registered');
+
+        Schema::drop('pos_agent_devices');
+        $this->request(self::KEY_ONE, [$this->event()])
+            ->assertStatus(503)
+            ->assertJsonPath('error', 'device_registry_unavailable');
+
+        $this->assertSame(0, DB::table('agent_core_events')->count());
     }
 
     public function test_unknown_types_oversize_payloads_and_batches_over_one_hundred_are_refused(): void

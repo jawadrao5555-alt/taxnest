@@ -14,10 +14,12 @@
         <div class="flex flex-wrap gap-2">
             @if($existingReport && !($dcIso ?? false))
             <a target="_blank" href="{{ route('pos.day-close-summary-thermal', $existingReport->id) }}" class="px-3 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg">{{ __('pos.dc_summary_thermal') }}</a>
-            <a href="{{ route('pos.day-close-summary-pdf', $existingReport->id) }}" class="px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg">{{ __('pos.dc_summary_pdf') }}</a>
+            <a target="_blank" href="{{ route('pos.day-close-summary-pdf', $existingReport->id) }}" class="px-3 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg">{{ __('pos.dc_summary_pdf') }}</a>
+            <a href="{{ route('pos.day-close-summary-pdf-download', $existingReport->id) }}" class="px-3 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-lg">{{ __('pos.download_pdf') }}</a>
             @elseif(!$existingReport)
             <a target="_blank" href="{{ route('pos.day-close-x-summary-thermal', ['date' => $date]) }}" class="px-3 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg">{{ __('pos.dc_summary_thermal') }}</a>
-            <a href="{{ route('pos.day-close-x-summary-pdf', ['date' => $date]) }}" class="px-3 py-2 bg-sky-600 text-white text-sm font-semibold rounded-lg">{{ __('pos.dc_summary_pdf') }}</a>
+            <a target="_blank" href="{{ route('pos.day-close-x-summary-pdf', ['date' => $date]) }}" class="px-3 py-2 bg-sky-600 text-white text-sm font-semibold rounded-lg">{{ __('pos.dc_summary_pdf') }}</a>
+            <a href="{{ route('pos.day-close-x-summary-pdf-download', ['date' => $date]) }}" class="px-3 py-2 bg-sky-700 text-white text-sm font-semibold rounded-lg">{{ __('pos.download_pdf') }}</a>
             @endif
             <a href="{{ route('pos.day-close', ['date' => $date]) }}" class="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white text-sm font-semibold rounded-lg">{{ __('pos.receipt_back') }}</a>
         </div>

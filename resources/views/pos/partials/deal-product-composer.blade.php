@@ -1,4 +1,4 @@
-{{-- Shared PRA/FBR deal product composer. Parent scope provides products. --}}
+{{-- Shared deal product composer. Parent scope provides products. --}}
 @php
     $isBlueComposer = ($accent ?? 'emerald') === 'blue';
     $accentSoft = $isBlueComposer
@@ -61,6 +61,7 @@
     <p x-show="rows.length === 0" x-cloak class="mt-2 rounded-lg border border-dashed border-gray-300 p-4 text-center text-xs text-gray-500 dark:border-gray-600 dark:text-gray-400">
         {{ __('pos.deal_picker_no_fixed') }}
     </p>
+    <p x-show="!canSubmit()" x-cloak class="mt-3 text-xs font-semibold text-amber-700 dark:text-amber-300" x-text="compositionMessage()"></p>
 </section>
 
 @if($choiceTableOk ?? false)
@@ -158,16 +159,16 @@
             <div class="border-b border-gray-100 p-3 dark:border-gray-800 sm:px-6">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m2.35-5.65a8 8 0 11-16 0 8 8 0 0116 0z"/></svg>
-                    <input x-model.debounce.150ms="picker.search" x-ref="dealPickerSearch" type="search"
+                    <input x-model.debounce.150ms="picker.search" @input="picker.limit = picker.step" x-ref="dealPickerSearch" type="search"
                            placeholder="{{ __('pos.deal_picker_search') }}"
                            class="w-full rounded-xl border-gray-300 bg-gray-50 py-2.5 pl-10 pr-3 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white">
                 </div>
             </div>
 
             <div class="min-h-0 flex-1 overflow-y-auto p-3 sm:px-6">
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                     <template x-for="product in pickerResults()" :key="product.id">
-                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 p-3 transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+                        <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 p-2.5 transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
                             <input type="checkbox" :value="String(product.id)" x-model="picker.draft"
                                    class="h-4 w-4 rounded border-gray-300 {{ $accentCheck }}">
                             <span class="min-w-0 flex-1">
@@ -180,9 +181,14 @@
                 <p x-show="pickerResults().length === 0" class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
                     {{ __('pos.deal_picker_no_matches') }}
                 </p>
-                <p x-show="matchingProductCount() > picker.limit" class="pt-3 text-center text-[11px] text-amber-700 dark:text-amber-300">
-                    {{ __('pos.deal_picker_showing_first', ['count' => 80]) }}
-                </p>
+                <div x-show="matchingProductCount() > pickerResults().length" class="pt-3 text-center">
+                    <p class="mb-2 text-[11px] text-gray-500 dark:text-gray-400"
+                       x-text="labels.showing.replace(':shown', pickerResults().length).replace(':total', matchingProductCount())"></p>
+                    <button type="button" @click="loadMoreProducts()"
+                            class="rounded-lg border px-3 py-2 text-xs font-bold transition {{ $accentOutline }}">
+                        {{ __('pos.deal_picker_load_more') }}
+                    </button>
+                </div>
             </div>
 
             <footer class="flex items-center gap-2 border-t border-gray-100 p-3 dark:border-gray-800 sm:px-6 sm:py-4">
@@ -205,8 +211,11 @@
 
 @once
 <script>
-document.addEventListener('alpine:init', function () {
-    Alpine.data('dealComposer', function (initialRows, initialGroups) {
+/* Deliberately a plain global factory, not Alpine.data() registered on
+ * alpine:init. This partial can be rendered after Alpine has initialized
+ * (navigation/cache restores), when an init listener would never run and the
+ * Add products button would have no component scope. */
+window.dealComposer = function (initialRows, initialGroups) {
         return {
             rows: (initialRows || []).map(function (row) {
                 return { product_id: String(row.product_id), quantity: Number(row.quantity) || 1 };
@@ -220,7 +229,10 @@ document.addEventListener('alpine:init', function () {
                 };
             }),
             dealType: 'regular',
-            picker: { open: false, mode: 'fixed', groupIndex: null, search: '', draft: [], limit: 80 },
+            // Search always examines the full local catalogue. Rendering starts
+            // small so a broad search does not create a huge DOM; Load More
+            // expands only the visible slice inside this bounded-scroll modal.
+            picker: { open: false, mode: 'fixed', groupIndex: null, search: '', draft: [], limit: 60, step: 60 },
             labels: {
                 addProducts: @js(__('pos.deal_picker_add_products')),
                 editProducts: @js(__('pos.deal_picker_edit_products')),
@@ -228,7 +240,8 @@ document.addEventListener('alpine:init', function () {
                 editOptions: @js(__('pos.deal_picker_edit_options')),
                 fixedTitle: @js(__('pos.deal_items_included')),
                 choiceTitle: @js(__('pos.deal_choice_groups')),
-                more: @js(__('pos.deal_picker_more', ['count' => ':count']))
+                more: @js(__('pos.deal_picker_more', ['count' => ':count'])),
+                showing: @js(__('pos.deal_picker_showing', ['shown' => ':shown', 'total' => ':total']))
             },
             normalizedSearch(product) {
                 return [product.name, product.sku, product.barcode, product.category, product.price]
@@ -268,11 +281,15 @@ document.addEventListener('alpine:init', function () {
                 this.picker.mode = mode;
                 this.picker.groupIndex = mode === 'choice' ? Number(groupIndex) : null;
                 this.picker.search = '';
+                this.picker.limit = this.picker.step;
                 this.picker.draft = mode === 'fixed'
                     ? this.rows.map(function (row) { return String(row.product_id); })
                     : ((this.choiceGroups[groupIndex] || {}).product_ids || []).map(String);
                 this.picker.open = true;
                 this.$nextTick(() => this.$refs.dealPickerSearch && this.$refs.dealPickerSearch.focus());
+            },
+            loadMoreProducts() {
+                this.picker.limit += this.picker.step;
             },
             closeProductPicker() {
                 this.picker.open = false;
@@ -324,9 +341,25 @@ document.addEventListener('alpine:init', function () {
             },
             formatPrice(price) {
                 return Number(price || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            },
+            canSubmit() {
+                const groupsComplete = this.choiceGroups.every(function (group) {
+                    return String(group.label || '').trim() !== '' && (group.product_ids || []).length > 0;
+                });
+                return groupsComplete && (this.rows.length > 0 || this.choiceGroups.length > 0);
+            },
+            compositionMessage() {
+                if (!this.rows.length && !this.choiceGroups.length) {
+                    return @js(__('pos.deal_picker_needs_composition'));
+                }
+                const incomplete = this.choiceGroups.find(function (group) {
+                    return String(group.label || '').trim() === '' || !(group.product_ids || []).length;
+                });
+                return incomplete
+                    ? @js(__('pos.deal_picker_complete_groups'))
+                    : @js(__('pos.deal_picker_needs_composition'));
             }
         };
-    });
-});
+};
 </script>
 @endonce

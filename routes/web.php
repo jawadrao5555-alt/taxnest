@@ -1001,12 +1001,16 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // day (no wash, no hash, no report row). Literal paths registered BEFORE
     // the /day-close/{id}/... routes so {id} never swallows 'x-report'.
     Route::get('/day-close/x-report/pdf', [PosController::class, 'dayCloseXReportPdf'])->name('pos.day-close-x-pdf');
+    Route::get('/day-close/x-report/pdf/download', [PosController::class, 'dayCloseXReportPdf'])->defaults('download', true)->name('pos.day-close-x-pdf-download');
     Route::get('/day-close/x-report/thermal', [PosController::class, 'dayCloseXReportThermal'])->name('pos.day-close-x-thermal');
     Route::get('/day-close/x-report/summary/pdf', [PosController::class, 'dayCloseXSummaryPdf'])->name('pos.day-close-x-summary-pdf');
+    Route::get('/day-close/x-report/summary/pdf/download', [PosController::class, 'dayCloseXSummaryPdf'])->defaults('download', true)->name('pos.day-close-x-summary-pdf-download');
     Route::get('/day-close/x-report/summary/thermal', [PosController::class, 'dayCloseXSummaryThermal'])->name('pos.day-close-x-summary-thermal');
     Route::get('/day-close/{id}/summary/pdf', [PosController::class, 'dayCloseSummaryPdf'])->name('pos.day-close-summary-pdf');
+    Route::get('/day-close/{id}/summary/pdf/download', [PosController::class, 'dayCloseSummaryPdf'])->defaults('download', true)->name('pos.day-close-summary-pdf-download');
     Route::get('/day-close/{id}/summary/thermal', [PosController::class, 'dayCloseSummaryThermal'])->name('pos.day-close-summary-thermal');
     Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
+    Route::get('/day-close/{id}/pdf/download', [PosController::class, 'dayCloseReportPdf'])->defaults('download', true)->name('pos.day-close-pdf-download');
     Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
     Route::post('/api/draft/save', [PosController::class, 'saveDraft'])->name('pos.api.draft.save');
@@ -1096,6 +1100,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/public-profile/regenerate', [\App\Http\Controllers\PublicProfileController::class, 'regenerateSlug'])->name('pos.public-profile.regenerate');
         Route::post('/public-profile/menu', [\App\Http\Controllers\PublicProfileController::class, 'saveMenu'])->name('pos.public-profile.menu');
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
+        Route::post('/rider-bill-preview/settings', [\App\Http\Controllers\RiderBillPreviewController::class, 'update'])->name('rider.preview.settings');
         Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
@@ -1339,6 +1344,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Rider portal — pos_rider role is confined to these routes by PosAuth
     // (exact 'pos/rider' + 'pos/rider/' prefix; /pos/riders stays admin-only).
     Route::get('/rider', [\App\Http\Controllers\PosRiderController::class, 'portal'])->name('pos.rider.portal');
+    Route::get('/rider/deliveries/{id}/preview', [\App\Http\Controllers\RiderBillPreviewController::class, 'web'])->name('pos.rider.preview');
     Route::post('/rider/deliveries/{id}/delivered', [\App\Http\Controllers\PosRiderController::class, 'portalMarkDelivered'])->name('pos.rider.delivered');
     });
 });
@@ -1634,6 +1640,9 @@ Route::post('/fbr-pos/guest-language', function (\Illuminate\Http\Request $reque
 })->name('fbrpos.guest-language');
 
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
+    // Same shared users.dark_mode preference as PRA POS. This is deliberately
+    // outside company settings: each authenticated cashier owns their display.
+    Route::post('/set-dark-mode', [PosController::class, 'toggleDarkMode'])->name('fbrpos.set-dark-mode');
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
     Route::post('/notifications/{id}/dismiss', [FbrPosController::class, 'dismissNotification'])->name('fbrpos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [FbrPosController::class, 'dismissAllNotifications'])->name('fbrpos.notifications.dismiss-all');
@@ -1790,6 +1799,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/settings/unassigned-delivery-dayclose', [FbrPosController::class, 'updateUnassignedDeliveryDayclose'])->name('fbrpos.settings.unassigned-delivery-dayclose');
     Route::post('/settings/dayclose-cutoff', [FbrPosController::class, 'updateDaycloseCutoff'])->name('fbrpos.settings.dayclose-cutoff');
     Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
+    Route::get('/day-close/{id}/pdf/download', [FbrPosController::class, 'dayCloseReportPdf'])->defaults('download', true)->name('fbrpos.day-close-pdf-download');
     Route::get('/day-close/{id}/thermal', [FbrPosController::class, 'dayCloseThermal'])->name('fbrpos.day-close-thermal');
     Route::get('/reports/analytics-pdf', [FbrPosController::class, 'reportsAnalyticsPdf'])->name('fbrpos.reports.analytics-pdf');
     // 🚀 Smart auto-close (rush/holiday recovery — closes any past day with sales but no Z-report)
@@ -2005,6 +2015,7 @@ Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->withoutMiddle
     Route::post('/fcm-token', [\App\Http\Controllers\PosRiderTrackingController::class, 'appFcmToken'])->name('riderapp.fcmtoken');
     Route::post('/locations', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLocations'])->name('riderapp.locations');
     Route::get('/me', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMe'])->name('riderapp.me');
+    Route::get('/deliveries/{txnId}/preview', [\App\Http\Controllers\RiderBillPreviewController::class, 'app'])->name('riderapp.preview');
     // Task #1160: rider marks his own bill delivered from the app (additive — old APKs unaffected).
     Route::post('/deliveries/{txnId}/delivered', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMarkDelivered'])->name('riderapp.delivered');
     Route::get('/version', [\App\Http\Controllers\PosRiderTrackingController::class, 'appVersion'])->name('riderapp.version');

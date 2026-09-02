@@ -70,6 +70,17 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#1e3a5f">
+        {{-- Synchronous, per-user theme bootstrap. Keep this ahead of CSS/Vite so
+             an offline/PWA document cannot paint in the opposite scheme first. --}}
+        <script data-tn-theme-bootstrap>
+            (function (root, userId, dark) {
+                var key = 'tn-pos-dark:' + String(userId);
+                root.classList.toggle('dark', dark);
+                root.style.colorScheme = dark ? 'dark' : 'light';
+                root.setAttribute('data-tn-theme-ready', '1');
+                try { localStorage.setItem(key, dark ? '1' : '0'); } catch (_) {}
+            })(document.documentElement, @json((string) ($fbrUser?->getKey() ?? 'guest')), @json((bool) $isDarkMode));
+        </script>
         <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -110,7 +121,7 @@
             })();
         </script>
         <script src="/vendor/chart.umd.min.js?v=4.4.0" defer></script>
-        <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
+        <script>document.documentElement.style.colorScheme=document.documentElement.classList.contains('dark')?'dark':'light';</script>
         <style>
             *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
             html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-feature-settings: 'cv11', 'ss01'; font-variation-settings: 'opsz' 32; }
@@ -306,7 +317,7 @@
     </head>
     <body class="h-screen overflow-hidden antialiased" data-theme="{{ $fbrTheme }}">
         <x-pwa-init />
-        <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}')" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
+        <div class="flex flex-col h-full" x-data="fbrPosHeader('{{ $fbrTheme }}', {{ $isDarkMode ? 'true' : 'false' }})" x-init="init()" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false; localOpen = false; failedOpen = false; sidebarOpen = false">
 
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
@@ -367,6 +378,17 @@
                         {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
                         <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="blue" />
+                        {{-- Personal display preference, intentionally visible at every
+                             desktop width (including compact Desktop shell). The DOM is
+                             painted only after its FBR JSON save contract succeeds. --}}
+                        <button type="button" @click="toggleDarkMode()" :disabled="darkSaving"
+                                aria-label="{{ __('pos.cmd_toggle_dark_mode') }}"
+                                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition disabled:opacity-50"
+                                title="{{ __('pos.cmd_toggle_dark_mode') }}">
+                            <svg x-show="!darkMode" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36-6.36-.71.71M6.35 17.65l-.71.71m12.72 0-.71-.71M6.35 6.35l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                            <svg x-show="darkMode" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.35 15.35A9 9 0 018.65 3.65 9 9 0 1012 21a9 9 0 008.35-5.65z"/></svg>
+                            <span class="sr-only">{{ __('pos.cmd_toggle_dark_mode') }}</span>
+                        </button>
 
                         {{-- 🟦 Local Bills (F10) — Provisional / Saved bills.
                              Hidden on the universal sale screen (its own teleported F10 pill lives there). --}}
@@ -1088,13 +1110,15 @@
         </div>{{-- /fbrPosHeader x-data root --}}
 
         <script>
-            function fbrPosHeader(initialTheme) {
+            function fbrPosHeader(initialTheme, initialDark) {
                 return {
                     profileOpen: false,
                     mobileMenuOpen: false,
                     themeOpen: false,
                     sidebarOpen: false,
                     currentTheme: initialTheme || 'blue',
+                    darkMode: initialDark === true,
+                    darkSaving: false,
                     localOpen: false,
                     failedOpen: false,
                     localBills: [],
@@ -1104,6 +1128,33 @@
                     localSelectedIdx: 0,
                     failedSelectedIdx: 0,
                     _csrf: document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    async toggleDarkMode() {
+                        if (this.darkSaving) return;
+                        const want = !this.darkMode;
+                        this.darkSaving = true;
+                        try {
+                            const response = await fetch('{{ route('fbrpos.set-dark-mode', [], false) }}', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': this._csrf},
+                                credentials: 'same-origin',
+                                body: JSON.stringify({dark: want})
+                            });
+                            const data = response.ok ? await response.json().catch(() => null) : null;
+                            if (!data || data.success !== true || !!data.dark !== want) throw new Error('save-failed');
+
+                            // Save succeeded: now (and only now) update the visible
+                            // scheme and the per-user PWA/prepaint mirror.
+                            this.darkMode = want;
+                            const root = document.documentElement;
+                            root.classList.toggle('dark', want);
+                            root.style.colorScheme = want ? 'dark' : 'light';
+                            try { localStorage.setItem('tn-pos-dark:' + {{ Js::from((string) $fbrUser->getKey()) }}, want ? '1' : '0'); } catch (_) {}
+                        } catch (e) {
+                            alert(@js(__('pos.setting_save_failed')));
+                        } finally {
+                            this.darkSaving = false;
+                        }
+                    },
                     init() {
                         this.refreshCounts();
                         // 🔋 Visibility-aware polling — only refresh when tab visible. 2-min interval (was 45s) to reduce DB load

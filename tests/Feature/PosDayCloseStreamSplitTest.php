@@ -643,6 +643,14 @@ class PosDayCloseStreamSplitTest extends TestCase
 
         $this->assertSame('application/pdf', $response->headers->get('content-type'));
         $this->assertStringContainsString('Summary-Z-Report-', $response->headers->get('content-disposition'));
+        $this->assertStringStartsWith('inline;', $response->headers->get('content-disposition'));
+
+        $download = (new PosController())->dayCloseReportPdf($result['report']->id, Request::create('/pos/day-close/1/summary/pdf/download', 'GET', [
+            'report_mode' => 'summary',
+            'download' => true,
+        ]));
+        $this->assertStringContainsString('Summary-Z-Report-', $download->headers->get('content-disposition'));
+        $this->assertStringStartsWith('attachment;', $download->headers->get('content-disposition'));
     }
 
     public function test_summary_thermal_templates_keep_provisional_and_frozen_state_markers(): void

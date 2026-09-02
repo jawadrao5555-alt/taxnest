@@ -205,7 +205,12 @@ class PosRiderTrackingController extends Controller
     }
 
     /** Resolve the rider from the Bearer token or abort with JSON. */
-    private function riderFromToken(Request $request): PosRider
+    /**
+     * Shared bearer-token boundary for every rider-app endpoint.  Public solely
+     * so additive rider-app features can reuse the exact proof/active-user/
+     * company-plan semantics instead of cloning a security-sensitive check.
+     */
+    public function riderFromToken(Request $request): PosRider
     {
         $token = (string) $request->bearerToken();
         $riderId = (int) strtok($token, '|');

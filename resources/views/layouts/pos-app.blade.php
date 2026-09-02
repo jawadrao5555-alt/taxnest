@@ -232,7 +232,19 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#7c3aed">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.7') }}">
+        {{-- Must run before styles/Vite: the server value is authoritative for this
+             authenticated user; localStorage is only a device boot mirror for
+             cached/PWA documents and is always keyed by the user ID. --}}
+        <script data-tn-theme-bootstrap>
+            (function (root, userId, dark) {
+                var key = 'tn-pos-dark:' + String(userId);
+                root.classList.toggle('dark', dark);
+                root.style.colorScheme = dark ? 'dark' : 'light';
+                root.setAttribute('data-tn-theme-ready', '1');
+                try { localStorage.setItem(key, dark ? '1' : '0'); } catch (_) {}
+            })(document.documentElement, @json((string) ($posUserLayout->getKey() ?? 'guest')), @json((bool) $isDarkMode));
+        </script>
+        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.8') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">
@@ -285,7 +297,7 @@
         {{-- Self-hosted Chart.js (perf, Jul 2026): third-party CDN cost an extra
              DNS+TLS connection on every fresh load; .htaccess caches /vendor 30d. --}}
         <script defer src="/vendor/chart.umd.min.js?v=4.4.0"></script>
-        <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
+        <script>document.documentElement.style.colorScheme=document.documentElement.classList.contains('dark')?'dark':'light';</script>
         <style>
             *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
             html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-feature-settings: 'cv11', 'ss01'; font-variation-settings: 'opsz' 32; }
@@ -500,9 +512,9 @@
                              as a floating pill it covered the nav underneath it. --}}
                         @include('partials.impersonation-banner')
 
-                        <div class="h-5 w-px bg-white/10 hidden md:block"></div>
+                        <div class="h-5 w-px bg-white/10 hidden lg:block"></div>
 
-                        <nav class="hidden md:flex items-center gap-1">
+                        <nav class="hidden lg:flex items-center gap-1">
                             {{-- Sale-screen redesign (Jul 2026): on the sale screen itself the static
                                  "New Sale" link is replaced by the teleported action button (newSale())
                                  that lands in #tn-nav-sale-tools below — see universal.blade.php. --}}
@@ -540,7 +552,7 @@
                             @endif
                         </nav>
 
-                        <div class="hidden md:block ml-1">
+                        <div class="hidden lg:block ml-1">
                             {{-- Multi-branch v1 (Task 1347): POS panel manages its own
                                  branches, and the owner may fall back to a company-wide view. --}}
                             <x-branch-switcher color="purple" :manage-url="route('pos.branches', [], false)" :allow-all="true" />
@@ -554,7 +566,7 @@
                     {{-- overflow-x-auto (scrollbar hidden) + mx-auto on the teleported child replace
                          justify-center: centered when it fits, scrollable when narrow — pills must
                          NEVER spill over the right-side user group (ZFC overlap bug, 26 Jul 2026). --}}
-                    <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
+                    <div id="tn-nav-sale-tools" class="hidden lg:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
 
                     <div class="flex items-center gap-2 flex-shrink-0" x-data="{ isFs: false }"
                          x-init="
@@ -564,7 +576,7 @@
                         {{-- Net/PRA/clock status cluster REMOVED (owner, 26 Jul 2026) — sale screen
                              already has its own Auto-Sync Online/Offline pill; do not re-add. --}}
 
-                        <button @click="$dispatch('open-cmd-palette')" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white hover:bg-white/15 transition group" title="{{ __('pos.ti_quick_command') }}">
+                        <button @click="$dispatch('open-cmd-palette')" class="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white hover:bg-white/15 transition group" title="{{ __('pos.ti_quick_command') }}">
                             <svg class="w-3.5 h-3.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                             <span class="text-[10px] font-medium opacity-80">{{ __('pos.search_label') }}</span>
                             <kbd class="text-[9px] font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-90 group-hover:opacity-100">⌘K</kbd>
@@ -600,7 +612,7 @@
                             </div>
                         </div>
 
-                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg text-white hover:bg-white/15 transition">
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-2 rounded-lg text-white hover:bg-white/15 transition">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         </button>
 
@@ -979,7 +991,7 @@
                      x-transition:leave="transition ease-in duration-100"
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0 -translate-y-2"
-                     class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
+                     class="lg:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
                     <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.new_sale') }}</a>
                     @if($posEffStyleLayout === 'saaf')
                     @if($posNavCan('dashboard'))

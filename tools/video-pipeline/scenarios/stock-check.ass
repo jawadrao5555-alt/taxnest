@@ -1,0 +1,52 @@
+[Script Info]
+; Compact Roman Urdu captions for the Physical Stock Check tutorial.
+ScriptType: v4.00+
+PlayResX: 384
+PlayResY: 288
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+; 13 at PlayResY 288 renders at ~49 px on a 1080p master.  BorderStyle 1
+; deliberately uses only an outline (never a filled caption bar).
+Style: Caption,DejaVu Sans,13,&H00FFFFFF,&H00FFFFFF,&H00152A30,&H00000000,1,0,0,0,100,100,0,0,1,1.8,0.4,2,35,35,22,1
+Style: CaptionTop,DejaVu Sans,13,&H00FFFFFF,&H00FFFFFF,&H00152A30,&H00000000,1,0,0,0,100,100,0,0,1,1.8,0.4,8,35,35,22,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.50,0:00:06.80,Caption,,0,0,0,,Assalam o Alaikum! Aaj NestPOS mein Physical Stock Check seekhein.
+Dialogue: 0,0:00:06.80,0:00:12.90,Caption,,0,0,0,,System stock aur shelf ki ginti milayen — farq foran samne aayega.
+Dialogue: 0,0:00:15.24,0:00:22.40,Caption,,0,0,0,,System batata hai sale ke baad kitna stock bachna chahiye.
+Dialogue: 0,0:00:22.40,0:00:29.80,Caption,,0,0,0,,Shelf ki ginti se farq chori, nuqsan ya ghalat entry pakarta hai.
+Dialogue: 0,0:00:31.90,0:00:37.30,Caption,,0,0,0,,Login ke baad Inventory kholen.
+Dialogue: 0,0:00:37.30,0:00:44.80,Caption,,0,0,0,,Physical Stock Check par click karein.
+Dialogue: 0,0:00:47.86,0:00:53.40,Caption,,0,0,0,,Yahan pichlay checks aur un ke farq mehfooz rehte hain.
+Dialogue: 0,0:00:53.40,0:00:58.00,Caption,,0,0,0,,Neeche How it works se tareeqa bhi dekh sakte hain.
+Dialogue: 0,0:00:59.87,0:01:06.50,Caption,,0,0,0,,New Stock Check dabayen aur count ka scope chunein.
+Dialogue: 0,0:01:06.50,0:01:13.20,Caption,,0,0,0,,Zero-stock items chhor sakte hain aur note likh sakte hain.
+Dialogue: 0,0:01:14.86,0:01:21.20,Caption,,0,0,0,,Start Counting dabayen. System stock snapshot mehfooz karta hai.
+Dialogue: 0,0:01:21.20,0:01:27.00,Caption,,0,0,0,,Counting ke dauran sale chale tab bhi Should Be nahi badalta.
+Dialogue: 0,0:01:29.27,0:01:35.60,Caption,,0,0,0,,Sheet ke cards items, counted, gaps aur short value dikhate hain.
+Dialogue: 0,0:01:35.60,0:01:46.00,Caption,,0,0,0,,Should Be system ka stock; Physical Count asal ginti; Difference farq.
+Dialogue: 0,0:01:48.33,0:01:54.20,Caption,,0,0,0,,Aata 10kg: system mein 24, shelf par 21.
+Dialogue: 0,0:01:54.20,0:02:01.00,Caption,,0,0,0,,21 likhte hi Difference minus 3 dikhta hai — teen thailay kam.
+Dialogue: 0,0:02:02.98,0:02:10.40,Caption,,0,0,0,,Anday 18 ki jagah 16; Doodh ke 30 poore milay.
+Dialogue: 0,0:02:10.40,0:02:18.80,Caption,,0,0,0,,Nimko 26 ki jagah 28 hai — do zyada, shayad purani entry ka farq.
+Dialogue: 0,0:02:21.81,0:02:29.10,Caption,,0,0,0,,Farq ki wajah likhein: wastage, breakage, chori ya ghalat entry.
+Dialogue: 0,0:02:29.10,0:02:34.70,Caption,,0,0,0,,Yahi wajah report se kami ka source samajhne mein madad deti hai.
+Dialogue: 0,0:02:36.95,0:02:43.00,CaptionTop,,0,0,0,,Save Counts se ginti mehfooz hoti hai; stock abhi nahi badalta.
+Dialogue: 0,0:02:43.00,0:02:49.60,CaptionTop,,0,0,0,,Cards par counted items, gaps aur short value check karein.
+Dialogue: 0,0:02:50.81,0:02:59.20,Caption,,0,0,0,,Bari dukan ke liye Download Excel Sheet zyada asaan hai.
+Dialogue: 0,0:02:59.20,0:03:10.00,Caption,,0,0,0,,Physical Count bhar kar upload karein — system farq khud nikalta hai.
+Dialogue: 0,0:03:13.14,0:03:20.80,Caption,,0,0,0,,Has a gap filter se sirf farq wali lines dikhti hain.
+Dialogue: 0,0:03:23.01,0:03:29.20,CaptionTop,,0,0,0,,Ginti theek ho to Post and Correct Stock dabayen.
+Dialogue: 0,0:03:29.20,0:03:34.40,CaptionTop,,0,0,0,,Yeh step wapas nahi hota — pehle tasdeeq zaroor karein.
+Dialogue: 0,0:03:37.96,0:03:46.00,Caption,,0,0,0,,Check Completed ho gaya aur stock farq ke mutabiq correct hua.
+Dialogue: 0,0:03:46.00,0:03:53.40,Caption,,0,0,0,,Darmiyan ki sale mehfooz rehti hai — sirf farq adjust hota hai.
+Dialogue: 0,0:03:55.82,0:04:02.00,Caption,,0,0,0,,Har adjustment Stock Movements mein record hoti hai.
+Dialogue: 0,0:04:02.00,0:04:06.40,Caption,,0,0,0,,Item, kami, check aur wajah — koi quantity chupke nahi badalti.
+Dialogue: 0,0:04:08.72,0:04:15.00,Caption,,0,0,0,,Har completed check ki Variance Report bhi milti hai.
+Dialogue: 0,0:04:15.00,0:04:20.80,Caption,,0,0,0,,Print karein, sign karwayen aur record mein lagayen.
+Dialogue: 0,0:04:20.81,0:04:26.00,Caption,,0,0,0,,Har raat das minute ki ginti, har farq ka hisaab.
+Dialogue: 0,0:04:26.00,0:04:28.10,Caption,,0,0,0,,Shukriya!

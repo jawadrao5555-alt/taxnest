@@ -63,7 +63,11 @@ class PosController extends Controller
      */
     public function toggleDarkMode(Request $request)
     {
-        $user = auth('pos')->user();
+        // PRA and FBR POS authenticate the same User rows through different
+        // guards. Resolve the active POS guard instead of tying this personal
+        // preference to PRA only; IDs may be MySQL string IDs, so never coerce
+        // them while saving.
+        $user = auth('pos')->user() ?: auth('fbrpos')->user();
         if (!$user) {
             return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 401);
         }
@@ -6167,7 +6171,8 @@ class PosController extends Controller
         string $view,
         array $data,
         string $filename,
-        string $orientation = 'portrait'
+        string $orientation = 'portrait',
+        bool $download = true
     ): \Illuminate\Http\Response {
         $isUrdu = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT;
         $data['pdfUrdu'] = $isUrdu;
@@ -6175,7 +6180,7 @@ class PosController extends Controller
         if ($isUrdu) {
             try {
                 return \App\Support\MpdfRenderer::render(
-                    $view, $data, 'a4-report', $filename, false, $orientation
+                    $view, $data, 'a4-report', $filename, !$download, $orientation
                 );
             } catch (\Throwable $e) {
                 \Log::warning("mPDF report render failed [{$filename}]: " . $e->getMessage());
@@ -6189,7 +6194,7 @@ class PosController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, $data)
             ->setPaper('a4', $orientation);
 
-        return $pdf->download($filename);
+        return $download ? $pdf->download($filename) : $pdf->stream($filename);
     }
 
     private function estimateReceiptHeightPt($transaction, $company, string $printerSize): float
@@ -6655,7 +6660,7 @@ class PosController extends Controller
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
         $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
 
-        return $this->renderReportPdf(
+         return $this->renderReportPdf(
             'pos.reports-analytics-pdf',
             compact('company', 'analytics', 'tab'),
             'Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf'
@@ -15420,7 +15425,9 @@ class PosController extends Controller
         return $this->renderReportPdf(
              $isSummaryReport ? 'pos.day-close-summary-pdf' : 'pos.day-close-pdf',
              compact('company', 'report', 'transactions', 'cashierBreakdown', 'terminalBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'counterCash', 'counterCashTotals', 'summary', 'isSummaryReport'),
-             ($isSummaryReport ? 'Summary-Z-Report-' : 'Day-Close-') . "{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
+              ($isSummaryReport ? 'Summary-Z-Report-' : 'Day-Close-') . "{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf",
+              'portrait',
+              $request->boolean('download') || (bool) $request->route('download')
         );
     }
 
@@ -15969,10 +15976,12 @@ class PosController extends Controller
             return $ctx;
         }
 
-        return $this->renderReportPdf(
+         return $this->renderReportPdf(
              ($ctx['isSummaryReport'] ?? false) ? 'pos.day-close-summary-pdf' : 'pos.day-close-pdf',
             $ctx,
-             (($ctx['isSummaryReport'] ?? false) ? 'Summary-X-Report-' : 'X-Report-') . $ctx['report']->report_date->format('Y-m-d') . '.pdf'
+              (($ctx['isSummaryReport'] ?? false) ? 'Summary-X-Report-' : 'X-Report-') . $ctx['report']->report_date->format('Y-m-d') . '.pdf',
+              'portrait',
+              $request->boolean('download') || (bool) $request->route('download')
         );
     }
 
@@ -15999,10 +16008,12 @@ class PosController extends Controller
             return $ctx;
         }
 
-        return $this->renderReportPdf(
+         return $this->renderReportPdf(
             'pos.day-close-summary-pdf',
             $ctx,
-            "Summary-X-Report-{$ctx['report']->report_date->format('Y-m-d')}.pdf"
+             "Summary-X-Report-{$ctx['report']->report_date->format('Y-m-d')}.pdf",
+             'portrait',
+             $request->boolean('download') || (bool) $request->route('download')
         );
     }
 
@@ -16046,11 +16057,15 @@ class PosController extends Controller
         return compact('company', 'report', 'streamSplit');
     }
 
-    public function dayCloseSummaryPdf($id)
+    public function dayCloseSummaryPdf($id, ?Request $request = null)
     {
+         $download = $request?->boolean('download') || (bool) $request?->route('download');
          return $this->dayCloseReportPdf(
              $id,
-             Request::create('/pos/day-close/' . $id . '/summary/pdf', 'GET', ['report_mode' => 'summary'])
+             Request::create('/pos/day-close/' . $id . '/summary/pdf', 'GET', [
+                 'report_mode' => 'summary',
+                 'download' => $download,
+             ])
          );
     }
 

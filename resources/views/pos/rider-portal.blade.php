@@ -58,6 +58,9 @@
                     <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $b->delivery_address }}</div>
                     @endif
                     <div class="text-[11px] text-gray-400 mt-0.5">{{ $b->created_at->format('h:i A') }} · Rs. {{ number_format((float) $b->total_amount) }}</div>
+                    @if(in_array($st, ['assigned', 'dispatched']))
+                    <a href="{{ route('pos.rider.preview', $b->id) }}?revision={{ urlencode($b->preview_assignment_revision) }}" class="inline-block mt-2 text-xs font-semibold text-purple-600 dark:text-purple-400 underline">View bill preview</a>
+                    @endif
                 </div>
                 @if(in_array($st, ['assigned', 'dispatched']))
                 <form method="POST" action="{{ route('pos.rider.delivered', $b->id) }}" class="shrink-0">

@@ -205,6 +205,7 @@ class Company extends Model
         'manager_discount_limit',
         'public_profile_slug',
         'public_profile_settings',
+        'rider_bill_preview_prefs',
     ];
 
     protected $casts = [
@@ -250,6 +251,7 @@ class Company extends Model
         'invoice_display_prefs' => 'array',
         'di_branding' => 'array',
         'public_profile_settings' => 'array',
+        'rider_bill_preview_prefs' => 'array',
         'use_universal_pos' => 'boolean',
         'auto_print_kot' => 'boolean',
         'dine_in_auto_kot' => 'boolean',

@@ -5921,7 +5921,8 @@ class FbrPosController extends Controller
         string $view,
         array $data,
         string $filename,
-        string $orientation = 'portrait'
+        string $orientation = 'portrait',
+        bool $download = true
     ): \Illuminate\Http\Response {
         $isUrdu = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT;
         $data['pdfUrdu'] = $isUrdu;
@@ -5929,7 +5930,7 @@ class FbrPosController extends Controller
         if ($isUrdu) {
             try {
                 return \App\Support\MpdfRenderer::render(
-                    $view, $data, 'a4-report', $filename, false, $orientation
+                    $view, $data, 'a4-report', $filename, !$download, $orientation
                 );
             } catch (\Throwable $e) {
                 \Log::warning("mPDF report render failed [{$filename}]: " . $e->getMessage());
@@ -5942,7 +5943,7 @@ class FbrPosController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, $data)
             ->setPaper('a4', $orientation);
 
-        return $pdf->download($filename);
+        return $download ? $pdf->download($filename) : $pdf->stream($filename);
     }
 
     private function resolveFbrReportRange(Request $request): array
@@ -7516,7 +7517,7 @@ class FbrPosController extends Controller
         return back()->with('success', $msg);
     }
 
-    public function dayCloseReportPdf($id)
+    public function dayCloseReportPdf($id, ?Request $request = null)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
@@ -7553,7 +7554,9 @@ class FbrPosController extends Controller
         return $this->renderReportPdf(
             'fbr-pos.day-close-pdf',
             compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'displayUdhaar', 'displayOther', 'hazri', 'bioPunches'),
-            "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
+            "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf",
+            'portrait',
+            $request?->boolean('download') || (bool) $request?->route('download')
         );
     }
 

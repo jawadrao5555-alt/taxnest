@@ -139,7 +139,21 @@
         android:text="@string/navigate_btn"
         android:visibility="gone" />
 
-    <!-- Row 8: Delivered button (v1.6.0, Task #1160) — visible only while the
+    <!-- Row 8: Bill preview — visible only for current assigned/dispatched bills. -->
+    <Button
+        android:id="@+id/billPreviewBtn"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#475467"
+        android:contentDescription="@string/bill_preview_content_description"
+        android:text="@string/bill_preview_btn"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Row 9: Delivered button (v1.6.0, Task #1160) — visible only while the
          bill is assigned/dispatched; MainActivity toggles visibility. -->
     <Button
         android:id="@+id/deliveredBtn"

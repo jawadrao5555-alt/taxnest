@@ -26,9 +26,16 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Build
+import android.widget.ImageView
+import android.widget.ScrollView
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -87,6 +94,9 @@ class MainActivity : AppCompatActivity() {
     // Holds the current deliveries JSONArray so proximity chips can be
     // refreshed from GPS callbacks without another /me call.
     private var currentDeliveries = JSONArray()
+    // Guards asynchronous preview replies against /me replacement,
+    // reassignment, logout, and Activity lifecycle changes.
+    private val billPreviewSafety = BillPreviewSafety()
 
     // 5-second loop — local Prefs only (duty bool, pending queue, last sync).
     // Never touches the network.
@@ -148,6 +158,7 @@ class MainActivity : AppCompatActivity() {
         batteryChip.setOnClickListener { showBatterySetupDialog(null) }
 
         findViewById<Button>(R.id.logoutBtn).setOnClickListener {
+            billPreviewSafety.invalidateLifecycle()
             thread { ApiClient.post("/logout", JSONObject(), Prefs.token(this)) }
             // v1.5.0 (Task #1106): kill push locally too — the /logout call
             // clears the server copy, this invalidates the device token.
@@ -189,6 +200,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        billPreviewSafety.resume()
         renderState()
         // Start both loops fresh (cancel any stale callbacks first).
         ui.removeCallbacks(localStateLoop)
@@ -242,10 +254,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        billPreviewSafety.invalidateLifecycle()
         ui.removeCallbacks(localStateLoop)
         ui.removeCallbacks(meRefreshLoop)
         unregisterConnectivityCallback()
         stopProximityGps()
+    }
+
+    override fun onDestroy() {
+        billPreviewSafety.invalidateLifecycle()
+        super.onDestroy()
     }
 
     // ── Connectivity callback ──────────────────────────────────────────────
@@ -611,6 +629,9 @@ class MainActivity : AppCompatActivity() {
      * Must be called on the main thread.
      */
     private fun updateDeliveriesList(arr: JSONArray) {
+        // This increment invalidates any response started by the old cards,
+        // even when an id/revision pair happens to appear in both payloads.
+        billPreviewSafety.replaceCards(currentPreviewAssignments(arr))
         currentDeliveries = arr
         deliveriesContainer.removeAllViews()
 
@@ -691,11 +712,15 @@ class MainActivity : AppCompatActivity() {
             // payload change can't show the button on a terminal-state bill.
             val status = item.optString("status")
             val deliveredBtn = row.findViewById<Button>(R.id.deliveredBtn)
+            val previewBtn = row.findViewById<Button>(R.id.billPreviewBtn)
             if (status == "assigned" || status == "dispatched") {
                 deliveredBtn.visibility = View.VISIBLE
                 deliveredBtn.setOnClickListener { showDeliveryConfirmDialog(item, deliveredBtn) }
+                previewBtn.visibility = View.VISIBLE
+                previewBtn.setOnClickListener { loadBillPreview(item, previewBtn) }
             } else {
                 deliveredBtn.visibility = View.GONE
+                previewBtn.visibility = View.GONE
             }
 
             deliveriesContainer.addView(row)
@@ -745,6 +770,231 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    // ── Bill preview (v1.7.2 beta) ─────────────────────────────────────────
+
+    /** Extracts only assignments that currently qualify for a preview button. */
+    private fun currentPreviewAssignments(deliveries: JSONArray): Set<BillPreviewSafety.Assignment> {
+        val assignments = mutableSetOf<BillPreviewSafety.Assignment>()
+        for (i in 0 until deliveries.length()) {
+            val item = deliveries.optJSONObject(i) ?: continue
+            val status = item.optString("status")
+            val id = item.optInt("id", 0)
+            val revision = item.optString("assignment_revision").trim()
+            if ((status == "assigned" || status == "dispatched") && id > 0 && revision.isNotBlank()) {
+                assignments.add(BillPreviewSafety.Assignment(id, revision))
+            }
+        }
+        return assignments
+    }
+
+    /**
+     * Fetches a preview only when the rider asks for it.  The revision comes
+     * from this exact current /me card and is never cached, so reassignment
+     * invalidates both an old card and any old preview request on the server.
+     */
+    private fun loadBillPreview(item: JSONObject, btn: Button) {
+        val txnId = item.optInt("id", 0)
+        val revision = item.optString("assignment_revision").trim()
+        if (txnId <= 0 || revision.isBlank()) {
+            showMsg(getString(R.string.bill_preview_unavailable))
+            refreshMe()
+            return
+        }
+        val request = billPreviewSafety.begin(txnId, revision)
+        if (request == null) {
+            // The card was replaced or the Activity is no longer foregrounded;
+            // do not start a request for a potentially stale assignment.
+            return
+        }
+        btn.isEnabled = false
+        thread(name = "bill-preview") {
+            val encodedRevision = URLEncoder.encode(revision, "UTF-8")
+            val (code, body) = ApiClient.get(
+                "/deliveries/$txnId/preview?revision=$encodedRevision",
+                Prefs.token(this)
+            )
+            runOnUiThread {
+                // Threads cannot safely cancel HttpURLConnection mid-read here,
+                // so discard its result instead. This also avoids touching a
+                // detached button after pause, logout, or reassignment.
+                if (!billPreviewSafety.isCurrent(request)) return@runOnUiThread
+                btn.isEnabled = true
+                when {
+                    code == 401 -> sessionExpired()
+                    code == 403 -> showMsg(
+                        body?.optString("message")?.ifBlank { null } ?: getString(R.string.plan_locked)
+                    )
+                    code == 404 -> {
+                        // This includes a changed assignment revision. Do not
+                        // retain or render an old preview; obtain fresh cards.
+                        showMsg(getString(R.string.bill_preview_unavailable))
+                        refreshMe()
+                    }
+                    code in 200..299 && body?.optBoolean("ok") == true -> {
+                        val preview = body.optJSONObject("preview")
+                        if (preview == null) showMsg(getString(R.string.bill_preview_failed))
+                        else showBillPreviewDialog(preview)
+                    }
+                    code == -1 -> showMsg(getString(R.string.network_error))
+                    else -> showMsg(getString(R.string.bill_preview_failed))
+                }
+            }
+        }
+    }
+
+    /**
+     * Renders exclusively the rider-preview DTO allowlist.  Do not use the
+     * original delivery item here: its customer/address/payment fields are not
+     * preview authorization and must never supplement this server response.
+     */
+    private fun showBillPreviewDialog(preview: JSONObject) {
+        // A missing/null availability flag is a malformed response, not a
+        // disabled preview. Only the explicit server false gets this message.
+        if (!preview.has("available") || preview.isNull("available")) {
+            showMsg(getString(R.string.bill_preview_failed))
+            return
+        }
+        if (!preview.optBoolean("available")) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.bill_preview_title)
+                .setMessage(R.string.bill_preview_disabled)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+
+        // grand_total is mandatory in an available DTO. Failing closed avoids
+        // inventing a total from any other field if a malformed response arrives.
+        val grandTotal = previewValue(preview, "grand_total")
+        if (grandTotal == null) {
+            showMsg(getString(R.string.bill_preview_failed))
+            return
+        }
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding)
+        }
+        val items = preview.optJSONArray("items")
+        // Every available DTO item must carry a meaningful name. Reject the
+        // full malformed preview rather than rendering a blank line or guessing
+        // an item name from the delivery card.
+        if (items == null) {
+            showMsg(getString(R.string.bill_preview_failed))
+            return
+        }
+        val itemLines = ArrayList<JSONObject>()
+        val itemNames = ArrayList<String?>()
+        for (i in 0 until items.length()) {
+            val line = items.optJSONObject(i)
+            if (line == null) {
+                showMsg(getString(R.string.bill_preview_failed))
+                return
+            }
+            itemLines.add(line)
+            itemNames.add(previewValue(line, "name")?.trim())
+        }
+        if (!BillPreviewSafety.hasRequiredItemNames(itemNames)) {
+            showMsg(getString(R.string.bill_preview_failed))
+            return
+        }
+        for (i in itemLines.indices) {
+            val line = itemLines[i]
+            // Checked above: this is a real, nonblank server-provided name.
+            addPreviewLine(content, getString(R.string.bill_preview_item, itemNames[i]!!))
+            previewValue(line, "quantity")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_quantity, it))
+            }
+            previewValue(line, "unit_rate")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_unit_rate, formatPreviewAmount(it)))
+            }
+            previewValue(line, "line_total")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_line_total, formatPreviewAmount(it)))
+            }
+        }
+
+        preview.optJSONObject("tax")?.let { tax ->
+            previewValue(tax, "rate")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_tax_rate, it))
+            }
+            previewValue(tax, "amount")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_tax_amount, formatPreviewAmount(it)))
+            }
+        }
+        previewValue(preview, "ntn")?.let {
+            addPreviewLine(content, getString(R.string.bill_preview_ntn, it))
+        }
+        preview.optJSONObject("customer")?.let { customer ->
+            previewValue(customer, "name")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_customer_name, it))
+            }
+            previewValue(customer, "phone")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_customer_phone, it))
+            }
+            previewValue(customer, "address")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_customer_address, it))
+            }
+        }
+        preview.optJSONObject("business")?.let { business ->
+            previewValue(business, "name")?.let {
+                addPreviewLine(content, getString(R.string.bill_preview_business, it))
+            }
+        }
+
+        val qr = preview.optJSONObject("qr")
+        val qrPayload = qr?.let { previewValue(it, "payload") }
+        if (qr?.optBoolean("available", false) == true && !qrPayload.isNullOrBlank()) {
+            localQrBitmap(qrPayload)?.let { bitmap ->
+                addPreviewLine(content, getString(R.string.bill_preview_qr))
+                content.addView(ImageView(this).apply {
+                    setImageBitmap(bitmap)
+                    contentDescription = getString(R.string.bill_preview_qr_description)
+                    adjustViewBounds = true
+                    val size = (180 * resources.displayMetrics.density).toInt()
+                    layoutParams = LinearLayout.LayoutParams(size, size)
+                })
+            }
+        }
+
+        addPreviewLine(content, getString(R.string.bill_preview_grand_total, formatPreviewAmount(grandTotal)), true)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.bill_preview_title)
+            .setView(ScrollView(this).apply { addView(content) })
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun addPreviewLine(container: LinearLayout, text: String, bold: Boolean = false) {
+        container.addView(TextView(this).apply {
+            this.text = text
+            textSize = if (bold) 16f else 14f
+            if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, 3, 0, 3)
+        })
+    }
+
+    /** Returns null for absent/null keys; never substitutes a local value. */
+    private fun previewValue(source: JSONObject, key: String): String? {
+        if (!source.has(key) || source.isNull(key)) return null
+        return source.opt(key)?.takeUnless { it == JSONObject.NULL }?.toString()
+    }
+
+    private fun formatPreviewAmount(value: String): String =
+        value.toDoubleOrNull()?.let { String.format(Locale.US, "%,.2f", it) } ?: value
+
+    /** The payload is encoded locally and is never replaced with transaction data. */
+    private fun localQrBitmap(payload: String): Bitmap? = try {
+        val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 512, 512)
+        Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            for (y in 0 until matrix.height) for (x in 0 until matrix.width) {
+                bitmap.setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
+            }
+        }
+    } catch (e: Exception) {
+        null
     }
 
     // ── Delivered button (Task #1508 extended, v1.6.0 original) ──────────
@@ -952,6 +1202,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sessionExpired() {
+        // A token loss is also an assignment/UI invalidation boundary: an
+        // in-flight preview must not render over the login transition.
+        billPreviewSafety.invalidateLifecycle()
         // v1.5.0 (Task #1106): another device logged in (app_token rotated) —
         // its login also rotated the server-side FCM token, so pushes already
         // target the new phone; this just invalidates OUR device token.

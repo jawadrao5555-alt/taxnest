@@ -17,8 +17,8 @@ android {
         applicationId "pk.taxnest.rider"
         minSdk 24
         targetSdk 34
-        versionCode 11
-        versionName "1.7.1"
+        versionCode 12
+        versionName "1.7.2-beta"
     }
 
     signingConfigs {
@@ -65,6 +65,9 @@ dependencies {
     // throw so a config-less build silently falls back to the 15-min poll.
     implementation platform('com.google.firebase:firebase-bom:33.1.2')
     implementation 'com.google.firebase:firebase-messaging'
+    // QR is encoded entirely on-device from the server allowlisted bare payload.
+    implementation 'com.google.zxing:core:3.5.3'
+    testImplementation 'junit:junit:4.13.2'
 }
 
 // Task #1106: Google Services plugin can only run with a real

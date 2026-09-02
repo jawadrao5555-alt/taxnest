@@ -60,6 +60,28 @@
     <string name="delivered_failed">اطلاع نہیں گئی — انٹرنیٹ چیک کر کے دوبارہ کوشش کریں</string>
     <string name="delivered_gone">یہ بل اب آپ کے پاس نہیں — لسٹ تازہ کر دی گئی ہے</string>
 
+    <!-- Rider bill preview (v1.7.2 beta) -->
+    <string name="bill_preview_btn">بل دیکھیں</string>
+    <string name="bill_preview_content_description">اس بل کا محفوظ خلاصہ دیکھیں</string>
+    <string name="bill_preview_title">بل کا خلاصہ</string>
+    <string name="bill_preview_disabled">دکان نے اس بل کا خلاصہ رائیڈر کے لیے بند کیا ہوا ہے۔</string>
+    <string name="bill_preview_unavailable">یہ بل اب آپ کے پاس نہیں — لسٹ تازہ کر دی گئی ہے</string>
+    <string name="bill_preview_failed">بل کا خلاصہ نہیں کھل سکا — دوبارہ کوشش کریں</string>
+    <string name="bill_preview_item">آئٹم: %1$s</string>
+    <string name="bill_preview_quantity">مقدار: %1$s</string>
+    <string name="bill_preview_unit_rate">فی آئٹم: روپے %1$s</string>
+    <string name="bill_preview_line_total">کل: روپے %1$s</string>
+    <string name="bill_preview_tax_rate">ٹیکس شرح: %1$s%%</string>
+    <string name="bill_preview_tax_amount">ٹیکس: روپے %1$s</string>
+    <string name="bill_preview_ntn">NTN: %1$s</string>
+    <string name="bill_preview_customer_name">گاہک: %1$s</string>
+    <string name="bill_preview_customer_phone">فون: %1$s</string>
+    <string name="bill_preview_customer_address">پتہ: %1$s</string>
+    <string name="bill_preview_business">کاروبار: %1$s</string>
+    <string name="bill_preview_qr">انوائس QR</string>
+    <string name="bill_preview_qr_description">انوائس کا QR کوڈ</string>
+    <string name="bill_preview_grand_total">کل رقم: روپے %1$s</string>
+
     <!-- New-delivery notifications (v1.4.0) -->
     <string name="notif_deliveries_channel">نئے آرڈر کی اطلاع</string>
     <string name="notif_new_delivery_one">نیا آرڈر آیا ہے — ڈیلیوری کے لیے!</string>

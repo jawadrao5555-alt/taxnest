@@ -1877,6 +1877,10 @@ class PosRiderController extends Controller
 
         $owed = $rider->openCashRemaining();
 
+        // The revision is an opaque assignment capability, not a database id;
+        // the preview endpoint independently rechecks it before rendering.
+        $previewService = app(\App\Services\RiderBillPreviewService::class);
+        $bills->each(fn ($bill) => $bill->setAttribute('preview_assignment_revision', $previewService->assignmentRevision($bill, $rider)));
         return view('pos.rider-portal', compact('rider', 'bills', 'owed'));
     }
 

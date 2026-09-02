@@ -231,6 +231,13 @@
 @endif
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+/* Delivery is an operational action, not a skin accent: fixed neutral states
+   retain readable contrast under every company colour skin and never glow. */
+.tn-deliveries-button { color:#1e293b; background:#f8fafc; border:1px solid #94a3b8; box-shadow:none !important; }
+.tn-deliveries-button:hover { color:#0f172a; background:#e2e8f0; border-color:#64748b; box-shadow:none !important; }
+.tn-deliveries-button:focus-visible { outline:2px solid #475569; outline-offset:2px; box-shadow:none !important; }
+.dark .tn-deliveries-button { color:#f1f5f9; background:#334155; border-color:#94a3b8; }
+.dark .tn-deliveries-button:hover { color:#fff; background:#475569; border-color:#cbd5e1; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideOut { from { opacity: 1; transform: translateX(0); max-height: 120px; } to { opacity: 0; transform: translateX(60px); max-height: 0; padding-top:0; padding-bottom:0; margin:0; } }
@@ -423,6 +430,16 @@
     .prod-card .price-badge { font-size: 12px; padding: 1px 6px; }
     .cat-pill { padding-left: 12px; padding-right: 12px; }
 }
+/* The header intentionally changes to its compact variant below lg.  This
+   includes the Desktop Agent's 900px minimum: unlike a phone, its sale area
+   stays desktop-shaped, but its top chrome cannot safely host the teleported
+   tool rail.  Keep only the fallback control strip adaptive here; do not
+   apply phone cart or touch styling to tablet/desktop viewports. */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .tn-toggles-strip { flex-wrap: wrap; justify-content: center; row-gap: 4px; column-gap: 14px; padding: 5px 8px; }
+    .tn-toggles-strip .w-px { display: none; }
+    .tn-toggles-strip span:first-child { white-space: nowrap; }
+}
 .priority-badge { position: relative; }
 .priority-badge::after { content: ''; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -571,7 +588,9 @@ window.addEventListener('popstate', function() {
          action and a "Switches" dropdown (PRA / Auto-Print / Auto-KOT) live INSIDE the black
          top-nav — teleported into #tn-nav-sale-tools (pos-app.blade.php) via x-teleport so
          they KEEP this restaurantPos() Alpine scope. The old in-page buttons + toggles strip
-         below stay as the MOBILE fallback (md:hidden) — same state, same handlers. --}}
+         below stay as the compact-layout fallback (lg:hidden) — same state, same handlers.
+         Desktop Agent windows can be 900 CSS px wide, where the full desktop chrome leaves
+         no reliable room for this teleported strip. --}}
     <template x-teleport="#tn-nav-sale-tools">
         {{-- mx-auto: centered while it fits; parent #tn-nav-sale-tools is overflow-x-auto so on
              narrow screens the strip scrolls instead of spilling over the user menu (ZFC bug). --}}
@@ -606,7 +625,7 @@ window.addEventListener('popstate', function() {
             {{-- Delivery Board (Task 431): rider assign / delivered / settle in a modal
                  iframe — delivery manager ko alag ID/window ki zaroorat nahi. --}}
             @if($showDeliveriesBoardBtn)
-            <button type="button" onclick="tnOpenDeliveryBoard()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition flex-shrink-0" title="{{ __('pos.deliveries') }}">
+            <button type="button" onclick="tnOpenDeliveryBoard()" class="tn-deliveries-button flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex-shrink-0" title="{{ __('pos.deliveries') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.deliveries') }}</span>
             </button>
@@ -784,11 +803,13 @@ window.addEventListener('popstate', function() {
         </div>
     </template>
 
-    {{-- PRA Reporting + Auto-Print toggles strip — MOBILE FALLBACK ONLY (md:hidden) since the
-         Jul 2026 redesign moved these switches into the top-nav dropdown on desktop.
+    {{-- PRA Reporting + Auto-Print toggles strip — COMPACT-LAYOUT FALLBACK ONLY (lg:hidden)
+         since the Jul 2026 redesign moved these switches into the top-nav dropdown on wide screens.
+         Keeping the fallback through the tablet/Desktop-Agent range makes the controls render
+         in the normal page flow rather than inside a width-starved header scroller.
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
-    <div class="tn-toggles-strip flex md:hidden items-center justify-end gap-4 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
+    <div class="tn-toggles-strip flex lg:hidden items-center justify-end gap-4 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
          x-data="{
             autoPrintLoading: false,
             autoKotLoading: false
@@ -1194,7 +1215,7 @@ window.addEventListener('popstate', function() {
 
         {{-- Delivery Board (Task 431) — mobile copy of the nav-strip button --}}
         @if($showDeliveriesBoardBtn)
-        <button type="button" onclick="tnOpenDeliveryBoard()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition" title="{{ __('pos.deliveries') }}">
+        <button type="button" onclick="tnOpenDeliveryBoard()" class="tn-deliveries-button flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition" title="{{ __('pos.deliveries') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
             <span class="hidden sm:inline">{{ __('pos.deliveries') }}</span>
         </button>

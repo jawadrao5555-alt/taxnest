@@ -169,6 +169,13 @@
 </script>
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+/* Fixed neutral treatment: the Delivery board must remain readable regardless
+   of the FBR/PRA company skin, in either colour scheme, without a coloured glow. */
+.tn-deliveries-button { color:#1e293b; background:#f8fafc; border:1px solid #94a3b8; box-shadow:none !important; }
+.tn-deliveries-button:hover { color:#0f172a; background:#e2e8f0; border-color:#64748b; box-shadow:none !important; }
+.tn-deliveries-button:focus-visible { outline:2px solid #475569; outline-offset:2px; box-shadow:none !important; }
+.dark .tn-deliveries-button { color:#f1f5f9; background:#334155; border-color:#94a3b8; }
+.dark .tn-deliveries-button:hover { color:#fff; background:#475569; border-color:#cbd5e1; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
 @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideOut { from { opacity: 1; transform: translateX(0); max-height: 120px; } to { opacity: 0; transform: translateX(60px); max-height: 0; padding-top:0; padding-bottom:0; margin:0; } }
@@ -431,7 +438,7 @@ window.addEventListener('popstate', function() {
 
             {{-- Delivery Board (Aug 2026) — lazy iframe modal; only shown when delivery feature + riders plan gate are both ON. --}}
             @if($showDeliveriesBoardBtn)
-            <button type="button" onclick="tnOpenDeliveryBoard()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-emerald-600/85 hover:bg-emerald-600 ring-1 ring-emerald-300/40 transition flex-shrink-0" title="{{ __('pos.deliveries') }}">
+            <button type="button" onclick="tnOpenDeliveryBoard()" class="tn-deliveries-button flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex-shrink-0" title="{{ __('pos.deliveries') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.deliveries') }}</span>
             </button>
@@ -974,7 +981,7 @@ window.addEventListener('popstate', function() {
 
         {{-- Delivery Board — mobile button (Aug 2026) --}}
         @if($showDeliveriesBoardBtn)
-        <button type="button" onclick="tnOpenDeliveryBoard()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition" title="{{ __('pos.deliveries') }}">
+        <button type="button" onclick="tnOpenDeliveryBoard()" class="tn-deliveries-button flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition" title="{{ __('pos.deliveries') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
             <span class="hidden sm:inline">{{ __('pos.deliveries') }}</span>
         </button>

@@ -163,6 +163,65 @@ class PosDarkModeToggleTest extends TestCase
         $this->assertTrue($this->storedDark($cashier->id));
     }
 
+    public function test_fbr_guard_persists_to_its_own_shared_user_row(): void
+    {
+        $fbrUser = $this->makeUser('pos_cashier', false);
+        $praColleague = $this->makeUser('pos_cashier', false);
+
+        $this->actingAs($fbrUser, 'fbrpos');
+        $res = (new PosController())->toggleDarkMode(Request::create('/fbr-pos/set-dark-mode', 'POST', ['dark' => true]));
+
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertTrue($this->storedDark($fbrUser->id));
+        $this->assertFalse($this->storedDark($praColleague->id), 'FBR must not share a company-wide theme preference');
+    }
+
+    public function test_pos_shells_have_prepaint_user_bootstrap_and_delivery_buttons_are_neutral(): void
+    {
+        foreach ([
+            resource_path('views/layouts/pos-app.blade.php'),
+            resource_path('views/layouts/fbr-pos-app.blade.php'),
+        ] as $shell) {
+            $html = file_get_contents($shell);
+            $this->assertNotFalse($html);
+            $this->assertStringContainsString('data-tn-theme-bootstrap', $html);
+            $this->assertStringContainsString("localStorage.setItem(key, dark ? '1' : '0')", $html);
+            $this->assertStringContainsString("root.style.colorScheme = dark ? 'dark' : 'light'", $html);
+        }
+
+        foreach ([
+            resource_path('views/pos/universal.blade.php'),
+            resource_path('views/fbr-pos/universal.blade.php'),
+        ] as $saleScreen) {
+            $html = file_get_contents($saleScreen);
+            $this->assertNotFalse($html);
+            $this->assertStringContainsString('tn-deliveries-button', $html);
+            $this->assertStringContainsString('.dark .tn-deliveries-button', $html);
+            $this->assertStringContainsString('box-shadow:none !important', $html);
+            preg_match_all('/tnOpenDeliveryBoard\(\)" class="([^"]+)/', $html, $buttons);
+            $this->assertNotEmpty($buttons[1]);
+            foreach ($buttons[1] as $classes) {
+                $this->assertStringContainsString('tn-deliveries-button', $classes);
+                $this->assertStringNotContainsString('emerald', $classes);
+                $this->assertStringNotContainsString('ring-', $classes);
+            }
+        }
+    }
+
+    public function test_fbr_header_renders_a_guarded_personal_dark_mode_interaction_contract(): void
+    {
+        $layout = file_get_contents(resource_path('views/layouts/fbr-pos-app.blade.php'));
+
+        $this->assertNotFalse($layout);
+        $this->assertStringContainsString('@click="toggleDarkMode()"', $layout);
+        $this->assertStringContainsString("route('fbrpos.set-dark-mode', [], false)", $layout);
+        $this->assertStringNotContainsString("route('pos.set-dark-mode', [], false)", $layout);
+        $this->assertStringContainsString('if (!data || data.success !== true || !!data.dark !== want)', $layout);
+        $this->assertStringContainsString("root.style.colorScheme = want ? 'dark' : 'light'", $layout);
+        $this->assertStringContainsString("localStorage.setItem('tn-pos-dark:'", $layout);
+        $this->assertStringContainsString("alert(@js(__('pos.setting_save_failed')))", $layout);
+    }
+
     public function test_guest_gets_401_and_writes_nothing(): void
     {
         $user = $this->makeUser('pos_admin', false);

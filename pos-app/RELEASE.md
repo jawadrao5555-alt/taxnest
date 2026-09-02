@@ -76,7 +76,7 @@ breaks in-place updates for everything. NEVER commit it (public repo).
 
 1. **Code merged & version bumped** — `pos-app/app/build.gradle`:
    `versionCode` N+1 (never reuse), `versionName "X.Y.Z"`.
-2. **Server side deployed** — push to origin (`.cpanel.yml` auto-deploys),
+2. **Server side deployed** — push to origin (then deploy with `bash scripts/deploy-live.sh`),
    `ea-php84 artisan migrate --force` on live, verify the live commit.
 3. **Build the signed APK** (above); `apksigner verify --print-certs` must show
    the shared key. Then verify it before it leaves the box — one command, no
@@ -103,7 +103,9 @@ breaks in-place updates for everything. NEVER commit it (public repo).
    `unzip -p <apk> resources.arsc | strings | grep -E "AIza|:android:"` —
    **silence means push is dead; do not host the APK.**
 5. **Host as a versioned BETA first**:
-   `scp … taxnestc@cpanel.taxnest.com.pk:public_html/public/downloads/taxnest-pos-<ver>.apk`
+   `scp -i .local/ssh/nayatel_vps_key … jawadrao5555@115.186.164.126:/var/www/taxnest/public/downloads/taxnest-pos-<ver>.apk`
+   (host/path per `scripts/lib/live-host.sh` — the old cPanel box is retired
+   but still answers, so an scp aimed there succeeds and reaches nobody)
    **NEVER GitHub Releases** — desktop agents self-update from
    `releases/latest` of this repo and would try to install the APK.
 6. **Owner phone-tests the beta** (mandatory rollout rule). For a push

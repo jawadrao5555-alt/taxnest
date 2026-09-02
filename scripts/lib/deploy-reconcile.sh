@@ -2,10 +2,9 @@
 # Sourced by scripts/deploy-live.sh, scripts/check-live-deploy.sh and
 # scripts/tests/deploy-reconcile-check.sh — single source of truth.
 #
-# Background (.agents/memory/cpanel-deployment.md): platform task-merges commit
-# to the workspace with NEW SHAs while content-identical commits already sit on
-# origin/main (live auto-pulled them via .cpanel.yml). Lineage diverges, content
-# does not. Manual reconcile pattern (done by hand 3x, last 14 Aug 2026):
+# Background: platform task-merges commit to the workspace with NEW SHAs while
+# content-identical commits already sit on origin/main. Lineage diverges,
+# content does not. Manual reconcile pattern (done by hand 3x, last 14 Aug 2026):
 #   1. verify origin/main has NO unique content — its TREE must be byte-identical
 #      to the tree of SOME commit in workspace lineage
 #      (git rev-parse origin/main^{tree} vs git log --format='%H %T')

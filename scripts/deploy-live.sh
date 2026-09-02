@@ -191,9 +191,12 @@ echo "REMOTE_STEP: cache rebuild"
 
 # The web server writes into these as apache; artisan just rewrote them as us.
 # Left unfixed, the next request that needs to write a cache or a log hits a
-# permission error, and SELinux would refuse the read outright.
-sudo -n chown -R "$LIVE_SSH_USER:$LIVE_WEB_GROUP" storage bootstrap/cache 2>/dev/null
-sudo -n restorecon -R storage bootstrap/cache public 2>/dev/null
+# permission error, and SELinux refuses the read outright. These MUST NOT be
+# best-effort: a silent failure here brings the site back UP with logging and
+# cache writes broken, which is worse than staying in maintenance.
+echo "REMOTE_STEP: repair ownership + SELinux contexts"
+sudo -n chown -R "$LIVE_SSH_USER:$LIVE_WEB_GROUP" storage bootstrap/cache 2>&1 || exit 95
+sudo -n restorecon -R storage bootstrap/cache public 2>&1 || exit 95
 
 # --- web OPcache reset -------------------------------------------------------
 # The old host had no privileged access, so it dropped a one-time PHP file into
@@ -225,16 +228,16 @@ for TRY in 1 2 3 4 5; do
   for p in $PIDS_AFTER; do
     case " $PIDS_BEFORE " in *" $p "*) ;; *) FRESH=1 ;; esac
   done
-  # Evidence B: systemd/php-fpm recorded the reload after we asked for it.
+  # Evidence B: php-fpm's OWN log says the master came back up. Deliberately
+  # NOT systemd's "Reloaded ..." line — systemd prints that whenever it
+  # delivered the signal, whether or not php-fpm did anything with it. These
+  # two phrases are emitted by the re-executed master itself.
   JOURNAL=$(sudo -n journalctl -u "$LIVE_FPM_SERVICE" --since "$RELOAD_TS" --no-pager 2>/dev/null \
-            | grep -ciE 'reloaded|inherited socket|ready to handle' || true)
-  if [ "$FRESH" = 1 ] || [ "${JOURNAL:-0}" -gt 0 ]; then OP_OK=1; break; fi
+            | grep -ciE 'inherited socket|ready to handle connections' || true)
+  if [ "$FRESH" = 1 ] && [ "${JOURNAL:-0}" -gt 0 ]; then OP_OK=1; break; fi
 done
 [ "$OP_OK" = 1 ] || exit 98
 echo "OPCACHE_RESET_OK php-fpm master reloaded (before:[$PIDS_BEFORE] after:[$PIDS_AFTER])"
-
-echo "REMOTE_STEP: artisan up"
-$PHP artisan up 2>&1 || exit 97
 
 # --- queue worker ------------------------------------------------------------
 # On the old host the queue ran from a cron line, so every minute spawned a
@@ -242,11 +245,18 @@ $PHP artisan up 2>&1 || exit 97
 # systemd unit: skip this and the worker keeps executing the code it booted
 # with, forever. Bills, ZIP exports and regulator filings would silently run
 # last release while the website runs this one.
+#
+# Deliberately BEFORE 'artisan up'. If the worker cannot come back we want the
+# shops on the maintenance page, not on a site that takes bills whose
+# background half is dead.
 echo "REMOTE_STEP: restart queue worker ($LIVE_QUEUE_SERVICE)"
 sudo -n systemctl restart "$LIVE_QUEUE_SERVICE" 2>&1 || exit 99
 sleep 3
 systemctl is-active --quiet "$LIVE_QUEUE_SERVICE" || exit 99
 echo "REMOTE_STEP: queue worker active on the new code"
+
+echo "REMOTE_STEP: artisan up"
+$PHP artisan up 2>&1 || exit 97
 
 # Settings-regression check, AFTER the site is back up. Deliberately not a
 # remote exit code: the release already shipped, and dropping the shops back
@@ -277,6 +287,7 @@ apply_fail_reason() {
     92) echo "composer install failed on live — SITE LEFT IN MAINTENANCE" ;;
     93) echo "migrate --force failed on live — SITE LEFT IN MAINTENANCE" ;;
     94) echo "cache rebuild failed on live — SITE LEFT IN MAINTENANCE" ;;
+    95) echo "could not repair storage ownership / SELinux contexts — SITE LEFT IN MAINTENANCE (bringing it up would break logging and cache writes)" ;;
     96) echo "could not open 200 maintenance window — ABORTED, live untouched" ;;
     97) echo "artisan up failed after successful release — run 'php artisan up' on live" ;;
     98) echo "web OPcache reset NOT confirmed (php-fpm reload) — SITE LEFT IN MAINTENANCE (old opcode risk)" ;;

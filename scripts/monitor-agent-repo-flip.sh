@@ -19,8 +19,8 @@
 # so they can still self-update to 1.7.0. Once all shops hit 1.7.0 this script
 # fires and the repo can safely go private (shim becomes a no-op too).
 #
-# Installed as a cron entry on the cPanel host (every 15 min):
-#   */15 * * * * /bin/bash /home/taxnestc/monitor_agent_versions.sh >> /home/taxnestc/monitor_agent_update.log 2>&1
+# Installed as a cron entry on the live origin (every 15 min), e.g.:
+#   */15 * * * * /bin/bash /home/jawadrao5555/monitor_agent_versions.sh >> /home/jawadrao5555/monitor_agent_update.log 2>&1
 #
 # The live copy on the server has GITHUB_TOKEN substituted with the real token.
 # NEVER commit the token here.
@@ -29,9 +29,12 @@
 # stripping) and errored every run. Install via scp (byte-exact) + bash -n
 # + one manual run, never via heredoc.
 
-LIVE_DIR="/home/taxnestc/public_html"
-LOG_FILE="/home/taxnestc/monitor_agent_update.log"
-PHP="/usr/local/bin/ea-php84"
+# Runs ON the live origin, so it cannot source scripts/lib/live-host.sh (that
+# file describes how to REACH the origin from the workspace). Keep these in
+# step with it. Overridable so a rebuilt server does not need a code change.
+LIVE_DIR="${LIVE_DIR:-/var/www/taxnest}"
+LOG_FILE="${LOG_FILE:-/home/jawadrao5555/monitor_agent_update.log}"
+PHP="${PHP:-/usr/bin/php}"
 GITHUB_TOKEN="__GITHUB_TOKEN_PLACEHOLDER__"
 OLD_REPO="jawadrao5555-alt/taxnest"
 NEW_REPO="jawadrao5555-alt/nestpos-releases"

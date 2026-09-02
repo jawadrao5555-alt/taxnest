@@ -426,13 +426,15 @@ downgrade, and swapping builds is a same-signature in-place update.
 APKs are **never committed** (public repo, disk quota) and **never published to
 GitHub Releases** (desktop agents self-update from `releases/latest`).
 
-> SSH/scp must target **`cpanel.taxnest.com.pk`** (DNS-only). `taxnest.pk`
-> is Cloudflare-proxied — port 22 there just times out and looks like "live is
-> unreachable". Note `scp` takes `-P 22`, `ssh` takes `-p 22`.
+> SSH/scp must target the origin **by IP** (see `scripts/lib/live-host.sh`).
+> The public domain is CDN-proxied — port 22 there just times out and looks
+> like "live is unreachable" — and the retired cPanel box still answers, so an
+> upload aimed at the old name succeeds and reaches nobody.
+> Note `scp` takes `-P 22`, `ssh` takes `-p 22`.
 
 ```bash
-SCP="-i .local/ssh/cpanel_deploy_key -P 22 -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
-H=taxnestc@cpanel.taxnest.com.pk
+SCP="-i .local/ssh/nayatel_vps_key -P 22 -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
+H=jawadrao5555@115.186.164.126
 
 # keep a versioned copy (the previous build stays as a rollback file), then
 # point the canonical names the download page uses at the new builds.
@@ -567,7 +569,7 @@ twins of the same map — `tests/Feature/AppVersionEndpointTest.php` locks both.
 5. scp both APKs to live `public_html/public/downloads/` (versioned name +
    canonical name), then re-run the guard on the **downloaded** canonical URLs
    and md5-match them against the build outputs.
-6. Deploy PHP (`git push origin HEAD:main`; `.cpanel.yml` auto-deploys).
+6. Deploy PHP (`git push origin HEAD:main`, then `bash scripts/deploy-live.sh`).
 7. **Owner phone-tests both builds** — see
    `docs/qa/task-1345-caller-id-two-builds-qa.md`. From 1.3.0 also check the
    language switch:

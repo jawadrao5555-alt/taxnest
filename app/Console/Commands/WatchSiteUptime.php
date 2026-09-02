@@ -212,40 +212,23 @@ class WatchSiteUptime extends Command
     }
 
     /**
-     * Origin IP for the Cloudflare-bypass probe. Configured value wins; the
-     * fallback resolves the cPanel hostname, which is never proxied through
-     * Cloudflare and therefore always points at the real server — so the
-     * monitor keeps working after a hosting IP change with no redeploy.
+     * Origin IP for the CDN-bypass probe. It must be CONFIGURED — there is no
+     * way to derive it.
+     *
+     * This used to build 'cpanel.' . $host and probe whatever answered. After
+     * the move to our own server that name still resolved, to the RETIRED old
+     * box, which happily replied 200 — so a real origin outage would have been
+     * classified as a healthy origin while every shop was down. A monitor that
+     * can be wrong in the reassuring direction is worse than no monitor.
+     *
+     * Returns null when unpinned. The caller must treat that as UNVERIFIED,
+     * never as evidence about the origin's health.
      */
     private function originIp(string $url): ?string
     {
         $configured = trim((string) config('services.uptime_watch.origin_ip', ''));
-        if ($configured !== '') {
-            return $configured;
-        }
 
-        $host = (string) parse_url($url, PHP_URL_HOST);
-        if ($host === '') {
-            return null;
-        }
-
-        // The origin IP must be CONFIGURED, never derived from the public
-        // hostname. This used to build 'cpanel.' . $host and probe whatever
-        // answered — which, after the move to the Islamabad VPS, was the
-        // RETIRED old server. It happily replied, so an origin outage would
-        // have been reported as healthy while every shop was down.
-        $configured = (string) config('services.uptime.origin_ip', '');
-        if ($configured !== '' && filter_var($configured, FILTER_VALIDATE_IP)) {
-            return $configured;
-        }
-
-        // No pin configured: resolve the public host itself. Behind a CDN this
-        // returns an edge address and the origin probe degrades to a second
-        // edge probe — weaker, but never a lie about a different machine.
-        $ip = gethostbyname($host);
-
-        // gethostbyname returns the input unchanged when resolution fails.
-        return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : null;
+        return filter_var($configured, FILTER_VALIDATE_IP) ? $configured : null;
     }
 
     private function classify(array $edge, ?array $origin): string
@@ -253,7 +236,13 @@ class WatchSiteUptime extends Command
         if ($edge['ok']) {
             return 'OK';
         }
-        if ($origin === null || $origin['ok'] === false) {
+        // No origin pin configured, so the bypass probe never ran. We know the
+        // edge is failing and nothing more. Saying ORIGIN-DOWN here would be
+        // inventing evidence we do not have.
+        if ($origin === null) {
+            return 'ORIGIN-UNVERIFIED';
+        }
+        if ($origin['ok'] === false) {
             return 'ORIGIN-DOWN';
         }
         if (($origin['tls_ok'] ?? true) === false) {

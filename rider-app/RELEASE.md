@@ -160,7 +160,7 @@ the POS and FBR POS shells too).
 
 8. **Deploy PHP changes**:
    ```bash
-   git push origin HEAD:main       # .cpanel.yml auto-deploys
+   git push origin HEAD:main       # then: bash scripts/deploy-live.sh
    php artisan migrate --force     # run on live via cPanel SSH
    ```
 

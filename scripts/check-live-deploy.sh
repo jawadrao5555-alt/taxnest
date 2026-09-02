@@ -35,12 +35,17 @@ fi
 # ONE SSH round-trip: live HEAD + cache-freshness evidence (Task 1053).
 # Freshness rule: NO source file that feeds Laravel's caches (routes/, app/,
 # config/, resources/views/, bootstrap/app.php, composer.lock) may be NEWER
-# than the built route cache. Every sanctioned deploy path (deploy-live.sh,
-# cpanel-autodeploy.sh) rebuilds caches AFTER the code lands, so fresh = cache
-# mtime >= code mtimes. mtime-based (not commit-date-based) so it catches ALL
-# delivery mechanisms: git pull, cp -R, tar-deploy, scp hot-fix.
-LIVE_OUT=$(timeout 30 ssh -i "$KEY" -p 22 -o BatchMode=yes -o ConnectTimeout=10 \
-  -o StrictHostKeyChecking=accept-new "$HOST" bash -s <<'LIVEPROBE' 2>/dev/null
+# than the built route cache. deploy-live.sh rebuilds caches AFTER the code
+# lands, so fresh = cache mtime >= code mtimes. mtime-based (not
+# commit-date-based) so it catches ALL delivery mechanisms: git pull, cp -R,
+# tar-deploy, scp hot-fix.
+#
+# LIVE_DIR must be INJECTED into the remote command: ssh does not carry the
+# local shell's variables, and the heredoc is quoted so it does not expand
+# locally either. Without this the probe cd's to an empty path, prints no
+# HEAD, and the whole check silently degrades to "could not reach live".
+LIVE_OUT=$(timeout 30 ssh "${LIVE_SSH_OPTS[@]}" "$HOST" \
+  "LIVE_DIR='$LIVE_DIR' bash -s" <<'LIVEPROBE' 2>/dev/null
 cd "$LIVE_DIR" || { echo "HEAD="; exit 0; }
 echo "HEAD=$(git rev-parse HEAD 2>/dev/null)"
 RC=$(ls -t bootstrap/cache/routes-*.php 2>/dev/null | head -1)

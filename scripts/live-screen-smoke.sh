@@ -91,6 +91,9 @@ fetch() {
 # No SSH key (owner machine) => old behavior (fail on first miss) unchanged.
 # shellcheck source=scripts/lib/live-host.sh
 source "$(dirname "$0")/lib/live-host.sh"
+# This script MUTATES live caches over SSH, so it must clear the same
+# approved-origin gate as the deploy itself.
+live_host_assert_not_retired || exit 1
 SSH_KEY="${SMOKE_SSH_KEY:-$LIVE_SSH_KEY}"
 SSH_HOST="$LIVE_SSH_HOST"
 SANITIZE_DONE=0   # 0 = not attempted, 1 = succeeded, 2 = attempted & failed (don't retry again)

@@ -61,15 +61,25 @@ require_live_key() {
   }
 }
 
-# The old cPanel box is retired but still powered on (it serves mail). Any
-# script that finds itself pointed there is pointed at a corpse: it will
-# answer, it will accept a git pull, and none of it will reach a single shop.
+# The ONE address these scripts are allowed to mutate. An allow-list, not a
+# deny-list: blacklisting the old host's name only catches the spelling we
+# thought of, and every override path (LIVE_SSH_IP=..., a stale checkout, a
+# copy-pasted script) walks straight past it. Anything not on this list is
+# refused, so a wrong target fails loudly instead of deploying somewhere.
+#
+# The old cPanel box is retired but still powered on (it serves mail), which is
+# exactly why this matters: it answers, it accepts a git pull, and none of it
+# reaches a single shop.
+LIVE_APPROVED_IPS="${LIVE_APPROVED_IPS:-115.186.164.126}"
+
 live_host_assert_not_retired() {
-  case "$LIVE_SSH_HOST" in
-    *taxnestc*|*cpanel.taxnest*)
-      echo "REFUSING TO RUN: this is the RETIRED cPanel host ($LIVE_SSH_HOST)." >&2
-      echo "The live origin is the Islamabad VPS. Fix scripts/lib/live-host.sh." >&2
-      return 1 ;;
-  esac
-  return 0
+  local ip
+  for ip in $LIVE_APPROVED_IPS; do
+    [ "$LIVE_SSH_IP" = "$ip" ] && return 0
+  done
+  echo "REFUSING TO RUN: $LIVE_SSH_IP is not an approved live origin." >&2
+  echo "Approved: $LIVE_APPROVED_IPS (the Islamabad VPS)." >&2
+  echo "The retired cPanel box still answers SSH and would fake a successful" >&2
+  echo "deploy. If the origin genuinely moved, update scripts/lib/live-host.sh." >&2
+  return 1
 }

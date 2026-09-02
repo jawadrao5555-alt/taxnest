@@ -16,11 +16,10 @@
 # ------------------------------------------------------------------ identity
 # Islamabad VPS (Nayatel), live since 1 Sep 2026.
 #
-# Addressed by IP on purpose. taxnest.com.pk is Cloudflare-proxied (its A
-# record answers with Cloudflare's edge, which does not speak SSH), and any
-# hostname we could use instead is one DNS edit away from silently pointing
-# our deploy at a different machine. The IP is the machine.
+# Addressed by IP on purpose. Either public hostname is one DNS edit away from
+# silently pointing our deploy at a different machine. The IP is the machine.
 LIVE_SSH_KEY="${LIVE_SSH_KEY:-/home/runner/workspace/.local/ssh/nayatel_vps_key}"
+LIVE_KNOWN_HOSTS="${LIVE_KNOWN_HOSTS:-/home/runner/workspace/scripts/lib/live-known-hosts}"
 LIVE_SSH_USER="${LIVE_SSH_USER:-jawadrao5555}"
 LIVE_SSH_IP="${LIVE_SSH_IP:-115.186.164.126}"
 LIVE_SSH_HOST="${LIVE_SSH_USER}@${LIVE_SSH_IP}"
@@ -50,13 +49,19 @@ LIVE_SETTINGS_BASE="${LIVE_SETTINGS_BASE:-${LIVE_STATE_DIR}/.taxnest-settings-be
 
 # --------------------------------------------------------------------- ssh
 LIVE_SSH_OPTS=(-i "$LIVE_SSH_KEY" -p "$LIVE_SSH_PORT" -o BatchMode=yes
-               -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+               -o ConnectTimeout=15
+               -o UserKnownHostsFile="$LIVE_KNOWN_HOSTS"
+               -o StrictHostKeyChecking=yes)
 
 live_ssh() { timeout "${LIVE_SSH_TIMEOUT:-120}" ssh "${LIVE_SSH_OPTS[@]}" "$LIVE_SSH_HOST" "$@"; }
 
 require_live_key() {
   [ -f "$LIVE_SSH_KEY" ] || {
     echo "SSH key not found at $LIVE_SSH_KEY — cannot reach the live origin." >&2
+    return 1
+  }
+  [ -f "$LIVE_KNOWN_HOSTS" ] || {
+    echo "Pinned known-hosts file not found at $LIVE_KNOWN_HOSTS — refusing unverified SSH." >&2
     return 1
   }
 }
@@ -67,9 +72,9 @@ require_live_key() {
 # copy-pasted script) walks straight past it. Anything not on this list is
 # refused, so a wrong target fails loudly instead of deploying somewhere.
 #
-# The old cPanel box is retired but still powered on (it serves mail), which is
-# exactly why this matters: it answers, it accepts a git pull, and none of it
-# reaches a single shop.
+# The old cPanel box is retired but may remain powered on until cancellation,
+# which is exactly why this matters: it can answer and accept a git pull while
+# none of it reaches a single shop.
 LIVE_APPROVED_IPS="${LIVE_APPROVED_IPS:-115.186.164.126}"
 
 live_host_assert_not_retired() {

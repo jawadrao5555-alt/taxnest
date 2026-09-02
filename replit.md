@@ -1,13 +1,13 @@
 # TaxNest - Heavy Enterprise Product
 
 ## Overview
-Multi-company SaaS for tax + invoice management in Pakistan (FBR/PRA compliant): smart invoicing (DI), two POS products (PRA POS "NestPOS" + FBR POS), SaaS admin layer, PDF generation, enterprise analytics, immutable audit logs. Laravel 12 / PHP 8.4, Breeze auth, Tailwind + Alpine.js + Chart.js. MySQL in production (owner's cPanel), MySQL staging in Replit dev.
+Multi-company SaaS for tax + invoice management in Pakistan (FBR/PRA compliant): smart invoicing (DI), two POS products (PRA POS "NestPOS" + FBR POS), SaaS admin layer, PDF generation, enterprise analytics, immutable audit logs. Laravel 12 / PHP 8.4, Breeze auth, Tailwind + Alpine.js + Chart.js. Production runs on the Nayatel Islamabad VPS with MariaDB; Replit dev uses MySQL staging.
 
 Deep module invariants live in `.agents/memory/` topic files — this file is the short map. ALWAYS read the matching memory topic before editing a subsystem.
 
 ## User Preferences & Business Rules
 - **Issue-log workflow (owner, 28 Jul 2026)**: jab owner issues bataye, sirf NOTE karo (`.local/issue-log.md` mein) — build/fix mat karo. "Summary do" kahe to logged issues ki summary do; "kaam karo" kahe tab hi implement karo.
-- **Strict feature-update isolation (owner, 2 Sep 2026)**: kisi feature ko update karte waqt sirf us feature ka behavior/settings change hon. Existing company settings, per-branch values, staff permissions, feature toggles, saved preferences aur legacy data kabhi silently overwrite/reset nahi honge. Har change se pehle relevant before-state capture, OFF/ON + old-data regression tests, targeted migration checks, aur live post-deploy verification lazmi hai.
+- **Generic fix + strict feature-update isolation (owner, confirmed 2 Sep 2026)**: kisi feature/bug ka root-cause fix us maslay ki had tak HAR applicable company ko code/logic level par mile — company-specific patch nahi. Magar sirf usi feature ka required behavior/data badlay; existing company settings, per-branch values, staff permissions, feature toggles, saved preferences aur legacy data kabhi silently overwrite/reset na hon. Nayi value sirf missing/unset state ko safe default de; pehle se chosen value preserve ho. Har change se pehle relevant before-state capture, OFF/ON + old-data regression tests, targeted/idempotent migration checks, aur live post-deploy verification lazmi hai.
 - **CURRENT FOCUS (owner, 18 Jul 2026): work ONLY on NestPOS PRA (PRA POS) for now** — DI, FBR POS, admin/SaaS surfaces sirf tab touch karo jab owner kahe.
 - ZIA CORPORATION is a REAL production account (not demo) — NTN 3620291786117, Digital Invoice ONLY (no POS data).
 - NestPOS Enterprise Store (company_id 11) = dedicated POS test company; Test Trading Company (company_id 12) = admin-approval-workflow testing. All dev/QA logins live in untracked `.local/qa-creds.env` — repo is PUBLIC, never write passwords into tracked files.
@@ -75,10 +75,10 @@ Isolated POS (own auth/layouts/models); PRA integration with offline billing + a
 - Live static-asset caching: `.htaccess` caches css/js 30d — ANY loose public asset edit MUST bump its `?v=` in blade refs. → `static-asset-caching.md`
 
 ## External Dependencies
-- **MySQL** — production DB (owner's cPanel); PostgreSQL exists in Replit env but dev uses MySQL staging. Dev startup waits for the DB: "MySQL Staging" runs `scripts/dev-mysql-serve.sh` (stale-lock cleanup + `READY` line) and "Laravel Server" gates `artisan serve` on `bash scripts/dev-mysql-ready.sh --wait 15`. Run that probe (no args) before any browser/curl check — "NOT ready" means the db-down page, not a bug. → `dev-mysql-coldstart.md`
+- **MariaDB/MySQL** — production MariaDB runs on the Islamabad VPS; PostgreSQL exists in Replit env but dev uses MySQL staging. Dev startup waits for the DB: "MySQL Staging" runs `scripts/dev-mysql-serve.sh` (stale-lock cleanup + `READY` line) and "Laravel Server" gates `artisan serve` on `bash scripts/dev-mysql-ready.sh --wait 15`. Run that probe (no args) before any browser/curl check — "NOT ready" means the db-down page, not a bug. → `dev-mysql-coldstart.md`
 - **FBR (Pakistan)** — DI + FBR POS tax compliance APIs. **PRA / PRAL IMS API v1.2** — POS fiscal integration (cloud + local fiscal-device).
 - **Laravel Breeze**, **Tailwind CSS**, **Alpine.js**, **Chart.js**. **Unsplash / Picsum** — `ProductImageService` fallback.
-- **cPanel SMTP (noreply@taxnest.com.pk)** — ALL outgoing email; admin SMTP override + MailHealth banner. → memory `mail-noreply-smtp.md`
+- **Domain SMTP (`noreply@taxnest.pk` via `mail.taxnest.pk`)** — ALL outgoing app email; admin SMTP override + MailHealth banner. The retired website host is not the app origin. → memory `mail-noreply-smtp.md`
 
 ## User preferences
 - **FBR POS aur Digital Invoice (DI) se related KOI task propose/show na karein** — dono streams mukammal band hain jab tak owner khud in par kaam start na kare. Yeh rule HAR agent par lagu hai (task agents bhi — follow-up tajaweez mein bhi FBR/DI item shamil NA karein). (Owner, 2 Aug 2026; dobara sakhti se, 16 Aug 2026)

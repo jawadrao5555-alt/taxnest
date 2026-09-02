@@ -66,7 +66,10 @@ class AgentManagementController extends Controller
             && version_compare($company->agent_version, $latestAgentVersion, '<');
         $offlineAllowed = $this->offlineAllowed($company);
 
-        return view('company.agent', compact('company', 'stats', 'isOnline', 'release', 'offlineAllowed', 'latestAgentVersion', 'agentOutdated'));
+        $canManageLocalCore = !$user->isPosCashier()
+            && !in_array($user->pos_role ?? null, ['archive_viewer', 'local_viewer'], true);
+
+        return view('company.agent', compact('company', 'stats', 'isOnline', 'release', 'offlineAllowed', 'latestAgentVersion', 'agentOutdated', 'canManageLocalCore'));
     }
 
     /**
@@ -207,6 +210,22 @@ class AgentManagementController extends Controller
         ]);
 
         return back()->with('success', 'Direct Production mode enabled — server ab PRA pe directly submit karega. Agent connected rahega (silent printing chalti rahegi).');
+    }
+
+    /** Owner/admin opt-in only; Core must never be implicitly enabled by pairing. */
+    public function toggleLocalCore(Request $request)
+    {
+        $user = $this->posUser();
+        abort_unless($user && !$user->isPosCashier()
+            && !in_array($user->pos_role ?? null, ['archive_viewer', 'local_viewer'], true), 403);
+        abort_unless(\Schema::hasColumn('companies', 'agent_core_enabled'), 503, 'Local Core is not available yet.');
+
+        $company = Company::findOrFail($user->company_id);
+        $company->update(['agent_core_enabled' => !$company->agent_core_enabled]);
+
+        return back()->with('success', $company->agent_core_enabled
+            ? 'Local TaxNest Core enabled. Your compatible desktop agent can now discover it.'
+            : 'Local TaxNest Core disabled. Existing inbox records were retained.');
     }
 
     /**

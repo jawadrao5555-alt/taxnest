@@ -13,9 +13,12 @@ const os = require('os');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
-const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, wakeAgent } = require('./src/agent');
+const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent } = require('./src/agent');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { createLanServer } = require('./src/lan-server');
+const { EventStore } = require('./src/local-core/event-store');
+const { capabilities: coreCapabilities } = require('./src/local-core/protocol');
+const { CloudSyncClient } = require('./src/local-core/cloud-sync');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
@@ -314,6 +317,87 @@ function setPosSettings(next) {
 // ON = waiter tablets and the Caller ID phone can reach this PC by IP, so the
 // shop keeps working through an internet cut. See src/lan-server.js.
 let lanServer = null;
+let localCore = null;
+let coreRuntime = null;
+let coreTimer = null;
+
+// Core is server-gated, not controlled by a hidden local preference. Until an
+// authenticated heartbeat explicitly advertises it, no journal, timer or cloud
+// request exists: legacy agents remain opt-out by default.
+function heartbeatAllowsCore(heartbeat) {
+  const caps = heartbeat && heartbeat.capabilities;
+  return !!(heartbeat && (heartbeat.local_core === true || heartbeat.local_core_enabled === true ||
+    (caps && (caps.local_core === true || (Array.isArray(caps) && caps.indexOf('local_core') !== -1)))));
+}
+
+function stopCoreRuntime() {
+  if (coreTimer) { clearTimeout(coreTimer); coreTimer = null; }
+  coreRuntime = null;
+  localCore = null;
+}
+
+function coreEndpoint(serverUrl) {
+  return String(serverUrl || '').replace(/\/+$/, '') + '/v2/events';
+}
+
+function scheduleCoreSync(delay) {
+  if (!coreRuntime) return;
+  if (coreTimer) clearTimeout(coreTimer);
+  coreTimer = setTimeout(async () => {
+    const runtime = coreRuntime;
+    if (!runtime) return;
+    const result = await runtime.client.sync();
+    // A failed delivery stays append-only queued; gradually back off without
+    // making heartbeat or the legacy PRA lane wait on it.
+    runtime.failures = result.ok ? 0 : Math.min(runtime.failures + 1, 5);
+    scheduleCoreSync(result.ok ? 30000 : Math.min(30000 * Math.pow(2, runtime.failures), 10 * 60 * 1000));
+  }, delay);
+}
+
+function startCoreForHeartbeat(config, heartbeat) {
+  if (!config || !heartbeatAllowsCore(heartbeat)) { stopCoreRuntime(); return; }
+  const companyId = String(config.companyId || '');
+  const deviceUid = String(config.deviceUid || '');
+  if (!companyId || !deviceUid || !config.apiKey || !config.serverUrl) { stopCoreRuntime(); return; }
+  // A digest avoids unsafe path characters while guaranteeing an old company's
+  // journal is never selected under a newly logged-in company/key.
+  const partition = require('crypto').createHash('sha256').update(companyId + '\n' + deviceUid).digest('hex');
+  // Include a one-way key fingerprint so a regenerated credential replaces the
+  // request closure too; otherwise an existing runtime could retain old auth.
+  const credentialFingerprint = require('crypto').createHash('sha256').update(String(config.apiKey)).digest('hex');
+  const key = partition + '|' + config.serverUrl + '|' + credentialFingerprint;
+  if (coreRuntime && coreRuntime.key === key) {
+    scheduleCoreSync(0);
+    return;
+  }
+  stopCoreRuntime();
+  const store_ = new EventStore({ dataDir: path.join(app.getPath('userData'), 'local-core', partition) });
+  const runtime = {
+    key,
+    failures: 0,
+    store: store_,
+    client: new CloudSyncClient({
+      store: store_,
+      deviceUid,
+      request: async (wire) => {
+        const response = await axios.post(coreEndpoint(config.serverUrl), wire, {
+          headers: { Authorization: 'Bearer ' + config.apiKey },
+          timeout: 15000,
+        });
+        return response.data;
+      },
+    }),
+  };
+  coreRuntime = runtime;
+  localCore = {
+    append: (event) => runtime.store.append(event),
+    status: () => Object.assign({}, runtime.store.status(), { sync: runtime.client.status() }),
+    capabilities: () => coreCapabilities(),
+  };
+  scheduleCoreSync(0);
+}
+
+function localCoreInstance() { return localCore; }
 
 function getLanSettings() {
   const s = store.get('lanSettings') || {};
@@ -342,6 +426,7 @@ function lanInstance() {
       // right after the shop switched LAN Mode off reads a plain sentence
       // instead of a half-alive page.
       isEnabled: () => getLanSettings().enabled,
+       coreProvider: () => localCoreInstance(),
       log: (m) => console.log('[lan]', m),
     });
   }
@@ -699,6 +784,11 @@ if (!gotInstanceLock) {
     // the cloud on the first beat that gets through. Lazy — creating the
     // instance does NOT start a listener; LAN mode still has to be switched on.
     setLanBridge(() => (lanServer ? lanServer : null));
+
+    // The authenticated heartbeat is the sole Core enablement gate. This also
+    // receives null from stopAgent(), including company switches, which tears
+    // down timers before a new company's credentials can be installed.
+    setCoreBridge((config, heartbeat) => startCoreForHeartbeat(config, heartbeat));
 
     // Wake triggers (Task 1062): after PC sleep/resume or a Wi-Fi drop the
     // agent used to sit "Offline" until the next timer tick happened to

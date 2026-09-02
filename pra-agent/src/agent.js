@@ -38,9 +38,17 @@ function setHeartbeatExtraProvider(fn) {
 // While the shop's internet is down the Caller ID phone can only reach that
 // server, so the rings it collected are pushed here once a beat gets through.
 let lanBridgeProvider = null;
+let coreBridgeProvider = null;
 
 function setLanBridge(fn) {
   lanBridgeProvider = typeof fn === 'function' ? fn : null;
+}
+
+// Local Core gate/lifecycle is owned by main.js (where the app data directory
+// and device identity exist). Agent merely supplies authenticated heartbeat
+// capability responses and clean stop/switch notifications.
+function setCoreBridge(fn) {
+  coreBridgeProvider = typeof fn === 'function' ? fn : null;
 }
 
 let lanFlushInFlight = false;
@@ -271,6 +279,9 @@ async function heartbeat() {
     status.lastError = null;
     heartbeatRetryCount = 0;
     clearHeartbeatRetry();
+    if (coreBridgeProvider) {
+      try { coreBridgeProvider(currentConfig, res.data || {}); } catch (e) {}
+    }
 
     // Self-update: the server piggybacks the latest release info on every
     // heartbeat; main.js decides whether it is actually newer.
@@ -494,6 +505,9 @@ function startAgent(config, onStatusChange, onAgentUpdate) {
 
 function stopAgent() {
   stopPrinting();
+  if (coreBridgeProvider) {
+    try { coreBridgeProvider(null, null); } catch (e) {}
+  }
   runGen += 1; // invalidate any pending quick-retry timers
   clearHeartbeatRetry();
   heartbeatRetryCount = 0;
@@ -511,4 +525,4 @@ function stopAgent() {
   log('Agent stopped');
 }
 
-module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, wakeAgent };
+module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent };

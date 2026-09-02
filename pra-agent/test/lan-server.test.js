@@ -13,6 +13,8 @@ const os = require('os');
 const path = require('path');
 
 const { createLanServer, isPrivateAddress } = require('../src/lan-server');
+const { EventStore } = require('../src/local-core/event-store');
+const { capabilities: coreCapabilities } = require('../src/local-core/protocol');
 
 let passed = 0;
 async function it(name, fn) {
@@ -39,7 +41,14 @@ function j(res) { return res.json(); }
     });
 
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lan-test-'));
-    const server = createLanServer({ dataDir: dataDir, port: 0, version: '9.9.9', log: function () {} });
+    const coreStore = new EventStore({ dataDir: path.join(dataDir, 'core') });
+    const server = createLanServer({
+        dataDir: dataDir, port: 0, version: '9.9.9', log: function () {},
+        coreProvider: function () {
+            return { append: function (ev) { return coreStore.append(ev); }, status: function () { return coreStore.status(); },
+                capabilities: function () { return coreCapabilities(); } };
+        },
+    });
     const st = await server.start();
     const base = 'http://127.0.0.1:' + st.port;
 
@@ -160,6 +169,22 @@ function j(res) { return res.json(); }
 
         const bad = await post({ number: '' });
         assert.strictEqual(bad.status, 422);
+    });
+
+    await it('Core routes share LAN pairing and expose no credentials', async function () {
+        assert.strictEqual((await fetch(base + '/core/status')).status, 401, 'unpaired core read must be refused');
+        const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+        const caps = await j(await fetch(base + '/core/capabilities', { headers: headers }));
+        assert.strictEqual(caps.ok, true);
+        assert.ok(caps.capabilities.protocol_versions.indexOf(1) !== -1);
+        assert.ok(JSON.stringify(caps).indexOf(token) === -1, 'credentials must never be returned');
+        const ev = { v: 1, id: 'lan-core-0001', type: 'sale.created', at_ms: Date.now(), payload: { sale_id: 1 } };
+        const accepted = await fetch(base + '/core/events', { method: 'POST', headers: headers, body: JSON.stringify(ev) });
+        assert.strictEqual(accepted.status, 202);
+        const duplicate = await fetch(base + '/core/events', { method: 'POST', headers: headers, body: JSON.stringify(ev) });
+        assert.strictEqual((await j(duplicate)).duplicate, true);
+        const status = await j(await fetch(base + '/core/status', { headers: headers }));
+        assert.strictEqual(status.status.pending_count, 1);
     });
 
     await it('the POS can poll rings with a cursor', async function () {

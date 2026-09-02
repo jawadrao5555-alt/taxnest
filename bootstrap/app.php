@@ -70,6 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'fbrpos.auth' => \App\Http\Middleware\FbrPosAuth::class,
             'admin.auth' => \App\Http\Middleware\AdminAuth::class,
             'agent.auth' => \App\Http\Middleware\AgentAuth::class,
+            'agent.core.enabled' => \App\Http\Middleware\AgentCoreEnabled::class,
             'di.api' => \App\Http\Middleware\DiApiAuth::class,
             'franchise.auth' => \App\Http\Middleware\FranchiseAuth::class,
             'agent.portal.auth' => \App\Http\Middleware\AgentPortalAuth::class,

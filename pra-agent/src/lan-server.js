@@ -50,6 +50,9 @@ const API_PATHS = [
     '/lan/whoami',
     '/lan/caller/ring',
     '/lan/caller/events',
+    '/core/capabilities',
+    '/core/status',
+    '/core/events',
 ];
 
 /* ---------------------------------------------------------------- helpers */
@@ -179,6 +182,9 @@ function createLanServer(options) {
     const isEnabled = typeof opts.isEnabled === 'function'
         ? function () { try { return !!opts.isEnabled(); } catch (e) { return true; } }
         : function () { return true; };
+    // Local Core is deliberately separate from LAN Mode. Its provider is lazy
+    // so merely starting the established LAN listener never creates journals.
+    const coreProvider = typeof opts.coreProvider === 'function' ? opts.coreProvider : function () { return null; };
 
     const state = {
         server: null,
@@ -265,7 +271,7 @@ function createLanServer(options) {
         // The POS running on THIS machine (desktop shell / a local dev copy).
         if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o)) { return origin; }
         // Our own site only.
-        if (/^https:\/\/([a-z0-9-]+\.)*taxnest\.com\.pk$/.test(o)) { return origin; }
+        if (/^https:\/\/([a-z0-9-]+\.)*taxnest\.(com\.)?pk$/.test(o)) { return origin; }
         return '';
     }
 
@@ -493,6 +499,49 @@ function createLanServer(options) {
 
         const auth = deviceFor(req, url);
         if (!auth) { send(res, 401, { ok: false, error: 'pair_required' }); return; }
+
+        // Core endpoints deliberately live behind the same private-address and
+        // paired-device gates as caller writes above. They do not start another
+        // listener and never return cloud credentials or pairing credentials.
+        if (route_ === '/core/capabilities' && req.method === 'GET') {
+            let core = null;
+            try { core = coreProvider(); } catch (e) {}
+            if (!core || typeof core.capabilities !== 'function') {
+                send(res, 503, { ok: false, error: 'core_disabled' }); return;
+            }
+            send(res, 200, { ok: true, capabilities: core.capabilities() });
+            return;
+        }
+        if (route_ === '/core/status' && req.method === 'GET') {
+            let core = null;
+            try { core = coreProvider(); } catch (e) {}
+            if (!core || typeof core.status !== 'function') {
+                send(res, 503, { ok: false, error: 'core_disabled' }); return;
+            }
+            send(res, 200, { ok: true, status: core.status() });
+            return;
+        }
+        if (route_ === '/core/events' && req.method === 'POST') {
+            let core = null;
+            try { core = coreProvider(); } catch (e) {}
+            if (!core || typeof core.append !== 'function') {
+                send(res, 503, { ok: false, error: 'core_disabled' }); return;
+            }
+            const body = await readBody(req);
+            try {
+                const result = core.append(body);
+                send(res, result.duplicate ? 200 : 202, {
+                    ok: true, id: result.event.id, duplicate: !!result.duplicate,
+                });
+            } catch (e) {
+                const code = e && e.code;
+                const status = code === 'store_read_only' ? 503 : 422;
+                // The validation code is stable protocol information; the
+                // exception message can contain filesystem detail and stays local.
+                send(res, status, { ok: false, error: code || 'invalid_event' });
+            }
+            return;
+        }
 
         if (route_ === '/lan/caller/ring' && req.method === 'POST') {
             handleRing(res, await readBody(req));

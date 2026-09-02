@@ -214,6 +214,25 @@
                 </div>
             </div>
 
+            @if($canManageLocalCore ?? false)
+                <div class="mb-6 p-5 rounded-xl border {{ $company->agent_core_enabled ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40' }}">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h3 class="font-bold text-gray-900 dark:text-white">Local TaxNest Core</h3>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                Compatible desktop agents can send the version 1 local event inbox. This does not change PRA sync or sales processing.
+                            </p>
+                        </div>
+                        <form method="POST" action="{{ route('pos.agent.local-core.toggle') }}" onsubmit="return confirm('Local TaxNest Core {{ $company->agent_core_enabled ? 'disable' : 'enable' }} karen?');">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 text-sm rounded-lg font-semibold {{ $company->agent_core_enabled ? 'bg-gray-700 hover:bg-gray-800 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white' }}">
+                                {{ $company->agent_core_enabled ? 'Disable Local Core' : 'Enable Local Core' }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @endif
+
             {{-- Stats --}}
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-5">

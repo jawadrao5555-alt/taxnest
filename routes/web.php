@@ -824,6 +824,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('pos.agent.generate');
     Route::post('/agent/regenerate-key', [\App\Http\Controllers\AgentManagementController::class, 'regenerateKey'])->name('pos.agent.regenerate');
     Route::post('/agent/toggle', [\App\Http\Controllers\AgentManagementController::class, 'toggle'])->name('pos.agent.toggle');
+    Route::post('/agent/local-core/toggle', [\App\Http\Controllers\AgentManagementController::class, 'toggleLocalCore'])
+        ->middleware(\App\Http\Middleware\PosAdminOnly::class)->name('pos.agent.local-core.toggle');
     Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('pos.agent.download');
     // NestPOS Desktop shell auto-config: shell fetches agent credentials with the
     // logged-in POS session cookie right after login (zero manual agent setup).
@@ -2055,6 +2057,14 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($state
     // LAN Mode: rings the phone could only deliver to the shop's own PC while
     // the internet was down, forwarded once it is back (history only).
     Route::post('/caller-events', [\App\Http\Controllers\AgentController::class, 'callerEvents']);
+});
+
+// Additive Local TaxNest Core protocol. This intentionally does not alter the
+// legacy /api/agent contract: companies must explicitly opt in before v2 exists.
+Route::prefix('api/agent/v2')->middleware(['agent.auth', 'agent.core.enabled'])->withoutMiddleware($statelessMachine)->group(function () {
+    Route::get('/capabilities', [\App\Http\Controllers\Api\AgentCoreController::class, 'capabilities']);
+    Route::post('/events', [\App\Http\Controllers\Api\AgentCoreController::class, 'storeEvents'])
+        ->middleware('throttle:60,1');
 });
 
 // === Public business profile + menu (F8) — slug-only, throttled, 404 on unknown ===

@@ -338,6 +338,9 @@ class AgentController extends Controller
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
             'agent_update' => $this->agentUpdateInfo($request->input('version')),
+            // Additive discovery for Local TaxNest Core-aware agents. Legacy
+            // agents ignore unknown response keys; the database flag defaults off.
+            'local_core_enabled' => (bool) $company->agent_core_enabled,
         ]);
     }
 
@@ -398,6 +401,7 @@ class AgentController extends Controller
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
             'agent_update' => $this->agentUpdateInfo($agentVersion),
+            'local_core_enabled' => (bool) $company->agent_core_enabled,
         ]);
     }
 

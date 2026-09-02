@@ -31,10 +31,40 @@
         @if($canTransfer ?? false)
         <a href="{{ route('pos.inventory.transfers') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.branch_transfer') }}</a>
         @endif
-        <a href="{{ route('pos.inventory.stock-check.index') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.stock_check') }}<x-new-badge feature="stock_check" class="ml-1" /></a>
+        <a href="{{ route('pos.inventory.stock-check.index') }}" class="px-4 py-2 text-xs font-bold rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/35 transition shadow-sm border border-purple-200 dark:border-purple-700">{{ __('pos.stock_check') }}<x-new-badge feature="stock_check" class="ml-1" /></a>
     </div>
 
     @include('pos.inventory.partials.branch-bar')
+
+    <section class="mb-6 rounded-2xl border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 p-5 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest text-purple-700 dark:text-purple-300">{{ __('pos.stock_check_eyebrow') }}</p>
+                <h2 class="mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.stock_check_dashboard_title') }}</h2>
+                <p class="mt-1 max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">{{ __('pos.stock_check_dashboard_body') }}</p>
+            </div>
+            <a href="{{ route('pos.inventory.stock-check.index') }}" class="shrink-0 inline-flex items-center justify-center rounded-xl bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-purple-700">
+                {{ __('pos.stock_check_dashboard_cta') }}
+                <svg class="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+        @php
+            $stockCheckSteps = [
+                __('pos.stock_check_step_open'),
+                __('pos.stock_check_step_count'),
+                __('pos.stock_check_step_post'),
+            ];
+        @endphp
+        <ol class="mt-5 grid gap-3 sm:grid-cols-3">
+            @foreach($stockCheckSteps as $step)
+            <li class="flex gap-3 rounded-xl bg-white/80 dark:bg-gray-900/50 p-3">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-600 text-xs font-black text-white">{{ $loop->iteration }}</span>
+                <span class="text-xs leading-relaxed text-gray-700 dark:text-gray-300">{{ $step }}</span>
+            </li>
+            @endforeach
+        </ol>
+        <p class="mt-4 text-xs font-medium text-purple-800 dark:text-purple-200">{{ __('pos.stock_check_safety_note') }}</p>
+    </section>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">

@@ -35,6 +35,11 @@
     </div>
     @endif
 
+    <section class="mb-5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/15 p-4">
+        <h2 class="text-sm font-bold text-blue-900 dark:text-blue-200">{{ __('pos.fbr_stock_check_title') }}</h2>
+        <p class="mt-1 text-sm leading-relaxed text-blue-800 dark:text-blue-300">{{ __('pos.fbr_stock_check_notice') }}</p>
+    </section>
+
     {{-- Stat tiles --}}
     <div class="grid grid-cols-3 gap-3 mb-6">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">

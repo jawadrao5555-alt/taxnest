@@ -21,11 +21,26 @@
     @include('pos.inventory.partials.branch-bar')
     @include('pos.inventory.stock-check.partials.flash')
 
-    <div class="mb-6 rounded-2xl border border-teal-100 dark:border-teal-900/40 bg-teal-50/60 dark:bg-teal-900/10 px-5 py-4">
-        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-            <span class="font-bold text-teal-800 dark:text-teal-300">{{ __('pos.stock_check_how_title') }}</span>
-            — {{ __('pos.stock_check_how_body') }}
-        </p>
+    <div class="mb-6 rounded-2xl border border-teal-200 dark:border-teal-800 bg-teal-50/60 dark:bg-teal-900/10 p-5">
+        <p class="text-xs font-bold uppercase tracking-widest text-teal-700 dark:text-teal-300">{{ __('pos.stock_check_eyebrow') }}</p>
+        <h2 class="mt-1 text-base font-bold text-gray-900 dark:text-white">{{ __('pos.stock_check_how_title') }}</h2>
+        <p class="mt-1 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{{ __('pos.stock_check_how_body') }}</p>
+        @php
+            $stockCheckSteps = [
+                __('pos.stock_check_step_open'),
+                __('pos.stock_check_step_count'),
+                __('pos.stock_check_step_post'),
+            ];
+        @endphp
+        <ol class="mt-4 grid gap-3 sm:grid-cols-3">
+            @foreach($stockCheckSteps as $step)
+            <li class="flex gap-3 rounded-xl bg-white/80 dark:bg-gray-900/50 p-3 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xs font-black text-white">{{ $loop->iteration }}</span>
+                {{ $step }}
+            </li>
+            @endforeach
+        </ol>
+        <p class="mt-4 text-xs font-medium text-teal-800 dark:text-teal-200">{{ __('pos.stock_check_safety_note') }}</p>
     </div>
 
     @if($openCheck ?? null)

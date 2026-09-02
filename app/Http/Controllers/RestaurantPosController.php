@@ -3110,7 +3110,10 @@ class RestaurantPosController extends Controller
             : collect();
 
         $recentOrders = RestaurantOrder::where('company_id', $companyId)
-            ->with(['items', 'table'])
+            // The dashboard presents the order number and, separately, its
+            // finalized invoice.  This must be eager loaded: invoice identity
+            // is never inferred from the order id.
+            ->with(['items', 'table', 'posTransaction'])
             ->where('status', '!=', 'cancelled')
             ->where('created_at', '>=', $today)
             ->orderBy('created_at', 'desc')
@@ -3539,6 +3542,13 @@ class RestaurantPosController extends Controller
                     ->whereIn('order_id', $this->cancelledOrdersQuery($request)->select('id'))
                     ->sum('subtotal')
                 : 0.0,
+            // NULL deliberately remains "Not recorded"; only an explicit true
+            // is waste.  A sent KOT is not evidence that an item was made.
+            'made_item_count' => Schema::hasColumn('restaurant_order_items', 'was_made')
+                ? RestaurantOrderItem::where('was_made', true)
+                    ->whereIn('order_id', $this->cancelledOrdersQuery($request)->select('id'))
+                    ->count()
+                : 0,
         ];
         // The quick-range links must be anchored on the current BUSINESS day too,
         // or before the cutoff the "Today" button asks for a different day than
@@ -3555,17 +3565,17 @@ class RestaurantPosController extends Controller
         return response()->streamDownload(function () use ($orders) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel)
-            fputcsv($out, ['Order #', 'Order Date/Time', 'Table', 'Order Type', 'Items', 'Made Items', 'Amount (Rs)', 'KOT Sent', 'Punched By', 'Cancelled By', 'Cancelled At']);
+            fputcsv($out, ['Order #', 'Order Date/Time', 'Table', 'Order Type', 'Items (made state)', 'Wasted value (Rs)', 'Amount (Rs)', 'KOT Sent', 'Punched By', 'Cancelled By', 'Cancelled At']);
             foreach ($orders as $o) {
-                $items = $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
-                $made = $o->items->where('was_made', true)->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
+                $items = $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name . ' [' . $i->madeStateLabel() . ']')->implode('; ');
+                $waste = $o->items->filter(fn ($i) => $i->was_made === true)->sum('subtotal');
                 fputcsv($out, [
                     $o->order_number,
                     optional($o->created_at)->format('Y-m-d H:i'),
                     $o->table?->table_number ? 'T-' . $o->table->table_number : '-',
                     $o->order_type,
                     $items,
-                    $made,
+                    (int) round($waste),
                     (int) round($o->total_amount),
                     $o->kot_sent_at ? 'YES' : 'no',
                     $o->creator?->name ?? '-',
@@ -3585,7 +3595,10 @@ class RestaurantPosController extends Controller
         $summary = [
             'count' => $orders->count(),
             'value' => (float) $orders->sum('total_amount'),
-            'waste' => (float) $orders->flatMap->items->where('was_made', true)->sum('subtotal'),
+            // Strict true is intentional: NULL is legacy/not-recorded, not
+            // made; KOT sent must never be promoted to made automatically.
+            'waste' => (float) $orders->flatMap->items->filter(fn ($i) => $i->was_made === true)->sum('subtotal'),
+            'made_item_count' => $orders->flatMap->items->filter(fn ($i) => $i->was_made === true)->count(),
         ];
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.cancelled-orders-pdf', compact('company', 'orders', 'from', 'to', 'summary'));
         return $pdf->download("cancelled-orders-{$from}-to-{$to}.pdf");

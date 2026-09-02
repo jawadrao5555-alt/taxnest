@@ -145,19 +145,9 @@
             </tr></thead>
             <tbody>
                 @forelse(($recentOrders ?? $recentTransactions ?? collect())->take(8) as $ro)
-                @php
-                    // Restaurant rows are RestaurantOrder models whose real receipt lives
-                    // in pos_transaction_id — never link by the order's own id. Plain
-                    // PosTransaction rows (non-restaurant fallback) link by their own id.
-                    $txnId = $ro->pos_transaction_id ?? (isset($recentOrders) ? null : $ro->id);
-                @endphp
                 <tr class="r-row border-b border-gray-50 dark:border-gray-800/50 transition">
                     <td class="py-2 px-4">
-                        @if($txnId)
-                            <a href="{{ route('pos.transaction.show', $txnId) }}" class="text-[11px] text-purple-600 font-bold">{{ $ro->invoice_number ?? ('#' . $ro->id) }}</a>
-                        @else
-                            <span class="text-[11px] text-gray-500 font-bold">{{ $ro->invoice_number ?? ('#' . $ro->id) }}</span>
-                        @endif
+                        @include('pos.dashboard-styles._restaurant-order-identity', ['order' => $ro])
                     </td>
                     <td class="py-2 px-3 hidden sm:table-cell"><span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500">{{ ucwords(str_replace('_', ' ', $ro->order_type ?? $ro->payment_method ?? '-')) }}</span></td>
                     <td class="py-2 px-3 text-[11px] text-gray-600 dark:text-gray-400">{{ $ro->table_number ?? '-' }}</td>

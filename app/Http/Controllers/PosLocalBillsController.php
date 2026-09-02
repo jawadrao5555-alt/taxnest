@@ -35,8 +35,29 @@ class PosLocalBillsController extends Controller
     {
         $query = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
-            ->where('invoice_mode', 'local')
-            ->where('status', 'completed');
+            ->where('status', 'completed')
+            // The portal is the local *stream*, not merely the old L-series
+            // shape. Reporting-OFF finals retain a PRA/NULL invoice_mode but
+            // have neither PRA status nor fiscal number. Keep this deliberately
+            // explicit: no row that entered the PRA pipeline may leak here.
+            ->where(function ($stream) {
+                $stream->where(function ($local) {
+                    $local->where('invoice_mode', 'local')
+                        ->whereNull('pra_invoice_number')
+                        ->where(function ($status) {
+                            $status->whereNull('pra_status')
+                                ->orWhere('pra_status', 'local');
+                        });
+                })
+                    ->orWhere(function ($final) {
+                        $final->whereNull('pra_status')
+                            ->whereNull('pra_invoice_number')
+                            ->where(function ($mode) {
+                                $mode->where('invoice_mode', 'pra')
+                                    ->orWhereNull('invoice_mode');
+                            });
+                    });
+            });
 
         app(BranchContextService::class)->applyToQuery($query, 'branch_id');
 

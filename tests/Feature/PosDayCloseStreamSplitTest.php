@@ -441,6 +441,57 @@ class PosDayCloseStreamSplitTest extends TestCase
         $this->assertSame(6, DB::table('pos_transactions')->count(), 'no wash — every bill survives');
     }
 
+    public function test_open_day_and_x_report_do_not_reintroduce_archived_local_rows(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        DB::table('users')->where('id', $user->id)->update(['role' => 'company_admin']);
+        $user = User::find($user->id);
+        $this->makeTxn($companyId, 'L-ACTIVE', [
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'pra_invoice_number' => null,
+            'subtotal' => 100,
+            'exempt_amount' => 20,
+            'tax_amount' => 14,
+            'total_amount' => 114,
+            'created_by' => $user->id,
+        ]);
+        $this->makeTxn($companyId, 'P-ACTIVE', [
+            'subtotal' => 50,
+            'tax_amount' => 8,
+            'total_amount' => 58,
+            'created_by' => $user->id,
+        ]);
+        $this->makeTxn($companyId, 'L-ARCHIVED', [
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'pra_invoice_number' => null,
+            'subtotal' => 900,
+            'exempt_amount' => 100,
+            'tax_amount' => 136,
+            'total_amount' => 1036,
+            'is_archived' => true,
+            'created_by' => $user->id,
+        ]);
+
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+
+        $page = (new PosController())->dayCloseReport(
+            Request::create('/pos/day-close', 'GET', ['date' => now()->toDateString()])
+        )->getData();
+        $this->assertSame(130.0, (float) $page['stats']->taxable_value);
+        $this->assertSame(20.0, (float) $page['stats']->exempt_value);
+
+        $xData = (new PosController())->dayCloseXReportThermal(
+            Request::create('/pos/day-close/x-report/thermal', 'GET', ['date' => now()->toDateString()])
+        )->getData();
+        $this->assertSame(114.0, (float) $xData['streamSplit']['local']['sales']);
+        $this->assertSame(130.0, (float) $xData['taxSplit']['taxable']);
+        $this->assertSame(20.0, (float) $xData['taxSplit']['exempt']);
+    }
+
     public function test_summary_x_and_z_keep_their_matching_live_and_frozen_figures(): void
     {
         $companyId = $this->makeCompany();
@@ -600,5 +651,51 @@ class PosDayCloseStreamSplitTest extends TestCase
         $this->assertStringContainsString('data-report-state="frozen"', file_get_contents(resource_path('views/pos/day-close-summary-thermal.blade.php')));
         $this->assertStringContainsString('data-report-state="provisional"', file_get_contents(resource_path('views/pos/day-close-summary-pdf.blade.php')));
         $this->assertStringContainsString('data-report-state="frozen"', file_get_contents(resource_path('views/pos/day-close-summary-pdf.blade.php')));
+    }
+
+    public function test_tax_split_uses_merged_local_money_and_is_frozen_for_z_outputs(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedMixedDay($companyId, $user->id);
+        // A deliberate local final has both a taxable and an exempt share; its
+        // local return proves the segregation follows the same signed money set
+        // as the stream boxes, rather than the PRA-only headline query.
+        $this->makeTxn($companyId, 'L-001', [
+            'invoice_mode' => 'local', 'pra_status' => 'local', 'pra_invoice_number' => null,
+            'subtotal' => 100, 'discount_amount' => 10, 'exempt_amount' => 20,
+            'tax_amount' => 12, 'total_amount' => 102, 'created_by' => $user->id,
+        ]);
+        $this->makeTxn($companyId, 'L-RET-001', [
+            'transaction_type' => 'return', 'invoice_mode' => 'local',
+            'pra_status' => 'local', 'pra_invoice_number' => null,
+            'subtotal' => 20, 'tax_amount' => 2, 'total_amount' => 22,
+            'created_by' => $user->id,
+        ]);
+
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+        $request = Request::create('/pos/day-close/x-report/thermal', 'GET', ['date' => now()->toDateString()]);
+        $xData = (new PosController())->dayCloseXReportThermal($request)->getData();
+        // Baseline mixed day = taxable 1,900 and exempt 400. Local final adds
+        // taxable 70/exempt 20; its return nets taxable 20.
+        $this->assertSame(1950.0, (float) $xData['taxSplit']['taxable']);
+        $this->assertSame(420.0, (float) $xData['taxSplit']['exempt']);
+        $this->assertSame(1950.0, (float) $xData['streamSplit']['tax_split']['taxable']);
+
+        $result = (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+        $frozen = json_decode(DB::table('pos_day_close_reports')->where('id', $result['report']->id)->value('stream_summary'), true);
+        $this->assertSame(1950.0, (float) $frozen['tax_split']['taxable']);
+        $this->assertSame(420.0, (float) $frozen['tax_split']['exempt']);
+
+        $zData = (new PosController())->dayCloseThermal($result['report']->id)->getData();
+        $this->assertSame(1950.0, (float) $zData['taxSplit']['taxable']);
+        $this->assertSame(420.0, (float) $zData['taxSplit']['exempt']);
+
+        $pageData = (new PosController())->dayCloseReport(
+            Request::create('/pos/day-close', 'GET', ['date' => now()->toDateString()])
+        )->getData();
+        $this->assertSame(1950.0, (float) $pageData['stats']->taxable_value);
+        $this->assertSame(420.0, (float) $pageData['stats']->exempt_value);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\RestaurantPosController;
+use App\Models\PosTransaction;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
@@ -72,6 +73,7 @@ class PosRestaurantDashboardCountsTest extends TestCase
             $table->unsignedBigInteger('table_id')->nullable();
             $table->string('order_type')->nullable();
             $table->string('status');
+            $table->unsignedBigInteger('pos_transaction_id')->nullable();
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('discount_amount', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
@@ -462,5 +464,73 @@ class PosRestaurantDashboardCountsTest extends TestCase
         // isRestaurant/openOrdersCount/cancelledTodayCount view data).
         $blade = file_get_contents(resource_path('views/pos/restaurant/dashboard.blade.php'));
         $this->assertStringContainsString("pos.partials.pending-bills-tile", $blade);
+    }
+
+    public function test_recent_orders_eager_load_and_render_their_separate_finalized_invoice_identity(): void
+    {
+        $this->actAs('pos_admin');
+
+        $transactionId = DB::table('pos_transactions')->insertGetId([
+            'company_id' => $this->companyId,
+            'invoice_number' => 'INV-2026-001',
+            'status' => 'completed',
+            'total_amount' => 800,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $finalizedOrder = $this->order([
+            'order_number' => 'ORD-2026-001',
+            'status' => 'completed',
+            'pos_transaction_id' => $transactionId,
+        ]);
+        $unfinalizedOrder = $this->order([
+            'order_number' => 'ORD-2026-002',
+            'status' => 'held',
+        ]);
+
+        $orders = $this->dashboardData()['recentOrders'];
+        $settled = $orders->firstWhere('id', $finalizedOrder);
+        $open = $orders->firstWhere('id', $unfinalizedOrder);
+
+        $this->assertTrue($settled->relationLoaded('posTransaction'));
+        $this->assertSame('INV-2026-001', $settled->posTransaction->invoice_number);
+        $this->assertTrue($open->relationLoaded('posTransaction'));
+        $this->assertNull($open->posTransaction);
+
+        $finalizedHtml = view('pos.dashboard-styles._restaurant-order-identity', ['order' => $settled])->render();
+        $openHtml = view('pos.dashboard-styles._restaurant-order-identity', ['order' => $open])->render();
+        $this->assertStringContainsString('Order #ORD-2026-001', $finalizedHtml);
+        $this->assertStringContainsString('Invoice INV-2026-001', $finalizedHtml);
+        $this->assertStringContainsString(route('pos.transaction.show', $transactionId), $finalizedHtml);
+        $this->assertStringContainsString('Order #ORD-2026-002', $openHtml);
+        $this->assertStringContainsString('Not finalized', $openHtml);
+    }
+
+    public function test_each_recent_order_dashboard_style_uses_the_shared_identity_renderer(): void
+    {
+        foreach (['_common-sections', 'toast', 'lightspeed', 'oscar', 'shopify', 'clover'] as $style) {
+            $blade = file_get_contents(resource_path("views/pos/dashboard-styles/{$style}.blade.php"));
+            $this->assertStringContainsString(
+                "pos.dashboard-styles._restaurant-order-identity",
+                $blade,
+                "{$style} must show the separate order/invoice identity"
+            );
+        }
+    }
+
+    public function test_shared_identity_renderer_keeps_retail_transactions_renderable(): void
+    {
+        $transaction = new PosTransaction([
+            'invoice_number' => 'P042',
+            'status' => 'completed',
+        ]);
+        $transaction->id = 42;
+
+        $html = view('pos.dashboard-styles._restaurant-order-identity', [
+            'order' => $transaction,
+        ])->render();
+
+        $this->assertStringContainsString('P042', $html);
+        $this->assertStringNotContainsString('Not finalized', $html);
+        $this->assertStringNotContainsString('Order #', $html);
     }
 }

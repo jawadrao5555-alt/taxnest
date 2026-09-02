@@ -21,7 +21,12 @@
     <div class="summary">
         <span>Total cancelled: {{ number_format($summary['count']) }}</span>
         <span>Cancelled value: Rs {{ number_format($summary['value']) }}</span>
-        @if (($summary['waste'] ?? 0) > 0)<span>Wasted (made) value: Rs {{ number_format($summary['waste']) }}</span>@endif
+        <span>
+            Wasted (made) value: Rs {{ number_format($summary['waste'] ?? 0) }}
+            @if(($summary['made_item_count'] ?? 0) === 0)
+                — No items were marked made
+            @endif
+        </span>
     </div>
     <table>
         <thead>
@@ -37,7 +42,7 @@
                 <td>{{ optional($o->created_at)->format('d M Y, h:i A') }}</td>
                 <td>{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '-' }}</td>
                 <td>{{ $o->order_type }}</td>
-                <td>{{ $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name . ($i->was_made ? ' [MADE]' : ''))->implode(', ') }}</td>
+                <td>{{ $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name . ' [' . $i->madeStateLabel() . ']')->implode(', ') }}</td>
                 <td class="num">{{ number_format($o->total_amount) }}</td>
                 <td>@if ($o->kot_sent_at)<span class="kot">YES</span>@else - @endif</td>
                 <td>{{ $o->creator?->name ?? '-' }}</td>

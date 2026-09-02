@@ -133,7 +133,7 @@ class PosLocalViewerSelfServiceTest extends TestCase
         });
         Schema::create('pos_transaction_items', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('pos_transaction_id');
+            $table->unsignedBigInteger('transaction_id');
             $table->timestamps();
         });
         Schema::create('pos_day_close_reports', function (Blueprint $table) {
@@ -472,5 +472,50 @@ class PosLocalViewerSelfServiceTest extends TestCase
         $ownerView = $this->actingAs($this->ownerA, 'pos')->get('/pos/local-bills');
         $ownerView->assertViewHas('canManageViewers', true);
         $ownerView->assertSee('viewer@t.test');
+    }
+
+    public function test_local_portal_includes_completed_reporting_off_finals_but_never_pra_submitted_or_offline_rows(): void
+    {
+        $today = now()->toDateString();
+        $insert = function (string $number, array $attrs = []) use ($today) {
+            return DB::table('pos_transactions')->insertGetId(array_merge([
+                'company_id' => $this->companyA,
+                'invoice_number' => $number,
+                'status' => 'completed',
+                'business_date' => $today,
+                'total_amount' => 100,
+                'created_at' => now(), 'updated_at' => now(),
+            ], $attrs));
+        };
+
+        $local = $insert('L-SERIES', ['invoice_mode' => 'local', 'pra_status' => 'local']);
+        $praModeFinal = $insert('REPORTING-OFF-PRA', [
+            'invoice_mode' => 'pra', 'pra_status' => null, 'pra_invoice_number' => null,
+        ]);
+        $nullModeFinal = $insert('REPORTING-OFF-NULL', [
+            'invoice_mode' => null, 'pra_status' => null, 'pra_invoice_number' => null,
+        ]);
+        // Archive visibility is deliberate for this audit portal.
+        $archived = $insert('ARCHIVED-LOCAL', ['invoice_mode' => 'local', 'pra_status' => 'local', 'is_archived' => true]);
+        $insert('SUBMITTED-NOT-LOCAL', ['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-1']);
+        $insert('OFFLINE-NOT-LOCAL', ['invoice_mode' => 'pra', 'pra_status' => 'offline']);
+        $insert('NOT-COMPLETED', ['invoice_mode' => 'local', 'pra_status' => 'local', 'status' => 'draft']);
+        DB::table('pos_transactions')->insert([
+            'company_id' => $this->companyB, 'invoice_number' => 'OTHER-COMPANY',
+            'invoice_mode' => 'local', 'pra_status' => 'local', 'status' => 'completed',
+            'business_date' => $today, 'total_amount' => 100,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->ownerA, 'pos')->get('/pos/local-bills');
+        $response->assertOk();
+        $response->assertViewHas('bills', function ($bills) use ($local, $praModeFinal, $nullModeFinal, $archived) {
+            return collect($bills->items())->pluck('id')->sort()->values()->all()
+                === collect([$local, $praModeFinal, $nullModeFinal, $archived])->sort()->values()->all();
+        });
+        $response->assertViewHas('stats', fn ($stats) => $stats['total'] === 4 && (float) $stats['sum'] === 400.0);
+        $response->assertDontSee('SUBMITTED-NOT-LOCAL')
+            ->assertDontSee('OFFLINE-NOT-LOCAL')
+            ->assertDontSee('OTHER-COMPANY');
     }
 }

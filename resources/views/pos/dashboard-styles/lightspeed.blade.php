@@ -180,7 +180,7 @@
             <div class="divide-y divide-gray-50 dark:divide-gray-800">
                 @forelse(($recentOrders ?? $recentTransactions ?? collect())->take(6) as $ro)
                 <div class="flex items-center justify-between px-5 py-3 hover:bg-violet-50/20 transition">
-                    <div><p class="text-[11px] font-bold text-violet-600">{{ $ro->invoice_number ?? ('#' . $ro->id) }}</p><p class="text-[9px] text-gray-400">{{ ucwords(str_replace('_', ' ', $ro->order_type ?? $ro->payment_method ?? '-')) }}</p></div>
+                    <div class="text-violet-600">@include('pos.dashboard-styles._restaurant-order-identity', ['order' => $ro])<p class="text-[9px] text-gray-400">{{ ucwords(str_replace('_', ' ', $ro->order_type ?? $ro->payment_method ?? '-')) }}</p></div>
                     <div class="text-right"><p class="text-[11px] font-black text-gray-900 dark:text-white">Rs.{{ number_format($ro->total_amount) }}</p><span class="text-[8px] font-bold {{ ($ro->status ?? '') === 'completed' ? 'text-green-600' : 'text-amber-600' }}">{{ ucfirst($ro->status ?? 'pending') }}</span></div>
                 </div>
                 @empty<div class="py-8 text-center text-[11px] text-gray-400">{{ __("pos.no_orders") }}</div>@endforelse

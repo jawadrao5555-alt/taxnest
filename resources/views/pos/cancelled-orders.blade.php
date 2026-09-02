@@ -45,6 +45,9 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">{{ __('pos.waste_value') }}</p>
             <p class="text-2xl font-black text-orange-600 mt-1">Rs {{ number_format($summary['waste'] ?? 0) }}</p>
+            @if(($summary['made_item_count'] ?? 0) === 0)
+                <p class="text-[10px] text-gray-400 mt-1">No items were marked made</p>
+            @endif
         </div>
     </div>
 
@@ -72,7 +75,11 @@
                          during the next morning's day-close read "01 Sep". --}}
                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ optional($o->created_at)->format('d M, h:i A') }}</td>
                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '—' }}</td>
-                    <td class="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell max-w-xs truncate">{{ $o->items->map(fn ($i) => $i->quantity . '× ' . $i->item_name . ($i->was_made ? ' ✓' : ''))->implode(', ') }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell max-w-xs">
+                        @foreach($o->items as $i)
+                            <span class="block truncate">{{ $i->quantity }}× {{ $i->item_name }} — <span class="font-semibold {{ $i->was_made === true ? 'text-orange-600' : ($i->was_made === false ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400') }}">{{ $i->madeStateLabel() }}</span></span>
+                        @endforeach
+                    </td>
                     <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{{ number_format($o->total_amount) }}</td>
                     <td class="px-4 py-3 hidden sm:table-cell">
                         @if ($o->kot_sent_at)

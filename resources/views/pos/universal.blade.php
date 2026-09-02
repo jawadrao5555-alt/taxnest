@@ -8888,7 +8888,11 @@ function restaurantPos() {
                 const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
                 const orders = res.ok ? await res.json() : [];
                 const list = Array.isArray(orders) ? orders : [];
-                const ord = list.find(o => o.id === t.order.id) || list[0];
+                // MySQL's PDO result can serialize ids as strings while the
+                // table-status payload has a numeric id. Never fall back to
+                // another order on this table: that can put the wrong dine-in
+                // bill in the cart when a table has more than one open order.
+                const ord = list.find(o => Number(o.id) === Number(t.order.id));
                 if (!ord) {
                     this.showToast(window.TXT.order_not_found_refreshing, 'warning');
                     this.loadTableStatus();
@@ -8902,10 +8906,10 @@ function restaurantPos() {
                 this.showToast(window.TXT.order_load_failed_conn, 'error');
             } finally { this.boardBusy = false; }
         },
-        // ZFC (3 Aug 2026): boot-time twin of boardViewEdit for ?table_id= landings
-        // (Tables page tile → sale screen). Agar us table par koi ACTIVE order hai
-        // to wohi load karo — warna kuch na karo (naya-order flow jaisa tha waisa).
-        // Waiter orders hamesha atomic claim se (single-winner invariant barqarar).
+        // ZFC (3 Aug 2026): boot-time twin of boardViewEdit for ?table_id=
+        // landings. Explicit open-order links also carry recall_order; the plain
+        // table tile keeps this fallback so an occupied table never lands as an
+        // empty takeaway cart.
         async autoOpenPreselectedTable() {
             const t = this.selectedTable;
             if (!t || !t.id) return;
@@ -8929,8 +8933,8 @@ function restaurantPos() {
         // pehle hi company + status (held/preparing/ready) par validate kiya hai;
         // yahan baked heldOrders (items+table samet) se uthate hain. Waiter-source
         // orders hamesha atomic claim se (single-winner invariant). Order na mile
-        // (kisi aur ne abhi-abhi final/delete kar diya) to purana table_id-based
-        // auto-open fallback chalta hai.
+        // (kisi aur ne abhi-abhi final/delete kar diya) to table_id fallback
+        // keeps the established stale-order rescue flow.
         async autoRecallFromUrl() {
             const rid = this.bootRecallOrderId;
             if (!rid) return this.autoOpenPreselectedTable();
@@ -9296,7 +9300,9 @@ function restaurantPos() {
                 const orders = res.ok ? await res.json() : [];
                 const list = Array.isArray(orders) ? orders : [];
                 // Number() dono taraf — live PDO ids ko STRING deta hai.
-                const ord = list.find(o => Number(o.id) === Number(t.order.id)) || list[0];
+                // Match the tile's stored order id exactly (after normalizing
+                // MySQL string ids). A fallback would recall a sibling order.
+                const ord = list.find(o => Number(o.id) === Number(t.order.id));
                 if (!ord) {
                     this.showToast(window.TXT.order_not_found_refreshing, 'warning');
                     this.loadTableStatus();

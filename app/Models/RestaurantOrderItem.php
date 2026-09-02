@@ -36,4 +36,17 @@ class RestaurantOrderItem extends Model
     {
         return $this->belongsTo(RestaurantOrder::class, 'order_id');
     }
+
+    /**
+     * Cancel audit state is deliberately three-valued.  In particular, NULL
+     * means the question was never recorded (legacy/no-KOT), not "Not made".
+     */
+    public function madeStateLabel(): string
+    {
+        if ($this->was_made === true) {
+            return 'Made';
+        }
+
+        return $this->was_made === false ? 'Not made' : 'Not recorded';
+    }
 }

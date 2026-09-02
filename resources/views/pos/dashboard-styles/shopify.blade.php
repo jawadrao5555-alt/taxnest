@@ -163,7 +163,7 @@
             @php $txnList = $isRestaurant ? ($recentOrders ?? $recentTransactions ?? collect()) : ($recentTransactions ?? collect()); @endphp
             @forelse($txnList->take(8) as $ro)
             <tr class="border-b border-gray-50 dark:border-gray-800/30 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition">
-                <td class="py-3 px-5 text-[12px] font-bold text-indigo-600 dark:text-indigo-400">{{ $ro->invoice_number ?? ('#' . $ro->id) }}</td>
+                <td class="py-3 px-5 text-[12px] font-bold text-indigo-600 dark:text-indigo-400">@if($isRestaurant) @include('pos.dashboard-styles._restaurant-order-identity', ['order' => $ro]) @else {{ $ro->invoice_number ?? ('#' . $ro->id) }} @endif</td>
                 <td class="py-3 px-3 hidden sm:table-cell text-[11px] text-gray-500 dark:text-gray-400">{{ $isRestaurant ? ucwords(str_replace('_', ' ', $ro->order_type ?? '-')) : ($ro->customer_name ?? __("pos.walk_in")) }}</td>
                 <td class="py-3 px-3 text-right text-[12px] font-black text-gray-900 dark:text-white">Rs.{{ number_format($ro->total_amount) }}</td>
                 <td class="py-3 px-3 text-center"><span class="text-[9px] font-bold px-2.5 py-1 rounded-lg {{ ($ro->status ?? '') === 'completed' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' }}">{{ ucfirst($ro->status ?? ($ro->created_at->diffForHumans())) }}</span></td>

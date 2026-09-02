@@ -182,7 +182,7 @@
                         <div class="os-timeline-dot {{ ($ro->status ?? '') === 'completed' ? 'bg-emerald-500' : 'bg-amber-500' }}" style="top: 2px;"></div>
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ $ro->invoice_number ?? ('#' . $ro->id) }}</p>
+                                @include('pos.dashboard-styles._restaurant-order-identity', ['order' => $ro])
                                 <p class="text-[9px] text-gray-400">{{ ucwords(str_replace('_', ' ', $ro->order_type ?? $ro->payment_method ?? '-')) }} · {{ $ro->created_at->diffForHumans() }}</p>
                             </div>
                             <div class="text-right">

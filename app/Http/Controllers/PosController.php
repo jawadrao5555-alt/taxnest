@@ -12406,6 +12406,19 @@ class PosController extends Controller
             ->with('creator')
             ->orderBy('created_at')
             ->get();
+        // The stream boxes intentionally merge L-series completed rows into the
+        // PRA-mode figure set. Taxable/exempt values must use that identical
+        // money set too; otherwise the headline tax segregation under-reports
+        // completed local rows while the stream total correctly includes them.
+        $streamTransactions = $this->withLocalStreamRows(
+            $transactions,
+            $companyId,
+            $date,
+            $dayCloseIso ? (int) $dayCloseUser->id : null,
+            $dcBranchId,
+            (bool) $dcHistorical
+        );
+        $streamTaxSplit = $this->dayCloseTaxSplit($streamTransactions);
 
         // Return / credit-note netting (Task 570): the day-close preview nets
         // returns exactly like the stored Z-report (performDayClose) so the
@@ -12499,10 +12512,8 @@ class PosController extends Controller
             // PRA segregation (owner 9 Aug 2026): taxable vs exempt split —
             // same formula as the tax report (taxable = subtotal − discount −
             // exempt share; exempt_amount is post-discount, PosTaxMath).
-            'taxable_value' => $dcSaleRows->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0)))
-                - $dcReturnRows->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))),
-            'exempt_value' => $dcSaleRows->sum(fn ($t) => (float) ($t->exempt_amount ?? 0))
-                - $dcReturnRows->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
+            'taxable_value' => $streamTaxSplit['taxable'],
+            'exempt_value' => $streamTaxSplit['exempt'],
             'total_tax' => $dcSaleRows->sum('tax_amount') - $dcReturnRows->sum('tax_amount'),
             'total_amount' => $dcSaleRows->sum('total_amount') - $dcReturnRows->sum('total_amount'),
             'cash_amount' => round($payBuckets['cash'] - $refundBuckets['cash'], 2),
@@ -12658,7 +12669,14 @@ class PosController extends Controller
         // summary — their preview recomputes live from the own-bills set.
         $streamSplit = ($existingReport && is_array($existingReport->stream_summary ?? null) && !$dayCloseIso)
             ? $existingReport->stream_summary
-            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $dayCloseIso ? (int) $dayCloseUser->id : null, $dcBranchId));
+            : $this->buildDayCloseStreamSplit($streamTransactions);
+        // New reports freeze the tax split inside the existing stream snapshot,
+        // so historical screen/PDF/thermal values survive a local-bill wash.
+        $frozenTaxSplit = $streamSplit['tax_split'] ?? null;
+        if (is_array($frozenTaxSplit)) {
+            $stats->taxable_value = (float) ($frozenTaxSplit['taxable'] ?? 0);
+            $stats->exempt_value = (float) ($frozenTaxSplit['exempt'] ?? 0);
+        }
 
         // Task 705: Z/X display mode-gating — normal mode = PRA section only;
         // khufia local-check mode ON = Local stream figures too. LOCAL-scoped
@@ -14941,7 +14959,7 @@ class PosController extends Controller
             // stays computed from the PRA set, and PRA-reporting logic is
             // untouched (compliance boundary).
              $streamSummary = $this->buildDayCloseStreamSplit(
-                $this->withLocalStreamRows($transactions, $companyId, $date, null, $branchId)
+                $this->withLocalStreamRows($transactions, $companyId, $date, null, $branchId, false)
             );
              // The compact payment split follows the report's PRA figure set,
              // not the extra local rows included in stream_summary.
@@ -15365,14 +15383,15 @@ class PosController extends Controller
 
         // PRA segregation (owner 9 Aug 2026) — computed from the historical
         // transaction set (works for OLD closed days too; no schema change).
-        $taxSplit = $this->dayCloseTaxSplit($transactions);
-
         // Per-stream split (Task 660): prefer the figures FROZEN at close time
         // (wash may have deleted reporting-OFF finals); graceful fallback for
         // OLD reports = best-effort recompute from surviving historical rows.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
             : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
+        $taxSplit = is_array($streamSplit['tax_split'] ?? null)
+            ? $streamSplit['tax_split']
+            : $this->dayCloseTaxSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
 
         // Task 705: Z display mode-gating — Local stream section renders only
         // in khufia local-check mode (or for LOCAL-scoped viewers).
@@ -15468,13 +15487,13 @@ class PosController extends Controller
             ? $this->buildBiometricRows($companyId, $report->report_date->toDateString())
             : [];
 
-        // PRA segregation (owner 9 Aug 2026) — same historical computation as the PDF.
-        $taxSplit = $this->dayCloseTaxSplit($transactions);
-
         // Per-stream split (Task 660) — same frozen-first logic as the PDF.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
             : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
+        $taxSplit = is_array($streamSplit['tax_split'] ?? null)
+            ? $streamSplit['tax_split']
+            : $this->dayCloseTaxSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString(), null, $rptBranchId));
 
         // Task 705: Z display mode-gating (same rule as the PDF).
         $showLocalStream = (bool) session('pos_local_check')
@@ -15535,9 +15554,11 @@ class PosController extends Controller
      */
     private function dayCloseTaxSplit($transactions): array
     {
+        $sign = fn ($t) => ($t->transaction_type ?? 'sale') === 'return' ? -1 : 1;
+
         return [
-            'taxable' => $transactions->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))),
-            'exempt' => $transactions->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
+            'taxable' => round((float) $transactions->sum(fn ($t) => $sign($t) * max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))), 2),
+            'exempt' => round((float) $transactions->sum(fn ($t) => $sign($t) * (float) ($t->exempt_amount ?? 0)), 2),
         ];
     }
 
@@ -15626,14 +15647,31 @@ class PosController extends Controller
      * after the wash); dedupe by id (LOCAL-scoped viewers' set already
      * contains these rows).
      */
-    private function withLocalStreamRows($transactions, int $companyId, string $date, ?int $onlyCreatedBy = null, ?int $branchId = null)
+    private function withLocalStreamRows(
+        $transactions,
+        int $companyId,
+        string $date,
+        ?int $onlyCreatedBy = null,
+        ?int $branchId = null,
+        bool $includeArchived = true
+    )
     {
         try {
-            $locals = PosTransaction::withoutGlobalScope('hide_archived')
+            $locals = PosTransaction::query()
+                // Closed historical outputs must survive the wash; open/X/close
+                // paths must preserve the normal hide_archived visibility.
+                ->when($includeArchived, fn ($q) => $q->withoutGlobalScope('hide_archived'))
                 ->where('company_id', $companyId)
                 ->where('business_date', $date)
                 ->where('status', 'completed')
                 ->where('invoice_mode', 'local')
+                ->whereNull('pra_invoice_number')
+                // A locally-shaped row that entered any PRA-pipeline state is
+                // not local-stream money. Mirror the Local Bills portal exactly.
+                ->where(function ($status) {
+                    $status->whereNull('pra_status')
+                        ->orWhere('pra_status', 'local');
+                })
                 // Task 1197: an isolated cashier's PREVIEW merges only their
                 // own local rows — otherwise the streamSplit boxes would leak
                 // company-wide local counts/amounts around the filtered set.
@@ -15724,6 +15762,10 @@ class PosController extends Controller
                 ->all();
         }
         $split['exempt_detail'] = ['value' => $exemptValue, 'items' => $exemptItems];
+        // Stored alongside the stream totals, rather than requiring a schema
+        // column: this is the frozen taxable/exempt headline for Z prints after
+        // the local-bill wash removes source rows.
+        $split['tax_split'] = $this->dayCloseTaxSplit($transactions);
 
         // Invoice Summary amounts — predicates MIRROR the stored count columns.
         $split['summary'] = [
@@ -15873,7 +15915,7 @@ class PosController extends Controller
             $report->rider_summary = $riderFigures;
         }
 
-         $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId));
+         $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date, $xIso ? (int) $user->id : null, $xBranchId, false));
 
         // Task 705: X display mode-gating (same rule as the Z page/PDF).
         $showLocalStream = (bool) session('pos_local_check')
@@ -15901,7 +15943,7 @@ class PosController extends Controller
         $bioPunches = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildBiometricRows($companyId, $date)
             : [];
-        $taxSplit = $this->dayCloseTaxSplit($transactions);
+        $taxSplit = $streamSplit['tax_split'] ?? $this->dayCloseTaxSplit($transactions);
         $isXReport = true;
          $isSummaryReport = $this->dayCloseReportMode($request) === 'summary';
          $summary = $this->buildDayCloseSummary($report, $streamSplit, $showLocalStream, null, null, $this->buildDayCloseSummaryPaymentSplit($saleRows, $returnRows));

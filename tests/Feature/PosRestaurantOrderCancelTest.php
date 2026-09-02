@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\RestaurantPosController;
 use App\Http\Controllers\RestaurantWaiterController;
+use App\Models\RestaurantOrderItem;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
@@ -329,6 +330,34 @@ class PosRestaurantOrderCancelTest extends TestCase
 
         $this->assertSame(200, $this->cancel($orderId)->getStatusCode());
         $this->assertNull(DB::table('restaurant_order_items')->find($itemId)->was_made);
+    }
+
+    public function test_made_state_labels_keep_null_distinct_from_explicit_not_made_and_kot_is_not_made(): void
+    {
+        $orderId = $this->order(['kot_sent_at' => now()]);
+        $made = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Made dish', 'was_made' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $notMade = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Not made dish', 'was_made' => false,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        // This KOT was sent, but no cancellation question was answered.
+        $notRecorded = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Legacy dish', 'was_made' => null,
+            'kot_printed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->assertSame('Made', RestaurantOrderItem::find($made)->madeStateLabel());
+        $this->assertSame('Not made', RestaurantOrderItem::find($notMade)->madeStateLabel());
+        $this->assertSame('Not recorded', RestaurantOrderItem::find($notRecorded)->madeStateLabel());
+        $this->assertSame(
+            0.0,
+            (float) RestaurantOrderItem::where('order_id', $orderId)
+                ->where('was_made', true)->sum('subtotal'),
+            'KOT-sent, NULL-state items must not become waste'
+        );
     }
 
     // ── Task #933: '…' menu dine-in cancel stamps was_made in report ─────────

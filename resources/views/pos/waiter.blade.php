@@ -736,6 +736,11 @@ function waiterApp() {
         // network error so the next tap replays the same server-side attempt
         // instead of creating a twin held order/KOT.
         holdAttemptUuid: null,
+        // Same idea for "Add Items". One UUID per append ATTEMPT, kept after a
+        // timeout so a retry replays that attempt server-side; without it an
+        // aborted-but-committed append re-inserted the lines and the kitchen got
+        // a second delta ticket for food it was already cooking.
+        appendAttemptUuid: null,
         showTables: false,
         tables: [],
         tablesLoading: false,
@@ -1086,7 +1091,11 @@ function waiterApp() {
             } catch (e) {
                 if (requestSerial === this._tableRequestSerial) this.tablesError = true;
             } finally {
-                if (requestSerial === this._tableRequestSerial) this.tablesLoading = false;
+                // Release the spinner UNCONDITIONALLY. The serial decides whose DATA
+                // wins, never who owns the loading flag: a background refresh that
+                // starts mid-request bumps the serial, and gating the cleanup on it
+                // left the picker stuck on "Loading…" with no way out.
+                this.tablesLoading = false;
             }
         },
         pickTable(t) {
@@ -1191,6 +1200,9 @@ function waiterApp() {
             if (this.cart.length && !confirm(@js(__('pos.discard_unsent_items_q')))) return;
             this.cart = [];
             this.appendOrderId = o.id;
+            // Fresh order picked = a brand-new attempt; never reuse the previous
+            // order's uuid or the server would treat this as its replay.
+            this.appendAttemptUuid = null;
             this.appendOrderNumber = o.order_number;
             // Task 526: My Orders API pehle hi order ka table bhejti hai (orderJson
             // 'table' = table_number); parcel/takeaway par null → badge chhupa rehta hai.
@@ -1269,17 +1281,21 @@ function waiterApp() {
             this.shiftFor = o;
             this.showMyOrders = false;
             this.shiftTablesLoading = true;
+            // Same serial as every other table read: a shift fetch that comes back
+            // late must not overwrite a fresher list from the background poll.
+            const requestSerial = ++this._tableRequestSerial;
             try {
                 const headers = { 'Accept': 'application/json' };
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
+                if (requestSerial !== this._tableRequestSerial) return;
                 if (res.status !== 304 && res.ok) {
                     const etag = res.headers.get('ETag');
                     if (etag) this._tableEtag = etag;
                     this.tables = await res.json();
                 }
             } catch (e) { /* silent — grid shows "koi khali table nahi" */ }
-            this.shiftTablesLoading = false;
+            finally { this.shiftTablesLoading = false; }
         },
         shiftFreeTables() {
             return this.tables.filter(t => t.status === 'available' && !(t.active_orders > 0) && !(this.shiftFor && Number(t.id) === Number(this.shiftFor.table_id)));
@@ -1321,6 +1337,9 @@ function waiterApp() {
             if (!this.appendOrderId && !this.holdAttemptUuid) {
                 this.holdAttemptUuid = this._newHoldUuid();
             }
+            if (this.appendOrderId && !this.appendAttemptUuid) {
+                this.appendAttemptUuid = this._newHoldUuid();
+            }
             const items = this.cart.map(l => ({
                 name: l.name, quantity: l.quantity, unit_price: l.unit_price,
                 item_id: l.item_id, special_notes: l.special_notes || null,
@@ -1328,7 +1347,7 @@ function waiterApp() {
             const url = this.appendOrderId
                 ? '/pos/waiter/orders/' + this.appendOrderId + '/items'
                 : '/pos/waiter/orders';
-            const body = this.appendOrderId ? { items } : {
+            const body = this.appendOrderId ? { items, append_uuid: this.appendAttemptUuid } : {
                 items,
                 cashier_id: this.cashierId || null,
                 order_type: this.orderType,

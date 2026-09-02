@@ -8,6 +8,9 @@ class RestaurantOrderItem extends Model
 {
     protected $fillable = [
         'order_id', 'item_type', 'item_id', 'item_name',
+        // Waiter "Add Items" replay guard — one uuid per append ATTEMPT, shared
+        // by every row that attempt writes and by each of its retries.
+        'append_uuid',
         // Yeh line kitchen ki cheez nahi (abhi sirf Delivery Charges) — KOT/KDS
         // par kabhi na chhape. Nishan row ke saath hamesha rehta hai, is liye
         // reprint aur purane orders bhi wahi sach parhte hain.

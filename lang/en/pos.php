@@ -4951,6 +4951,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'waiter_takeaway_toggle_sub' => 'Waiter may punch takeaway (parcel) orders from the tablet (off = dine-in only)',
     'waiter_cancel_not_allowed' => 'Order cancel is not allowed for waiters — the admin can enable this permission from POS settings.',
     'waiter_takeaway_not_allowed' => 'Takeaway orders are not allowed for waiters — the admin can enable this permission from POS settings.',
+    'waiter_append_already_added' => 'These items were already added — the kitchen has them, nothing was sent twice.',
     'waiter_delivery_not_allowed' => 'Delivery orders cannot be punched from the waiter tablet.',
 
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable

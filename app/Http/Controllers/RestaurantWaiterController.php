@@ -628,13 +628,17 @@ class RestaurantWaiterController extends Controller
             'items.*.unit_price' => 'required|numeric|min:0|max:99999999',
             'items.*.item_id' => 'nullable|integer',
             'items.*.special_notes' => 'nullable|string|max:500',
+            // One uuid per append ATTEMPT, resent by every retry of that attempt.
+            'append_uuid' => 'nullable|string|max:64',
         ]);
+
+        $appendUuid = trim((string) ($validated['append_uuid'] ?? ''));
 
         // Task 632: same identity-autofill note discard as storeOrder — this
         // path also persists + immediately prints special_notes on a KOT.
         $validated = self::stripIdentityNotes($validated, $user);
 
-        return DB::transaction(function () use ($companyId, $validated, $user, $id) {
+        return DB::transaction(function () use ($companyId, $validated, $user, $id, $appendUuid) {
             // ZFC (1 Aug 2026): waiter DESKTOP (cashier) ke lagaye held orders mein
             // bhi items add kar sakta hai — source/creator restriction hata di
             // (table-shift jaisi company-wide authority, owner-approved).
@@ -659,9 +663,35 @@ class RestaurantWaiterController extends Controller
                 }
             }
 
+            // Replay guard: the tablet aborts a request that outlives its timeout,
+            // so an append whose first attempt already committed can arrive again.
+            // The parent order is row-locked above, so two racing copies of the
+            // same attempt are serialised here — the loser sees the winner's rows
+            // and returns without inserting or printing a second delta ticket.
+            $hasAppendUuidColumn = Schema::hasColumn('restaurant_order_items', 'append_uuid');
+            if ($appendUuid !== '' && $hasAppendUuidColumn) {
+                $alreadyAdded = RestaurantOrderItem::where('order_id', $order->id)
+                    ->where('append_uuid', $appendUuid)
+                    ->exists();
+                if ($alreadyAdded) {
+                    Log::info('[WAITER] Replayed append_uuid — items already on this order', [
+                        'order_id' => $order->id,
+                        'append_uuid' => $appendUuid,
+                        'company_id' => $companyId,
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'replayed' => true,
+                        'kot_printed' => true,
+                        'message' => __('pos.waiter_append_already_added'),
+                    ]);
+                }
+            }
+
             $added = 0;
             foreach ($validated['items'] as $it) {
-                RestaurantOrderItem::create([
+                $row = [
                     'order_id' => $order->id,
                     'item_type' => !empty($it['item_id']) ? 'product' : 'manual',
                     'item_id' => $it['item_id'] ?? null,
@@ -670,7 +700,14 @@ class RestaurantWaiterController extends Controller
                     'unit_price' => round((float) $it['unit_price'], 2),
                     'subtotal' => round((float) $it['quantity'] * (float) $it['unit_price'], 2),
                     'special_notes' => $it['special_notes'] ?? null,
-                ]);
+                ];
+                // Only stamp the attempt uuid where the column actually exists —
+                // a host whose schema has not caught up must keep appending items
+                // (without replay protection), not blow up on an unknown column.
+                if ($appendUuid !== '' && $hasAppendUuidColumn) {
+                    $row['append_uuid'] = $appendUuid;
+                }
+                RestaurantOrderItem::create($row);
                 $added += round((float) $it['quantity'] * (float) $it['unit_price'], 2);
             }
 

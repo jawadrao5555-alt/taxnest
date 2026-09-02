@@ -89,8 +89,10 @@ fetch() {
 # .agents/memory/cpanel-deployment.md). So: on the FIRST marker miss, sanitize
 # live's caches ONCE over SSH and retry that page; only a second miss FAILs.
 # No SSH key (owner machine) => old behavior (fail on first miss) unchanged.
-SSH_KEY="${SMOKE_SSH_KEY:-/home/runner/workspace/.local/ssh/cpanel_deploy_key}"
-SSH_HOST="taxnestc@cpanel.taxnest.com.pk"   # DNS-only host; taxnest.pk is Cloudflare-proxied (port 22 dead)
+# shellcheck source=scripts/lib/live-host.sh
+source "$(dirname "$0")/lib/live-host.sh"
+SSH_KEY="${SMOKE_SSH_KEY:-$LIVE_SSH_KEY}"
+SSH_HOST="$LIVE_SSH_HOST"
 SANITIZE_DONE=0   # 0 = not attempted, 1 = succeeded, 2 = attempted & failed (don't retry again)
 
 # sanitize_live_caches -> 0 if the sanitize ran & OPcache reset confirmed
@@ -98,23 +100,26 @@ sanitize_live_caches() {
   if [ "$SANITIZE_DONE" = 1 ]; then return 0; fi
   if [ "$SANITIZE_DONE" = 2 ]; then return 1; fi
   if [ ! -f "$SSH_KEY" ]; then SANITIZE_DONE=2; return 1; fi
-  echo "    Marker miss — sanitizing live caches once (view:clear+view:cache + web OPcache reset) then retrying (Task 740, stale-compiled-view false alarm guard)..."
-  local RPROBE="opr-smoke-$(date +%s%N)$RANDOM.php" OUT
-  OUT=$(timeout 120 ssh -i "$SSH_KEY" -p 22 -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new \
-    "$SSH_HOST" bash -s -- "$RPROBE" <<'SANITIZE' 2>&1
+  echo "    Marker miss — sanitizing live caches once (view:clear+view:cache + web OPcache reset) then retrying (stale-compiled-view false alarm guard)..."
+  local OUT
+  OUT=$(timeout 120 ssh "${LIVE_SSH_OPTS[@]}" \
+    "$SSH_HOST" "LIVE_DIR='$LIVE_DIR' LIVE_PHP='$LIVE_PHP' LIVE_FPM_SERVICE='$LIVE_FPM_SERVICE' bash -s" <<'SANITIZE' 2>&1
 set -u
-RPROBE=$1
-LIVE_DIR=/home/taxnestc/public_html
-PHP84=/usr/local/bin/ea-php84
-trap 'rm -f "$LIVE_DIR/public/$RPROBE"' EXIT INT TERM
+PHP="$LIVE_PHP"
 cd "$LIVE_DIR" || exit 90
-$PHP84 artisan view:clear 2>&1 || exit 94
-$PHP84 artisan view:cache 2>&1 || exit 94
-echo '<?php opcache_reset(); echo "OPCACHE_RESET_OK"; ?>' > "public/$RPROBE" || exit 95
-for TRY in 1 2 3; do
-  OP_OUT=$(curl -s --max-time 15 "https://taxnest.pk/$RPROBE" || true)
-  case "$OP_OUT" in *OPCACHE_RESET_OK*) echo "SANITIZE_OK"; exit 0 ;; esac
-  sleep 3
+$PHP artisan view:clear 2>&1 || exit 94
+$PHP artisan view:cache 2>&1 || exit 94
+# Reloading php-fpm re-execs the master, which rebuilds the shared opcode
+# memory. Proof = fresh workers appeared (a busy worker may legitimately
+# linger, so we never demand that ALL of them are gone).
+pids() { pgrep -f 'php-fpm: pool' 2>/dev/null | sort | tr '\n' ' '; }
+BEFORE=$(pids)
+sudo -n systemctl reload "$LIVE_FPM_SERVICE" 2>&1 || exit 98
+for TRY in 1 2 3 4 5; do
+  sleep 2
+  FRESH=0
+  for p in $(pids); do case " $BEFORE " in *" $p "*) ;; *) FRESH=1 ;; esac; done
+  [ "$FRESH" = 1 ] && { echo "SANITIZE_OK"; exit 0; }
 done
 exit 98
 SANITIZE

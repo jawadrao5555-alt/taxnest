@@ -26,11 +26,12 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
-HOST="taxnestc@cpanel.taxnest.com.pk"
-PORT=22
-LIVE_DIR="/home/taxnestc/public_html"
-SSH_OPTS=(-i "$KEY" -p "$PORT" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+# shellcheck source=scripts/lib/live-host.sh
+source "$(dirname "$0")/lib/live-host.sh"
+live_host_assert_not_retired || exit 1
+KEY="$LIVE_SSH_KEY"
+HOST="$LIVE_SSH_HOST"
+SSH_OPTS=("${LIVE_SSH_OPTS[@]}")
 
 fail() { echo ""; echo "ELAAN INSERT FAILED: $*" >&2; exit 1; }
 
@@ -88,8 +89,8 @@ read -r -d '' PHP_SCRIPT <<PHPEOF || true
 // Base path: argv[1] (dev, passed by shell) > hardcoded live path > __DIR__ fallback.
 \$base = (!empty(\$argv[1]) && is_dir(\$argv[1].'/vendor'))
     ? \$argv[1]
-    : (is_dir('/home/taxnestc/public_html/vendor')
-        ? '/home/taxnestc/public_html'
+    : (is_dir('$LIVE_DIR/vendor')
+        ? '$LIVE_DIR'
         : realpath(__DIR__));
 
 require \$base . '/vendor/autoload.php';
@@ -145,12 +146,12 @@ if [ "$DEV" = "1" ]; then
   echo "                Verify: /admin/app-updates on the dev server."
   echo "---------------------------------------------------------------"
 else
-  # Live: stream the PHP script to live via SSH and run with ea-php84.
+  # Live: stream the PHP script to live via SSH and run it there.
   [ -f "$KEY" ] || fail "SSH key not found at $KEY — can only run on live from the workspace"
   echo "Streaming bootstrap script to live server..."
   LIVE_OUT=$(printf '%s' "$PHP_SCRIPT" \
     | timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" \
-        "cat > /tmp/elaan_insert_$$.php && ea-php84 /tmp/elaan_insert_$$.php; RC=\$?; rm -f /tmp/elaan_insert_$$.php; exit \$RC" \
+        "cat > /tmp/elaan_insert_$$.php && $LIVE_PHP /tmp/elaan_insert_$$.php; RC=\$?; rm -f /tmp/elaan_insert_$$.php; exit \$RC" \
     2>&1) || { echo "$LIVE_OUT" >&2; fail "PHP bootstrap failed on live"; }
   echo "$LIVE_OUT"
   echo "$LIVE_OUT" | grep -q "ELAAN_INSERTED" \

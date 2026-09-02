@@ -21,10 +21,12 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-KEY=".local/ssh/cpanel_deploy_key"
-HOST="taxnestc@cpanel.taxnest.com.pk"
-SSH_OPTS=(-i "$KEY" -p 22 -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
-LIVE_DIR="/home/taxnestc/public_html"
+# shellcheck source=scripts/lib/live-host.sh
+source "$(dirname "$0")/lib/live-host.sh"
+live_host_assert_not_retired || exit 1
+KEY="$LIVE_SSH_KEY"
+HOST="$LIVE_SSH_HOST"
+SSH_OPTS=("${LIVE_SSH_OPTS[@]}")
 
 [ -f .local/qa-creds.env ] || { echo "ERROR: .local/qa-creds.env missing" >&2; exit 2; }
 . .local/qa-creds.env

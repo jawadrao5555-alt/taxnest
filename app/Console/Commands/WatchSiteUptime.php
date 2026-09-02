@@ -229,8 +229,20 @@ class WatchSiteUptime extends Command
             return null;
         }
 
-        $cpanelHost = 'cpanel.' . preg_replace('/^www\./', '', $host);
-        $ip = gethostbyname($cpanelHost);
+        // The origin IP must be CONFIGURED, never derived from the public
+        // hostname. This used to build 'cpanel.' . $host and probe whatever
+        // answered — which, after the move to the Islamabad VPS, was the
+        // RETIRED old server. It happily replied, so an origin outage would
+        // have been reported as healthy while every shop was down.
+        $configured = (string) config('services.uptime.origin_ip', '');
+        if ($configured !== '' && filter_var($configured, FILTER_VALIDATE_IP)) {
+            return $configured;
+        }
+
+        // No pin configured: resolve the public host itself. Behind a CDN this
+        // returns an edge address and the origin probe degrades to a second
+        // edge probe — weaker, but never a lie about a different machine.
+        $ip = gethostbyname($host);
 
         // gethostbyname returns the input unchanged when resolution fails.
         return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : null;

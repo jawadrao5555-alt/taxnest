@@ -15,10 +15,12 @@
 
 set -uo pipefail
 
-KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
-HOST="taxnestc@cpanel.taxnest.com.pk"
-PORT=22
-SSH_OPTS=(-i "$KEY" -p "$PORT" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+# shellcheck source=scripts/lib/live-host.sh
+source "$(dirname "$0")/lib/live-host.sh"
+live_host_assert_not_retired || exit 1
+KEY="$LIVE_SSH_KEY"
+HOST="$LIVE_SSH_HOST"
+SSH_OPTS=("${LIVE_SSH_OPTS[@]}")
 
 fail() { echo ""; echo "FAILED: $*" >&2; exit 1; }
 

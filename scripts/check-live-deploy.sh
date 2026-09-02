@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy-gap check: compare workspace HEAD vs live (cPanel) HEAD.
+# Deploy-gap check: compare workspace HEAD vs the live origin's HEAD.
 # Usage: bash scripts/check-live-deploy.sh
 # Exit 0 = live is up to date with workspace HEAD (or ahead/equal) AND its
 #          caches are fresh (rebuilt after the code last changed).
@@ -12,19 +12,19 @@
 #          byte-identical to a workspace-lineage commit — deploy-live.sh will
 #          auto-reconcile (merge -s ours) and deploy; callers should run it.
 #
-# WHY the cache tripwire exists (Task 1053, Aug 17 2026 incident): the cPanel
-# .cpanel.yml "auto-deploy" only runs when a cPanel Pull&Deploy task fires —
-# and the GitHub repo has NO webhook, so a plain push to origin main deploys
-# NOTHING by itself. Code reaches live via deploy-live.sh or ad-hoc pulls; an
-# ad-hoc pull without a cache rebuild leaves new routes/web.php against an old
-# route cache → every page 500s. This check makes that state loud.
+# WHY the cache tripwire exists (Aug 17 2026 incident): a push to GitHub
+# deploys NOTHING by itself — there is no hook on the origin. Code reaches
+# live via deploy-live.sh or an ad-hoc pull, and an ad-hoc pull without a
+# cache rebuild leaves new routes against an old route cache → every page
+# 500s. This check makes that state loud.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
-# Cloudflare (Aug 2026): main domain is proxied — SSH must use the DNS-only host.
-HOST="taxnestc@cpanel.taxnest.com.pk"
-LIVE_DIR="/home/taxnestc/public_html"
+# shellcheck source=scripts/lib/live-host.sh
+source "$(dirname "$0")/lib/live-host.sh"
+live_host_assert_not_retired || exit 2
+KEY="$LIVE_SSH_KEY"
+HOST="$LIVE_SSH_HOST"
 
 LOCAL_HEAD=$(git rev-parse HEAD 2>/dev/null)
 if [ -z "$LOCAL_HEAD" ]; then
@@ -41,7 +41,7 @@ fi
 # delivery mechanisms: git pull, cp -R, tar-deploy, scp hot-fix.
 LIVE_OUT=$(timeout 30 ssh -i "$KEY" -p 22 -o BatchMode=yes -o ConnectTimeout=10 \
   -o StrictHostKeyChecking=accept-new "$HOST" bash -s <<'LIVEPROBE' 2>/dev/null
-cd /home/taxnestc/public_html || { echo "HEAD="; exit 0; }
+cd "$LIVE_DIR" || { echo "HEAD="; exit 0; }
 echo "HEAD=$(git rev-parse HEAD 2>/dev/null)"
 RC=$(ls -t bootstrap/cache/routes-*.php 2>/dev/null | head -1)
 if [ -z "$RC" ]; then
@@ -54,10 +54,6 @@ else
 $NEWER"
   [ -n "$NEWER" ] && { echo "STALE=CODE_NEWER_THAN_ROUTE_CACHE"; echo "$NEWER" | sed 's/^/NEWERFILE=/'; }
 fi
-# Task 1053: durable failure signal from the cron autodeploy watcher on live.
-if [ -f /home/taxnestc/.taxnest-autodeploy-FAILED ]; then
-  echo "WATCHFAIL=$(tr '\n' ' ' < /home/taxnestc/.taxnest-autodeploy-FAILED | head -c 300)"
-fi
 LIVEPROBE
 )
 LIVE_HEAD=$(echo "$LIVE_OUT" | sed -n 's/^HEAD=//p' | head -1)
@@ -68,17 +64,6 @@ if [ -z "${LIVE_HEAD:-}" ]; then
 fi
 
 STALE_REASON=$(echo "$LIVE_OUT" | sed -n 's/^STALE=//p' | head -1)
-
-# Cron autodeploy watcher left a durable failure marker on live (Task 1053) —
-# a push-triggered deploy FAILED or live diverged; live may be in maintenance.
-WATCHFAIL=$(echo "$LIVE_OUT" | sed -n 's/^WATCHFAIL=//p' | head -1)
-if [ -n "$WATCHFAIL" ]; then
-  echo "check-live-deploy: AUTODEPLOY WATCHER FAILURE flagged on live:" >&2
-  echo "  $WATCHFAIL" >&2
-  echo "  See /home/taxnestc/.taxnest-autodeploy-watch.log on live. Fix: bash scripts/deploy-live.sh" >&2
-  echo "  (a successful deploy-live.sh clears the marker)." >&2
-  exit 1
-fi
 
 if [ "$LIVE_HEAD" = "$LOCAL_HEAD" ]; then
   if [ -n "$STALE_REASON" ]; then

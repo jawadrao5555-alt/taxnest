@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {{-- Pre-rendered by `artisan down --render=errors::deploying --status=200` during the
-     cPanel auto-deploy window (scripts/cpanel-autodeploy.sh). Served as a static
+     deploy window (scripts/deploy-live.sh). Served as a static
      snapshot from storage/framework/maintenance.php, so it must be fully
      self-contained (inline CSS, no assets, no routes, no JS). Auto-refreshes
      every 4s until `artisan up`. --}}

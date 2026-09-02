@@ -1,15 +1,19 @@
 #!/bin/bash
-# One-command live (cPanel) deploy for TaxNest.
-# Usage: bash scripts/deploy-live.sh [--no-elaan]
+# One-command live deploy for TaxNest — Islamabad VPS origin.
+# Usage: bash scripts/deploy-live.sh [--no-elaan] [--allow-settings=a,b]
 #
-# Does the FULL runbook from .agents/memory/cpanel-deployment.md:
+# Does the FULL runbook from .agents/memory/islamabad-vps-stack.md:
 #   1. Push workspace HEAD to GitHub main (git push origin HEAD:main)
-#   2. Over SSH on the live server (/home/taxnestc/public_html):
+#   2. Over SSH on the live server ($LIVE_DIR):
 #        git pull origin main
 #        php artisan migrate --force        (only when the gap includes migrations)
 #        config/route/view cache rebuild
-#        WEB OPcache reset via temp public/r.php + curl (real PHP-FPM hit)
+#        WEB OPcache reset by reloading PHP-FPM (proved by fresh worker PIDs)
+#        queue worker restarted so it stops running the OLD code
 #   3. Verify: live HEAD == workspace HEAD, and homepage curls 200.
+#
+# The host, key, paths and PHP binary all come from scripts/lib/live-host.sh —
+# never hardcode them here again.
 #
 # Fails LOUDLY on any step — no silent half-deploys. Safe to re-run.
 #
@@ -21,9 +25,9 @@
 #   To create an announcement:  bash scripts/elaan-insert.sh --title "..." --point "..."
 #   Emergency bypass (hotfixes): bash scripts/deploy-live.sh --no-elaan
 #
-#   After each successful deploy, a marker is written to:
-#   /home/taxnestc/.taxnest-last-deploy-marker  (format: EPOCH|COMMIT_SHA)
-#   This lets the next deploy know exactly what window to check.
+#   After each successful deploy, a marker is written to $LIVE_DEPLOY_MARKER
+#   (format: EPOCH|COMMIT_SHA). This lets the next deploy know exactly what
+#   window to check.
 
 set -uo pipefail
 
@@ -46,17 +50,18 @@ case "$ALLOW_SETTINGS" in
 esac
 cd "$(dirname "$0")/.."
 
-KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
-# Cloudflare (Aug 2026): taxnest.pk A record is proxied — SSH must go to
-# the origin cPanel box directly. cpanel.taxnest.com.pk is DNS-only (grey cloud).
-HOST="taxnestc@cpanel.taxnest.com.pk"
-PORT=22
-LIVE_DIR="/home/taxnestc/public_html"
-LIVE_URL="https://taxnest.pk"   # NOT taxnest.pk (different server, 403)
-SSH_OPTS=(-i "$KEY" -p "$PORT" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+# The live origin — host, key, app path, PHP binary, URLs, state files.
+# shellcheck source=scripts/lib/live-host.sh
+source "$(dirname "$0")/lib/live-host.sh"
 
 fail() { echo ""; echo "DEPLOY FAILED: $*" >&2; exit 1; }
 step() { echo ""; echo "==> $*"; }
+
+live_host_assert_not_retired || exit 1
+
+KEY="$LIVE_SSH_KEY"
+HOST="$LIVE_SSH_HOST"
+SSH_OPTS=("${LIVE_SSH_OPTS[@]}")
 
 run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 
@@ -68,8 +73,8 @@ run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 verify_live_cache_fresh() {
   step "Verify: live caches fresh (no source file newer than route cache — Task 1053)"
   local OUT
-  OUT=$(run_ssh bash -s <<'FRESHPROBE' 2>/dev/null
-cd /home/taxnestc/public_html || { echo PROBE_CD_FAIL; exit 0; }
+  OUT=$(run_ssh "LIVE_DIR='$LIVE_DIR' bash -s" <<'FRESHPROBE' 2>/dev/null
+cd "$LIVE_DIR" || { echo PROBE_CD_FAIL; exit 0; }
 RC=$(ls -t bootstrap/cache/routes-*.php 2>/dev/null | head -1)
 [ -z "$RC" ] && { echo PROBE_NO_ROUTE_CACHE; exit 0; }
 NEWER=$(find routes app config resources/views bootstrap/app.php \
@@ -113,31 +118,29 @@ post_deploy_screen_smoke() {
   return 0
 }
 
-# ALL live-mutating work (pull/composer/migrate/caches/OPcache) runs as ONE
-# remote payload under a single exclusive flock — the SAME lock the cPanel
-# auto-deploy (scripts/cpanel-autodeploy.sh) holds for its whole critical
-# section. Neither deploy can interleave between the other's stages.
-DEPLOY_LOCK="/home/taxnestc/.taxnest-deploy.lock"
+# ALL live-mutating work (pull/composer/migrate/caches/OPcache/queue) runs as
+# ONE remote payload under a single exclusive flock, so two people deploying
+# at once cannot interleave their stages.
+DEPLOY_LOCK="$LIVE_DEPLOY_LOCK"
 
 # remote_apply DO_PULL DO_COMPOSER DO_MIGRATE
 # Executes the full mutation sequence on live inside one held lock AND inside
-# the same pre-rendered HTTP-200 maintenance window the auto-deploy uses:
-# down(200) BEFORE any mutation, up ONLY after caches + confirmed OPcache
-# reset. On any failure the site STAYS on the 200 maintenance page (fail
-# closed — identical lifecycle semantics to scripts/cpanel-autodeploy.sh).
+# a pre-rendered HTTP-200 maintenance window: down(200) BEFORE any mutation,
+# up ONLY after caches + a CONFIRMED OPcache reset. On any failure the site
+# STAYS on the 200 maintenance page (fail closed).
 # Exit codes: 90 cd, 91 pull, 92 composer, 93 migrate, 94 caches,
-# 95 opcache-probe-write, 96 down failed (live untouched), 97 up failed,
-# 98 opcache reset unconfirmed. Prints REMOTE_* markers.
+# 96 down failed (live untouched), 97 up failed, 98 opcache reset unconfirmed,
+# 99 queue worker did not come back. Prints REMOTE_* markers.
 remote_apply() {
   local DO_PULL=$1 DO_COMPOSER=$2 DO_MIGRATE=$3
-  local RPROBE="opr-$(date +%s%N)$RANDOM$RANDOM.php"   # unguessable one-time probe name
   timeout 900 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "flock -w 300 $DEPLOY_LOCK bash -s -- $DO_PULL $DO_COMPOSER $DO_MIGRATE $RPROBE '${ALLOW_SETTINGS:-}'" <<'REMOTE'
+    "LIVE_DIR='$LIVE_DIR' LIVE_PHP='$LIVE_PHP' LIVE_WEB_GROUP='$LIVE_WEB_GROUP' \
+     LIVE_FPM_SERVICE='$LIVE_FPM_SERVICE' LIVE_QUEUE_SERVICE='$LIVE_QUEUE_SERVICE' \
+     LIVE_SETTINGS_BASE='$LIVE_SETTINGS_BASE' LIVE_SSH_USER='$LIVE_SSH_USER' \
+     flock -w 300 $DEPLOY_LOCK bash -s -- $DO_PULL $DO_COMPOSER $DO_MIGRATE '${ALLOW_SETTINGS:-}'" <<'REMOTE'
 set -u
-DO_PULL=$1; DO_COMPOSER=$2; DO_MIGRATE=$3; RPROBE=$4; ALLOW_SETTINGS=${5:-}
-LIVE_DIR=/home/taxnestc/public_html
-PHP84=/usr/local/bin/ea-php84
-trap 'rm -f "$LIVE_DIR/public/$RPROBE"' EXIT INT TERM
+DO_PULL=$1; DO_COMPOSER=$2; DO_MIGRATE=$3; ALLOW_SETTINGS=${4:-}
+PHP="$LIVE_PHP"
 cd "$LIVE_DIR" || exit 90
 echo "REMOTE_LOCK_HELD"
 
@@ -149,50 +152,24 @@ if [ ! -f resources/views/errors/deploying.blade.php ]; then
     > resources/views/errors/deploying.blade.php || exit 96
 fi
 echo "REMOTE_STEP: artisan down (200 maintenance window)"
-$PHP84 artisan down --render=errors::deploying --status=200 --refresh=4 2>&1 || exit 96
+$PHP artisan down --render=errors::deploying --status=200 --refresh=4 2>&1 || exit 96
 # From here on, any failure exits WITHOUT artisan up — site stays on the
 # friendly 200 page; recover manually ('php artisan up' after fixing).
 
 if [ "$DO_PULL" = 1 ]; then
-  # Task 713: cPanel auto-deploys server-bump public/sw.js CACHE_VERSION when a
-  # plain push carried no bump, leaving the live worktree with a CACHE_VERSION-
-  # only local modification that would abort the pull. Restore it ONLY when the
-  # diff touches nothing but CACHE_VERSION lines — this deploy ships its own
-  # fresh CACHE_VERSION anyway. Any other local sw.js change still fails loudly.
-  if ! git diff --quiet -- public/sw.js 2>/dev/null; then
-    if git diff -- public/sw.js | grep '^[+-]' | grep -v '^+++' | grep -v '^---' | grep -qv 'CACHE_VERSION'; then
-      echo "REMOTE_STEP: public/sw.js locally modified beyond CACHE_VERSION — NOT auto-restoring"
-    else
-      echo "REMOTE_STEP: restoring server-bumped public/sw.js (CACHE_VERSION-only diff) before pull"
-      git checkout -- public/sw.js || exit 91
-    fi
-  fi
   echo "REMOTE_STEP: git pull origin main"
   git pull origin main 2>&1 || exit 91
-  # Task 728: record the repo sw.js CACHE_VERSION this deploy ships, in the SAME
-  # state file cpanel-autodeploy.sh uses. Without this, a deploy-live push (which
-  # does NOT trigger the cPanel webhook autodeploy) leaves the state stale, and
-  # the NEXT plain task-merge push would compare against the wrong version and
-  # wrongly skip its server-side bump (devices would keep old caches).
-  SHIPPED_SW=$(grep -m1 "^const CACHE_VERSION = '" public/sw.js | sed "s/^const CACHE_VERSION = '\([^']*\)'.*/\1/")
-  if [ -n "$SHIPPED_SW" ]; then
-    printf '%s\n' "$SHIPPED_SW" > /home/taxnestc/.taxnest-last-shipped-sw-version \
-      && echo "REMOTE_STEP: recorded shipped SW version $SHIPPED_SW" \
-      || echo "REMOTE_STEP: WARNING could not record shipped SW version (autodeploy falls back to live-file comparison)"
-  else
-    echo "REMOTE_STEP: WARNING could not read CACHE_VERSION from pulled public/sw.js — state file NOT updated"
-  fi
 fi
 if [ "$DO_COMPOSER" = 1 ]; then
   echo "REMOTE_STEP: composer install"
-  /usr/local/bin/php $(command -v composer || echo composer.phar) install --no-interaction --prefer-dist --no-dev 2>&1 || exit 92
+  composer install --no-interaction --prefer-dist --no-dev 2>&1 || exit 92
 fi
 # Settings baseline BEFORE any migration touches a column. Taken on the code
 # that is already live, so it reflects what the shops actually had. Never fatal:
 # a host that cannot snapshot must still be able to deploy a hotfix.
-SETTINGS_BASE="/home/taxnestc/.taxnest-settings-before.json"
+SETTINGS_BASE="$LIVE_SETTINGS_BASE"
 SETTINGS_BASE_OK=0
-if $PHP84 artisan pos:settings-snapshot --out="$SETTINGS_BASE" >/dev/null 2>&1; then
+if $PHP artisan pos:settings-snapshot --out="$SETTINGS_BASE" >/dev/null 2>&1; then
   SETTINGS_BASE_OK=1
   echo "REMOTE_STEP: settings baseline captured"
 else
@@ -205,27 +182,71 @@ fi
 
 if [ "$DO_MIGRATE" = 1 ]; then
   echo "REMOTE_STEP: migrate --force"
-  $PHP84 artisan migrate --force 2>&1 || exit 93
+  $PHP artisan migrate --force 2>&1 || exit 93
 fi
 echo "REMOTE_STEP: cache rebuild"
-{ $PHP84 artisan config:clear && $PHP84 artisan cache:clear && $PHP84 artisan route:clear \
-  && $PHP84 artisan view:clear && $PHP84 artisan config:cache && $PHP84 artisan route:cache \
-  && $PHP84 artisan view:cache; } 2>&1 || exit 94
-echo "REMOTE_STEP: web OPcache reset"
-echo '<?php opcache_reset(); echo "OPCACHE_RESET_OK ".__DIR__; ?>' > "public/$RPROBE" || exit 95
+{ $PHP artisan config:clear && $PHP artisan cache:clear && $PHP artisan route:clear \
+  && $PHP artisan view:clear && $PHP artisan config:cache && $PHP artisan route:cache \
+  && $PHP artisan view:cache; } 2>&1 || exit 94
+
+# The web server writes into these as apache; artisan just rewrote them as us.
+# Left unfixed, the next request that needs to write a cache or a log hits a
+# permission error, and SELinux would refuse the read outright.
+sudo -n chown -R "$LIVE_SSH_USER:$LIVE_WEB_GROUP" storage bootstrap/cache 2>/dev/null
+sudo -n restorecon -R storage bootstrap/cache public 2>/dev/null
+
+# --- web OPcache reset -------------------------------------------------------
+# The old host had no privileged access, so it dropped a one-time PHP file into
+# public/ and curled it. That put an executable script in the web root, which is
+# exactly how a throwaway debug endpoint outlives its incident. Here we have
+# sudo, so we reload PHP-FPM instead: the master gracefully respawns every
+# worker, and a fresh worker cannot be holding old opcode.
+#
+# Reloading is not proof, so we PROVE it: the worker PIDs must all be new. An
+# unproven OPcache reset is how live silently serves last week's code.
+echo "REMOTE_STEP: web OPcache reset (PHP-FPM graceful reload)"
+fpm_worker_pids() { pgrep -f 'php-fpm: pool' 2>/dev/null | sort | tr '\n' ' '; }
+PIDS_BEFORE=$(fpm_worker_pids)
+RELOAD_TS=$(date '+%Y-%m-%d %H:%M:%S')
+sleep 1
+sudo -n systemctl reload "$LIVE_FPM_SERVICE" 2>&1 || exit 98
+
+# What must be true is that the MASTER re-executed: that is what rebuilds the
+# shared opcode memory. Do NOT demand that every old worker is gone — a
+# graceful reload lets a worker finish its current request first, and our own
+# long-polling endpoints can hold one for a while. Demanding zero survivors
+# would fail a perfectly good deploy and strand the shops in maintenance.
 OP_OK=0
-for TRY in 1 2 3; do
-  OP_OUT=$(curl -s --max-time 15 "https://taxnest.pk/$RPROBE" || true)
-  case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
-  OP_OUT=$(curl -sk --max-time 15 -H "Host: taxnest.pk" "https://127.0.0.1/$RPROBE" || true)
-  case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
-  sleep 3
+for TRY in 1 2 3 4 5; do
+  sleep 2
+  PIDS_AFTER=$(fpm_worker_pids)
+  # Evidence A: fresh workers exist that did not exist before the reload.
+  FRESH=0
+  for p in $PIDS_AFTER; do
+    case " $PIDS_BEFORE " in *" $p "*) ;; *) FRESH=1 ;; esac
+  done
+  # Evidence B: systemd/php-fpm recorded the reload after we asked for it.
+  JOURNAL=$(sudo -n journalctl -u "$LIVE_FPM_SERVICE" --since "$RELOAD_TS" --no-pager 2>/dev/null \
+            | grep -ciE 'reloaded|inherited socket|ready to handle' || true)
+  if [ "$FRESH" = 1 ] || [ "${JOURNAL:-0}" -gt 0 ]; then OP_OK=1; break; fi
 done
-rm -f "public/$RPROBE"
 [ "$OP_OK" = 1 ] || exit 98
-echo "$OP_OUT"
+echo "OPCACHE_RESET_OK php-fpm master reloaded (before:[$PIDS_BEFORE] after:[$PIDS_AFTER])"
+
 echo "REMOTE_STEP: artisan up"
-$PHP84 artisan up 2>&1 || exit 97
+$PHP artisan up 2>&1 || exit 97
+
+# --- queue worker ------------------------------------------------------------
+# On the old host the queue ran from a cron line, so every minute spawned a
+# fresh process that picked up new code by itself. Here it is a long-lived
+# systemd unit: skip this and the worker keeps executing the code it booted
+# with, forever. Bills, ZIP exports and regulator filings would silently run
+# last release while the website runs this one.
+echo "REMOTE_STEP: restart queue worker ($LIVE_QUEUE_SERVICE)"
+sudo -n systemctl restart "$LIVE_QUEUE_SERVICE" 2>&1 || exit 99
+sleep 3
+systemctl is-active --quiet "$LIVE_QUEUE_SERVICE" || exit 99
+echo "REMOTE_STEP: queue worker active on the new code"
 
 # Settings-regression check, AFTER the site is back up. Deliberately not a
 # remote exit code: the release already shipped, and dropping the shops back
@@ -234,9 +255,9 @@ $PHP84 artisan up 2>&1 || exit 97
 if [ "$SETTINGS_BASE_OK" = 1 ]; then
   echo "REMOTE_STEP: settings regression check"
   if [ -n "$ALLOW_SETTINGS" ]; then
-    SET_OUT=$($PHP84 artisan pos:settings-snapshot --compare="$SETTINGS_BASE" --allow="$ALLOW_SETTINGS" 2>&1)
+    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" --allow="$ALLOW_SETTINGS" 2>&1)
   else
-    SET_OUT=$($PHP84 artisan pos:settings-snapshot --compare="$SETTINGS_BASE" 2>&1)
+    SET_OUT=$($PHP artisan pos:settings-snapshot --compare="$SETTINGS_BASE" 2>&1)
   fi
   SET_RC=$?
   echo "$SET_OUT"
@@ -256,10 +277,10 @@ apply_fail_reason() {
     92) echo "composer install failed on live — SITE LEFT IN MAINTENANCE" ;;
     93) echo "migrate --force failed on live — SITE LEFT IN MAINTENANCE" ;;
     94) echo "cache rebuild failed on live — SITE LEFT IN MAINTENANCE" ;;
-    95) echo "could not write OPcache probe on live — SITE LEFT IN MAINTENANCE" ;;
     96) echo "could not open 200 maintenance window — ABORTED, live untouched" ;;
     97) echo "artisan up failed after successful release — run 'php artisan up' on live" ;;
-    98) echo "web OPcache reset NOT confirmed — SITE LEFT IN MAINTENANCE (old opcode risk)" ;;
+    98) echo "web OPcache reset NOT confirmed (php-fpm reload) — SITE LEFT IN MAINTENANCE (old opcode risk)" ;;
+    99) echo "the site is live on the new code but the QUEUE WORKER did not come back — background jobs (bills, ZIPs, FBR filings) are NOT running. Fix now: sudo systemctl restart $LIVE_QUEUE_SERVICE" ;;
     124) echo "remote apply timed out (or lock held >300s by another deploy) — check live maintenance state" ;;
     *)  echo "remote apply failed with exit $1" ;;
   esac
@@ -345,8 +366,8 @@ check_elaan_freshness() {
   fi
 
   local ELAAN_OUT ELAAN_RC
-  ELAAN_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" bash -s 2>&1 <<'EOFELAAN'
-MARKER_FILE=/home/taxnestc/.taxnest-last-deploy-marker
+  ELAAN_OUT=$(timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
+    "LIVE_DIR='$LIVE_DIR' MARKER_FILE='$LIVE_DEPLOY_MARKER' bash -s" 2>&1 <<'EOFELAAN'
 if [ ! -f "$MARKER_FILE" ]; then
   echo "ELAAN_NO_MARKER"
   exit 0
@@ -356,7 +377,7 @@ MARKER_TS=$(echo "$MARKER" | cut -d'|' -f1)
 MARKER_COMMIT=$(echo "$MARKER" | cut -d'|' -f2)
 # Validate that MARKER_TS is a plain integer epoch
 if ! echo "$MARKER_TS" | grep -qE '^[0-9]+$'; then
-  echo "ELAAN_MARKER_PARSE_ERROR content=$(cat /home/taxnestc/.taxnest-last-deploy-marker 2>/dev/null | head -1)"
+  echo "ELAAN_MARKER_PARSE_ERROR content=$(head -1 "$MARKER_FILE" 2>/dev/null)"
   exit 0
 fi
 SINCE=$(date -d "@$MARKER_TS" '+%Y-%m-%d %H:%M:%S' 2>/dev/null \
@@ -366,8 +387,9 @@ if [ -z "$SINCE" ]; then
   echo "ELAAN_MARKER_PARSE_ERROR ts=$MARKER_TS"
   exit 0
 fi
-cd /home/taxnestc/public_html
+cd "$LIVE_DIR"
 DB_HOST=$(grep '^DB_HOST=' .env | head -1 | sed 's/^DB_HOST=//' | tr -d "\"'")
+[ -z "$DB_HOST" ] && DB_HOST=127.0.0.1   # VPS .env omits it; MariaDB is local
 DB_USER=$(grep '^DB_USERNAME=' .env | head -1 | sed 's/^DB_USERNAME=//' | tr -d "\"'")
 DB_PASS=$(grep '^DB_PASSWORD=' .env | head -1 | sed 's/^DB_PASSWORD=//' | tr -d "\"'")
 DB_NAME=$(grep '^DB_DATABASE=' .env | head -1 | sed 's/^DB_DATABASE=//' | tr -d "\"'")
@@ -418,7 +440,7 @@ EOFELAAN
       echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
       echo "!!! ELAAN CHECK: MARKER FILE MALFORMED — $ELAAN_OUT" >&2
       echo "!!! Fix: SSH to live and run:                                        !!!" >&2
-      echo "!!!   printf 'EPOCH|COMMIT\n' > /home/taxnestc/.taxnest-last-deploy-marker  !!!" >&2
+      echo "!!!   printf 'EPOCH|COMMIT\n' > $LIVE_DEPLOY_MARKER  !!!" >&2
       echo "!!! Or use --no-elaan to re-seed the marker with this deploy.       !!!" >&2
       echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
       fail "elaan check: marker file malformed ($ELAAN_OUT) — fix or re-seed with --no-elaan"
@@ -480,7 +502,7 @@ EOFELAAN
 }
 
 # Task 999: Record a deploy marker on live after a successful deploy.
-# Format: EPOCH|COMMIT_SHA  →  /home/taxnestc/.taxnest-last-deploy-marker
+# Format: EPOCH|COMMIT_SHA  →  $LIVE_DEPLOY_MARKER
 # The next deploy's check_elaan_freshness reads this to know the window to check.
 # HARD FAIL if the write does not succeed — without a marker the next deploy's
 # elaan check has no baseline and would fail on "no marker" immediately.
@@ -491,10 +513,10 @@ record_deploy_marker() {
   step "Recording deploy marker (${NOW_TS}|${COMMIT})"
   # Task 1053: a successful manual deploy also clears the cron watcher's
   # failure marker (the failure state it flagged has been remediated).
-  run_ssh "rm -f /home/taxnestc/.taxnest-autodeploy-FAILED; printf '%s\n' '${NOW_TS}|${COMMIT}' > /home/taxnestc/.taxnest-last-deploy-marker && echo MARKER_WRITTEN" 2>/dev/null \
+  run_ssh "printf '%s\n' '${NOW_TS}|${COMMIT}' > '$LIVE_DEPLOY_MARKER' && echo MARKER_WRITTEN" 2>/dev/null \
     | grep -q "MARKER_WRITTEN" \
-    || fail "deploy marker write FAILED on live — the deploy code is live but the marker was not recorded. Fix manually: SSH to live and run: printf '${NOW_TS}|${COMMIT}\n' > /home/taxnestc/.taxnest-last-deploy-marker — then re-verify the next elaan check will pass."
-  echo "Deploy marker recorded: ${NOW_TS}|${COMMIT} → /home/taxnestc/.taxnest-last-deploy-marker"
+    || fail "deploy marker write FAILED on live — the deploy code is live but the marker was not recorded. Fix manually: SSH to live and run: printf '${NOW_TS}|${COMMIT}\n' > $LIVE_DEPLOY_MARKER — then re-verify the next elaan check will pass."
+  echo "Deploy marker recorded: ${NOW_TS}|${COMMIT} → $LIVE_DEPLOY_MARKER"
 }
 
 [ -f "$KEY" ] || fail "SSH key not found at $KEY"
@@ -735,17 +757,19 @@ else
 fi
 
 # Live worktree must be clean for a fast-forward pull (untracked junk is fine).
-# Exception (Task 713): a public/sw.js diff that touches ONLY the CACHE_VERSION
-# line is the cPanel auto-deploy's server-side bump — expected; remote_apply
-# restores it just before the pull. Anything else in sw.js still counts dirty.
-DIRTY=$(timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" bash -s <<'DIRTYCHECK' 2>/dev/null || true
-cd /home/taxnestc/public_html || exit 0
-git status --porcelain | grep -v '^??' | grep -v ' public/sw\.js$' | head -20
-if ! git diff --quiet -- public/sw.js 2>/dev/null; then
-  if git diff -- public/sw.js | grep '^[+-]' | grep -v '^+++' | grep -v '^---' | grep -qv 'CACHE_VERSION'; then
-    echo ' M public/sw.js (changes beyond CACHE_VERSION auto-bump)'
-  fi
-fi
+#
+# core.fileMode is forced off first. The cutover rsynced the app from the old
+# host and flipped the executable bit on ~39 tracked scripts, so git reports
+# them as modified forever. They would abort a pull the day an incoming commit
+# happens to touch one of them — a deploy failing on a permission bit that
+# means nothing on this box. Setting it here (not once by hand) keeps a
+# rebuilt server from quietly reintroducing the trap.
+timeout 30 ssh "${SSH_OPTS[@]}" "$HOST" \
+  "cd '$LIVE_DIR' && git config core.fileMode false" >/dev/null 2>&1 || true
+
+DIRTY=$(timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" "LIVE_DIR='$LIVE_DIR' bash -s" <<'DIRTYCHECK' 2>/dev/null || true
+cd "$LIVE_DIR" || exit 0
+git status --porcelain | grep -v '^??' | head -20
 DIRTYCHECK
 )
 if [ -n "$DIRTY" ]; then
@@ -774,10 +798,10 @@ if ! git push origin HEAD:main 2>&1; then
 fi
 
 # ------------------------------------------------------------------ 2. Deploy over SSH
-# Composer note: MUST run under /usr/local/bin/php (CloudLinux alt-php — the
-# SAME runtime as the lsphp web handler, has gd/iconv). ea-php84 CLI lacks
-# gd+iconv → mPDF/PhpSpreadsheet platform checks fail (discovered 4 Aug 2026).
-step "Live: pull + composer($NEED_COMPOSER) + migrate($NEED_MIGRATE) + caches + OPcache under ONE held deploy lock"
+# One PHP on this box (/usr/bin/php 8.4) serves both CLI and FPM, so the old
+# host's split — a separate CLI binary for composer because ea-php84 lacked
+# gd/iconv — no longer applies.
+step "Live: pull + composer($NEED_COMPOSER) + migrate($NEED_MIGRATE) + caches + OPcache + queue under ONE held deploy lock"
 APPLY_OUT=$(remote_apply 1 "$NEED_COMPOSER" "$NEED_MIGRATE"); APPLY_RC=$?
 echo "$APPLY_OUT"
 [ $APPLY_RC -eq 0 ] || fail "$(apply_fail_reason $APPLY_RC)"

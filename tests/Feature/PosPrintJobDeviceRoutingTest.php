@@ -428,6 +428,9 @@ class PosPrintJobDeviceRoutingTest extends TestCase
         $this->assertContains($own, $ids);
         $this->assertContains($legacy, $ids);
         $this->assertNotContains($other, $ids, "another counter's stamped job must never be claimed");
+        $claimedOwn = collect($res->json('jobs'))->firstWhere('id', $own);
+        $this->assertArrayHasKey('created_at', $claimedOwn);
+        $this->assertArrayHasKey('printed_item_ids', $claimedOwn);
 
         // The other counter's job is still pending for ITS agent.
         $this->assertSame('pending', DB::table('pos_print_jobs')->where('id', $other)->value('status'));

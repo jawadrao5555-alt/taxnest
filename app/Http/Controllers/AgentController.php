@@ -1105,7 +1105,10 @@ class AgentController extends Controller
             ->where('company_id', $company->id)
             ->where('claim_token', $token)
             ->orderBy('id')
-            ->get(['id', 'type', 'target_printer', 'transaction_id', 'restaurant_order_id', 'render_query']);
+            ->get([
+                'id', 'type', 'target_printer', 'transaction_id',
+                'restaurant_order_id', 'render_query', 'printed_item_ids', 'created_at',
+            ]);
 
         return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count(), 'held' => $held]);
     }

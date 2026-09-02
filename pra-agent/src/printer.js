@@ -16,10 +16,11 @@ const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { printerLaneKey, processPrintSchedule } = require('./printer-queue');
 
 let printersInterval = null;
 let jobsInterval = null;
-let printWindow = null;
+const printWindows = new Map();
 let printing = false;
 let cfg = null;
 
@@ -39,9 +40,11 @@ function getPrintStatus() {
   return { ...printStatus };
 }
 
-function getPrintWindow() {
-  if (printWindow && !printWindow.isDestroyed()) return printWindow;
-  printWindow = new BrowserWindow({
+function getPrintWindow(laneKey) {
+  const existing = printWindows.get(laneKey);
+  if (existing && !existing.isDestroyed()) return existing;
+
+  const win = new BrowserWindow({
     show: false,
     width: 420,
     height: 800,
@@ -51,14 +54,18 @@ function getPrintWindow() {
       sandbox: true,
     },
   });
-  printWindow.on('closed', () => { printWindow = null; });
-  return printWindow;
+  printWindows.set(laneKey, win);
+  win.on('closed', () => {
+    if (printWindows.get(laneKey) === win) printWindows.delete(laneKey);
+  });
+  return win;
 }
 
 async function reportPrinters() {
-  if (!cfg) return;
+  const sessionCfg = cfg;
+  if (!sessionCfg) return;
   try {
-    const win = getPrintWindow();
+    const win = getPrintWindow('__discovery__');
     const list = await win.webContents.getPrintersAsync();
     const printers = (list || []).slice(0, 50).map(p => ({
       name: p.name,
@@ -66,15 +73,15 @@ async function reportPrinters() {
       isDefault: !!p.isDefault,
     }));
     await axios.post(
-      `${cfg.serverUrl}/printers`,
+      `${sessionCfg.serverUrl}/printers`,
       {
         printers,
         // Per-counter routing (v1.9.0): this PC's own printer list is stored
         // on its device row so the admin can pick a printer PER counter.
-        device_uid: cfg.deviceUid || null,
-        hostname: cfg.hostname || null,
+        device_uid: sessionCfg.deviceUid || null,
+        hostname: sessionCfg.hostname || null,
       },
-      { headers: { Authorization: `Bearer ${cfg.apiKey}` }, timeout: 10000 }
+      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}` }, timeout: 10000 }
     );
     printStatus.printersReported = printers.length;
     plog(`Reported ${printers.length} printer(s) to server`);
@@ -83,23 +90,27 @@ async function reportPrinters() {
   }
 }
 
-// Print-window MUTEX (v1.6.0, architect-flagged): the queue poller and the
-// POS-window bridge (pos-print-html IPC) share ONE hidden window — two
-// concurrent printHtml calls would race loadFile/did-finish-load and can
-// print the wrong content. Chain every call behind the previous one.
-let printChain = Promise.resolve();
+// Per-printer mutex: calls targeting the SAME Windows queue must stay ordered
+// or their loadFile/listeners can race and print the wrong content. Different
+// physical queues get independent hidden windows and may print in parallel —
+// a kitchen KOT must not wait behind its counter copy (or vice versa).
+const printChains = new Map();
 function printHtml(html, deviceName, jobType = 'bill') {
-  const run = () => printHtmlUnlocked(html, deviceName, jobType);
-  const p = printChain.then(run, run);
-  // Keep the chain alive regardless of outcome (printHtmlUnlocked never
-  // rejects, but belt-and-braces).
-  printChain = p.catch(() => {});
+  const laneKey = printerLaneKey(deviceName);
+  const previous = printChains.get(laneKey) || Promise.resolve();
+  const run = () => printHtmlUnlocked(html, deviceName, jobType, laneKey);
+  const p = previous.then(run, run);
+  const tail = p.catch(() => {});
+  printChains.set(laneKey, tail);
+  tail.finally(() => {
+    if (printChains.get(laneKey) === tail) printChains.delete(laneKey);
+  });
   return p;
 }
 
 // Load HTML into the hidden window and print silently on `deviceName`.
 // Resolves { success, error }. Never rejects.
-function printHtmlUnlocked(html, deviceName, jobType = 'bill') {
+function printHtmlUnlocked(html, deviceName, jobType = 'bill', laneKey = printerLaneKey(deviceName)) {
   return new Promise((resolve) => {
     let settled = false;
     let win;
@@ -110,16 +121,19 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill') {
       // CRITICAL: drop any pending load listener — a stale listener firing on
       // the NEXT job's load would print the same content twice.
       try { if (win && !win.isDestroyed()) win.webContents.removeAllListeners('did-finish-load'); } catch (e) {}
+      try { if (win) win.removeListener('closed', onClosed); } catch (e) {}
       // Best-effort temp file cleanup — content is already rasterized by now.
       try { if (tmpFile) fs.unlinkSync(tmpFile); } catch (e) {}
       resolve({ success, error: error || null });
     };
 
     try {
-      win = getPrintWindow();
+      win = getPrintWindow(laneKey);
     } catch (e) {
       return done(false, `window: ${e.message}`);
     }
+    const onClosed = () => done(false, 'print window closed');
+    win.once('closed', onClosed);
 
     // Hard timeout — a wedged load/driver must never jam the queue.
     const timer = setTimeout(() => done(false, 'print timeout (30s)'), 30000);
@@ -182,21 +196,53 @@ function printHtmlUnlocked(html, deviceName, jobType = 'bill') {
   });
 }
 
-async function reportJobResult(jobId, success, error) {
+async function reportJobResult(jobId, success, error, sessionCfg) {
   try {
     await axios.post(
-      `${cfg.serverUrl}/print-jobs/${jobId}/result`,
+      `${sessionCfg.serverUrl}/print-jobs/${jobId}/result`,
       {
         success,
         error: error ? String(error).slice(0, 500) : null,
-        device_uid: cfg.deviceUid || null,
+        device_uid: sessionCfg.deviceUid || null,
       },
-      { headers: { Authorization: `Bearer ${cfg.apiKey}` }, timeout: 10000 }
+      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}` }, timeout: 10000 }
     );
   } catch (e) {
     // Server-side stale-requeue (printing > 2 min) recovers the job if this
     // result report is lost — no local retry queue needed.
     plog(`Result report failed for job ${jobId}:`, e.message);
+  }
+}
+
+async function processPrintJob(job, sessionCfg) {
+  try {
+    const contentRes = await axios.get(
+      `${sessionCfg.serverUrl}/print-jobs/${job.id}/content`,
+      { headers: { Authorization: `Bearer ${sessionCfg.apiKey}` }, timeout: 15000, responseType: 'text' }
+    );
+    // 204 = nothing left to print (e.g. delta items already covered by an
+    // earlier ticket) — mark done WITHOUT feeding a blank page to the printer.
+    if (contentRes.status === 204 || !contentRes.data) {
+      plog(`Job ${job.id}: nothing to print (already covered) — marking done`);
+      await reportJobResult(job.id, true, null, sessionCfg);
+      return;
+    }
+    const { success, error } = await printHtml(contentRes.data, job.target_printer, job.type);
+    if (success) {
+      printStatus.jobsPrinted += 1;
+      printStatus.lastPrintError = null;
+      plog(`✅ Printed job ${job.id} (${job.type}) on "${job.target_printer}"`);
+    } else {
+      printStatus.jobsFailed += 1;
+      printStatus.lastPrintError = error;
+      plog(`❌ Job ${job.id} failed: ${error}`);
+    }
+    await reportJobResult(job.id, success, error, sessionCfg);
+  } catch (e) {
+    printStatus.jobsFailed += 1;
+    printStatus.lastPrintError = e.message;
+    plog(`❌ Job ${job.id} error:`, e.message);
+    await reportJobResult(job.id, false, e.message, sessionCfg);
   }
 }
 
@@ -210,53 +256,28 @@ async function reportJobResult(jobId, success, error) {
 //   - instant empty answer         → 1500 (old server / no hold — never tight-loop)
 //   - network/server error         → 3000
 async function pollPrintJobs() {
-  if (!cfg || printing) return 1500; // one batch at a time — receipts must not interleave
+  const sessionCfg = cfg;
+  if (!sessionCfg || printing) return 1500; // one batch at a time — receipts must not interleave
   printing = true;
   let nextDelay = 1500;
   try {
     // timeout must comfortably exceed the server's max hold (8s).
     // device_uid (v1.9.0): the server hands us our own counter's stamped jobs
     // plus unstamped company-wide jobs; another counter's jobs are never ours.
-    const deviceParam = cfg.deviceUid ? `&device_uid=${encodeURIComponent(cfg.deviceUid)}` : '';
-    const res = await axios.get(`${cfg.serverUrl}/print-jobs?wait=8${deviceParam}`, {
-      headers: { Authorization: `Bearer ${cfg.apiKey}` },
+    const deviceParam = sessionCfg.deviceUid ? `&device_uid=${encodeURIComponent(sessionCfg.deviceUid)}` : '';
+    const res = await axios.get(`${sessionCfg.serverUrl}/print-jobs?wait=8${deviceParam}`, {
+      headers: { Authorization: `Bearer ${sessionCfg.apiKey}` },
       timeout: 15000,
     });
     const jobs = (res.data && res.data.jobs) || [];
     if (jobs.length > 0 || (res.data && res.data.held)) {
       nextDelay = 0;
     }
-    for (const job of jobs) {
-      try {
-        const contentRes = await axios.get(
-          `${cfg.serverUrl}/print-jobs/${job.id}/content`,
-          { headers: { Authorization: `Bearer ${cfg.apiKey}` }, timeout: 15000, responseType: 'text' }
-        );
-        // 204 = nothing left to print (e.g. delta items already covered by an
-        // earlier ticket) — mark done WITHOUT feeding a blank page to the printer.
-        if (contentRes.status === 204 || !contentRes.data) {
-          plog(`Job ${job.id}: nothing to print (already covered) — marking done`);
-          await reportJobResult(job.id, true, null);
-          continue;
-        }
-        const { success, error } = await printHtml(contentRes.data, job.target_printer, job.type);
-        if (success) {
-          printStatus.jobsPrinted += 1;
-          printStatus.lastPrintError = null;
-          plog(`✅ Printed job ${job.id} (${job.type}) on "${job.target_printer}"`);
-        } else {
-          printStatus.jobsFailed += 1;
-          printStatus.lastPrintError = error;
-          plog(`❌ Job ${job.id} failed: ${error}`);
-        }
-        await reportJobResult(job.id, success, error);
-      } catch (e) {
-        printStatus.jobsFailed += 1;
-        printStatus.lastPrintError = e.message;
-        plog(`❌ Job ${job.id} error:`, e.message);
-        await reportJobResult(job.id, false, e.message);
-      }
-    }
+    // Copies from one KOT send may print on independent kitchen/counter queues
+    // in parallel. A later send for the SAME order waits until every copy in
+    // the prior wave has reported its result, so KOT numbering/stamping cannot
+    // race after an offline backlog. Unrelated orders remain concurrent.
+    await processPrintSchedule(jobs, (job) => processPrintJob(job, sessionCfg));
   } catch (e) {
     // Poll failure is quiet — heartbeat already tracks connectivity.
     nextDelay = 3000;
@@ -305,10 +326,10 @@ function stopPrinting() {
   if (printersInterval) { clearInterval(printersInterval); printersInterval = null; }
   if (pollLoopStop) { pollLoopStop(); pollLoopStop = null; }
   if (jobsInterval) { clearInterval(jobsInterval); jobsInterval = null; }
-  if (printWindow && !printWindow.isDestroyed()) {
-    try { printWindow.destroy(); } catch (e) {}
-  }
-  printWindow = null;
+  // Do not destroy per-printer windows or clear their chains here. stopAgent()
+  // can be followed immediately by startAgent() with refreshed config; an
+  // in-flight Windows spool callback must settle before the new session may
+  // use that same printer lane. Electron closes hidden windows on process exit.
   cfg = null;
   if (printStatus.printingEnabled) plog('Silent printing stopped');
   printStatus.printingEnabled = false;
@@ -321,11 +342,11 @@ function stopPrinting() {
  * Return the list of printers installed on this PC — used by the agent
  * setup screen's Receipt Printer dropdown so the shopkeeper can pick
  * their counter's printer without leaving the setup form.
- * Reuses the shared hidden print window (creates one if not yet open).
+ * Reuses the dedicated discovery window (creates one if not yet open).
  */
 async function getLocalPrinters() {
   try {
-    const win = getPrintWindow();
+    const win = getPrintWindow('__discovery__');
     const list = await win.webContents.getPrintersAsync();
     return (list || []).map(p => ({
       name: p.name,

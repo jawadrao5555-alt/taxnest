@@ -309,6 +309,48 @@ class WhatsNewAudienceTargetingTest extends TestCase
         );
     }
 
+    public function test_specific_update_dismiss_marks_only_that_update_seen(): void
+    {
+        $posId = $this->updateId(self::T_POS);
+        $allId = $this->updateId(self::T_ALL);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->postJson('/pos/whats-new/seen', ['update_id' => $posId])
+            ->assertStatus(200)
+            ->assertJson(['ok' => true]);
+
+        $seen = AppUpdateSeen::where('user_id', $this->posAdminId)->pluck('app_update_id')->all();
+        $this->assertSame([$posId], $seen);
+        $this->assertNotContains($allId, $seen, 'A different unread update must remain unread.');
+    }
+
+    public function test_specific_update_dismiss_cannot_mark_another_panels_update_seen(): void
+    {
+        $fbrId = $this->updateId(self::T_FBR);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->postJson('/pos/whats-new/seen', ['update_id' => $fbrId])
+            ->assertStatus(200)
+            ->assertJson(['ok' => true]);
+
+        $this->assertDatabaseMissing('app_update_seens', [
+            'user_id' => $this->posAdminId,
+            'app_update_id' => $fbrId,
+        ]);
+    }
+
+    public function test_bell_history_renders_reopenable_large_detail_modals(): void
+    {
+        $posId = $this->updateId(self::T_POS);
+
+        $response = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $response->assertStatus(200);
+        $response->assertSee('open-whats-new-detail', false);
+        $response->assertSee('data-whats-new-detail-id="' . $posId . '"', false);
+        $response->assertSee('body: JSON.stringify({ update_id:', false);
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // 4. Role gate — cashier never gets popup/bell (isPosAdmin only)
     // ════════════════════════════════════════════════════════════════════

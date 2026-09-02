@@ -245,7 +245,15 @@ class AppUpdateController extends Controller
 
         // Task 1286: only rows inside the 7-day live window are marked seen —
         // mirrors the layout queries (older rows are invisible on POS anyway).
-        $ids = AppUpdate::whereIn('audience', $audiences)->published()->liveWindow()->pluck('id');
+        $request->validate([
+            'update_id' => 'nullable|integer|min:1',
+        ]);
+
+        $query = AppUpdate::whereIn('audience', $audiences)->published()->liveWindow();
+        if ($request->filled('update_id')) {
+            $query->whereKey((int) $request->input('update_id'));
+        }
+        $ids = $query->pluck('id');
         $already = AppUpdateSeen::where('user_id', $user->id)->whereIn('app_update_id', $ids)->pluck('app_update_id')->all();
 
         foreach ($ids as $id) {

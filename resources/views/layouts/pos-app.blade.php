@@ -106,9 +106,9 @@
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
                 $whatsNewPopup = $whatsNewUnseen->first();
-                // Owner (21 Jul 2026): popup shows ALL unseen updates stacked in one
-                // scrollable body (newest first) — not just the latest one.
-                $whatsNewPopupList = $whatsNewUnseen->values();
+                // Auto-popup only the latest unseen update. The remaining unread
+                // rows stay unread and can be opened individually from the bell.
+                $whatsNewPopupList = $whatsNewUnseen->take(1)->values();
                 // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
                 // the popup renders in celebratory hero style with that update on top.
                 // ?? false: column may not exist yet mid-deploy (missing attr = null).
@@ -649,16 +649,10 @@
                         @endif
 
                         @if($whatsNewList->isNotEmpty())
-                        {{-- What's New bell — updates history (opening marks all as seen) --}}
+                        {{-- What's New bell — opening history does NOT mark anything seen. --}}
                         <div class="relative" x-data="{ bellOpen: false, unseen: {{ (int) $whatsNewUnseenCount }},
-                                toggleBell() {
-                                    this.bellOpen = !this.bellOpen;
-                                    if (this.bellOpen && this.unseen > 0) {
-                                        this.unseen = 0;
-                                        fetch('/pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
-                                    }
-                                } }">
-                            <button @click="toggleBell()" title="{{ __('pos.ti_app_updates') }}" class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
+                                }" @whats-new-seen.window="if (!$event.detail.wasSeen) unseen = Math.max(0, unseen - 1)">
+                            <button @click="bellOpen = !bellOpen" title="{{ __('pos.ti_app_updates') }}" class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                 <span x-show="unseen > 0" x-cloak x-text="unseen"
                                       class="absolute rounded-full bg-red-500 text-white font-bold flex items-center justify-center"
@@ -679,12 +673,14 @@
                                 </div>
                                 <div class="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
                                     @foreach($whatsNewList as $wnu)
-                                        <div class="px-4 py-3">
+                                        <button type="button"
+                                                x-data="{ rowUnseen: {{ in_array($wnu->id, $whatsNewSeenIds) ? 'false' : 'true' }} }"
+                                                @whats-new-seen.window="if ($event.detail.id === {{ (int) $wnu->id }}) rowUnseen = false"
+                                                @click="bellOpen = false; window.dispatchEvent(new CustomEvent('open-whats-new-detail', { detail: { id: {{ (int) $wnu->id }} } }))"
+                                                class="block w-full px-4 py-3 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition cursor-pointer">
                                             <div class="flex items-center justify-between gap-2">
                                                 <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $wnu->title }} <x-wn-type-badge :update="$wnu" /></p>
-                                                @if(!in_array($wnu->id, $whatsNewSeenIds))
-                                                    <span class="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">{{ __('pos.new_word') }}</span>
-                                                @endif
+                                                <span x-show="rowUnseen" x-cloak class="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">{{ __('pos.new_word') }}</span>
                                             </div>
                                             <p class="text-[10px] text-gray-400 mt-0.5">{{ $wnu->created_at->format('d M Y') }}</p>
                                             @if($wnu->image_path ?? null)
@@ -700,7 +696,7 @@
                                                     </li>
                                                 @endforeach
                                             </ul>
-                                        </div>
+                                        </button>
                                     @endforeach
                                 </div>
                             </div>
@@ -1307,6 +1303,12 @@
             } catch(_){}
         })();
         </script>
+        @include('partials.whats-new-detail-modals', [
+            'updates' => $whatsNewList,
+            'seenIds' => $whatsNewSeenIds,
+            'seenEndpoint' => '/pos/whats-new/seen',
+        ])
+
         @if($whatsNewPopup)
         @if($whatsNewFeatured)
         {{-- ⭐ FEATURED "bara elaan" popup (Task 722) — celebratory hero style for big
@@ -1327,7 +1329,7 @@
         <div x-data="{ wnOpen: true,
                 wnDismiss() {
                     this.wnOpen = false;
-                    fetch('/pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                    fetch('/pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) }).catch(() => {});
                     @if($surveyPopup && !$surveyDismissedSession) window.dispatchEvent(new CustomEvent('open-pos-survey')); @endif
                 },
                 wnTry(url) { this.wnDismiss(); window.location.href = url; } }"
@@ -1404,7 +1406,7 @@
         <div x-data="{ wnOpen: true,
                 wnDismiss() {
                     this.wnOpen = false;
-                    fetch('/pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                    fetch('/pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ update_id: {{ (int) $whatsNewPopup->id }} }) }).catch(() => {});
                     @if($surveyPopup && !$surveyDismissedSession) window.dispatchEvent(new CustomEvent('open-pos-survey')); @endif
                 } }"
              x-show="wnOpen" x-cloak

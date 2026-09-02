@@ -514,7 +514,7 @@ class FbrPosPhase2Controller extends Controller
         $products = \App\Models\Product::where('company_id', $companyId)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'default_price']);
+            ->get(['id', 'name', 'default_price', 'sku', 'barcode']);
         // Company-scoped product-name lookup for the list cards (deal items
         // store only product_id; Product has no global company scope).
         $productNames = $products->pluck('name', 'id');

@@ -7516,7 +7516,7 @@ class PosController extends Controller
         $products = PosProduct::where('company_id', $companyId)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'price']);
+            ->get(['id', 'name', 'price', 'sku', 'barcode', 'category']);
         // Company-scoped product-name lookup for the list table (deal items store
         // only pos_product_id; PosProduct has no global scope).
         $productNames = $products->pluck('name', 'id');

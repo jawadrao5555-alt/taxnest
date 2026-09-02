@@ -5120,6 +5120,10 @@ function restaurantPos() {
         // Queue is COMPANY-SCOPED — a shared browser must never post another
         // company's bills into the current session.
         offlineQueueCount: 0,
+        // Walk-in customers saved while the line was dead, still waiting to
+        // reach the server. Counted separately from bills: they carry no money,
+        // so they must never inflate the "unsynced bills" badge.
+        offlineCustomerCount: 0,
         offlineSyncing: false,
         offlineNeedsLogin: false,
         // ── Offline queue visibility ──
@@ -5706,6 +5710,9 @@ function restaurantPos() {
             window.addEventListener('online', () => { this.syncStatus = 'online'; this._markConnectivity(true); this.offlineLockDismissed = false; this.syncOfflineBills(); this._autoSyncTick(true); });
             window.addEventListener('offline', () => { this.syncStatus = 'offline'; this._markConnectivity(false); });
             this.refreshOfflineCount();
+            // Pending walk-ins survive a reload: put them back in the searchable
+            // list before anything else touches allCustomers.
+            this._mergeQueuedCustomers();
             this.syncOfflineBills();
             this._autoSyncTick();
             this._syncTimer = setInterval(() => this._autoSyncTick(), 30000);
@@ -5782,10 +5789,14 @@ function restaurantPos() {
             return new Promise((resolve, reject) => {
                 if (this._idb) return resolve(this._idb);
                 if (!window.indexedDB) return reject(new Error('IndexedDB unavailable'));
-                const req = indexedDB.open('tn_pos_offline', 1);
+                // v2 adds the `customers` store. A cashier who saves a walk-in's
+                // number while the line is dead must not lose it — the record is
+                // queued here and replayed BEFORE the bills on reconnect.
+                const req = indexedDB.open('tn_pos_offline', 2);
                 req.onupgradeneeded = () => {
                     const db = req.result;
                     if (!db.objectStoreNames.contains('bills')) db.createObjectStore('bills', { keyPath: 'uuid' });
+                    if (!db.objectStoreNames.contains('customers')) db.createObjectStore('customers', { keyPath: 'uuid' });
                 };
                 req.onsuccess = () => { this._idb = req.result; resolve(this._idb); };
                 req.onerror = () => reject(req.error);
@@ -5817,6 +5828,125 @@ function restaurantPos() {
         },
         async refreshOfflineCount() {
             try { this.offlineQueueCount = (await this.idbAllMine()).length; } catch (e) {}
+        },
+
+        // ─── OFFLINE CUSTOMER QUEUE ────────────────────────────────────────
+        // The bill itself already survives an outage (name + phone ride on the
+        // payload), but the CUSTOMER RECORD used to die with the failed POST:
+        // the cashier typed a walk-in's number, got "error adding customer",
+        // and the number was gone. Now it is queued on-device and replayed
+        // before the bills, so history/khata/repeat-order find it afterwards.
+        //
+        // Idempotency key = the phone number, not a uuid. The server's
+        // customer-store already returns the EXISTING row for a phone that is
+        // already on file, so a lost response or a second till queueing the
+        // same walk-in can never produce a duplicate. The uuid is only the
+        // local keyPath, so a re-save of the same number overwrites its own
+        // pending record instead of stacking another one.
+        _custQueueKey(phone) {
+            return 'c-' + this._offlineCompanyId + '-' + String(phone || '').replace(/\D/g, '');
+        },
+        async idbCustPut(rec) {
+            const db = await this.idbOpen();
+            return new Promise((res, rej) => {
+                const tx = db.transaction('customers', 'readwrite');
+                tx.objectStore('customers').put(rec);
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        },
+        async idbCustAllMine() {
+            const db = await this.idbOpen();
+            return new Promise((res, rej) => {
+                const rq = db.transaction('customers').objectStore('customers').getAll();
+                rq.onsuccess = () => res((rq.result || []).filter(c => c.company_id === this._offlineCompanyId));
+                rq.onerror = () => rej(rq.error);
+            });
+        },
+        async idbCustDelete(uuid) {
+            const db = await this.idbOpen();
+            return new Promise((res, rej) => {
+                const tx = db.transaction('customers', 'readwrite');
+                tx.objectStore('customers').delete(uuid);
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        },
+        async refreshOfflineCustomerCount() {
+            try { this.offlineCustomerCount = (await this.idbCustAllMine()).length; } catch (e) {}
+        },
+        // Merge still-pending offline customers back into the in-memory list so
+        // they stay searchable/selectable after a reload (the baked list comes
+        // from the server and cannot know about them yet). Matched by phone so a
+        // customer that synced in another tab is not shown twice.
+        async _mergeQueuedCustomers() {
+            let pending = [];
+            try { pending = await this.idbCustAllMine(); } catch (e) { return; }
+            this.offlineCustomerCount = pending.length;
+            if (!pending.length) return;
+            if (!Array.isArray(this.allCustomers)) this.allCustomers = [];
+            const seen = new Set(this.allCustomers.map(c => String(c.phone || '').replace(/\D/g, '')).filter(Boolean));
+            pending.forEach(p => {
+                const digits = String(p.phone || '').replace(/\D/g, '');
+                if (digits && seen.has(digits)) return;
+                if (digits) seen.add(digits);
+                this.allCustomers.push({ id: null, name: p.name, phone: p.phone, address: p.address || null, _pending: true });
+            });
+        },
+        // Replay queued customers. Runs BEFORE the bills so a synced bill's
+        // phone already has a customer row to hang history off. Never throws
+        // into the bill sync — a customer that will not save must not be able
+        // to block the money.
+        async syncOfflineCustomers() {
+            if (!navigator.onLine) return 0;
+            let pending = [];
+            try { pending = await this.idbCustAllMine(); } catch (e) { return 0; }
+            if (!pending.length) return 0;
+            let ok = 0;
+            for (const c of pending.sort((a, z) => (a.queued_at || 0) - (z.queued_at || 0))) {
+                if ((c.tries || 0) >= 50) continue; // poisoned — keep on-device, stop retrying
+                try {
+                    const res = await this.fetchWithTimeout('{{ route("pos.restaurant.customer-store", [], false) }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        body: JSON.stringify({ name: c.name, phone: c.phone, address: c.address || null }),
+                    }, 12000);
+                    let data = null;
+                    try { data = JSON.parse(await res.text()); } catch (_) {}
+                    if (res.ok && data && data.success && data.customer) {
+                        await this.idbCustDelete(c.uuid);
+                        ok++;
+                        // Promote the local placeholder to the real server row so
+                        // the very next bill on this screen carries a real id.
+                        this._adoptSyncedCustomer(c.phone, data.customer);
+                        continue;
+                    }
+                    if (res.status === 419 || res.status === 401) {
+                        // Session gone. Say so HERE too — with no bill queued,
+                        // the bill sync never runs and the cashier would keep
+                        // seeing a silent pending count with no explanation.
+                        this.offlineNeedsLogin = true;
+                        this.syncStatus = 'offline';
+                        break;
+                    }
+                    c.tries = (c.tries || 0) + 1;
+                    c.last_error = (data && (data.message || data.error)) || ('HTTP ' + res.status);
+                    await this.idbCustPut(c);
+                } catch (e) {
+                    break; // still offline / timed out — keep the rest queued
+                }
+            }
+            await this.refreshOfflineCustomerCount();
+            return ok;
+        },
+        _adoptSyncedCustomer(phone, server) {
+            const digits = String(phone || '').replace(/\D/g, '');
+            const same = c => c && String(c.phone || '').replace(/\D/g, '') === digits;
+            (this.allCustomers || []).forEach(c => {
+                if (same(c)) { c.id = server.id; c.name = server.name || c.name; delete c._pending; }
+            });
+            if (same(this.selectedCustomer)) {
+                this.selectedCustomer = { ...this.selectedCustomer, id: server.id, name: server.name || this.selectedCustomer.name };
+                delete this.selectedCustomer._pending;
+            }
         },
         // ── OFFLINE QUEUE VISIBILITY ───────────────────────────────────────
         // Records WHEN the outage began. Driven by the browser's online/offline
@@ -5861,6 +5991,7 @@ function restaurantPos() {
                     .sort((a, b) => (a.queued_at || 0) - (b.queued_at || 0));
             } catch (e) { this.offlineQueueList = []; }
             this.offlineQueueCount = this.offlineQueueList.length;
+            await this.refreshOfflineCustomerCount();
             this.showOfflineQueue = true;
         },
         offlineQueueSum() {
@@ -6076,10 +6207,16 @@ function restaurantPos() {
                 if (manual) this.showToast(window.TXT.still_offline_will_sync, 'error');
                 return;
             }
+            // Walk-ins first: a bill that syncs a second later should already
+            // find its customer on file. Runs even when no bill is queued, and
+            // can never stop the bill replay — it swallows its own failures.
+            let custOk = 0;
+            try { custOk = await this.syncOfflineCustomers(); } catch (e) {}
             let bills = [];
             try { bills = await this.idbAllMine(); } catch (e) { return; }
             if (!bills.length) {
-                if (manual) this.showToast(window.TXT.all_bills_synced, 'success');
+                if (custOk > 0) this.showToast(window.TXT.customers_synced_offline, 'success');
+                else if (manual) this.showToast(window.TXT.all_bills_synced, 'success');
                 return;
             }
             this.offlineSyncing = true;
@@ -12384,21 +12521,55 @@ function restaurantPos() {
             if (!this.quickCustomerPhone.trim()) {
                 this.showToast(window.TXT.phone_required, 'error'); return;
             }
+            const name = this.quickCustomerName.trim();
+            const phone = this.quickCustomerPhone.trim();
+            const address = this.quickCustomerAddress.trim();
             try {
-                const res = await fetch('{{ route("pos.restaurant.customer-store") }}', {
+                const res = await this.fetchWithTimeout('{{ route("pos.restaurant.customer-store", [], false) }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    body: JSON.stringify({ name: this.quickCustomerName.trim() || null, phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() || null }),
-                });
+                    body: JSON.stringify({ name: name || null, phone: phone, address: address || null }),
+                }, 12000);
                 const data = await res.json();
                 if (data.customer || data.success) {
-                    const cust = data.customer || { id: Date.now(), name: this.quickCustomerName.trim() || this.quickCustomerPhone.trim(), phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() };
+                    const cust = data.customer || { id: Date.now(), name: name || phone, phone: phone, address: address };
                     if (!data.existing) this.allCustomers.push(cust);
-                    this.selectedCustomer = cust; this.showQuickAdd = false;
-                    this.customerPhoneQuery = cust.phone || cust.name;
-                    this.quickCustomerName = ''; this.quickCustomerPhone = ''; this.quickCustomerAddress = ''; this.showCustomerPicker = false;
-                    this.showToast(data.existing ? window.TXT.customer_found_prefix + cust.name : window.TXT.customer_added_prefix + cust.name, 'success');
+                    this._selectQuickCustomer(cust, data.existing ? window.TXT.customer_found_prefix + cust.name : window.TXT.customer_added_prefix + cust.name, 'success');
                 } else { this.showToast(data.message || window.TXT.failed_word, 'error'); }
-            } catch (e) { this.showToast(window.TXT.error_adding_customer, 'error'); }
+            } catch (e) {
+                // No line (or the request timed out). The number the cashier just
+                // typed is real work — queue it instead of throwing it away, and
+                // let the bill go out with the same name/phone right now.
+                const queued = await this._queueOfflineCustomer(name, phone, address);
+                if (!queued) { this.showToast(window.TXT.error_adding_customer, 'error'); return; }
+                this._selectQuickCustomer(queued, window.TXT.customer_saved_offline, 'success');
+            }
+        },
+        _selectQuickCustomer(cust, msg, tone) {
+            this.selectedCustomer = cust; this.showQuickAdd = false;
+            this.customerPhoneQuery = cust.phone || cust.name;
+            this.quickCustomerName = ''; this.quickCustomerPhone = ''; this.quickCustomerAddress = ''; this.showCustomerPicker = false;
+            this.showToast(msg, tone);
+        },
+        async _queueOfflineCustomer(name, phone, address) {
+            const rec = {
+                uuid: this._custQueueKey(phone),
+                company_id: this._offlineCompanyId,
+                name: name || phone,
+                phone: phone,
+                address: address || null,
+                queued_at: Date.now(),
+                tries: 0,
+            };
+            try { await this.idbCustPut(rec); } catch (e) { return null; }
+            this._markConnectivity(false);
+            await this.refreshOfflineCustomerCount();
+            const cust = { id: null, name: rec.name, phone: rec.phone, address: rec.address, _pending: true };
+            if (!Array.isArray(this.allCustomers)) this.allCustomers = [];
+            const digits = String(phone || '').replace(/\D/g, '');
+            if (!this.allCustomers.some(c => String(c.phone || '').replace(/\D/g, '') === digits)) {
+                this.allCustomers.push(cust);
+            }
+            return cust;
         },
 
         get effectiveDiscountLimit() {

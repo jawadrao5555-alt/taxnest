@@ -29,11 +29,21 @@ set -uo pipefail
 
 # ---------------------------------------------------------------- Parse flags
 NO_ELAAN=0
+# Settings-regression guard (owner rule, Sep 2026): a deploy must change ONLY
+# the feature it ships. Columns this deploy INTENDS to change are declared here
+# — everything else that moves fails the deploy loudly.
+#   bash scripts/deploy-live.sh --allow-settings=pos_theme,kot_align_center
+ALLOW_SETTINGS=""
 for _arg in "$@"; do
   case "$_arg" in
     --no-elaan) NO_ELAAN=1 ;;
+    --allow-settings=*) ALLOW_SETTINGS="${_arg#--allow-settings=}" ;;
   esac
 done
+# Only column-name characters ever reach the remote shell.
+case "$ALLOW_SETTINGS" in
+  *[!a-zA-Z0-9_,]*) echo "Invalid --allow-settings (letters, digits, _ and , only)" >&2; exit 1 ;;
+esac
 cd "$(dirname "$0")/.."
 
 KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
@@ -122,9 +132,9 @@ remote_apply() {
   local DO_PULL=$1 DO_COMPOSER=$2 DO_MIGRATE=$3
   local RPROBE="opr-$(date +%s%N)$RANDOM$RANDOM.php"   # unguessable one-time probe name
   timeout 900 ssh "${SSH_OPTS[@]}" "$HOST" \
-    "flock -w 300 $DEPLOY_LOCK bash -s -- $DO_PULL $DO_COMPOSER $DO_MIGRATE $RPROBE" <<'REMOTE'
+    "flock -w 300 $DEPLOY_LOCK bash -s -- $DO_PULL $DO_COMPOSER $DO_MIGRATE $RPROBE '${ALLOW_SETTINGS:-}'" <<'REMOTE'
 set -u
-DO_PULL=$1; DO_COMPOSER=$2; DO_MIGRATE=$3; RPROBE=$4
+DO_PULL=$1; DO_COMPOSER=$2; DO_MIGRATE=$3; RPROBE=$4; ALLOW_SETTINGS=${5:-}
 LIVE_DIR=/home/taxnestc/public_html
 PHP84=/usr/local/bin/ea-php84
 trap 'rm -f "$LIVE_DIR/public/$RPROBE"' EXIT INT TERM
@@ -177,6 +187,22 @@ if [ "$DO_COMPOSER" = 1 ]; then
   echo "REMOTE_STEP: composer install"
   /usr/local/bin/php $(command -v composer || echo composer.phar) install --no-interaction --prefer-dist --no-dev 2>&1 || exit 92
 fi
+# Settings baseline BEFORE any migration touches a column. Taken on the code
+# that is already live, so it reflects what the shops actually had. Never fatal:
+# a host that cannot snapshot must still be able to deploy a hotfix.
+SETTINGS_BASE="/home/taxnestc/.taxnest-settings-before.json"
+SETTINGS_BASE_OK=0
+if $PHP84 artisan pos:settings-snapshot --out="$SETTINGS_BASE" >/dev/null 2>&1; then
+  SETTINGS_BASE_OK=1
+  echo "REMOTE_STEP: settings baseline captured"
+else
+  # Not a remote exit code (the site is mid-maintenance and the release itself
+  # is fine), but the deploy is NOT clean: nothing is watching the settings this
+  # time. The local script turns this marker into a loud failure.
+  echo "REMOTE_SETTINGS_BASELINE_FAILED"
+  echo "REMOTE_STEP: WARNING could not capture the settings baseline — regression guard is DISARMED for this deploy"
+fi
+
 if [ "$DO_MIGRATE" = 1 ]; then
   echo "REMOTE_STEP: migrate --force"
   $PHP84 artisan migrate --force 2>&1 || exit 93
@@ -200,6 +226,24 @@ rm -f "public/$RPROBE"
 echo "$OP_OUT"
 echo "REMOTE_STEP: artisan up"
 $PHP84 artisan up 2>&1 || exit 97
+
+# Settings-regression check, AFTER the site is back up. Deliberately not a
+# remote exit code: the release already shipped, and dropping the shops back
+# into maintenance would punish them for our bug. Instead it prints a marker
+# the local script turns into a loud DEPLOY FAILED, so a human must look.
+if [ "$SETTINGS_BASE_OK" = 1 ]; then
+  echo "REMOTE_STEP: settings regression check"
+  if [ -n "$ALLOW_SETTINGS" ]; then
+    SET_OUT=$($PHP84 artisan pos:settings-snapshot --compare="$SETTINGS_BASE" --allow="$ALLOW_SETTINGS" 2>&1)
+  else
+    SET_OUT=$($PHP84 artisan pos:settings-snapshot --compare="$SETTINGS_BASE" 2>&1)
+  fi
+  SET_RC=$?
+  echo "$SET_OUT"
+  [ "$SET_RC" = 0 ] || echo "REMOTE_SETTINGS_REGRESSION"
+  rm -f "$SETTINGS_BASE"
+fi
+
 echo "REMOTE_DONE"
 exit 0
 REMOTE
@@ -592,6 +636,9 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   echo "$REFRESH_OUT"
   [ $APPLY_RC -eq 0 ] || fail "$(apply_fail_reason $APPLY_RC)"
   echo "$REFRESH_OUT" | grep -q "OPCACHE_RESET_OK" || fail "web OPcache reset did not confirm"
+  if echo "$REFRESH_OUT" | grep -q "REMOTE_SETTINGS_REGRESSION"; then
+    fail "the refresh CHANGED existing shops' saved settings (table above) — investigate before shipping anything else."
+  fi
 
   HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$LIVE_URL/")
   echo "GET $LIVE_URL/ -> $HTTP_CODE"
@@ -736,6 +783,16 @@ echo "$APPLY_OUT"
 [ $APPLY_RC -eq 0 ] || fail "$(apply_fail_reason $APPLY_RC)"
 echo "$APPLY_OUT" | grep -q "OPCACHE_RESET_OK" \
   || fail "web OPcache reset did not confirm (probe output above) — live may serve stale compiled code"
+
+# Owner rule: this deploy may change the feature it ships and NOTHING else.
+# The site is already back up by now, so this fails the DEPLOY, not the shops:
+# a human must read the table above and decide repair vs. --allow-settings.
+if echo "$APPLY_OUT" | grep -q "REMOTE_SETTINGS_REGRESSION"; then
+  fail "this deploy CHANGED existing shops' saved settings (table above). Repair the migration/backfill, or re-run with --allow-settings=<columns> if every listed change was intended."
+fi
+if echo "$APPLY_OUT" | grep -q "REMOTE_SETTINGS_BASELINE_FAILED"; then
+  fail "the settings baseline could not be captured, so NOTHING checked whether this deploy reset shops' settings. Fix 'php artisan pos:settings-snapshot' on live and verify the shops by hand before trusting this release."
+fi
 
 LIVE_HEAD_AFTER=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null)
 [ "$LIVE_HEAD_AFTER" = "$LOCAL_HEAD" ] \

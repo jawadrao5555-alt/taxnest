@@ -57,6 +57,14 @@
             {{ __('pos.session_expired_offline_safe') }}
         </div>
 
+        {{-- Walk-ins saved while the line was dead. They carry no money, so they
+             stay OUT of the bill count and out of the totals — but they are real
+             work the cashier did and must not be invisible. --}}
+        <div x-show="offlineCustomerCount > 0" x-cloak
+             class="mx-5 mt-3 px-3 py-2 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 text-[11px] font-semibold text-sky-800 dark:text-sky-300">
+            <span x-text="offlineCustomerCount"></span> {{ __('pos.offq_customers_pending') }}
+        </div>
+
         {{-- Grow warning: fires before the queue is scary, not after. --}}
         <div x-show="offlineQueueList.length >= 25" x-cloak
              class="mx-5 mt-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-[11px] font-semibold text-amber-800 dark:text-amber-300">

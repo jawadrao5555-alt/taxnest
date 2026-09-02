@@ -19,6 +19,7 @@ use App\Models\InventoryStock;
 use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -1910,27 +1911,79 @@ class RestaurantPosController extends Controller
             'address' => 'nullable|string|max:500',
         ]);
 
-        $existing = PosCustomer::where('company_id', $companyId)
-            ->where('phone', $request->phone)
-            ->first();
+        // Dedupe on the DIGITS, not the typed string. Two tills, an offline
+        // replay and a walk-in re-save all reach this method with the same
+        // number written differently (0300-1234567 / 0300 1234567 / +923001234567),
+        // and an exact-string match would create a fresh "customer" for each.
+        // The lock closes the last gap: two requests that both find nothing and
+        // both insert. pos_customers has no unique (company_id, phone) index —
+        // adding one would fail on shards that already carry duplicates — so
+        // the check-and-create is serialised per company+number instead.
+        $digits = preg_replace('/\D+/', '', (string) $request->phone);
+        $lock = Cache::lock('poscust:' . $companyId . ':' . $digits, 10);
 
-        if ($existing) {
-            if ($request->address && !$existing->address) {
-                $existing->update(['address' => $request->address]);
-            }
-            return response()->json(['success' => true, 'customer' => $existing, 'existing' => true]);
+        try {
+            $lock->block(5);
+        } catch (\Throwable $e) {
+            $lock = null; // lock store unavailable — still better to proceed than to fail the cashier
         }
 
-        $customer = PosCustomer::create([
-            'company_id' => $companyId,
-            'name' => trim((string) $request->name) !== '' ? trim($request->name) : $request->phone,
-            'phone' => $request->phone,
-            'email' => $request->email,
-            'address' => $request->address,
-            'type' => 'unregistered',
-        ]);
+        try {
+            $existing = $this->findPosCustomerByPhone($companyId, (string) $request->phone);
+
+            if ($existing) {
+                if ($request->address && ! $existing->address) {
+                    $existing->update(['address' => $request->address]);
+                }
+
+                return response()->json(['success' => true, 'customer' => $existing, 'existing' => true]);
+            }
+
+            $customer = PosCustomer::create([
+                'company_id' => $companyId,
+                'name' => trim((string) $request->name) !== '' ? trim($request->name) : $request->phone,
+                'phone' => $request->phone,
+                'email' => $request->email,
+                'address' => $request->address,
+                'type' => 'unregistered',
+            ]);
+        } finally {
+            optional($lock)->release();
+        }
 
         return response()->json(['success' => true, 'customer' => $customer]);
+    }
+
+    /**
+     * Find a company's customer by phone, comparing DIGITS ONLY.
+     *
+     * Narrowed in SQL by the last 7 digits (so the scan stays indexed-ish and
+     * tiny) and then confirmed in PHP on the full normalized number, which is
+     * the only comparison that is actually correct across the formats shops
+     * type. Returns null for a number with too few digits to be meaningful.
+     */
+    private function findPosCustomerByPhone(int|string|null $companyId, string $phone): ?PosCustomer
+    {
+        $digits = preg_replace('/\D+/', '', $phone);
+        if ($digits === '') {
+            return null;
+        }
+
+        $exact = PosCustomer::where('company_id', $companyId)->where('phone', $phone)->first();
+        if ($exact) {
+            return $exact;
+        }
+
+        $tail = substr($digits, -7);
+        if (strlen($tail) < 7) {
+            return null;
+        }
+
+        return PosCustomer::where('company_id', $companyId)
+            ->where('phone', 'like', '%' . $tail)
+            ->orderBy('id')
+            ->get(['id', 'company_id', 'name', 'phone', 'email', 'address', 'type'])
+            ->first(fn ($c) => preg_replace('/\D+/', '', (string) $c->phone) === $digits);
     }
 
     /**

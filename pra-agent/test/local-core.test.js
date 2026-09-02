@@ -8,6 +8,7 @@ const { EventStore } = require('../src/local-core/event-store');
 const { loadOrCreateCoreKey } = require('../src/local-core/key-store');
 const { validateEvent, PROTOCOL_VERSION } = require('../src/local-core/protocol');
 const { CloudSyncClient } = require('../src/local-core/cloud-sync');
+const { createBackup, restoreBackup, recoverInterruptedRestore } = require('../src/local-core/backup');
 
 const KEY = Buffer.from('0123456789abcdef0123456789abcdef');
 function storeOptions(dataDir, extra) {
@@ -255,6 +256,98 @@ function fakeSafeStorage() {
         assert.strictEqual(restarted.status().event_count, 0);
         assert.strictEqual(restarted.status().journal.recovered_tail_frames, 1);
         fs.rmSync(faultDir, { recursive: true, force: true });
+    });
+
+    await it('creates authenticated encrypted same-install backups and restores through staging', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-backup-'));
+        const source = path.join(root, 'source');
+        const backupDir = path.join(root, 'backups');
+        const store = new EventStore(storeOptions(source));
+        store.append(event('event-backup-1'));
+        const backup = createBackup({ store, encryptionKey: KEY, partition: 'partition-a', backupDir,
+            now: () => 1700000000123, automatic: true, maxRetained: 2 });
+        const wire = fs.readFileSync(backup.path);
+        assert.strictEqual(wire.includes(KEY), false, 'backup must not contain raw encryption key');
+        assert.strictEqual(wire.includes(Buffer.from('sale.created')), false, 'backup must not contain plaintext event');
+        const target = path.join(root, 'restored');
+        restoreBackup({ backupPath: backup.path, targetDir: target, encryptionKey: KEY, partition: 'partition-a' });
+        const restored = new EventStore(storeOptions(target));
+        assert.deepStrictEqual(restored.pending().map((item) => item.id), ['event-backup-1']);
+        const existing = path.join(root, 'existing');
+        fs.mkdirSync(existing); fs.writeFileSync(path.join(existing, 'keep'), 'unchanged');
+        assert.throws(() => restoreBackup({ backupPath: backup.path, targetDir: existing, encryptionKey: KEY, partition: 'partition-a' }), /replace=true/);
+        assert.strictEqual(fs.readFileSync(path.join(existing, 'keep'), 'utf8'), 'unchanged');
+        assert.throws(() => restoreBackup({ backupPath: backup.path, targetDir: existing, encryptionKey: Buffer.alloc(32, 7), partition: 'partition-a', replace: true }), /validation|authentication/);
+        assert.strictEqual(fs.readFileSync(path.join(existing, 'keep'), 'utf8'), 'unchanged');
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    await it('recovers an interrupted restore without ever creating an empty target', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-restore-crash-'));
+        const source = new EventStore(storeOptions(path.join(root, 'source')));
+        source.append(event('event-restore-source'));
+        const backup = createBackup({ store: source, encryptionKey: KEY, partition: 'restore-p', backupDir: path.join(root, 'backups'),
+            now: () => 1700000000999, minFreeBytes: 0 });
+        const target = path.join(root, 'target');
+        const active = new EventStore(storeOptions(target));
+        active.append(event('event-active'));
+        assert.throws(() => restoreBackup({ backupPath: backup.path, targetDir: target, encryptionKey: KEY, partition: 'restore-p', replace: true,
+            fault: (stage) => { if (stage === 'after_active_rename') { const e = new Error('simulated power loss'); e.code = 'restore_interrupted_for_test'; throw e; } } }));
+        assert.strictEqual(fs.existsSync(target), false);
+        assert.deepStrictEqual(recoverInterruptedRestore(target), { recovered: true, action: 'rollback_restored' });
+        assert.deepStrictEqual(new EventStore(storeOptions(target)).pending().map((e) => e.id), ['event-active']);
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    await it('preflights backup reserve, retains active health, and avoids destination collisions', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-backup-space-'));
+        const store = new EventStore(storeOptions(path.join(root, 'source')));
+        store.append(event('event-space'));
+        const options = { store, encryptionKey: KEY, partition: 'space-p', backupDir: path.join(root, 'backups'), now: () => 7,
+            diskFreeBytes: () => 0, minFreeBytes: 1 };
+        assert.throws(() => createBackup(options), /free space/);
+        assert.strictEqual(store.readOnly, false);
+        const good = createBackup(Object.assign({}, options, { diskFreeBytes: () => Number.MAX_SAFE_INTEGER, minFreeBytes: 0 }));
+        assert.throws(() => createBackup(Object.assign({}, options, { backupPath: good.path, diskFreeBytes: () => Number.MAX_SAFE_INTEGER, minFreeBytes: 0 })), /already exists/);
+        assert.strictEqual(good.backup_count, 1);
+        assert.ok(good.backup_bytes > 0);
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    await it('leaves the active store reserve plus room for the next offline write', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-backup-headroom-'));
+        let free = 16 * 1024 * 1024;
+        const sourceDir = path.join(root, 'source');
+        const store = new EventStore(storeOptions(sourceDir, {
+            minFreeBytes: 4096,
+            diskFreeBytes: function () { return free; },
+        }));
+        store.append(event('event-headroom-1'));
+        const backup = createBackup({
+            store,
+            encryptionKey: KEY,
+            partition: 'headroom-p',
+            backupDir: path.join(root, 'backups'),
+            diskFreeBytes: function () { return free; },
+            minFreeBytes: 4096,
+            operationalMarginBytes: 1024 * 1024,
+        });
+        free -= backup.backup_bytes;
+        assert.doesNotThrow(() => store.append(event('event-headroom-2')));
+
+        fs.rmSync(path.join(root, 'backups'), { recursive: true, force: true });
+        fs.mkdirSync(path.join(root, 'backups'));
+        free = backup.backup_bytes + store.minFreeBytes + 1024 * 1024;
+        assert.throws(() => createBackup({
+            store,
+            encryptionKey: KEY,
+            partition: 'headroom-p',
+            backupDir: path.join(root, 'backups'),
+            diskFreeBytes: function () { return free; },
+            minFreeBytes: store.minFreeBytes,
+            operationalMarginBytes: 1024 * 1024,
+        }), /free space/);
+        fs.rmSync(root, { recursive: true, force: true });
     });
 
     await it('coalesces concurrent cloud drains into one request', async function () {

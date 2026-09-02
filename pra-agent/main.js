@@ -20,6 +20,7 @@ const { EventStore } = require('./src/local-core/event-store');
 const { capabilities: coreCapabilities } = require('./src/local-core/protocol');
 const { CloudSyncClient } = require('./src/local-core/cloud-sync');
 const { loadOrCreateCoreKey } = require('./src/local-core/key-store');
+const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
@@ -322,6 +323,7 @@ let localCore = null;
 let coreRuntime = null;
 let coreTimer = null;
 let coreStartupError = null;
+let coreBackupTelemetry = { last_success_at: null, last_failure_code: null, last_failure_at: null, backup_count: 0, backup_bytes: 0 };
 
 // Core is server-gated, not controlled by a hidden local preference. Until an
 // authenticated heartbeat explicitly advertises it, no journal, timer or cloud
@@ -383,6 +385,7 @@ function startCoreForHeartbeat(config, heartbeat) {
       dataDir: path.join(app.getPath('userData'), 'local-core'),
       safeStorage,
     });
+    recoverInterruptedRestore(path.join(app.getPath('userData'), 'local-core', partition));
     store_ = new EventStore({
       dataDir: path.join(app.getPath('userData'), 'local-core', partition),
       encryptionKey: encryption.key,
@@ -400,6 +403,30 @@ function startCoreForHeartbeat(config, heartbeat) {
     };
     console.log('[local-core] startup refused:', coreStartupError.message);
     return;
+  }
+  // A backup is strictly best effort: a healthy journal must continue serving
+  // offline writes and syncing even if disk/backup maintenance is unavailable.
+  // Do not log exception text here; paths and filesystem details are telemetry
+  // sensitive. Corrupt/read-only stores are intentionally never copied.
+  if (!store_.readOnly) {
+    try {
+      const retained = Number(store.get('localCoreBackupMaxRetained'));
+      const backupResult = createBackup({
+        store: store_,
+        encryptionKey: encryption.key,
+        encryptionKeyId: encryption.keyId,
+        partition,
+        backupDir: path.join(app.getPath('userData'), 'local-core-backups'),
+        automatic: true,
+        maxRetained: Number.isInteger(retained) && retained >= 0 ? retained : 7,
+      });
+      coreBackupTelemetry = { last_success_at: new Date().toISOString(), last_failure_code: null, last_failure_at: null,
+        backup_count: backupResult.backup_count, backup_bytes: backupResult.backup_bytes };
+    } catch (e) {
+      coreBackupTelemetry = Object.assign({}, coreBackupTelemetry, { last_failure_code: 'local_core_backup_failed',
+        last_failure_at: new Date().toISOString() });
+      console.log('[local-core] backup failed: local_core_backup_failed');
+    }
   }
   const runtime = {
     key,
@@ -420,7 +447,7 @@ function startCoreForHeartbeat(config, heartbeat) {
   coreRuntime = runtime;
   localCore = {
     append: (event) => runtime.store.append(event),
-    status: () => Object.assign({}, runtime.store.status(), { sync: runtime.client.status() }),
+    status: () => Object.assign({}, runtime.store.status(), { sync: runtime.client.status(), backup: coreBackupTelemetry }),
     capabilities: () => coreCapabilities(),
   };
   scheduleCoreSync(0);
@@ -815,6 +842,13 @@ if (!gotInstanceLock) {
         out.local_core_read_only = coreStatus.read_only ? 1 : 0;
         out.local_core_storage_full = coreStatus.storage_full ? 1 : 0;
       }
+      // Backup telemetry deliberately contains only aggregate status: no
+      // filesystem paths, partition identity, journal content, or key material.
+      out.local_core_backup_last_success_at = coreBackupTelemetry.last_success_at;
+      out.local_core_backup_last_failure_code = coreBackupTelemetry.last_failure_code;
+      out.local_core_backup_last_failure_at = coreBackupTelemetry.last_failure_at;
+      out.local_core_backup_count = coreBackupTelemetry.backup_count;
+      out.local_core_backup_bytes = coreBackupTelemetry.backup_bytes;
       return out;
     });
 

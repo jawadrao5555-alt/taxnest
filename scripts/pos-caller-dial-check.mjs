@@ -464,7 +464,17 @@ try {
     check(!(s.toast.show && s.toast.message === s.TXT.dialFailed), 'no error toast — the cashier gets the number, not a dead end');
 
     const card = page.locator('[x-show="callerDialFallback"]');
-    check(await card.isVisible(), 'the fallback card is on screen');
+    // We waited on the Alpine STATE above, but x-show + x-transition only
+    // unhide the element on the next tick — asking the DOM straight away
+    // caught it mid-flip and failed a deploy over a race in this check, not a
+    // regression in the screen. Wait for the card, then judge it.
+    let cardOnScreen = true;
+    try {
+        await card.waitFor({ state: 'visible', timeout: 5000 });
+    } catch {
+        cardOnScreen = false;
+    }
+    check(cardOnScreen, 'the fallback card is on screen');
     const shown = await card.locator('p.text-2xl').first();
     check((await shown.innerText()).trim() === setup.display_phone, 'the card shows the ENLARGED number',
         `rendered "${(await shown.innerText()).trim()}"`);

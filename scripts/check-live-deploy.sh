@@ -88,8 +88,8 @@ if git merge-base --is-ancestor "$LIVE_HEAD" "$LOCAL_HEAD" 2>/dev/null; then
   echo "check-live-deploy: DEPLOY GAP — live is $BEHIND commit(s) behind workspace." >&2
   echo "  workspace HEAD: $LOCAL_HEAD" >&2
   echo "  live HEAD:      $LIVE_HEAD" >&2
-  echo "  Fix: git push origin HEAD:main, then run the cPanel deploy runbook" >&2
-  echo "  (see .agents/memory/cpanel-deployment.md — pull, migrate --force, caches, opcache reset)." >&2
+  echo "  Fix: bash scripts/deploy-live.sh (pull, migrate --force, caches," >&2
+  echo "  OPcache reset, queue restart — see .agents/memory/islamabad-vps-stack.md)." >&2
   exit 1
 fi
 
@@ -122,5 +122,5 @@ if [ -f scripts/lib/deploy-reconcile.sh ]; then
 fi
 echo "check-live-deploy: live HEAD ($LIVE_HEAD) is not an ancestor of workspace HEAD ($LOCAL_HEAD)." >&2
 echo "  Origin carries unique content or live has REAL drift — investigate before deploying" >&2
-echo "  (see .agents/memory/cpanel-deployment.md). deploy-live.sh will also fail loudly on this." >&2
+echo "  (see .agents/memory/deploy-toolchain-retarget.md). deploy-live.sh will also fail loudly on this." >&2
 exit 2

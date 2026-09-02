@@ -303,6 +303,20 @@ class PosWaiterMultiOrderPickerTest extends TestCase
         $this->assertStringContainsString('tableActionFor && tableActionFor.order_id', $blade);
     }
 
+    public function test_waiter_network_reads_have_timeout_and_honest_retry_states(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/waiter.blade.php'));
+
+        // A stalled request must leave Loading; every waiter request uses the
+        // same abortable helper rather than a raw fetch.
+        $this->assertStringContainsString('async _fetchWithTimeout(url, options = {}, timeoutMs = 12000)', $blade);
+        $this->assertStringNotContainsString("const res = await fetch(", $blade);
+        $this->assertStringContainsString('finally {', $blade);
+        $this->assertStringContainsString('this.myOrdersError', $blade);
+        $this->assertStringContainsString('retryMyOrders()', $blade);
+        $this->assertStringContainsString('this._tableRequestSerial', $blade);
+    }
+
     // ── 3: append hits ONLY the chosen order ─────────────────────────────
 
     public function test_append_items_targets_only_the_chosen_order(): void

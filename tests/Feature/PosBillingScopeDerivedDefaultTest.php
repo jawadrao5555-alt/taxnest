@@ -103,6 +103,23 @@ class PosBillingScopeDerivedDefaultTest extends TestCase
             $table->timestamps();
         });
 
+        // AuditLogService is invoked by the cashier permission update path.
+        // Keep this fixture aligned with the production audit_logs contract so
+        // the test exercises the request outcome instead of failing on setup.
+        Schema::create('audit_logs', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('action');
+            $table->string('entity_type');
+            $table->unsignedBigInteger('entity_id')->nullable();
+            $table->json('old_values')->nullable();
+            $table->json('new_values')->nullable();
+            $table->string('ip_address')->nullable();
+            $table->string('sha256_hash');
+            $table->timestamp('created_at')->nullable();
+        });
+
         // ── pos_transactions ─────────────────────────────────────────────────
         Schema::create('pos_transactions', function (Blueprint $table) {
             $table->id();

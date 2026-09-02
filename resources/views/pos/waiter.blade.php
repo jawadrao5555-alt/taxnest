@@ -504,7 +504,11 @@
             </div>
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
                 <div x-show="myOrdersLoading" class="text-center py-8 text-sm text-gray-400">{{ __('pos.loading_ellipsis') }}</div>
-                <div x-show="!myOrdersLoading && myOrders.length === 0" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_open_orders_settled') }}</div>
+                <div x-show="!myOrdersLoading && myOrdersError" class="text-center py-6 px-4">
+                    <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.my_orders_offline') }}</p>
+                    <button type="button" @click="retryMyOrders()" class="mt-3 px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold active:scale-95">{{ __('pos.my_orders_retry') }}</button>
+                </div>
+                <div x-show="!myOrdersLoading && !myOrdersError && myOrders.length === 0" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_open_orders_settled') }}</div>
                 <template x-for="o in myOrders" :key="o.id">
                     <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
                         <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -752,6 +756,8 @@ function waiterApp() {
         showThemeTab: false,
         myOrders: [],
         myOrdersLoading: false,
+         myOrdersError: false,
+         _myOrdersRequest: null,
         appendOrderId: null,
         appendOrderNumber: '',
         appendTableLabel: '',    // Task 526: append banner mein table number dikhao (parcel = khali)
@@ -765,6 +771,7 @@ function waiterApp() {
         cancelAsk: null,        // Task 412: waiter self-cancel confirm modal (order object)
         cancelBusy: false,
         shiftTablesLoading: false,
+         _tableRequestSerial: 0,
         toast: '',
         toastType: 'success',
         _toastTimer: null,
@@ -814,7 +821,7 @@ function waiterApp() {
         async checkVersion() {
             if (this.updateAvailable || document.hidden) return;
             try {
-                const res = await fetch('{{ route("pos.waiter.version") }}?_=' + Date.now(), { cache: 'no-store' });
+                const res = await this._fetchWithTimeout('{{ route("pos.waiter.version") }}?_=' + Date.now(), { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json();
                 if (data.v && this.appVersion !== 'unknown' && data.v !== this.appVersion) {
@@ -964,7 +971,7 @@ function waiterApp() {
             const prev = this.userGridPrefs[key];
             this.userGridPrefs[key] = newVisible ? 1 : 0; // optimistic
             try {
-                const res = await fetch('/pos/grid-prefs/toggle', {
+                const res = await this._fetchWithTimeout('/pos/grid-prefs/toggle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     body: JSON.stringify({ item_type: 'product', item_id: p.id, visible: newVisible })
@@ -980,7 +987,7 @@ function waiterApp() {
             if (this.gridPrefBusy) return;
             this.gridPrefBusy = true;
             try {
-                const res = await fetch('/pos/grid-prefs/reset', {
+                const res = await this._fetchWithTimeout('/pos/grid-prefs/reset', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
@@ -1004,7 +1011,7 @@ function waiterApp() {
             if (this.styleBusy) return;
             this.styleBusy = true;
             try {
-                const res = await fetch('{{ route('pos.waiter.style') }}', {
+                const res = await this._fetchWithTimeout('{{ route('pos.waiter.style') }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     body: JSON.stringify({ style }),
@@ -1051,12 +1058,15 @@ function waiterApp() {
             return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
         },
         async openTables() {
+            if (this.tablesLoading) return;
             this.showTables = true;
             this.tablesLoading = true;
+            const requestSerial = ++this._tableRequestSerial;
             try {
                 const headers = { 'Accept': 'application/json' };
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
+                if (requestSerial !== this._tableRequestSerial) return;
                 if (res.status !== 304) {
                     if (!res.ok) {
                         // Net/server down: purani list ZINDA rakho aur saaf batao ke
@@ -1074,9 +1084,10 @@ function waiterApp() {
                     this.tablesError = false;
                 }
             } catch (e) {
-                this.tablesError = true;
+                if (requestSerial === this._tableRequestSerial) this.tablesError = true;
+            } finally {
+                if (requestSerial === this._tableRequestSerial) this.tablesLoading = false;
             }
-            this.tablesLoading = false;
         },
         pickTable(t) {
             if (t.status === 'occupied') return;
@@ -1085,15 +1096,38 @@ function waiterApp() {
         },
 
         async loadMyOrders() {
-            try {
-                const res = await fetch('/pos/waiter/api/orders', { headers: { 'Accept': 'application/json' } });
-                if (res.ok) this.myOrders = await res.json();
-            } catch (e) { /* silent */ }
+            if (this._myOrdersRequest) return this._myOrdersRequest;
+            this._myOrdersRequest = (async () => {
+                try {
+                    const res = await this._fetchWithTimeout('/pos/waiter/api/orders', { headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    const orders = await res.json();
+                    if (!Array.isArray(orders)) throw new Error('Invalid orders response');
+                    this.myOrders = orders;
+                    this.myOrdersError = false;
+                    return true;
+                } catch (e) {
+                    // Do not replace the last good list with an empty one. A
+                    // timed-out poll is a connection problem, not proof that
+                    // the waiter has no open orders.
+                    this.myOrdersError = true;
+                    return false;
+                }
+            })().finally(() => {
+                this._myOrdersRequest = null;
+                this.myOrdersLoading = false;
+            });
+            return this._myOrdersRequest;
         },
         openMyOrders() {
             this.showMyOrders = true;
             this.myOrdersLoading = true;
-            this.loadMyOrders().finally(() => { this.myOrdersLoading = false; });
+            this.loadMyOrders();
+        },
+        retryMyOrders() {
+            if (this.myOrdersLoading) return;
+            this.myOrdersLoading = true;
+            this.loadMyOrders();
         },
 
         // Waiter self-cancel (Task 412): apna held, abhi-tak-un-settled order
@@ -1115,7 +1149,7 @@ function waiterApp() {
             const voidWin = window.open('', 'waiter-void-print', 'width=380,height=620');
 
             try {
-                const res = await fetch('/pos/waiter/orders/' + this.cancelAsk.id + '/cancel', {
+                const res = await this._fetchWithTimeout('/pos/waiter/orders/' + this.cancelAsk.id + '/cancel', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
@@ -1254,7 +1288,7 @@ function waiterApp() {
             if (this.shiftBusy || !this.shiftFor) return;
             this.shiftBusy = true;
             try {
-                const res = await fetch('/pos/waiter/orders/' + this.shiftFor.id + '/shift-table', {
+                 const res = await this._fetchWithTimeout('/pos/waiter/orders/' + this.shiftFor.id + '/shift-table', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     body: JSON.stringify({ table_id: t.id }),
@@ -1306,7 +1340,7 @@ function waiterApp() {
                 hold_uuid: this.holdAttemptUuid,
             };
             try {
-                const res = await fetch(url, {
+                const res = await this._fetchWithTimeout(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     body: JSON.stringify(body),
@@ -1418,17 +1452,22 @@ function waiterApp() {
         // Silent background table refresh — updates this.tables without opening the
         // showTables modal (used by the buttons-style poll and post-send reset).
         async reloadTablesQuiet() {
+            const requestSerial = ++this._tableRequestSerial;
             try {
                 const headers = { 'Accept': 'application/json' };
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
+                if (requestSerial !== this._tableRequestSerial) return;
                 if (res.status === 304) { this.tablesError = false; return; }
                 if (!res.ok) { this.tablesError = true; return; }
                 const etag = res.headers.get('ETag');
                 if (etag) this._tableEtag = etag;
                 this.tables = await res.json();
                 this.tablesError = false;
-            } catch (e) { this.tablesError = true; /* stale data stays until next poll */ }
+            } catch (e) {
+                if (requestSerial === this._tableRequestSerial) this.tablesError = true;
+                /* stale data stays until next poll */
+            }
         },
 
         // Buttons-view ka "dobara koshish karein" — modal khole baghair list refresh.

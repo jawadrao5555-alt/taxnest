@@ -2425,6 +2425,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'no_movements_found' => 'Koi movements nahi milin',
     'no_movements_yet' => 'Abhi koi movements record nahi huin',
     'no_open_orders_settled' => 'Koi open orders nahi — sab settle ho gaye hain.',
+    'my_orders_offline' => 'Open orders load nahi ho sake — server se rabta nahi ho raha.',
+    'my_orders_retry' => 'Dobara koshish karein',
     'no_orders' => 'Koi orders nahi',
     'no_orders_today' => 'Aaj koi orders nahi',
     'no_orders_yet' => 'Abhi koi orders nahi',

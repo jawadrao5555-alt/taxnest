@@ -1,5 +1,11 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## Unreleased — Local Core foundation
+
+- Added a default-off, pure-Node Local TaxNest Core foundation behind both the existing Offline Mode switch and an authenticated per-company/device heartbeat rollout gate: authenticated encrypted append-only journals, durable ordered cloud outbox, scoped/idempotent events, fail-closed key handling, torn-write recovery, authenticated same-install backups, health telemetry, and clean shutdown.
+- Immutable events can enter only through the owning Electron POS window's authenticated IPC bridge; no sensitive Core HTTP/LAN route was added. Cloud draining uses the heartbeat-authenticated agent credentials and stops when the rollout/device gate is removed.
+- This is storage and lifecycle groundwork only. It does **not** claim full offline POS, expose sensitive LAN APIs, or change established waiter/Caller ID behavior when Offline Mode is off.
+
 ## v1.11.0 (2026-08-29)
 **LAN Mode: juday huay devices ab naam ke sath dikhte hain, har ek alag hataya ja sakta hai**
 

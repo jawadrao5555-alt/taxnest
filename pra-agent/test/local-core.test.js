@@ -9,6 +9,9 @@ const { loadOrCreateCoreKey } = require('../src/local-core/key-store');
 const { validateEvent, PROTOCOL_VERSION } = require('../src/local-core/protocol');
 const { CloudSyncClient } = require('../src/local-core/cloud-sync');
 const { createBackup, restoreBackup, recoverInterruptedRestore } = require('../src/local-core/backup');
+const { LocalCoreLifecycle, heartbeatAllowsCore } = require('../src/local-core/lifecycle');
+const { createEventIngress } = require('../src/local-core/ingress');
+const { isCurrentHeartbeatRequest } = require('../src/heartbeat-guard');
 
 const KEY = Buffer.from('0123456789abcdef0123456789abcdef');
 function storeOptions(dataDir, extra) {
@@ -21,7 +24,11 @@ async function it(name, fn) {
     catch (e) { process.exitCode = 1; console.error('  FAIL  ' + name + ': ' + e.message); }
 }
 function event(id) {
-    return { v: PROTOCOL_VERSION, id: id, type: 'sale.created', at_ms: 1700000000000, payload: { sale_id: 12 } };
+    return {
+        v: PROTOCOL_VERSION, id: id, idempotency_key: 'idem-' + id,
+        scope: { company_id: 'company-1', branch_id: 'branch-1', device_id: 'device-1', user_id: 'user-1' },
+        type: 'sale.created', at_ms: 1700000000000, payload: { sale_id: 12 },
+    };
 }
 
 function fakeSafeStorage() {
@@ -96,6 +103,90 @@ function fakeSafeStorage() {
         fs.rmSync(root, { recursive: true, force: true });
     });
 
+    await it('does no Core work while Offline Mode is off and closes cleanly', function () {
+        let opens = 0;
+        let closes = 0;
+        const lifecycle = new LocalCoreLifecycle({
+            open: function () { opens++; return { enabled: true, pending_count: 0 }; },
+            close: function () { closes++; },
+        });
+        assert.deepStrictEqual(lifecycle.apply(false), { enabled: false });
+        assert.strictEqual(opens, 0, 'disabled compatibility path must not open storage');
+        assert.strictEqual(closes, 0, 'disabled compatibility path must not manufacture a close');
+        assert.strictEqual(lifecycle.apply(true).enabled, true);
+        assert.strictEqual(opens, 1);
+        lifecycle.close();
+        assert.strictEqual(closes, 1);
+        assert.deepStrictEqual(lifecycle.status(), { enabled: false, active: false });
+    });
+
+    await it('requires a positive authenticated heartbeat gate and honors kill switch/scope', function () {
+        const config = { companyId: 'company-1', deviceUid: 'device-1' };
+        assert.strictEqual(heartbeatAllowsCore(config, null), false);
+        assert.strictEqual(heartbeatAllowsCore(config, {}), false);
+        assert.strictEqual(heartbeatAllowsCore(config, { local_core: true }), false,
+            'bare capability is not device registration');
+        assert.strictEqual(heartbeatAllowsCore(config, { local_core: true, local_core_kill_switch: true }), false);
+        assert.strictEqual(heartbeatAllowsCore(config, { local_core_enabled: false, local_core: true }), false);
+        assert.strictEqual(heartbeatAllowsCore(config, {
+            local_core: { enabled: true, device_registered: true, company_id: 'company-1', device_uid: 'device-1' },
+        }), true);
+        assert.strictEqual(heartbeatAllowsCore(config, {
+            local_core: { enabled: true, device_registered: true, company_id: 'company-2', device_uid: 'device-1' },
+        }), false);
+        assert.strictEqual(heartbeatAllowsCore(config, {
+            local_core: { enabled: true, device_registered: false, company_id: 'company-1', device_uid: 'device-1' },
+        }), false);
+    });
+
+    await it('closes on gate loss, agent stop, and company/device switch', function () {
+        let opens = 0;
+        let closes = 0;
+        const lifecycle = new LocalCoreLifecycle({
+            open: function () { opens++; return { enabled: true }; },
+            close: function () { closes++; },
+        });
+        const a = { companyId: 'company-a', deviceUid: 'device-a' };
+        lifecycle.apply(heartbeatAllowsCore(a, { local_core: { enabled: true, device_registered: true, company_id: 'company-a', device_uid: 'device-a' } }));
+        assert.strictEqual(opens, 1);
+        lifecycle.apply(heartbeatAllowsCore(a, { local_core: false })); // rollout gate loss
+        assert.strictEqual(closes, 1);
+        lifecycle.apply(heartbeatAllowsCore(a, { local_core: { enabled: true, device_registered: true, company_id: 'company-a', device_uid: 'device-a' } }));
+        lifecycle.apply(heartbeatAllowsCore(
+            { companyId: 'company-b', deviceUid: 'device-b' },
+            { local_core: { enabled: true, company_id: 'company-a', device_uid: 'device-a' } }
+        )); // stale heartbeat after company/device switch
+        assert.strictEqual(closes, 2);
+        lifecycle.apply(heartbeatAllowsCore(a, { local_core: { enabled: true, device_registered: true, company_id: 'company-a', device_uid: 'device-a' } }));
+        lifecycle.close(); // agent stop
+        assert.strictEqual(closes, 3);
+    });
+
+    await it('discards delayed stopped/switched heartbeat responses before Core can open', function () {
+        let opens = 0;
+        let drains = 0;
+        const lifecycle = new LocalCoreLifecycle({
+            open: () => { opens++; drains++; return { enabled: true }; },
+            close: () => {},
+        });
+        const companyA = { companyId: 'company-a', deviceUid: 'device-a' };
+        const responseA = { local_core: { enabled: true, device_registered: true, company_id: 'company-a', device_uid: 'device-a' } };
+        // Stop while A's HTTP request is outstanding: its eventual response is ignored.
+        let state = { runGen: 2, currentConfig: companyA, running: false };
+        if (isCurrentHeartbeatRequest(1, companyA, state) && heartbeatAllowsCore(companyA, responseA)) lifecycle.apply(true);
+        assert.strictEqual(opens, 0);
+        // A -> B switch before A resolves: A may not authorize B's runtime.
+        const companyB = { companyId: 'company-b', deviceUid: 'device-b' };
+        state = { runGen: 2, currentConfig: companyB, running: true };
+        if (isCurrentHeartbeatRequest(1, companyA, state) && heartbeatAllowsCore(companyA, responseA)) lifecycle.apply(true);
+        assert.strictEqual(opens, 0);
+        // Only the current B request with exact B registration can open/drain.
+        const responseB = { local_core: { enabled: true, device_registered: true, company_id: 'company-b', device_uid: 'device-b' } };
+        if (isCurrentHeartbeatRequest(2, companyB, state) && heartbeatAllowsCore(companyB, responseB)) lifecycle.apply(true);
+        assert.strictEqual(opens, 1);
+        assert.strictEqual(drains, 1);
+    });
+
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-'));
     await it('is durable, append-only, and idempotent across restart', function () {
         const store = new EventStore(storeOptions(dir));
@@ -112,6 +203,48 @@ function fakeSafeStorage() {
         const bytes = fs.readFileSync(path.join(dir, 'events.ndjson'));
         assert.strictEqual(bytes.subarray(0, 4).toString(), 'PRAE');
         assert.strictEqual(bytes.includes(Buffer.from('sale.created')), false, 'event must not be plaintext at rest');
+    });
+
+    await it('rejects idempotency conflicts and isolates pending/ack by scope', function () {
+        const scopedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-scoped-'));
+        const store = new EventStore(storeOptions(scopedDir, {
+            authorityScope: { company_id: 'company-1', device_id: 'device-1' },
+        }));
+        const first = event('event-scope-1');
+        const second = { ...event('event-scope-2'), scope: { ...event('event-scope-2').scope, branch_id: 'branch-2', user_id: 'user-2' } };
+        store.append(first);
+        store.append(second);
+        assert.throws(() => store.append({ ...event('event-scope-3'), idempotency_key: first.idempotency_key }),
+            (e) => e.code === 'idempotency_conflict');
+        assert.throws(() => store.append({ ...event('event-scope-4'), scope: { ...first.scope, company_id: 'company-2' } }),
+            (e) => e.code === 'scope_mismatch');
+        assert.deepStrictEqual(store.pending(100, { branch_id: 'branch-2' }).map((e) => e.id), ['event-scope-2']);
+        assert.strictEqual(store.acknowledge(['event-scope-1', 'event-scope-2'], { branch_id: 'branch-1' }), 1);
+        assert.deepStrictEqual(store.pending().map((e) => e.id), ['event-scope-2']);
+        fs.rmSync(scopedDir, { recursive: true, force: true });
+    });
+
+    await it('accepts IPC ingress only from its authenticated owner while Core is gated on', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-ingress-'));
+        const store = new EventStore(storeOptions(root, {
+            authorityScope: { company_id: 'company-1', device_id: 'device-1' },
+        }));
+        const owner = {};
+        let gatedStore = null;
+        let wakes = 0;
+        const ingress = createEventIngress({
+            isAuthorized: (context) => context === owner,
+            storeProvider: () => gatedStore,
+            onAccepted: () => { wakes++; },
+        });
+        assert.strictEqual(ingress({}, event('event-ingress-1')).error, 'unauthorized');
+        assert.strictEqual(ingress(owner, event('event-ingress-1')).error, 'core_disabled');
+        gatedStore = store;
+        assert.deepStrictEqual(ingress(owner, event('event-ingress-1')),
+            { ok: true, id: 'event-ingress-1', duplicate: false });
+        assert.strictEqual(ingress(owner, event('event-ingress-1')).duplicate, true);
+        assert.strictEqual(wakes, 2);
+        fs.rmSync(root, { recursive: true, force: true });
     });
 
     await it('leaves authenticated corruption in place and refuses new writes', function () {
@@ -314,6 +447,35 @@ function fakeSafeStorage() {
         fs.rmSync(root, { recursive: true, force: true });
     });
 
+    await it('preserves the last known-good automatic backup when replacement write fails', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-backup-fail-'));
+        const store = new EventStore(storeOptions(path.join(root, 'source')));
+        store.append(event('event-backup-safe'));
+        const backupDir = path.join(root, 'backups');
+        const first = createBackup({ store, encryptionKey: KEY, partition: 'safe-p', backupDir,
+            automatic: true, maxRetained: 1, now: () => 1, minFreeBytes: 0 });
+        const oldBytes = fs.readFileSync(first.path);
+        const originalWrite = fs.writeSync;
+        fs.writeSync = function (fd, buffer) {
+            if (Buffer.isBuffer(buffer) && buffer.subarray(0, 8).toString() === 'PRABACK1') {
+                const error = new Error('injected full disk');
+                error.code = 'ENOSPC';
+                throw error;
+            }
+            return originalWrite.apply(fs, arguments);
+        };
+        try {
+            assert.throws(() => createBackup({ store, encryptionKey: KEY, partition: 'safe-p', backupDir,
+                automatic: true, maxRetained: 1, now: () => 2, minFreeBytes: 0 }), (e) => e.code === 'ENOSPC');
+        } finally {
+            fs.writeSync = originalWrite;
+        }
+        assert.deepStrictEqual(fs.readFileSync(first.path), oldBytes);
+        assert.deepStrictEqual(fs.readdirSync(backupDir).filter((name) => name.endsWith('.prab')),
+            [path.basename(first.path)]);
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
     await it('leaves the active store reserve plus room for the next offline write', function () {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-backup-headroom-'));
         let free = 16 * 1024 * 1024;
@@ -375,12 +537,36 @@ function fakeSafeStorage() {
             version: 1,
             device_uid: 'dev-test-1',
             events: [
-                { event_id: 'event-0003', event_type: 'sale.created', occurred_at: '2023-11-14T22:13:20.000Z', idempotency_key: 'event-0003', payload: { sale_id: 12 } },
-                { event_id: 'event-0004', event_type: 'sale.created', occurred_at: '2023-11-14T22:13:20.000Z', idempotency_key: 'event-0004', payload: { sale_id: 12 } },
+                { event_id: 'event-0003', event_type: 'sale.created', occurred_at: '2023-11-14T22:13:20.000Z', idempotency_key: 'idem-event-0003',
+                    scope: { company_id: 'company-1', branch_id: 'branch-1', device_id: 'device-1', user_id: 'user-1' }, payload: { sale_id: 12 } },
+                { event_id: 'event-0004', event_type: 'sale.created', occurred_at: '2023-11-14T22:13:20.000Z', idempotency_key: 'idem-event-0004',
+                    scope: { company_id: 'company-1', branch_id: 'branch-1', device_id: 'device-1', user_id: 'user-1' }, payload: { sale_id: 12 } },
             ],
         });
         assert.strictEqual(store.status().pending_count, 1, 'unknown ACK must not mark arbitrary entries sent');
         fs.rmSync(syncDir, { recursive: true, force: true });
+    });
+    await it('never drains until the heartbeat gate registers this company/device', async function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-gated-sync-'));
+        const store = new EventStore(storeOptions(root));
+        store.append(event('event-gated-sync'));
+        let calls = 0;
+        const client = new CloudSyncClient({
+            store, deviceUid: 'device-1',
+            request: async function (wire) {
+                calls++;
+                return { acknowledged_ids: wire.events.map((e) => e.event_id) };
+            },
+        });
+        const config = { companyId: 'company-1', deviceUid: 'device-1' };
+        if (heartbeatAllowsCore(config, { local_core: false })) await client.sync();
+        assert.strictEqual(calls, 0);
+        if (heartbeatAllowsCore(config, {
+            local_core: { enabled: true, device_registered: true, company_id: 'company-1', device_uid: 'device-1' },
+        })) await client.sync();
+        assert.strictEqual(calls, 1);
+        assert.strictEqual(store.pending().length, 0);
+        fs.rmSync(root, { recursive: true, force: true });
     });
     fs.rmSync(dir, { recursive: true, force: true });
     console.log(passed + ' passed' + (process.exitCode ? ' — WITH FAILURES' : ''));

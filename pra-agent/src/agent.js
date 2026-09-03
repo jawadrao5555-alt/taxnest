@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { startPrinting, stopPrinting, getPrintStatus } = require('./printer');
+const { isCurrentHeartbeatRequest } = require('./heartbeat-guard');
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -44,9 +45,6 @@ function setLanBridge(fn) {
   lanBridgeProvider = typeof fn === 'function' ? fn : null;
 }
 
-// Local Core gate/lifecycle is owned by main.js (where the app data directory
-// and device identity exist). Agent merely supplies authenticated heartbeat
-// capability responses and clean stop/switch notifications.
 function setCoreBridge(fn) {
   coreBridgeProvider = typeof fn === 'function' ? fn : null;
 }
@@ -248,41 +246,51 @@ async function heartbeat() {
   // Overlap guard: a slow beat (10s timeout) must never stack with the next
   // tick or a wake/retry-triggered beat.
   if (heartbeatInFlight) return;
-  heartbeatInFlight = true;
+  const activeConfig = currentConfig;
+  const requestConfig = Object.freeze({ ...activeConfig });
+  const requestGen = runGen;
+  const flight = { requestGen };
+  heartbeatInFlight = flight;
+  const stillCurrent = () => isCurrentHeartbeatRequest(requestGen, activeConfig, {
+    runGen, currentConfig, running: status.running,
+  });
   try {
     let extra = {};
     if (heartbeatExtraProvider) {
       try { extra = heartbeatExtraProvider() || {}; } catch (e) { extra = {}; }
     }
     const res = await axios.post(
-      `${currentConfig.serverUrl}/heartbeat`,
+      `${requestConfig.serverUrl}/heartbeat`,
       {
-        version: currentConfig.appVersion || '1.0.0',
-        build: currentConfig.appBuild || null,
-        company_id: currentConfig.companyId,
+        version: requestConfig.appVersion || '1.0.0',
+        build: requestConfig.appBuild || null,
+        company_id: requestConfig.companyId,
         // Per-counter routing (v1.9.0): persistent device identity so the
         // server can tell multi-counter installs (same key) apart.
-        device_uid: currentConfig.deviceUid || null,
-        hostname: currentConfig.hostname || null,
+        device_uid: requestConfig.deviceUid || null,
+        hostname: requestConfig.hostname || null,
         // PC Name (v1.9.0): shopkeeper-entered friendly name ("Counter 1").
         // Sent only when non-blank; server never wipes an existing name on blank.
-        pc_name: currentConfig.pcName || null,
+        pc_name: requestConfig.pcName || null,
         ...extra,
       },
       {
-        headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
+        headers: { Authorization: `Bearer ${requestConfig.apiKey}` },
         timeout: 10000,
       }
     );
+    // A delayed response belongs to the config/generation that made it. It
+    // must not mark a replacement agent connected, invoke Core, or mutate any
+    // other status after stop or a company/device switch.
+    if (!stillCurrent()) return;
     status.connected = true;
     status.serverInfo = res.data.company;
     status.lastError = null;
     heartbeatRetryCount = 0;
     clearHeartbeatRetry();
     if (coreBridgeProvider) {
-      try { coreBridgeProvider(currentConfig, res.data || {}); } catch (e) {}
+      try { coreBridgeProvider(requestConfig, res.data || {}); } catch (e) {}
     }
-
     // Self-update: the server piggybacks the latest release info on every
     // heartbeat; main.js decides whether it is actually newer.
     if (updateCallback && res.data.agent_update) {
@@ -310,14 +318,15 @@ async function heartbeat() {
       syncOnce().catch(() => {});
     }
   } catch (e) {
+    if (!stillCurrent()) return;
     status.connected = false;
     status.lastError = `Heartbeat failed: ${e.message}`;
     log('Heartbeat failed:', e.message);
     scheduleHeartbeatRetry();
   } finally {
-    heartbeatInFlight = false;
+    if (heartbeatInFlight === flight) heartbeatInFlight = false;
   }
-  notify();
+  if (stillCurrent()) notify();
 }
 
 async function syncOnce() {
@@ -509,6 +518,9 @@ function stopAgent() {
     try { coreBridgeProvider(null, null); } catch (e) {}
   }
   runGen += 1; // invalidate any pending quick-retry timers
+  // Let a newly started configuration heartbeat immediately; an old request's
+  // finally block is identity-guarded and cannot clear the new flight.
+  heartbeatInFlight = false;
   clearHeartbeatRetry();
   heartbeatRetryCount = 0;
   if (pollInterval) {

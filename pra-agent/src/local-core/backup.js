@@ -66,7 +66,7 @@ function writeAll(fd, bytes) {
     }
 }
 
-function pruneAutomaticBackups(dir, partition, retain) {
+function pruneAutomaticBackups(dir, partition, retain, retainedByteCap) {
     if (!Number.isInteger(retain) || retain < 0) return;
     const prefix = 'local-core-' + partition + '-';
     const files = fs.readdirSync(dir)
@@ -74,7 +74,13 @@ function pruneAutomaticBackups(dir, partition, retain) {
         .map((name) => ({ name, stat: fs.statSync(path.join(dir, name)) }))
         .filter((item) => item.stat.isFile())
         .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs || b.name.localeCompare(a.name));
-    for (const item of files.slice(retain)) fs.unlinkSync(path.join(dir, item.name));
+    let total = files.reduce((n, item) => n + item.stat.size, 0);
+    for (let i = files.length - 1; i >= 1; i--) {
+        if (i >= retain || total > retainedByteCap) {
+            fs.unlinkSync(path.join(dir, files[i].name));
+            total -= files[i].stat.size;
+        }
+    }
     fsyncParent(path.join(dir, '.'));
 }
 
@@ -94,14 +100,10 @@ function prepareBackupSpace(dir, partition, needed, options) {
     const byteCap = Number.isInteger(opts.maxRetainedBytes) && opts.maxRetainedBytes >= 0
         ? opts.maxRetainedBytes : Number.MAX_SAFE_INTEGER;
     const entries = backupEntries(dir, partition);
-    let total = entries.reduce((n, item) => n + item.stat.size, 0);
-    // Prune before allocating space, retaining room for the backup being made.
-    while (entries.length >= retain || total + needed > byteCap) {
-        const old = entries.shift();
-        if (!old) break;
-        fs.unlinkSync(old.path); total -= old.stat.size;
-    }
-    if (retain === 0 || total + needed > byteCap) throw new Error('backup retention capacity exceeded');
+    const total = entries.reduce((n, item) => n + item.stat.size, 0);
+    // Never prune before publish: an ENOSPC or power loss while writing the
+    // replacement must leave every previously durable snapshot untouched.
+    if (retain === 0 || needed > byteCap) throw new Error('backup retention capacity exceeded');
     const configuredReserve = Number.isInteger(opts.minFreeBytes) && opts.minFreeBytes >= 0
         ? opts.minFreeBytes : 32 * 1024 * 1024;
     const storeReserve = opts.store && Number.isInteger(opts.store.minFreeBytes) && opts.store.minFreeBytes >= 0
@@ -185,7 +187,8 @@ function createBackup(options) {
         throw e;
     }
     if (opts.automatic === true) pruneAutomaticBackups(destinationDir, opts.partition,
-        Number.isInteger(opts.maxRetained) ? opts.maxRetained : 7);
+        Number.isInteger(opts.maxRetained) ? opts.maxRetained : 7,
+        Number.isInteger(opts.maxRetainedBytes) ? opts.maxRetainedBytes : Number.MAX_SAFE_INTEGER);
     const retained = backupEntries(destinationDir, opts.partition);
     return { path: output, manifest: JSON.parse(JSON.stringify(manifest)), backup_count: retained.length,
         backup_bytes: retained.reduce((n, item) => n + item.stat.size, 0), created_at_ms: manifest.created_at_ms };

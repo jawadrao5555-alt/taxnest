@@ -36,7 +36,8 @@ class CloudSyncClient {
                     event_id: e.id,
                     event_type: e.type,
                     occurred_at: new Date(e.at_ms).toISOString(),
-                    idempotency_key: e.id,
+                    idempotency_key: e.idempotency_key,
+                    scope: e.scope,
                     payload: e.payload,
                 })),
             });

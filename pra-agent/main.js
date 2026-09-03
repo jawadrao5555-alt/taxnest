@@ -17,9 +17,10 @@ const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridg
 const offlineSnapshot = require('./src/offline-snapshot');
 const { createLanServer } = require('./src/lan-server');
 const { EventStore } = require('./src/local-core/event-store');
-const { capabilities: coreCapabilities } = require('./src/local-core/protocol');
+const { heartbeatAllowsCore } = require('./src/local-core/lifecycle');
+const { SafeStorageKeyProvider, loadOrCreateCoreKey } = require('./src/local-core/key-store');
 const { CloudSyncClient } = require('./src/local-core/cloud-sync');
-const { loadOrCreateCoreKey } = require('./src/local-core/key-store');
+const { createEventIngress } = require('./src/local-core/ingress');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
@@ -319,25 +320,15 @@ function setPosSettings(next) {
 // ON = waiter tablets and the Caller ID phone can reach this PC by IP, so the
 // shop keeps working through an internet cut. See src/lan-server.js.
 let lanServer = null;
-let localCore = null;
 let coreRuntime = null;
 let coreTimer = null;
 let coreStartupError = null;
 let coreBackupTelemetry = { last_success_at: null, last_failure_code: null, last_failure_at: null, backup_count: 0, backup_bytes: 0 };
 
-// Core is server-gated, not controlled by a hidden local preference. Until an
-// authenticated heartbeat explicitly advertises it, no journal, timer or cloud
-// request exists: legacy agents remain opt-out by default.
-function heartbeatAllowsCore(heartbeat) {
-  const caps = heartbeat && heartbeat.capabilities;
-  return !!(heartbeat && (heartbeat.local_core === true || heartbeat.local_core_enabled === true ||
-    (caps && (caps.local_core === true || (Array.isArray(caps) && caps.indexOf('local_core') !== -1)))));
-}
-
 function stopCoreRuntime() {
   if (coreTimer) { clearTimeout(coreTimer); coreTimer = null; }
+  try { if (coreRuntime && coreRuntime.store) coreRuntime.store.close(); } catch (e) {}
   coreRuntime = null;
-  localCore = null;
 }
 
 function coreEndpoint(serverUrl) {
@@ -351,64 +342,61 @@ function scheduleCoreSync(delay) {
     const runtime = coreRuntime;
     if (!runtime) return;
     const result = await runtime.client.sync();
-    // A failed delivery stays append-only queued; gradually back off without
-    // making heartbeat or the legacy PRA lane wait on it.
+    if (runtime !== coreRuntime) return;
     runtime.failures = result.ok ? 0 : Math.min(runtime.failures + 1, 5);
     scheduleCoreSync(result.ok ? 30000 : Math.min(30000 * Math.pow(2, runtime.failures), 10 * 60 * 1000));
   }, delay);
 }
 
-function startCoreForHeartbeat(config, heartbeat) {
-  if (!config || !heartbeatAllowsCore(heartbeat)) {
-    stopCoreRuntime();
-    coreStartupError = null;
-    return;
-  }
+function openLocalCoreRuntime(config) {
   const companyId = String(config.companyId || '');
   const deviceUid = String(config.deviceUid || '');
-  if (!companyId || !deviceUid || !config.apiKey || !config.serverUrl) { stopCoreRuntime(); return; }
-  // A digest avoids unsafe path characters while guaranteeing an old company's
-  // journal is never selected under a newly logged-in company/key.
-  const partition = require('crypto').createHash('sha256').update(companyId + '\n' + deviceUid).digest('hex');
-  // Include a one-way key fingerprint so a regenerated credential replaces the
-  // request closure too; otherwise an existing runtime could retain old auth.
-  const credentialFingerprint = require('crypto').createHash('sha256').update(String(config.apiKey)).digest('hex');
-  const key = partition + '|' + config.serverUrl + '|' + credentialFingerprint;
-  if (coreRuntime && coreRuntime.key === key) {
+  if (!companyId || !deviceUid) {
+    stopCoreRuntime();
+    coreStartupError = { code: 'core_scope_unavailable', message: 'Local Core requires company and device identity',
+      at: new Date().toISOString() };
+    return { enabled: false, error: coreStartupError.code };
+  }
+  const crypto_ = require('crypto');
+  const partition = crypto_.createHash('sha256').update(companyId + '\n' + deviceUid).digest('hex');
+  const credentialFingerprint = crypto_.createHash('sha256').update(String(config.apiKey || '')).digest('hex');
+  const runtimeKey = partition + '|' + String(config.serverUrl || '') + '|' + credentialFingerprint;
+  if (coreRuntime && coreRuntime.key === runtimeKey) {
     scheduleCoreSync(0);
-    return;
+    return coreRuntime.store.status();
   }
   stopCoreRuntime();
-  let store_;
   try {
+    const root = path.join(app.getPath('userData'), 'local-core');
     const encryption = loadOrCreateCoreKey({
-      dataDir: path.join(app.getPath('userData'), 'local-core'),
-      safeStorage,
+      dataDir: root,
+      keyProvider: new SafeStorageKeyProvider(safeStorage),
     });
-    recoverInterruptedRestore(path.join(app.getPath('userData'), 'local-core', partition));
-    store_ = new EventStore({
-      dataDir: path.join(app.getPath('userData'), 'local-core', partition),
+    const partitionDir = path.join(root, partition);
+    recoverInterruptedRestore(partitionDir);
+    const store_ = new EventStore({
+      dataDir: partitionDir,
       encryptionKey: encryption.key,
       encryptionKeyId: encryption.keyId,
-      // No released shop build wrote the v1 format, but this allows internal
-      // pilot/dev data to be upgraded once instead of silently discarded.
-      allowPlaintextMigration: true,
+      authorityScope: { company_id: companyId, device_id: deviceUid },
     });
-    coreStartupError = null;
-  } catch (e) {
-    coreStartupError = {
-      code: 'core_secure_storage_unavailable',
-      message: String((e && e.message) || 'Local Core secure storage failed').slice(0, 240),
-      at: new Date().toISOString(),
+    if (store_.readOnly) throw new Error('Local Core journal authentication failed');
+    const runtime = {
+      key: runtimeKey, partition, store: store_, failures: 0,
+      client: new CloudSyncClient({
+        store: store_,
+        deviceUid,
+        request: async (wire) => {
+          const response = await axios.post(coreEndpoint(config.serverUrl), wire, {
+            headers: { Authorization: 'Bearer ' + config.apiKey },
+            timeout: 15000,
+          });
+          return response.data;
+        },
+      }),
     };
-    console.log('[local-core] startup refused:', coreStartupError.message);
-    return;
-  }
-  // A backup is strictly best effort: a healthy journal must continue serving
-  // offline writes and syncing even if disk/backup maintenance is unavailable.
-  // Do not log exception text here; paths and filesystem details are telemetry
-  // sensitive. Corrupt/read-only stores are intentionally never copied.
-  if (!store_.readOnly) {
+    coreRuntime = runtime;
+    coreStartupError = null;
     try {
       const retained = Number(store.get('localCoreBackupMaxRetained'));
       const backupResult = createBackup({
@@ -427,33 +415,39 @@ function startCoreForHeartbeat(config, heartbeat) {
         last_failure_at: new Date().toISOString() });
       console.log('[local-core] backup failed: local_core_backup_failed');
     }
+    scheduleCoreSync(0);
+    return store_.status();
+  } catch (e) {
+    stopCoreRuntime();
+    coreStartupError = {
+      code: 'core_secure_storage_unavailable',
+      message: String((e && e.message) || 'Local Core secure storage failed').slice(0, 240),
+      at: new Date().toISOString(),
+    };
+    console.log('[local-core] startup refused:', coreStartupError.message);
+    return { enabled: false, error: coreStartupError.code };
   }
-  const runtime = {
-    key,
-    failures: 0,
-    store: store_,
-    client: new CloudSyncClient({
-      store: store_,
-      deviceUid,
-      request: async (wire) => {
-        const response = await axios.post(coreEndpoint(config.serverUrl), wire, {
-          headers: { Authorization: 'Bearer ' + config.apiKey },
-          timeout: 15000,
-        });
-        return response.data;
-      },
-    }),
-  };
-  coreRuntime = runtime;
-  localCore = {
-    append: (event) => runtime.store.append(event),
-    status: () => Object.assign({}, runtime.store.status(), { sync: runtime.client.status(), backup: coreBackupTelemetry }),
-    capabilities: () => coreCapabilities(),
-  };
-  scheduleCoreSync(0);
 }
 
-function localCoreInstance() { return localCore; }
+function applyCoreHeartbeat(config, heartbeat) {
+  if (!getPosSettings().offlineMode || !heartbeatAllowsCore(config, heartbeat)) {
+    stopCoreRuntime();
+    coreStartupError = null;
+    return { enabled: false };
+  }
+  return openLocalCoreRuntime(config);
+}
+
+function applyLocalCoreSetting() {
+  if (!getPosSettings().offlineMode) {
+    stopCoreRuntime();
+    coreStartupError = null;
+  } else {
+    // Enabling locally does not open storage. Ask for a fresh authenticated
+    // heartbeat; only its positive company/device gate may open Core.
+    try { wakeAgent('local-core-setting'); } catch (e) {}
+  }
+}
 
 function getLanSettings() {
   const s = store.get('lanSettings') || {};
@@ -482,7 +476,6 @@ function lanInstance() {
       // right after the shop switched LAN Mode off reads a plain sentence
       // instead of a half-alive page.
       isEnabled: () => getLanSettings().enabled,
-       coreProvider: () => localCoreInstance(),
       log: (m) => console.log('[lan]', m),
     });
   }
@@ -832,23 +825,24 @@ if (!gotInstanceLock) {
         out.update_error = lastUpdateAttempt.error || null;
         out.update_attempted_at = lastUpdateAttempt.at || null;
       }
-      if (coreStartupError) {
-        out.local_core_error_code = coreStartupError.code;
-        out.local_core_error = coreStartupError.message;
-        out.local_core_error_at = coreStartupError.at;
-      } else if (coreRuntime && coreRuntime.store) {
-        const coreStatus = coreRuntime.store.status();
-        out.local_core_pending = coreStatus.pending_count;
-        out.local_core_read_only = coreStatus.read_only ? 1 : 0;
-        out.local_core_storage_full = coreStatus.storage_full ? 1 : 0;
+      if (getPosSettings().offlineMode) {
+        if (coreStartupError) {
+          out.local_core_error_code = coreStartupError.code;
+          out.local_core_error = coreStartupError.message;
+          out.local_core_error_at = coreStartupError.at;
+        } else if (coreRuntime && coreRuntime.store) {
+          const coreStatus = coreRuntime.store.status();
+          out.local_core_pending = coreStatus.pending_count;
+          out.local_core_read_only = coreStatus.read_only ? 1 : 0;
+          out.local_core_storage_full = coreStatus.storage_full ? 1 : 0;
+        }
+        // Aggregate health only: never paths, scope identifiers or key data.
+        out.local_core_backup_last_success_at = coreBackupTelemetry.last_success_at;
+        out.local_core_backup_last_failure_code = coreBackupTelemetry.last_failure_code;
+        out.local_core_backup_last_failure_at = coreBackupTelemetry.last_failure_at;
+        out.local_core_backup_count = coreBackupTelemetry.backup_count;
+        out.local_core_backup_bytes = coreBackupTelemetry.backup_bytes;
       }
-      // Backup telemetry deliberately contains only aggregate status: no
-      // filesystem paths, partition identity, journal content, or key material.
-      out.local_core_backup_last_success_at = coreBackupTelemetry.last_success_at;
-      out.local_core_backup_last_failure_code = coreBackupTelemetry.last_failure_code;
-      out.local_core_backup_last_failure_at = coreBackupTelemetry.last_failure_at;
-      out.local_core_backup_count = coreBackupTelemetry.backup_count;
-      out.local_core_backup_bytes = coreBackupTelemetry.backup_bytes;
       return out;
     });
 
@@ -857,11 +851,7 @@ if (!gotInstanceLock) {
     // the cloud on the first beat that gets through. Lazy — creating the
     // instance does NOT start a listener; LAN mode still has to be switched on.
     setLanBridge(() => (lanServer ? lanServer : null));
-
-    // The authenticated heartbeat is the sole Core enablement gate. This also
-    // receives null from stopAgent(), including company switches, which tears
-    // down timers before a new company's credentials can be installed.
-    setCoreBridge((config, heartbeat) => startCoreForHeartbeat(config, heartbeat));
+    setCoreBridge((config_, heartbeat) => applyCoreHeartbeat(config_, heartbeat));
 
     // Wake triggers (Task 1062): after PC sleep/resume or a Wi-Fi drop the
     // agent used to sit "Offline" until the next timer tick happened to
@@ -968,6 +958,7 @@ app.on('window-all-closed', (e) => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  stopCoreRuntime();
   stopAgent();
   // Free the LAN port so a restart (or an update swap) can bind it again.
   try { if (lanServer) lanServer.stop(); } catch (e) {}
@@ -1075,12 +1066,25 @@ ipcMain.handle('get-pos-settings', () => getPosSettings());
 
 ipcMain.handle('save-pos-settings', (event, s) => {
   setPosSettings(s || {});
+  applyLocalCoreSetting();
   applyKiosk(!!(s && s.kiosk));
   buildTrayMenu();
   return { ok: true };
 });
 
 ipcMain.handle('open-pos-window', () => ({ ok: openPos() }));
+
+// Sensitive Core ingress is Electron IPC only. The exact POS webContents is
+// the authentication boundary; no HTTP/LAN route exists for these records.
+const appendCoreEventFromPos = createEventIngress({
+  isAuthorized: (event) => {
+    const pw = getPosWindowRef();
+    return !!(pw && !pw.isDestroyed() && event && event.sender === pw.webContents);
+  },
+  storeProvider: () => (coreRuntime && getPosSettings().offlineMode ? coreRuntime.store : null),
+  onAccepted: () => scheduleCoreSync(0),
+});
+ipcMain.handle('local-core-append-event', (event, input) => appendCoreEventFromPos(event, input));
 
 // ─── NestPOS LAN Mode IPC ───────────────────────────────────────────────────
 ipcMain.handle('get-lan-settings', () => getLanSettings());

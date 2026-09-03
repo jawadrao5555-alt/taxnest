@@ -69,7 +69,15 @@ class EventStore {
                 return Number(stat.bavail) * Number(stat.bsize);
             };
         this.now = typeof opts.now === 'function' ? opts.now : Date.now;
+        this.authorityScope = opts.authorityScope ? {
+            company_id: String(opts.authorityScope.company_id || ''),
+            device_id: String(opts.authorityScope.device_id || ''),
+        } : null;
+        if (this.authorityScope && (!this.authorityScope.company_id || !this.authorityScope.device_id)) {
+            throw new Error('authorityScope requires company_id and device_id');
+        }
         this.events = new Map();
+        this.idempotency = new Map();
         this.outbox = new Map();
         this.sequence = 0;
         this.readOnly = false;
@@ -84,6 +92,22 @@ class EventStore {
     _failReadOnly(file, reason) {
         this.readOnly = true;
         this.corruption = { file: path.basename(file), reason: String(reason), at_ms: this.now() };
+    }
+
+    _validateAuthority(event) {
+        if (!this.authorityScope) return;
+        if (event.scope.company_id !== this.authorityScope.company_id ||
+            event.scope.device_id !== this.authorityScope.device_id) {
+            const error = new Error('event is outside this store authority scope');
+            error.code = 'scope_mismatch';
+            throw error;
+        }
+    }
+
+    _indexEvent(event) {
+        const existingId = this.idempotency.get(event.idempotency_key);
+        if (existingId && existingId !== event.id) throw new Error('duplicate idempotency key in journal');
+        this.idempotency.set(event.idempotency_key, event.id);
     }
 
     _withMutation(fn) {
@@ -239,7 +263,9 @@ class EventStore {
             for (const data of this._readRecords(this.eventsFile)) {
                 if (!Number.isInteger(data.seq) || data.seq < 1) throw new Error('invalid event sequence');
                 const event = validateEvent(data.event);
+                this._validateAuthority(event);
                 if (this.events.has(event.id)) throw new Error('duplicate event id in journal');
+                this._indexEvent(event);
                 this.events.set(event.id, event);
                 this.outbox.set(event.id, { state: 'queued', attempts: 0, updated_at_ms: event.at_ms });
                 this.sequence = Math.max(this.sequence, data.seq);
@@ -369,6 +395,8 @@ class EventStore {
         this._replace(this.outboxFile, outboxRecords);
         this._replace(this.eventsFile, eventRecords);
         for (const id of remove) {
+            const event = this.events.get(id);
+            if (event) this.idempotency.delete(event.idempotency_key);
             this.events.delete(id);
             this.outbox.delete(id);
         }
@@ -384,7 +412,17 @@ class EventStore {
         return this._withMutation(() => {
             if (this.readOnly) throw new StoreReadOnlyError('local core store is read-only after corruption');
             const safe = validateEvent(event);
-            if (this.events.has(safe.id)) return { duplicate: true, event: clone(this.events.get(safe.id)) };
+            this._validateAuthority(safe);
+            const existingId = this.idempotency.get(safe.idempotency_key);
+            const existing = this.events.get(existingId || safe.id);
+            if (existing) {
+                if (existing.id === safe.id && JSON.stringify(existing) === JSON.stringify(safe)) {
+                    return { duplicate: true, event: clone(existing) };
+                }
+                const error = new Error('idempotency key or event id was reused with different content');
+                error.code = 'idempotency_conflict';
+                throw error;
+            }
             const now = this.now();
             const outboxData = { id: safe.id, state: 'queued', attempts: 0, at_ms: now };
             const required = this._frame({ seq: this.sequence + 1, event: safe }).length + this._frame(outboxData).length;
@@ -392,6 +430,7 @@ class EventStore {
             const eventData = { seq: ++this.sequence, event: safe };
             this._append(this.eventsFile, eventData, true);
             this.events.set(safe.id, safe);
+            this._indexEvent(safe);
             this.outbox.set(safe.id, { state: 'queued', attempts: 0, updated_at_ms: now });
             this._append(this.outboxFile, outboxData, true);
             this.storageFull = false;
@@ -399,12 +438,13 @@ class EventStore {
         });
     }
 
-    pending(limit) {
+    pending(limit, scope) {
         const max = Number.isInteger(limit) ? Math.max(0, limit) : 100;
         const out = [];
         for (const [id, event] of this.events) {
             const state = this.outbox.get(id);
-            if (state && state.state === 'queued') {
+            const scoped = !scope || Object.keys(scope).every((key) => event.scope[key] === String(scope[key]));
+            if (state && state.state === 'queued' && scoped) {
                 out.push(clone(event));
                 if (out.length >= max) break;
             }
@@ -427,6 +467,17 @@ class EventStore {
             }
             return changed;
         });
+    }
+
+    acknowledge(ids, scope) {
+        const allowed = new Set();
+        for (const id of (ids || []).map(String)) {
+            const event = this.events.get(id);
+            if (event && (!scope || Object.keys(scope).every((key) => event.scope[key] === String(scope[key])))) {
+                allowed.add(id);
+            }
+        }
+        return this.markSent(Array.from(allowed));
     }
 
     noteAttempt(ids) {
@@ -470,6 +521,11 @@ class EventStore {
                 free_bytes: freeBytes,
             },
         };
+    }
+
+    close() {
+        this.encryptionKey.fill(0);
+        this.closed = true;
     }
 }
 

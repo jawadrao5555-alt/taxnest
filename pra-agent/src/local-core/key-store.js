@@ -29,16 +29,27 @@ function hasCoreJournal(root) {
     }
 }
 
-// safeStorage is injected by main.js. On the shipped Windows agent it wraps
-// this random key with DPAPI; tests inject a deterministic stand-in.
+class SafeStorageKeyProvider {
+    constructor(safeStorage) { this.safeStorage = safeStorage; this.name = 'electron-safe-storage'; }
+    available() {
+        return !!(this.safeStorage && typeof this.safeStorage.isEncryptionAvailable === 'function' &&
+            typeof this.safeStorage.encryptString === 'function' &&
+            typeof this.safeStorage.decryptString === 'function' &&
+            this.safeStorage.isEncryptionAvailable());
+    }
+    wrap(value) { return this.safeStorage.encryptString(value); }
+    unwrap(value) { return this.safeStorage.decryptString(value); }
+}
+
+// Providers are injected. Production main.js supplies Electron safeStorage
+// (DPAPI on Windows). There is intentionally no plaintext fallback provider.
 function loadOrCreateCoreKey(options) {
     const opts = options || {};
     const root = String(opts.dataDir || '');
-    const safeStorage = opts.safeStorage;
+    const provider = opts.keyProvider || new SafeStorageKeyProvider(opts.safeStorage);
     if (!root) throw new Error('Local Core key dataDir is required');
-    if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' ||
-        typeof safeStorage.encryptString !== 'function' || typeof safeStorage.decryptString !== 'function' ||
-        !safeStorage.isEncryptionAvailable()) {
+    if (!provider || typeof provider.available !== 'function' || typeof provider.wrap !== 'function' ||
+        typeof provider.unwrap !== 'function' || !provider.available()) {
         throw new Error('Windows secure storage is unavailable; Local Core remains disabled');
     }
 
@@ -46,7 +57,7 @@ function loadOrCreateCoreKey(options) {
     if (fs.existsSync(keyFile)) {
         let decoded;
         try {
-            decoded = JSON.parse(safeStorage.decryptString(fs.readFileSync(keyFile)));
+            decoded = JSON.parse(provider.unwrap(fs.readFileSync(keyFile)));
         } catch (e) {
             throw new Error('Local Core encryption key cannot be unlocked; refusing to replace it');
         }
@@ -63,7 +74,7 @@ function loadOrCreateCoreKey(options) {
 
     const key = crypto.randomBytes(32);
     const keyId = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
-    const wrapped = safeStorage.encryptString(JSON.stringify({
+    const wrapped = provider.wrap(JSON.stringify({
         v: 1,
         key_id: keyId,
         key_b64: key.toString('base64'),
@@ -92,4 +103,4 @@ function loadOrCreateCoreKey(options) {
     return { key, keyId, created: true };
 }
 
-module.exports = { loadOrCreateCoreKey, hasCoreJournal };
+module.exports = { SafeStorageKeyProvider, loadOrCreateCoreKey, hasCoreJournal };

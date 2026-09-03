@@ -1,0 +1,37 @@
+{
+  "description": "AgentCoreScopeLeaseService canonical JSON cross-runtime fixture v1",
+  "signing_secret": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "authority": {
+    "lease_id": 7,
+    "next_sequence": 1,
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "wire_event": {
+    "event_id": "domain-event-000000000001",
+    "event_type": "order.created",
+    "occurred_at": "2026-09-03T12:34:56.789Z",
+    "idempotency_key": "domain-command:fixture-0001",
+    "scope": {
+      "company_id": "1",
+      "branch_id": "2",
+      "device_id": "DEV-1",
+      "user_id": "3"
+    },
+    "payload": {
+      "schema": "local-core.order.v1",
+      "command_type": "order.open",
+      "aggregate_id": "order-1",
+      "aggregate_revision": 1,
+      "data": {
+        "note": "چائے / tea",
+        "items": [
+          { "qty": 1, "name": "Tea" },
+          { "name": "Cake", "qty": 2 }
+        ]
+      }
+    }
+  },
+  "canonical_json": "{\"event_id\":\"domain-event-000000000001\",\"event_type\":\"order.created\",\"idempotency_key\":\"domain-command:fixture-0001\",\"lease_id\":7,\"occurred_at\":\"2026-09-03T12:34:56.789Z\",\"payload\":{\"aggregate_id\":\"order-1\",\"aggregate_revision\":1,\"command_type\":\"order.open\",\"data\":{\"items\":[{\"name\":\"Tea\",\"qty\":1},{\"name\":\"Cake\",\"qty\":2}],\"note\":\"\\u0686\\u0627\\u0626\\u06d2 \\/ tea\"},\"schema\":\"local-core.order.v1\"},\"prev_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"scope\":{\"branch_id\":\"2\",\"company_id\":\"1\",\"device_id\":\"DEV-1\",\"user_id\":\"3\"},\"sequence\":1}",
+  "signature": "70451ffb3b6ae1eaa16d92d25cec8956bd960160478f30efe6de5192ae6b9594",
+  "chain_hash": "e5c145e0f4add74609cac429d6b9af10a7e1bcbf1d0f8d01dc9d8122d58be97d"
+}

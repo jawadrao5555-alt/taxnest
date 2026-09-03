@@ -1021,6 +1021,18 @@ class PosInventoryController extends Controller
 
         $branchId = BranchStockService::writeBranchId($companyId, $branchId);
         $warnings = [];
+        // The sale ledger is the authoritative record of what direct product
+        // stock actually left. This prevents enabling inventory later, changing
+        // a recipe, or tampering with return lines from minting stock.
+        $deductedDirect = InventoryMovement::where('company_id', $companyId)
+            ->where('reference_type', 'pos_transaction')
+            ->where('reference_id', $transactionId)
+            ->where('type', InventoryMovement::TYPE_SALE)
+            ->selectRaw('product_id, SUM(quantity) as quantity')
+            ->groupBy('product_id')->pluck('quantity', 'product_id')
+            // Legacy deductions stored a negative movement quantity; current
+            // paths store the positive magnitude. Both mean stock actually left.
+            ->map(fn ($qty) => abs((float) $qty))->all();
         try {
             RecipeInventoryService::reverseForInvoice(
                 $companyId, $transactionId, $branchId, $userId, $referenceType
@@ -1040,9 +1052,12 @@ class PosInventoryController extends Controller
             $productId = (int) $item['item_id'];
             $qty = (float) ($item['quantity'] ?? 0);
             if ($qty <= 0) continue;
-            if (RecipeInventoryService::hasRecipe($companyId, $productId)) {
+            if (!array_key_exists($productId, $deductedDirect)) {
                 continue;
             }
+            $qty = min($qty, max(0, (float) $deductedDirect[$productId]));
+            $deductedDirect[$productId] = round((float) $deductedDirect[$productId] - $qty, 4);
+            if ($qty <= 0) continue;
 
             try {
                 $stock = BranchStockService::stockRow($companyId, $productId, $branchId, false);
@@ -1088,6 +1103,14 @@ class PosInventoryController extends Controller
                 $warnings[] = "Inventory restore skipped for {$productName}: " . $e->getMessage();
                 continue;
             }
+        }
+
+        if ($deductedDirect) {
+            InventoryMovement::where('company_id', $companyId)
+                ->where('reference_type', 'pos_transaction')
+                ->where('reference_id', $transactionId)
+                ->where('type', InventoryMovement::TYPE_SALE)
+                ->update(['reference_type' => $referenceType]);
         }
 
         return ['skipped' => false, 'warnings' => $warnings];

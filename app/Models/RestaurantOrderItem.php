@@ -16,6 +16,7 @@ class RestaurantOrderItem extends Model
         // reprint aur purane orders bhi wahi sach parhte hain.
         'skip_kitchen',
         'quantity', 'unit_price', 'subtotal', 'special_notes', 'is_tax_exempt',
+        'deal_snapshot',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
         'kot_printed_at', 'kot_batch_no',
     ];
@@ -30,6 +31,7 @@ class RestaurantOrderItem extends Model
         'item_discount_amount' => 'decimal:2',
         'kot_printed_at' => 'datetime',
         'was_made' => 'boolean',
+        'deal_snapshot' => 'array',
     ];
 
     public function order()

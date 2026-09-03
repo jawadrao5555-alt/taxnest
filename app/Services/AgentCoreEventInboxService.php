@@ -22,6 +22,26 @@ class AgentCoreEventInboxService
         'print.completed',
         'sync.acked',
         'sync.rejected',
+        'order.created',
+        'order.held',
+        'order.updated',
+        'order.settled',
+        'order.cancelled',
+        'kot.created',
+        'kot.updated',
+        'kot.completed',
+        'stock.adjusted',
+        'stock.transferred',
+        'customer.ledger.posted',
+        'customer.khata.posted',
+        'customer.wasooli.posted',
+        'customer.refund.posted',
+        'cash.opened',
+        'cash.movement.posted',
+        'expense.created',
+        'day-close.created',
+        'staff.attendance.recorded',
+        'staff.shift.recorded',
     ];
 
     /**
@@ -74,6 +94,9 @@ class AgentCoreEventInboxService
                     'updated_at' => now(),
                 ];
                 if ($hasScopeColumn) $insert['event_scope'] = self::canonicalJson((array) $event['scope']);
+                if (Schema::hasColumn('agent_core_events', 'projection_status')) {
+                    $insert['projection_status'] = 'received';
+                }
                 $inserted = AgentCoreEvent::query()->insertOrIgnore($insert);
                 if ($inserted) {
                     $stored++;
@@ -118,7 +141,11 @@ class AgentCoreEventInboxService
             'event_type' => $event['event_type'],
             'occurred_at' => self::normalizedOccurredAt($event['occurred_at'] ?? null),
             'idempotency_key' => $event['idempotency_key'],
-            'payload' => self::canonicalValue($event['payload']),
+            // Historical rows and callers of this shared migration helper can
+            // predate the payload field. Treat its absence as the canonical
+            // empty object; HTTP ingestion still rejects it at validation.
+            // Valid flat/nested payload hashes remain byte-for-byte unchanged.
+            'payload' => self::canonicalValue((array) ($event['payload'] ?? [])),
         ], JSON_THROW_ON_ERROR));
     }
 

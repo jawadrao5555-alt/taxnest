@@ -14,5 +14,12 @@ contextBridge.exposeInMainWorld('nestposDesktop', {
   // Typed immediate-sale command. Main injects/validates its exact authority
   // scope; arbitrary browser-authored Core events are deliberately not exposed.
   acceptImmediateSale: (sale) => ipcRenderer.invoke('local-core-accept-immediate-sale', sale),
+  // Versioned, typed Local Core surface. Main owns scope, lease, time and
+  // webContents authorization; there is intentionally no arbitrary event IPC.
+  localCore: Object.freeze({
+    version: 1,
+    command: (command) => ipcRenderer.invoke('local-core-command-v1', command),
+    query: (query) => ipcRenderer.invoke('local-core-query-v1', query),
+  }),
   getVersion: () => ipcRenderer.invoke('get-version'),
 });

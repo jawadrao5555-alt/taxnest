@@ -34,7 +34,8 @@
     </div>
     @endif
 
-    <form method="POST" action="{{ route('pos.inventory.adjust') }}" class="space-y-6">
+    <form method="POST" action="{{ route('pos.inventory.adjust') }}" class="space-y-6"
+          data-local-core-command="stock.adjust" data-local-core-aggregate-field="product_id">
         @csrf
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 space-y-4">
             <div>

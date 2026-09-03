@@ -30,7 +30,8 @@
     </div>
     @endif
 
-    <form method="POST" action="{{ route('pos.transaction.return', $original->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
+    <form method="POST" action="{{ route('pos.transaction.return', $original->id) }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6"
+          data-local-core-command="refund.record" data-local-core-aggregate="refund-{{ $original->id }}" data-order-id="{{ $original->id }}">
         @csrf
         <h3 class="font-bold mb-3 text-gray-900 dark:text-white">{{ __('pos.select_items_to_return') }}</h3>
         <table class="w-full text-sm mb-5 table-cards">
@@ -56,7 +57,9 @@
                             <input type="hidden" name="items[{{ $loop->index }}][item_id]" value="{{ $it->id }}">
                             {{-- Owner rule (14 Aug 2026): full remaining qty PREFILLED — most
                                  returns are whole-bill; cashier only edits for partial returns. --}}
-                            <input type="number" name="items[{{ $loop->index }}][return_qty]" value="{{ $remaining > 0 ? rtrim(rtrim(number_format($remaining, 3, '.', ''), '0'), '.') : 0 }}" min="0" max="{{ $remaining }}" step="0.001" {{ $remaining <= 0 ? 'disabled' : '' }} class="w-24 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm dark:bg-gray-800 dark:text-white">
+                            <input type="number" name="items[{{ $loop->index }}][return_qty]" value="{{ $remaining > 0 ? rtrim(rtrim(number_format($remaining, 3, '.', ''), '0'), '.') : 0 }}" min="0" max="{{ $remaining }}" step="0.001" {{ $remaining <= 0 ? 'disabled' : '' }}
+                                   data-local-refund-line="{{ $it->id }}" data-unit-price="{{ $it->unit_price }}"
+                                   class="w-24 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm dark:bg-gray-800 dark:text-white">
                         </td>
                         <td class="px-2">
                             @if($remaining > 0)

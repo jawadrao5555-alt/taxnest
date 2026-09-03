@@ -18,6 +18,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -168,6 +169,19 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
+        root.addView(
+            Button(this).apply {
+                text = "Local PC"
+                setOnClickListener {
+                    startActivity(Intent(this@MainActivity, LocalCorePairingActivity::class.java))
+                }
+            },
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.END
+            ).apply { setMargins(dp(12), dp(12), dp(12), dp(12)) }
+        )
         setContentView(root)
 
         // restoreState() brings the history list back but NOT the display data
@@ -194,6 +208,9 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(): WebView {
         val view = WebView(this)
+        // The bridge exposes only pinned Local Core command/query calls. It
+        // never exposes the device token or an arbitrary URL/request primitive.
+        view.addJavascriptInterface(LocalCoreBridge(this) { view.url }, "TaxNestLocalCore")
 
         with(view.settings) {
             javaScriptEnabled = true

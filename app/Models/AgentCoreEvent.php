@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Immutable, tenant-scoped inbox for Local TaxNest Core events.
  *
- * These rows are deliberately not projected into sales, stock, or accounting.
- * They are the durable acknowledgement boundary for the first Core protocol.
+ * The row is both the durable receipt and the exactly-once projection state.
+ * Terminal results are immutable within the company/device namespace.
  */
 class AgentCoreEvent extends Model
 {
@@ -24,6 +24,15 @@ class AgentCoreEvent extends Model
         'payload',
         'legacy_backfilled',
         'event_scope',
+        'projection_status',
+        'projection_result',
+        'projection_error',
+        'projection_dependency',
+        'projection_attempts',
+        'projected_at',
+        'lease_id',
+        'lease_sequence',
+        'lease_chain_hash',
     ];
 
     protected $casts = [
@@ -31,5 +40,9 @@ class AgentCoreEvent extends Model
         'payload' => 'array',
         'legacy_backfilled' => 'boolean',
         'event_scope' => 'array',
+        'projection_result' => 'array',
+        'projection_attempts' => 'integer',
+        'projected_at' => 'datetime',
+        'lease_sequence' => 'integer',
     ];
 }

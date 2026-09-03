@@ -1,0 +1,107 @@
+{
+  "aggregate_id": "held-order-fixture-01",
+  "revision": 0,
+  "snapshot": {
+    "order_id": "held-order-fixture-01",
+    "idempotency_key": "hold-fixture-0001",
+    "business_date": "2026-09-04",
+    "order_type": "dine_in",
+    "customer_ref": {
+      "id": 9,
+      "name": "Fixture Customer",
+      "phone": "03001234567"
+    },
+    "terminal_id": 7,
+    "table_id": "70",
+    "table_revision": 2,
+    "lines": [
+      {
+        "line_id": "direct-line-1",
+        "type": "product",
+        "product_id": "51",
+        "product_revision": 4,
+        "name": "Bottle",
+        "quantity": 1,
+        "unit_price_cents": 100,
+        "has_recipe": false,
+        "recipe_snapshot": [],
+        "deal_snapshot": [],
+        "direct_consumption_snapshot": [
+          {
+            "stock_id": "51",
+            "quantity": 1
+          }
+        ],
+        "tax_snapshot": {
+          "rate_basis_points": 1600,
+          "exempt": false,
+          "inclusive": false,
+          "menu_rate_basis_points": null
+        },
+        "consumption_snapshot": {
+          "mode": "direct",
+          "product_id": "51"
+        }
+      },
+      {
+        "line_id": "deal-line-1",
+        "type": "deal",
+        "product_id": "77",
+        "product_revision": 5,
+        "name": "Burger Combo",
+        "quantity": 1,
+        "unit_price_cents": 1500,
+        "has_recipe": false,
+        "recipe_snapshot": [],
+        "direct_consumption_snapshot": [],
+        "deal_snapshot": [
+          {
+            "deal_id": 77,
+            "deal_version": "2026-09-04T09:00:00.000000Z",
+            "deal_name": "Burger Combo",
+            "deal_price": 15,
+            "product_id": "50",
+            "product_revision": 3,
+            "quantity": 1,
+            "qty": 1,
+            "mode": "recipe",
+            "has_recipe": true,
+            "recipe_snapshot": [
+              {
+                "stock_id": "ingredient-4",
+                "quantity": 1
+              }
+            ],
+            "direct_consumption_snapshot": [],
+            "tax_facts": {
+              "is_tax_exempt": false,
+              "is_third_schedule": false,
+              "company_id": 1
+            }
+          }
+        ],
+        "tax_snapshot": {
+          "rate_basis_points": 1600,
+          "exempt": false,
+          "inclusive": false,
+          "menu_rate_basis_points": null
+        },
+        "consumption_snapshot": {
+          "mode": "deal"
+        }
+      }
+    ],
+    "totals": {
+      "gross_subtotal_cents": 1600,
+      "item_discount_cents": 0,
+      "subtotal_cents": 1600,
+      "tax_cents": 256,
+      "discount_cents": 0,
+      "total_cents": 1856
+    },
+    "immutable_metadata": {
+      "occurred_at_ms": 1788474600000,
+      "kitchen_notes": null
+    }
+  }
+}

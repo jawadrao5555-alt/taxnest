@@ -8,10 +8,15 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { EventStore } = require('./event-store');
+const { LocalCoreDomain } = require('./domain-engine');
 
 const MAGIC = Buffer.from('PRABACK1');
 const FORMAT = 1;
-const FILES = ['events.ndjson', 'outbox.ndjson'];
+// Every durable Local Core file belongs in the same authenticated archive.
+// In particular, omitting either high-water state would allow identities to be
+// reused after restore, while omitting domain-state would restore a journal
+// without its operational projections.
+const FILES = ['events.ndjson', 'outbox.ndjson', 'state.ndjson', 'domain-state.bin', 'domain-transaction.bin'];
 const DEFAULT_MAX_FILE_BYTES = 256 * 1024 * 1024;
 const DEFAULT_MAX_MANIFEST_BYTES = 16 * 1024;
 
@@ -35,6 +40,7 @@ function canonicalManifest(manifest) {
         key_id: manifest.key_id,
         partition: manifest.partition,
         created_at_ms: manifest.created_at_ms,
+        generation: manifest.generation,
         files: manifest.files,
     });
 }
@@ -138,7 +144,7 @@ function reserveOutput(dir, partition, timestamp, explicit) {
     throw new Error('could not reserve unique backup destination');
 }
 
-function createBackup(options) {
+function createBackupUnlocked(options) {
     const opts = options || {};
     if (!opts.store || opts.store.readOnly) throw new Error('healthy writable EventStore is required for backup');
     if (!validKey(opts.encryptionKey)) throw new Error('backup requires a 32-byte encryption key');
@@ -146,12 +152,26 @@ function createBackup(options) {
     const keyId = String(opts.encryptionKeyId || opts.store.keyId || keyIdFor(opts.encryptionKey));
     if (keyId !== String(opts.store.keyId || keyId)) throw new Error('backup key-id does not match EventStore');
     const limit = maxFileBytes(opts);
+    // Re-open read-only-in-practice under the shared barrier so a caller that
+    // holds an older EventStore instance cannot stamp a stale generation.
+    const diskStore = new EventStore({ dataDir: opts.store.dir, encryptionKey: opts.encryptionKey,
+        encryptionKeyId: keyId, minFreeBytes: 0 });
+    if (diskStore.readOnly) throw new Error('healthy EventStore snapshot is required for backup');
+    let generation = diskStore.generation || 0;
+    if (fs.existsSync(path.join(opts.store.dir, 'domain-state.bin')) &&
+        fs.statSync(path.join(opts.store.dir, 'domain-state.bin')).size) {
+        const domain = new LocalCoreDomain({ dataDir: opts.store.dir, encryptionKey: opts.encryptionKey,
+            encryptionKeyId: keyId, eventStore: opts.store });
+        generation = domain.snapshot().generation || 0;
+        if (generation !== diskStore.generation) throw new Error('Local Core snapshot generation mismatch');
+    }
     const bytes = FILES.map((name) => readJournal(path.join(opts.store.dir, name), limit));
     const manifest = {
         format: FORMAT,
         key_id: keyId,
         partition: opts.partition,
         created_at_ms: typeof opts.now === 'function' ? opts.now() : Date.now(),
+        generation,
         files: FILES.map((name, index) => ({ name, size: bytes[index].length, sha256: sha256(bytes[index]) })),
     };
     manifest.hmac_sha256 = hmac(opts.encryptionKey, canonicalManifest(manifest));
@@ -194,6 +214,14 @@ function createBackup(options) {
         backup_bytes: retained.reduce((n, item) => n + item.stat.size, 0), created_at_ms: manifest.created_at_ms };
 }
 
+function createBackup(options) {
+    const opts = options || {};
+    if (!opts.store || typeof opts.store.withSnapshotBarrier !== 'function') {
+        return createBackupUnlocked(opts);
+    }
+    return opts.store.withSnapshotBarrier(() => createBackupUnlocked(opts));
+}
+
 function markerPath(target) { return path.join(path.dirname(target), '.' + path.basename(target) + '.restore-transaction.json'); }
 function writeMarker(file, value) {
     const temp = file + '.tmp-' + process.pid;
@@ -234,18 +262,21 @@ function parseBackup(backupPath, key, partition, options) {
     let manifest;
     try { manifest = JSON.parse(all.subarray(start, start + manifestLength).toString('utf8')); } catch (e) { throw new Error('invalid backup manifest'); }
     const expectedKeyId = String(opts.encryptionKeyId || keyIdFor(key));
+    const legacyTwoFile = manifest && Array.isArray(manifest.files) && manifest.files.length === 2;
+    const expectedFiles = legacyTwoFile ? FILES.slice(0, 2) : FILES;
     if (!manifest || manifest.format !== FORMAT || manifest.key_id !== expectedKeyId ||
         manifest.partition !== partition || !Number.isInteger(manifest.created_at_ms) ||
-        !Array.isArray(manifest.files) || manifest.files.length !== FILES.length ||
+        (manifest.generation != null && (!Number.isInteger(manifest.generation) || manifest.generation < 0)) ||
+        !Array.isArray(manifest.files) || manifest.files.length !== expectedFiles.length ||
         typeof manifest.hmac_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(manifest.hmac_sha256)) throw new Error('backup manifest validation failed');
     const expected = Buffer.from(hmac(key, canonicalManifest(manifest)), 'hex');
     const supplied = Buffer.from(manifest.hmac_sha256, 'hex');
     if (!crypto.timingSafeEqual(expected, supplied)) throw new Error('backup manifest authentication failed');
     let offset = start + manifestLength;
     const files = [];
-    for (let i = 0; i < FILES.length; i++) {
+    for (let i = 0; i < expectedFiles.length; i++) {
         const entry = manifest.files[i];
-        if (!entry || entry.name !== FILES[i] || !Number.isInteger(entry.size) || entry.size < 0 || entry.size > cap ||
+        if (!entry || entry.name !== expectedFiles[i] || !Number.isInteger(entry.size) || entry.size < 0 || entry.size > cap ||
             typeof entry.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(entry.sha256) || offset + entry.size > all.length) {
             throw new Error('backup file metadata validation failed');
         }
@@ -254,7 +285,7 @@ function parseBackup(backupPath, key, partition, options) {
         files.push(data); offset += entry.size;
     }
     if (offset !== all.length) throw new Error('backup has trailing data');
-    return { manifest, files };
+    return { manifest, files, fileNames: expectedFiles };
 }
 
 function restoreBackup(options) {
@@ -271,7 +302,7 @@ function restoreBackup(options) {
     let completed = false;
     try {
         fs.mkdirSync(staging, { recursive: false, mode: 0o700 });
-        FILES.forEach((name, i) => {
+        parsed.fileNames.forEach((name, i) => {
             const file = path.join(staging, name);
             const fd = fs.openSync(file, 'wx', 0o600);
             try { writeAll(fd, parsed.files[i]); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
@@ -280,6 +311,24 @@ function restoreBackup(options) {
         const validated = new EventStore({ dataDir: staging, encryptionKey: opts.encryptionKey, encryptionKeyId: parsed.manifest.key_id,
             minFreeBytes: 0, allowPlaintextMigration: false, maxBytes: maxFileBytes(opts) * FILES.length });
         if (validated.readOnly) throw new Error('restored EventStore validation failed');
+        // Validate encrypted projection before it can replace a healthy
+        // install. Old two-file archives intentionally have no domain file.
+        if ((parsed.fileNames.includes('domain-state.bin') &&
+                parsed.files[parsed.fileNames.indexOf('domain-state.bin')].length) ||
+            (parsed.fileNames.includes('domain-transaction.bin') &&
+                parsed.files[parsed.fileNames.indexOf('domain-transaction.bin')].length)) {
+            const restoredDomain = new LocalCoreDomain({ dataDir: staging, encryptionKey: opts.encryptionKey,
+                encryptionKeyId: parsed.manifest.key_id });
+            const postRecoveryStore = new EventStore({ dataDir: staging, encryptionKey: opts.encryptionKey,
+                encryptionKeyId: parsed.manifest.key_id, minFreeBytes: 0 });
+            if (parsed.manifest.generation != null &&
+                (restoredDomain.snapshot().generation !== parsed.manifest.generation ||
+                postRecoveryStore.generation !== parsed.manifest.generation)) {
+                throw new Error('restored Local Core generation mismatch');
+            }
+        } else if (parsed.manifest.generation != null && validated.generation !== parsed.manifest.generation) {
+            throw new Error('restored EventStore generation mismatch');
+        }
         writeMarker(marker, { v: 1, target, rollback, staging });
         if (fs.existsSync(target)) { fs.renameSync(target, rollback); movedTarget = true; }
         if (typeof opts.fault === 'function') opts.fault('after_active_rename');

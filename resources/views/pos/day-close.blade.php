@@ -812,7 +812,8 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.close_day') }}</h3>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.close_day_hint', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]) }}</p>
-        <form method="POST" action="{{ route('pos.close-day') }}">
+        <form method="POST" action="{{ route('pos.close-day') }}"
+              data-local-core-command="cash.close" data-local-core-aggregate="close-{{ $date }}" data-business-date="{{ $date }}">
             @csrf
             <input type="hidden" name="date" value="{{ $date }}">
             <div class="mb-4">

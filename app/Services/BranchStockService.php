@@ -79,7 +79,19 @@ class BranchStockService
     public static function branches(int $companyId)
     {
         if (isset(self::$branchMemo[$companyId])) {
-            return self::$branchMemo[$companyId];
+            // Long-running workers and the SQLite suite can rebuild/swap the
+            // schema while this process remains alive. A cached multi-branch
+            // answer must never survive after the branches table disappears:
+            // it would redirect a later branchless return into a stale branch
+            // row and leave the real stock untouched.
+            try {
+                if (Schema::hasTable('branches')) {
+                    return self::$branchMemo[$companyId];
+                }
+            } catch (\Throwable $e) {
+                // Treat an unavailable table as branchless below.
+            }
+            self::flushMemo();
         }
         if (!self::ready()) {
             return self::$branchMemo[$companyId] = collect();

@@ -172,6 +172,39 @@ class AgentCoreInboxTest extends TestCase
         $this->request(self::KEY_ONE, [$this->event(str_repeat('b', 65))])->assertStatus(422);
     }
 
+    public function test_missing_payload_is_a_validation_error_not_an_inbox_exception(): void
+    {
+        $event = $this->event('without-payload');
+        unset($event['payload']);
+
+        $this->request(self::KEY_ONE, [$event])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('events.0.payload');
+        $this->assertSame(0, DB::table('agent_core_events')->count());
+    }
+
+    public function test_hashing_a_historic_missing_payload_is_safe_and_nested_payloads_remain_canonical(): void
+    {
+        $base = [
+            'event_id' => 'historic-no-payload',
+            'event_type' => 'caller.ring',
+            'occurred_at' => null,
+            'idempotency_key' => 'historic-no-payload',
+        ];
+        $empty = $base + ['payload' => []];
+        $this->assertSame(
+            \App\Services\AgentCoreEventInboxService::contentHashFor($empty),
+            \App\Services\AgentCoreEventInboxService::contentHashFor($base),
+        );
+
+        $nestedA = $empty + ['payload' => ['z' => ['b' => 2, 'a' => 1], 'items' => [['b' => 4, 'a' => 3]]]];
+        $nestedB = $empty + ['payload' => ['items' => [['a' => 3, 'b' => 4]], 'z' => ['a' => 1, 'b' => 2]]];
+        $this->assertSame(
+            \App\Services\AgentCoreEventInboxService::contentHashFor($nestedA),
+            \App\Services\AgentCoreEventInboxService::contentHashFor($nestedB),
+        );
+    }
+
     public function test_reusing_an_event_or_idempotency_key_with_different_content_is_a_conflict(): void
     {
         $this->request(self::KEY_ONE, [$this->event('event-a')])->assertOk();

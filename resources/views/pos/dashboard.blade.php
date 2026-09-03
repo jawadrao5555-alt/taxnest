@@ -149,7 +149,8 @@
                     </div>
                     <button type="button" @click="editing = !editing" class="px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition">{{ __('pos.change_word') }}</button>
                 </div>
-                <form method="POST" action="{{ route('pos.day-opening.save') }}" x-show="editing" x-cloak class="mt-3 flex flex-wrap items-end gap-2">
+                <form method="POST" action="{{ route('pos.day-opening.save') }}" x-show="editing" x-cloak class="mt-3 flex flex-wrap items-end gap-2"
+                      data-local-core-command="cash.open" data-local-core-aggregate="cash-{{ now()->toDateString() }}" data-business-date="{{ now()->toDateString() }}">
                     @csrf
                     @if($ocList->isNotEmpty())
                     <div class="flex-1 min-w-[160px]">
@@ -181,7 +182,8 @@
                         <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.opening_cash_hint') }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ route('pos.day-opening.save') }}" class="mt-3 flex flex-wrap items-end gap-2">
+                <form method="POST" action="{{ route('pos.day-opening.save') }}" class="mt-3 flex flex-wrap items-end gap-2"
+                      data-local-core-command="cash.open" data-local-core-aggregate="cash-{{ now()->toDateString() }}" data-business-date="{{ now()->toDateString() }}">
                     @csrf
                     @if($ocList->isNotEmpty())
                     {{-- Counters wali shop: har counter ka float alag darj hota

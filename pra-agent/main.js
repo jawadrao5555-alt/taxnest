@@ -16,10 +16,14 @@ const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider, setLanBridge, setCoreBridge, wakeAgent } = require('./src/agent');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { createLanServer } = require('./src/lan-server');
+const { createLocalCoreLanTls } = require('./src/local-core/lan-tls');
+const { loadOrCreateTlsIdentity } = require('./src/local-core/lan-tls-identity');
+const { LocalCoreDomain } = require('./src/local-core/domain-engine');
 const { EventStore } = require('./src/local-core/event-store');
 const { heartbeatAllowsCore } = require('./src/local-core/lifecycle');
 const { SafeStorageKeyProvider, loadOrCreateCoreKey } = require('./src/local-core/key-store');
 const { CloudSyncClient } = require('./src/local-core/cloud-sync');
+const { SnapshotSyncClient } = require('./src/local-core/snapshot-sync');
 const { createEventIngress } = require('./src/local-core/ingress');
 const { createSaleAcceptance } = require('./src/local-core/sale-acceptance');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
@@ -321,12 +325,14 @@ function setPosSettings(next) {
 // ON = waiter tablets and the Caller ID phone can reach this PC by IP, so the
 // shop keeps working through an internet cut. See src/lan-server.js.
 let lanServer = null;
+let coreLanTls = null;
 let coreRuntime = null;
 let coreTimer = null;
 let coreStartupError = null;
 let coreBackupTelemetry = { last_success_at: null, last_failure_code: null, last_failure_at: null, backup_count: 0, backup_bytes: 0 };
 let trustedPosScope = null;
 let trustedScopeGeneration = 0;
+let lastPositiveCoreHeartbeat = null;
 function clearTrustedPosScope() { trustedScopeGeneration++; trustedPosScope = null; }
 async function refreshTrustedPosScope(ses, origin) {
   const pw = getPosWindowRef();
@@ -335,22 +341,43 @@ async function refreshTrustedPosScope(ses, origin) {
   const contents = pw.webContents;
   const configAtStart = store.get('config') || {};
   try {
-    const response = await ses.fetch(origin + '/pos/desktop/local-core-scope', { headers: { Accept: 'application/json' } });
+    const response = await ses.fetch(origin + '/pos/desktop/local-core-scope', { headers: {
+      Accept: 'application/json',
+      'X-NestPOS-Device-Uid': getDeviceUid(),
+    } });
     const data = response.ok ? await response.json() : null;
     const config = store.get('config') || {};
     if (generation !== trustedScopeGeneration || !getPosWindowRef() ||
         getPosWindowRef().webContents !== contents || config.companyId !== configAtStart.companyId ||
-        config.deviceUid !== configAtStart.deviceUid ||
         !data || !data.success || String(data.company_id) !== String(config.companyId || '') ||
         !/^[1-9]\d*$/.test(String(data.branch_id)) || !/^[1-9]\d*$/.test(String(data.user_id))) return null;
+    const lease = data.lease;
+    if (!lease || !lease.lease_id || !lease.token || !lease.chain || !lease.chain.signing_secret) return null;
+    const leaseScope = lease.scope || {};
+    if (String(leaseScope.company_id || '') !== String(data.company_id) ||
+        String(leaseScope.branch_id || '') !== String(data.branch_id) ||
+        String(leaseScope.user_id || '') !== String(data.user_id) ||
+        String(leaseScope.device_uid || leaseScope.device_id || '') !== getDeviceUid() ||
+        (leaseScope.device_uid && leaseScope.device_id &&
+         String(leaseScope.device_uid) !== String(leaseScope.device_id))) return null;
     trustedPosScope = { company_id: String(data.company_id), branch_id: String(data.branch_id),
-      user_id: String(data.user_id), webContents: contents, configCompanyId: String(config.companyId || '') };
+      user_id: String(data.user_id), webContents: contents, configCompanyId: String(config.companyId || ''),
+      device_uid: getDeviceUid(), lease };
+    // A lease is tied to the logged-in user/branch. Never retain a domain made
+    // under an older login's authority.
+    if (coreRuntime && coreRuntime.domain) {
+      try { coreRuntime.domain.close(); } catch (e) {}
+      coreRuntime.domain = null;
+      coreRuntime.snapshotClient = null;
+    }
     return trustedPosScope;
   } catch (e) { return null; }
 }
 
 function stopCoreRuntime(clearScope) {
   if (coreTimer) { clearTimeout(coreTimer); coreTimer = null; }
+  try { if (coreLanTls) coreLanTls.stop(); } catch (e) {}
+  try { if (coreRuntime && coreRuntime.domain) coreRuntime.domain.close(); } catch (e) {}
   try { if (coreRuntime && coreRuntime.store) coreRuntime.store.close(); } catch (e) {}
   coreRuntime = null;
   if (clearScope) clearTrustedPosScope();
@@ -368,6 +395,33 @@ function scheduleCoreSync(delay) {
     if (!runtime) return;
     const result = await runtime.client.sync();
     if (runtime !== coreRuntime) return;
+    if (result.ok && trustedPosScope && lastPositiveCoreHeartbeat) {
+      try {
+        const domain = coreLanDomain();
+        if (domain && !runtime.snapshotClient) {
+          const config = store.get('config') || {};
+          runtime.snapshotClient = new SnapshotSyncClient({
+            domain,
+            // Immutable identity captured from the positive heartbeat/config
+            // boundary. Domain sharing intentionally clears EventStore's old
+            // single-device gate, so it is not an identity source.
+            deviceUid: runtime.deviceUid,
+            scopeProvider: currentCoreLanScope,
+            leaseProvider: () => trustedPosScope && trustedPosScope.lease,
+            heartbeatProvider: () => lastPositiveCoreHeartbeat,
+            request: async (query) => {
+              const response = await axios.post(String(config.serverUrl || '').replace(/\/+$/, '') + '/v2/snapshot', query, {
+                headers: { Authorization: 'Bearer ' + config.apiKey }, timeout: 30000,
+              });
+              return response.data;
+            },
+          });
+        }
+        if (runtime.snapshotClient) await runtime.snapshotClient.sync();
+      } catch (e) {
+        console.log('[local-core] inbound snapshot refused:', e && e.code, e && e.message);
+      }
+    }
     runtime.failures = result.ok ? 0 : Math.min(runtime.failures + 1, 5);
     scheduleCoreSync(result.ok ? 30000 : Math.min(30000 * Math.pow(2, runtime.failures), 10 * 60 * 1000));
   }, delay);
@@ -391,8 +445,8 @@ function openLocalCoreRuntime(config) {
     return coreRuntime.store.status();
   }
   // Reopening the same company/device must not erase a valid POS login scope.
-  if (coreRuntime && (coreRuntime.store.authorityScope.company_id !== companyId ||
-      coreRuntime.store.authorityScope.device_id !== deviceUid)) clearTrustedPosScope();
+  if (coreRuntime && (coreRuntime.companyId !== companyId ||
+      coreRuntime.deviceUid !== deviceUid)) clearTrustedPosScope();
   stopCoreRuntime(false);
   try {
     const root = path.join(app.getPath('userData'), 'local-core');
@@ -410,7 +464,8 @@ function openLocalCoreRuntime(config) {
     });
     if (store_.readOnly) throw new Error('Local Core journal authentication failed');
     const runtime = {
-      key: runtimeKey, partition, store: store_, failures: 0,
+      key: runtimeKey, partition, companyId, deviceUid, store: store_, encryptionKey: Buffer.from(encryption.key),
+      encryptionKeyId: encryption.keyId, partitionDir, domain: null, failures: 0,
       client: new CloudSyncClient({
         store: store_,
         deviceUid,
@@ -467,11 +522,18 @@ function openLocalCoreRuntime(config) {
 
 function applyCoreHeartbeat(config, heartbeat) {
   if (!getPosSettings().offlineMode || !heartbeatAllowsCore(config, heartbeat)) {
+    lastPositiveCoreHeartbeat = null;
     stopCoreRuntime(false);
     coreStartupError = null;
     return { enabled: false };
   }
-  return openLocalCoreRuntime(config);
+  lastPositiveCoreHeartbeat = Object.assign({}, heartbeat, { positive: true, at_ms: Date.now() });
+  const result = openLocalCoreRuntime(config);
+  const lan = getLanSettings();
+  if (lan.enabled && lan.coreTlsEnabled && coreRuntime) {
+    try { coreLanInstance().start().catch((e) => console.log('[local-core-lan] start refused:', e && e.message)); } catch (e) {}
+  }
+  return result;
 }
 
 function applyLocalCoreSetting() {
@@ -490,6 +552,7 @@ function getLanSettings() {
   const port = Number(s.port);
   return {
     enabled: !!s.enabled,
+    coreTlsEnabled: !!s.coreTlsEnabled,
     port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 8531,
   };
 }
@@ -498,8 +561,133 @@ function setLanSettings(next) {
   const port = Number(next && next.port);
   store.set('lanSettings', {
     enabled: !!(next && next.enabled),
+    coreTlsEnabled: !!(next && next.coreTlsEnabled),
     port: Number.isInteger(port) && port > 0 && port <= 65535 ? port : 8531,
   });
+}
+
+function currentCoreLanScope() {
+  if (!coreRuntime || !trustedPosScope) return null;
+  return {
+    company_id: coreRuntime.companyId,
+    branch_id: trustedPosScope.branch_id,
+    device_id: coreRuntime.deviceUid,
+    user_id: trustedPosScope.user_id,
+  };
+}
+
+function waiterAuthorityForToken(token) {
+  const heartbeat = lastPositiveCoreHeartbeat || {};
+  const details = heartbeat.local_core && typeof heartbeat.local_core === 'object' ? heartbeat.local_core : {};
+  const leases = Array.isArray(details.waiter_leases) ? details.waiter_leases :
+    (Array.isArray(heartbeat.waiter_leases) ? heartbeat.waiter_leases : []);
+  const lease = leases.find((candidate) => candidate && String(candidate.token || '') === String(token || ''));
+  if (!lease || lease.revoked === true || lease.role !== 'waiter') return null;
+  const authority = coreRuntime ? { company_id: coreRuntime.companyId, device_id: coreRuntime.deviceUid } : {};
+  if (String(lease.company_id || '') !== String(authority.company_id || '') ||
+      String(lease.device_id || authority.device_id || '') !== String(authority.device_id || '')) return null;
+  return Object.assign({}, lease, {
+    device_id: String(authority.device_id || ''),
+    permissions: Array.isArray(lease.permissions) ? lease.permissions :
+      (Array.isArray(lease.allowed_actions) ? lease.allowed_actions : []),
+  });
+}
+
+function currentWaiterPairingAuthority() {
+  const heartbeat = lastPositiveCoreHeartbeat || {};
+  const details = heartbeat.local_core && typeof heartbeat.local_core === 'object' ? heartbeat.local_core : {};
+  if (details.waiter_pairing_lease && details.waiter_pairing_lease.token) {
+    return waiterAuthorityForToken(details.waiter_pairing_lease.token);
+  }
+  const leases = Array.isArray(details.waiter_leases) ? details.waiter_leases :
+    (Array.isArray(heartbeat.waiter_leases) ? heartbeat.waiter_leases : []);
+  const active = leases.map((lease) => waiterAuthorityForToken(lease && lease.token)).filter(Boolean);
+  return active.length === 1 ? active[0] : null;
+}
+
+function coreLanDomain(boundScope, waiterAuthority) {
+  if (waiterAuthority) {
+    if (!coreRuntime || !boundScope || waiterAuthority.role !== 'waiter') return null;
+    const domain = coreLanDomain();
+    if (!domain || String(boundScope.company_id) !== String(domain.state.scope.company_id) ||
+        String(boundScope.branch_id) !== String(domain.state.scope.branch_id)) return null;
+    const lease = waiterAuthority;
+    const explicitWaiterActions = (Array.isArray(lease.permissions) ? lease.permissions : [])
+      .filter((action) => ['order.cancel', 'order.settle'].includes(action));
+    const waiterActions = Array.from(new Set([
+      'order.hold', 'order.claim',
+      'table.claim', 'table.release', 'table.shift',
+    ].concat(explicitWaiterActions)));
+    domain.registerActorSession({
+      lease_id: lease.lease_id, token: lease.token,
+      signing_secret: lease.chain.signing_secret,
+      next_sequence: lease.chain.next_sequence, prev_hash: lease.chain.prev_hash,
+      allowed_actions: waiterActions, permissions: waiterActions, role: 'waiter',
+      expires_at_ms: Number.isFinite(Number(lease.expires_at))
+        ? Number(lease.expires_at) : Date.parse(String(lease.expires_at)),
+      staff_session_id: lease.staff_session_id, owner: false, scope: boundScope,
+      allow_rotation: true,
+    });
+    return domain;
+  }
+  const scope = currentCoreLanScope();
+  if (!scope || !coreRuntime) return null;
+  if (boundScope && ['company_id', 'branch_id'].some(
+    (key) => String(boundScope[key] || '') !== String(scope[key] || '')
+  )) return null;
+  if (!coreRuntime.domain) {
+    const lease = trustedPosScope.lease;
+    coreRuntime.domain = new LocalCoreDomain({
+      dataDir: coreRuntime.partitionDir,
+      encryptionKey: coreRuntime.encryptionKey,
+      encryptionKeyId: coreRuntime.encryptionKeyId,
+      authorityScope: scope,
+      eventStore: coreRuntime.store,
+      isTrustedOwner: () => false,
+      authority: {
+        lease_id: lease.lease_id, token: lease.token,
+        signing_secret: lease.chain.signing_secret,
+        next_sequence: lease.chain.next_sequence,
+        prev_hash: lease.chain.prev_hash,
+        allowed_actions: lease.allowed_actions,
+        expires_at: lease.expires_at,
+        // The renderer never supplies this authority. The authenticated
+        // server-issued allow-list remains enforced, while Desktop does not
+        // require a second synthetic staff shift merely to use the same login.
+        owner: true,
+        scope,
+      },
+      allowAuthorityRotation: true,
+    });
+  }
+  return coreRuntime.domain;
+}
+
+function coreLanInstance() {
+  if (!coreLanTls) {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('OS safeStorage unavailable');
+    const identity = loadOrCreateTlsIdentity({
+      dataDir: app.getPath('userData'),
+      protector: {
+        protect: (bytes) => safeStorage.encryptString(bytes.toString('base64')),
+        unprotect: (bytes) => Buffer.from(safeStorage.decryptString(bytes), 'base64'),
+      },
+    });
+    coreLanTls = createLocalCoreLanTls({
+      dataDir: app.getPath('userData'),
+      port: getLanSettings().port < 65535 ? getLanSettings().port + 1 : 8532,
+      identity,
+      domainProvider: coreLanDomain,
+      waiterAuthorityProvider: waiterAuthorityForToken,
+      pairingAuthorityProvider: currentWaiterPairingAuthority,
+      actorRegistrar: (scope, authority) => !!coreLanDomain(scope, authority),
+      actorRevoker: (scope) => {
+        try { return !!(coreRuntime && coreRuntime.domain && coreRuntime.domain.revokeActorSession(scope)); }
+        catch (e) { return false; }
+      },
+    });
+  }
+  return coreLanTls;
 }
 
 function lanInstance() {
@@ -524,8 +712,15 @@ async function applyLanSettings() {
   const s = getLanSettings();
   const srv = lanInstance();
   try { await srv.stop(); } catch (e) {}
+  try { if (coreLanTls) await coreLanTls.stop(); } catch (e) {}
+  // Recreate so a changed base port moves the TLS listener as well. The
+  // certificate remains the same per-install identity in safeStorage.
+  coreLanTls = null;
   if (s.enabled) {
     try { await srv.start(s.port); } catch (e) { console.log('[lan] start failed:', e && e.message); }
+    if (s.coreTlsEnabled && coreRuntime) {
+      try { await coreLanInstance().start(); } catch (e) { console.log('[local-core-lan] start refused:', e && e.message); }
+    }
   }
   return srv.status();
 }
@@ -1142,7 +1337,7 @@ const acceptCoreSaleFromPos = createSaleAcceptance({
   },
   storeProvider: () => (coreRuntime && getPosSettings().offlineMode ? coreRuntime.store : null),
   scopeProvider: () => {
-    const authority = coreRuntime && coreRuntime.store && coreRuntime.store.authorityScope;
+    const authority = coreRuntime ? { company_id: coreRuntime.companyId, device_id: coreRuntime.deviceUid } : null;
     const pw = getPosWindowRef();
     if (!trustedPosScope || !pw || trustedPosScope.webContents !== pw.webContents ||
         trustedPosScope.configCompanyId !== String((authority && authority.company_id) || '')) return null;
@@ -1164,9 +1359,64 @@ ipcMain.handle('local-core-accept-immediate-sale', (event, input) => {
   }
   input = Object.assign({}, input, { scope: Object.assign({}, input && input.scope, {
     company_id: trustedPosScope.company_id, branch_id: trustedPosScope.branch_id,
-    user_id: trustedPosScope.user_id, device_id: coreRuntime && coreRuntime.store.authorityScope.device_id,
+    user_id: trustedPosScope.user_id, device_id: coreRuntime && coreRuntime.deviceUid,
   }) });
   return acceptCoreSaleFromPos(event, input);
+});
+
+const POS_CORE_COMMANDS = new Set([
+  'order.hold', 'order.claim', 'order.cancel', 'order.settle',
+  'table.claim', 'table.release', 'stock.set', 'stock.adjust', 'customer.upsert', 'khata.debit',
+  'wasooli.record', 'refund.record', 'cash.open', 'cash.expense', 'cash.close', 'staff.start',
+  'staff.end', 'print.enqueue', 'print.claim', 'print.complete', 'print.fail',
+]);
+const POS_CORE_PROJECTIONS = new Set([
+  'catalog', 'orders', 'tables', 'stock', 'recipes', 'customers', 'cash_days',
+  'staff_sessions', 'print_queue', 'revisions',
+]);
+function ownedCoreDomain(event) {
+  const pw = getPosWindowRef();
+  if (!event || !pw || pw.isDestroyed() || event.sender !== pw.webContents ||
+      !trustedPosScope || trustedPosScope.webContents !== event.sender ||
+      !coreRuntime || !getPosSettings().offlineMode) return null;
+  return coreLanDomain(currentCoreLanScope());
+}
+ipcMain.handle('local-core-command-v1', (event, input) => {
+  try {
+    const domain = ownedCoreDomain(event);
+    if (!domain) return { ok: false, success: false, state: 'rejected', error: 'trusted_scope_unavailable' };
+    if (!input || input.v !== 1 || !POS_CORE_COMMANDS.has(input.type)) {
+      return { ok: false, success: false, state: 'rejected', error: 'command_not_supported' };
+    }
+    const result = domain.execute({
+      v: 1, id: input.id, type: input.type, aggregate_id: input.aggregate_id,
+      expected_revision: input.expected_revision, at_ms: Date.now(),
+      scope: currentCoreLanScope(), payload: input.payload || {},
+    });
+    scheduleCoreSync(0);
+    return { ok: true, success: true, local: true, pending: true, state: 'pending', result };
+  } catch (e) {
+    return { ok: false, success: false, local: true, state: 'rejected',
+      error: (e && e.code) || 'command_rejected', message: String((e && e.message) || '').slice(0, 240) };
+  }
+});
+ipcMain.handle('local-core-query-v1', (event, input) => {
+  try {
+    const domain = ownedCoreDomain(event);
+    if (!domain) return { ok: false, success: false, state: 'rejected', error: 'trusted_scope_unavailable' };
+    const projection = input && input.v === 1 && input.projection;
+    if (!POS_CORE_PROJECTIONS.has(projection)) {
+      return { ok: false, success: false, state: 'rejected', error: 'query_not_supported' };
+    }
+    const snapshot = domain.snapshot();
+    let data = snapshot[projection];
+    if (input.id != null && data && typeof data === 'object') data = data[String(input.id)] || null;
+    return { ok: true, success: true, local: true, pending: false, state: 'local',
+      sequence: snapshot.sequence, data };
+  } catch (e) {
+    return { ok: false, success: false, local: true, state: 'rejected',
+      error: (e && e.code) || 'query_rejected', message: String((e && e.message) || '').slice(0, 240) };
+  }
 });
 
 // ─── NestPOS LAN Mode IPC ───────────────────────────────────────────────────
@@ -1179,8 +1429,29 @@ ipcMain.handle('save-lan-settings', async (event, s) => {
 
 ipcMain.handle('get-lan-status', () => {
   const st = lanInstance().status();
-  return { ...st, enabled: getLanSettings().enabled };
+  let core_tls = { running: false };
+  try { if (coreLanTls) core_tls = coreLanTls.status(); } catch (e) {}
+  return { ...st, enabled: getLanSettings().enabled, core_tls };
 });
+
+ipcMain.handle('lan-core-pairing-payload', async () => {
+  const settings = getLanSettings();
+  if (!settings.enabled || !settings.coreTlsEnabled || !coreRuntime || !currentCoreLanScope()) {
+    return { ok: false, error: 'core_tls_unavailable' };
+  }
+  try {
+    const offer = coreLanInstance().pairingPayload();
+    const qr = await require('qrcode').toDataURL(offer.encoded, { errorCorrectionLevel: 'M', margin: 1, width: 300 });
+    return { ok: true, payload: offer.payload, encoded: offer.encoded, qr };
+  } catch (e) {
+    return { ok: false, error: 'core_tls_unavailable' };
+  }
+});
+
+ipcMain.handle('lan-core-list-devices', () => coreLanTls ? coreLanTls.listDevices() : []);
+ipcMain.handle('lan-core-revoke-device', (_event, id) => ({
+  ok: !!(coreLanTls && coreLanTls.revoke(String(id || ''))),
+}));
 
 ipcMain.handle('lan-forget-devices', () => {
   lanInstance().forgetDevices();

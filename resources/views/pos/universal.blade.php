@@ -4520,7 +4520,7 @@ window.addEventListener('popstate', function() {
 </div>
 
 @php
-$productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus) {
+$productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus, $recipes) {
     return [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
         'price' => $p->price ?? 0, 'category' => $p->category,
@@ -4530,6 +4530,10 @@ $productsJson = $products->map(function($p) use ($recipeLookup, $stockStatus) {
         'is_tax_exempt' => $p->is_tax_exempt ?? false,
             'is_third_schedule' => $p->is_third_schedule ?? false,
         'hasRecipe' => in_array($p->id, $recipeLookup ?? []),
+        'recipe_snapshot' => $recipes->get($p->id, collect())->map(fn ($r) => [
+            'stock_id' => 'ingredient-' . (int) $r->ingredient_id,
+            'quantity' => (float) $r->quantity_needed,
+        ])->values(),
         'image' => $p->image ? asset('storage/products/' . $p->image) : null,
         'stockStatus' => $stockStatus[$p->id] ?? null,
     ];
@@ -4552,7 +4556,7 @@ $customersJson = $customers->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 
 // autoRecallFromUrl). NOTE: holdOrder's POST response unshifts a FULL row into
 // this list at runtime — that shape is a superset, so both coexist. If new JS
 // starts reading another held-order field, add it HERE too.
-$heldOrdersJson = $heldOrders->map(function ($o) {
+$heldOrdersJson = $heldOrders->map(function ($o) use ($recipes) {
     return [
         'id' => $o->id,
         'order_number' => $o->order_number,
@@ -4593,6 +4597,18 @@ $heldOrdersJson = $heldOrders->map(function ($o) {
             'is_tax_exempt' => (bool) ($i->is_tax_exempt ?? false),
             'item_discount_type' => $i->item_discount_type,
             'item_discount_value' => (float) ($i->item_discount_value ?? 0),
+            // Tenant-scoped deal components are frozen in the server boot payload.
+            // Settlement only carries this snapshot; it never re-opens allDeals.
+            'deal_snapshot' => $i->item_type === 'deal'
+                ? (is_array($i->deal_snapshot) ? array_values($i->deal_snapshot) : null)
+                : null,
+            'has_recipe' => $i->item_type === 'product' && $recipes->has($i->item_id),
+            'recipe_snapshot' => $i->item_type === 'product'
+                ? $recipes->get($i->item_id, collect())->map(fn ($r) => [
+                    'stock_id' => (string) $r->ingredient_id,
+                    'quantity' => (float) $r->quantity_needed,
+                ])->values()
+                : [],
         ])->values(),
     ];
 })->values();
@@ -7065,7 +7081,9 @@ function restaurantPos() {
                     this.showToast(window.TXT.deal_choice_required, 'error');
                     return;
                 }
-                selections.push({ group_id: Number(group.id), product_id: Number(option.product_id), name: option.name, quantity: Number(group.quantity) || 1, label: group.label });
+                selections.push({ group_id: Number(group.id), product_id: Number(option.product_id), name: option.name,
+                    quantity: Number(group.quantity) || 1, label: group.label,
+                    deal_component_snapshot: option.deal_component_snapshot || null });
             }
             this.cancelDealChoice();
             this.addToCart(deal, selections);
@@ -7088,7 +7106,12 @@ function restaurantPos() {
             } else {
                 const fixedComponents = item.type === 'deal' ? (item.component_rows || []) : [];
                 const selectedComponents = (selectedDealChoices || []).map(choice => ({ name: choice.name, quantity: choice.quantity }));
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey, deal_components: [...fixedComponents, ...selectedComponents] });
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, deal_choices: selectedDealChoices || [], _dealChoiceKey: choiceKey, deal_components: [...fixedComponents, ...selectedComponents],
+                    has_recipe: !!item.hasRecipe,
+                    recipe_snapshot: Array.isArray(item.recipe_snapshot) ? item.recipe_snapshot.map(part => ({ ...part })) : [],
+                    deal_snapshot: item.type === 'deal'
+                        ? [...(item.deal_snapshot || []), ...(selectedDealChoices || []).map(choice => choice.deal_component_snapshot).filter(Boolean)]
+                        : null });
                 this.activeCartIndex = this.cart.length - 1;
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
@@ -9173,10 +9196,15 @@ function restaurantPos() {
                     }
                     orderId = (data.order && data.order.id) || orderId;
                 }
-                await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in', !this.boardPrintReceipt);
-                this.boardConfirm = null;
-                this.loadTableStatus();
-                if (this.isRestaurantMode) this.loadIncoming();
+                const paid = await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in', !this.boardPrintReceipt);
+                // Keep the confirmation and order visible after any cloud/Core
+                // rejection. Closing this modal used to make a rejected local
+                // settlement look paid even though no durable settlement existed.
+                if (paid) {
+                    this.boardConfirm = null;
+                    this.loadTableStatus();
+                    if (this.isRestaurantMode) this.loadIncoming();
+                }
             } finally { this.boardBusy = false; }
         },
         boardResendKot() {
@@ -9225,7 +9253,16 @@ function restaurantPos() {
                     this.showToast((data && data.message) || window.TXT.shift_failed, 'error');
                 }
             } catch (e) {
-                this.showToast(window.TXT.shift_failed_conn, 'error');
+                const local = window.NestPosLocal && await window.NestPosLocal.table.shift(
+                    String(fromT.id), String(target.id), String(ord.id)
+                );
+                if (local && local.success) {
+                    this.boardShift = null;
+                    if (this.selectedTable && Number(this.selectedTable.id) === Number(fromT.id)) {
+                        this.selectedTable = { id: target.id, table_number: target.table_number, seats: target.seats };
+                    }
+                    this.showToast('Table shifted locally — sync pending', 'success');
+                } else this.showToast((local && (local.message || local.error)) || window.TXT.shift_failed_conn, 'error');
             } finally {
                 this.boardBusy = false;
                 this.loadTableStatus();
@@ -10151,6 +10188,108 @@ function restaurantPos() {
             if (this.retailHeldIndex >= this.retailHeldAll().length) this.retailHeldIndex = Math.max(0, this.retailHeldAll().length - 1);
         },
 
+        async _localCoreHold() {
+            if (!window.NestPosLocal) return null;
+            const orderId = String(this.recalledOrderId ||
+                (this.holdAttemptUuid = this.holdAttemptUuid || this._newOfflineUuid()));
+            const idempotency = String(this.holdAttemptUuid || orderId);
+            const rate = Number(this.taxRules['cash'] ?? 16);
+            const lines = this.cart.map((item, index) => {
+                const quantity = Number(item.quantity || item.qty || 1);
+                const unitPrice = Number(item.unit_price || item.price || 0);
+                const itemDiscount = Number(this.getItemDiscount(item) || 0);
+                const recipe = Array.isArray(item.recipe_snapshot)
+                    ? item.recipe_snapshot.map(part => ({ stock_id: String(part.stock_id), quantity: Number(part.quantity) }))
+                    : null;
+                const deal = item.item_type === 'deal' && Array.isArray(item.deal_snapshot)
+                    ? item.deal_snapshot.map(component => ({
+                        ...component,
+                        recipe_snapshot: Array.isArray(component.recipe_snapshot)
+                            ? component.recipe_snapshot.map(part => ({ ...part })) : null,
+                        tax_facts: component.tax_facts ? { ...component.tax_facts } : null,
+                    })) : [];
+                return {
+                    line_id: String(item.line_id || item.cart_id || item.cart_uid || (orderId + '-line-' + index)),
+                    item_type: item.item_type || 'product',
+                    type: item.item_type || 'product',
+                    product_id: item.item_id == null ? null : String(item.item_id),
+                    item_id: item.item_id == null ? null : item.item_id,
+                    name: String(item.name || item.item_name || '').trim(),
+                    quantity,
+                    unit_price_cents: Math.round(unitPrice * 100),
+                    line_subtotal_cents: Math.round(quantity * unitPrice * 100),
+                    item_discount: {
+                        type: item.item_discount_type || 'percentage',
+                        value: Number(item.item_discount_value || 0),
+                        amount_cents: Math.round(itemDiscount * 100),
+                    },
+                    net_line_cents: Math.round((quantity * unitPrice - itemDiscount) * 100),
+                    special_notes: item.special_notes || null,
+                    has_recipe: !!item.has_recipe,
+                    recipe_snapshot: recipe,
+                    deal_snapshot: deal,
+                    direct_consumption_snapshot: item.item_type === 'product' && !item.has_recipe && item.item_id != null
+                        ? [{ stock_id: String(item.item_id), quantity: 1 }] : [],
+                    tax_snapshot: {
+                        rate_basis_points: Math.round(rate * 100),
+                        exempt: !!item.is_tax_exempt,
+                        inclusive: !!this.taxInclusive,
+                        menu_rate_basis_points: this.taxMenuRate == null ? null : Math.round(this.taxMenuRate * 100),
+                    },
+                    consumption_snapshot: item.item_type === 'deal'
+                        ? { mode: 'deal', components: deal }
+                        : (item.has_recipe ? { mode: 'recipe', recipe_snapshot: recipe }
+                            : { mode: 'direct', product_id: item.item_id == null ? null : String(item.item_id) }),
+                };
+            });
+            const invalid = !lines.length || lines.some(line =>
+                !line.name || !Number.isInteger(line.quantity) || line.quantity < 1 ||
+                !Number.isInteger(line.unit_price_cents) || line.unit_price_cents < 0 ||
+                !Array.isArray(line.recipe_snapshot) ||
+                (line.has_recipe && !line.recipe_snapshot.length) ||
+                (line.type === 'deal' && (!Array.isArray(line.deal_snapshot) || !line.deal_snapshot.length))
+            );
+            if (invalid) return { ok: false, success: false, pending: false, state: 'rejected',
+                error: 'invalid_hold_snapshot', message: 'Order was not held: an immutable line snapshot is incomplete.' };
+            const snapshot = {
+                order_id: orderId,
+                idempotency_key: idempotency,
+                business_date: this.bizToday || new Date().toISOString().slice(0, 10),
+                order_type: this.orderType || 'takeaway',
+                customer_ref: this.selectedCustomer ? {
+                    id: this.selectedCustomer.id || null,
+                    name: this.selectedCustomer.name || null,
+                    phone: this.selectedCustomer.phone || null,
+                } : null,
+                terminal_id: this.terminalId || null,
+                table_id: this.selectedTable?.id ? String(this.selectedTable.id) : null,
+                table_revision: this.selectedTable?.revision ?? this.selectedTable?.version ?? null,
+                lines,
+                totals: {
+                    gross_subtotal_cents: Math.round(Number(this.subtotal || 0) * 100),
+                    item_discount_cents: Math.round(Number(this.itemDiscountsTotal || 0) * 100),
+                    subtotal_cents: Math.round(Number(this.subtotal || 0) * 100),
+                    tax_cents: Math.round(Number(this.taxAmount || 0) * 100),
+                    discount_cents: Math.round((Number(this.itemDiscountsTotal || 0) +
+                        Number(this.discountAmount || 0)) * 100),
+                    total_cents: Math.round(Number(this.grandTotal || 0) * 100),
+                    tax_inclusive: !!this.taxInclusive,
+                },
+                immutable_metadata: {
+                    occurred_at_ms: Date.now(),
+                    kitchen_notes: this.kitchenNotes || null,
+                },
+            };
+            const revision = Number(this.recalledOrderMeta?.local_revision || 0);
+            const answer = await window.NestPosLocal.heldOrder.hold(orderId, snapshot, revision);
+            if (!answer || !answer.success) return answer;
+            return { success: true, local: true, pending: true, state: 'pending',
+                message: 'Order saved locally — sync pending',
+                order: { id: orderId, order_number: orderId, order_type: this.orderType,
+                    table: this.selectedTable || null, table_id: this.selectedTable?.id || null,
+                    items: this.cart.slice(), total_amount: this.grandTotal } };
+        },
+
         async holdOrder(opts) {
             // EDIT MODE: a provisional bill can't be turned into a held order —
             // F9 Update Bill is the only save path while editing.
@@ -10268,7 +10407,14 @@ function restaurantPos() {
                     }
                     result = data;
                 } else { this.showToast(data.message || window.TXT.failed_word, 'error'); }
-            } catch (e) { this.showToast(window.TXT.network_error, 'error'); }
+            } catch (e) {
+                const local = await this._localCoreHold();
+                if (local && local.success) {
+                    result = local; this.heldOrders.unshift(local.order); this.clearCart();
+                    this.showToast(local.message, 'success');
+                    if (opts.forcePrintKot) this.trySilentPrint({ type: 'kot', restaurant_order_id: local.order.id });
+                } else this.showToast((local && (local.message || local.error)) || window.TXT.network_error, 'error');
+            }
             this.submitting = false;
             if (result && this.tableBoardEnabled) this.loadTableStatus(); // Table Board: held table goes red
             return result;
@@ -11198,6 +11344,11 @@ function restaurantPos() {
             } catch (e) {
                 // Network blip — retry once before giving up to the popup fallback.
                 if (_retry) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
+                const local = window.NestPosLocal && await window.NestPosLocal.printQueue.enqueue(
+                    String(payload.job_id || payload.transaction_id || payload.restaurant_order_id || this._newOfflineUuid()),
+                    { document: payload }
+                );
+                if (local && local.success) return { success: true, local: true, pending: true };
                 this.printBeacon('silent-print-network-fail', { type: payload.type, transaction_id: payload.transaction_id, order_id: payload.restaurant_order_id, error: (e && (e.name + ': ' + e.message)) || 'unknown' });
                 return false;
             }
@@ -12355,7 +12506,15 @@ function restaurantPos() {
                         this._printViaIframe('print-kot-void-frame', data.kot_void_url + '&auto_print=1', 'width=380,height=620');
                     }
                 } else { this.showToast(data.message || window.TXT.failed_word, 'error'); }
-            } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
+            } catch (e) {
+                console.error('Delete held order error:', e);
+                const local = window.NestPosLocal && await window.NestPosLocal.heldOrder.cancel(String(orderId), {});
+                if (local && local.success) {
+                    if (ord && ord.table_id) await window.NestPosLocal.table.release(String(ord.table_id), { order_id: String(orderId) });
+                    this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
+                    this.showToast('Order cancelled locally — sync pending', 'success');
+                } else this.showToast((local && (local.message || local.error)) || window.TXT.error_deleting_order, 'error');
+            }
         },
 
         // Task 994: shared pay-success handler — used by payHeldOrderDirect AND
@@ -12482,6 +12641,117 @@ function restaurantPos() {
             }
             this.waHighlight = false;
         },
+        localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, payUuid, payOrderType) {
+            if (!['cash', 'card'].includes(method)) return null;
+            if (!heldOrd || !Array.isArray(heldOrd.items) || !heldOrd.items.length) return null;
+            const rate = method === 'card'
+                ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
+                : (this.taxRules['cash'] || 16);
+            const items = heldOrd.items.map(item => {
+                const quantity = Number(item.quantity);
+                const unitPrice = Number(item.unit_price);
+                return {
+                    line_id: String(item.id),
+                    product_id: item.item_id == null ? null : String(item.item_id),
+                    name: String(item.item_name || '').trim(),
+                    quantity,
+                    unit_price: this.r2(unitPrice),
+                    line_total: this.r2(quantity * unitPrice),
+                    type: item.item_type || 'product',
+                    item_id: item.item_id || null,
+                    is_tax_exempt: !!item.is_tax_exempt,
+                    _manual: item.item_id == null,
+                    special_notes: item.special_notes || null,
+                    item_discount_type: item.item_discount_type || 'percentage',
+                    item_discount_value: Number(item.item_discount_value || 0),
+                    deal_snapshot: item.item_type === 'deal' && Array.isArray(item.deal_snapshot)
+                        ? item.deal_snapshot.map(component => ({
+                            ...component,
+                            recipe_snapshot: Array.isArray(component.recipe_snapshot)
+                                ? component.recipe_snapshot.map(part => ({ ...part }))
+                                : null,
+                            tax_facts: component.tax_facts ? { ...component.tax_facts } : null,
+                        }))
+                        : null,
+                    has_recipe: !!item.has_recipe,
+                    tax_snapshot: {
+                        rate_basis_points: Math.round(rate * 100),
+                        exempt: !!item.is_tax_exempt,
+                        inclusive: !!this.taxInclusive,
+                        menu_rate_basis_points: this.taxMenuRate == null ? null : Math.round(this.taxMenuRate * 100),
+                    },
+                    recipe_snapshot: Array.isArray(item.recipe_snapshot)
+                        ? item.recipe_snapshot.map(part => ({
+                            stock_id: String(part.stock_id),
+                            quantity: Number(part.quantity),
+                        }))
+                        : null,
+                };
+            });
+            if (items.some(item => !item.name || !Number.isInteger(item.quantity) || item.quantity < 1 ||
+                !Number.isFinite(item.unit_price) || item.unit_price < 0)) return null;
+            if (items.some(item => item.type === 'deal' &&
+                (!Array.isArray(item.deal_snapshot) || !item.deal_snapshot.length))) return null;
+            const subtotal = this.r2(items.reduce((sum, item) => sum + item.line_total, 0));
+            const discount = this.r2(Number(heldOrd.discount_amount || 0));
+            const total = this.r2(Number(savedTotal || heldOrd.total_amount || 0));
+            const ratio = subtotal > 0 ? Math.max(0, (subtotal - discount) / subtotal) : 1;
+            const taxable = heldOrd.items.filter(item => !item.is_tax_exempt)
+                .reduce((sum, item) => sum + Number(item.subtotal || 0), 0) * ratio;
+            const includedBaseRate = this.taxMenuRate !== null && this.taxMenuRate > 0 ? this.taxMenuRate : rate;
+            const tax = this.taxInclusive
+                ? this.r2(taxable * rate / (100 + includedBaseRate))
+                : Math.max(0, this.r2(total - subtotal + discount));
+            return {
+                scope: {
+                    company_id: String(this._offlineCompanyId),
+                    branch_id: String(this._localCoreBranchId),
+                    user_id: String(this._localCoreUserId),
+                },
+                offline_uuid: payUuid,
+                occurred_at_ms: Date.now(),
+                business_date: this.bizToday || new Date().toISOString().slice(0, 10),
+                payment_method: method === 'cash' ? 'cash' : 'card',
+                provisional: false,
+                pra_reporting_enabled: !!this.praEnabled,
+                inventory_enabled: !!this._localCoreInventoryEnabled,
+                order_type: payOrderType || heldOrd.order_type || null,
+                customer_credit: false,
+                incoming_order_id: null,
+                recalled_order_id: Number(orderId),
+                table_id: heldOrd.table ? heldOrd.table.id : null,
+                online_payment_confirmed: !!this._onlineOkByOrder[orderId],
+                order_ref: {
+                    id: String(orderId),
+                    order_number: heldOrd.order_number || null,
+                    order_type: payOrderType || heldOrd.order_type || null,
+                    table_id: heldOrd.table ? heldOrd.table.id : null,
+                },
+                customer_ref: {
+                    id: heldOrd.customer_id || null,
+                    name: heldOrd.customer_name || null,
+                    phone: heldOrd.customer_phone || null,
+                },
+                customer_id: heldOrd.customer_id || null,
+                delivery_address: heldOrd.delivery_address || null,
+                discount_type: heldOrd.discount_type || 'amount',
+                discount_value: Number(heldOrd.discount_value || 0),
+                cash_received: method === 'cash' && Number(this.cashReceived) > 0 ? Number(this.cashReceived) : total,
+                terminal_id: this.terminalId || null,
+                customer_name: heldOrd.customer_name || null,
+                customer_phone: heldOrd.customer_phone || null,
+                items,
+                totals: {
+                    subtotal, discount_amount: discount, tax_amount: tax,
+                    total_amount: total, tax_inclusive: !!this.taxInclusive,
+                },
+                tax_pricing: {
+                    inclusive: !!this.taxInclusive,
+                    rate_basis_points: Math.round(rate * 100),
+                    menu_rate_basis_points: this.taxMenuRate == null ? null : Math.round(this.taxMenuRate * 100),
+                },
+            };
+        },
         // Reprint list / preview: purane bill ka share token on-demand mint hota
         // hai. The blank tab opens SYNCHRONOUSLY (inside the click gesture) and
         // navigates after the fetch — window.open after an await would be
@@ -12574,13 +12844,34 @@ function restaurantPos() {
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || window.TXT.payment_failed, 'error'); if (res.status === 409 && this.tableBoardEnabled) this.loadTableStatus(); return false; }
             } catch (e) {
                 console.error('[payHeldOrderDirect] FAIL', e);
-                // Task 994: timeout gets its own message — retry is SAFE (same
-                // uuid rides the retry, server replays instead of duplicating).
-                if (this._isTimeoutError(e)) {
-                    this.showToast(window.TXT.pay_timeout_retry, 'error');
-                } else {
-                    this.showToast(window.TXT.payment_error_prefix + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');
+                const snapshot = this.localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, effPayUuid, payOrderType);
+                const totalCents = Math.round(Number(savedTotal || (heldOrd && heldOrd.total_amount) || 0) * 100);
+                const local = window.NestPosLocal && snapshot && await window.NestPosLocal.heldOrder.settleWithSale(
+                    String(orderId), snapshot, {
+                        business_date: snapshot.business_date,
+                        total_cents: totalCents,
+                        tax_cents: Math.round(snapshot.totals.tax_amount * 100),
+                        discount_cents: Math.round(snapshot.totals.discount_amount * 100),
+                        payment: {
+                            method: snapshot.payment_method,
+                            cash_received: snapshot.cash_received,
+                            terminal_id: snapshot.terminal_id,
+                        },
+                        customer_ref: snapshot.customer_ref,
+                        order_ref: snapshot.order_ref,
+                        offline_uuid: snapshot.offline_uuid,
+                        online_payment_confirmed: !!this._onlineOkByOrder[orderId],
+                    }
+                );
+                if (local && local.success) {
+                    this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
+                    delete this._payUuidByOrder[orderId];
+                    delete this._onlineOkByOrder[orderId];
+                    this.showToast('Payment saved locally — sync pending', 'success');
+                    return true;
                 }
+                this.showToast((local && (local.message || local.error)) ||
+                    'Payment was not saved locally. The held order remains open.', 'error');
                 return false;
             }
         },

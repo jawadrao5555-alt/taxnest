@@ -1,4 +1,5 @@
 <x-pos-layout>
+<script src="{{ asset('js/waiter-local-core.js') }}?v=1" defer></script>
 @php
     // Per-waiter style pref (owner, 5 Aug 2026): waiter apni marzi se Full/Saaf.
     // Effective = user's own pick (BOTH-direction override), else company style.
@@ -1354,6 +1355,7 @@ function waiterApp() {
             const items = this.cart.map(l => ({
                 name: l.name, quantity: l.quantity, unit_price: l.unit_price,
                 item_id: l.item_id, special_notes: l.special_notes || null,
+                is_tax_exempt: !!l.is_tax_exempt,
             }));
             const url = this.appendOrderId
                 ? '/pos/waiter/orders/' + this.appendOrderId + '/items'
@@ -1367,6 +1369,8 @@ function waiterApp() {
                 customer_phone: this.customerPhone || null,
                 kitchen_notes: this.kitchenNotes || null,
                 priority: this.priority,
+                tax_rate_basis_points: Math.round(Number(this.cashTaxRate || 0) * 100),
+                tax_inclusive: {{ ($taxInclusive ?? false) ? 'true' : 'false' }},
                 hold_uuid: this.holdAttemptUuid,
             };
             try {
@@ -1400,7 +1404,23 @@ function waiterApp() {
                     }
                 }
             } catch (e) {
-                this.showToast(@js(__('pos.network_error_try_again')), 'error');
+                try {
+                    // Cloud remains first. Only a real network failure reaches
+                    // this native, pinned-TLS Local Core fallback.
+                    const local = window.TaxNestWaiterLocalCore &&
+                        window.TaxNestWaiterLocalCore.fallbackOrder(body, this.appendOrderId);
+                    if (!local || !local.ok) throw e;
+                    this.showToast('Local PC par order save ho gaya.', 'success');
+                    this.cart = [];
+                    this.selectedTable = null;
+                    this.holdAttemptUuid = null;
+                    this.appendAttemptUuid = null;
+                    this.appendOrderId = null;
+                    this.loadMyOrders();
+                    this.reloadTablesQuiet();
+                } catch (localError) {
+                    this.showToast(@js(__('pos.network_error_try_again')), 'error');
+                }
             }
             this.sending = false;
         },

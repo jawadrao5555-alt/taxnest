@@ -57,6 +57,7 @@ class EventStore {
         this.eventsFile = path.join(this.dir, 'events.ndjson');
         this.outboxFile = path.join(this.dir, 'outbox.ndjson');
         this.stateFile = path.join(this.dir, 'state.ndjson');
+        this.snapshotLockFile = path.join(this.dir, '.core-snapshot.lock');
         this.allowPlaintextMigration = opts.allowPlaintextMigration === true;
         this.maxEvents = integerOption(opts.maxEvents, 100000, 1);
         this.maxBytes = integerOption(opts.maxBytes, 256 * 1024 * 1024, 1);
@@ -82,10 +83,12 @@ class EventStore {
         this.outbox = new Map();
         this.sequence = 0;
         this.localSaleHighWater = 0;
+        this.generation = 0;
         this.readOnly = false;
         this.storageFull = false;
         this.corruption = null;
         this._mutating = false;
+        this._barrierDepth = 0;
         this.telemetry = { recovered_tail_frames: 0, plaintext_migrations: 0, compactions: 0 };
         fs.mkdirSync(this.dir, { recursive: true });
         this._load();
@@ -112,14 +115,37 @@ class EventStore {
         this.idempotency.set(event.idempotency_key, event.id);
     }
 
+    withSnapshotBarrier(fn) {
+        if (this._barrierDepth) return fn();
+        let fd;
+        try {
+            fd = fs.openSync(this.snapshotLockFile, 'wx', 0o600);
+        } catch (e) {
+            if (e.code === 'EEXIST') {
+                const error = new Error('local core snapshot/mutation is already in progress');
+                error.code = 'concurrent_mutation';
+                throw error;
+            }
+            throw e;
+        }
+        this._barrierDepth++;
+        try { return fn(); } finally {
+            this._barrierDepth--;
+            if (fd !== undefined) try { fs.closeSync(fd); } catch (e) {}
+            try { fs.unlinkSync(this.snapshotLockFile); } catch (e) {}
+        }
+    }
+
     _withMutation(fn) {
         if (this._mutating) {
             const error = new Error('a synchronous store mutation is already in progress');
             error.code = 'concurrent_mutation';
             throw error;
         }
-        this._mutating = true;
-        try { return fn(); } finally { this._mutating = false; }
+        return this.withSnapshotBarrier(() => {
+            this._mutating = true;
+            try { return fn(); } finally { this._mutating = false; }
+        });
     }
 
     _frame(data) {
@@ -291,10 +317,13 @@ class EventStore {
         }
         try {
             const state = this._readRecords(this.stateFile);
-            if (state.length > 1 || (state[0] && (!Number.isInteger(state[0].local_sale_high_water) || state[0].local_sale_high_water < 0))) {
+            if (state.length > 1 || (state[0] && (!Number.isInteger(state[0].local_sale_high_water) ||
+                state[0].local_sale_high_water < 0 || (state[0].generation != null &&
+                (!Number.isInteger(state[0].generation) || state[0].generation < 0))))) {
                 throw new Error('invalid local state');
             }
             this.localSaleHighWater = state[0] ? state[0].local_sale_high_water : 0;
+            this.generation = state[0] && state[0].generation ? state[0].generation : 0;
         } catch (e) {
             this._failReadOnly(this.stateFile, e.message);
         }
@@ -467,9 +496,19 @@ class EventStore {
             const next = this.localSaleHighWater + 1;
             // State is encrypted and non-prunable. Persist it before the sale
             // frame: a power loss can leave a harmless gap, never a reused ref.
-            this._replace(this.stateFile, [{ local_sale_high_water: next }]);
+            this._replace(this.stateFile, [{ local_sale_high_water: next, generation: this.generation }]);
             this.localSaleHighWater = next;
             return next;
+        });
+    }
+
+    setGeneration(generation) {
+        return this._withMutation(() => {
+            if (!Number.isInteger(generation) || generation < this.generation) throw new Error('invalid EventStore generation');
+            if (generation === this.generation) return generation;
+            this._replace(this.stateFile, [{ local_sale_high_water: this.localSaleHighWater, generation }]);
+            this.generation = generation;
+            return generation;
         });
     }
 
@@ -568,6 +607,7 @@ class EventStore {
             read_only: this.readOnly,
             storage_full: this.storageFull,
             event_count: this.events.size,
+            generation: this.generation,
             pending_count: pending,
             rejected_count: rejected,
             corruption: this.corruption ? clone(this.corruption) : null,

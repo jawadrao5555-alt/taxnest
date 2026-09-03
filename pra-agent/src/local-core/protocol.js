@@ -6,6 +6,12 @@ const PROTOCOL_VERSION = 1;
 const EVENT_TYPES = Object.freeze([
     'sale.created', 'sale.voided', 'caller.ring', 'print.requested',
     'print.completed', 'sync.acked', 'sync.rejected',
+    'order.created', 'order.held', 'order.updated', 'order.cancelled', 'order.settled',
+    'kot.created', 'kot.updated', 'kot.completed',
+    'stock.adjusted', 'stock.transferred',
+    'customer.ledger.posted', 'customer.khata.posted', 'customer.wasooli.posted', 'customer.refund.posted',
+    'cash.opened', 'cash.movement.posted', 'expense.created', 'day-close.created',
+    'staff.attendance.recorded', 'staff.shift.recorded',
 ]);
 const MAX_PAYLOAD_BYTES = 16 * 1024;
 const SCOPE_KEYS = Object.freeze(['company_id', 'branch_id', 'device_id', 'user_id']);
@@ -43,6 +49,27 @@ function validateEvent(input) {
         throw validationError('invalid_event_time', 'event at_ms must be a non-negative integer');
     }
     if (!plainObject(input.payload)) throw validationError('invalid_event_payload', 'event payload must be an object');
+    if (typeof input.payload.schema === 'string' && input.payload.schema.startsWith('local-core.')) {
+        if (!Number.isInteger(input.scope_lease_id) || input.scope_lease_id < 1 ||
+            typeof input.scope_lease !== 'string' || input.scope_lease.length < 8 || input.scope_lease.length > 128) {
+            throw validationError('invalid_scope_lease', 'canonical Local Core events require a scope lease');
+        }
+        for (const key of ['schema', 'command_type', 'aggregate_id', 'aggregate_revision', 'data']) {
+            if (!Object.prototype.hasOwnProperty.call(input.payload, key)) {
+                throw validationError('invalid_event_payload', 'canonical Local Core envelope is incomplete');
+            }
+        }
+        if (!Number.isInteger(input.payload.aggregate_revision) || input.payload.aggregate_revision < 1 ||
+            !plainObject(input.payload.data)) {
+            throw validationError('invalid_event_payload', 'canonical Local Core envelope is invalid');
+        }
+        if (!plainObject(input.lease_chain) || input.lease_chain.lease_id !== input.scope_lease_id ||
+            !Number.isInteger(input.lease_chain.sequence) || input.lease_chain.sequence < 1 ||
+            typeof input.lease_chain.prev_hash !== 'string' || !/^[a-f0-9]{64}$/.test(input.lease_chain.prev_hash) ||
+            typeof input.lease_chain.signature !== 'string' || !/^[a-f0-9]{64}$/.test(input.lease_chain.signature)) {
+            throw validationError('invalid_lease_chain', 'canonical Local Core event lease chain is invalid');
+        }
+    }
     let payloadEncoded;
     let eventEncoded;
     try {

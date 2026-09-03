@@ -767,12 +767,22 @@ class RecipeInventoryService
     ): float {
         $snapshot = json_decode((string) ($row->snapshot ?? '{}'), true);
         $perUnit = 0.0;
+        $soldUnits = 0.0;
+        $consumedUnits = 0.0;
         foreach ((array) $snapshot as $component) {
             if ((int) ($component['product_id'] ?? 0) !== $productId) continue;
             $saleQty = (float) ($component['sale_quantity'] ?? 0);
             if ($saleQty > 0) {
-                $perUnit += (float) ($component['quantity_needed'] ?? 0) * $returnQty;
+                $soldUnits += $saleQty;
+                $consumedUnits += (float) ($component['quantity_needed'] ?? 0) * $saleQty;
             }
+        }
+        if ($soldUnits > 0) {
+            // Repeated sale lines and repeated deal choices may produce more
+            // than one frozen snapshot entry for the same product. Compute the
+            // weighted per-product rate once; multiplying returnQty by every
+            // entry would restore those ingredients twice.
+            $perUnit = ($consumedUnits / $soldUnits) * $returnQty;
         }
         // Old snapshots may only contain a components map. In that case the
         // parent line quantity is needed to calculate a proportional return.

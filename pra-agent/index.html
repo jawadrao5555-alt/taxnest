@@ -260,6 +260,10 @@
       <input type="checkbox" id="lanEnabled" style="width:auto; margin:0;">
       LAN Mode chalu karein (yeh PC shop ka local server ban jayega)
     </label>
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0 0 10px 24px; font-size:12px; color:#fff;">
+      <input type="checkbox" id="lanCoreTlsEnabled" style="width:auto; margin:0;">
+      Native Waiter / multi-counter pinned TLS (Local Core heartbeat milne ke baad hi)
+    </label>
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
       <label style="font-size:12px; color:#c4b5fd; margin:0;">Port</label>
       <input type="number" id="lanPort" value="8531" min="1" max="65535" style="width:110px; margin:0;">
@@ -267,6 +271,8 @@
     </div>
     <div id="lanStatus" style="font-size:12px; color:#c4b5fd; line-height:1.7;"></div>
     <div id="lanDevices" style="margin-top:10px;"></div>
+    <button id="lanCorePairBtn" class="btn btn-secondary" style="display:none; margin-top:10px;">Native device ka QR banayein</button>
+    <div id="lanCorePairing" style="display:none; margin-top:10px; text-align:center;"></div>
     <div id="lanSaved" style="display:none; margin-top:8px; font-size:12px; color:#10b981;">Saved</div>
   </div>
 
@@ -620,6 +626,7 @@
   function renderLanStatus(st) {
     if (!st) return;
     const box = $('lanStatus');
+    $('lanCorePairBtn').style.display = st.enabled && st.core_tls && st.core_tls.running ? 'inline-block' : 'none';
     if (!st.enabled) {
       box.innerHTML = '<span style="color:#c4b5fd;">LAN Mode band hai — sab kuch cloud par chal raha hai.</span>';
       return;
@@ -706,6 +713,7 @@
   async function loadLanSettings() {
     const s = await window.agentAPI.getLanSettings();
     $('lanEnabled').checked = !!s.enabled;
+    $('lanCoreTlsEnabled').checked = !!s.coreTlsEnabled;
     $('lanPort').value = s.port || 8531;
     renderLanStatus(await window.agentAPI.getLanStatus());
     renderLanDevices();
@@ -713,6 +721,7 @@
   async function saveLanSettings() {
     await window.agentAPI.saveLanSettings({
       enabled: $('lanEnabled').checked,
+      coreTlsEnabled: $('lanCoreTlsEnabled').checked,
       port: parseInt($('lanPort').value, 10) || 8531,
     });
     $('lanSaved').style.display = 'block';
@@ -721,10 +730,23 @@
     renderLanDevices();
   }
   $('lanEnabled').addEventListener('change', saveLanSettings);
+  $('lanCoreTlsEnabled').addEventListener('change', saveLanSettings);
   $('lanPort').addEventListener('change', saveLanSettings);
   $('lanForgetBtn').addEventListener('click', async () => {
     renderLanStatus({ ...(await window.agentAPI.lanForgetDevices()), enabled: $('lanEnabled').checked });
     renderLanDevices();
+  });
+  $('lanCorePairBtn').addEventListener('click', async () => {
+    const box = $('lanCorePairing');
+    const r = await window.agentAPI.lanCorePairingPayload();
+    box.style.display = 'block';
+    if (!r || !r.ok) {
+      box.innerHTML = '<span style="color:#fca5a5">Local Core abhi available nahi. Offline Mode aur authenticated heartbeat check karein.</span>';
+      return;
+    }
+    box.innerHTML = '<img alt="Native device pairing QR" style="width:260px;max-width:100%;background:#fff;padding:8px" src="' +
+      r.qr + '"><div style="font-size:26px;letter-spacing:6px;color:#fff;margin-top:6px">' +
+      lanEsc(r.payload.code) + '</div><div style="font-size:11px;color:#8b83c9">5 minute, sirf ek device</div>';
   });
   loadLanSettings();
   // Pairing code rotates and devices come and go — keep the card honest.

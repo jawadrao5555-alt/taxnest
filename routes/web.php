@@ -820,6 +820,8 @@ Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function
 });
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
+    Route::post('/desktop/local-core-lease', [\App\Http\Controllers\Api\AgentCoreController::class, 'issueLease'])
+        ->middleware('throttle:10,1')->name('pos.desktop.local-core-lease');
     Route::get('/desktop/local-core-scope', [PosController::class, 'desktopLocalCoreScope'])
         ->name('pos.desktop.local-core-scope');
     Route::get('/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('pos.agent');
@@ -2078,6 +2080,10 @@ Route::prefix('api/agent/v2')->middleware(['agent.auth', 'agent.core.enabled'])-
     Route::get('/capabilities', [\App\Http\Controllers\Api\AgentCoreController::class, 'capabilities']);
     Route::post('/events', [\App\Http\Controllers\Api\AgentCoreController::class, 'storeEvents'])
         ->middleware('throttle:60,1');
+    Route::get('/status', [\App\Http\Controllers\Api\AgentCoreController::class, 'status'])
+        ->middleware('throttle:60,1');
+    Route::post('/snapshot', [\App\Http\Controllers\Api\AgentCoreController::class, 'snapshot'])
+        ->middleware('throttle:10,1');
 });
 
 // === Public business profile + menu (F8) — slug-only, throttled, 404 on unknown ===

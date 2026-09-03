@@ -35,7 +35,7 @@ use Illuminate\Support\Facades\Log;
 class PosController extends Controller
 {
     /** Desktop-only trusted scope source. Renderer-provided identities are never authority. */
-    public function desktopLocalCoreScope(Request $request)
+    public function desktopLocalCoreScope(Request $request, \App\Services\AgentCoreScopeLeaseService $leases)
     {
         $user = auth('pos')->user();
         if (!$user || !$user->is_active) {
@@ -43,12 +43,29 @@ class PosController extends Controller
         }
         $branch = app(\App\Services\BranchContextService::class)->stampBranchId();
         if (!$branch) return response()->json(['success' => false, 'error' => 'branch_unavailable'], 422);
-        return response()->json([
+        $response = [
             'success' => true,
             'company_id' => (string) app('currentCompanyId'),
             'branch_id' => (string) $branch,
             'user_id' => (string) $user->id,
-        ])->header('Cache-Control', 'no-store');
+        ];
+        // Only the Desktop main process sends this header. A lease is still
+        // issued solely for an authenticated active user and a registered
+        // company device; renderer-provided scope is never trusted.
+        $deviceUid = (string) $request->header('X-NestPOS-Device-Uid', '');
+        if ($deviceUid !== '') {
+            try {
+                $response['lease'] = $leases->issue(
+                    Company::query()->findOrFail((int) app('currentCompanyId')),
+                    $user,
+                    (int) $branch,
+                    $deviceUid
+                );
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return response()->json(['success' => false, 'error' => 'scope_lease_denied'], 403);
+            }
+        }
+        return response()->json($response)->header('Cache-Control', 'no-store');
     }
     public function updateTheme(Request $request)
     {
@@ -2438,12 +2455,40 @@ class PosController extends Controller
                     : collect();
                 return $fixed->merge($choices);
             })->unique();
-            $dealProductNames = PosProduct::where('company_id', $companyId)
-                ->whereIn('id', $dealProductIds)->pluck('name', 'id');
+            $dealProductsById = PosProduct::where('company_id', $companyId)
+                ->whereIn('id', $dealProductIds)->get()->keyBy('id');
             foreach ($activeDeals as $deal) {
                 $componentsText = $deal->items
-                    ->map(fn ($di) => $di->quantity . 'x ' . ($dealProductNames[$di->pos_product_id] ?? 'Item'))
+                    ->map(fn ($di) => $di->quantity . 'x ' . ($dealProductsById[$di->pos_product_id]->name ?? 'Item'))
                     ->implode(' + ');
+                $dealVersion = optional($deal->updated_at)->toJSON() ?: 'legacy';
+                $snapshotComponent = function (int $productId, int $quantity) use (
+                    $companyId, $deal, $dealVersion, $dealProductsById, $recipes
+                ): array {
+                    $product = $dealProductsById->get($productId);
+                    $recipe = $recipes->get($productId, collect())->map(fn ($row) => [
+                        'stock_id' => 'ingredient-' . (int) $row->ingredient_id,
+                        'quantity' => (float) $row->quantity_needed,
+                    ])->values()->all();
+                    return [
+                        'deal_id' => (int) $deal->id,
+                        'deal_version' => $dealVersion,
+                        'deal_name' => (string) $deal->name,
+                        'deal_price' => (float) $deal->price,
+                        'product_id' => $productId,
+                        'name' => (string) ($product?->name ?? 'Item'),
+                        'qty' => $quantity,
+                        'quantity' => $quantity,
+                        'mode' => $recipe ? 'recipe' : 'direct',
+                        'has_recipe' => (bool) $recipe,
+                        'recipe_snapshot' => $recipe,
+                        'tax_facts' => [
+                            'is_tax_exempt' => (bool) ($product?->is_tax_exempt ?? false),
+                            'is_third_schedule' => (bool) ($product?->is_third_schedule ?? false),
+                            'company_id' => (int) $companyId,
+                        ],
+                    ];
+                };
                 $dealsForJs[] = [
                     'id' => $deal->id,
                     'type' => 'deal',
@@ -2453,9 +2498,12 @@ class PosController extends Controller
                     'components' => $componentsText,
                     'component_rows' => $deal->items->map(fn ($di) => [
                         'product_id' => (int) $di->pos_product_id,
-                        'name' => (string) ($dealProductNames[(int) $di->pos_product_id] ?? 'Item'),
+                        'name' => (string) ($dealProductsById[(int) $di->pos_product_id]->name ?? 'Item'),
                         'quantity' => (int) $di->quantity,
                     ])->values(),
+                    'deal_snapshot' => $deal->items->map(fn ($di) => $snapshotComponent(
+                        (int) $di->pos_product_id, (int) $di->quantity
+                    ))->values(),
                     'is_tax_exempt' => false,
                     'hasRecipe' => false,
                     'image' => null,
@@ -2469,7 +2517,10 @@ class PosController extends Controller
                         'quantity' => (int) $group->quantity,
                         'options' => $group->options->map(fn ($option) => [
                             'product_id' => (int) $option->pos_product_id,
-                            'name' => (string) ($dealProductNames[(int) $option->pos_product_id] ?? 'Item'),
+                            'name' => (string) ($dealProductsById[(int) $option->pos_product_id]->name ?? 'Item'),
+                            'deal_component_snapshot' => $snapshotComponent(
+                                (int) $option->pos_product_id, (int) $group->quantity
+                            ),
                         ])->values(),
                     ])->values() : [],
                     ...$deal->quotaMetadata(),
@@ -2948,6 +2999,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+        $agentCoreInventorySale = $request->attributes->get('agent_core_inventory_sale');
 
         // Plan gate (Aug 2026 matrix): deal LINES are server-priced, so a
         // crafted payload could bill deals even when the sale screen hides
@@ -3091,12 +3143,17 @@ class PosController extends Controller
             }
         }
 
-        $companyItems = $this->resolveItemExemptions($request->items, $companyId, $request->input('order_type'));
+        $companyItems = $this->resolveItemExemptions(
+            $request->items,
+            $companyId,
+            $request->input('order_type'),
+            (bool) $agentCoreInventorySale
+        );
         // Deals are billing-only: component stock and the live deal row cannot
         // be authoritatively checked while a bill is offline. Keep this server
         // guard alongside the client guard so a stale/crafted offline replay
         // cannot consume a Special quota later.
-        if ($request->filled('offline_queued_at')
+        if (!$agentCoreInventorySale && $request->filled('offline_queued_at')
             && collect($companyItems)->contains(fn ($item) => ($item['type'] ?? 'product') === 'deal')) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'items' => [__('pos.deal_offline_block')],
@@ -3116,7 +3173,7 @@ class PosController extends Controller
         $recipeBranchId = $request->filled('offline_branch_id')
             ? (int) $request->input('offline_branch_id')
             : app(\App\Services\BranchContextService::class)->stampBranchId();
-        $recipeStockErrors = \App\Services\RecipeInventoryService::stockErrors($companyId, $recipeItemsForStock, $recipeBranchId);
+        $recipeStockErrors = $agentCoreInventorySale ? [] : \App\Services\RecipeInventoryService::stockErrors($companyId, $recipeItemsForStock, $recipeBranchId);
         if ($recipeStockErrors) {
             return response()->json([
                 'success' => false,
@@ -3178,6 +3235,17 @@ class PosController extends Controller
             $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
             $totalAmount = (float) round($afterDiscount + $taxAmount);
             $headerSubtotal = $subtotal;
+        }
+        if ($agentCoreInventorySale) {
+            // The signed Local Core snapshot is the accepted fiscal history.
+            // Cloud tax settings may have changed while the branch was offline;
+            // never re-price or reject that already-authoritative sale.
+            $frozenTotals = (array) ($agentCoreInventorySale['totals'] ?? []);
+            $discountAmount = (float) $frozenTotals['discount_amount'];
+            $taxAmount = (float) $frozenTotals['tax_amount'];
+            $totalAmount = (float) $frozenTotals['total_amount'];
+            $headerSubtotal = (float) $frozenTotals['subtotal'];
+            $taxInclusive = $taxInclusiveColumnExists && (bool) ($frozenTotals['tax_inclusive'] ?? false);
         }
         $taxInclusiveFields = $taxInclusiveColumnExists ? ['tax_inclusive' => $taxInclusive] : [];
         if ($menuRateColumnExists) {
@@ -3432,7 +3500,9 @@ class PosController extends Controller
             // Reloading and locking the live deal here prevents two cashiers
             // from spending the last bundle simultaneously. Any later stock,
             // recipe, waiter, or persistence failure rolls this reservation back.
-            $this->reserveDealUnitsForInvoice($companyItems, $companyId);
+            if (!$agentCoreInventorySale) {
+                $this->reserveDealUnitsForInvoice($companyItems, $companyId);
+            }
 
             if ($draftId) {
                 $transaction = PosTransaction::where('company_id', $companyId)
@@ -3655,14 +3725,25 @@ class PosController extends Controller
             // Kitchen consumption belongs to the bill transaction. The
             // post-commit inventory call below remains for direct products and
             // is idempotent for these recipe rows.
-            \App\Services\RecipeInventoryService::consumeForInvoice(
-                $companyId,
-                $recipeItemsForStock,
-                (int) $transaction->id,
-                $invoiceNumber,
-                auth('pos')->id(),
-                $transaction->branch_id ?? null
-            );
+            if ($agentCoreInventorySale) {
+                \App\Services\InventoryService::projectCanonicalSale(
+                    (int) $companyId,
+                    (int) ($transaction->branch_id ?? $recipeBranchId),
+                    $agentCoreInventorySale,
+                    (int) $transaction->id,
+                    $invoiceNumber,
+                    auth('pos')->id()
+                );
+            } else {
+                \App\Services\RecipeInventoryService::consumeForInvoice(
+                    $companyId,
+                    $recipeItemsForStock,
+                    (int) $transaction->id,
+                    $invoiceNumber,
+                    auth('pos')->id(),
+                    $transaction->branch_id ?? null
+                );
+            }
 
             DB::commit();
         } catch (\Exception $e) {
@@ -3686,16 +3767,18 @@ class PosController extends Controller
         // frozen deal_snapshot so deal components move stock too (deal lines
         // themselves are type 'deal' → skipped by the deduction loop).
         $stockItems = $stockItemsForRecipe;
-        $inventoryResult = PosInventoryController::deductStockForInvoice(
-            $companyId,
-            $stockItems,
-            $transaction->id,
-            $invoiceNumber,
-            auth('pos')->id(),
-            // Per-branch stock (Task 1354): the goods leave the shop that made
-            // the bill — take the branch from the transaction, never the session.
-            $transaction->branch_id ?? null
-        );
+        $inventoryResult = $agentCoreInventorySale
+            ? ['skipped' => false, 'warnings' => []]
+            : PosInventoryController::deductStockForInvoice(
+                $companyId,
+                $stockItems,
+                $transaction->id,
+                $invoiceNumber,
+                auth('pos')->id(),
+                // Per-branch stock (Task 1354): the goods leave the shop that made
+                // the bill — take the branch from the transaction, never the session.
+                $transaction->branch_id ?? null
+            );
 
         // F3 Dine-In (Jul 2026): a table reserved from the universal sale screen is
         // auto-freed the moment its bill is stored (final OR provisional). Only
@@ -11839,7 +11922,9 @@ class PosController extends Controller
      *   "kitchen se chhupi hui line" (Delivery Charges) ka faisla server khud
      *   kare — dekho App\Support\PosKitchenLines::allowSkip().
      */
-    private function resolveItemExemptions(array $requestItems, int $companyId, ?string $orderType = null): array
+    private function resolveItemExemptions(
+        array $requestItems, int $companyId, ?string $orderType = null, bool $authoritativeSnapshot = false
+    ): array
     {
         $resolved = [];
         $skipUsed = false; // ek bill mein sirf EK line kitchen se chhup sakti hai
@@ -11855,6 +11940,7 @@ class PosController extends Controller
             $isExempt = !empty($item['is_tax_exempt']);
 
             $dealSnapshot = null;
+            $dealChoices = [];
             if ($itemId) {
                 if ($itemType === 'product') {
                     $obj = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
@@ -11864,6 +11950,19 @@ class PosController extends Controller
                     // NOTE: Do NOT overwrite $isExempt from $obj->is_tax_exempt here.
                     // Cart payload already reflects user's intent (master default OR T-toggle override).
                 } elseif ($itemType === 'deal') {
+                    if ($authoritativeSnapshot) {
+                        $deal = PosDeal::where('company_id', $companyId)->whereKey($itemId)->first();
+                        if (!$deal || !is_array($item['deal_snapshot'] ?? null) || empty($item['deal_snapshot'])) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => ['The immutable deal snapshot is invalid or outside the company.'],
+                            ]);
+                        }
+                        // Never re-read mutable deal components or price for an
+                        // accepted offline sale. canonicalConsumptions already
+                        // tenant-validates every frozen component.
+                        $dealSnapshot = array_values($item['deal_snapshot']);
+                        $obj = $deal;
+                    } else {
                     // Deals (Jul 2026): MANDATORY explicit branch — without it a deal's
                     // item_id would be probed against pos_services below. Server price is
                     // ENFORCED (promo price is server-defined; closes the tamper hole),
@@ -11902,6 +12001,7 @@ class PosController extends Controller
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'items' => [__('pos.deal_unavailable_line', ['name' => (string) ($itemName ?: 'Deal')])],
                         ]);
+                    }
                     }
                 } else {
                     $obj = PosService::where('company_id', $companyId)->where('id', $itemId)->first();

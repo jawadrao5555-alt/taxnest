@@ -13,6 +13,13 @@
         android:theme="@style/Theme.TaxNestWaiter"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false">
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
+        <activity
+            android:name=".LocalCorePairingActivity"
+            android:exported="false" />
 
         <activity
             android:name=".MainActivity"

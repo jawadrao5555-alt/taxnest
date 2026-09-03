@@ -4,10 +4,224 @@ namespace App\Services;
 
 use App\Models\InventoryStock;
 use App\Models\InventoryMovement;
+use App\Models\Ingredient;
+use App\Models\PosProduct;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
+    /**
+     * Validate and expand the immutable Local Core stock snapshot.  This method
+     * is deliberately read-only so a malformed/cross-tenant settlement is
+     * rejected before storeInvoice can create a bill or auto-create a product.
+     */
+    public static function canonicalConsumptions(int $companyId, array $sale): array
+    {
+        $products = [];
+        $ingredients = [];
+        $items = $sale['items'] ?? null;
+        if (!is_array($items) || !$items) {
+            throw ValidationException::withMessages(['payload.sale.items' => ['A non-empty immutable item snapshot is required.']]);
+        }
+
+        $expand = function (array $line, float $multiplier = 1.0) use (&$expand, &$products, &$ingredients, $companyId): void {
+            $type = (string) ($line['type'] ?? 'product');
+            $quantity = $line['quantity'] ?? $line['qty'] ?? null;
+            if (!is_numeric($quantity) || !is_finite((float) $quantity) || (float) $quantity <= 0) {
+                throw ValidationException::withMessages(['payload.sale.items' => ['Every stock quantity must be finite and positive.']]);
+            }
+            $quantity = (float) $quantity * $multiplier;
+
+            if ($type === 'deal') {
+                $dealId = (int) ($line['item_id'] ?? $line['deal_id'] ?? 0);
+                $snapshot = $line['deal_snapshot'] ?? null;
+                if ($dealId < 1 || !is_array($snapshot) || !$snapshot) {
+                    throw ValidationException::withMessages(['payload.sale.items' => ['A deal requires its immutable component snapshot.']]);
+                }
+                foreach ($snapshot as $component) {
+                    if (!is_array($component)) {
+                        throw ValidationException::withMessages(['payload.sale.items' => ['A deal component snapshot is invalid.']]);
+                    }
+                    if ((isset($component['deal_id']) && (int) $component['deal_id'] !== $dealId)
+                        || (isset($component['tax_facts']['company_id'])
+                            && (int) $component['tax_facts']['company_id'] !== $companyId)
+                        || (isset($component['mode'])
+                            && !in_array((string) $component['mode'], ['direct', 'recipe'], true))
+                        || (($component['mode'] ?? null) === 'recipe' && empty($component['recipe_snapshot']))
+                        || (($component['mode'] ?? null) === 'direct' && !empty($component['recipe_snapshot']))) {
+                        throw ValidationException::withMessages(['payload.sale.items' => ['A deal component snapshot was tampered with.']]);
+                    }
+                    $component['type'] = 'product';
+                    $component['item_id'] = $component['product_id'] ?? $component['item_id'] ?? null;
+                    $expand($component, $quantity);
+                }
+                return;
+            }
+            if (in_array($type, ['manual', 'service'], true)) {
+                if (!empty($line['recipe_snapshot'])) {
+                    throw ValidationException::withMessages(['payload.sale.items' => ['Manual/service lines cannot consume stock.']]);
+                }
+                return;
+            }
+            if ($type !== 'product') {
+                throw ValidationException::withMessages(['payload.sale.items' => ['Unsupported stock line type.']]);
+            }
+
+            $productId = (int) ($line['item_id'] ?? $line['product_id'] ?? 0);
+            if ($productId < 1 || !PosProduct::where('company_id', $companyId)->whereKey($productId)->exists()) {
+                throw ValidationException::withMessages(['payload.sale.items' => ['A product or deal component is outside the company.']]);
+            }
+            $recipe = $line['recipe_snapshot'] ?? [];
+            if (!is_array($recipe)) {
+                throw ValidationException::withMessages(['payload.sale.items' => ['recipe_snapshot must be an array.']]);
+            }
+            if (($line['has_recipe'] ?? false) === true && !$recipe) {
+                throw ValidationException::withMessages(['payload.sale.items' => ['A recipe product requires its immutable recipe snapshot.']]);
+            }
+            if ($recipe) {
+                foreach ($recipe as $part) {
+                    if (!is_array($part) || !is_numeric($part['quantity'] ?? null)
+                        || !is_finite((float) $part['quantity']) || (float) $part['quantity'] <= 0) {
+                        throw ValidationException::withMessages(['payload.sale.items' => ['A recipe component quantity is invalid.']]);
+                    }
+                    $stockId = (string) ($part['stock_id'] ?? '');
+                    if (!preg_match('/^(?:ingredient[:\\-])?(\\d+)$/', $stockId, $match)) {
+                        throw ValidationException::withMessages(['payload.sale.items' => ['A recipe component stock id is invalid.']]);
+                    }
+                    $ingredientId = (int) $match[1];
+                    if (!Ingredient::where('company_id', $companyId)->whereKey($ingredientId)->exists()) {
+                        throw ValidationException::withMessages(['payload.sale.items' => ['A recipe component is outside the company.']]);
+                    }
+                    $needed = round($quantity * (float) $part['quantity'], 4);
+                    $ingredients[$ingredientId]['quantity'] = round(($ingredients[$ingredientId]['quantity'] ?? 0) + $needed, 4);
+                    $ingredients[$ingredientId]['products'][(string) $productId] =
+                        round(($ingredients[$ingredientId]['products'][(string) $productId] ?? 0) + $needed, 4);
+                    $ingredients[$ingredientId]['snapshot'][] = [
+                        'product_id' => $productId,
+                        'sale_quantity' => $quantity,
+                        'quantity_needed' => (float) $part['quantity'],
+                        'ingredient_id' => $ingredientId,
+                        'recipe_version' => (int) ($part['version'] ?? $part['recipe_version'] ?? 1),
+                    ];
+                }
+                return;
+            }
+            $products[$productId] = round(($products[$productId] ?? 0) + $quantity, 4);
+        };
+
+        foreach ($items as $line) {
+            if (!is_array($line)) {
+                throw ValidationException::withMessages(['payload.sale.items' => ['A sale line is invalid.']]);
+            }
+            $expand($line);
+        }
+        ksort($products);
+        ksort($ingredients);
+        return ['products' => $products, 'ingredients' => $ingredients];
+    }
+
+    /**
+     * Apply a canonical Local Core sale exactly once inside the caller's bill
+     * transaction. Cloud stock may become negative: the sale was already
+     * accepted by the authoritative offline policy.
+     */
+    public static function projectCanonicalSale(
+        int $companyId, int $branchId, array $sale, int $transactionId,
+        string $invoiceNumber, ?int $userId = null
+    ): array {
+        $consumptions = self::canonicalConsumptions($companyId, $sale);
+        if (InventoryMovement::where('company_id', $companyId)
+            ->where('reference_type', 'pos_transaction')->where('reference_id', $transactionId)
+            ->whereIn('type', [InventoryMovement::TYPE_SALE, InventoryMovement::TYPE_RECIPE_SALE])->exists()) {
+            return ['idempotent' => true];
+        }
+
+        $productIds = array_keys($consumptions['products']);
+        if ($productIds) {
+            PosProduct::where('company_id', $companyId)->whereIn('id', $productIds)
+                ->orderBy('id')->lockForUpdate()->get();
+        }
+        foreach ($productIds as $productId) {
+            $stock = InventoryStock::where('company_id', $companyId)->where('product_id', $productId)
+                ->where('branch_id', $branchId)->lockForUpdate()->first();
+            if (!$stock) {
+                $stock = InventoryStock::create([
+                    'company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId,
+                    'quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0,
+                ]);
+            }
+            $qty = $consumptions['products'][$productId];
+            $after = round((float) $stock->quantity - $qty, 4);
+            $stock->update(['quantity' => $after]);
+            BranchStockService::syncProductMirror($companyId, (int) $productId);
+            InventoryMovement::create([
+                'company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId,
+                'type' => InventoryMovement::TYPE_SALE, 'quantity' => $qty, 'unit_price' => 0,
+                'total_price' => 0, 'balance_after' => $after, 'reference_type' => 'pos_transaction',
+                'reference_id' => $transactionId, 'reference_number' => $invoiceNumber,
+                'notes' => 'Authoritative Local Core sale deduction', 'created_by' => $userId,
+            ]);
+        }
+
+        $ingredientIds = array_keys($consumptions['ingredients']);
+        $lockedIngredients = $ingredientIds
+            ? Ingredient::where('company_id', $companyId)->whereIn('id', $ingredientIds)
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id')
+            : collect();
+        foreach ($ingredientIds as $ingredientId) {
+            $ingredient = $lockedIngredients[$ingredientId];
+            $requirement = $consumptions['ingredients'][$ingredientId];
+            $qty = (float) $requirement['quantity'];
+            $after = round((float) $ingredient->current_stock - $qty, 4);
+            $ingredient->update(['current_stock' => $after]);
+            if (Schema::hasTable('ingredient_stocks')) {
+                $row = DB::table('ingredient_stocks')->where('company_id', $companyId)
+                    ->where('ingredient_id', $ingredientId)->where('branch_id', $branchId)->lockForUpdate()->first();
+                if ($row) {
+                    DB::table('ingredient_stocks')->where('id', $row->id)
+                        ->update(['quantity' => round((float) $row->quantity - $qty, 4), 'updated_at' => now()]);
+                } else {
+                    DB::table('ingredient_stocks')->insert([
+                        'company_id' => $companyId, 'ingredient_id' => $ingredientId, 'branch_id' => $branchId,
+                        'quantity' => $after, 'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
+            }
+            InventoryMovement::create([
+                'company_id' => $companyId, 'product_id' => (int) array_key_first($requirement['products']),
+                'branch_id' => $branchId, 'type' => InventoryMovement::TYPE_RECIPE_SALE,
+                'quantity' => $qty, 'unit_price' => (float) ($ingredient->cost_per_unit ?? 0),
+                'total_price' => round($qty * (float) ($ingredient->cost_per_unit ?? 0), 2),
+                'balance_after' => $after, 'reference_type' => 'pos_transaction',
+                'reference_id' => $transactionId, 'reference_number' => $invoiceNumber,
+                'notes' => 'Authoritative Local Core recipe consumption', 'created_by' => $userId,
+            ]);
+            if (Schema::hasTable('ingredient_movements')) {
+                DB::table('ingredient_movements')->insert([
+                    'company_id' => $companyId, 'ingredient_id' => $ingredientId,
+                    'branch_id' => $branchId, 'type' => InventoryMovement::TYPE_RECIPE_SALE,
+                    'quantity' => $qty, 'balance_after' => $after,
+                    'reference_type' => 'pos_transaction', 'reference_id' => $transactionId,
+                    'reference_number' => $invoiceNumber,
+                    'snapshot' => json_encode($requirement['snapshot']), 'created_by' => $userId,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+            if (Schema::hasTable('recipe_consumptions')) {
+                DB::table('recipe_consumptions')->insert([
+                    'company_id' => $companyId, 'transaction_id' => $transactionId,
+                    'ingredient_id' => $ingredientId, 'branch_id' => $branchId, 'quantity' => $qty,
+                    'components' => json_encode($requirement['products']),
+                    'snapshot' => json_encode($requirement['snapshot']), 'invoice_number' => $invoiceNumber,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+        }
+        return ['idempotent' => false, 'consumptions' => $consumptions];
+    }
+
     public static function addStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null)
     {
         return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId) {

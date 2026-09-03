@@ -168,6 +168,7 @@ class PosReturnService
             $taxSum = 0.0;    // Σ prorated item tax
             $exemptSum = 0.0; // Σ prorated exempt-line subtotals (taxable/exempt split)
             $returnItems = [];
+            $stockReturnItems = [];
 
             foreach ($items as $row) {
                 $qty = (float) $row['return_qty'];
@@ -215,6 +216,27 @@ class PosReturnService
                     'return_disposition' => $disposition,
                     'disposition' => $disposition,
                 ];
+                if ($orig->item_type === 'product' && $orig->item_id) {
+                    $stockReturnItems[] = [
+                        'item_type' => 'product', 'item_id' => (int) $orig->item_id,
+                        'quantity' => $qty, 'unit_price' => (float) $orig->unit_price,
+                        'return_disposition' => $disposition,
+                    ];
+                } elseif ($orig->item_type === 'deal' && is_array($orig->deal_snapshot)) {
+                    // A deal's sold components are immutable. Return the exact
+                    // frozen products (including choices), never today's deal.
+                    foreach ($orig->deal_snapshot as $component) {
+                        $productId = (int) ($component['product_id'] ?? 0);
+                        $componentQty = (float) ($component['qty'] ?? 0);
+                        if ($productId > 0 && $componentQty > 0) {
+                            $stockReturnItems[] = [
+                                'item_type' => 'product', 'item_id' => $productId,
+                                'quantity' => round($qty * $componentQty, 4), 'unit_price' => 0,
+                                'return_disposition' => $disposition,
+                            ];
+                        }
+                    }
+                }
 
                 // Over-return guard state ON the parent line.
                 $orig->update(['returned_quantity' => round((float) ($orig->returned_quantity ?? 0) + $qty, 3)]);
@@ -335,7 +357,7 @@ class PosReturnService
                     ->where('reference_id', $original->id)
                     ->where('type', InventoryMovement::TYPE_SALE)
                     ->pluck('product_id')->map(fn ($v) => (int) $v)->all();
-                foreach ($returnItems as $it) {
+                foreach ($stockReturnItems as $it) {
                     if (($it['item_type'] ?? null) === 'product'
                         && !empty($it['item_id'])
                         && ($it['return_disposition'] ?? RecipeInventoryService::DISPOSITION_NORMAL)
@@ -378,7 +400,7 @@ class PosReturnService
                     $companyId,
                     (int) $original->id,
                     (int) $return->id,
-                    $returnItems,
+                    $stockReturnItems,
                     $original->branch_id ?? null,
                     $userId,
                     $invNum
@@ -387,7 +409,7 @@ class PosReturnService
                     $companyId,
                     (int) $return->id,
                     $original->branch_id ?? null,
-                    $returnItems,
+                    $stockReturnItems,
                     $userId,
                     $expiryHours
                 );

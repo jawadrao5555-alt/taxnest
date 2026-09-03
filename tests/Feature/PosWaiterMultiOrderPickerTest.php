@@ -301,6 +301,10 @@ class PosWaiterMultiOrderPickerTest extends TestCase
         $this->assertStringNotContainsString('t.status === \'occupied\' && !t.order_id', $blade);
         // Add/Shift buttons stay gated on a held order being present.
         $this->assertStringContainsString('tableActionFor && tableActionFor.order_id', $blade);
+        // Item quantities and names remain prominent and wrap inside the scrollable modal.
+        $this->assertStringContainsString('flex-1 overflow-y-auto p-4', $blade);
+        $this->assertStringContainsString('min-w-0 text-sm font-bold leading-snug', $blade);
+        $this->assertStringContainsString('dark:text-gray-200 break-words', $blade);
     }
 
     public function test_waiter_network_reads_have_timeout_and_honest_retry_states(): void

@@ -2217,9 +2217,9 @@ window.addEventListener('popstate', function() {
                                     <p class="text-[11px] text-gray-400 text-center py-1">{{ __('pos.no_items_found') }}</p>
                                 </template>
                                 <template x-for="(it, idx) in (Array.isArray(boardMenuItems) ? boardMenuItems : [])" :key="idx">
-                                    <div class="flex justify-between gap-2 py-0.5">
-                                        <span class="text-[11px] text-gray-700 dark:text-gray-300 truncate" x-text="(parseFloat(it.quantity) || 1) + ' × ' + it.item_name"></span>
-                                        <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex-shrink-0" x-text="'Rs ' + Math.round(parseFloat(it.subtotal ?? 0) || ((parseFloat(it.quantity)||1) * (parseFloat(it.unit_price)||0))).toLocaleString()"></span>
+                                    <div class="flex items-start justify-between gap-2 py-1">
+                                        <span class="min-w-0 flex-1 text-sm font-bold leading-snug text-gray-800 dark:text-gray-200 break-words" x-text="(parseFloat(it.quantity) || 1) + ' × ' + it.item_name"></span>
+                                        <span class="text-sm font-extrabold tabular-nums text-gray-700 dark:text-gray-300 flex-shrink-0 whitespace-nowrap" x-text="'Rs ' + Math.round(parseFloat(it.subtotal ?? 0) || ((parseFloat(it.quantity)||1) * (parseFloat(it.unit_price)||0))).toLocaleString()"></span>
                                     </div>
                                 </template>
                             </div>

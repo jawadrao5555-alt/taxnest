@@ -58,6 +58,21 @@ class PosUniversalTableOrderRecallTest extends TestCase
         );
     }
 
+    public function test_occupied_table_popup_items_are_readable_and_actions_stay_wired(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/universal.blade.php'));
+        $this->assertNotFalse($blade);
+
+        $this->assertStringContainsString('max-h-36 overflow-y-auto', $blade);
+        $this->assertStringContainsString('min-w-0 flex-1 text-sm font-bold leading-snug', $blade);
+        $this->assertStringContainsString('text-sm font-extrabold tabular-nums', $blade);
+        $this->assertStringContainsString('flex-shrink-0 whitespace-nowrap', $blade);
+
+        foreach (['boardViewEdit()', 'boardProofBill()', 'toggleOnlinePayment(boardMenuTable.order, true)', 'boardAskFinal()'] as $action) {
+            $this->assertStringContainsString('@click="' . $action . '"', $blade);
+        }
+    }
+
     private function methodBody(string $blade, string $signature): string
     {
         $start = strpos($blade, $signature);

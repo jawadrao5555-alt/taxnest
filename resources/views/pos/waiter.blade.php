@@ -483,8 +483,10 @@
                                             <span class="text-xs font-black text-gray-900 dark:text-white" x-text="'Rs ' + Math.round(o.total_amount || 0).toLocaleString()"></span>
                                         </span>
                                     </div>
-                                    <div class="mt-1 text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">
-                                        <template x-for="(it, ix) in o.items" :key="'tprevit' + o.id + '-' + ix"><span><span x-text="it.quantity + '× ' + it.name"></span><span x-show="ix < o.items.length - 1"> · </span></span></template>
+                                    <div class="mt-1.5 space-y-1">
+                                        <template x-for="(it, ix) in o.items" :key="'tprevit' + o.id + '-' + ix">
+                                            <div class="min-w-0 text-sm font-bold leading-snug text-gray-700 dark:text-gray-200 break-words" x-text="it.quantity + ' × ' + it.name"></div>
+                                        </template>
                                     </div>
                                 </div>
                             </template>

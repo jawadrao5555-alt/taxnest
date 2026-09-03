@@ -2660,7 +2660,7 @@ class PosController extends Controller
 
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
-            'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
+            'recipeLookup', 'recipes', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',

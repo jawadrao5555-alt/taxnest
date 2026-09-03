@@ -1223,6 +1223,7 @@ window.addEventListener('popstate', function() {
                     :title="cartMode ? window.TXT.ti_cart_mode_on : window.TXT.ti_enter_cart_mode">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     <span x-text="cartMode ? window.TXT.editing_word : window.TXT.edit"></span>
+                    <kbd x-show="!cartMode" class="px-1.5 py-0.5 rounded bg-white/70 dark:bg-gray-900/40 text-[9px] font-extrabold leading-none">F6</kbd>
                 </button>
                 <template x-if="priorityOrder"><span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">URGENT</span></template>
                 <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
@@ -2655,10 +2656,6 @@ window.addEventListener('popstate', function() {
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.edit_cart_mode') }}</span>
                                 <kbd style="background:#e9d5ff; color:#2563eb; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+E</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.latest_cart_quantity') }}</span>
-                                <kbd style="background:#e9d5ff; color:#2563eb; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">PgDn</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.customer_field') }}</span>

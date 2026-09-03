@@ -6,6 +6,36 @@ use Tests\TestCase;
 
 class PosSaleScreenInteractionLatencyTest extends TestCase
 {
+    public function test_f6_is_the_official_direct_latest_quantity_shortcut_on_every_sale_view(): void
+    {
+        $saleViews = [
+            'PRA' => resource_path('views/pos/universal.blade.php'),
+            'FBR' => resource_path('views/fbr-pos/universal.blade.php'),
+            'Restaurant' => resource_path('views/pos/restaurant/pos.blade.php'),
+        ];
+
+        foreach ($saleViews as $product => $path) {
+            $view = file_get_contents($path);
+            $f6Handler = strpos($view, "if (e.key === 'F6')");
+            $formFieldGate = strpos($view, "e.target.closest('input, textarea, select')", $f6Handler);
+            if ($formFieldGate === false) {
+                $formFieldGate = strpos($view, 'if (isInput) return;', $f6Handler);
+            }
+
+            $this->assertNotFalse($f6Handler, "{$product} must reserve F6");
+            $this->assertNotFalse($formFieldGate, "{$product} must retain its form-field safety gate");
+            $this->assertLessThan($formFieldGate, $f6Handler, "{$product} F6 must work even while search or quantity is focused");
+            $this->assertStringContainsString("this.enterCartMode(", substr($view, $f6Handler, 260), "{$product} F6 must enter cart quantity editing");
+            $this->assertStringContainsString("this.mobileView = 'cart';", substr($view, $f6Handler, 260), "{$product} F6 must reveal the cart on narrow screens");
+            $this->assertStringContainsString('if (el) { el.focus(); el.select(); }', $view, "{$product} must select the quantity for direct numeric replacement");
+            $this->assertStringContainsString('x-show="!cartMode"', $view, "{$product} must visibly advertise F6 beside the cart edit control");
+        }
+
+        $this->assertSame('Edit Latest Item Quantity', __('pos.jump_to_cart', [], 'en'));
+        $this->assertSame('Aakhri item ki quantity edit karein', __('pos.jump_to_cart', [], 'rur'));
+        $this->assertSame('آخری آئٹم کی مقدار تبدیل کریں', __('pos.jump_to_cart', [], 'ur'));
+    }
+
     public function test_cart_interactions_keep_the_visible_feedback_immediate(): void
     {
         $saleViews = [
@@ -58,8 +88,6 @@ class PosSaleScreenInteractionLatencyTest extends TestCase
             $this->assertStringContainsString("this.cart.length > 0", $view, "{$product} must ignore Page Down for an empty cart");
             $this->assertStringContainsString('e.preventDefault();', $view, "{$product} must prevent native Page Down scrolling when handled");
             $this->assertStringContainsString('this.mobileView = \'cart\';', $view, "{$product} must reveal the cart before focusing quantity");
-            $this->assertStringContainsString("__('pos.latest_cart_quantity')", $view, "{$product} must explain the Page Down shortcut");
-            $this->assertStringContainsString('>PgDn</kbd>', $view, "{$product} must display the Page Down key");
             $this->assertStringContainsString("if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }", $view, "{$product} must preserve focused quantity down-arrow navigation");
             $this->assertStringContainsString("if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }", $view, "{$product} must preserve focused quantity up-arrow navigation");
         }

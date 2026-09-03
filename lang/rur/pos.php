@@ -1911,7 +1911,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'js_prompt_set_price' => 'Nayi price (Rs) — :count selected product(s) par lagegi:',
     'js_scope_all' => 'SAB products',
     'js_scope_category' => '":category" category ke products',
-    'jump_to_cart' => 'Cart par jayen',
+    'jump_to_cart' => 'Aakhri item ki quantity edit karein',
     'just_now' => 'abhi abhi',
     'kal_se_kam' => 'kal se kam',
     'kal_se_zyada' => 'kal se zyada',

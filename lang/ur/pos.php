@@ -1911,7 +1911,7 @@ return [
     'js_prompt_set_price' => 'نئی قیمت (Rs) — :count منتخب پروڈکٹ(s) پر لاگو ہوگی:',
     'js_scope_all' => 'تمام پروڈکٹس',
     'js_scope_category' => '":category" کیٹیگری کی پروڈکٹس',
-    'jump_to_cart' => 'کارٹ پر جائیں',
+    'jump_to_cart' => 'آخری آئٹم کی مقدار تبدیل کریں',
     'just_now' => 'ابھی',
     'kal_se_kam' => 'کل سے کم',
     'kal_se_zyada' => 'کل سے زیادہ',

@@ -160,7 +160,7 @@ function createGateway(options = {}) {
     if (!deviceUid || !auth || rateLimited) {
       metrics.authFailures += 1;
       if (rateLimited) metrics.rateLimited += 1;
-      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); return socket.destroy();
+      return socket.end('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
     }
     if (!ipWindow) {
       ipWindow = { startedAt: now, count: 0 };
@@ -180,7 +180,7 @@ function createGateway(options = {}) {
     const companyId = data && normalizeCompanyId(data.company_id);
     if (!data || String(data.device_uid) !== deviceUid || companyId === null) {
       metrics.authFailures += 1;
-      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); return socket.destroy();
+      return socket.end('HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
     }
     wss.handleUpgrade(request, socket, head, (ws) => {
       ws.companyId = companyId;

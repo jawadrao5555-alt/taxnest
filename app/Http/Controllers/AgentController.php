@@ -107,6 +107,44 @@ class AgentController extends Controller
     }
 
     /**
+     * Authenticated Local Core discovery contract consumed by the desktop
+     * lifecycle gate. A company-level opt-in alone is deliberately insufficient:
+     * the response must bind the exact registered device namespace to the
+     * company resolved by AgentAuth.
+     */
+    private function localCoreHeartbeat(Company $company, Request $request): array
+    {
+        $deviceUid = $this->requestDeviceUid($request);
+        $registered = false;
+        if ($deviceUid && self::deviceRoutingReady()) {
+            try {
+                $registered = \App\Models\PosAgentDevice::query()
+                    ->where('company_id', $company->id)
+                    ->where('device_uid', $deviceUid)
+                    ->exists();
+            } catch (\Throwable $e) {
+                $registered = false;
+            }
+        }
+
+        $companyEnabled = (bool) $company->agent_core_enabled;
+        $killSwitch = !$companyEnabled;
+
+        return [
+            // Legacy discovery remains the company opt-in flag.
+            'local_core_enabled' => $companyEnabled,
+            'local_core_kill_switch' => $killSwitch,
+            'local_core' => [
+                'enabled' => $companyEnabled && $registered,
+                'device_registered' => $registered,
+                'company_id' => (string) $company->id,
+                'device_uid' => $deviceUid,
+                'kill_switch' => $killSwitch,
+            ],
+        ];
+    }
+
+    /**
      * Self-update advertisement for v1.3.0+ agents, piggybacked on the
      * heartbeat response. Reuses the cached GitHub latest-release info so
      * agents never hit api.github.com directly (shared-ISP rate limits).
@@ -275,7 +313,7 @@ class AgentController extends Controller
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {
-            return $this->fbrHeartbeat($company, $request->input('version'));
+            return $this->fbrHeartbeat($company, $request);
         }
 
         // ===== PRA POS company (default) =====
@@ -340,12 +378,11 @@ class AgentController extends Controller
             'agent_update' => $this->agentUpdateInfo($request->input('version')),
             // Additive discovery for Local TaxNest Core-aware agents. Legacy
             // agents ignore unknown response keys; the database flag defaults off.
-            'local_core_enabled' => (bool) $company->agent_core_enabled,
-        ]);
+        ] + $this->localCoreHeartbeat($company, $request));
     }
 
     /** FBR POS equivalent of the PRA self-heal sweep, operating on fbr_pos_transactions. */
-    private function fbrHeartbeat(Company $company, ?string $agentVersion = null)
+    private function fbrHeartbeat(Company $company, Request $request)
     {
         // Self-heal: rows with a fiscal invoice # but a stale status.
         $healed = DB::table('fbr_pos_transactions')
@@ -400,9 +437,8 @@ class AgentController extends Controller
             'repromoted' => $repromoted,
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
-            'agent_update' => $this->agentUpdateInfo($agentVersion),
-            'local_core_enabled' => (bool) $company->agent_core_enabled,
-        ]);
+            'agent_update' => $this->agentUpdateInfo($request->input('version')),
+        ] + $this->localCoreHeartbeat($company, $request));
     }
 
     public function pendingInvoices(Request $request)

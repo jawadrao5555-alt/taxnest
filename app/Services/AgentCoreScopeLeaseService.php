@@ -31,12 +31,10 @@ class AgentCoreScopeLeaseService
             throw ValidationException::withMessages(['device_uid' => ['Device/user scope is not authorized.']]);
         }
         $role = (string) ($user->pos_role ?: $user->role);
-        $actions = in_array($role, ['company_admin', 'pos_admin', 'pos_manager'], true)
-            ? self::SUPPORTED_ACTIONS
-            : ['order.hold', 'order.open', 'order.line.add', 'order.line.consume', 'order.claim', 'order.cancel',
-                'order.settle', 'table.claim', 'table.shift', 'table.release', 'customer.upsert', 'khata.debit',
-                'wasooli.record', 'refund.record', 'cash.open', 'cash.expense', 'cash.close',
-                'staff.start', 'staff.end', 'print.enqueue', 'print.claim', 'print.complete', 'print.fail'];
+        $actions = array_values(array_filter(
+            self::SUPPORTED_ACTIONS,
+            fn (string $action): bool => PosAccessService::localCoreActionAllowed($user, $company, $action)
+        ));
         $token = Str::random(80);
         $signingSecret = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
         $version = hash('sha256', implode('|', [$user->updated_at?->getTimestamp(), $user->is_active, $role]));

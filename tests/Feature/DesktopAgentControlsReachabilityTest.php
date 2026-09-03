@@ -50,10 +50,12 @@ class DesktopAgentControlsReachabilityTest extends TestCase
         $this->assertStringContainsString('.tn-toggles-strip { flex-wrap: wrap;', $sale);
 
         // A new worker cache namespace removes any runtime-cached authenticated
-        // settings page created before the layout correction.
-        $this->assertStringContainsString(
-            "const CACHE_VERSION = 'taxnest-20260903-desktop-agent-controls'",
-            $worker
+        // settings page created before the layout correction. Deploys
+        // intentionally replace the suffix, so assert the generated namespace
+        // contract instead of pinning one obsolete deployment value.
+        $this->assertMatchesRegularExpression(
+            "/const CACHE_VERSION = 'taxnest-[^']+';/",
+            $worker,
         );
         $this->assertStringContainsString("'/pos/pra-settings'", $worker);
     }

@@ -4,6 +4,7 @@
      Product.default_price, product_id column (shared products table). --}}
 @php
     $dayNames = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'];
+    $restoringCreateDeal = old('deal_form_context') === 'create' && $errors->any();
     $productsJson = $products->map(fn($p) => [
         'id' => $p->id,
         'name' => $p->name,
@@ -41,22 +42,23 @@
 
     {{-- Add New Deal --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
-         x-data="Object.assign(dealComposer([], []), { dealType: 'regular' })">
+         x-data="Object.assign(dealComposer({{ json_encode($restoringCreateDeal ? old('items', []) : [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}, {{ json_encode($restoringCreateDeal ? old('choice_groups', []) : [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}), { dealType: @js($restoringCreateDeal ? old('deal_type', 'regular') : 'regular') })">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.add_new_deal') }}</h3>
         <form method="POST" action="{{ route('fbrpos.deals.store') }}">
             @csrf
+            <input type="hidden" name="deal_form_context" value="create">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_name') }}</label>
-                    <input type="text" name="name" required maxlength="255" placeholder="{{ __('pos.ph_deal_name_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" name="name" required maxlength="255" value="{{ $restoringCreateDeal ? old('name') : '' }}" placeholder="{{ __('pos.ph_deal_name_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_price_pkr') }}</label>
-                    <input type="number" name="price" required step="0.01" min="1" placeholder="0.00" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="number" name="price" required step="0.01" min="1" value="{{ $restoringCreateDeal ? old('price') : '' }}" placeholder="0.00" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div class="sm:col-span-2">
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.description_label') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="text" name="description" maxlength="255" placeholder="{{ __('pos.ph_deal_desc_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" name="description" maxlength="255" value="{{ $restoringCreateDeal ? old('description') : '' }}" placeholder="{{ __('pos.ph_deal_desc_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -68,7 +70,7 @@
                 <div class="flex flex-wrap gap-2">
                     @foreach($dayNames as $num => $label)
                     <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer has-[:checked]:bg-blue-600 has-[:checked]:text-white has-[:checked]:border-blue-600 transition">
-                        <input type="checkbox" name="active_days[]" value="{{ $num }}" class="sr-only">
+                        <input type="checkbox" name="active_days[]" value="{{ $num }}" @checked($restoringCreateDeal && in_array($num, old('active_days', []))) class="sr-only">
                         {{ $label }}
                     </label>
                     @endforeach
@@ -78,24 +80,24 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.start_date') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="date" name="starts_on" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" name="starts_on" value="{{ $restoringCreateDeal ? old('starts_on') : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.end_date') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="date" name="ends_on" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" name="ends_on" value="{{ $restoringCreateDeal ? old('ends_on') : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
             <div x-show="dealType === 'special'" x-cloak class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
-                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_start_time') }}</label><input type="time" name="special_start_time" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
-                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_end_time') }}</label><input type="time" name="special_end_time" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
-                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.total_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="total_deal_units_limit" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
-                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.daily_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="daily_deal_units_limit" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_start_time') }}</label><input type="time" name="special_start_time" value="{{ $restoringCreateDeal ? old('special_start_time') : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_end_time') }}</label><input type="time" name="special_end_time" value="{{ $restoringCreateDeal ? old('special_end_time') : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.total_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="total_deal_units_limit" value="{{ $restoringCreateDeal ? old('total_deal_units_limit') : '' }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.daily_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="daily_deal_units_limit" value="{{ $restoringCreateDeal ? old('daily_deal_units_limit') : '' }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
                 <p class="sm:col-span-2 lg:col-span-4 text-[11px] text-amber-700 dark:text-amber-300">{{ __('pos.special_deal_help') }}</p>
             </div>
 
             @include('pos.partials.deal-product-composer', ['accent' => 'blue'])
 
-            <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">{{ __('pos.add_deal') }}</button>
+            <button type="submit" :disabled="!canSubmit()" :title="!canSubmit() ? compositionMessage() : ''" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 text-white text-sm font-medium rounded-lg transition">{{ __('pos.add_deal') }}</button>
         </form>
     </div>
 
@@ -109,6 +111,7 @@
     <div class="space-y-4">
         @forelse($deals as $deal)
         @php
+            $restoringEditDeal = (string) old('editing_deal_id') === (string) $deal->id && $errors->any();
             $dealDays = array_map('intval', (array) ($deal->active_days ?? []));
             $componentsText = $deal->items->map(fn($di) => $di->quantity . 'x ' . ($productNames[$di->product_id] ?? 'Product #' . $di->product_id))->implode(', ');
             $dealItemsJson = $deal->items->map(fn($di) => ['product_id' => $di->product_id, 'quantity' => (int) $di->quantity])->values();
@@ -124,7 +127,7 @@
             )->implode(' · ') : '';
         @endphp
         <div x-show="dealFilter === 'all' || dealFilter === @js($deal->deal_type ?: 'regular')" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5"
-             x-data="Object.assign(dealComposer({{ json_encode($dealItemsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}, {{ json_encode($dealChoiceGroupsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}), { editing: false, dealType: @js($deal->deal_type ?: 'regular') })">
+             x-data="Object.assign(dealComposer({{ json_encode($restoringEditDeal ? old('items', []) : $dealItemsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}, {{ json_encode($restoringEditDeal ? old('choice_groups', []) : $dealChoiceGroupsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }}), { editing: @js($restoringEditDeal), dealType: @js($restoringEditDeal ? old('deal_type', $deal->deal_type ?: 'regular') : ($deal->deal_type ?: 'regular')) })">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
@@ -171,18 +174,19 @@
             <div x-show="editing" x-cloak class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <form method="POST" action="{{ route('fbrpos.deals.update', $deal->id) }}">
                     @csrf @method('PUT')
+                    <input type="hidden" name="editing_deal_id" value="{{ $deal->id }}">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_name') }}</label>
-                            <input type="text" name="name" required maxlength="255" value="{{ $deal->name }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="text" name="name" required maxlength="255" value="{{ $restoringEditDeal ? old('name') : $deal->name }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_price_pkr') }}</label>
-                            <input type="number" name="price" required step="0.01" min="1" value="{{ $deal->price }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="number" name="price" required step="0.01" min="1" value="{{ $restoringEditDeal ? old('price') : $deal->price }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div class="sm:col-span-2">
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.description_label') }}</label>
-                            <input type="text" name="description" maxlength="255" value="{{ $deal->description }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="text" name="description" maxlength="255" value="{{ $restoringEditDeal ? old('description') : $deal->description }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -193,7 +197,7 @@
                         <div class="flex flex-wrap gap-2">
                             @foreach($dayNames as $num => $label)
                             <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer has-[:checked]:bg-blue-600 has-[:checked]:text-white has-[:checked]:border-blue-600 transition">
-                                <input type="checkbox" name="active_days[]" value="{{ $num }}" @checked(in_array($num, $dealDays, true)) class="sr-only">
+                                <input type="checkbox" name="active_days[]" value="{{ $num }}" @checked($restoringEditDeal ? in_array($num, old('active_days', [])) : in_array($num, $dealDays, true)) class="sr-only">
                                 {{ $label }}
                             </label>
                             @endforeach
@@ -202,27 +206,27 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.start_date') }}</label>
-                            <input type="date" name="starts_on" value="{{ $deal->starts_on?->format('Y-m-d') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="date" name="starts_on" value="{{ $restoringEditDeal ? old('starts_on') : $deal->starts_on?->format('Y-m-d') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.end_date') }}</label>
-                            <input type="date" name="ends_on" value="{{ $deal->ends_on?->format('Y-m-d') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <input type="date" name="ends_on" value="{{ $restoringEditDeal ? old('ends_on') : $deal->ends_on?->format('Y-m-d') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div class="flex items-end pb-1">
                             <label class="inline-flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" name="is_active" value="1" @checked($deal->is_active) class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <input type="checkbox" name="is_active" value="1" @checked($restoringEditDeal ? old('is_active') : $deal->is_active) class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                 <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ __('pos.active_word') }}</span>
                             </label>
                         </div>
                     </div>
                     <div x-show="dealType === 'special'" x-cloak class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
-                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_start_time') }}</label><input type="time" name="special_start_time" value="{{ $deal->special_start_time ? substr((string) $deal->special_start_time, 0, 5) : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
-                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_end_time') }}</label><input type="time" name="special_end_time" value="{{ $deal->special_end_time ? substr((string) $deal->special_end_time, 0, 5) : '' }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
-                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.total_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="total_deal_units_limit" value="{{ $deal->total_deal_units_limit }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
-                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.daily_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="daily_deal_units_limit" value="{{ $deal->daily_deal_units_limit }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_start_time') }}</label><input type="time" name="special_start_time" value="{{ $restoringEditDeal ? old('special_start_time') : ($deal->special_start_time ? substr((string) $deal->special_start_time, 0, 5) : '') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.special_end_time') }}</label><input type="time" name="special_end_time" value="{{ $restoringEditDeal ? old('special_end_time') : ($deal->special_end_time ? substr((string) $deal->special_end_time, 0, 5) : '') }}" :required="dealType === 'special'" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.total_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="total_deal_units_limit" value="{{ $restoringEditDeal ? old('total_deal_units_limit') : $deal->total_deal_units_limit }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
+                        <div><label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.daily_deal_units_limit') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label><input type="number" name="daily_deal_units_limit" value="{{ $restoringEditDeal ? old('daily_deal_units_limit') : $deal->daily_deal_units_limit }}" min="1" step="1" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></div>
                     </div>
                     @include('pos.partials.deal-product-composer', ['accent' => 'blue'])
-                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">{{ __('pos.save_changes') }}</button>
+                    <button type="submit" :disabled="!canSubmit()" :title="!canSubmit() ? compositionMessage() : ''" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 text-white text-sm font-medium rounded-lg transition">{{ __('pos.save_changes') }}</button>
                 </form>
             </div>
         </div>

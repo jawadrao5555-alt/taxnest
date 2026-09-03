@@ -6,12 +6,97 @@ use App\Models\InventoryStock;
 use App\Models\InventoryMovement;
 use App\Models\Ingredient;
 use App\Models\PosProduct;
+use App\Models\Product;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
+    /**
+     * Restore the stock that an FBR POS transaction actually deducted.
+     *
+     * FBR deals are deliberately persisted as frozen component rows (fixed and
+     * selected choice components alike), rather than as a mutable deal id.  The
+     * persisted rows therefore define the requested quantities while the sale
+     * movement ledger defines what really left stock.  Intersecting both avoids
+     * minting stock when tracking was enabled after the sale and also combines
+     * repeated choices/components before writing one auditable movement.
+     *
+     * The caller owns the surrounding transaction. Any exception must escape so
+     * deleting a bill/creating a credit note cannot commit without its stock.
+     */
+    public static function restoreFbrTransaction(
+        int $companyId,
+        iterable $items,
+        int $saleTransactionId,
+        string $referenceType,
+        int $referenceId,
+        string $referenceNumber,
+        ?int $branchId = null,
+        ?int $userId = null
+    ): array {
+        $company = \App\Models\Company::find($companyId);
+        if (!$company || !$company->inventory_enabled) {
+            return ['skipped' => true, 'restored' => []];
+        }
+
+        $requested = [];
+        $prices = [];
+        foreach ($items as $item) {
+            $productId = (int) (is_array($item) ? ($item['product_id'] ?? $item['item_id'] ?? 0) : ($item->product_id ?? 0));
+            $quantity = (float) (is_array($item) ? ($item['quantity'] ?? 0) : ($item->quantity ?? 0));
+            if ($productId < 1 || $quantity <= 0) {
+                continue;
+            }
+            $requested[$productId] = round(($requested[$productId] ?? 0) + $quantity, 4);
+            $prices[$productId] = (float) (is_array($item) ? ($item['unit_price'] ?? 0) : ($item->unit_price ?? 0));
+        }
+        if (!$requested) {
+            return ['skipped' => false, 'restored' => []];
+        }
+
+        $deducted = InventoryMovement::where('company_id', $companyId)
+            ->where('reference_type', 'fbr_pos_transaction')
+            ->where('reference_id', $saleTransactionId)
+            ->where('type', InventoryMovement::TYPE_SALE)
+            ->selectRaw('product_id, SUM(ABS(quantity)) as quantity')
+            ->groupBy('product_id')
+            ->lockForUpdate()
+            ->pluck('quantity', 'product_id')
+            ->map(fn ($quantity) => (float) $quantity)
+            ->all();
+
+        $restored = [];
+        $resolvedBranch = BranchStockService::writeBranchId($companyId, $branchId);
+        foreach ($requested as $productId => $quantity) {
+            $quantity = min($quantity, max(0, (float) ($deducted[$productId] ?? 0)));
+            if ($quantity <= 0) {
+                continue;
+            }
+            // A deleted catalog row must not create an orphan movement. Existing
+            // persisted stock can still be restored only while its product is
+            // company-owned; otherwise fail the caller's whole transaction.
+            if (!Product::where('company_id', $companyId)->whereKey($productId)->exists()) {
+                throw new \RuntimeException("Cannot restore stock for missing FBR product #{$productId}.");
+            }
+            self::addStock(
+                $companyId,
+                $productId,
+                $quantity,
+                $prices[$productId] ?? 0,
+                InventoryMovement::TYPE_RETURN_IN,
+                $resolvedBranch,
+                ['type' => $referenceType, 'id' => $referenceId, 'number' => $referenceNumber],
+                'FBR POS transaction stock restoration',
+                $userId
+            );
+            $restored[] = ['product_id' => $productId, 'quantity' => $quantity];
+        }
+
+        return ['skipped' => false, 'restored' => $restored];
+    }
+
     /**
      * Validate and expand the immutable Local Core stock snapshot.  This method
      * is deliberately read-only so a malformed/cross-tenant settlement is

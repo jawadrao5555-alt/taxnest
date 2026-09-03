@@ -2086,9 +2086,8 @@ window.addEventListener('popstate', function() {
                         </div>
                         <p class="text-[11px] text-gray-500 ml-7 mb-2" x-text="bill.items_count + window.TXT.sfx_item_s_dot + bill.created_human"></p>
                         <div class="flex gap-2 ml-7">
-                            <a :href="'{{ url('/fbr-pos/transactions') }}/' + bill.id + '/edit-failed'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                {{ __('pos.edit') }}
+                            <a :href="'{{ url('/fbr-pos/transactions') }}/' + bill.id" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
+                                {{ __('pos.view') }}
                             </a>
                             <button @click="deleteProvisional(bill)" class="py-2 px-3 text-xs font-bold text-red-600 border border-red-300 rounded-xl hover:bg-red-50 transition flex items-center gap-1">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V3a1 1 0 011-1h4a1 1 0 011 1v4"/></svg>
@@ -6356,7 +6355,6 @@ function restaurantPos() {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeLocalIndex = Math.min(this.activeLocalIndex + 1, flb.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeLocalIndex = Math.max(this.activeLocalIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); if (flb[this.activeLocalIndex]) this.promoteProvisional(flb[this.activeLocalIndex]); }
-                else if ((e.key === 'e' || e.key === 'E') && flb[this.activeLocalIndex]) { e.preventDefault(); window.location.href = '{{ url('/fbr-pos/transactions') }}/' + flb[this.activeLocalIndex].id + '/edit-failed'; }
                 else if ((e.key === 'd' || e.key === 'D') && flb[this.activeLocalIndex]) { e.preventDefault(); this.deleteProvisional(flb[this.activeLocalIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
                 return;

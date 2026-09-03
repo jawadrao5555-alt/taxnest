@@ -517,6 +517,46 @@ class FbrDealStockAndAllocationTest extends TestCase
             ->where('company_id', $this->companyId)->count(), 'one movement per component');
     }
 
+    public function test_provisional_delete_restores_frozen_fixed_and_repeated_choice_components(): void
+    {
+        // The drink is already a fixed 2x component. Add a choice group which
+        // also selects that same product to prove restoration aggregates every
+        // persisted component row rather than de-duplicating product ids.
+        $groupId = (int) DB::table('fbr_pos_deal_choice_groups')->insertGetId([
+            'deal_id' => $this->dealId, 'label' => 'Extra drink', 'quantity' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('fbr_pos_deal_choice_options')->insert([
+            'group_id' => $groupId, 'product_id' => $this->drinkId,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $response = $this->callStore($this->dealPayload(2, [
+            'save_as_provisional' => 1,
+            'items' => [[
+                'item_name' => 'Family Combo', 'quantity' => 2, 'unit_price' => 850,
+                'deal_id' => $this->dealId, 'deal_choices' => [
+                    ['group_id' => $groupId, 'product_id' => $this->drinkId],
+                ],
+                'uom' => 'U', 'tax_rate' => 0, 'is_tax_exempt' => false, 'item_discount' => 0,
+            ]],
+        ]));
+        $transactionId = (int) $response->getData(true)['transaction_id'];
+        $this->assertSame(4.0, $this->stockQty($this->drinkId), 'two deals consume fixed 4 + chosen 2 drinks');
+
+        $request = Request::create("/fbr-pos/api/provisional/{$transactionId}", 'DELETE');
+        $request->headers->set('Accept', 'application/json');
+        $deleted = (new FbrPosController())->apiDeleteProvisional($request, $transactionId);
+
+        $this->assertTrue($deleted->getData(true)['success'] ?? false);
+        $this->assertSame(10.0, $this->stockQty($this->burgerId));
+        $this->assertSame(10.0, $this->stockQty($this->friesId));
+        $this->assertSame(10.0, $this->stockQty($this->drinkId), 'all repeated component rows restored');
+        $this->assertFalse(DB::table('fbr_pos_transactions')->where('id', $transactionId)->exists());
+        $this->assertSame(3, DB::table('inventory_movements')
+            ->where('reference_type', 'fbr_pos_void')->count(), 'one restore movement per product');
+    }
+
     // ── 3. insufficient stock blocks atomically ─────────────────────────────
 
     public function test_insufficient_component_stock_blocks_sale_atomically(): void

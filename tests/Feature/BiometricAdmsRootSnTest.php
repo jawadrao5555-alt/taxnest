@@ -177,8 +177,10 @@ class BiometricAdmsRootSnTest extends TestCase
 
     public function test_root_attlog_saves_punch_and_maps_pin(): void
     {
-        $body = "7\t2026-08-04 09:05:00\t1\t0\t0\t\r\n"
-              . "42\t2026-08-04 09:06:00\t1\t1\t0\t\r\n";
+        $firstPunch = now()->subMinutes(2)->format('Y-m-d H:i:s');
+        $secondPunch = now()->subMinute()->format('Y-m-d H:i:s');
+        $body = "7\t{$firstPunch}\t1\t0\t0\t\r\n"
+              . "42\t{$secondPunch}\t1\t1\t0\t\r\n";
         $res = $this->admsRootPost($this->sn, $body);
         $res->assertStatus(200);
         $this->assertStringContainsString('OK: 2', $res->getContent());

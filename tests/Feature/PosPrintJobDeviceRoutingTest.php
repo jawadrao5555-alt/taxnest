@@ -62,6 +62,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
             $t->boolean('fbr_pos_enabled')->default(false);
             $t->string('agent_api_key')->nullable();
             $t->boolean('agent_enabled')->default(false);
+            $t->boolean('agent_core_enabled')->default(false);
             $t->timestamp('agent_last_seen')->nullable();
             $t->string('agent_version')->nullable();
             $t->text('pos_printer_settings')->nullable();
@@ -153,6 +154,7 @@ class PosPrintJobDeviceRoutingTest extends TestCase
             'status' => 'approved', 'company_status' => 'approved',
             'agent_api_key' => $this->agentKey,
             'agent_enabled' => true,
+            'agent_core_enabled' => true,
             'agent_last_seen' => $now,
             'pos_cashier_own_sales_only' => false,
             'pos_printer_settings' => json_encode([
@@ -239,11 +241,23 @@ class PosPrintJobDeviceRoutingTest extends TestCase
 
     public function test_heartbeat_with_device_uid_registers_device_row(): void
     {
-        $this->agentPost('/api/agent/heartbeat', [
+        $response = $this->agentPost('/api/agent/heartbeat', [
             'version' => '1.9.0',
             'device_uid' => 'dev-abc123',
             'hostname' => 'COUNTER-1-PC',
         ])->assertOk();
+
+        $response->assertJson([
+            'local_core_enabled' => true,
+            'local_core_kill_switch' => false,
+            'local_core' => [
+                'enabled' => true,
+                'device_registered' => true,
+                'company_id' => (string) $this->companyId,
+                'device_uid' => 'dev-abc123',
+                'kill_switch' => false,
+            ],
+        ]);
 
         $device = PosAgentDevice::where('company_id', $this->companyId)
             ->where('device_uid', 'dev-abc123')->first();
@@ -255,8 +269,39 @@ class PosPrintJobDeviceRoutingTest extends TestCase
 
     public function test_legacy_heartbeat_without_uid_registers_nothing(): void
     {
-        $this->agentPost('/api/agent/heartbeat', ['version' => '1.6.2'])->assertOk();
+        $this->agentPost('/api/agent/heartbeat', ['version' => '1.6.2'])
+            ->assertOk()
+            ->assertJson([
+                'local_core_enabled' => true,
+                'local_core_kill_switch' => false,
+                'local_core' => [
+                    'enabled' => false,
+                    'device_registered' => false,
+                    'company_id' => (string) $this->companyId,
+                    'device_uid' => null,
+                    'kill_switch' => false,
+                ],
+            ]);
         $this->assertSame(0, PosAgentDevice::count());
+    }
+
+    public function test_company_kill_switch_disables_registered_device_contract(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update(['agent_core_enabled' => false]);
+
+        $this->agentPost('/api/agent/heartbeat', ['version' => '1.9.0', 'device_uid' => 'killed-device'])
+            ->assertOk()
+            ->assertJson([
+                'local_core_enabled' => false,
+                'local_core_kill_switch' => true,
+                'local_core' => [
+                    'enabled' => false,
+                    'device_registered' => true,
+                    'company_id' => (string) $this->companyId,
+                    'device_uid' => 'killed-device',
+                    'kill_switch' => true,
+                ],
+            ]);
     }
 
     public function test_printers_report_stores_per_device_list_and_company_list(): void

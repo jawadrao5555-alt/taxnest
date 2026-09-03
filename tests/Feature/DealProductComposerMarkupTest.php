@@ -96,4 +96,27 @@ class DealProductComposerMarkupTest extends TestCase
         $this->assertStringNotContainsString('<select multiple', $pra);
         $this->assertStringNotContainsString('<select multiple', $fbr);
     }
+
+    public function test_fbr_edit_failure_restores_every_scalar_control_only_for_its_edit_card(): void
+    {
+        $fbr = file_get_contents(resource_path('views/fbr-pos/deals.blade.php'));
+
+        foreach ([
+            "old('name') : \$deal->name",
+            "old('price') : \$deal->price",
+            "old('description') : \$deal->description",
+            "old('starts_on') : \$deal->starts_on?->format('Y-m-d')",
+            "old('ends_on') : \$deal->ends_on?->format('Y-m-d')",
+            "old('special_start_time') : (\$deal->special_start_time",
+            "old('special_end_time') : (\$deal->special_end_time",
+            "old('total_deal_units_limit') : \$deal->total_deal_units_limit",
+            "old('daily_deal_units_limit') : \$deal->daily_deal_units_limit",
+            "old('is_active') : \$deal->is_active",
+            "old('active_days', [])",
+        ] as $needle) {
+            $this->assertStringContainsString($needle, $fbr);
+        }
+        $this->assertStringContainsString("\$restoringEditDeal ? old('items', []) : \$dealItemsJson", $fbr);
+        $this->assertStringContainsString("\$restoringEditDeal ? old('choice_groups', []) : \$dealChoiceGroupsJson", $fbr);
+    }
 }

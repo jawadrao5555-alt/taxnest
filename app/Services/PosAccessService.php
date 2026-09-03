@@ -410,6 +410,65 @@ class PosAccessService
         return true;
     }
 
+    /**
+     * Permission verdict for an offline Local Core command. These mappings
+     * intentionally reuse the same custom-access and special predicates as the
+     * live POS surfaces; commands without a reviewed mapping fail closed.
+     */
+    public static function localCoreActionAllowed(?User $user, $company, string $action): bool
+    {
+        if (!$user || !$user->is_active) {
+            return false;
+        }
+
+        if (in_array($action, [
+            'order.hold', 'order.open', 'order.line.add', 'order.line.consume',
+            'order.claim', 'order.settle', 'staff.start', 'staff.end',
+            'print.enqueue', 'print.claim', 'print.complete', 'print.fail',
+        ], true)) {
+            return in_array($user->pos_role, ['pos_admin', 'pos_manager', 'pos_cashier', 'pos_waiter'], true)
+                || $user->isCompanyAdmin();
+        }
+
+        // Path confinement supersedes custom grants in PosAuth. Mirror that
+        // invariant before consulting predicates whose live callers already
+        // ran through the middleware.
+        if (!$user->isPosAdmin() && !$user->isPosCashier()) {
+            return false;
+        }
+
+        if ($action === 'order.cancel') {
+            return self::orderCancelAllowed($user, $company);
+        }
+        if ($action === 'refund.record') {
+            return self::returnsAllowed($user);
+        }
+        if ($action === 'cash.close') {
+            return self::dayCloseAllowed($user, $company);
+        }
+
+        $feature = match ($action) {
+            'table.claim', 'table.shift', 'table.release' => 'tables',
+            'stock.set', 'stock.adjust' => 'inventory',
+            'customer.upsert', 'khata.debit', 'wasooli.record' => 'customers',
+            'cash.open' => 'dashboard',
+            'cash.expense' => 'day_close',
+            default => null,
+        };
+        if ($feature === null) {
+            return false;
+        }
+
+        $custom = self::customAllows($user, $feature);
+        if ($custom !== null) {
+            return $custom;
+        }
+
+        // These mutations are admin/manager work unless a reviewed custom-role
+        // grant explicitly opens the corresponding live POS feature.
+        return $user->isPosAdmin();
+    }
+
     /** Whether the users.pos_custom_access column exists (PROD drift guard). */
     public static function columnReady(): bool
     {

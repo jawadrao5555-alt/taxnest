@@ -1138,8 +1138,11 @@ class PosController extends Controller
         // the batch=last branch so "Akhri Add-on", plain reprints and every
         // future KOT branch below are all covered by ONE check. Only reprints
         // are gated — first fires and deltas always reach the kitchen.
-        if (\App\Services\KotPrintService::isReprintRender($order, $request->boolean('delta'), $request->input('batch') === 'last')
-            && !\App\Services\PosAccessService::kotReprintAllowed($user, $company)) {
+        $batchLast = $request->input('batch') === 'last';
+        if (\App\Services\KotPrintService::isReprintRender($order, $request->boolean('delta'), $batchLast)
+            && !($batchLast
+                ? \App\Services\PosAccessService::kotLastAddonAllowed($user, $company)
+                : \App\Services\PosAccessService::kotReprintAllowed($user, $company))) {
             return response()->json([
                 'success' => false,
                 'reason' => 'not_allowed',

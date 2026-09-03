@@ -31,22 +31,64 @@ use Illuminate\Support\Facades\Schema;
  */
 class PosKitchenLines
 {
-    /** Ek hi request mein baar baar hasColumn na chale. */
+    /**
+     * Ek hi request mein baar baar hasColumn na chale.
+     *
+     * The value must not be keyed by table name alone. PHPUnit (and Octane-style
+     * long-lived processes) may drop and recreate the same table while this PHP
+     * process stays alive. A stale positive value then adds `skip_kitchen` to a
+     * newly-created pre-migration schema, making every KOT visibility query fail.
+     *
+     * SQLite exposes a monotonically-changing schema_version, so retain the
+     * cheap cache for normal requests while invalidating it after test/schema DDL.
+     */
     private static array $colCache = [];
 
     public static function columnExists(string $table): bool
     {
-        if (!array_key_exists($table, self::$colCache)) {
+        $cacheKey = $table;
+        $schemaVersion = null;
+        $cacheable = false;
+        try {
+            $connection = Schema::getConnection();
+            $cacheKey = $connection->getName() . ':' . $table;
+            if ($connection->getDriverName() === 'sqlite') {
+                $schemaVersion = (int) ($connection->selectOne('PRAGMA schema_version')->schema_version ?? 0);
+                $cacheable = true;
+            }
+        } catch (\Throwable $e) {
+            // Fall through to the guarded column lookup below. Failing open to
+            // legacy behaviour is safer than stopping a kitchen ticket.
+        }
+
+        // MySQL exposes no cheap monotonic schema version. Queue/Octane workers
+        // can survive a deploy, so retaining a positive or negative forever
+        // would make migrations invisible to KOT routing. Re-check there;
+        // SQLite's schema_version keeps repeated test/request lookups cheap.
+        $cached = $cacheable ? (self::$colCache[$cacheKey] ?? null) : null;
+        if ($cached === null || $cached['schema_version'] !== $schemaVersion) {
             try {
-                self::$colCache[$table] = Schema::hasColumn($table, 'skip_kitchen');
+                $resolved = [
+                    'exists' => Schema::hasColumn($table, 'skip_kitchen'),
+                    'schema_version' => $schemaVersion,
+                ];
             } catch (\Throwable $e) {
                 // Deploy-before-migrate window: column ka pata na chale to purana
                 // bartao (sab lines kitchen ki) — KOT kabhi gum na ho.
-                self::$colCache[$table] = false;
+                $resolved = [
+                    'exists' => false,
+                    'schema_version' => $schemaVersion,
+                ];
             }
+
+            if ($cacheable) {
+                self::$colCache[$cacheKey] = $resolved;
+            }
+
+            return $resolved['exists'];
         }
 
-        return self::$colCache[$table];
+        return $cached['exists'];
     }
 
     /**

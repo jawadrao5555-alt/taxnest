@@ -1265,10 +1265,6 @@ class FbrPosPhase2Controller extends Controller
                 // Symmetry guard: only restore products the ORIGINAL sale actually
                 // deducted — if tracking was OFF at sale time there is no deduct
                 // movement, and restoring would mint stock out of thin air.
-                $deductedProductIds = \App\Models\InventoryMovement::where('company_id', $this->companyId())
-                    ->where('reference_type', 'fbr_pos_transaction')
-                    ->where('reference_id', $original->id)
-                    ->pluck('product_id')->map(fn ($v) => (int) $v)->all();
                 // Per-branch stock (Task 1365): the maal goes back on the shelf
                 // of the branch that SOLD it — the ORIGINAL bill's branch, not
                 // whichever shop the refund is being processed from.
@@ -1276,25 +1272,16 @@ class FbrPosPhase2Controller extends Controller
                     $this->companyId(),
                     $original->branch_id !== null ? (int) $original->branch_id : null
                 );
-                foreach ($returnItems as $it) {
-                    if (!empty($it['product_id']) && in_array((int) $it['product_id'], $deductedProductIds, true) && (float) $it['quantity'] > 0) {
-                        try {
-                            \App\Services\InventoryService::addStock(
-                                $this->companyId(),
-                                $it['product_id'],
-                                (float) $it['quantity'],
-                                (float) $it['unit_price'],
-                                \App\Models\InventoryMovement::TYPE_RETURN_IN,
-                                $restoreBranchId,
-                                ['type' => 'fbr_pos_return', 'id' => $return->id, 'number' => $invNum],
-                                null,
-                                $this->user()->id
-                            );
-                        } catch (\Throwable $stockEx) {
-                            \Illuminate\Support\Facades\Log::warning('FBR POS return stock restore failed', ['tx' => $return->id, 'err' => $stockEx->getMessage()]);
-                        }
-                    }
-                }
+                \App\Services\InventoryService::restoreFbrTransaction(
+                    $this->companyId(),
+                    $returnItems,
+                    (int) $original->id,
+                    'fbr_pos_return',
+                    (int) $return->id,
+                    $invNum,
+                    $restoreBranchId,
+                    $this->user()->id
+                );
             }
 
             // ── FBR CREDIT NOTE (Aug 2026 — Retail Core) ─────────────────────────

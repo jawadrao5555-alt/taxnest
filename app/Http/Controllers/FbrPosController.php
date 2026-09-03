@@ -323,10 +323,38 @@ class FbrPosController extends Controller
         if (!$bill) {
             return response()->json(['success' => false, 'message' => __('pos.provisional_bill_not_found')], 404);
         }
-        \DB::transaction(function () use ($bill) {
-            \App\Models\FbrPosTransactionItem::where('transaction_id', $bill->id)->delete();
-            $bill->delete();
-        });
+        try {
+            \DB::transaction(function () use ($bill, $companyId) {
+                $locked = \App\Models\FbrPosTransaction::where('company_id', $companyId)
+                    ->where('id', $bill->id)
+                    ->where('invoice_mode', 'local')
+                    ->where('fbr_status', 'local')
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $items = \App\Models\FbrPosTransactionItem::where('transaction_id', $locked->id)
+                    ->lockForUpdate()->get();
+                \App\Services\InventoryService::restoreFbrTransaction(
+                    (int) $companyId,
+                    $items,
+                    (int) $locked->id,
+                    'fbr_pos_void',
+                    (int) $locked->id,
+                    (string) $locked->invoice_number,
+                    $locked->branch_id !== null ? (int) $locked->branch_id : null,
+                    Auth::guard('fbrpos')->id()
+                );
+                \App\Models\FbrPosTransactionItem::where('transaction_id', $locked->id)->delete();
+                $locked->delete();
+            });
+        } catch (\Throwable $e) {
+            Log::error('FBR provisional deletion stock restoration failed', [
+                'company_id' => $companyId, 'transaction_id' => $bill->id, 'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.setting_save_failed') . ': stock restoration failed',
+            ], 500);
+        }
         return response()->json(['success' => true]);
     }
 
@@ -1034,9 +1062,30 @@ class FbrPosController extends Controller
             }
             if ($ids->isNotEmpty()) {
                 \DB::transaction(function () use ($ids, $companyId) {
-                    FbrPosTransactionItem::whereIn('transaction_id', $ids)->delete();
-                    $this->lastWashDeleted = FbrPosTransaction::where('company_id', $companyId)
+                    $deleteRows = FbrPosTransaction::where('company_id', $companyId)
                         ->whereIn('id', $ids)
+                        ->where('invoice_mode', 'local')
+                        ->where('fbr_status', 'local')
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get();
+                    foreach ($deleteRows as $deleteRow) {
+                        $items = FbrPosTransactionItem::where('transaction_id', $deleteRow->id)
+                            ->lockForUpdate()->get();
+                        \App\Services\InventoryService::restoreFbrTransaction(
+                            (int) $companyId,
+                            $items,
+                            (int) $deleteRow->id,
+                            'fbr_pos_day_close_void',
+                            (int) $deleteRow->id,
+                            (string) $deleteRow->invoice_number,
+                            $deleteRow->branch_id !== null ? (int) $deleteRow->branch_id : null,
+                            Auth::guard('fbrpos')->id()
+                        );
+                    }
+                    FbrPosTransactionItem::whereIn('transaction_id', $deleteRows->pluck('id'))->delete();
+                    $this->lastWashDeleted = FbrPosTransaction::where('company_id', $companyId)
+                        ->whereIn('id', $deleteRows->pluck('id'))
                         ->where('invoice_mode', 'local')
                         ->where('fbr_status', 'local')
                         ->delete();

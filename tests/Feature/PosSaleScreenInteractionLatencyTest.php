@@ -41,4 +41,72 @@ class PosSaleScreenInteractionLatencyTest extends TestCase
         $this->assertStringContainsString('Smart Upsell is disabled for retail FBR POS.', $fbr);
         $this->assertStringNotContainsString('this.triggerUpsell(item);', $fbr);
     }
+
+    public function test_page_down_enters_latest_cart_quantity_editing_on_every_sale_view(): void
+    {
+        $saleViews = [
+            'PRA' => resource_path('views/pos/universal.blade.php'),
+            'FBR' => resource_path('views/fbr-pos/universal.blade.php'),
+            'Restaurant' => resource_path('views/pos/restaurant/pos.blade.php'),
+        ];
+
+        foreach ($saleViews as $product => $path) {
+            $view = file_get_contents($path);
+
+            $this->assertStringContainsString("if (e.key === 'PageDown')", $view, "{$product} must route Page Down centrally");
+            $this->assertStringContainsString("e.target?.closest?.('input, textarea, select')", $view, "{$product} must not steal Page Down from form fields");
+            $this->assertStringContainsString("this.cart.length > 0", $view, "{$product} must ignore Page Down for an empty cart");
+            $this->assertStringContainsString('e.preventDefault();', $view, "{$product} must prevent native Page Down scrolling when handled");
+            $this->assertStringContainsString('this.mobileView = \'cart\';', $view, "{$product} must reveal the cart before focusing quantity");
+            $this->assertStringContainsString("__('pos.latest_cart_quantity')", $view, "{$product} must explain the Page Down shortcut");
+            $this->assertStringContainsString('>PgDn</kbd>', $view, "{$product} must display the Page Down key");
+            $this->assertStringContainsString("if (e.key === 'ArrowDown') { e.preventDefault(); this.moveCartSelection(1); return; }", $view, "{$product} must preserve focused quantity down-arrow navigation");
+            $this->assertStringContainsString("if (e.key === 'ArrowUp')   { e.preventDefault(); this.moveCartSelection(-1); return; }", $view, "{$product} must preserve focused quantity up-arrow navigation");
+        }
+
+        $this->assertStringContainsString("this.enterCartMode('last');", file_get_contents($saleViews['PRA']));
+        $this->assertStringContainsString("this.enterCartMode('last');", file_get_contents($saleViews['FBR']));
+        $this->assertStringContainsString('this.enterCartMode();', file_get_contents($saleViews['Restaurant']));
+    }
+
+    public function test_page_down_cannot_enter_cart_behind_sale_screen_overlays(): void
+    {
+        $expectedModalGuards = [
+            resource_path('views/pos/universal.blade.php') => [
+                'showHeldOrders', 'showRetailHeld', 'retailHoldNaming', 'showQuickType',
+                'showManualItem', 'showCustomerPicker', 'showShortcuts', 'showManagerPinModal',
+                'showLocalBills', 'showFailedBills', 'showPendingDeliveries', 'showTablePicker',
+                'showReprint', 'boardMenuTable', 'boardConfirm', 'boardCancelAsk', 'boardShift',
+                'heldMenu', 'tableSwitchPrompt', 'showPromoteMethod', 'riderSettleBill',
+                'onlineConfirm', 'tableBoardOpen', 'showIncoming', 'showCustomerHistory',
+                'showLowStockPopup', 'showNewCustomerModal', 'showNewCustomerInline',
+                'quickCreating', 'showDealChoiceModal', 'showOfflineQueue', 'quickReturnOpen',
+                'showPrintConfirm', 'showTerminalPicker', 'showFitMenu',
+            ],
+            resource_path('views/fbr-pos/universal.blade.php') => [
+                'showHeldOrders', 'fbrHoldNaming', 'showQuickType', 'showManualItem',
+                'showCustomerPicker', 'showShortcuts', 'showManagerPinModal', 'showLocalBills',
+                'showFailedBills', 'showPendingDeliveries', 'showTablePicker', 'tableSwitchPrompt',
+                'riderSettleBill', 'currentUpsell', 'qcModal', 'showDrafts',
+                'showCustomerHistory', 'showLowStockPopup', 'showNewCustomerInline',
+                'quickCreating', 'showDealChoiceModal', 'showOfflineQueue', 'quickReturnOpen',
+                'showPrintConfirm', 'showFitMenu',
+            ],
+        ];
+
+        foreach ($expectedModalGuards as $path => $guards) {
+            $view = file_get_contents($path);
+            $pageDownStart = strpos($view, "if (e.key === 'PageDown')");
+            $qtyGateStart = strpos($view, '// CART QTY INPUT:', $pageDownStart);
+            $this->assertNotFalse($pageDownStart);
+            $this->assertNotFalse($qtyGateStart);
+            $pageDownHandler = substr($view, $pageDownStart, $qtyGateStart - $pageDownStart);
+
+            foreach ($guards as $guard) {
+                $this->assertStringContainsString("this.{$guard}", $pageDownHandler, basename($path)." must block Page Down while {$guard} owns the screen");
+            }
+
+            $this->assertStringContainsString('if (!pageDownBlocked && !pageDownInField && this.cart.length > 0)', $pageDownHandler);
+        }
+    }
 }

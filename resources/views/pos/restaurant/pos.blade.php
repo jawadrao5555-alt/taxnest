@@ -828,6 +828,10 @@ window.addEventListener('popstate', function() {
                                 <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+E</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
+                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.latest_cart_quantity') }}</span>
+                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">PgDn</kbd>
+                            </div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Customer Field</span>
                                 <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+C</kbd>
                             </div>
@@ -2053,6 +2057,18 @@ function restaurantPos() {
                 if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) { if (this.guidedFlow) this.flowStep = 'finish'; this.showPayModal = true; } return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
+            }
+
+            // Page Down enters quantity editing at the latest cart row. Capturing
+            // overlays returned above; non-capturing modals and form fields retain it.
+            if (e.key === 'PageDown') {
+                const pageDownInField = !!(e.target?.closest?.('input, textarea, select'));
+                if (!blockingModal && !pageDownInField && this.cart.length > 0) {
+                    e.preventDefault();
+                    this.enterCartMode();
+                    this.mobileView = 'cart';
+                }
+                return;
             }
 
             // ── CART QTY INPUT gate — runs AFTER the global hotkeys (so F-keys win while a qty

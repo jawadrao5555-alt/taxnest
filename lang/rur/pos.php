@@ -1478,6 +1478,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'edit_and_retry' => 'Edit & Retry',
     'edit_cart' => 'Cart edit karein',
     'edit_cart_mode' => 'Edit cart mode',
+    'latest_cart_quantity' => 'Aakhri item ki quantity',
     'edit_failed_bullet_1' => 'Koi bhi change karne se <b>pehle</b> original cart ka snapshot audit log mein save ho jata hai.',
     'edit_failed_bullet_2' => 'Common FBR rejections: ghalat HS code, ghalat tax rate, ya missing UoM. Isay theek karke resubmit karein.',
     'edit_failed_bullet_3' => 'Agar edit ke baad bhi FBR reject kare, to aapki tabdeeliya save rahengi — aap dobara edit aur retry kar sakte hain.',

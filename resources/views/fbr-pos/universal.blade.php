@@ -2658,6 +2658,10 @@ window.addEventListener('popstate', function() {
                                 <kbd style="background:#e9d5ff; color:#2563eb; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+E</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
+                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.latest_cart_quantity') }}</span>
+                                <kbd style="background:#e9d5ff; color:#2563eb; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">PgDn</kbd>
+                            </div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">{{ __('pos.customer_field') }}</span>
                                 <kbd style="background:#e9d5ff; color:#2563eb; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Ctrl+C</kbd>
                             </div>
@@ -6286,6 +6290,25 @@ function restaurantPos() {
                 // button — a cached/offline copy of this screen must say WHY
                 // instead of firing a slip the server will refuse.
                 if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); if (!this.canKotReprint && !this.lastKotPending) { this.showToast(window.TXT.kot_reprint_not_allowed, 'error'); return; } this.printKitchenTicket(); return; }
+                return;
+            }
+            // Page Down enters quantity editing at the most recently added row.
+            // Keep list/dialog ownership and unrelated form fields isolated.
+            if (e.key === 'PageDown') {
+                const pageDownBlocked = this.showHeldOrders || this.fbrHoldNaming || this.showQuickType
+                    || this.showManualItem || this.showCustomerPicker || this.showShortcuts
+                    || this.showManagerPinModal || this.showLocalBills || this.showFailedBills
+                    || this.showPendingDeliveries || this.showTablePicker || this.tableSwitchPrompt
+                    || this.riderSettleBill || this.currentUpsell || this.qcModal || this.showDrafts
+                    || this.showCustomerHistory || this.showLowStockPopup || this.showNewCustomerInline
+                    || this.quickCreating || this.showDealChoiceModal || this.showOfflineQueue
+                    || this.quickReturnOpen || this.showPrintConfirm || this.showFitMenu;
+                const pageDownInField = !!(e.target?.closest?.('input, textarea, select'));
+                if (!pageDownBlocked && !pageDownInField && this.cart.length > 0) {
+                    e.preventDefault();
+                    this.enterCartMode('last');
+                    this.mobileView = 'cart';
+                }
                 return;
             }
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows

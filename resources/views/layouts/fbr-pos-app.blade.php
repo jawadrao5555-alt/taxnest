@@ -878,7 +878,7 @@
                             {{ __('pos.nav_customize_pos') }}
                             {{-- 26 Aug 2026: naya switch aane par yahan "NEW" — register
                                  (NewFeatureBadges) mein panel 'fbrpos'/'all' wali entry ho to. --}}
-                            <x-new-badge panel="fbrpos" class="ml-1" />
+                            <x-new-badge page="fbrpos.customize" panel="fbrpos" class="ml-1" />
                         </a>
                         {{-- Desktop Agent (Task 1403): FBR's own agent page. Admin-only, and
                              deliberately NOT gated on fbr_connection_mode — silent printing

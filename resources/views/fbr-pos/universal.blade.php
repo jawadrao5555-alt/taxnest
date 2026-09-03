@@ -5120,9 +5120,12 @@ function restaurantPos() {
 
         openDealChoice(item) {
             const deal = this.allDeals.find(d => String(d.id) === String(item.id)) || item;
-            const groups = deal.choice_groups || [];
+            // A legacy/test group without an option is not actionable. Exclude
+            // it rather than trapping a fixed deal behind an empty picker; the
+            // next editor update replaces the persisted group rows.
+            const groups = (deal.choice_groups || []).filter(group => Array.isArray(group.options) && group.options.length > 0);
             if (!groups.length) return this.addToCart(deal, []);
-            this.pendingDeal = deal;
+            this.pendingDeal = { ...deal, choice_groups: groups };
             this.pendingDealChoices = {};
             this.showDealChoiceModal = true;
             return false;
@@ -5170,7 +5173,7 @@ function restaurantPos() {
         },
         confirmDealChoice() {
             const deal = this.pendingDeal;
-            const groups = deal?.choice_groups || [];
+            const groups = (deal?.choice_groups || []).filter(group => Array.isArray(group.options) && group.options.length > 0);
             const selections = [];
             for (const group of groups) {
                 const productId = this.pendingDealChoices[group.id];
@@ -5188,7 +5191,8 @@ function restaurantPos() {
             this.showToast(window.TXT.added_prefix + deal.name, 'success');
         },
         addToCart(item, selectedDealChoices = null, dealPreview = null) {
-            const isChoiceDeal = item.type === 'deal' && (item.choice_groups || []).length > 0;
+            const isChoiceDeal = item.type === 'deal'
+                && (item.choice_groups || []).some(group => Array.isArray(group.options) && group.options.length > 0);
             if (isChoiceDeal && selectedDealChoices === null) return this.openDealChoice(item);
             const choiceKey = isChoiceDeal ? selectedDealChoices.map(c => c.group_id + ':' + c.product_id).join('|') : '';
             const existing = this.cart.find(c => c.item_id === item.id && c.item_type === item.type

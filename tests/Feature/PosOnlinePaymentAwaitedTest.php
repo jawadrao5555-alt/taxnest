@@ -650,4 +650,20 @@ class PosOnlinePaymentAwaitedTest extends TestCase
         $this->assertSame('completed', DB::table('restaurant_orders')->where('id', $orderId)->value('status'));
         $this->assertNull($this->awaitedAt($orderId));
     }
+
+    /**
+     * The occupied-table popup must offer the marked order's direct route without
+     * turning the UI into a client-side approval.  Keep this small rendering
+     * contract beside the endpoint invariants above: boardOnlinePayment starts
+     * boardFinalPay, which reaches the server's existing 422 confirmation gate.
+     */
+    public function test_marked_table_popup_offers_direct_online_payment_through_the_server_gated_flow(): void
+    {
+        $saleScreen = file_get_contents(base_path('resources/views/pos/universal.blade.php'));
+
+        $this->assertStringContainsString("x-text=\"'Online Payment — Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()\"", $saleScreen);
+        $this->assertStringContainsString('async boardOnlinePayment()', $saleScreen);
+        $this->assertStringContainsString("await this.boardFinalPay('qr_payment');", $saleScreen);
+        $this->assertStringContainsString('online_payment_confirmed', $saleScreen);
+    }
 }

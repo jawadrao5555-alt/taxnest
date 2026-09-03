@@ -2255,12 +2255,20 @@ window.addEventListener('popstate', function() {
                                  ONLINE likh dega aur bill tasdeeq ke baghair final nahi
                                  hoga. Proof Bill ke UPAR nahi, saath rakha hai taake
                                  cashier pehle nishan lagaye phir parchi nikale. --}}
-                            <button @click="toggleOnlinePayment(boardMenuTable.order, true)" :disabled="boardBusy || onlineMarkBusy === boardMenuTable.order.id"
-                                    class="w-full py-2.5 rounded-xl text-sm font-bold border transition disabled:opacity-40"
-                                    :class="boardMenuTable.order.online_payment_awaited_at ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' : 'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100'">
-                                <span>&#128179;</span> <span x-text="{{ Js::from(__('pos.online_mark_btn')) }} + (boardMenuTable.order.online_payment_awaited_at ? ' \u2713' : '')"></span>
-                            </button>
-                            <button @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
+                            {{-- A marked table must not make the cashier first Open/Edit Bill
+                                 just to acknowledge the transfer. This deliberately starts the
+                                 same server-gated finalisation path as Final: it receives the
+                                 422 gate, then reuses onlineConfirm to post the confirmation. --}}
+                            <template x-if="boardMenuTable.order.online_payment_awaited_at">
+                                <button @click="boardOnlinePayment()" :disabled="boardBusy" class="w-full py-3 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 transition shadow-sm" x-text="'Online Payment — Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()"></button>
+                            </template>
+                            <template x-if="!boardMenuTable.order.online_payment_awaited_at">
+                                <button @click="toggleOnlinePayment(boardMenuTable.order, true)" :disabled="boardBusy || onlineMarkBusy === boardMenuTable.order.id"
+                                        class="w-full py-2.5 rounded-xl text-sm font-bold border transition disabled:opacity-40 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100">
+                                    <span>&#128179;</span> <span>{{ __('pos.online_mark_btn') }}</span>
+                                </button>
+                            </template>
+                            <button x-show="!boardMenuTable.order.online_payment_awaited_at" @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
                             {{-- Task 1379: reprint gate — see $canKotReprint. --}}
                             @if((($features->kot ?? false) || ($features->kitchen ?? false)) && $canKotReprint)
                             <button x-show="boardMenuTable.order.kot_sent_at" @click="boardResendKot()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">{{ __('pos.kot_resend_btn') }}</button>
@@ -2652,11 +2660,13 @@ window.addEventListener('popstate', function() {
                                  bill par "NOT PAID" ki jagah ONLINE likha jata hai aur
                                  bill tab tak final nahi hota jab tak counter tasdeeq na
                                  kare ke paise aa gaye. --}}
-                            <button @click="toggleOnlinePayment(order)" :disabled="onlineMarkBusy === order.id"
+                            <button x-show="!order.online_payment_awaited_at" @click="toggleOnlinePayment(order, true)" :disabled="onlineMarkBusy === order.id"
                                     :title="{{ Js::from(__('pos.online_mark_btn')) }}"
                                     class="py-2 px-2.5 text-xs font-black rounded-xl border transition disabled:opacity-40"
-                                    :class="order.online_payment_awaited_at ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' : 'text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'">&#128179;</button>
-                            <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
+                                    :class="'text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'">&#128179;</button>
+                            <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white rounded-xl transition"
+                                    :class="order.online_payment_awaited_at ? 'bg-indigo-600 hover:bg-indigo-700 font-black' : 'bg-green-600 hover:bg-green-700'"
+                                    x-text="order.online_payment_awaited_at ? 'Online Payment — Rs ' + Math.round(order.total_amount || 0).toLocaleString() : {{ Js::from(__('pos.pay')) }}"></button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
                         </div>
                     </div>
@@ -7051,9 +7061,13 @@ function restaurantPos() {
 
         openDealChoice(item) {
             const deal = this.allDeals.find(d => String(d.id) === String(item.id)) || item;
-            const groups = deal.choice_groups || [];
+            // Legacy/test data can contain a persisted group after all of its
+            // options were removed. It is not a choice slot: showing it makes a
+            // fixed deal impossible to add. The editor removes it on the next
+            // successful update; never invent a replacement at sale time.
+            const groups = (deal.choice_groups || []).filter(group => Array.isArray(group.options) && group.options.length > 0);
             if (!groups.length) return this.addToCart(deal, []);
-            this.pendingDeal = deal;
+            this.pendingDeal = { ...deal, choice_groups: groups };
             this.pendingDealChoices = {};
             this.showDealChoiceModal = true;
             return false;
@@ -7065,7 +7079,7 @@ function restaurantPos() {
         },
         confirmDealChoice() {
             const deal = this.pendingDeal;
-            const groups = deal?.choice_groups || [];
+            const groups = (deal?.choice_groups || []).filter(group => Array.isArray(group.options) && group.options.length > 0);
             const selections = [];
             for (const group of groups) {
                 const productId = this.pendingDealChoices[group.id];
@@ -7087,7 +7101,8 @@ function restaurantPos() {
             this.showToast(window.TXT.added_prefix + deal.name, 'success');
         },
         addToCart(item, selectedDealChoices = null) {
-            const isChoiceDeal = item.type === 'deal' && (item.choice_groups || []).length > 0;
+            const isChoiceDeal = item.type === 'deal'
+                && (item.choice_groups || []).some(group => Array.isArray(group.options) && group.options.length > 0);
             if (isChoiceDeal && selectedDealChoices === null) {
                 return this.openDealChoice(item);
             }
@@ -9164,6 +9179,18 @@ function restaurantPos() {
             // (tile ki apni order_type ke hisaab se) — har bill par fresh reset.
             this.boardPrintReceipt = this.billPrintDefault(t.order.order_type || 'dine_in');
             this.boardConfirm = { table: t };
+        },
+        // Marked online payments use the normal table finalisation pipeline, not a
+        // client-side settlement shortcut. Its first request intentionally reaches
+        // the server gate; only the existing online-confirm dialog can retry it
+        // with online_payment_confirmed.
+        async boardOnlinePayment() {
+            const t = this.boardMenuTable;
+            if (!t || !t.order || !t.order.online_payment_awaited_at || this.boardBusy) return;
+            this.boardMenuTable = null;
+            this.boardPrintReceipt = this.billPrintDefault(t.order.order_type || 'dine_in');
+            this.boardConfirm = { table: t };
+            await this.boardFinalPay('qr_payment');
         },
         // FINAL — step 2 (CASH/CARD chosen): waiter orders claim FIRST, then the
         // shared payHeldOrderDirect pipeline with the tile's own order_type so a

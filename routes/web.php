@@ -891,10 +891,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/restock-toggle', [PosController::class, 'updateRestockToggle'])->name('pos.settings.restock-toggle');
     Route::post('/settings/auto-purge-local-toggle', [PosController::class, 'toggleAutoPurgeLocal'])->name('pos.settings.auto-purge-local-toggle');
     Route::post('/settings/local-billing', [PosController::class, 'updateLocalBillingSettings'])->name('pos.settings.local-billing');
-    // Task 1358: owner-confirmed clear of ARCHIVED local bills so the L-series
-    // restarts at L-001 (admin-only, permanent — never runs on its own).
+    // Task 1358: owner-confirmed clear of ARCHIVED local bill detail (admin-only,
+    // permanent — never runs on its own and never resets the L-series).
     Route::post('/settings/local-billing/clear-archived', [PosController::class, 'clearArchivedLocalBills'])->name('pos.settings.local-billing.clear-archived');
-    // Owner (25 Aug 2026): fresh start for the L-series once it is empty.
+    // Explicit admin-only fresh start, available only when the series is empty.
     Route::post('/settings/local-billing/reset-numbering', [PosController::class, 'resetLocalNumbering'])->name('pos.settings.local-billing.reset-numbering');
     // Owner (25 Aug 2026): wipe the customer-spend lines left behind by local
     // bills that were already deleted at day close (admin-only, permanent).

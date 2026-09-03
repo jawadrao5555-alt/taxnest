@@ -404,6 +404,7 @@
                                 </div>
                             @endif
                         @endif
+
                     </div>
                 </div>
                 @endif
@@ -736,6 +737,7 @@
                             <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.local_billing_dayclose_policy') }}</p>
                             <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.local_billing_dayclose_sub') }}</p>
                         </div>
+                        <p class="mb-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 px-3 py-2 text-[11px] font-semibold text-teal-800 dark:text-teal-300">{{ __('pos.local_billing_numbering_never_resets') }}</p>
                         <span class="shrink-0 text-[10px] font-semibold text-gray-400" x-show="savingLB" x-cloak>{{ __('pos.saving_ellipsis') }}</span>
                     </div>
                     <div class="space-y-3">
@@ -882,36 +884,21 @@
                         </div>
                         @endif
 
-                        {{-- Fresh start (owner, 25 Aug 2026): jab series bilkul khali
-                             ho to numbering dobara L001 se shuru karne ka option.
-                             Monotonic usool waisa hi hai — yeh sirf khali series par
-                             jaan-boojh kar kiya gaya amal hai, warna do bill ek hi
-                             reference le baithte. --}}
-                        @if($localSeries['can_reset'] ?? false)
-                        <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
-                             x-data="{ lrBusy: false, lrDone: false, lrMsg: '', lrErr: '',
-                                resetSeries() {
-                                    if (this.lrBusy) return;
-                                    this.lrBusy = true; this.lrErr = '';
-                                    fetch('{{ route('pos.settings.local-billing.reset-numbering', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:'{}'})
-                                        .then(r=>r.json().then(d=>({ok:r.ok,d})))
-                                        .then(({ok,d})=>{ if (ok && d && d.success === true) { this.lrMsg = d.message || ''; this.lrDone = true; } else { this.lrErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } })
-                                        .catch(()=>{ this.lrErr = {{ Js::from(__('pos.setting_save_failed')) }}; })
-                                        .finally(()=>{ this.lrBusy = false; });
-                                } }">
-                            <div x-show="!lrDone" class="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-300 dark:border-teal-700">
-                                <p class="text-[11px] font-bold text-teal-900 dark:text-teal-300">{{ __('pos.local_series_reset_title', ['next' => \App\Services\PosLocalSeries::format(1)]) }} <x-new-badge feature="local_series_reset" class="ml-1" /></p>
-                                <p class="text-[11px] text-teal-800 dark:text-teal-400 mt-1">{{ __('pos.local_series_reset_hint') }}</p>
-                                <p x-show="lrErr" x-cloak class="text-[11px] font-bold text-red-700 dark:text-red-400 mt-1.5" x-text="lrErr"></p>
-                                <button type="button" @click="resetSeries()" :disabled="lrBusy" :class="lrBusy && 'opacity-60 cursor-not-allowed'"
-                                    class="mt-2.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[12px] font-bold transition">{{ __('pos.local_series_reset_btn', ['next' => \App\Services\PosLocalSeries::format(1)]) }}</button>
-                            </div>
-                            <div x-show="lrDone" x-cloak class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700">
-                                <p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300" x-text="lrMsg"></p>
-                            </div>
-                        </div>
-                        @endif
                     </div>
+                    {{-- Explicit reset is available only after every issued L-reference
+                         is gone. It never runs as part of day close or Clear. --}}
+                    @if($localSeries['can_reset'] ?? false)
+                    <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
+                         x-data="{ lrBusy: false, lrDone: false, lrMsg: '', lrErr: '', resetSeries() { if (this.lrBusy) return; this.lrBusy = true; this.lrErr = ''; fetch('{{ route('pos.settings.local-billing.reset-numbering', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:'{}'}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{ if (ok && d && d.success === true) { this.lrMsg = d.message || ''; this.lrDone = true; } else { this.lrErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } }).catch(()=>{ this.lrErr = {{ Js::from(__('pos.setting_save_failed')) }}; }).finally(()=>{ this.lrBusy = false; }); } }">
+                        <div x-show="!lrDone" class="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-300 dark:border-teal-700">
+                            <p class="text-[11px] font-bold text-teal-900 dark:text-teal-300">{{ __('pos.local_series_reset_title', ['next' => \App\Services\PosLocalSeries::format(1)]) }} <x-new-badge feature="local_series_reset" class="ml-1" /></p>
+                            <p class="text-[11px] text-teal-800 dark:text-teal-400 mt-1">{{ __('pos.local_series_reset_hint') }}</p>
+                            <p x-show="lrErr" x-cloak class="text-[11px] font-bold text-red-700 dark:text-red-400 mt-1.5" x-text="lrErr"></p>
+                            <button type="button" @click="resetSeries()" :disabled="lrBusy" class="mt-2.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[12px] font-bold transition">{{ __('pos.local_series_reset_btn', ['next' => \App\Services\PosLocalSeries::format(1)]) }}</button>
+                        </div>
+                        <div x-show="lrDone" x-cloak class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700"><p class="text-[11px] font-bold text-emerald-800 dark:text-emerald-300" x-text="lrMsg"></p></div>
+                    </div>
+                    @endif
                 </div>
 
                 {{-- Auto day-close at 6:00 AM the next morning --}}

@@ -68,6 +68,46 @@
         </form>
     </div>
 
+    @if($topItemsDetailed !== null)
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+        <div class="flex items-center justify-between gap-3 mb-4">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.top_selling_items') }}</h2>
+                <p class="text-xs text-gray-500">
+                    {{ $topItemsRange->from->format('d M Y') }} — {{ $topItemsRange->to->format('d M Y') }}
+                </p>
+            </div>
+            <a href="{{ route('pos.reports', array_filter(['tab' => $tab, 'cashier' => $selectedCashier, 'from' => $topItemsRange->from->toDateString(), 'to' => $topItemsRange->to->toDateString()])) }}" class="text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400">
+                {{ __('pos.back') }}
+            </a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm table-cards">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
+                        <th class="pb-2">#</th>
+                        <th class="pb-2">{{ __('pos.receipt_item') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.receipt_qty') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($topItemsDetailed as $i => $item)
+                    <tr class="border-b border-gray-50 dark:border-gray-800">
+                        <td class="py-2.5 text-gray-400">{{ $i + 1 }}</td>
+                        <td class="py-2.5 text-gray-900 dark:text-white font-medium">{{ $item->item_name }}</td>
+                        <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ rtrim(rtrim(number_format($item->total_qty, 2), '0'), '.') }}</td>
+                        <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($item->total_revenue) }}</td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ __('pos.no_data') }}</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
+
     {{-- ═══ Sales Analytics — date-range deep dive (owner request Jul 2026) ═══
          Plan gate (Task 664 review): controller passes NULL when the plan lacks
          analytics_enabled — no data is built or rendered for ineligible plans. --}}

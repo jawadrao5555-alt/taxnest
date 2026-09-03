@@ -103,7 +103,7 @@
 
         @if($isRestaurant)
         <div class="sh-minimal overflow-hidden">
-            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800/50"><h2 class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">{{ __("pos.top_sellers") }}</h2></div>
+            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800/50 flex items-center justify-between"><h2 class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">{{ __("pos.top_sellers") }}</h2><a href="{{ $topItemsReportUrl ?? route('pos.reports', ['top_items' => 1]) }}" class="text-[10px] font-bold text-gray-600 hover:text-gray-900 dark:text-gray-300">{{ __("pos.view_all_caps") }}</a></div>
             <div class="divide-y divide-gray-50 dark:divide-gray-800/50">
                 @forelse(($topProducts ?? collect())->take(5) as $idx => $p)
                 <div class="flex items-center gap-4 px-5 py-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition">

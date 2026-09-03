@@ -155,7 +155,7 @@
     @if($isRestaurant)
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 os-anim os-d5">
         <div class="lg:col-span-2 os-card p-4">
-            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">🏆 {{ __("pos.best_sellers") }}</h2>
+            <div class="flex items-center justify-between mb-3"><h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">🏆 {{ __("pos.best_sellers") }}</h2><a href="{{ $topItemsReportUrl ?? route('pos.reports', ['top_items' => 1]) }}" class="text-[10px] font-bold text-teal-600 hover:text-teal-700 dark:text-teal-400">{{ __("pos.view_all_caps") }}</a></div>
             <div class="space-y-2">
                 @forelse(($topProducts ?? collect())->take(5) as $idx => $p)
                 <div class="flex items-center gap-3">

@@ -97,6 +97,38 @@ class DealProductComposerMarkupTest extends TestCase
         $this->assertStringNotContainsString('<select multiple', $fbr);
     }
 
+    public function test_fixed_product_picker_is_an_explicit_add_control_in_create_and_edit_forms(): void
+    {
+        $composer = view('pos.partials.deal-product-composer', [
+            'accent' => 'emerald',
+            'choiceTableOk' => true,
+        ])->render();
+        $pra = file_get_contents(resource_path('views/pos/deals.blade.php'));
+        $fbr = file_get_contents(resource_path('views/fbr-pos/deals.blade.php'));
+
+        $this->assertStringContainsString("openProductPicker('fixed')", $composer);
+        $this->assertStringContainsString('x-text="labels.addProducts"', $composer);
+        $this->assertSame(2, substr_count($pra, "@include('pos.partials.deal-product-composer'"));
+        $this->assertSame(2, substr_count($fbr, "@include('pos.partials.deal-product-composer'"));
+    }
+
+    public function test_sale_screens_ignore_stale_choice_groups_without_options(): void
+    {
+        $praSale = file_get_contents(resource_path('views/pos/universal.blade.php'));
+        $fbrSale = file_get_contents(resource_path('views/fbr-pos/universal.blade.php'));
+        $praPayload = file_get_contents(app_path('Http/Controllers/PosController.php'));
+        $fbrPayload = file_get_contents(app_path('Http/Controllers/FbrPosController.php'));
+
+        foreach ([$praSale, $fbrSale] as $sale) {
+            $this->assertStringContainsString('Array.isArray(group.options) && group.options.length > 0', $sale);
+            $this->assertStringContainsString('this.pendingDeal = { ...deal, choice_groups: groups }', $sale);
+        }
+        $this->assertStringContainsString('->filter(fn ($group) => $group->options->isNotEmpty())', $praPayload);
+        $this->assertStringContainsString('$usableChoiceGroups', $fbrPayload);
+        $this->assertStringContainsString('choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())', $praPayload);
+        $this->assertStringContainsString('choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())', $fbrPayload);
+    }
+
     public function test_fbr_edit_failure_restores_every_scalar_control_only_for_its_edit_card(): void
     {
         $fbr = file_get_contents(resource_path('views/fbr-pos/deals.blade.php'));

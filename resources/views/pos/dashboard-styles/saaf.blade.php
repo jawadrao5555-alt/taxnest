@@ -164,7 +164,7 @@
     {{-- Two panels: Top items + Roz ke Kaam --}}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-3">{{ $saafTopLabel }}</p>
+            <div class="flex items-center justify-between gap-3 mb-3"><p class="text-sm font-extrabold text-gray-900 dark:text-white">{{ $saafTopLabel }}</p><a href="{{ $topItemsReportUrl ?? route('pos.reports', ['top_items' => 1]) }}" class="text-[10px] font-bold hover:underline" style="color:#0A4D5C;">{{ __("pos.view_all_caps") }}</a></div>
             @forelse($saafTopItems as $i => $item)
             <div class="flex items-center justify-between py-2.5 text-[13px] border-b border-gray-50 dark:border-gray-800 last:border-0">
                 <span class="flex items-center gap-3 min-w-0">

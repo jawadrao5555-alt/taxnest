@@ -517,6 +517,43 @@ class PosRestaurantDashboardCountsTest extends TestCase
         }
     }
 
+    public function test_top_seller_widgets_link_to_the_canonical_detailed_reports_mode(): void
+    {
+        // Default delegates this widget to the common section; each alternate
+        // style owns its own compact widget. Keeping this contract explicit
+        // prevents a future style refresh from leaving a truncated dead end.
+        $common = file_get_contents(resource_path('views/pos/dashboard-styles/_common-sections.blade.php'));
+        $this->assertStringContainsString('$topItemsReportUrl', $common);
+        $this->assertStringContainsString("['top_items' => 1]", $common);
+
+        foreach (['toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'] as $style) {
+            $blade = file_get_contents(resource_path("views/pos/dashboard-styles/{$style}.blade.php"));
+            $this->assertStringContainsString(
+                '$topItemsReportUrl',
+                $blade,
+                "{$style} top-seller widget must retain its complete-report link"
+            );
+        }
+    }
+
+    public function test_detailed_top_seller_report_uses_report_filters_and_business_dates_without_a_limit(): void
+    {
+        // This is deliberately source-focused: the report method is private,
+        // while the assertions lock the critical shared-query contract. The
+        // detailed query must use the report choke point (branch, stream and
+        // cashier), business_date, and never re-introduce the widget's 5/10
+        // item truncation.
+        $controller = file_get_contents(app_path('Http/Controllers/PosController.php'));
+        $start = strpos($controller, '$topItemsDetailed = null;');
+        $end = strpos($controller, '$monthlyTrend =', $start);
+        $detailedBlock = substr($controller, $start, $end - $start);
+
+        $this->assertStringContainsString("whereBetween('business_date'", $detailedBlock);
+        $this->assertStringContainsString('applyReportFilters($q, $tab, $cashierFilter, $user)', $detailedBlock);
+        $this->assertStringNotContainsString('->take(', $detailedBlock);
+        $this->assertStringNotContainsString('->limit(', $detailedBlock);
+    }
+
     public function test_shared_identity_renderer_keeps_retail_transactions_renderable(): void
     {
         $transaction = new PosTransaction([

@@ -665,6 +665,29 @@ class PosLocalSeriesResetTest extends TestCase
     }
 
     /**
+     * Housekeeping language is a safety feature: deleting bill detail is not a
+     * numbering reset, and retained customer spend history can only be purged by
+     * its own explicit action.  Check all supported POS languages so a locale
+     * cannot quietly reintroduce the unsafe promise.
+     */
+    public function test_customize_ui_explains_monotonic_numbering_and_explicit_history_purge(): void
+    {
+        $customize = file_get_contents(base_path('resources/views/pos/customize.blade.php'));
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $this->assertStringContainsString("__('pos.local_billing_numbering_never_resets')", $customize);
+        $this->assertStringContainsString('reset-numbering', $customize);
+        $this->assertStringContainsString('reset-numbering', $routes);
+
+        foreach (['en', 'rur', 'ur'] as $locale) {
+            $copy = file_get_contents(base_path("lang/{$locale}/pos.php"));
+            $this->assertStringContainsString("'local_billing_numbering_never_resets'", $copy);
+            $this->assertStringContainsString("'spend_records_hint'", $copy);
+            $this->assertStringContainsString("'auto_dayclose_6am_sub'", $copy);
+        }
+    }
+
+    /**
      * Replayed / double-clicked clear (and the second admin in a race): candidates
      * are selected and locked INSIDE the transaction, so the second run finds an
      * empty set — one snapshot set, ONE quota ledger row, no phantom usage.
@@ -714,11 +737,7 @@ class PosLocalSeriesResetTest extends TestCase
         $this->assertSame([], $this->numbers($cid));
     }
 
-    // ── 9. fresh start on an EMPTY series (owner, 25 Aug 2026) ───────────────
-    // "Numbering 1 par reset karne ka option chahiye." Monotonic usool waisa hi
-    // hai — clear/delete/day-close numbering ko peechay nahi le jate. Yeh alag,
-    // admin ka jaan-boojh kar kiya gaya amal hai, aur SIRF khali series par:
-    // ek bhi bill baqi ho to do bill ek hi reference le baithte.
+    // ── 9. explicit fresh start on an EMPTY series ──────────────────────────
 
     private function resetNumbering(User $user)
     {
@@ -731,13 +750,12 @@ class PosLocalSeriesResetTest extends TestCase
         $cid = $this->makeCompany();
         $this->makeBill($cid, 'L014');
 
-        $this->assertFalse($this->seriesStatus($cid)['can_reset'], 'Bill maujood hai to reset ki paishkash nahi');
-
+        $this->assertFalse($this->seriesStatus($cid)['can_reset']);
         $this->clear($this->makeUser($cid))->assertStatus(200);
 
         $after = $this->seriesStatus($cid);
-        $this->assertTrue($after['can_reset'], 'Series khali hone par hi option milta hai');
-        $this->assertSame('L015', $after['next'], 'Reset se PEHLE numbering waisi hi monotonic rehti hai');
+        $this->assertTrue($after['can_reset']);
+        $this->assertSame('L015', $after['next'], 'Clear itself never resets numbering');
     }
 
     public function test_a_brand_new_company_is_never_offered_a_pointless_reset(): void
@@ -756,9 +774,9 @@ class PosLocalSeriesResetTest extends TestCase
             ->assertStatus(200)
             ->assertJson(['success' => true, 'next_number' => 'L001']);
 
-        $this->assertSame('L001', $this->nextPreview($cid), 'Preview wahi kehta hai jo sale screen chhapega');
+        $this->assertSame('L001', $this->nextPreview($cid));
         $this->assertSame('L001', $this->nextRetail($cid));
-        $this->assertSame('L002', $this->nextRestaurant($cid), 'Dono sale paths ek hi counter par chalte hain');
+        $this->assertSame('L002', $this->nextRestaurant($cid));
     }
 
     public function test_reset_refuses_while_a_live_bill_still_holds_a_reference(): void
@@ -767,7 +785,6 @@ class PosLocalSeriesResetTest extends TestCase
         $this->makeBill($cid, 'L014', ['is_archived' => false]);
 
         $this->resetNumbering($this->makeUser($cid))->assertStatus(409);
-
         $this->assertSame('L015', $this->nextPreview($cid));
     }
 
@@ -777,7 +794,6 @@ class PosLocalSeriesResetTest extends TestCase
         $this->makeBill($cid, 'L014');
 
         $this->resetNumbering($this->makeUser($cid))->assertStatus(409);
-
         $this->assertSame('L015', $this->nextPreview($cid));
     }
 
@@ -788,7 +804,6 @@ class PosLocalSeriesResetTest extends TestCase
         $this->clear($this->makeUser($cid))->assertStatus(200);
 
         $this->resetNumbering($this->makeUser($cid, 'pos_cashier'))->assertStatus(403);
-
         $this->assertSame('L015', $this->nextPreview($cid));
     }
 

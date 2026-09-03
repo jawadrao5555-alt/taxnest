@@ -164,7 +164,7 @@
     @if($isRestaurant)
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 ls-anim ls-d5">
         <div class="lg:col-span-2 ls-glass overflow-hidden">
-            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between"><h2 class="text-xs font-bold text-gray-900 dark:text-white uppercase">{{ __("pos.best_sellers") }}</h2></div>
+            <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between"><h2 class="text-xs font-bold text-gray-900 dark:text-white uppercase">{{ __("pos.best_sellers") }}</h2><a href="{{ $topItemsReportUrl ?? route('pos.reports', ['top_items' => 1]) }}" class="text-[10px] font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400">{{ __("pos.view_all_caps") }}</a></div>
             <div class="grid grid-cols-1 sm:grid-cols-2">
                 @forelse(($topProducts ?? collect())->take(6) as $idx => $p)
                 <div class="flex items-center gap-3 p-4 border-b border-r border-gray-50 dark:border-gray-800/50 hover:bg-violet-50/20 dark:hover:bg-violet-900/5 transition">

@@ -172,6 +172,28 @@ class NewFeatureBadgesTest extends TestCase
         $this->assertStringNotContainsString('>' . __('pos.new_badge') . '<', $dot);
     }
 
+    public function test_settings_navigation_is_scoped_to_its_destination_and_stock_check_marks_its_page(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-03 10:00:00'));
+        NewFeatureBadges::fake([
+            'unrelated' => ['since' => '2026-09-03', 'panel' => 'pos', 'pages' => ['pos.receipt-settings']],
+        ]);
+
+        $this->assertSame(
+            '',
+            trim(Blade::render('<x-new-badge page="pos.customize" panel="pos" />')),
+            'An unrelated POS update must not make Customize look new'
+        );
+
+        $posLayout = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
+        $fbrLayout = file_get_contents(resource_path('views/layouts/fbr-pos-app.blade.php'));
+        $stockCheck = file_get_contents(resource_path('views/pos/inventory/stock-check/index.blade.php'));
+
+        $this->assertSame(3, substr_count($posLayout, 'page="pos.customize" panel="pos"'));
+        $this->assertStringContainsString('page="fbrpos.customize" panel="fbrpos"', $fbrLayout);
+        $this->assertStringContainsString('<x-new-badge feature="stock_check"', $stockCheck);
+    }
+
     public function test_every_registered_entry_points_at_a_real_page(): void
     {
         NewFeatureBadges::clearFake();

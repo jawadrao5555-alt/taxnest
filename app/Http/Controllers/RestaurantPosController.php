@@ -3104,6 +3104,18 @@ class RestaurantPosController extends Controller
             ->limit(8)
             ->get();
 
+        // Keep the widget a compact preview and send its "View all" action to
+        // the shared POS Reports implementation. The report owns stream,
+        // cashier and active-branch filtering; the dates reproduce this
+        // dashboard's seven business-day window.
+        $topItemsReportUrl = route('pos.reports', [
+            'top_items' => 1,
+            'tab' => ($user?->posBillingScope() ?? 'both') === 'local' ? 'local' : 'pra',
+            'cashier' => 'all',
+            'from' => \Carbon\Carbon::parse($bizDate, config('app.timezone'))->subDays(6)->toDateString(),
+            'to' => $bizDate,
+        ]);
+
         // Inventory master switch — when company has inventory_enabled = false,
         // the dashboard low-stock badge/section must stay empty.
         $inventoryOn = (bool)($company->inventory_enabled ?? false);
@@ -3275,6 +3287,7 @@ class RestaurantPosController extends Controller
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
             'topProducts', 'lowStockItems', 'recentOrders',
+            'topItemsReportUrl',
             'salesChartLabels', 'salesChartData', 'orderTypeCounts',
             'peakHour', 'todayTax', 'todayDiscount',
             'todayCost', 'todayProfit', 'kitchenStats',

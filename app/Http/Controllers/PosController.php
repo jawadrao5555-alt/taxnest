@@ -1501,21 +1501,38 @@ class PosController extends Controller
         $dashScope = auth('pos')->user()?->posBillingScope() ?? 'both';
         if ($dashScope === 'local') {
             $excludeLocal = function ($q) {
-                $q->where('invoice_mode', 'local')->orWhere(function ($s) {
-                    $s->whereNull('pra_status')->whereNull('pra_invoice_number');
-                });
+                // Same local stream predicate as pos.reports, except dashboards
+                // retain their normal archived-row scope.
+                $q->where(function ($s) {
+                    $s->where('invoice_mode', 'local')->orWhere(function ($r) {
+                        $r->whereNull('pra_status')->whereNull('pra_invoice_number');
+                    });
+                })->where(fn ($s) => $s->whereNull('pra_status')->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
             };
             $excludeLocalRaw = function ($q) {
-                $q->where('t.invoice_mode', 'local')->orWhere(function ($s) {
-                    $s->whereNull('t.pra_status')->whereNull('t.pra_invoice_number');
-                });
+                $q->where(function ($s) {
+                    $s->where('t.invoice_mode', 'local')->orWhere(function ($r) {
+                        $r->whereNull('t.pra_status')->whereNull('t.pra_invoice_number');
+                    });
+                })->where(fn ($s) => $s->whereNull('t.pra_status')->orWhere('t.pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
             };
         } else {
             $excludeLocal = function ($q) {
-                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                // A mode alone is not fiscal: reporting-OFF finals are local
+                // report rows. Keep the PRA dashboard aligned with
+                // PosTransaction::applyStreamTab('pra').
+                $q->where(function ($s) {
+                    $s->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                })->where(function ($s) {
+                    $s->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
+                })->where(fn ($s) => $s->whereNull('pra_status')->orWhere('pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
             };
             $excludeLocalRaw = function ($q) {
-                $q->where('t.invoice_mode', 'pra')->orWhereNull('t.invoice_mode');
+                $q->where(function ($s) {
+                    $s->where('t.invoice_mode', 'pra')->orWhereNull('t.invoice_mode');
+                })->where(function ($s) {
+                    $s->whereNotNull('t.pra_status')->orWhereNotNull('t.pra_invoice_number');
+                })->where(fn ($s) => $s->whereNull('t.pra_status')->orWhere('t.pra_status', '!=', PosTransaction::EXEMPT_INTERNAL));
             };
         }
 
@@ -1706,6 +1723,19 @@ class PosController extends Controller
             ->orderByDesc('qty')
             ->limit(5)
             ->get();
+
+        // The compact best-sellers widget is only a preview. Its destination is
+        // the canonical Reports route, carrying this dashboard's business-day
+        // period, active stream and cashier selection. Reports applies branch
+        // context itself through applyReportFilters(), rather than trusting a
+        // renderer-supplied branch id.
+        $topItemsReportUrl = route('pos.reports', array_filter([
+            'top_items' => 1,
+            'tab' => $dashScope === 'local' ? 'local' : 'pra',
+            'cashier' => $dashCashierId ?: 'all',
+            'from' => $periodStart,
+            'to' => $bizToday,
+        ], fn ($value) => $value !== null && $value !== ''));
 
         // Top products by profit (period) — PROFIT-FREEZE: use frozen item snapshot.
         if ($hasDashFrozenCost) {
@@ -1979,6 +2009,7 @@ class PosController extends Controller
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
+            'topItemsReportUrl',
             'dayOpening', 'dayOpeningTotal', 'openingDrawers', 'openingCounters',
             'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
             'pendingProvisional', 'openOrdersCount', 'counterOrdersCount', 'heldNoTableCount',
@@ -2515,7 +2546,13 @@ class PosController extends Controller
                     // Required choice slots are baked as a display aid only.
                     // Checkout locks/revalidates live groups before preserving the
                     // selected components in the bill snapshot.
-                    'choice_groups' => $choiceTablesReady ? $deal->choiceGroups->map(fn ($group) => [
+                    // A historical/testing group can outlive all of its options.
+                    // It cannot be selected, so do not turn an otherwise fixed
+                    // deal into a dead-end choice modal. Edit replaces all group
+                    // rows atomically and is the deliberate cleanup path.
+                    'choice_groups' => $choiceTablesReady ? $deal->choiceGroups
+                        ->filter(fn ($group) => $group->options->isNotEmpty())
+                        ->map(fn ($group) => [
                         'id' => (int) $group->id,
                         'label' => (string) $group->label,
                         'quantity' => (int) $group->quantity,
@@ -6707,6 +6744,32 @@ class PosController extends Controller
             ->take(10)
             ->get();
 
+        // Dashboard best-seller cards link here with top_items=1. Deliberately
+        // use the same report range, stream/cashier and branch choke point as
+        // every other report query. Unlike the monthly summary above, detailed
+        // mode has no presentation limit: every matching product is shown.
+        $topItemsDetailed = null;
+        $topItemsRange = null;
+        if ($request->boolean('top_items')) {
+            [$topItemsFrom, $topItemsTo] = $this->resolveReportRange($request);
+            $topItemsRange = (object) ['from' => $topItemsFrom, 'to' => $topItemsTo];
+            $topItemsDetailed = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter, $typeReady, $user, $topItemsFrom, $topItemsTo) {
+                $q->where('company_id', $companyId)
+                    ->where('status', 'completed')
+                    ->whereBetween('business_date', [$topItemsFrom->toDateString(), $topItemsTo->toDateString()]);
+                if ($typeReady) {
+                    $q->where(function ($w) {
+                        $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                    });
+                }
+                $this->applyReportFilters($q, $tab, $cashierFilter, $user);
+            })
+                ->selectRaw('item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue')
+                ->groupBy('item_name')
+                ->orderByDesc('total_revenue')
+                ->get();
+        }
+
         $monthlyTrend = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->subMonths(6)->startOfMonth()->toDateString())
@@ -6750,7 +6813,7 @@ class PosController extends Controller
             $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
         }
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics'));
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'topItemsDetailed', 'topItemsRange', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics'));
     }
 
     /**
@@ -8303,9 +8366,8 @@ class PosController extends Controller
                 return $empty;
             }
             $rows = $this->archivedLocalSeriesRows($companyId, ['id', 'invoice_number', 'business_date', 'created_at']);
-            // Fresh-start offer (owner, 25 Aug 2026): sirf tab jab series mein ek
-            // bhi bill baqi na ho (archived samet) AUR counter aage barha hua ho.
-            // Bill maujood hote hue reset ka matlab do bilon par ek hi reference.
+            // Reset is an explicit admin operation, offered only when no issued
+            // L-reference remains. Day close and Clear never invoke it.
             $canReset = !\App\Services\PosLocalSeries::hasIssuedRows($companyId)
                 && $this->previewNextLocalNumber($companyId) !== \App\Services\PosLocalSeries::format(1);
             if ($rows->isEmpty()) {
@@ -8532,24 +8594,11 @@ class PosController extends Controller
     }
 
     /**
-     * Customize POS → Local Billing — start the local reference series over at
-     * L001 (owner request, 25 Aug 2026).
-     *
-     * Pas-manzar: shop ne saray provisional/local record clear kar diye, token
-     * agle din 1 se shuru hue, magar reference L-016 se aage chalta raha —
-     * "numbering 1 par reset karne ka option chahiye". Monotonic usool waisa hi
-     * hai (clear, delete, day-close, archive — koi bhi cheez numbering peechay
-     * nahi le jati); yeh ek alag, jaan-boojh kar kiya gaya admin amal hai.
-     *
-     * Sakht shart: series KHALI ho — ek bhi L-reference wala bill (archived
-     * samet) baqi ho to reset nahi hota, warna do bill ek hi reference le kar
-     * ghoomenge. PRA/fiscal serial (POS-YYYY-NNNNN) yahan se nahi badalta: wo
-     * mojooda bilon se derive hota hai, aur report-shuda bill delete nahi hote.
+     * Explicit ADMIN/OWNER-only reset for an EMPTY local series. This is never
+     * called by day close, automatic day close, or archived-record clearing.
      */
     public function resetLocalNumbering(Request $request)
     {
-        // Same bar as the clear: this rewrites how every future bill is
-        // numbered, so custom-access cashiers/managers are out.
         $user = auth('pos')->user();
         if (!$user || !$user->isPosAdmin()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
@@ -8560,19 +8609,12 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 404);
         }
 
-        // Re-check INSIDE the transaction (and under the sale lock the service
-        // takes): the card the admin clicked may be minutes old, and a cashier
-        // may have billed since.
         $done = DB::transaction(fn () => \App\Services\PosLocalSeries::resetToStart($companyId));
-
         if (!$done) {
-            return response()->json([
-                'success' => false,
-                'message' => __('pos.local_series_reset_blocked'),
-            ], 409);
+            return response()->json(['success' => false, 'message' => __('pos.local_series_reset_blocked')], 409);
         }
 
-        \Illuminate\Support\Facades\Log::info('POS local series reset to its first number', [
+        \Illuminate\Support\Facades\Log::info('POS local series explicitly reset to its first number', [
             'company_id' => $companyId,
             'by' => $user->id,
         ]);
@@ -11756,7 +11798,11 @@ class PosController extends Controller
             return [[], []];
         }
 
-        $groups = $deal->choiceGroups;
+        // Legacy/test rows may retain a group after its option rows were
+        // removed. It is not a required choice: treating it as one blocks an
+        // otherwise fixed deal forever. The deal editor replaces these rows on
+        // its next successful update; snapshots for completed sales stay frozen.
+        $groups = $deal->choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())->values();
         $postedChoices = is_array($postedChoices) ? array_values($postedChoices) : [];
         if ($groups->isEmpty()) {
             if (!empty($postedChoices)) {

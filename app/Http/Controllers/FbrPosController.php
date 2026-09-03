@@ -425,7 +425,10 @@ class FbrPosController extends Controller
         if (!$this->fbrDealChoiceTablesReady()) {
             return [];
         }
-        $groups = $deal->choiceGroups;
+        // An empty persisted group is stale configuration, not an invoiceable
+        // choice. Ignore it here as well as in the sale payload so a fixed-only
+        // deal can still sell before its next editor update removes the row.
+        $groups = $deal->choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())->values();
         $postedChoices = is_array($postedChoices) ? array_values($postedChoices) : [];
         if ($groups->isEmpty()) {
             if (!empty($postedChoices)) {
@@ -1441,10 +1444,19 @@ class FbrPosController extends Controller
                 // allowed option only as an initial display preview; the cashier
                 // picker recomputes it from their actual choice before cart add,
                 // and store() recomputes it again from the locked deal.
-                $previewChoices = $choiceTablesReady ? $dealRow->choiceGroups->map(function ($group) {
-                    $option = $group->options->first();
+                // Ignore groups whose usable option list is empty. Old/test rows
+                // can retain a group after its products were retired; it must not
+                // force a sale-screen choice modal for a fixed-only deal.
+                $usableChoiceGroups = $choiceTablesReady ? $dealRow->choiceGroups
+                    ->filter(fn ($group) => $group->options->contains(
+                        fn ($option) => $choiceOptionProducts->has((int) $option->product_id)
+                    )) : collect();
+                $previewChoices = $usableChoiceGroups->map(function ($group) use ($choiceOptionProducts) {
+                    $option = $group->options->first(
+                        fn ($option) => $choiceOptionProducts->has((int) $option->product_id)
+                    );
                     return $option ? ['group_id' => (int) $group->id, 'product_id' => (int) $option->product_id] : null;
-                })->filter()->values()->all() : [];
+                })->filter()->values()->all();
                 $units = $this->fbrAllocateDealUnits($dealRow, $previewChoices);
                 if (empty($units)) { continue; }
                 $quota = $dealRow->quotaMetadata();
@@ -1470,7 +1482,7 @@ class FbrPosController extends Controller
                         'product_id' => (int) $item->product_id,
                         'quantity' => (int) $item->quantity,
                     ])->values(),
-                    'choice_groups' => $choiceTablesReady ? $dealRow->choiceGroups->map(fn ($group) => [
+                    'choice_groups' => $usableChoiceGroups->map(fn ($group) => [
                         'id' => (int) $group->id,
                         'label' => (string) $group->label,
                         'quantity' => (int) $group->quantity,
@@ -1486,7 +1498,7 @@ class FbrPosController extends Controller
                                 'is_third_schedule' => (bool) ($product->is_third_schedule ?? false),
                             ] : null;
                         })->filter()->values(),
-                    ])->values() : [],
+                    ])->values(),
                     ...$quota,
                 ];
             }

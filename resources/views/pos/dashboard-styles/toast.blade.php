@@ -169,6 +169,7 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 t-anim t-d4">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
             <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500"></span><h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">{{ __("pos.top_selling_items") }}</h2></div>
+            <a href="{{ $topItemsReportUrl ?? route('pos.reports', ['top_items' => 1]) }}" class="text-[10px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400">{{ __("pos.view_all_caps") }}</a>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-50 dark:divide-gray-800">
             @forelse(($topProducts ?? collect())->take(6) as $idx => $p)

@@ -27,7 +27,7 @@
         <button type="button" @click="openProductPicker('fixed')"
                 class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition {{ $accentOutline }}">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            <span x-text="rows.length ? labels.editProducts : labels.addProducts"></span>
+            <span x-text="labels.addProducts"></span>
         </button>
     </div>
 

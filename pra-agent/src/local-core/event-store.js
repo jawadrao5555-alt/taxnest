@@ -56,6 +56,7 @@ class EventStore {
         this.dir = opts.dataDir || path.join(process.cwd(), 'local-core');
         this.eventsFile = path.join(this.dir, 'events.ndjson');
         this.outboxFile = path.join(this.dir, 'outbox.ndjson');
+        this.stateFile = path.join(this.dir, 'state.ndjson');
         this.allowPlaintextMigration = opts.allowPlaintextMigration === true;
         this.maxEvents = integerOption(opts.maxEvents, 100000, 1);
         this.maxBytes = integerOption(opts.maxBytes, 256 * 1024 * 1024, 1);
@@ -80,6 +81,7 @@ class EventStore {
         this.idempotency = new Map();
         this.outbox = new Map();
         this.sequence = 0;
+        this.localSaleHighWater = 0;
         this.readOnly = false;
         this.storageFull = false;
         this.corruption = null;
@@ -174,7 +176,7 @@ class EventStore {
             return;
         }
         for (const data of records) {
-            if (!this.events.has(data.id) || ['queued', 'sent'].indexOf(data.state) === -1 ||
+            if (!this.events.has(data.id) || ['queued', 'sent', 'rejected'].indexOf(data.state) === -1 ||
                 !Number.isInteger(data.at_ms) || !Number.isInteger(data.attempts) || data.attempts < 0) {
                 throw new Error('invalid outbox record');
             }
@@ -277,14 +279,24 @@ class EventStore {
         }
         try {
             for (const data of this._readRecords(this.outboxFile)) {
-                if (!this.events.has(data.id) || ['queued', 'sent'].indexOf(data.state) === -1 ||
+                if (!this.events.has(data.id) || ['queued', 'sent', 'rejected'].indexOf(data.state) === -1 ||
                     !Number.isInteger(data.at_ms) || !Number.isInteger(data.attempts) || data.attempts < 0) {
                     throw new Error('invalid outbox record');
                 }
-                this.outbox.set(data.id, { state: data.state, attempts: data.attempts, updated_at_ms: data.at_ms });
+                this.outbox.set(data.id, { state: data.state, attempts: data.attempts, updated_at_ms: data.at_ms,
+                    sync_result: data.sync_result || null });
             }
         } catch (e) {
             this._failReadOnly(this.outboxFile, e.message);
+        }
+        try {
+            const state = this._readRecords(this.stateFile);
+            if (state.length > 1 || (state[0] && (!Number.isInteger(state[0].local_sale_high_water) || state[0].local_sale_high_water < 0))) {
+                throw new Error('invalid local state');
+            }
+            this.localSaleHighWater = state[0] ? state[0].local_sale_high_water : 0;
+        } catch (e) {
+            this._failReadOnly(this.stateFile, e.message);
         }
     }
 
@@ -385,7 +397,8 @@ class EventStore {
         const keptIds = new Set(Array.from(this.events.keys()).filter((id) => remove.indexOf(id) === -1));
         const outboxRecords = [];
         for (const [id, state] of this.outbox) {
-            if (keptIds.has(id)) outboxRecords.push({ id, state: state.state, attempts: state.attempts, at_ms: state.updated_at_ms });
+            if (keptIds.has(id)) outboxRecords.push({ id, state: state.state, attempts: state.attempts,
+                at_ms: state.updated_at_ms, sync_result: state.sync_result || null });
         }
         const eventRecords = [];
         for (const [id, event] of this.events) {
@@ -438,6 +451,28 @@ class EventStore {
         });
     }
 
+    findByIdempotency(key) {
+        const id = this.idempotency.get(String(key));
+        const event = id ? this.events.get(id) : null;
+        return event ? clone(event) : null;
+    }
+
+    maxSaleSequence(companyId) {
+        return this.localSaleHighWater;
+    }
+
+    allocateLocalSaleSequence() {
+        return this._withMutation(() => {
+            if (this.readOnly) throw new StoreReadOnlyError('local core store is read-only after corruption');
+            const next = this.localSaleHighWater + 1;
+            // State is encrypted and non-prunable. Persist it before the sale
+            // frame: a power loss can leave a harmless gap, never a reused ref.
+            this._replace(this.stateFile, [{ local_sale_high_water: next }]);
+            this.localSaleHighWater = next;
+            return next;
+        });
+    }
+
     pending(limit, scope) {
         const max = Number.isInteger(limit) ? Math.max(0, limit) : 100;
         const out = [];
@@ -452,21 +487,48 @@ class EventStore {
         return out;
     }
 
-    markSent(ids) {
+    markSent(ids, results) {
         return this._withMutation(() => {
             if (this.readOnly) throw new StoreReadOnlyError('local core store is read-only after corruption');
             let changed = 0;
+            const mappings = results || {};
             for (const id of new Set((ids || []).map(String))) {
                 const prior = this.outbox.get(id);
                 if (!prior || prior.state === 'sent') continue;
-                const next = { state: 'sent', attempts: prior.attempts + 1, updated_at_ms: this.now() };
+                const next = { state: 'sent', attempts: prior.attempts + 1, updated_at_ms: this.now(),
+                    sync_result: mappings[id] || prior.sync_result || null };
                 this._append(this.outboxFile,
-                    { id, state: next.state, attempts: next.attempts, at_ms: next.updated_at_ms });
+                    { id, state: next.state, attempts: next.attempts, at_ms: next.updated_at_ms,
+                        sync_result: next.sync_result });
                 this.outbox.set(id, next);
                 changed++;
             }
             return changed;
         });
+    }
+
+    markRejected(ids, results) {
+        return this._withMutation(() => {
+            if (this.readOnly) throw new StoreReadOnlyError('local core store is read-only after corruption');
+            let changed = 0;
+            const mappings = results || {};
+            for (const id of new Set((ids || []).map(String))) {
+                const prior = this.outbox.get(id);
+                if (!prior || prior.state !== 'queued') continue;
+                const next = { state: 'rejected', attempts: prior.attempts + 1, updated_at_ms: this.now(),
+                    sync_result: mappings[id] || { error: 'projection_rejected' } };
+                this._append(this.outboxFile, { id, state: next.state, attempts: next.attempts,
+                    at_ms: next.updated_at_ms, sync_result: next.sync_result });
+                this.outbox.set(id, next);
+                changed++;
+            }
+            return changed;
+        });
+    }
+
+    syncResult(id) {
+        const state = this.outbox.get(String(id));
+        return state && state.sync_result ? clone(state.sync_result) : null;
     }
 
     acknowledge(ids, scope) {
@@ -496,7 +558,8 @@ class EventStore {
 
     status() {
         let pending = 0;
-        this.outbox.forEach((value) => { if (value.state === 'queued') pending++; });
+        let rejected = 0;
+        this.outbox.forEach((value) => { if (value.state === 'queued') pending++; if (value.state === 'rejected') rejected++; });
         const sizes = this._journalBytes();
         let freeBytes;
         try { freeBytes = this._freeBytes(); } catch (e) { freeBytes = null; }
@@ -506,6 +569,7 @@ class EventStore {
             storage_full: this.storageFull,
             event_count: this.events.size,
             pending_count: pending,
+            rejected_count: rejected,
             corruption: this.corruption ? clone(this.corruption) : null,
             encryption: { enabled: true, algorithm: 'aes-256-gcm', format_version: FORMAT_VERSION, key_id: this.keyId },
             journal: {

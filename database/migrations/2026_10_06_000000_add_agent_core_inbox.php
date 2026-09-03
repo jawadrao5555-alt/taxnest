@@ -29,6 +29,10 @@ return new class extends Migration
                 $table->timestamp('occurred_at')->nullable();
                 $table->json('payload');
                 $table->string('content_hash', 64);
+                $table->json('event_scope')->nullable();
+                $table->string('projection_status', 24)->nullable()->index();
+                $table->json('projection_result')->nullable();
+                $table->text('projection_error')->nullable();
                 // Explicitly scoped escape hatch for pre-Core rows whose old
                 // timestamp column discarded sub-second precision.
                 $table->boolean('legacy_backfilled')->default(false);

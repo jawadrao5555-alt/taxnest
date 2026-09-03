@@ -69,6 +69,16 @@ class AgentCoreInboxTest extends TestCase
 
     private function request(string $key, array $events, string $device = 'counter-1')
     {
+        $companyId = $key === self::KEY_ONE ? '1' : '2';
+        $events = array_map(function (array $event) use ($companyId, $device): array {
+            $event['scope'] ??= [
+                'company_id' => $companyId,
+                'branch_id' => '1',
+                'device_id' => $device,
+                'user_id' => '1',
+            ];
+            return $event;
+        }, $events);
         return $this->withToken($key)->postJson('/api/agent/v2/events', [
             'version' => 1,
             'device_uid' => $device,
@@ -80,7 +90,7 @@ class AgentCoreInboxTest extends TestCase
     {
         return [
             'event_id' => $id,
-            'event_type' => 'sale.created',
+            'event_type' => 'caller.ring',
             'occurred_at' => now()->toIso8601String(),
             'idempotency_key' => 'idem-' . $id,
             'payload' => ['local_sale_id' => 'L-100'],

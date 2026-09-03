@@ -34,6 +34,22 @@ use Illuminate\Support\Facades\Log;
 
 class PosController extends Controller
 {
+    /** Desktop-only trusted scope source. Renderer-provided identities are never authority. */
+    public function desktopLocalCoreScope(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || !$user->is_active) {
+            return response()->json(['success' => false], 401);
+        }
+        $branch = app(\App\Services\BranchContextService::class)->stampBranchId();
+        if (!$branch) return response()->json(['success' => false, 'error' => 'branch_unavailable'], 422);
+        return response()->json([
+            'success' => true,
+            'company_id' => (string) app('currentCompanyId'),
+            'branch_id' => (string) $branch,
+            'user_id' => (string) $user->id,
+        ])->header('Cache-Control', 'no-store');
+    }
     public function updateTheme(Request $request)
     {
         $theme = $request->input('theme', 'purple');

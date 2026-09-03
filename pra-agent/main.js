@@ -21,6 +21,7 @@ const { heartbeatAllowsCore } = require('./src/local-core/lifecycle');
 const { SafeStorageKeyProvider, loadOrCreateCoreKey } = require('./src/local-core/key-store');
 const { CloudSyncClient } = require('./src/local-core/cloud-sync');
 const { createEventIngress } = require('./src/local-core/ingress');
+const { createSaleAcceptance } = require('./src/local-core/sale-acceptance');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
@@ -324,11 +325,35 @@ let coreRuntime = null;
 let coreTimer = null;
 let coreStartupError = null;
 let coreBackupTelemetry = { last_success_at: null, last_failure_code: null, last_failure_at: null, backup_count: 0, backup_bytes: 0 };
+let trustedPosScope = null;
+let trustedScopeGeneration = 0;
+function clearTrustedPosScope() { trustedScopeGeneration++; trustedPosScope = null; }
+async function refreshTrustedPosScope(ses, origin) {
+  const pw = getPosWindowRef();
+  if (!pw || !ses || !origin) return null;
+  const generation = trustedScopeGeneration;
+  const contents = pw.webContents;
+  const configAtStart = store.get('config') || {};
+  try {
+    const response = await ses.fetch(origin + '/pos/desktop/local-core-scope', { headers: { Accept: 'application/json' } });
+    const data = response.ok ? await response.json() : null;
+    const config = store.get('config') || {};
+    if (generation !== trustedScopeGeneration || !getPosWindowRef() ||
+        getPosWindowRef().webContents !== contents || config.companyId !== configAtStart.companyId ||
+        config.deviceUid !== configAtStart.deviceUid ||
+        !data || !data.success || String(data.company_id) !== String(config.companyId || '') ||
+        !/^[1-9]\d*$/.test(String(data.branch_id)) || !/^[1-9]\d*$/.test(String(data.user_id))) return null;
+    trustedPosScope = { company_id: String(data.company_id), branch_id: String(data.branch_id),
+      user_id: String(data.user_id), webContents: contents, configCompanyId: String(config.companyId || '') };
+    return trustedPosScope;
+  } catch (e) { return null; }
+}
 
-function stopCoreRuntime() {
+function stopCoreRuntime(clearScope) {
   if (coreTimer) { clearTimeout(coreTimer); coreTimer = null; }
   try { if (coreRuntime && coreRuntime.store) coreRuntime.store.close(); } catch (e) {}
   coreRuntime = null;
+  if (clearScope) clearTrustedPosScope();
 }
 
 function coreEndpoint(serverUrl) {
@@ -352,7 +377,7 @@ function openLocalCoreRuntime(config) {
   const companyId = String(config.companyId || '');
   const deviceUid = String(config.deviceUid || '');
   if (!companyId || !deviceUid) {
-    stopCoreRuntime();
+    stopCoreRuntime(true);
     coreStartupError = { code: 'core_scope_unavailable', message: 'Local Core requires company and device identity',
       at: new Date().toISOString() };
     return { enabled: false, error: coreStartupError.code };
@@ -365,7 +390,10 @@ function openLocalCoreRuntime(config) {
     scheduleCoreSync(0);
     return coreRuntime.store.status();
   }
-  stopCoreRuntime();
+  // Reopening the same company/device must not erase a valid POS login scope.
+  if (coreRuntime && (coreRuntime.store.authorityScope.company_id !== companyId ||
+      coreRuntime.store.authorityScope.device_id !== deviceUid)) clearTrustedPosScope();
+  stopCoreRuntime(false);
   try {
     const root = path.join(app.getPath('userData'), 'local-core');
     const encryption = loadOrCreateCoreKey({
@@ -397,6 +425,14 @@ function openLocalCoreRuntime(config) {
     };
     coreRuntime = runtime;
     coreStartupError = null;
+    // Scope and heartbeat may arrive in either order. Refresh from the owning
+    // authenticated Electron session after a successful open; stale responses
+    // are rejected by refreshTrustedPosScope's generation/config/window checks.
+    try {
+      const pw = getPosWindowRef();
+      const origin = pw && new URL(pw.webContents.getURL()).origin;
+      if (pw && origin && /^https?:$/.test(new URL(origin).protocol)) refreshTrustedPosScope(pw.webContents.session, origin);
+    } catch (e) {}
     try {
       const retained = Number(store.get('localCoreBackupMaxRetained'));
       const backupResult = createBackup({
@@ -418,7 +454,7 @@ function openLocalCoreRuntime(config) {
     scheduleCoreSync(0);
     return store_.status();
   } catch (e) {
-    stopCoreRuntime();
+    stopCoreRuntime(false);
     coreStartupError = {
       code: 'core_secure_storage_unavailable',
       message: String((e && e.message) || 'Local Core secure storage failed').slice(0, 240),
@@ -431,7 +467,7 @@ function openLocalCoreRuntime(config) {
 
 function applyCoreHeartbeat(config, heartbeat) {
   if (!getPosSettings().offlineMode || !heartbeatAllowsCore(config, heartbeat)) {
-    stopCoreRuntime();
+    stopCoreRuntime(false);
     coreStartupError = null;
     return { enabled: false };
   }
@@ -440,7 +476,7 @@ function applyCoreHeartbeat(config, heartbeat) {
 
 function applyLocalCoreSetting() {
   if (!getPosSettings().offlineMode) {
-    stopCoreRuntime();
+    stopCoreRuntime(false);
     coreStartupError = null;
   } else {
     // Enabling locally does not open storage. Ask for a fresh authenticated
@@ -512,11 +548,23 @@ function openPos() {
         setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
         buildTrayMenu();
       },
-      onLoggedIn: autoConfigureAgent,
+      onLoggedIn: async (ses, origin) => {
+        const configured = await autoConfigureAgent(ses, origin);
+        await refreshTrustedPosScope(ses, origin);
+        return configured;
+      },
       // Keep-alive (v1.5.2): POS window hides on close and must only REALLY
       // close when the whole app is quitting (tray Quit / self-update).
       isQuitting: () => isQuitting,
     });
+    const posWin = getPosWindowRef();
+    if (posWin && !posWin.__localCoreScopeWired) {
+      posWin.__localCoreScopeWired = true;
+      posWin.webContents.on('did-navigate', (_e, url) => {
+        if (/\/pos\/(login|logout)(?:[/?#]|$)/.test(String(url))) clearTrustedPosScope();
+      });
+      posWin.on('closed', clearTrustedPosScope);
+    }
     // First open "installs" NestPOS as its own app: Desktop + Start Menu
     // shortcuts with the NestPOS icon (relaunch straight into the POS).
     try {
@@ -642,6 +690,7 @@ async function autoConfigureAgent(ses, origin) {
       companyId: data.company_id,
     };
     store.set('config', config);
+    clearTrustedPosScope();
     stopAgent();
     startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
     console.log(
@@ -958,7 +1007,7 @@ app.on('window-all-closed', (e) => {
 
 app.on('before-quit', () => {
   isQuitting = true;
-  stopCoreRuntime();
+  stopCoreRuntime(true);
   stopAgent();
   // Free the LAN port so a restart (or an update swap) can bind it again.
   try { if (lanServer) lanServer.stop(); } catch (e) {}
@@ -1038,6 +1087,7 @@ ipcMain.handle('toggle-agent', (event, enabled) => {
     }
     return { ok: false, error: 'Configure agent first' };
   } else {
+    clearTrustedPosScope();
     stopAgent();
     return { ok: true, running: false };
   }
@@ -1085,6 +1135,39 @@ const appendCoreEventFromPos = createEventIngress({
   onAccepted: () => scheduleCoreSync(0),
 });
 ipcMain.handle('local-core-append-event', (event, input) => appendCoreEventFromPos(event, input));
+const acceptCoreSaleFromPos = createSaleAcceptance({
+  isAuthorized: (event) => {
+    const pw = getPosWindowRef();
+    return !!(pw && !pw.isDestroyed() && event && event.sender === pw.webContents);
+  },
+  storeProvider: () => (coreRuntime && getPosSettings().offlineMode ? coreRuntime.store : null),
+  scopeProvider: () => {
+    const authority = coreRuntime && coreRuntime.store && coreRuntime.store.authorityScope;
+    const pw = getPosWindowRef();
+    if (!trustedPosScope || !pw || trustedPosScope.webContents !== pw.webContents ||
+        trustedPosScope.configCompanyId !== String((authority && authority.company_id) || '')) return null;
+    return {
+      company_id: String((authority && authority.company_id) || ''),
+      device_id: String((authority && authority.device_id) || ''),
+      branch_id: trustedPosScope.branch_id,
+      user_id: trustedPosScope.user_id,
+    };
+  },
+  onAccepted: () => scheduleCoreSync(0),
+});
+ipcMain.handle('local-core-accept-immediate-sale', (event, input) => {
+  if (!trustedPosScope || trustedPosScope.webContents !== event.sender) return { ok: false, error: 'trusted_scope_unavailable' };
+  const supplied = input && input.scope;
+  if (!supplied || String(supplied.company_id) !== trustedPosScope.company_id ||
+      String(supplied.branch_id) !== trustedPosScope.branch_id || String(supplied.user_id) !== trustedPosScope.user_id) {
+    return { ok: false, error: 'scope_mismatch' };
+  }
+  input = Object.assign({}, input, { scope: Object.assign({}, input && input.scope, {
+    company_id: trustedPosScope.company_id, branch_id: trustedPosScope.branch_id,
+    user_id: trustedPosScope.user_id, device_id: coreRuntime && coreRuntime.store.authorityScope.device_id,
+  }) });
+  return acceptCoreSaleFromPos(event, input);
+});
 
 // ─── NestPOS LAN Mode IPC ───────────────────────────────────────────────────
 ipcMain.handle('get-lan-settings', () => getLanSettings());

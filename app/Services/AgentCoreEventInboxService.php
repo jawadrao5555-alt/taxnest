@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AgentCoreEvent;
 use App\Models\Company;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AgentCoreEventInboxService
 {
@@ -34,8 +35,9 @@ class AgentCoreEventInboxService
     {
         $stored = 0;
         $duplicates = 0;
+        $hasScopeColumn = Schema::hasColumn('agent_core_events', 'event_scope');
 
-        DB::transaction(function () use ($company, $deviceUid, $events, &$stored, &$duplicates): void {
+        DB::transaction(function () use ($company, $deviceUid, $events, $hasScopeColumn, &$stored, &$duplicates): void {
             foreach ($events as $event) {
                 $hash = self::contentHashFor($event);
                 $existing = AgentCoreEvent::query()
@@ -49,15 +51,17 @@ class AgentCoreEventInboxService
                     ->first();
 
                 if ($existing) {
-                    if (!hash_equals((string) $existing->content_hash, $hash)
-                        && !$this->isSafeLegacyPrecisionRetry($existing, $event)) {
+                    $contentDiffers = !hash_equals((string) $existing->content_hash, $hash)
+                        || ($hasScopeColumn && $existing->event_scope !== null
+                            && self::canonicalJson((array) $existing->event_scope) !== self::canonicalJson((array) $event['scope']));
+                    if ($contentDiffers && !$this->isSafeLegacyPrecisionRetry($existing, $event)) {
                         throw new AgentCoreEventConflictException('An event_id or idempotency_key was reused with different immutable content.');
                     }
                     $duplicates++;
                     continue;
                 }
 
-                $inserted = AgentCoreEvent::query()->insertOrIgnore([
+                $insert = [
                     'company_id' => $company->id,
                     'device_uid' => $deviceUid,
                     'event_id' => $event['event_id'],
@@ -68,7 +72,9 @@ class AgentCoreEventInboxService
                     'content_hash' => $hash,
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
+                if ($hasScopeColumn) $insert['event_scope'] = self::canonicalJson((array) $event['scope']);
+                $inserted = AgentCoreEvent::query()->insertOrIgnore($insert);
                 if ($inserted) {
                     $stored++;
                     continue;
@@ -85,7 +91,9 @@ class AgentCoreEventInboxService
                             ->orWhere('idempotency_key', $event['idempotency_key']);
                     })
                     ->first();
-                if (!$existing || !hash_equals((string) $existing->content_hash, $hash)) {
+                if (!$existing || !hash_equals((string) $existing->content_hash, $hash)
+                    || ($hasScopeColumn && $existing->event_scope !== null
+                        && self::canonicalJson((array) $existing->event_scope) !== self::canonicalJson((array) $event['scope']))) {
                     if (!$existing || !$this->isSafeLegacyPrecisionRetry($existing, $event)) {
                         throw new AgentCoreEventConflictException('An event_id or idempotency_key was reused with different immutable content.');
                     }

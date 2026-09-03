@@ -11,7 +11,8 @@ contextBridge.exposeInMainWorld('nestposDesktop', {
   // Silent-print raw receipt/KOT HTML on the shop printer (no dialog).
   // printer omitted/empty = Windows default printer.
   printHtml: (html, printer) => ipcRenderer.invoke('pos-print-html', html, printer || null),
-  // Authenticated by the owning POS webContents in main; never exposed on LAN.
-  appendCoreEvent: (event) => ipcRenderer.invoke('local-core-append-event', event),
+  // Typed immediate-sale command. Main injects/validates its exact authority
+  // scope; arbitrary browser-authored Core events are deliberately not exposed.
+  acceptImmediateSale: (sale) => ipcRenderer.invoke('local-core-accept-immediate-sale', sale),
   getVersion: () => ipcRenderer.invoke('get-version'),
 });

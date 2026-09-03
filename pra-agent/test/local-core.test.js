@@ -11,6 +11,7 @@ const { CloudSyncClient } = require('../src/local-core/cloud-sync');
 const { createBackup, restoreBackup, recoverInterruptedRestore } = require('../src/local-core/backup');
 const { LocalCoreLifecycle, heartbeatAllowsCore } = require('../src/local-core/lifecycle');
 const { createEventIngress } = require('../src/local-core/ingress');
+const { createSaleAcceptance } = require('../src/local-core/sale-acceptance');
 const { isCurrentHeartbeatRequest } = require('../src/heartbeat-guard');
 
 const KEY = Buffer.from('0123456789abcdef0123456789abcdef');
@@ -244,6 +245,35 @@ function fakeSafeStorage() {
             { ok: true, id: 'event-ingress-1', duplicate: false });
         assert.strictEqual(ingress(owner, event('event-ingress-1')).duplicate, true);
         assert.strictEqual(wakes, 2);
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    await it('durably accepts immediate PRA sales with stable identity and monotonic sequence', function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-sales-'));
+        const options = storeOptions(root, { authorityScope: { company_id: '1', device_id: 'device-1' } });
+        let store = new EventStore(options);
+        const owner = {};
+        const scope = { company_id: '1', branch_id: '2', device_id: 'device-1', user_id: '3' };
+        const accept = () => createSaleAcceptance({
+            isAuthorized: (context) => context === owner, storeProvider: () => store, scopeProvider: () => scope,
+        });
+        const sale = (uuid) => ({
+            scope, offline_uuid: uuid, occurred_at_ms: 1700000000000, payment_method: 'cash',
+            provisional: false, pra_reporting_enabled: true, inventory_enabled: false, order_type: null, customer_credit: false,
+            items: [{ name: 'Tea', quantity: 2, unit_price: 100, line_total: 200 }],
+            totals: { subtotal: 200, discount_amount: 0, tax_amount: 32, total_amount: 232 },
+            discount_type: 'percentage', discount_value: 0,
+        });
+        const first = accept()(owner, sale('offline-uuid-00000001'));
+        assert.strictEqual(first.status, 'accepted_local');
+        assert.match(first.receipt.local_bill_number, /^DL-[A-F0-9]{8}-000001$/);
+        assert.strictEqual(accept()(owner, sale('offline-uuid-00000001')).status, 'duplicate');
+        store.close();
+        store = new EventStore(options);
+        assert.match(accept()(owner, sale('offline-uuid-00000002')).receipt.local_bill_number, /^DL-[A-F0-9]{8}-000002$/);
+        assert.strictEqual(fs.readFileSync(path.join(root, 'events.ndjson')).includes(Buffer.from('Tea')), false);
+        assert.strictEqual(accept()({}, sale('offline-uuid-00000003')).error, 'unauthorized');
+        assert.strictEqual(accept()(owner, { ...sale('offline-uuid-00000004'), inventory_enabled: true }).error, 'unsupported_sale');
         fs.rmSync(root, { recursive: true, force: true });
     });
 
@@ -526,7 +556,12 @@ function fakeSafeStorage() {
                 calls++;
                 await new Promise((resolve) => setTimeout(resolve, 15));
                 wire = body;
-                return { acknowledged_ids: [body.events[0].event_id, 'not-submitted-ever'] };
+                return {
+                    acknowledged_ids: [body.events[0].event_id, 'not-submitted-ever'],
+                    results: [{ event_id: body.events[0].event_id, status: 'projected',
+                        transaction_id: 91, invoice_number: 'P-091', pra_status: 'pending' }],
+                    rejected: [{ event_id: body.events[1].event_id, error: 'projection_rejected' }],
+                };
             },
         });
         const [a, b] = await Promise.all([client.sync(), client.sync()]);
@@ -543,7 +578,18 @@ function fakeSafeStorage() {
                     scope: { company_id: 'company-1', branch_id: 'branch-1', device_id: 'device-1', user_id: 'user-1' }, payload: { sale_id: 12 } },
             ],
         });
-        assert.strictEqual(store.status().pending_count, 1, 'unknown ACK must not mark arbitrary entries sent');
+        assert.strictEqual(store.status().pending_count, 0, 'terminal rejection must not poison later queue progress');
+        assert.strictEqual(store.status().rejected_count, 1);
+        assert.deepStrictEqual(store.syncResult('event-0003'), {
+            event_id: 'event-0003', status: 'projected', transaction_id: 91,
+            invoice_number: 'P-091', pra_status: 'pending',
+        });
+        assert.deepStrictEqual(store.syncResult('event-0004'), {
+            event_id: 'event-0004', error: 'projection_rejected',
+        }, 'a terminal rejection must be durably visible without retrying');
+        const restarted = new EventStore(storeOptions(syncDir));
+        assert.strictEqual(restarted.syncResult('event-0003').transaction_id, 91,
+            'cloud mapping must survive restart without changing local identity');
         fs.rmSync(syncDir, { recursive: true, force: true });
     });
     await it('never drains until the heartbeat gate registers this company/device', async function () {
@@ -566,6 +612,26 @@ function fakeSafeStorage() {
         })) await client.sync();
         assert.strictEqual(calls, 1);
         assert.strictEqual(store.pending().length, 0);
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+    await it('terminal poison events do not block later projected events and survive restart', async function () {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'local-core-poison-'));
+        const store = new EventStore(storeOptions(root));
+        for (let i = 0; i < 101; i++) store.append(event('poison-' + String(i).padStart(4, '0')));
+        const client = new CloudSyncClient({
+            store, deviceUid: 'device-1',
+            request: async (wire) => ({
+                acknowledged_ids: wire.events.filter((e) => e.event_id.endsWith('0100')).map((e) => e.event_id),
+                rejected: wire.events.filter((e) => !e.event_id.endsWith('0100'))
+                    .map((e) => ({ event_id: e.event_id, error: 'projection_rejected', message: 'bad sale' })),
+            }),
+        });
+        await client.sync();
+        assert.strictEqual(store.status().rejected_count, 100);
+        assert.strictEqual(store.status().pending_count, 1);
+        await client.sync();
+        assert.strictEqual(store.status().pending_count, 0);
+        assert.strictEqual(new EventStore(storeOptions(root)).status().rejected_count, 100);
         fs.rmSync(root, { recursive: true, force: true });
     });
     fs.rmSync(dir, { recursive: true, force: true });

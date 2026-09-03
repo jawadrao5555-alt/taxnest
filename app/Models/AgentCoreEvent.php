@@ -23,11 +23,13 @@ class AgentCoreEvent extends Model
         'occurred_at',
         'payload',
         'legacy_backfilled',
+        'event_scope',
     ];
 
     protected $casts = [
         'occurred_at' => 'datetime',
         'payload' => 'array',
         'legacy_backfilled' => 'boolean',
+        'event_scope' => 'array',
     ];
 }

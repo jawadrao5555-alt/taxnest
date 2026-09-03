@@ -28,6 +28,11 @@ class AgentCoreEventBatchRequest extends FormRequest
             'events.*.occurred_at' => ['nullable', 'date'],
             'events.*.idempotency_key' => ['required', 'string', 'max:128', 'regex:/^[A-Za-z0-9._:-]+$/'],
             'events.*.payload' => ['required', 'array'],
+            'events.*.scope' => ['required', 'array'],
+            'events.*.scope.company_id' => ['required', 'string', 'max:128'],
+            'events.*.scope.branch_id' => ['required', 'string', 'max:128'],
+            'events.*.scope.device_id' => ['required', 'string', 'max:128'],
+            'events.*.scope.user_id' => ['required', 'string', 'max:128'],
         ];
     }
 

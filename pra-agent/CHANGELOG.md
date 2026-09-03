@@ -1,3 +1,7 @@
+# In development
+
+- Local Core phase: added a default-off, heartbeat-gated NestPOS Desktop path for durable immediate PRA manual cash/card sale acceptance and projected cloud synchronization. Receipts are explicitly marked `LOCAL / PRA PENDING`; this is an internal development slice, not fleet-ready or full offline POS support.
+
 # TaxNest PRA Sync Agent — Changelog
 
 ## Unreleased — Local Core foundation

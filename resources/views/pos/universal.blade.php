@@ -4058,7 +4058,7 @@ window.addEventListener('popstate', function() {
                           :class="lastIsOffline ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : (lastPraStatus === 'submitted' ? 'bg-emerald-600 text-white' : (lastPraStatus === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300')))">
                         <svg x-show="!lastIsOffline && lastPraStatus === 'submitted'" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42l2.79 2.8 6.79-6.8a1 1 0 011.42 0z" clip-rule="evenodd"/></svg>
                         <svg x-show="!lastIsOffline && lastPraStatus === 'pending'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="lastIsOffline ? window.TXT.saved_offline_autosync : (lastPraStatus === 'submitted' ? window.TXT.pra_verified : (lastPraStatus === 'pending' ? window.TXT.reporting_to_pra : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? window.TXT.saved_will_sync_pra : window.TXT.local_bill)))"></span>
+                        <span x-text="lastPraStatus === 'local_core_pending' ? 'LOCAL / PRA PENDING' : (lastIsOffline ? window.TXT.saved_offline_autosync : (lastPraStatus === 'submitted' ? window.TXT.pra_verified : (lastPraStatus === 'pending' ? window.TXT.reporting_to_pra : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? window.TXT.saved_will_sync_pra : window.TXT.local_bill)))"></span>
                     </span>
                 </div>
                 {{-- Big total --}}
@@ -5865,6 +5865,9 @@ function restaurantPos() {
         // (online event + every auto-sync tick). Server-side offline_uuid
         // dedupe makes replays idempotent — a lost response never duplicates.
         _offlineCompanyId: {{ (int) (app('currentCompanyId') ?? 0) }},
+        _localCoreBranchId: {{ (int) (app()->bound('currentBranchId') ? (app('currentBranchId') ?? 0) : 0) }},
+        _localCoreUserId: {{ (int) auth('pos')->id() }},
+        _localCoreInventoryEnabled: {{ $company->inventory_enabled ? 'true' : 'false' }},
         idbOpen() {
             return new Promise((resolve, reject) => {
                 if (this._idb) return resolve(this._idb);
@@ -6278,6 +6281,86 @@ function restaurantPos() {
             this.clearCart();
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
         },
+        async acceptLocalCoreSale(payload, method, savedTotal, skipReceipt = false) {
+            const bridge = window.nestposDesktop;
+            if (!bridge || typeof bridge.acceptImmediateSale !== 'function') return false;
+            // Deliberately narrow: immediate final universal sale only. Every
+            // unsupported shape returns to the established IndexedDB path.
+            if (!['cash', 'card'].includes(method) || !this.praEnabled || payload.save_as_provisional ||
+                this._localCoreInventoryEnabled || payload.incoming_order_id ||
+                payload.recalled_order_id || payload.table_id ||
+                payload.online_payment_confirmed || this.orderType === 'delivery' ||
+                this.orderType === 'dine_in') return false;
+            const command = {
+                scope: {
+                    company_id: String(this._offlineCompanyId),
+                    branch_id: String(this._localCoreBranchId),
+                    user_id: String(this._localCoreUserId),
+                },
+                offline_uuid: payload.offline_uuid,
+                occurred_at_ms: Date.now(),
+                payment_method: method,
+                provisional: false,
+                pra_reporting_enabled: true,
+                inventory_enabled: false,
+                order_type: null,
+                customer_credit: false,
+                incoming_order_id: null, recalled_order_id: null, table_id: null,
+                online_payment_confirmed: false,
+                discount_type: payload.discount_type,
+                discount_value: payload.discount_value || 0,
+                cash_received: payload.cash_received,
+                terminal_id: payload.terminal_id,
+                customer_name: payload.customer_name,
+                customer_phone: payload.customer_phone,
+                items: payload.items.map((item) => ({
+                    name: item.name, quantity: Number(item.quantity), unit_price: Number(item.unit_price),
+                    line_total: this.r2(Number(item.quantity) * Number(item.unit_price)),
+                    type: item.type, item_id: item.item_id, is_tax_exempt: !!item.is_tax_exempt,
+                    _manual: !!item._manual,
+                })),
+                totals: {
+                    subtotal: this.r2(this.effectiveSubtotal),
+                    discount_amount: this.r2(this.discountAmount),
+                    tax_amount: this.r2(this.taxAmount),
+                    total_amount: Math.round(savedTotal || 0),
+                    tax_inclusive: !!this.taxInclusive,
+                },
+            };
+            let accepted;
+            try { accepted = await bridge.acceptImmediateSale(command); } catch (_) { return false; }
+            if (!accepted || !accepted.ok || !accepted.receipt) return false;
+            const receipt = accepted.receipt;
+            const rec = {
+                uuid: payload.offline_uuid, method, total: receipt.total_amount,
+                local_ref: receipt.local_bill_number, local_core: true,
+                customer: this.selectedCustomer?.name || '',
+                items: this.cart.map(c => ({ name: c.item_name, qty: this._safeQty(c.quantity), price: c.unit_price })),
+                queued_at: Date.parse(receipt.accepted_at) || Date.now(),
+            };
+            this.lastIsOffline = true;
+            this.lastOfflineRec = rec;
+            this.lastInvoiceNumber = receipt.local_bill_number;
+            this.lastTransactionId = null;
+            this.lastOrderId = null;
+            this.lastKotPending = false;
+            this.lastOrderType = this.orderType || null;
+            this.lastTotal = receipt.total_amount;
+            this.lastPaymentMethod = method;
+            this.lastPraNumber = '';
+            this.lastPraStatus = 'local_core_pending';
+            this.lastWaiterName = '';
+            this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+            this.lastSaleAt = Date.now();
+            this.setWaBill(null);
+            this.showReceipt = true;
+            this.scheduleReceiptAutoClose();
+            this.showToast('LOCAL sale accepted — PRA pending sync', 'success');
+            if (!skipReceipt && this.autoPrintEnabled) setTimeout(() => this.printOfflineReceipt(), 400);
+            this.clearCart();
+            this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+            return true;
+        },
         // Replay queued offline bills, OLDEST first. Stops on network failure
         // (still offline) or auth loss (419/401 — session expired; bills stay
         // safe until the cashier logs in again and the page reloads).
@@ -6411,10 +6494,10 @@ function restaurantPos() {
                 '<h1>' + esc(@json($company->name ?? 'NestPOS')) + '</h1>' +
                 '<p>' + new Date(r.queued_at).toLocaleString() + '</p>' +
                 (r.customer ? '<p>Customer: ' + esc(r.customer) + '</p>' : '') +
-                '<p>Ref: ' + esc('OFFLINE-' + r.uuid.slice(0, 8).toUpperCase()) + ' · ' + esc(r.method) + '</p>' +
+                '<p>Ref: ' + esc(r.local_ref || ('OFFLINE-' + r.uuid.slice(0, 8).toUpperCase())) + ' · ' + esc(r.method) + '</p>' +
                 '<table>' + rows +
                 '<tr class="tot"><td>TOTAL</td><td class="r">Rs. ' + Number(r.total).toLocaleString() + '</td></tr></table>' +
-                '<div class="note">OFFLINE PROVISIONAL RECEIPT<br>Final invoice number issues after sync</div>' +
+                '<div class="note">' + (r.local_core ? 'LOCAL / PRA PENDING<br>This is not a PRA invoice number' : 'OFFLINE PROVISIONAL RECEIPT<br>Final invoice number issues after sync') + '</div>' +
                 '</body></html>';
             const fr = document.createElement('iframe');
             fr.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;';
@@ -10684,9 +10767,17 @@ function restaurantPos() {
                     // internet is dead) OR timed out. Same offline path — HTTP
                     // errors from a REACHABLE server never land here.
                     console.warn('[storeInvoice] network unreachable/timeout — queueing offline', netErr);
-                    if (!this.offlineAllowed) { // Task 117: plan-gated (cart intact for retry)
+                    // Preserve the established plan eligibility boundary before
+                    // trying the optional Desktop lane.
+                    if (!this.offlineAllowed) {
                         this.showToast(window.TXT.offline_plan_locked, 'error');
                         this.submitting = false;
+                        return;
+                    }
+                    if (await this.acceptLocalCoreSale(payload, method, savedTotal, skipReceipt)) {
+                        this.showPayModal = false;
+                        this.submitting = false;
+                        this.saveAsProvisional = false;
                         return;
                     }
                     await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);

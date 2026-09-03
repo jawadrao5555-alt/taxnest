@@ -47,8 +47,24 @@ class CloudSyncClient {
                 ? Array.from(new Set(response.acknowledged_ids
                     .map(String).filter((id) => submittedIds.has(id))))
                 : [];
-            this.store.markSent(acknowledged);
-            return (this.lastResult = { ok: true, sent: acknowledged.length, pending: this.store.status().pending_count });
+            const mappings = {};
+            if (response && Array.isArray(response.results)) {
+                for (const result of response.results) {
+                    if (result && submittedIds.has(String(result.event_id))) mappings[String(result.event_id)] = result;
+                }
+            }
+            this.store.markSent(acknowledged, mappings);
+            const rejected = response && Array.isArray(response.rejected) ? response.rejected : [];
+            const terminal = {};
+            for (const rejection of rejected) {
+                if (rejection && rejection.error === 'projection_rejected' && submittedIds.has(String(rejection.event_id))) {
+                    terminal[String(rejection.event_id)] = rejection;
+                }
+            }
+            this.store.markRejected(Object.keys(terminal), terminal);
+            return (this.lastResult = { ok: true, sent: acknowledged.length,
+                rejected,
+                pending: this.store.status().pending_count });
         } catch (e) {
             return (this.lastResult = { ok: false, error: (e && e.message) || 'cloud_sync_failed', pending: this.store.status().pending_count });
         }

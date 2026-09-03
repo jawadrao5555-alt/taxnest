@@ -820,6 +820,8 @@ Route::middleware(['fbrpos.auth'])->prefix('fbr-pos/grid-prefs')->group(function
 });
 
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
+    Route::get('/desktop/local-core-scope', [PosController::class, 'desktopLocalCoreScope'])
+        ->name('pos.desktop.local-core-scope');
     Route::get('/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('pos.agent');
     Route::post('/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('pos.agent.generate');
     Route::post('/agent/regenerate-key', [\App\Http\Controllers\AgentManagementController::class, 'regenerateKey'])->name('pos.agent.regenerate');

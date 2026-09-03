@@ -13,6 +13,20 @@ use Tests\TestCase;
  */
 class WaiterIdentityNoteStripTest extends TestCase
 {
+    public function test_waiter_cart_keeps_item_note_compact_and_bound_safely(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/waiter.blade.php'));
+
+        $this->assertStringContainsString("__('pos.waiter_item_note')", $blade);
+        $this->assertStringContainsString('x-show="line.note_open || line.special_notes"', $blade);
+        $this->assertStringContainsString('x-model="line.special_notes"', $blade);
+        $this->assertStringContainsString('autocomplete="one-time-code"', $blade);
+        $this->assertStringContainsString('data-lpignore="true"', $blade);
+        $this->assertStringContainsString('data-form-type="other"', $blade);
+        $this->assertStringContainsString('data-1p-ignore', $blade);
+        $this->assertStringContainsString("special_notes: '', note_open: false", $blade);
+    }
+
     private function user(): object
     {
         return (object) [

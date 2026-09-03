@@ -285,7 +285,7 @@
             {{-- Cart lines --}}
             <div class="space-y-2 max-h-[32vh] overflow-y-auto" x-show="cart.length">
                 <template x-for="(line, i) in cart" :key="line.uid">
-                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-2.5">
+                    <div class="waiter-cart-line rounded-xl border border-gray-200 dark:border-gray-700 p-2.5">
                         <div class="flex items-center justify-between gap-2">
                             <span class="text-sm font-bold text-gray-800 dark:text-gray-100 flex-1 leading-snug" x-text="line.name"></span>
                             <button @click="cart.splice(i, 1)" class="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center text-sm font-black">×</button>
@@ -296,15 +296,24 @@
                                 <span class="w-8 text-center text-base font-black text-gray-900 dark:text-white" x-text="line.quantity"></span>
                                 <button @click="line.quantity++" class="w-9 h-9 rounded-lg bg-teal-600 text-white font-black text-lg">+</button>
                             </div>
-                            <span class="text-sm font-black text-gray-700 dark:text-gray-200" x-text="'Rs ' + Math.round(line.quantity * line.unit_price).toLocaleString()"></span>
+                            <div class="flex items-center gap-2">
+                                <button type="button"
+                                        @click="line.note_open = !(line.note_open || line.special_notes); if (line.note_open) $nextTick(() => $el.closest('.waiter-cart-line').querySelector('.waiter-item-note').focus())"
+                                        class="h-8 px-2.5 rounded-lg border text-xs font-black transition"
+                                        :class="line.special_notes ? 'border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-200' : (line.note_open ? 'border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-200' : 'border-gray-300 bg-white text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300')">
+                                    <span x-text="line.special_notes ? '✓ ' : ''"></span>{{ __('pos.waiter_item_note') }}
+                                </button>
+                                <span class="text-sm font-black text-gray-700 dark:text-gray-200" x-text="'Rs ' + Math.round(line.quantity * line.unit_price).toLocaleString()"></span>
+                            </div>
                         </div>
                         {{-- Task 632 (ZFC "NOTE: waiter"): mobile Chrome/keyboard ignores
                              autocomplete="off" on text inputs and autofills the saved login
                              (username "waiter" landed in an item note). one-time-code is the
                              strongest suppressor per the anti-autofill guard set. --}}
-                        <input type="text" x-model="line.special_notes" placeholder="{{ __('pos.ph_note_for_kitchen') }}"
+                        <input type="text" x-model="line.special_notes" x-show="line.note_open || line.special_notes" x-cloak
+                               placeholder="{{ __('pos.ph_note_for_kitchen') }}"
                                autocomplete="one-time-code" :name="'waiter_note_' + i + '_nofill'" data-lpignore="true" data-form-type="other" data-1p-ignore
-                               class="mt-2 w-full rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs px-2.5 py-1.5 focus:ring-teal-500 focus:border-teal-500">
+                               class="waiter-item-note mt-2 w-full rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs px-2.5 py-1.5 focus:ring-teal-500 focus:border-teal-500">
                     </div>
                 </template>
             </div>
@@ -1035,7 +1044,7 @@ function waiterApp() {
             this.cart.push({
                 uid: 'w' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
                 item_id: p.id, name: p.name, quantity: 1,
-                unit_price: p.price, special_notes: '',
+                unit_price: p.price, special_notes: '', note_open: false,
                 is_tax_exempt: !!p.is_tax_exempt,
             });
         },

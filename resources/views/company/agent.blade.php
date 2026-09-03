@@ -268,7 +268,7 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key</label>
                         @if($company->agent_api_key)
                             <div class="flex gap-2">
-                                <input type="password" id="apiKey" readonly value="{{ $company->agent_api_key }}" class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white font-mono">
+                                <input type="password" id="apiKey" data-password-toggle-exempt="true" readonly value="{{ $company->agent_api_key }}" class="flex-1 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white font-mono">
                                 <button type="button" onclick="toggleKey()" class="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-sm font-medium" id="toggleBtn">Show</button>
                                 <button type="button" onclick="copyToClipboard(document.getElementById('apiKey').value, this)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">Copy</button>
                             </div>

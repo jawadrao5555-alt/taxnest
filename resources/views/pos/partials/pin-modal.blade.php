@@ -11,12 +11,15 @@
         <div id="pinError" class="hidden mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm text-center"></div>
 
         <div class="flex justify-center gap-3 mb-6">
-            <input type="password" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="0">
-            <input type="password" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="1">
-            <input type="password" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="2">
-            <input type="password" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="3">
-            <input type="password" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition hidden" data-index="4">
-            <input type="password" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition hidden" data-index="5">
+            <input type="password" data-password-toggle-exempt="true" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="0">
+            <input type="password" data-password-toggle-exempt="true" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="1">
+            <input type="password" data-password-toggle-exempt="true" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="2">
+            <input type="password" data-password-toggle-exempt="true" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition" data-index="3">
+            <input type="password" data-password-toggle-exempt="true" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition hidden" data-index="4">
+            <input type="password" data-password-toggle-exempt="true" maxlength="1" class="pin-digit w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition hidden" data-index="5">
+        </div>
+        <div class="flex justify-center -mt-4 mb-4">
+            <button type="button" data-password-group-toggle=".pin-digit" class="tn-password-group-toggle text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-300" aria-label="{{ __('pos.ti_show_password') }}" aria-pressed="false"></button>
         </div>
 
         <div class="flex gap-3">

@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
     <title>Franchise Login - TaxNest</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @vite(['resources/js/app.js'])
 </head>
 <body class="h-full bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
     <div class="w-full max-w-md px-6">

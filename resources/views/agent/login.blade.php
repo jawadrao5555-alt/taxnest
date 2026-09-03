@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agent Login - TaxNest</title><script src="https://cdn.tailwindcss.com"></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agent Login - TaxNest</title><script src="https://cdn.tailwindcss.com"></script>@vite(['resources/js/app.js'])</head>
 <body class="min-h-screen bg-gray-950 flex items-center justify-center p-6">
 <div class="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl p-8">
     <h1 class="text-3xl font-bold text-indigo-500 text-center">TaxNest</h1>

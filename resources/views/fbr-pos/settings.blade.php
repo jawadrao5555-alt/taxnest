@@ -191,7 +191,7 @@
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.agent_field_api_key') }}</label>
                         <div class="flex gap-2">
-                            <input type="password" id="agentKey" readonly value="{{ $company->agent_api_key ?? '' }}" placeholder="{{ __('pos.ph_agent_key_generated') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-mono focus:ring-blue-500 focus:border-blue-500">
+                            <input type="password" id="agentKey" data-password-toggle-exempt="true" readonly value="{{ $company->agent_api_key ?? '' }}" placeholder="{{ __('pos.ph_agent_key_generated') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs font-mono focus:ring-blue-500 focus:border-blue-500">
                             <button type="button" onclick="toggleAgentKey()" id="agentKeyToggle" class="px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-lg whitespace-nowrap">{{ __('pos.show_word') }}</button>
                             <button type="button" onclick="copyField('agentKey', this)" class="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition whitespace-nowrap">Copy</button>
                         </div>

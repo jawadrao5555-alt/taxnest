@@ -1410,7 +1410,7 @@ function waiterApp() {
                     const local = window.TaxNestWaiterLocalCore &&
                         window.TaxNestWaiterLocalCore.fallbackOrder(body, this.appendOrderId);
                     if (!local || !local.ok) throw e;
-                    this.showToast('Local PC par order save ho gaya.', 'success');
+                    this.showToast(@js(__('pos.waiter_local_order_saved')), 'success');
                     this.cart = [];
                     this.selectedTable = null;
                     this.holdAttemptUuid = null;

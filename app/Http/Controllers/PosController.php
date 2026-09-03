@@ -2361,6 +2361,7 @@ class PosController extends Controller
         $productIds = $products->pluck('id')->toArray();
 
         $recipeLookup = [];
+        $recipes = collect();
         $stockStatus = [];
         $ingredientCosts = [];
         $lowStockAlerts = collect();

@@ -2381,6 +2381,7 @@ return [
     'network_error_dot' => 'نیٹ ورک ایرر۔',
     'network_error_please_try_again' => 'نیٹ ورک ایرر — براہ کرم دوبارہ کوشش کریں۔',
     'network_error_try_again' => 'نیٹ ورک ایرر۔ براہ کرم دوبارہ کوشش کریں۔',
+    'waiter_local_order_saved' => 'آرڈر لوکل پی سی پر محفوظ ہو گیا۔',
     'network_error_update_not_saved' => 'نیٹ ورک ایرر — اپ ڈیٹ سیو نہیں ہوا',
     'never_connected' => 'کبھی کنیکٹ نہیں ہوا',
     'never_word' => 'کبھی نہیں',

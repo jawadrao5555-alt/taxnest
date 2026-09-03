@@ -2383,6 +2383,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'network_error_dot' => 'Network error.',
     'network_error_please_try_again' => 'Network error — please dobara try karein.',
     'network_error_try_again' => 'Network error. Please dobara try karein.',
+    'waiter_local_order_saved' => 'Order Local PC par save ho gaya.',
     'network_error_update_not_saved' => 'Network error — update save nahi hua',
     'never_connected' => 'Kabhi connect nahi hua',
     'never_word' => 'Kabhi nahi',

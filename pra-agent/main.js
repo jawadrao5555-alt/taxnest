@@ -31,7 +31,7 @@ const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer'
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260819-1';
+const BUILD_TIMESTAMP = '20260903-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────

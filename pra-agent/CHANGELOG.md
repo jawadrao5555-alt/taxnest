@@ -1,14 +1,13 @@
-# In development
-
-- Local Core phase: added a default-off, heartbeat-gated NestPOS Desktop path for durable immediate PRA manual cash/card sale acceptance and projected cloud synchronization. Receipts are explicitly marked `LOCAL / PRA PENDING`; this is an internal development slice, not fleet-ready or full offline POS support.
-
 # TaxNest PRA Sync Agent — Changelog
 
-## Unreleased — Local Core foundation
+## v1.12.0 (2026-09-03)
+**Local-First Offline Mode — internet band honay par bhi shop ka kaam Local Core mein mehfooz rehta hai**
 
-- Added a default-off, pure-Node Local TaxNest Core foundation behind both the existing Offline Mode switch and an authenticated per-company/device heartbeat rollout gate: authenticated encrypted append-only journals, durable ordered cloud outbox, scoped/idempotent events, fail-closed key handling, torn-write recovery, authenticated same-install backups, health telemetry, and clean shutdown.
-- Immutable events can enter only through the owning Electron POS window's authenticated IPC bridge; no sensitive Core HTTP/LAN route was added. Cloud draining uses the heartbeat-authenticated agent credentials and stops when the rollout/device gate is removed.
-- This is storage and lifecycle groundwork only. It does **not** claim full offline POS, expose sensitive LAN APIs, or change established waiter/Caller ID behavior when Offline Mode is off.
+- Added the production Local TaxNest Core behind the existing Offline Mode switch and authenticated per-company/device rollout gate. Supported local operations are accepted immediately into an encrypted append-only journal and synchronize to the cloud in order when internet returns.
+- Billing and restaurant operations use immutable, idempotent events with company, branch, device, user and permission scope. Local receipts clearly show `LOCAL / PRA PENDING` until cloud/regulator synchronization completes.
+- Corruption, an unreadable encryption key, a revoked device, permission drift, low disk space or a removed rollout gate all fail closed instead of silently creating a second source of truth.
+- Added authenticated same-install recovery snapshots, torn-write recovery, durable cloud outbox, health telemetry, bounded retry handling and clean shutdown.
+- Sensitive Core traffic enters only through the authenticated NestPOS Desktop bridge or certificate-pinned native clients. Existing PRA sync, Waiter and Caller ID behavior remains unchanged whenever Offline Mode is off.
 
 ## v1.11.0 (2026-08-29)
 **LAN Mode: juday huay devices ab naam ke sath dikhte hain, har ek alag hataya ja sakta hai**

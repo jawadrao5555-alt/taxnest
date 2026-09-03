@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FBR POS identity: fiscal receipt carrying a verification shield. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#0A4D5C"
+        android:pathData="M20,0 L88,0 A20,20 0 0 1 108,20 L108,88 A20,20 0 0 1 88,108 L20,108 A20,20 0 0 1 0,88 L0,20 A20,20 0 0 1 20,0 Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M27,20 L70,20 L70,82 L64,76 L58,82 L52,76 L46,82 L40,76 L34,82 L27,75 Z" />
+    <path android:fillColor="#0A4D5C"
+        android:pathData="M34,29 L62,29 L62,34 L34,34 Z M34,40 L57,40 L57,45 L34,45 Z M34,51 L51,51 L51,56 L34,56 Z" />
+    <path android:fillColor="#E7BF3B"
+        android:pathData="M65,49 L84,56 L82,72 C80,80 74,85 65,89 C56,85 50,80 48,72 L46,56 Z" />
+    <path android:fillColor="#0A4D5C"
+        android:pathData="M55,68 L62,75 L76,60 L80,64 L62,82 L51,72 Z" />
+</vector>

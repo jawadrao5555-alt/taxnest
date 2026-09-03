@@ -65,7 +65,7 @@ class PushService : FirebaseMessagingService() {
                     .setDefaults(Notification.DEFAULT_ALL)
             }
             val notif = builder
-                .setSmallIcon(R.drawable.ic_pos)
+                .setSmallIcon(R.drawable.ic_fbr_pos)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(Notification.BigTextStyle().bigText(body))

@@ -507,7 +507,7 @@ class MainActivity : Activity() {
             isClickable = true   // swallow taps meant for the page underneath
         }
         wrap.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_pos)
+            setImageResource(R.drawable.ic_fbr_pos)
             layoutParams = LinearLayout.LayoutParams(dp(96), dp(96))
         })
         wrap.addView(ProgressBar(this).apply {

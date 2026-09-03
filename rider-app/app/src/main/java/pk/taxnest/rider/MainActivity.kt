@@ -291,6 +291,10 @@ class MainActivity : AppCompatActivity() {
     // ── Lightweight GPS for proximity display (Task #1508) ────────────────
 
     private fun startProximityGps() {
+        // Duty tracking already owns GPS. A second foreground listener doubles
+        // GNSS/radio callbacks without improving required server tracking.
+        if (Prefs.duty(this) || currentDeliveries.length() == 0) return
+        stopProximityGps()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -520,6 +524,17 @@ class MainActivity : AppCompatActivity() {
     // ── UI state ───────────────────────────────────────────────────────────
 
     private fun renderState() {
+        // Reuse the duty service's fix for foreground proximity UI rather than
+        // registering a second location listener while tracking is active.
+        TrackingService.latestFix()?.let { fix ->
+            if (fix.capturedAtMs > (lastRiderCapturedAtMs ?: 0L)) {
+                lastRiderLat = fix.lat
+                lastRiderLng = fix.lng
+                lastRiderAccM = fix.accuracyM
+                lastRiderCapturedAtMs = fix.capturedAtMs
+                refreshProximityChips()
+            }
+        }
         val onDuty = Prefs.duty(this)
         dutyBtn.text = getString(if (onDuty) R.string.duty_off else R.string.duty_on)
         dutyBtn.setBackgroundColor(ContextCompat.getColor(this,
@@ -583,6 +598,12 @@ class MainActivity : AppCompatActivity() {
         val deliveries = body.optInt("open_deliveries", 0)
         val khata = body.optDouble("khata_owed", 0.0)
         val deliveriesArr = body.optJSONArray("deliveries") ?: JSONArray()
+        // /me is authoritative: reassignment invalidates a queued completion
+        // immediately instead of leaving WorkManager to send a stale request.
+        DeliveryOutbox.retainAssignments(
+            this,
+            DeliveryAssignmentSafety.currentAssignments(deliveriesArr)
+        )
         // Nayi assigned delivery → phone par awaz ke saath ittila
         // (background thread — notifications are thread-safe).
         DeliveryNotifier.process(this, deliveriesArr)
@@ -636,6 +657,7 @@ class MainActivity : AppCompatActivity() {
         deliveriesContainer.removeAllViews()
 
         if (arr.length() == 0) {
+            stopProximityGps()
             emptyDeliveriesText.visibility = View.VISIBLE
             return
         }
@@ -725,6 +747,9 @@ class MainActivity : AppCompatActivity() {
 
             deliveriesContainer.addView(row)
         }
+        // Off duty there is no TrackingService fix source, so keep the
+        // foreground-only low-rate listener only while cards need it.
+        if (!Prefs.duty(this)) startProximityGps() else stopProximityGps()
     }
 
     // ── Navigation (Task #1508) ────────────────────────────────────────────

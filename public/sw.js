@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260903-desktop-agent-controls'; // purges stale authenticated settings/runtime documents after the compact-shell layout fix
+const CACHE_VERSION = 'taxnest-20260903-order-rider-fixes'; // purges stale sale screens after prepaid, waiter-age, delivery and rider-assignment fixes
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create

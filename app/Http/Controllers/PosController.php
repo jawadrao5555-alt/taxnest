@@ -3001,15 +3001,20 @@ class PosController extends Controller
         $settleOrderIdIn = (int) $request->input('incoming_order_id', 0)
             ?: (int) $request->input('recalled_order_id', 0);
         $incomingOrderIdIn = $settleOrderIdIn;
+        $settleOrderAwaitingOnline = false;
         if ($incomingOrderIdIn > 0
             && !$request->boolean('save_as_provisional')
-            && !$request->boolean('online_payment_confirmed')
-            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')
-            && \App\Models\RestaurantOrder::where('company_id', $companyId)
+            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+            $settleOrderAwaitingOnline = \App\Models\RestaurantOrder::where('company_id', $companyId)
                 ->where('id', $incomingOrderIdIn)
                 ->whereIn('status', ['held', 'preparing', 'ready'])
                 ->whereNotNull('online_payment_awaited_at')
-                ->exists()) {
+                ->exists();
+        }
+        if ($incomingOrderIdIn > 0
+            && !$request->boolean('save_as_provisional')
+            && !$request->boolean('online_payment_confirmed')
+            && $settleOrderAwaitingOnline) {
             return response()->json([
                 'success' => false,
                 'code'    => 'online_payment_awaited',
@@ -3053,6 +3058,9 @@ class PosController extends Controller
         // lookup/PRA payment-mode mapping miss the rule and fall back to defaults.
         if ($request->input('payment_method') === 'card') {
             $request->merge(['payment_method' => 'debit_card']);
+        }
+        if ($settleOrderAwaitingOnline && $request->boolean('online_payment_confirmed')) {
+            $request->merge(['payment_method' => 'qr_payment']);
         }
 
         // Cashier discount guardrail — mirrors RestaurantPosController::holdOrder.
@@ -4735,6 +4743,7 @@ class PosController extends Controller
         // Prepaid conversion stamp — PROD-drift guarded (older installs may not
         // have run the prepaid-conversion migration yet).
         $hasPrepaidCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'prepaid_converted_at');
+        $hasBillToken = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token');
         // Current business day (00:00–05:59 counts in yesterday) — the Pending
         // Deliveries badge filters bills to THIS date client-side, and Task 524
         // stamps purani unassigned bills server-side against the same date.
@@ -4760,7 +4769,8 @@ class PosController extends Controller
             ->tap(fn ($q) => PosTransaction::applyCashierIsolation($q, auth('pos')->user()))
             ->orderBy('id', 'desc')
             ->limit(100)
-            ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at',
+             ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at',
+                   ...($hasBillToken ? ['bill_token'] : []),
                    ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : []),
                    ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
                    ...($hasBizDate ? ['business_date'] : [])]);
@@ -4845,6 +4855,7 @@ class PosController extends Controller
                 ->orderBy('id', 'desc')
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
+                       ...($hasBillToken ? ['bill_token'] : []),
                        ...($hasBizDate ? ['business_date'] : []),
                        // Owner video (25 Aug 2026): the popup now offers the same
                        // Prepaid / Back-to-Cash pair as the Deliveries board, so it
@@ -4914,11 +4925,15 @@ class PosController extends Controller
             }
         }
 
-        $data = $bills->map(function ($b) use ($kotCompany, $kotOrders, $hasRiderCols, $hasBizDate, $riderNames, $riderOpen) {
+        $hasAssignmentRevision = $hasRiderCols && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
+        $data = $bills->map(function ($b) use ($kotCompany, $kotOrders, $hasRiderCols, $hasBizDate, $riderNames, $riderOpen, $hasAssignmentRevision, $hasBillToken) {
             $kot = \App\Services\KotPrintService::deliveryPromoteKot($kotCompany, $b, $kotOrders[$b->id] ?? null);
             return [
                 'id'               => $b->id,
                 'invoice_number'   => $b->invoice_number,
+                // Same display authority as both receipt widths: raw token 4 may
+                // deliberately render as L004 under the local daily style.
+                'bill_token'       => $hasBillToken ? \App\Support\PosBillNumberStyle::bigNumber($kotCompany, $b) : null,
                 'customer_name'    => $b->customer_name,
                 'customer_phone'   => $b->customer_phone,
                 'order_type'       => $b->order_type,
@@ -4947,6 +4962,7 @@ class PosController extends Controller
                 'rider_unsettled'  => $hasRiderCols && $b->rider_id && empty($b->rider_settlement_id),
                 // Task 123: whole-khata scope for the panel's Settle button.
                 'rider_id'         => $hasRiderCols ? ($b->rider_id ? (int) $b->rider_id : null) : null,
+                'assignment_revision' => $hasAssignmentRevision ? $b->rider_assignment_revision : null,
                 'rider_open_count' => ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                 'rider_open_amount'=> ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
             ];
@@ -4963,7 +4979,7 @@ class PosController extends Controller
         // delivery+rider context, cash-only, unsettled, not returned) — the
         // popup must never show a button the POST will refuse.
         $canPrepaidRole = in_array(auth('pos')->user()->pos_role ?? '', ['pos_admin', 'pos_manager'], true);
-        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $bizToday, $riderNames, $riderOpen, $canPrepaidRole, $hasPrepaidCol) {
+        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $bizToday, $riderNames, $riderOpen, $canPrepaidRole, $hasPrepaidCol, $hasAssignmentRevision, $hasBillToken, $kotCompany) {
             // Task 524: purana (pichhle business day ka) UNASSIGNED bill — popup
             // ise alag collapsed "Purani deliveries" group mein dikhata hai aur
             // badge ki ginti se bahar rakhta hai. Flag SERVER par banta hai
@@ -4975,6 +4991,7 @@ class PosController extends Controller
                 'id'               => $b->id,
                 'is_final'         => true,
                 'invoice_number'   => $b->invoice_number,
+                'bill_token'       => $hasBillToken ? \App\Support\PosBillNumberStyle::bigNumber($kotCompany, $b) : null,
                 'customer_name'    => $b->customer_name,
                 'customer_phone'   => $b->customer_phone,
                 'order_type'       => $b->order_type,
@@ -4992,6 +5009,7 @@ class PosController extends Controller
                 'business_date'    => $hasBizDate ? ($b->business_date ? (string) $b->business_date : null) : null,
                 'delivery_status'  => $b->delivery_status,
                 'rider_id'         => $b->rider_id ? (int) $b->rider_id : null,
+                'assignment_revision' => $hasAssignmentRevision ? $b->rider_assignment_revision : null,
                 'rider_name'       => $b->rider_id ? ($riderNames[$b->rider_id] ?? null) : null,
                 // Cash bill jo rider ke khaate par hai (card bills khata par nahi hote).
                 'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && $b->delivery_status !== 'returned'),
@@ -12580,7 +12598,9 @@ class PosController extends Controller
             // holds figures this page's viewer never saw.
             : PosDayCloseReport::where('company_id', $companyId)
                 ->forBranch($dcBranchId)
-                ->orderBy('report_date', 'desc')
+                ->orderByDesc('report_date')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
                 ->limit(10)
                 ->get();
 

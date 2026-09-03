@@ -1344,7 +1344,10 @@ class RestaurantWaiterController extends Controller
                 'is_third_schedule' => \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule') ? (bool) ($i->is_third_schedule ?? false) : false,
                 'printed' => $i->kot_printed_at !== null,
             ])->values(),
-            'created_at' => $o->created_at->format('H:i'),
+            // Consumers need an absolute instant for elapsed-age labels.
+            // Keep the old clock-only value under its own explicit key.
+            'created_at' => $o->created_at->toIso8601String(),
+            'created_time' => $o->created_at->format('H:i'),
         ];
     }
 }

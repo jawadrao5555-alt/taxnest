@@ -29,6 +29,7 @@ class RiderBillPreviewServiceTest extends TestCase
         });
         Schema::create('pos_transactions', function (Blueprint $t) {
             $t->id(); $t->unsignedBigInteger('company_id'); $t->unsignedBigInteger('rider_id')->nullable();
+            $t->unsignedBigInteger('customer_id')->nullable();
             $t->string('delivery_status')->nullable(); $t->unsignedBigInteger('rider_settlement_id')->nullable();
             $t->string('rider_assignment_revision')->nullable(); $t->string('invoice_number')->nullable();
             $t->string('pra_status')->nullable(); $t->string('pra_invoice_number')->nullable(); $t->decimal('total_amount', 12, 2); $t->decimal('tax_rate', 8, 2)->default(0); $t->decimal('tax_amount', 12, 2)->default(0);
@@ -37,13 +38,21 @@ class RiderBillPreviewServiceTest extends TestCase
         Schema::create('pos_transaction_items', function (Blueprint $t) {
             $t->id(); $t->unsignedBigInteger('transaction_id'); $t->string('item_name'); $t->decimal('quantity', 10, 3); $t->decimal('unit_price', 12, 2); $t->decimal('subtotal', 12, 2); $t->timestamps();
         });
+        Schema::create('pos_customers', function (Blueprint $t) {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->string('name');
+            $t->string('customer_code')->nullable(); $t->timestamps();
+        });
     }
 
     private function fixtures(): array
     {
         $company = Company::create(['name' => 'Safe Co', 'ntn' => '123']);
         $rider = PosRider::create(['company_id' => $company->id, 'name' => 'A', 'is_active' => true]);
-        $bill = \App\Models\PosTransaction::create(['company_id' => $company->id, 'rider_id' => $rider->id, 'delivery_status' => 'assigned', 'rider_assignment_revision' => 'rev', 'invoice_number' => 'B-1', 'pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-1', 'total_amount' => 120, 'tax_rate' => 18, 'tax_amount' => 18, 'customer_name' => 'Customer', 'customer_phone' => '0300']);
+        $customerId = \Illuminate\Support\Facades\DB::table('pos_customers')->insertGetId([
+            'company_id' => $company->id, 'name' => 'Customer', 'customer_code' => 'C-17',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $bill = \App\Models\PosTransaction::create(['company_id' => $company->id, 'rider_id' => $rider->id, 'customer_id' => $customerId, 'delivery_status' => 'assigned', 'rider_assignment_revision' => 'rev', 'invoice_number' => 'B-1', 'pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-1', 'total_amount' => 120, 'tax_rate' => 18, 'tax_amount' => 18, 'customer_name' => 'Customer', 'customer_phone' => '0300', 'delivery_address' => 'Street 1']);
         \App\Models\PosTransactionItem::create(['transaction_id' => $bill->id, 'item_name' => 'Pizza', 'quantity' => 2, 'unit_price' => 60, 'subtotal' => 120]);
         return [$company, $rider, $bill];
     }
@@ -66,7 +75,7 @@ class RiderBillPreviewServiceTest extends TestCase
         $s = app(RiderBillPreviewService::class);
         $s->save($company, ['enabled' => false, 'prices' => true]);
         $this->assertSame(['available' => false], $s->dto($company->fresh(), $bill));
-        $s->save($company->fresh(), array_fill_keys(['enabled','quantity','prices','tax','ntn','qr','customer','business'], true));
+        $s->save($company->fresh(), array_fill_keys(['enabled','quantity','prices','tax','ntn','qr','customer_name','customer_phone','customer_address','customer_code','business'], true));
         $dto = $s->dto($company->fresh(), $bill);
         $this->assertSame('PRA-1', $dto['qr']['payload']);
         $this->assertArrayHasKey('unit_rate', $dto['items'][0]);
@@ -77,6 +86,35 @@ class RiderBillPreviewServiceTest extends TestCase
         $qr = $s->dto($company->fresh(), $bill->fresh())['qr'];
         $this->assertFalse($qr['available']);
         $this->assertArrayNotHasKey('payload', $qr);
+    }
+
+    public function test_customer_fields_are_independent_allowlisted_and_absent_values_are_omitted(): void
+    {
+        [$company, , $bill] = $this->fixtures();
+        $s = app(RiderBillPreviewService::class);
+        $s->save($company, ['enabled' => true, 'customer_phone' => true, 'customer_code' => true, 'unexpected_secret' => true]);
+        $dto = $s->dto($company->fresh(), $bill);
+        $this->assertSame(['phone' => '0300', 'code' => 'C-17'], $dto['customer']);
+        $this->assertFalse($company->fresh()->rider_bill_preview_prefs['customer_name']);
+        $this->assertArrayNotHasKey('customer', $company->fresh()->rider_bill_preview_prefs);
+        $this->assertArrayNotHasKey('unexpected_secret', $company->fresh()->rider_bill_preview_prefs);
+
+        $bill->update(['customer_phone' => null, 'customer_id' => null]);
+        $this->assertArrayNotHasKey('customer', $s->dto($company->fresh(), $bill->fresh()));
+    }
+
+    public function test_legacy_broad_customer_preference_migrates_compatibly_in_memory(): void
+    {
+        [$company, , $bill] = $this->fixtures();
+        $company->update(['rider_bill_preview_prefs' => ['v' => 1, 'enabled' => true, 'customer' => true]]);
+        $s = app(RiderBillPreviewService::class);
+        $prefs = $s->prefs($company->fresh());
+        foreach (['customer_name', 'customer_phone', 'customer_address', 'customer_code'] as $flag) {
+            $this->assertTrue($prefs[$flag]);
+        }
+        $this->assertSame([
+            'name' => 'Customer', 'phone' => '0300', 'address' => 'Street 1', 'code' => 'C-17',
+        ], $s->dto($company->fresh(), $bill)['customer']);
     }
 
     public function test_assignment_revision_and_terminal_settled_cross_rider_and_company_are_refused(): void

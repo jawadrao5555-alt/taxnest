@@ -1064,6 +1064,32 @@ class PosRiderController extends Controller
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)->findOrFail($txnId);
 
+        $hasAssignmentRevision = Schema::hasColumn('pos_transactions', 'rider_assignment_revision');
+        $expectsAssignmentRevision = $hasAssignmentRevision && $request->has('assignment_revision');
+        $expectedAssignmentRevision = $expectsAssignmentRevision && filled($request->input('assignment_revision'))
+            ? (string) $request->input('assignment_revision')
+            : null;
+
+        // Sale-screen cards are long-lived and can be open on several tills.
+        // When the caller supplies its observed rider, refuse to overwrite a
+        // newer assignment made on another till. Page forms remain compatible.
+        if ($request->has('expected_rider_id')) {
+            $expectedRiderId = $request->input('expected_rider_id');
+            $expectedRiderId = filled($expectedRiderId) ? (int) $expectedRiderId : null;
+            $currentRiderId = $txn->rider_id ? (int) $txn->rider_id : null;
+            if ($expectedRiderId !== $currentRiderId) {
+                return $this->statusError($request, 'This delivery assignment changed on another screen. Refresh and try again.');
+            }
+        }
+        if ($expectsAssignmentRevision) {
+            $currentAssignmentRevision = filled($txn->rider_assignment_revision)
+                ? (string) $txn->rider_assignment_revision
+                : null;
+            if ($expectedAssignmentRevision !== $currentAssignmentRevision) {
+                return $this->statusError($request, 'This delivery assignment changed on another screen. Refresh and try again.');
+            }
+        }
+
         // Task 353: stream-locked staff cannot touch the other stream's bills.
         if (!$this->streamScopeAllowsTxn($txn)) {
             abort(403);
@@ -1098,7 +1124,8 @@ class PosRiderController extends Controller
 
         // Task #1106: push only on a genuinely NEW assignment for this rider —
         // re-saving the same rider must not re-ping his phone.
-        $isNewAssignment = $riderId && (int) $txn->rider_id !== (int) $riderId;
+        $oldRiderId = $txn->rider_id ? (int) $txn->rider_id : null;
+        $isNewAssignment = $riderId && $oldRiderId !== (int) $riderId;
 
         $upd = [
             'rider_id' => $riderId,
@@ -1114,7 +1141,7 @@ class PosRiderController extends Controller
                 $upd['rider_assigned_at'] = now();
             }
         }
-        if (Schema::hasColumn('pos_transactions', 'rider_assignment_revision')) {
+        if ($hasAssignmentRevision) {
             if (!$riderId) {
                 $upd['rider_assignment_revision'] = null;
             } elseif ((int) $txn->rider_id !== (int) $riderId
@@ -1122,7 +1149,34 @@ class PosRiderController extends Controller
                 $upd['rider_assignment_revision'] = (string) Str::uuid();
             }
         }
-        $txn->update($upd);
+        // CAS the write for JSON/mobile-panel callers. Besides preventing two
+        // reassignment clicks from silently winning over each other, the
+        // lifecycle predicates prevent a concurrent Delivered/Settle action
+        // from being overwritten after the guards above were read.
+        if ($request->has('expected_rider_id')) {
+            $write = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->whereKey($txn->id)
+                ->whereNull('rider_settlement_id')
+                ->where(function ($q) {
+                    $q->whereNull('delivery_status')
+                        ->orWhereNotIn('delivery_status', ['delivered', 'returned']);
+                });
+            $txn->rider_id
+                ? $write->where('rider_id', (int) $txn->rider_id)
+                : $write->whereNull('rider_id');
+            if ($expectsAssignmentRevision) {
+                $expectedAssignmentRevision
+                    ? $write->where('rider_assignment_revision', $expectedAssignmentRevision)
+                    : $write->whereNull('rider_assignment_revision');
+            }
+            if ($write->update($upd) !== 1) {
+                return $this->statusError($request, 'This delivery changed while you were assigning it. Refresh and try again.');
+            }
+            $txn->refresh();
+        } else {
+            $txn->update($upd);
+        }
 
         // Delivery receipts are normally skipped because the customer is away
         // from the counter. A cashier may explicitly ask for one while handing
@@ -1142,6 +1196,12 @@ class PosRiderController extends Controller
                 'txn_id'   => $txn->id,
             ]);
             \App\Services\RiderPushService::queuePush((int) $riderId);
+        }
+        // The previous rider must also receive an authoritative current-list
+        // push. This removes the mistaken card/cache immediately and prevents
+        // stale arrival/completion work while the app remains backgrounded.
+        if ($oldRiderId && $oldRiderId !== (int) $riderId) {
+            \App\Services\RiderPushService::queuePush($oldRiderId);
         }
 
         // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —

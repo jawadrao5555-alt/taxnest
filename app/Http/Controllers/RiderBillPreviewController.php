@@ -18,7 +18,11 @@ class RiderBillPreviewController extends Controller
         abort_unless($user && (($user->pos_role ?? null) === 'company_admin' || ($user->role ?? null) === 'company_admin'), 403);
         abort_unless($request->input('rider_bill_preview_present') === '1', 422);
         $company = Company::findOrFail(app('currentCompanyId'));
-        $service->save($company, $request->only(['enabled', 'quantity', 'prices', 'tax', 'ntn', 'qr', 'customer', 'business']));
+        $service->save($company, $request->only([
+            'enabled', 'quantity', 'prices', 'tax', 'ntn', 'qr',
+            'customer_name', 'customer_phone', 'customer_address', 'customer_code',
+            'business',
+        ]));
         return back()->with('success', __('pos.rider_bill_preview_saved'));
     }
 

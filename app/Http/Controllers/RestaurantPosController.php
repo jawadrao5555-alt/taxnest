@@ -1218,6 +1218,13 @@ class RestaurantPosController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'cash');
+        // A confirmed online transfer is money already received, not a request
+        // to collect Cash/Card again.  Older tabs still submit whichever payment
+        // button opened the confirmation dialog, so make the server authoritative
+        // and preserve the marked order's payment state.
+        if ($order->awaitingOnlinePayment() && $request->boolean('online_payment_confirmed')) {
+            $paymentMethod = 'qr_payment';
+        }
         // Normalize aliases → canonical stored buckets (mirrors storeInvoice):
         // 'card'/'online' front-end aliases become 'debit_card' so PosTaxRule,
         // PRA PaymentMode mapping, and cash/card aggregations all see one bucket.

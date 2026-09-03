@@ -6,7 +6,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
             <h1 class="text-xl font-black text-gray-900 dark:text-white">{{ __('pos.cancelled_orders') }}</h1>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ $from }} → {{ $to }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.business_date_range') }}: {{ $from }} → {{ $to }}</p>
         </div>
         <div class="flex items-center gap-2">
             <a href="{{ route('pos.restaurant.cancelled-orders.csv', ['from' => $from, 'to' => $to]) }}" class="px-3 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition">CSV ⬇</a>
@@ -17,11 +17,11 @@
     {{-- Filters --}}
     <form method="GET" class="flex flex-wrap items-end gap-3 mb-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
         <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">{{ __('pos.from_date') }}</label>
+            <label class="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">{{ __('pos.business_day_from') }}</label>
             <input type="date" name="from" value="{{ $from }}" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white">
         </div>
         <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">{{ __('pos.to_date') }}</label>
+            <label class="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">{{ __('pos.business_day_to') }}</label>
             <input type="date" name="to" value="{{ $to }}" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white">
         </div>
         <button class="px-4 py-2 rounded-lg text-xs font-bold bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 transition">{{ __('pos.apply_filter') }}</button>
@@ -56,7 +56,7 @@
             <thead>
                 <tr class="text-left text-[11px] uppercase tracking-wide text-gray-400 border-b border-gray-100 dark:border-gray-800">
                     <th class="px-4 py-3">{{ __('pos.order_number') }}</th>
-                    <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.date_word') }}</th>
+                    <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.business_date_calendar_time') }}</th>
                     <th class="px-4 py-3">Table</th>
                     <th class="px-4 py-3 hidden lg:table-cell">Items</th>
                     <th class="px-4 py-3 text-right">Rs</th>
@@ -69,11 +69,23 @@
                 @forelse ($orders as $o)
                 <tr class="border-b border-gray-100 dark:border-gray-800 {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}">
                     <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ $o->order_number }}</td>
-                    {{-- Owner (1 Sep 2026): the ORDER's own date — the day whose
-                         sale this cancellation belongs to. It used to print the
-                         moment cancel was pressed, so a 31 Aug order cancelled
-                         during the next morning's day-close read "01 Sep". --}}
-                    <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ optional($o->created_at)->format('d M, h:i A') }}</td>
+                    {{-- The filter uses the POS business-day window (cutoff to
+                         cutoff), while created_at remains an honest calendar
+                         timestamp. Show BOTH so a 02-Sep business-day order
+                         created at 03-Sep 02:00 is never mistaken for a bad
+                         filter result. This calculation intentionally mirrors
+                         PosBusinessDay::windowFor(), which is the query rule. --}}
+                    @php
+                        $calendarAt = $o->created_at?->copy()->setTimezone(config('app.timezone'));
+                        $cutoff = \App\Services\PosBusinessDay::cutoffFor((int) $company->id);
+                        $orderBusinessDate = $calendarAt
+                            ? (($calendarAt->format('H:i') < $cutoff) ? $calendarAt->copy()->subDay() : $calendarAt)->format('d M Y')
+                            : '—';
+                    @endphp
+                    <td class="px-4 py-3 text-gray-500 hidden md:table-cell">
+                        <span class="block font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.business_day_label') }}: {{ $orderBusinessDate }}</span>
+                        <span class="block text-[11px]">{{ __('pos.calendar_time_label') }}: {{ $calendarAt?->format('d M Y, h:i A') ?? '—' }}</span>
+                    </td>
                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '—' }}</td>
                     <td class="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell max-w-xs">
                         @foreach($o->items as $i)

@@ -86,7 +86,12 @@ class PosArchiveController extends Controller
             ->get(['id', 'name']);
 
         $reports = PosDayCloseReport::where('company_id', $companyId)
-            ->orderBy('report_date', 'desc')
+            // Multiple closes can share one business date (stream/branch or a
+            // corrected close). Keep the archive filter in true newest-first
+            // sequence instead of leaving equal dates to database row order.
+            ->orderByDesc('report_date')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->take(60)
             ->get(['id', 'report_number', 'report_date']);
 

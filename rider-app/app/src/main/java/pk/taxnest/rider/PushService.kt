@@ -40,20 +40,18 @@ class PushService : FirebaseMessagingService() {
             DutyWatchdog.ensureRunning(c)
             SyncWorker.schedule(c) // self-heal if the periodic job was dropped
             SyncWorker.runNow(c)   // survives us being killed right after this
-            QueueDrain.drainAsync(c)
             return
         }
 
         if (data["type"] != "new_deliveries") return
+        val rawDeliveries = data["deliveries"] ?: return
         val arr = try {
-            JSONArray(data["deliveries"] ?: "[]")
+            JSONArray(rawDeliveries)
         } catch (e: Exception) {
-            JSONArray()
+            return
         }
-        // Empty/garbled payload: do NOT process — process() would REPLACE the
-        // seen-set with an empty set and the next poll would re-alert every
-        // open bill. Server never sends an empty list.
-        if (arr.length() == 0) return
+        // Empty is meaningful: reassignment may leave the previous rider with
+        // no cards, and must clear stale cache/outbox work immediately.
         DeliveryNotifier.process(c, arr)
     }
 }

@@ -138,22 +138,21 @@ class RiderPushService
 
         // Same query + shape as appMe's deliveries array (dedupe parity: the
         // app REPLACES its seen-set with this list, exactly like the poll).
-        $hasAssignedAt = Schema::hasColumn('pos_transactions', 'rider_assigned_at');
         $bills = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $rider->company_id)
             ->where('rider_id', $rider->id)
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->orderBy('id')
             ->limit(self::MAX_BILLS_IN_PUSH)
-            ->get(['id', 'invoice_number', 'total_amount']);
-        if ($bills->isEmpty()) {
-            return; // assign was undone before the response flushed — nothing to alert
-        }
+            ->get();
 
+        $previewService = app(RiderBillPreviewService::class);
         $deliveries = $bills->map(fn ($b) => [
             'id' => (int) $b->id, // live PDO returns ints as strings — cast
             'invoice_number' => (string) $b->invoice_number,
             'amount' => (float) $b->total_amount,
+            'status' => (string) $b->delivery_status,
+            'assignment_revision' => $previewService->assignmentRevision($b, $rider),
         ])->values()->all();
 
         $creds = self::credentials();

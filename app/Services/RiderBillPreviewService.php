@@ -16,7 +16,12 @@ use Illuminate\Support\Facades\Schema;
 class RiderBillPreviewService
 {
     private const VERSION = 1;
-    private const FLAGS = ['enabled', 'quantity', 'prices', 'tax', 'ntn', 'qr', 'customer', 'business'];
+    private const FLAGS = [
+        'enabled', 'quantity', 'prices', 'tax', 'ntn', 'qr',
+        'customer_name', 'customer_phone', 'customer_address', 'customer_code',
+        'business',
+    ];
+    private const CUSTOMER_FLAGS = ['customer_name', 'customer_phone', 'customer_address', 'customer_code'];
 
     public function prefs(Company $company): array
     {
@@ -30,9 +35,16 @@ class RiderBillPreviewService
         }
         $out = ['v' => self::VERSION];
         foreach (self::FLAGS as $flag) {
-            $out[$flag] = array_key_exists($flag, $raw)
-                ? filter_var($raw[$flag], FILTER_VALIDATE_BOOLEAN)
-                : false;
+            if (array_key_exists($flag, $raw)) {
+                $out[$flag] = filter_var($raw[$flag], FILTER_VALIDATE_BOOLEAN);
+            } elseif (in_array($flag, self::CUSTOMER_FLAGS, true) && array_key_exists('customer', $raw)) {
+                // Version-one policies originally had one broad customer switch.
+                // Preserve that owner's choice while all newly-saved policies use
+                // the four independent, least-privilege switches.
+                $out[$flag] = filter_var($raw['customer'], FILTER_VALIDATE_BOOLEAN);
+            } else {
+                $out[$flag] = false;
+            }
         }
         return $out;
     }
@@ -105,12 +117,14 @@ class RiderBillPreviewService
         ];
         if ($p['tax']) $out['tax'] = ['rate' => (float) $bill->tax_rate, 'amount' => (float) $bill->tax_amount];
         if ($p['ntn'] && filled($company->ntn)) $out['ntn'] = (string) $company->ntn;
-        if ($p['customer']) {
-            $out['customer'] = array_filter([
-                'name' => $bill->customer_name ? (string) $bill->customer_name : null,
-                'phone' => $bill->customer_phone ? (string) $bill->customer_phone : null,
-                'address' => $bill->delivery_address ? (string) $bill->delivery_address : null,
-            ], fn ($v) => $v !== null);
+        $customer = array_filter([
+            'name' => $p['customer_name'] && filled($bill->customer_name) ? (string) $bill->customer_name : null,
+            'phone' => $p['customer_phone'] && filled($bill->customer_phone) ? (string) $bill->customer_phone : null,
+            'address' => $p['customer_address'] && filled($bill->delivery_address) ? (string) $bill->delivery_address : null,
+            'code' => $p['customer_code'] ? $this->customerCode($bill) : null,
+        ], fn ($v) => $v !== null);
+        if ($customer !== []) {
+            $out['customer'] = $customer;
         }
         if ($p['business']) $out['business'] = ['name' => (string) $company->name];
         if ($p['qr']) {
@@ -126,5 +140,30 @@ class RiderBillPreviewService
             if ($filed) $out['qr']['payload'] = $fiscal;
         }
         return $out;
+    }
+
+    /**
+     * Account codes are optional and schema-dependent. Only explicitly named
+     * code columns are considered; the internal customer id is never disclosed.
+     * The linked customer is constrained to the bill's company.
+     */
+    private function customerCode(Model $bill): ?string
+    {
+        foreach (['customer_code', 'account_code'] as $column) {
+            if (Schema::hasColumn($bill->getTable(), $column) && filled($bill->getAttribute($column))) {
+                return (string) $bill->getAttribute($column);
+            }
+        }
+
+        if (!filled($bill->customer_id) || !Schema::hasTable('pos_customers')) return null;
+        foreach (['customer_code', 'account_code', 'code'] as $column) {
+            if (!Schema::hasColumn('pos_customers', $column)) continue;
+            $value = \App\Models\PosCustomer::query()
+                ->whereKey((int) $bill->customer_id)
+                ->where('company_id', (int) $bill->company_id)
+                ->value($column);
+            if (filled($value)) return (string) $value;
+        }
+        return null;
     }
 }

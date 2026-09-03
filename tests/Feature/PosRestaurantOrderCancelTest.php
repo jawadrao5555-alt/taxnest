@@ -199,13 +199,13 @@ class PosRestaurantOrderCancelTest extends TestCase
     }
 
     /** Report query is private — the report page/CSV/PDF all share it. */
-    protected function cancelledReportOrders(): \Illuminate\Support\Collection
+    protected function cancelledReportOrders(array $query = []): \Illuminate\Support\Collection
     {
         $controller = new RestaurantPosController();
         $method = new \ReflectionMethod($controller, 'cancelledOrdersQuery');
         $method->setAccessible(true);
 
-        return $method->invokeArgs($controller, [Request::create('/pos/restaurant/cancelled-orders', 'GET')])->get();
+        return $method->invokeArgs($controller, [Request::create('/pos/restaurant/cancelled-orders', 'GET', $query)])->get();
     }
 
     // ── soft cancel + table freeing ──────────────────────────────────────────
@@ -501,6 +501,32 @@ class PosRestaurantOrderCancelTest extends TestCase
         $this->assertEquals($manager->id, $row->cancelled_by);
     }
 
+    public function test_business_day_filter_honestly_includes_after_midnight_calendar_timestamp(): void
+    {
+        // 03 Sep 02:15 is still the 02 Sep business day with the default
+        // 06:00 cutoff. The report must include it for 02 Sep while the UI
+        // retains and labels its truthful 03-Sep calendar timestamp.
+        $afterMidnight = \Illuminate\Support\Carbon::create(2026, 9, 3, 2, 15, 0, config('app.timezone'));
+        $inBusinessDay = $this->order([
+            'status' => 'cancelled',
+            'created_at' => $afterMidnight,
+            'updated_at' => $afterMidnight,
+            'cancelled_at' => $afterMidnight,
+        ]);
+        $nextBusinessDay = $this->order([
+            'status' => 'cancelled',
+            'created_at' => $afterMidnight->copy()->setTime(6, 0),
+            'updated_at' => $afterMidnight->copy()->setTime(6, 0),
+            'cancelled_at' => $afterMidnight->copy()->setTime(6, 0),
+        ]);
+
+        $rows = $this->cancelledReportOrders(['from' => '2026-09-02', 'to' => '2026-09-02']);
+
+        $this->assertContains($inBusinessDay, $rows->pluck('id')->all());
+        $this->assertNotContains($nextBusinessDay, $rows->pluck('id')->all());
+        $this->assertSame('2026-09-03 02:15', $rows->firstWhere('id', $inBusinessDay)->created_at->format('Y-m-d H:i'));
+    }
+
     // ── incoming feed & claimable set ────────────────────────────────────────
 
     public function test_cancelled_waiter_order_leaves_incoming_feed_and_is_unclaimable(): void
@@ -515,9 +541,15 @@ class PosRestaurantOrderCancelTest extends TestCase
         $waiterController = new RestaurantWaiterController();
 
         // Before cancel: both waiter-held orders are in the incoming feed.
-        $ids = collect($waiterController->incomingOrders()->getData())->pluck('id')->all();
+        $incoming = collect($waiterController->incomingOrders()->getData());
+        $ids = $incoming->pluck('id')->all();
         $this->assertContains($cancelledId, $ids);
         $this->assertContains($liveId, $ids);
+        $createdAt = (string) $incoming->firstWhere('id', $liveId)->created_at;
+        $this->assertStringContainsString('T', $createdAt);
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($createdAt)->equalTo(
+            \App\Models\RestaurantOrder::findOrFail($liveId)->created_at
+        ));
 
         $this->cancel($cancelledId);
 

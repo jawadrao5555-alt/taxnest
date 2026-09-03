@@ -71,6 +71,7 @@ class PosRiderAssignStatusInvariantTest extends TestCase
             $table->string('delivery_address')->nullable();
             $table->unsignedBigInteger('rider_id')->nullable();
             $table->string('delivery_status')->nullable();
+            $table->uuid('rider_assignment_revision')->nullable();
             $table->unsignedBigInteger('rider_settlement_id')->nullable();
             $table->timestamp('rider_settled_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
@@ -269,6 +270,46 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertFiscalIdentityUnchanged($before, $bill);
         $this->assertNull($this->tx($bill)->rider_id);
         $this->assertNull($this->tx($bill)->delivery_status);
+    }
+
+    public function test_stale_pos_card_cannot_overwrite_a_newer_rider_assignment(): void
+    {
+        $rider = $this->makeRider();
+        $rider2 = $this->makeRider();
+        $rider3 = $this->makeRider();
+        $bill = $this->makeBill($rider, [
+            'delivery_status' => 'assigned',
+            'rider_assignment_revision' => 'revision-a1',
+        ]);
+
+        $ok = $this->assignJson($bill, [
+            'rider_id' => $rider2,
+            'expected_rider_id' => $rider,
+            'assignment_revision' => 'revision-a1',
+        ]);
+        $this->assertSame(200, $ok->getStatusCode());
+        $revisionB = (string) $this->tx($bill)->rider_assignment_revision;
+        $this->assertNotSame('revision-a1', $revisionB);
+
+        $backToA = $this->assignJson($bill, [
+            'rider_id' => $rider,
+            'expected_rider_id' => $rider2,
+            'assignment_revision' => $revisionB,
+        ]);
+        $this->assertSame(200, $backToA->getStatusCode());
+        $revisionA2 = (string) $this->tx($bill)->rider_assignment_revision;
+        $this->assertNotSame('revision-a1', $revisionA2);
+
+        // ABA guard: rider is A again, but the card's old revision proves it
+        // did not observe the A→B→A assignment history.
+        $stale = $this->assignJson($bill, [
+            'rider_id' => $rider3,
+            'expected_rider_id' => $rider,
+            'assignment_revision' => 'revision-a1',
+        ]);
+        $this->assertSame(422, $stale->getStatusCode());
+        $this->assertSame($rider, (int) $this->tx($bill)->rider_id);
+        $this->assertSame($revisionA2, (string) $this->tx($bill)->rider_assignment_revision);
     }
 
     public function test_assignment_receipt_is_only_allowed_for_a_final_bill_with_a_rider(): void

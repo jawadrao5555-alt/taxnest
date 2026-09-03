@@ -60,6 +60,15 @@ class TrackingService : Service(), LocationListener {
          * analytics are untouched (0 m moved, below the 12 m jitter floor).
          */
         private const val HEARTBEAT_MS = 120_000L
+
+        data class LatestFix(
+            val lat: Double,
+            val lng: Double,
+            val accuracyM: Float?,
+            val capturedAtMs: Long
+        )
+        @Volatile private var latestFix: LatestFix? = null
+        fun latestFix(): LatestFix? = latestFix
     }
 
     private lateinit var netThread: HandlerThread
@@ -193,6 +202,11 @@ class TrackingService : Service(), LocationListener {
                     lastLat = seed.latitude
                     lastLng = seed.longitude
                     lastAcc = if (seed.hasAccuracy()) seed.accuracy.toInt() else null
+                    latestFix = LatestFix(
+                        seed.latitude, seed.longitude,
+                        if (seed.hasAccuracy()) seed.accuracy else null,
+                        seed.time.takeIf { it > 0L } ?: System.currentTimeMillis()
+                    )
                 }
             }
         } catch (e: SecurityException) {
@@ -208,6 +222,11 @@ class TrackingService : Service(), LocationListener {
         lastLng = location.longitude
         lastAcc = if (location.hasAccuracy()) location.accuracy.toInt() else null
         lastPointAt = System.currentTimeMillis()
+        latestFix = LatestFix(
+            location.latitude, location.longitude,
+            if (location.hasAccuracy()) location.accuracy else null,
+            location.time.takeIf { it > 0L } ?: lastPointAt
+        )
         PointQueue.add(
             this, location.latitude, location.longitude, lastAcc, batteryPct()
         )

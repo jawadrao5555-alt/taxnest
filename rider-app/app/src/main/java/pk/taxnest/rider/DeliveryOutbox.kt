@@ -80,6 +80,23 @@ object DeliveryOutbox {
     /** Returns the number of pending entries. */
     fun size(c: Context): Int = load(c).length()
 
+    /** Drop confirmations that no longer match the rider's fresh /me assignments. */
+    fun retainAssignments(c: Context, assignments: Set<String>) {
+        synchronized(lock) {
+            val arr = load(c)
+            val out = JSONArray()
+            for (i in 0 until arr.length()) {
+                val e = arr.optJSONObject(i) ?: continue
+                val identity = DeliveryAssignmentSafety.identity(
+                    e.optInt("txn_id", 0).toString(),
+                    e.optString("assignment_revision")
+                )
+                if (assignments.contains(identity)) out.put(e)
+            }
+            save(c, out)
+        }
+    }
+
     /** Removes an entry by client_event_id (for duplicate detection). */
     fun removeByEventId(c: Context, clientEventId: String) {
         synchronized(lock) {

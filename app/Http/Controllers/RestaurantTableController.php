@@ -354,7 +354,13 @@ class RestaurantTableController extends Controller
             // constrain eager-load columns so the polling endpoint stays light.
             ->with([
                 'floor:id,name',
-                'activeOrders' => fn ($q) => $q->select('id', 'table_id', 'order_number', 'total_amount', 'created_by', 'source', 'order_type', 'kot_sent_at', 'status'),
+                'activeOrders' => function ($q) {
+                    $columns = ['id', 'table_id', 'order_number', 'total_amount', 'created_by', 'source', 'order_type', 'kot_sent_at', 'status', 'created_at'];
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+                        $columns[] = 'online_payment_awaited_at';
+                    }
+                    $q->select($columns);
+                },
                 'activeOrders.creator:id,name',
             ])
             ->get()
@@ -382,6 +388,7 @@ class RestaurantTableController extends Controller
                         'order_type' => $active->order_type,
                         'kot_sent_at' => $active->kot_sent_at,
                         'status' => $active->status,
+                        'created_at' => $active->created_at,
                         // Owner batch 26 Aug 2026: table waiting on an online transfer —
                         // the tile menu shows/toggles it and the proof bill says so.
                         'online_payment_awaited_at' => $active->online_payment_awaited_at ?? null,

@@ -521,6 +521,11 @@ class PosOnlinePaymentAwaitedTest extends TestCase
             1,
             (int) DB::table('pos_transactions')->where('company_id', $companyId)->count()
         );
+        $this->assertSame(
+            'qr_payment',
+            DB::table('pos_transactions')->where('company_id', $companyId)->value('payment_method'),
+            'a confirmed online transfer must stay online instead of being recollected as Cash/Card'
+        );
     }
 
     public function test_an_unmarked_order_still_pays_in_one_step(): void
@@ -602,6 +607,11 @@ class PosOnlinePaymentAwaitedTest extends TestCase
         $res->assertOk()->assertJson(['success' => true, 'waiter_order_settled' => true]);
         $this->assertSame('completed', DB::table('restaurant_orders')->where('id', $orderId)->value('status'));
         $this->assertNull($this->awaitedAt($orderId), 'settling a marked waiter order must end the wait too');
+        $this->assertSame(
+            'qr_payment',
+            DB::table('pos_transactions')->where('company_id', $companyId)->value('payment_method'),
+            'even an old counter tab posting cash must preserve the confirmed online payment state'
+        );
     }
 
     public function test_the_client_fallback_complete_endpoint_is_gated_as_well(): void

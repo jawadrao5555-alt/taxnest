@@ -2030,7 +2030,7 @@ window.addEventListener('popstate', function() {
             {{-- Delivery Riders: rider picker REMOVED from the pay modal (owner, 20 Jul 2026)
                  — rider assignment now happens ONLY on the /pos/deliveries board after
                  payment; cash bills enter the rider khata the moment a rider is assigned. --}}
-            <div class="p-4 grid grid-cols-2 gap-3">
+            <div x-show="!payingOrderAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
                 <button data-video="cash-payment" @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -2045,6 +2045,14 @@ window.addEventListener('popstate', function() {
                     <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? window.TXT.incl_tax_prefix : window.TXT.tax_colon) + (taxRules['debit_card'] || taxRules['card'] || 8) + '%' + (modalCardSaving > 0 ? ' • Save Rs. ' + Number(modalCardSaving).toLocaleString() : '')"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">{{ __('pos.press_2') }}</kbd>
                 </button>
+            </div>
+            <div x-show="payingOrderAwaitingOnline()" class="p-4">
+                <div class="mb-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 text-xs">
+                    <div class="flex justify-between font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Number(payModalTotal).toLocaleString()"></span></div>
+                    <div class="flex justify-between mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Number(payModalTotal).toLocaleString()"></span></div>
+                    <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
+                </div>
+                <button @click="confirmAwaitedPayment()" :disabled="submitting" class="w-full py-4 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition">{{ __('pos.confirm_online_received') }}</button>
             </div>
             {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — cashier
                  types the note customer gave; big green "Wapas dein" shows the change.
@@ -2154,6 +2162,7 @@ window.addEventListener('popstate', function() {
                                             {{-- ZFC issue #10b: "Order Tayyar" misled — order is only PUNCHED, not ready. --}}
                                             <span class="inline-block text-[9px] font-bold text-white bg-purple-600 rounded-full px-1.5 py-px animate-pulse">{{ __('pos.new_order') }}</span>
                                             <span class="block text-[9px] text-purple-600 dark:text-purple-300 font-medium truncate" x-text="incomingForTable(t).waiter + ' • Rs ' + Math.round(incomingForTable(t).total_amount).toLocaleString()"></span>
+                                             <span class="block text-[9px] text-purple-500 dark:text-purple-300 font-bold" x-text="elapsedSince(incomingForTable(t).created_at || t.occupied_since)"></span>
                                         </span>
                                     </template>
                                     <template x-if="!incomingForTable(t)">
@@ -2198,6 +2207,12 @@ window.addEventListener('popstate', function() {
                     <div class="min-w-0 flex-1">
                         <p class="text-base font-black text-gray-900 dark:text-white" x-text="'T-' + boardMenuTable.table_number"></p>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate" x-text="boardMenuSummary()"></p>
+                         <template x-if="boardMenuTable.order">
+                             <div class="mt-1 flex flex-wrap gap-1">
+                                 <span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300 uppercase" x-text="orderTypeName(boardMenuTable.order.order_type)"></span>
+                                 <span class="text-[9px] font-black px-1.5 py-0.5 rounded" :class="boardMenuTable.order.online_payment_awaited_at ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'" x-text="boardMenuTable.order.online_payment_awaited_at ? window.TXT.payment_online_pending : window.TXT.payment_unpaid"></span>
+                             </div>
+                         </template>
                     </div>
                     <button @click="boardMenuTable = null" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
@@ -2223,6 +2238,13 @@ window.addEventListener('popstate', function() {
                                     </div>
                                 </template>
                             </div>
+                             <template x-if="boardMenuTable.order.online_payment_awaited_at">
+                                 <div class="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 text-xs">
+                                     <div class="flex justify-between gap-3 font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()"></span></div>
+                                     <div class="flex justify-between gap-3 mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()"></span></div>
+                                     <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
+                                 </div>
+                             </template>
                             <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? window.TXT.loading_generic : window.TXT.open_edit_bill"></button>
                             {{-- Proof Bill (Pizza Master feedback, Jul 2026): customer ko bill
                                  dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
@@ -2278,7 +2300,7 @@ window.addEventListener('popstate', function() {
                     <p class="text-lg font-extrabold text-green-600 mt-0.5" x-text="'Rs ' + Math.round(boardConfirm.table.order.total_amount).toLocaleString()"></p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.finalize_confirm_choose_payment') }}</p>
                 </div>
-                <div class="p-4 grid grid-cols-2 gap-3">
+            <div x-show="!payingOrderAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
                     <button @click="boardFinalPay('cash')" :disabled="boardBusy" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                         <p class="text-sm font-black text-green-700 dark:text-green-300">CASH</p>
                     </button>
@@ -2286,6 +2308,14 @@ window.addEventListener('popstate', function() {
                         <p class="text-sm font-black text-blue-700 dark:text-blue-300">CARD</p>
                     </button>
                 </div>
+             <div x-show="payingOrderAwaitingOnline()" class="p-4">
+                 <div class="mb-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 text-xs">
+                     <div class="flex justify-between font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardConfirm.table.order.total_amount || 0).toLocaleString()"></span></div>
+                     <div class="flex justify-between mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardConfirm.table.order.total_amount || 0).toLocaleString()"></span></div>
+                     <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
+                 </div>
+                 <button @click="_onlineOkByOrder[boardConfirm.table.order.id] = true; boardFinalPay('qr_payment')" :disabled="boardBusy" class="w-full py-4 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition">{{ __('pos.confirm_online_received') }}</button>
+             </div>
                 {{-- Task 514 (Zahid Irfan, 12 Aug 2026): PER-BILL receipt print choice —
                      default company setting se aata hai (dine-in → print_on_pay_dinein),
                      cashier is EK bill ke liye override kar sakta hai. Sirf receipt
@@ -2580,7 +2610,10 @@ window.addEventListener('popstate', function() {
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-1.5 flex-wrap">
                                     <span class="text-[11px] font-mono font-bold text-gray-400" x-text="(oi + 1) + '.'"></span>
+                                    <span class="text-[10px] font-bold text-gray-500">{{ __('pos.order_id_label') }}</span>
                                     <span class="text-base font-mono font-black text-gray-900 dark:text-white" x-text="order.order_number"></span>
+                                    <template x-if="order.token_no"><span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200" x-text="{{ Js::from(__('pos.order_token_label')) }} + ': ' + order.token_no"></span></template>
+                                    <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300 uppercase" x-text="orderTypeName(order.order_type)"></span>
                                     <template x-if="order.table"><span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" x-text="window.TXT.table_t_colon + order.table.table_number"></span></template>
                                     <template x-if="order.priority"><span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">URGENT</span></template>
                                     <template x-if="order.online_payment_awaited_at"><span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200" x-text="{{ Js::from(__('pos.online_awaited_badge')) }}"></span></template>
@@ -2590,6 +2623,11 @@ window.addEventListener('popstate', function() {
                                 <p x-show="heldCustomerLine(order)" class="mt-1 text-xs font-black text-blue-700 dark:text-blue-300" x-text="heldCustomerLine(order)"></p>
                                 <p x-show="order.delivery_address" class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 leading-snug" x-text="order.delivery_address"></p>
                                 <p x-show="heldNotesLine(order)" class="mt-1.5 text-[11px] font-bold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-2 py-1 leading-snug" x-text="heldNotesLine(order)"></p>
+                                 <div class="mt-1.5 text-[11px] font-bold rounded-lg px-2 py-1" :class="order.online_payment_awaited_at ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300'">
+                                     <span x-text="order.online_payment_awaited_at ? window.TXT.payment_online_pending : window.TXT.payment_unpaid"></span>
+                                     <span x-show="order.online_payment_awaited_at" x-text="' • ' + window.TXT.online_amount + ': Rs ' + Math.round(order.total_amount || 0).toLocaleString()"></span>
+                                     <span x-text="' • ' + window.TXT.remaining_amount + ': Rs ' + Math.round(order.total_amount || 0).toLocaleString()"></span>
+                                 </div>
                             </div>
                             <div class="text-right flex-shrink-0">
                                 <p class="text-base font-black text-gray-900 dark:text-white" x-text="'Rs ' + Number(order.total_amount).toLocaleString()"></p>
@@ -2774,7 +2812,8 @@ window.addEventListener('popstate', function() {
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
-                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
+                                <span x-show="bill.bill_token" class="text-sm font-black text-gray-900 dark:text-white" x-text="window.TXT.daily_token + ': ' + bill.bill_token"></span>
+                                <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400" x-text="window.TXT.bill_serial + ': ' + bill.invoice_number"></span>
                                 <span class="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Local</span>
                                 <template x-if="bill.order_type">
                                     <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
@@ -3001,6 +3040,21 @@ window.addEventListener('popstate', function() {
                                 </template>
                             </div>
                         </template>
+                        {{-- An assigned/dispatched mistake must be fixable from the same
+                             authorized POS popup. Terminal/settled rows are rejected again
+                             server-side; the observed rider makes this a safe CAS update. --}}
+                        <template x-if="bill.rider_id && bill.delivery_status !== 'delivered' && bill.delivery_status !== 'returned' && canAssignRider && deliveryRiders.length > 1">
+                            <div class="mb-2 flex items-center gap-2">
+                                <span class="text-[11px] font-semibold text-gray-500">{{ __('pos.rider_word') }}:</span>
+                                <select @change="assignRider(bill, $event.target.value); $event.target.value = bill.rider_id"
+                                        :value="bill.rider_id" :disabled="riderAssignBusyId"
+                                        class="flex-1 rounded-lg border-amber-300 dark:border-amber-700 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-amber-500 focus:border-amber-500 disabled:opacity-50">
+                                    <template x-for="r in deliveryRiders" :key="'reassign-' + bill.id + '-' + r.id">
+                                        <option :value="r.id" x-text="r.name + (r.battery_pct != null && r.battery_pct <= 20 ? ' 🪫 ' + r.battery_pct + '%' : '')"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </template>
                         {{-- PROVISIONAL bill: Final Cash/Card (promote path). FINAL bills
                              par yeh buttons render hi nahi hote — promote unpar kabhi nahi. --}}
                         <template x-if="!bill.is_final">
@@ -3089,7 +3143,8 @@ window.addEventListener('popstate', function() {
                                     <div class="p-4 border-b border-gray-100 dark:border-gray-800">
                                         <div class="flex items-center justify-between mb-1.5">
                                             <div class="flex items-center gap-2 flex-wrap">
-                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300" x-text="bill.invoice_number"></span>
+                                                <span x-show="bill.bill_token" class="text-sm font-black text-gray-700 dark:text-gray-300" x-text="window.TXT.daily_token + ': ' + bill.bill_token"></span>
+                                                <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400" x-text="window.TXT.bill_serial + ': ' + bill.invoice_number"></span>
                                                 {{-- Halka (gray) chip — purana bill koi RED demand nahi (Task 524) --}}
                                                 <span class="text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
                                             </div>
@@ -10356,6 +10411,9 @@ function restaurantPos() {
 
         async processPayment(method) {
             if (this.submitting) return;
+            // A recalled/held online-marked order has already chosen its payment
+            // state. Cash/Card shortcuts from an older tab must not recollect it.
+            if (this.payingOrderAwaitingOnline()) method = 'qr_payment';
             // Cash Received / Wapsi: snapshot the entered cash for the success popup
             // (client-side display works for BOTH cart sales and held-order pays).
             this.lastCashReceived = (method === 'cash') ? (parseFloat(this.cashReceived) || 0) : 0;
@@ -10765,6 +10823,12 @@ function restaurantPos() {
 
         async payHeldOrder(orderId) {
             if (this.submitting) return;
+            const order = this.heldOrders.find(o => Number(o.id) === Number(orderId));
+            if (order && order.online_payment_awaited_at) {
+                this.showHeldOrders = false;
+                await this.payHeldOrderDirect(orderId, 'qr_payment', order.total_amount || 0, false, order.order_type || null, false);
+                return;
+            }
             this.payingHeldOrderId = orderId;
             this.showHeldOrders = false;
             this.stockError = '';
@@ -10799,6 +10863,23 @@ function restaurantPos() {
             }
             const tax = Math.round(taxable * ratio * rate / 100);
             return Math.round(sub - disc + tax);
+        },
+        payingOrderAwaitingOnline() {
+            if (this.boardConfirm?.table?.order?.online_payment_awaited_at) return true;
+            if (this.payingHeldOrderId) {
+                const held = this.heldOrders.find(o => Number(o.id) === Number(this.payingHeldOrderId));
+                return !!(held && held.online_payment_awaited_at);
+            }
+            return !!(this.recalledOrderMeta && this.recalledOrderMeta.online_payment_awaited_at);
+        },
+        confirmAwaitedPayment() {
+            const orderId = this.payingHeldOrderId || this.incomingOrderId || this.recalledOrderId;
+            if (orderId) this._onlineOkByOrder[orderId] = true;
+            this.processPayment('qr_payment');
+        },
+        orderTypeName(type) {
+            return type === 'delivery' ? window.TXT.delivery
+                : (type === 'dine_in' ? window.TXT.dine_in : window.TXT.takeaway);
         },
         get payModalTotal() {
             if (this.payingHeldOrderId) return this.heldOrderEstimate(this.payMethodIndex === 1 ? 'card' : 'cash');
@@ -11695,6 +11776,9 @@ function restaurantPos() {
         // mein chala jata hai, khata rider_id follow karta hai).
         async assignRider(bill, riderId) {
             if (!bill || !riderId || this.riderAssignBusyId) return;
+            if (bill.rider_id && Number(bill.rider_id) !== Number(riderId)
+                && !window.confirm(@json(__('pos.rider_word')) + ': ' + (bill.rider_name || '') + ' → '
+                    + ((this.deliveryRiders.find(r => Number(r.id) === Number(riderId)) || {}).name || '') + '?')) return;
             this.riderAssignBusyId = bill.id;
             try {
                 const res = await fetch('{{ url('/pos/deliveries') }}/' + bill.id + '/assign', {
@@ -11703,7 +11787,12 @@ function restaurantPos() {
                     // A rider may be pre-assigned while the bill is still
                     // provisional. Only ask the server to print an already
                     // final bill; the controller re-checks both conditions.
-                    body: JSON.stringify({ rider_id: riderId, print_receipt: !!(bill.is_final && this.deliveryPrintReceipt) }),
+                    body: JSON.stringify({
+                        rider_id: riderId,
+                        expected_rider_id: bill.rider_id || null,
+                        assignment_revision: bill.assignment_revision || null,
+                        print_receipt: !!(bill.is_final && this.deliveryPrintReceipt)
+                    }),
                 });
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {
@@ -12219,7 +12308,7 @@ function restaurantPos() {
             this.lastKotPending = !!(data && data.kot_pending);
             this.runAutoPrintChain(orderId, payOrderType, orderId ? null : (data.transaction_id || null), skipReceipt, false, !!(data && data.kot_pending));
             // Refresh provisional badge count when this save was provisional.
-            if (provisional) { this.loadLocalBills(); }
+            if (provisional || payOrderType === 'delivery') { this.loadLocalBills(); }
             // Refresh failed badge so cashier sees pending/failed state in real time.
             this.loadFailedBills();
             this.loadReprintBills(); // Akhri Bills strip stays current
@@ -12563,7 +12652,7 @@ function restaurantPos() {
             // Task 781: meta snapshot for the in-panel table actions — the order
             // leaves heldOrders on the next line, so KOT gating + the cancel
             // modal would otherwise lose kot_sent_at / order_number.
-            this.recalledOrderMeta = { order_number: order.order_number || null, kot_sent_at: order.kot_sent_at || null, source: order.source || null };
+            this.recalledOrderMeta = { order_number: order.order_number || null, kot_sent_at: order.kot_sent_at || null, source: order.source || null, online_payment_awaited_at: order.online_payment_awaited_at || null };
             // Task 1028: recall ke foran baad ka fingerprint — table-switch par
             // isi se compare ho kar dirty (edited) carts ko explicit choice milti hai.
             this._recallCartBaseline = this.cartEditFingerprint();

@@ -23,14 +23,19 @@ object DeliveryNotifier {
 
     /** Safe to call from any thread. */
     fun process(c: Context, arr: JSONArray) {
+        // Every /me/push list is an authoritative assignment snapshot, not
+        // merely notification input. Invalidate stale background work first.
+        DeliveryArrivalCache.set(c, arr)
+        DeliveryOutbox.retainAssignments(c, DeliveryAssignmentSafety.currentAssignments(arr))
         val current = LinkedHashSet<String>()
         val fresh = mutableListOf<String>()
         val seen = Prefs.seenDeliveryIds(c)
         for (i in 0 until arr.length()) {
             val item = arr.optJSONObject(i) ?: continue
             val id = item.optInt("id", 0).toString()
-            current.add(id)
-            if (!seen.contains(id)) {
+            val identity = DeliveryAssignmentSafety.identity(id, item.optString("assignment_revision"))
+            current.add(identity)
+            if (!seen.contains(identity)) {
                 val inv = item.optString("invoice_number").ifBlank { "#$id" }
                 val amt = String.format(Locale.US, "%,.0f", item.optDouble("amount", 0.0))
                 fresh.add("$inv — Rs $amt")

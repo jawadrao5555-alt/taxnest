@@ -87,8 +87,15 @@ sudo -n httpd -t
 sudo -n systemctl reload httpd
 (cd "$APP_DIR" && /usr/bin/php artisan config:cache)
 sudo -n systemctl restart "$SERVICE_NAME"
-curl --fail --silent --show-error http://127.0.0.1:6101/health >/dev/null \
-  || die "loopback gateway health check failed"
+GATEWAY_READY=0
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if curl --fail --silent http://127.0.0.1:6101/health >/dev/null; then
+    GATEWAY_READY=1
+    break
+  fi
+  sleep 1
+done
+[ "$GATEWAY_READY" = 1 ] || die "loopback gateway health check failed"
 
 # Prove Apache + TLS + SELinux reach the gateway. An unauthenticated WebSocket
 # upgrade must be rejected by the gateway with 401; 404/502/503 means the

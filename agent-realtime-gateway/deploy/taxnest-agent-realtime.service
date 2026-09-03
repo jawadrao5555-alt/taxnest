@@ -1,0 +1,30 @@
+[Unit]
+Description=TaxNest Agent Realtime Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jawadrao5555
+Group=apache
+WorkingDirectory=/var/www/taxnest/agent-realtime-gateway
+EnvironmentFile=/etc/taxnest/agent-realtime.env
+ExecStart=/usr/bin/node gateway.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+MemoryMax=256M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=/var/www/taxnest/agent-realtime-gateway
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

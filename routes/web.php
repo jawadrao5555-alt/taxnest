@@ -2059,6 +2059,8 @@ Route::prefix('api/di/v1')->middleware(['di.api', 'throttle:120,1'])->withoutMid
 });
 
 Route::prefix('api/agent')->middleware(['agent.auth'])->withoutMiddleware($statelessMachine)->group(function () {
+    // Local realtime gateway credential exchange; deliberately sessionless.
+    Route::get('/realtime-auth', [\App\Http\Controllers\AgentController::class, 'realtimeAuth']);
     Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);
     Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);
     Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);

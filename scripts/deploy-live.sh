@@ -255,6 +255,18 @@ sleep 3
 systemctl is-active --quiet "$LIVE_QUEUE_SERVICE" || exit 99
 echo "REMOTE_STEP: queue worker active on the new code"
 
+# Realtime Agent wake gateway is optional on older releases/hosts. Once
+# installed, every deploy must restart it so it cannot keep serving the
+# previous checkout's JavaScript while Laravel has moved forward.
+if sudo -n systemctl cat taxnest-agent-realtime.service >/dev/null 2>&1; then
+  echo "REMOTE_STEP: restart Agent realtime gateway"
+  sudo -n systemctl restart taxnest-agent-realtime.service 2>&1 || exit 93
+  sleep 2
+  systemctl is-active --quiet taxnest-agent-realtime.service || exit 93
+  curl --fail --silent http://127.0.0.1:6101/health >/dev/null || exit 93
+  echo "REMOTE_STEP: Agent realtime gateway active on the new code"
+fi
+
 echo "REMOTE_STEP: artisan up"
 $PHP artisan up 2>&1 || exit 97
 
@@ -287,6 +299,7 @@ apply_fail_reason() {
     92) echo "composer install failed on live — SITE LEFT IN MAINTENANCE" ;;
     93) echo "migrate --force failed on live — SITE LEFT IN MAINTENANCE" ;;
     94) echo "cache rebuild failed on live — SITE LEFT IN MAINTENANCE" ;;
+    93) echo "Agent realtime gateway did not restart or pass health — SITE LEFT IN MAINTENANCE (old/new wake path mismatch risk)" ;;
     95) echo "could not repair storage ownership / SELinux contexts — SITE LEFT IN MAINTENANCE (bringing it up would break logging and cache writes)" ;;
     96) echo "could not open 200 maintenance window — ABORTED, live untouched" ;;
     97) echo "artisan up failed after successful release — run 'php artisan up' on live" ;;

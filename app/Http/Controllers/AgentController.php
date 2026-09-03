@@ -66,6 +66,45 @@ class AgentController extends Controller
     }
 
     /**
+     * Stateless credential exchange for the local realtime gateway. The
+     * company agent key is not enough to authorize a device namespace: bind it
+     * to a registered row owned by that same authenticated company.
+     */
+    public function realtimeAuth(Request $request)
+    {
+        $company = $request->attributes->get('agent_company');
+        $deviceUid = $this->requestDeviceUid($request);
+
+        if (!$deviceUid) {
+            return response()->json(['error' => 'A valid device_uid is required'], 422);
+        }
+
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_agent_devices')) {
+                return response()->json(['error' => 'Unknown device'], 403);
+            }
+
+            $registered = \App\Models\PosAgentDevice::query()
+                ->where('company_id', $company->id)
+                ->where('device_uid', $deviceUid)
+                ->exists();
+        } catch (\Throwable $e) {
+            // Do not reveal schema/database details to an agent caller.
+            return response()->json(['error' => 'Unknown device'], 403);
+        }
+
+        if (!$registered) {
+            return response()->json(['error' => 'Unknown device'], 403);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'company_id' => (string) $company->id,
+            'device_uid' => $deviceUid,
+        ]);
+    }
+
+    /**
      * Upsert this agent install's device row (multi-counter registry).
      * Fire-and-forget telemetry: throttled to one write per 60s per device
      * (heartbeat is every 30s and claim polls are near-continuous), and any

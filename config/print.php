@@ -39,4 +39,12 @@ return [
     // How long after the last real print job a shop still counts as "printing"
     // and may be offered a held poll.
     'active_window_minutes' => (int) env('PRINT_ACTIVE_WINDOW_MINUTES', 20),
+
+    /*
+     * Optional local realtime wake relay. Leave either value blank to keep the
+     * established polling-only behaviour. This is deliberately a loopback URL:
+     * it is a local companion gateway, never a customer-controlled webhook.
+     */
+    'realtime_gateway_url' => env('PRINT_REALTIME_GATEWAY_URL'),
+    'realtime_gateway_secret' => env('PRINT_REALTIME_GATEWAY_SECRET'),
 ];

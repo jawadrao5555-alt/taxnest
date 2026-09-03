@@ -16,13 +16,19 @@ const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const WebSocket = require('ws');
 const { printerLaneKey, processPrintSchedule } = require('./printer-queue');
+const { RealtimeWakeClient, realtimeUrl } = require('./realtime-wake');
 
 let printersInterval = null;
 let jobsInterval = null;
 const printWindows = new Map();
 let printing = false;
 let cfg = null;
+let realtimeClient = null;
+let realtimeHealthy = false;
+let pollLoopNudge = null;
+let wakePollPending = false;
 
 const printStatus = {
   printingEnabled: false,
@@ -294,9 +300,19 @@ let pollLoopStop = null;
 function startPollLoop() {
   let stopped = false;
   let timer = null;
-  pollLoopStop = () => { stopped = true; if (timer) { clearTimeout(timer); timer = null; } };
+  const nudge = () => {
+    wakePollPending = true;
+    if (!stopped && timer) { clearTimeout(timer); timer = null; tick(); }
+  };
+  pollLoopNudge = nudge;
+  pollLoopStop = () => {
+    stopped = true;
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (pollLoopNudge === nudge) pollLoopNudge = null;
+  };
   const tick = async () => {
     if (stopped) return;
+    wakePollPending = false;
     let delay = 1500;
     try {
       delay = await pollPrintJobs();
@@ -305,7 +321,10 @@ function startPollLoop() {
     }
     if (stopped) return;
     if (typeof delay !== 'number' || !isFinite(delay) || delay < 0) delay = 1500;
-    timer = setTimeout(tick, delay);
+    // WebSocket wakeups make continuous long-polls unnecessary while connected.
+    // Retain a slow recovery sweep in case a wake is lost or a gateway deploys.
+    if (realtimeHealthy && !wakePollPending) delay = Math.max(delay, 30000);
+    timer = setTimeout(tick, wakePollPending ? 0 : delay);
   };
   tick();
 }
@@ -320,11 +339,28 @@ function startPrinting(config) {
   printersInterval = setInterval(reportPrinters, 5 * 60 * 1000);
   // v1.6.2: long-poll loop (was fixed 2s setInterval) — near-instant prints.
   startPollLoop();
+  if (config.deviceUid && config.serverUrl && config.apiKey) {
+    realtimeClient = new RealtimeWakeClient({
+      WebSocket,
+      url: realtimeUrl(config.serverUrl, config.deviceUid),
+      apiKey: config.apiKey,
+      onWake: () => { if (pollLoopNudge) pollLoopNudge(); },
+      onState: (healthy) => {
+        realtimeHealthy = healthy;
+        if (!healthy && pollLoopNudge) pollLoopNudge();
+      },
+      log: plog,
+    });
+    realtimeClient.start();
+  }
 }
 
 function stopPrinting() {
   if (printersInterval) { clearInterval(printersInterval); printersInterval = null; }
   if (pollLoopStop) { pollLoopStop(); pollLoopStop = null; }
+  if (realtimeClient) { realtimeClient.stop(); realtimeClient = null; }
+  realtimeHealthy = false;
+  wakePollPending = false;
   if (jobsInterval) { clearInterval(jobsInterval); jobsInterval = null; }
   // Do not destroy per-printer windows or clear their chains here. stopAgent()
   // can be followed immediately by startAgent() with refreshed config; an

@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.0 (2026-09-03)
+**Realtime silent printing — server par repeated polling kam, receipt/KOT wake signal par foran pick hoti hai**
+
+- Agent authenticated WebSocket par sirf lightweight `job ready` wake signal leta hai; actual print job ab bhi existing company/device-scoped secure API se claim hoti hai.
+- Healthy realtime connection ke dauran repeated HTTP polling 30-second recovery sweep tak kam ho jati hai. Gateway, internet ya WebSocket mein koi masla ho to Agent automatically purani polling cadence par aa jata hai—printing ka naya single point of failure nahi.
+- Reconnect exponential backoff+jitter ke sath hai, credentials URL/logs mein nahi jate, aur one-device jobs sirf usi registered counter ko wake karti hain.
+
 ## v1.12.0 (2026-09-03)
 **Local-First Offline Mode — internet band honay par bhi shop ka kaam Local Core mein mehfooz rehta hai**
 

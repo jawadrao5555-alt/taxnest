@@ -1,0 +1,14 @@
+{
+  "name": "taxnest-agent-realtime-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Loopback-authenticated WebSocket wake gateway for desktop agents",
+  "main": "gateway.js",
+  "scripts": {
+    "start": "node gateway.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "8.18.3"
+  }
+}

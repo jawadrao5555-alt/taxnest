@@ -2,7 +2,7 @@
 # Install/refresh the loopback-only Agent realtime gateway on the RHEL live host.
 # Run on the live host from the checked-out TaxNest repository, as jawadrao5555.
 set -euo pipefail
-umask 077
+umask 022
 
 APP_DIR="${APP_DIR:-/var/www/taxnest}"
 GATEWAY_DIR="$APP_DIR/agent-realtime-gateway"
@@ -42,8 +42,8 @@ if ! sudo -n test -s "$SERVICE_ENV"; then
     | sudo -n tee "$SERVICE_ENV" >/dev/null
   unset WAKE_SECRET
 fi
-sudo -n chown jawadrao5555:apache "$SERVICE_ENV"
-sudo -n chmod 0640 "$SERVICE_ENV"
+sudo -n chown root:root "$SERVICE_ENV"
+sudo -n chmod 0600 "$SERVICE_ENV"
 
 # Read the existing secret only into this process to keep the Laravel and
 # gateway values synchronized. Nothing below prints it (and xtrace is off).
@@ -57,7 +57,8 @@ set_laravel_env() {
     { print }
     END { if (!done) print key "=" value }
   ' "$file" > "$tmp"
-  chmod 0600 "$tmp"
+  chmod 0640 "$tmp"
+  chgrp apache "$tmp"
   mv "$tmp" "$file"
 }
 set_laravel_env PRINT_REALTIME_GATEWAY_URL "$INTERNAL_GATEWAY_URL" "$APP_DIR/.env"
@@ -86,6 +87,8 @@ fi
 sudo -n httpd -t
 sudo -n systemctl reload httpd
 (cd "$APP_DIR" && /usr/bin/php artisan config:cache)
+sudo -n chown jawadrao5555:apache "$APP_DIR/.env" "$APP_DIR/bootstrap/cache/config.php"
+sudo -n chmod 0640 "$APP_DIR/.env" "$APP_DIR/bootstrap/cache/config.php"
 sudo -n systemctl restart "$SERVICE_NAME"
 GATEWAY_READY=0
 for _ in 1 2 3 4 5 6 7 8 9 10; do

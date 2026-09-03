@@ -24,8 +24,6 @@ export const modules: ModuleMap = {
   "./components/mockups/pos-cart/SaafSaleScreen.tsx": () => import("../components/mockups/pos-cart/SaafSaleScreen.tsx"),
   "./components/mockups/receipt-cleanup/After.tsx": () => import("../components/mockups/receipt-cleanup/After.tsx"),
   "./components/mockups/receipt-cleanup/Before.tsx": () => import("../components/mockups/receipt-cleanup/Before.tsx"),
-  "./components/mockups/receipt-order-code/Current.tsx": () => import("../components/mockups/receipt-order-code/Current.tsx"),
-  "./components/mockups/receipt-order-code/Proposed.tsx": () => import("../components/mockups/receipt-order-code/Proposed.tsx"),
   "./components/mockups/sale-screen-features/DesignACards.tsx": () => import("../components/mockups/sale-screen-features/DesignACards.tsx"),
   "./components/mockups/sale-screen-features/DesignBList.tsx": () => import("../components/mockups/sale-screen-features/DesignBList.tsx"),
   "./components/mockups/sale-screen-features/SaleScreenFull.tsx": () => import("../components/mockups/sale-screen-features/SaleScreenFull.tsx"),
@@ -36,5 +34,7 @@ export const modules: ModuleMap = {
   "./components/mockups/waiter-table-flow/SaleScreenPlacement.tsx": () => import("../components/mockups/waiter-table-flow/SaleScreenPlacement.tsx"),
   "./components/mockups/waiter-table-flow/SaleScreenPlacementSaaf.tsx": () => import("../components/mockups/waiter-table-flow/SaleScreenPlacementSaaf.tsx"),
   "./components/mockups/waiter-table-flow/TablePicker.tsx": () => import("../components/mockups/waiter-table-flow/TablePicker.tsx"),
-  "./components/mockups/waiter-table-flow/WaiterSalesReport.tsx": () => import("../components/mockups/waiter-table-flow/WaiterSalesReport.tsx")
+  "./components/mockups/waiter-table-flow/WaiterSalesReport.tsx": () => import("../components/mockups/waiter-table-flow/WaiterSalesReport.tsx"),
+  "./components/mockups/receipt-order-code/Current.tsx": () => import("../components/mockups/receipt-order-code/Current.tsx"),
+  "./components/mockups/receipt-order-code/Proposed.tsx": () => import("../components/mockups/receipt-order-code/Proposed.tsx")
 };

@@ -173,7 +173,11 @@ async function sweep(page, budgetMs = 6000) {
                 .find((n) => !root?.contains(n) && vis(n));
             if (!overlay) return null;
             return [...overlay.querySelectorAll('button')]
-                .find((b) => /Dismiss\(\)/.test(b.getAttribute('@click') || b.getAttribute('x-on:click') || '') && vis(b)) || null;
+                .find((b) => (
+                    /Dismiss\(\)/.test(b.getAttribute('@click') || b.getAttribute('x-on:click') || '')
+                    || b.id === 'tn-domain-move-dismiss'
+                    || b.id === 'tn-domain-move-close'
+                ) && vis(b)) || null;
         });
         const el = handle.asElement();
         if (!el) {

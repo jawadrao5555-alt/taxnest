@@ -26,6 +26,7 @@ use App\Services\AuditLogService;
 use App\Services\PraIntegrationService;
 use App\Services\PosFeatureService;
 use App\Services\PosPlanComparisonService;
+use App\Services\RestaurantOrderPaymentCalculator;
 use App\Support\PosPaymentBuckets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -3110,7 +3111,7 @@ class PosController extends Controller
         $settleOrderIdIn = (int) $request->input('incoming_order_id', 0)
             ?: (int) $request->input('recalled_order_id', 0);
         $incomingOrderIdIn = $settleOrderIdIn;
-        $settleOrderAwaitingOnline = false;
+        $settleOrderAwaitingOnline = null;
         if ($incomingOrderIdIn > 0
             && !$request->boolean('save_as_provisional')
             && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
@@ -3118,16 +3119,23 @@ class PosController extends Controller
                 ->where('id', $incomingOrderIdIn)
                 ->whereIn('status', ['held', 'preparing', 'ready'])
                 ->whereNotNull('online_payment_awaited_at')
-                ->exists();
+                ->with('items')
+                ->first();
         }
         if ($incomingOrderIdIn > 0
             && !$request->boolean('save_as_provisional')
             && !$request->boolean('online_payment_confirmed')
             && $settleOrderAwaitingOnline) {
+            $onlineQuote = RestaurantOrderPaymentCalculator::calculate(
+                $settleOrderAwaitingOnline,
+                $company,
+                'qr_payment'
+            );
             return response()->json([
                 'success' => false,
                 'code'    => 'online_payment_awaited',
                 'message' => __('pos.online_confirm_body'),
+                'online_total_amount' => $onlineQuote['total_amount'],
             ], 422);
         }
 

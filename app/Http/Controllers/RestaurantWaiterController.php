@@ -9,6 +9,7 @@ use App\Models\RestaurantOrderItem;
 use App\Models\RestaurantTable;
 use App\Models\User;
 use App\Services\PosFeatureService;
+use App\Services\RestaurantOrderPaymentCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -1111,17 +1112,28 @@ class RestaurantWaiterController extends Controller
 
         // Online-adaigi gate: yeh client fallback bhi bina tasdeeq final na kare
         // (wohi 422 contract jo payOrder aur storeInvoice bhejte hain).
+        $awaitingOnlineOrder = null;
         if (!$request->boolean('online_payment_confirmed')
-            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')
-            && RestaurantOrder::where('company_id', $companyId)
+            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'online_payment_awaited_at')) {
+            $awaitingOnlineOrder = RestaurantOrder::where('company_id', $companyId)
                 ->where('id', (int) $id)
                 ->whereIn('status', ['held', 'preparing', 'ready'])
                 ->whereNotNull('online_payment_awaited_at')
-                ->exists()) {
+                ->with('items')
+                ->first();
+        }
+        if ($awaitingOnlineOrder) {
+            $company = Company::findOrFail($companyId);
+            $onlineQuote = RestaurantOrderPaymentCalculator::calculate(
+                $awaitingOnlineOrder,
+                $company,
+                'qr_payment'
+            );
             return response()->json([
                 'success' => false,
                 'code'    => 'online_payment_awaited',
                 'message' => __('pos.online_confirm_body'),
+                'online_total_amount' => $onlineQuote['total_amount'],
             ], 422);
         }
 

@@ -2239,10 +2239,16 @@ window.addEventListener('popstate', function() {
                                     </div>
                                 </template>
                             </div>
+                            <template x-if="boardOnlineQuote && boardOnlineQuote.error">
+                                <button type="button" @click="loadBoardOnlineQuote(boardMenuTable)"
+                                    class="w-full rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-[11px] font-bold text-red-700 dark:text-red-300">
+                                    {{ __('pos.online_quote_retry') }}
+                                </button>
+                            </template>
                              <template x-if="boardMenuTable.order.online_payment_awaited_at">
                                  <div class="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 text-xs">
-                                     <div class="flex justify-between gap-3 font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()"></span></div>
-                                     <div class="flex justify-between gap-3 mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()"></span></div>
+                                     <div class="flex justify-between gap-3 font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="boardOnlineQuoteText()"></span></div>
+                                     <div class="flex justify-between gap-3 mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="boardOnlineQuoteText()"></span></div>
                                      <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
                                  </div>
                              </template>
@@ -2260,12 +2266,13 @@ window.addEventListener('popstate', function() {
                                  same server-gated finalisation path as Final: it receives the
                                  422 gate, then reuses onlineConfirm to post the confirmation. --}}
                             <template x-if="boardMenuTable.order.online_payment_awaited_at">
-                                <button @click="boardOnlinePayment()" :disabled="boardBusy" class="w-full py-3 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 transition shadow-sm" x-text="'Online Payment — Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()"></button>
+                                <button @click="boardOnlinePayment()" :disabled="boardBusy || !boardOnlineQuoteReady()" class="w-full py-3 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 transition shadow-sm" x-text="'Online Payment — ' + boardOnlineQuoteText()"></button>
                             </template>
                             <template x-if="!boardMenuTable.order.online_payment_awaited_at">
-                                <button @click="toggleOnlinePayment(boardMenuTable.order, true)" :disabled="boardBusy || onlineMarkBusy === boardMenuTable.order.id"
-                                        class="w-full py-2.5 rounded-xl text-sm font-bold border transition disabled:opacity-40 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100">
-                                    <span>&#128179;</span> <span>{{ __('pos.online_mark_btn') }}</span>
+                                <button @click="toggleOnlinePayment(boardMenuTable.order, true)" :disabled="boardBusy || onlineMarkBusy === boardMenuTable.order.id || !boardOnlineQuoteReady()"
+                                        class="w-full py-2.5 px-3 rounded-xl text-sm font-bold border transition disabled:opacity-40 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 flex items-center justify-between gap-3">
+                                    <span><span>&#128179;</span> <span>{{ __('pos.online_mark_btn') }}</span></span>
+                                    <span class="font-black tabular-nums whitespace-nowrap" x-text="boardOnlineQuoteText()"></span>
                                 </button>
                             </template>
                             <button x-show="!boardMenuTable.order.online_payment_awaited_at" @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
@@ -2306,7 +2313,7 @@ window.addEventListener('popstate', function() {
                 <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ __('pos.bill_will_be_final') }}</p>
                     <p class="text-2xl font-black text-gray-900 dark:text-white mt-1" x-text="'T-' + boardConfirm.table.table_number"></p>
-                    <p class="text-lg font-extrabold text-green-600 mt-0.5" x-text="'Rs ' + Math.round(boardConfirm.table.order.total_amount).toLocaleString()"></p>
+                    <p class="text-lg font-extrabold text-green-600 mt-0.5" x-text="boardConfirmAmountText()"></p>
                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.finalize_confirm_choose_payment') }}</p>
                 </div>
             <div x-show="!payingOrderAwaitingOnline()" class="p-4 grid grid-cols-2 gap-3">
@@ -2319,8 +2326,8 @@ window.addEventListener('popstate', function() {
                 </div>
              <div x-show="payingOrderAwaitingOnline()" class="p-4">
                  <div class="mb-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 text-xs">
-                     <div class="flex justify-between font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardConfirm.table.order.total_amount || 0).toLocaleString()"></span></div>
-                     <div class="flex justify-between mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Math.round(boardConfirm.table.order.total_amount || 0).toLocaleString()"></span></div>
+                     <div class="flex justify-between font-black text-indigo-700 dark:text-indigo-300"><span>{{ __('pos.online_amount_label') }}</span><span x-text="'Rs ' + Math.round(Number(boardConfirm.onlineTotal || 0)).toLocaleString()"></span></div>
+                     <div class="flex justify-between mt-1 font-bold text-amber-700 dark:text-amber-300"><span>{{ __('pos.remaining_amount_label') }}</span><span x-text="'Rs ' + Math.round(Number(boardConfirm.onlineTotal || 0)).toLocaleString()"></span></div>
                      <p class="mt-1 text-[10px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{{ __('pos.online_payment_pending_status') }}</p>
                  </div>
                  <button @click="_onlineOkByOrder[boardConfirm.table.order.id] = true; boardFinalPay('qr_payment')" :disabled="boardBusy" class="w-full py-4 rounded-xl text-sm font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition">{{ __('pos.confirm_online_received') }}</button>
@@ -5085,6 +5092,8 @@ function restaurantPos() {
         tableBoardOpen: false, // board ab MODAL hai (owner 26 Jul 2026) — load par band, Alt+B / TABLE button se khulta hai
         boardMenuTable: null,   // tile clicked → action menu modal
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
+        boardOnlineQuote: null, // authoritative qr_payment total for the open order
+        boardOnlineQuoteSeq: 0, // stale-response guard when the popup changes/retries
         boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
         boardCancelAsk: null,   // { table, order, items|null } → cancel-warning modal (ZFC, 2 Aug 2026)
         boardCancelMade: {},    // item_id → true jab cashier ne "ban gaya" tick kiya (waste audit)
@@ -9050,6 +9059,7 @@ function restaurantPos() {
         openBoardMenu(t) {
             if (this.boardBusy) return;
             this.boardMenuTable = t;
+            this.loadBoardOnlineQuote(t);
             // Items list (Pizza Master feedback, Jul 2026): lazy-fetch so the
             // board endpoint stays light — only the OPEN popup pays this cost.
             this.boardMenuItems = null;
@@ -9066,6 +9076,54 @@ function restaurantPos() {
                     })
                     .catch(() => { if (this.boardMenuTable && this.boardMenuTable.id === t.id) this.boardMenuItems = []; });
             }
+        },
+        loadBoardOnlineQuote(t) {
+            const quoteOrderId = t && t.order ? Number(t.order.id) : 0;
+            const quoteSeq = ++this.boardOnlineQuoteSeq;
+            if (!quoteOrderId) {
+                this.boardOnlineQuote = null;
+                return;
+            }
+            this.boardOnlineQuote = { orderId: quoteOrderId, totalAmount: null, loading: true, error: false };
+            fetch('/pos/restaurant/orders/' + quoteOrderId + '/payment-quote?payment_method=qr_payment', {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store'
+            })
+                .then(r => r.ok ? r.json() : Promise.reject(new Error('quote_failed')))
+                .then(data => {
+                    if (quoteSeq !== this.boardOnlineQuoteSeq
+                        || !this.boardMenuTable || !this.boardMenuTable.order
+                        || Number(this.boardMenuTable.order.id) !== quoteOrderId) return;
+                    const total = Number(data && data.total_amount);
+                    if (!data || data.success !== true || !Number.isFinite(total)) {
+                        throw new Error('quote_invalid');
+                    }
+                    this.boardOnlineQuote = { orderId: quoteOrderId, totalAmount: total, loading: false, error: false };
+                })
+                .catch(() => {
+                    if (quoteSeq === this.boardOnlineQuoteSeq
+                        && this.boardMenuTable && this.boardMenuTable.order
+                        && Number(this.boardMenuTable.order.id) === quoteOrderId) {
+                        this.boardOnlineQuote = { orderId: quoteOrderId, totalAmount: null, loading: false, error: true };
+                    }
+                });
+        },
+        boardOnlineQuoteReady() {
+            const orderId = this.boardMenuTable && this.boardMenuTable.order
+                ? Number(this.boardMenuTable.order.id)
+                : 0;
+            const quote = this.boardOnlineQuote;
+            return !!quote && Number(quote.orderId) === orderId
+                && Number.isFinite(Number(quote.totalAmount));
+        },
+        boardOnlineQuoteText() {
+            if (!this.boardOnlineQuoteReady()) {
+                return this.boardOnlineQuote && this.boardOnlineQuote.error
+                    ? {{ Js::from(__('pos.online_quote_unavailable')) }}
+                    : {{ Js::from(__('pos.online_quote_loading')) }};
+            }
+            const quote = this.boardOnlineQuote;
+            return 'Rs ' + Math.round(Number(quote.totalAmount)).toLocaleString();
         },
         // Proof Bill (Pizza Master, Jul 2026): thermal pre-bill WITHOUT finalizing —
         // no invoice, no serial, order stays open. Print via the same hidden-iframe
@@ -9178,7 +9236,7 @@ function restaurantPos() {
             // Task 514: per-bill print checkbox ka default company setting se
             // (tile ki apni order_type ke hisaab se) — har bill par fresh reset.
             this.boardPrintReceipt = this.billPrintDefault(t.order.order_type || 'dine_in');
-            this.boardConfirm = { table: t };
+            this.boardConfirm = { table: t, onlineTotal: null };
         },
         // Marked online payments use the normal table finalisation pipeline, not a
         // client-side settlement shortcut. Its first request intentionally reaches
@@ -9186,11 +9244,22 @@ function restaurantPos() {
         // with online_payment_confirmed.
         async boardOnlinePayment() {
             const t = this.boardMenuTable;
-            if (!t || !t.order || !t.order.online_payment_awaited_at || this.boardBusy) return;
+            if (!t || !t.order || !t.order.online_payment_awaited_at
+                || this.boardBusy || !this.boardOnlineQuoteReady()) return;
+            const onlineTotal = Number(this.boardOnlineQuote.totalAmount);
             this.boardMenuTable = null;
             this.boardPrintReceipt = this.billPrintDefault(t.order.order_type || 'dine_in');
-            this.boardConfirm = { table: t };
+            this.boardConfirm = { table: t, onlineTotal };
             await this.boardFinalPay('qr_payment');
+        },
+        boardConfirmAmountText() {
+            if (!this.boardConfirm || !this.boardConfirm.table || !this.boardConfirm.table.order) {
+                return 'Rs 0';
+            }
+            const amount = this.payingOrderAwaitingOnline()
+                ? Number(this.boardConfirm.onlineTotal || 0)
+                : Number(this.boardConfirm.table.order.total_amount || 0);
+            return 'Rs ' + Math.round(amount).toLocaleString();
         },
         // FINAL — step 2 (CASH/CARD chosen): waiter orders claim FIRST, then the
         // shared payHeldOrderDirect pipeline with the tile's own order_type so a
@@ -9220,7 +9289,10 @@ function restaurantPos() {
                     }
                     orderId = (data.order && data.order.id) || orderId;
                 }
-                const paid = await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in', !this.boardPrintReceipt);
+                const quotedTotal = method === 'qr_payment'
+                    ? Number(this.boardConfirm.onlineTotal || 0)
+                    : null;
+                const paid = await this.payHeldOrderDirect(orderId, method, quotedTotal, false, t.order.order_type || 'dine_in', !this.boardPrintReceipt);
                 // Keep the confirmation and order visible after any cloud/Core
                 // rejection. Closing this modal used to make a rejected local
                 // settlement look paid even though no durable settlement existed.
@@ -10983,7 +11055,7 @@ function restaurantPos() {
                             // wala cart yahin se pay hota hai) — HAAN wale nishan ko
                             // usi order par lagao jo asal mein settle hoga.
                             orderId: this.incomingOrderId || this.recalledOrderId,
-                            total: savedTotal,
+                            total: Number(data.online_total_amount ?? savedTotal ?? 0),
                             retry: async () => {
                                 this.lastPayTime = 0; // deliberate retry — 3s debounce bypass
                                 await this.processPaymentManual(method, provisional, skipReceipt);
@@ -12850,7 +12922,7 @@ function restaurantPos() {
                         this.onlineConfirm = {
                             orderId: orderId,
                             args: [orderId, method, savedTotal, provisional, orderTypeOverride, skipReceipt, effPayUuid],
-                            total: savedTotal || (heldOrd && heldOrd.total_amount) || 0,
+                            total: Number(errData.online_total_amount ?? savedTotal ?? ((heldOrd && heldOrd.total_amount) || 0)),
                         };
                         return false;
                     }

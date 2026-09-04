@@ -579,14 +579,26 @@ class PosOnlinePaymentAwaitedTest extends TestCase
 
     public function test_a_marked_waiter_order_cannot_be_rung_up_at_the_counter_without_confirmation(): void
     {
-        $companyId = $this->makeShop();
+        $companyId = $this->makeShop(['pos_tax_rate_card' => 8.00]);
         $user = $this->makeCashier($companyId);
-        $orderId = $this->makeOrder($companyId, ['source' => 'waiter']);
+        $orderId = $this->makeOrder($companyId, [
+            'source' => 'waiter',
+            'subtotal' => 320,
+            'total_amount' => 371,
+        ]);
+        DB::table('restaurant_order_items')->where('order_id', $orderId)->update([
+            'unit_price' => 320,
+            'subtotal' => 320,
+        ]);
         $this->mark($orderId, $user, true)->assertOk();
 
         $res = $this->settleAtCounter($orderId, $user);
 
-        $res->assertStatus(422)->assertJson(['success' => false, 'code' => 'online_payment_awaited']);
+        $res->assertStatus(422)->assertJson([
+            'success' => false,
+            'code' => 'online_payment_awaited',
+            'online_total_amount' => 346,
+        ]);
         $this->assertSame('held', DB::table('restaurant_orders')->where('id', $orderId)->value('status'));
         $this->assertSame(
             0,
@@ -616,9 +628,17 @@ class PosOnlinePaymentAwaitedTest extends TestCase
 
     public function test_the_client_fallback_complete_endpoint_is_gated_as_well(): void
     {
-        $companyId = $this->makeShop();
+        $companyId = $this->makeShop(['pos_tax_rate_card' => 8.00]);
         $user = $this->makeCashier($companyId);
-        $orderId = $this->makeOrder($companyId, ['source' => 'waiter']);
+        $orderId = $this->makeOrder($companyId, [
+            'source' => 'waiter',
+            'subtotal' => 320,
+            'total_amount' => 371,
+        ]);
+        DB::table('restaurant_order_items')->where('order_id', $orderId)->update([
+            'unit_price' => 320,
+            'subtotal' => 320,
+        ]);
         $this->mark($orderId, $user, true)->assertOk();
 
         // A bill that exists but has NOT been linked to the order yet — exactly
@@ -637,7 +657,11 @@ class PosOnlinePaymentAwaitedTest extends TestCase
         $blocked = $this->actingAs($user, 'pos')
             ->postJson("/pos/api/incoming-orders/{$orderId}/complete", ['transaction_id' => $txnId]);
 
-        $blocked->assertStatus(422)->assertJson(['success' => false, 'code' => 'online_payment_awaited']);
+        $blocked->assertStatus(422)->assertJson([
+            'success' => false,
+            'code' => 'online_payment_awaited',
+            'online_total_amount' => 346,
+        ]);
         $this->assertSame('held', DB::table('restaurant_orders')->where('id', $orderId)->value('status'));
 
         $allowed = $this->actingAs($user, 'pos')
@@ -651,6 +675,144 @@ class PosOnlinePaymentAwaitedTest extends TestCase
         $this->assertNull($this->awaitedAt($orderId));
     }
 
+    public function test_online_quote_matches_the_total_stored_by_final_payment(): void
+    {
+        $companyId = $this->makeShop([
+            'pos_tax_rate_cash' => 16.00,
+            'pos_tax_rate_card' => 8.00,
+        ]);
+        $user = $this->makeCashier($companyId);
+        $orderId = $this->makeOrder($companyId, [
+            'subtotal' => 320,
+            'total_amount' => 371,
+        ]);
+        DB::table('restaurant_order_items')->where('order_id', $orderId)->update([
+            'unit_price' => 320,
+            'subtotal' => 320,
+        ]);
+
+        $quote = $this->actingAs($user, 'pos')
+            ->getJson("/pos/restaurant/orders/{$orderId}/payment-quote?payment_method=qr_payment")
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'must-revalidate, no-cache, no-store, private')
+            ->assertJson([
+                'success' => true,
+                'order_id' => $orderId,
+                'payment_method' => 'qr_payment',
+                'tax_rate' => 8,
+                'subtotal' => 320,
+                'tax_amount' => 26,
+                'total_amount' => 346,
+            ]);
+
+        $this->mark($orderId, $user, true)->assertOk();
+        $this->pay($orderId, $user)
+            ->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'code' => 'online_payment_awaited',
+                'online_total_amount' => 346,
+            ]);
+
+        $this->pay($orderId, $user, [
+            'payment_method' => 'cash',
+            'online_payment_confirmed' => true,
+        ])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $transactionId = DB::table('restaurant_orders')->where('id', $orderId)->value('pos_transaction_id');
+        $this->assertNotNull($transactionId);
+        $transaction = DB::table('pos_transactions')->where('id', $transactionId)->first();
+        $this->assertSame('qr_payment', $transaction->payment_method);
+        $this->assertSame(346.0, (float) $transaction->total_amount);
+    }
+
+    public function test_quote_and_final_payment_stay_equal_across_tax_modes_with_discount_and_exempt_items(): void
+    {
+        foreach (['exclusive', 'inclusive', 'inclusive_card_save'] as $index => $pricingMode) {
+            $companyId = $this->makeShop([
+                'name' => 'Tax Mode Shop ' . $index,
+                'pos_tax_inclusive' => $pricingMode !== 'exclusive',
+                'pos_tax_pricing_mode' => $pricingMode,
+                'pos_tax_rate_cash' => 16.00,
+                'pos_tax_rate_card' => 8.00,
+            ]);
+            $user = $this->makeCashier($companyId);
+            $orderId = $this->makeOrder($companyId, [
+                'subtotal' => 370,
+                'discount_type' => 'amount',
+                'discount_value' => 37,
+                'discount_amount' => 37,
+                'total_amount' => 333,
+            ]);
+            DB::table('restaurant_order_items')->where('order_id', $orderId)->update([
+                'unit_price' => 300,
+                'subtotal' => 300,
+            ]);
+            DB::table('restaurant_order_items')->insert([
+                'order_id' => $orderId,
+                'item_type' => 'product',
+                'item_id' => 9002 + $index,
+                'item_name' => 'Tax Exempt Item',
+                'quantity' => 1,
+                'unit_price' => 70,
+                'subtotal' => 70,
+                'is_tax_exempt' => true,
+                'item_discount_type' => 'percentage',
+                'item_discount_value' => 0,
+                'item_discount_amount' => 0,
+                'kot_printed_at' => now(),
+                'kot_batch_no' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $quoteResponse = $this->actingAs($user, 'pos')
+                ->getJson("/pos/restaurant/orders/{$orderId}/payment-quote?payment_method=qr_payment")
+                ->assertOk()
+                ->assertJson([
+                    'success' => true,
+                    'payment_method' => 'qr_payment',
+                ]);
+            $quote = $quoteResponse->json();
+
+            $this->pay($orderId, $user, ['payment_method' => 'qr_payment'])
+                ->assertOk()
+                ->assertJson(['success' => true]);
+
+            $transactionId = DB::table('restaurant_orders')->where('id', $orderId)->value('pos_transaction_id');
+            $transaction = DB::table('pos_transactions')->where('id', $transactionId)->first();
+            $this->assertSame(
+                (float) $quote['total_amount'],
+                (float) $transaction->total_amount,
+                "final total drifted from {$pricingMode} quote"
+            );
+            $this->assertSame(
+                (float) $quote['tax_amount'],
+                (float) $transaction->tax_amount,
+                "final tax drifted from {$pricingMode} quote"
+            );
+        }
+    }
+
+    public function test_payment_quote_cannot_read_another_shops_order(): void
+    {
+        $mineId = $this->makeShop();
+        $user = $this->makeCashier($mineId);
+        $theirsId = $this->makeShop(['name' => 'Doosri Dukan']);
+        $foreignOrder = $this->makeOrder($theirsId);
+
+        $this->actingAs($user, 'pos')
+            ->getJson("/pos/restaurant/orders/{$foreignOrder}/payment-quote?payment_method=qr_payment")
+            ->assertNotFound();
+
+        $completedOrder = $this->makeOrder($mineId, ['status' => 'completed']);
+        $this->actingAs($user, 'pos')
+            ->getJson("/pos/restaurant/orders/{$completedOrder}/payment-quote?payment_method=qr_payment")
+            ->assertNotFound();
+    }
+
     /**
      * The occupied-table popup must offer the marked order's direct route without
      * turning the UI into a client-side approval.  Keep this small rendering
@@ -661,7 +823,20 @@ class PosOnlinePaymentAwaitedTest extends TestCase
     {
         $saleScreen = file_get_contents(base_path('resources/views/pos/universal.blade.php'));
 
-        $this->assertStringContainsString("x-text=\"'Online Payment — Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()\"", $saleScreen);
+        $this->assertStringContainsString("'/payment-quote?payment_method=qr_payment'", $saleScreen);
+        $this->assertStringContainsString("cache: 'no-store'", $saleScreen);
+        $this->assertStringContainsString("x-text=\"'Online Payment — ' + boardOnlineQuoteText()\"", $saleScreen);
+        $this->assertStringContainsString('x-text="boardOnlineQuoteText()"', $saleScreen);
+        $this->assertStringContainsString(':disabled="boardBusy || !boardOnlineQuoteReady()"', $saleScreen);
+        $this->assertStringContainsString('{{ __(\'pos.online_quote_retry\') }}', $saleScreen);
+        $this->assertStringContainsString('boardOnlineQuoteSeq', $saleScreen);
+        $this->assertStringContainsString('Number(this.boardMenuTable.order.id) !== quoteOrderId', $saleScreen);
+        $this->assertStringContainsString('Number(errData.online_total_amount ?? savedTotal', $saleScreen);
+        $this->assertStringContainsString('x-text="boardConfirmAmountText()"', $saleScreen);
+        $this->assertStringNotContainsString(
+            "x-text=\"'Online Payment — Rs ' + Math.round(boardMenuTable.order.total_amount || 0).toLocaleString()\"",
+            $saleScreen
+        );
         $this->assertStringContainsString('async boardOnlinePayment()', $saleScreen);
         $this->assertStringContainsString("await this.boardFinalPay('qr_payment');", $saleScreen);
         $this->assertStringContainsString('online_payment_confirmed', $saleScreen);

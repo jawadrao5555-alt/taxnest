@@ -12,6 +12,7 @@ use App\Models\PosTransactionItem;
 use App\Models\RestaurantTable;
 use App\Models\RestaurantOrder;
 use App\Services\PosCustomerSpend;
+use App\Services\RestaurantOrderPaymentCalculator;
 use App\Models\RestaurantOrderItem;
 use App\Models\ProductRecipe;
 use App\Models\Ingredient;
@@ -1101,6 +1102,37 @@ class RestaurantPosController extends Controller
         }
     }
 
+    public function paymentQuote(Request $request, $orderId)
+    {
+        $validated = $request->validate([
+            'payment_method' => 'required|string|in:cash,card,debit_card,credit_card,qr_payment,online,split',
+        ]);
+
+        if (!is_numeric($orderId) || (int) $orderId < 1) {
+            return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
+        }
+
+        $companyId = (int) app('currentCompanyId');
+        $company = Company::findOrFail($companyId);
+        $order = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->with('items')
+            ->findOrFail((int) $orderId);
+
+        $quote = RestaurantOrderPaymentCalculator::calculate($order, $company, $validated['payment_method']);
+
+        return response()->json([
+            'success' => true,
+            'order_id' => (int) $order->id,
+            'payment_method' => $quote['payment_method'],
+            'tax_rate' => $quote['tax_rate'],
+            'subtotal' => $quote['subtotal'],
+            'discount_amount' => $quote['discount_amount'],
+            'tax_amount' => $quote['tax_amount'],
+            'total_amount' => $quote['total_amount'],
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    }
+
     public function payOrder(Request $request, $orderId)
     {
         $companyId = app('currentCompanyId');
@@ -1185,10 +1217,12 @@ class RestaurantPosController extends Controller
         // a stale tab, the table board, a crafted POST — is refused here, so
         // an unpaid table can never be closed by accident.
         if ($order->awaitingOnlinePayment() && !$request->boolean('online_payment_confirmed')) {
+            $onlineQuote = RestaurantOrderPaymentCalculator::calculate($order, $company, 'qr_payment');
             return response()->json([
                 'success'  => false,
                 'code'     => 'online_payment_awaited',
                 'message'  => __('pos.online_confirm_body'),
+                'online_total_amount' => $onlineQuote['total_amount'],
             ], 422);
         }
 
@@ -1228,41 +1262,20 @@ class RestaurantPosController extends Controller
         // Normalize aliases → canonical stored buckets (mirrors storeInvoice):
         // 'card'/'online' front-end aliases become 'debit_card' so PosTaxRule,
         // PRA PaymentMode mapping, and cash/card aggregations all see one bucket.
-        if (in_array($paymentMethod, ['card', 'online', 'split'], true)) {
-            $paymentMethod = 'debit_card';
-        }
-        $taxRate = PosTaxRule::getRateForMethod($paymentMethod, $company);
-
-        $subtotal = $order->items->sum('subtotal');
-        $discountAmount = (float)($order->discount_amount ?? 0);
-        $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
-        $taxableSubtotal = $order->items->where('is_tax_exempt', false)->sum('subtotal');
-        $adjustedTaxable = round($taxableSubtotal * max(0, $discountRatio), 2);
-        // Tax-Inclusive Pricing (Menu-Rate-Final, owner Jul 2026): order lines are menu
-        // (tax-in) prices — back-calculate the included tax for the CHOSEN method and
-        // store the header in ex-tax-consistent semantics (see PosTaxMath docblock).
-        // Snapshot column guard mirrors PosController::storeInvoice.
-        $taxInclusiveColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive');
-        $pricingMode = $company->posTaxPricingMode();
-        $taxInclusive = $taxInclusiveColumnExists && in_array($pricingMode, ['inclusive', 'inclusive_card_save'], true);
-        // Card-save (mode 3): menu inclusive at the CASH rate, this bill's own
-        // method rate applied on the derived base (mirrors PosController::storeInvoice).
-        $menuRateColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate');
-        $menuRate = null;
-        if ($taxInclusive && $pricingMode === 'inclusive_card_save' && $menuRateColumnExists) {
-            $menuRate = (float) PosTaxRule::getRateForMethod('cash', $company);
-        }
-        if ($taxInclusive) {
-            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate, $menuRate);
-            $taxAmount = $inc['tax_amount'];
-            $totalAmount = $inc['total_amount'];
-        } else {
-            // Whole-rupee rounding — matches PosController::storeInvoice and the universal
-            // cart's roundedTotal getter (Math.round). Was round(...,2) → decimal totals on
-            // held/table-order bills while direct cart bills were whole-rupee.
-            $taxAmount = (float) round($adjustedTaxable * $taxRate / 100);
-            $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
-        }
+        $payment = RestaurantOrderPaymentCalculator::calculate($order, $company, $paymentMethod);
+        $paymentMethod = $payment['payment_method'];
+        $taxRate = $payment['tax_rate'];
+        $subtotal = $payment['subtotal'];
+        $discountAmount = $payment['discount_amount'];
+        $discountRatio = $payment['discount_ratio'];
+        $taxableSubtotal = $payment['taxable_subtotal'];
+        $taxInclusive = $payment['tax_inclusive'];
+        $taxInclusiveColumnExists = $payment['tax_inclusive_column_exists'];
+        $menuRateColumnExists = $payment['menu_rate_column_exists'];
+        $menuRate = $payment['menu_rate'];
+        $inc = $payment['inclusive_header'];
+        $taxAmount = $payment['tax_amount'];
+        $totalAmount = $payment['total_amount'];
         $totalItemDiscounts = $order->items->sum('item_discount_amount');
 
         // PROVISIONAL BILL FLOW — when cashier saves as provisional, the bill is created

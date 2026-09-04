@@ -1223,6 +1223,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // restaurant companies (defence-in-depth). Same fix pattern as customer-search above.
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
+    Route::get('/restaurant/orders/{id}/payment-quote', [RestaurantPosController::class, 'paymentQuote'])->name('pos.restaurant.orders.payment-quote');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
 
     // ── "Bill rokein" for RETAIL (owner, 23 Aug 2026) ────────────────────────

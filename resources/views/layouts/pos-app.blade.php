@@ -154,6 +154,12 @@
             }
         }
     } catch (\Throwable $e) { /* keep POS pages alive */ }
+    // During the fixed domain/Agent service-notice window, keep the survey
+    // available from its header pill but never auto-open it over the shared
+    // announcement. This is deliberately not persisted as a survey dismissal.
+    if ($sharedDomainAgentNoticeLive) {
+        $surveyDismissedSession = true;
+    }
     // "New APK available" update banner — ONLY for the Android WebView shell.
     // The shell appends "TaxNestPOSApp/<versionName>" to its user agent; compare
     // that against the latest released APK version (SystemSetting, admin-editable

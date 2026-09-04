@@ -28,6 +28,10 @@ class DomainMoveNoticeTest extends TestCase
             $this->assertStringContainsString('$sharedDomainAgentNoticeLive', $markup);
             $this->assertStringContainsString('$sharedDomainAgentNoticeLive ? null : $whatsNewUnseen->first()', $markup);
         }
+
+        $posLayout = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
+        $this->assertStringContainsString('if ($sharedDomainAgentNoticeLive)', $posLayout);
+        $this->assertStringContainsString('$surveyDismissedSession = true;', $posLayout);
     }
 
     public function test_notice_is_per_login_session_for_exactly_seven_days_and_closable(): void

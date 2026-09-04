@@ -31,6 +31,10 @@ class DealProductComposerMarkupTest extends TestCase
         $this->assertStringContainsString("openProductPicker('fixed')", $html);
         $this->assertStringContainsString("openProductPicker('choice', groupIdx)", $html);
         $this->assertStringContainsString('pickerResults()', $html);
+        $this->assertStringContainsString('findProduct(id)', $html);
+        $this->assertStringNotContainsString('this.product(id)', $html);
+        $this->assertStringContainsString('@click.self="closeProductPicker()"', $html);
+        $this->assertStringNotContainsString('@click.outside="closeProductPicker()"', $html);
         $this->assertStringContainsString('product.sku', $html);
         $this->assertStringContainsString('product.barcode', $html);
         $this->assertStringNotContainsString('<select multiple', $html);
@@ -127,6 +131,30 @@ class DealProductComposerMarkupTest extends TestCase
         $this->assertStringContainsString('$usableChoiceGroups', $fbrPayload);
         $this->assertStringContainsString('$usableChoiceGroups->count() !== $dealRow->choiceGroups->count()', $fbrPayload);
         $this->assertStringContainsString('where(\'is_active\', true)', $fbrPayload);
+    }
+
+    public function test_pra_store_and_provisional_update_payloads_keep_deal_choices_and_rich_snapshots(): void
+    {
+        $praSale = file_get_contents(resource_path('views/pos/universal.blade.php'));
+
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count($praSale, "deal_choices: c.item_type === 'deal'"),
+            'Both new-sale and provisional-update payloads must carry the selected Deal choices.'
+        );
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count($praSale, "deal_snapshot: c.item_type === 'deal'"),
+            'Both new-sale and provisional-update payloads must carry the immutable Deal snapshot.'
+        );
+        $this->assertStringContainsString(
+            'component.recipe_snapshot.map(part => ({ ...part }))',
+            $praSale
+        );
+        $this->assertStringContainsString(
+            'tax_facts: component.tax_facts ? { ...component.tax_facts } : null',
+            $praSale
+        );
     }
 
     public function test_fbr_edit_failure_restores_every_scalar_control_only_for_its_edit_card(): void

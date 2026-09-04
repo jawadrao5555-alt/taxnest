@@ -141,9 +141,9 @@
 
 <template x-if="picker.open">
     <div class="fixed inset-0 z-[150] flex items-end justify-center bg-gray-950/65 p-0 backdrop-blur-sm sm:items-center sm:p-5"
+         @click.self="closeProductPicker()"
          @keydown.escape.window="closeProductPicker()">
-        <div @click.outside="closeProductPicker()"
-             class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-gray-900 sm:rounded-2xl">
+        <div class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-gray-900 sm:rounded-2xl">
             <header class="flex items-start justify-between gap-4 border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
                 <div>
                     <h3 class="text-base font-extrabold text-gray-900 dark:text-white" x-text="pickerTitle()"></h3>
@@ -313,7 +313,7 @@ window.dealComposer = function (initialRows, initialGroups) {
                     return String(id) !== String(productId);
                 });
             },
-            product(id) {
+            findProduct(id) {
                 return (this.products || []).find(function (product) {
                     return String(product.id) === String(id);
                 });
@@ -325,11 +325,11 @@ window.dealComposer = function (initialRows, initialGroups) {
                 });
             },
             productName(id) {
-                const found = this.product(id);
+                const found = this.findProduct(id);
                 return found ? found.name : 'Product #' + id;
             },
             productMeta(id) {
-                const found = this.product(id);
+                const found = this.findProduct(id);
                 if (!found) return '';
                 const identity = found.sku || found.barcode || found.category || '';
                 return (identity ? identity + ' · ' : '') + 'Rs. ' + this.formatPrice(found.price);

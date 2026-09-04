@@ -10686,6 +10686,15 @@ function restaurantPos() {
                         // Choice ids are display hints until the server resolves
                         // the locked deal configuration and freezes its snapshot.
                         deal_choices: c.item_type === 'deal' ? (c.deal_choices || []) : [],
+                        deal_snapshot: c.item_type === 'deal' && Array.isArray(c.deal_snapshot)
+                            ? c.deal_snapshot.map(component => ({
+                                ...component,
+                                recipe_snapshot: Array.isArray(component.recipe_snapshot)
+                                    ? component.recipe_snapshot.map(part => ({ ...part }))
+                                    : null,
+                                tax_facts: component.tax_facts ? { ...component.tax_facts } : null,
+                            }))
+                            : null,
                     })),
                     // Payment method is chosen at Make Final time — keep the bill's own.
                     payment_method: (this.editingBillData && this.editingBillData.payment_method) || 'cash',
@@ -10957,6 +10966,20 @@ function restaurantPos() {
                         // KOT par na chhapne wali line (Delivery Charges) — server
                         // isay sirf manual lines par manta hai.
                         skip_kitchen: !!c.skip_kitchen,
+                        // Deal choice ids plus the rich browser snapshot must ride
+                        // every online/offline attempt. The server still rebuilds
+                        // and locks authoritative facts; these fields preserve the
+                        // selected required options and detect stale/tampered carts.
+                        deal_choices: c.item_type === 'deal' ? (c.deal_choices || []) : [],
+                        deal_snapshot: c.item_type === 'deal' && Array.isArray(c.deal_snapshot)
+                            ? c.deal_snapshot.map(component => ({
+                                ...component,
+                                recipe_snapshot: Array.isArray(component.recipe_snapshot)
+                                    ? component.recipe_snapshot.map(part => ({ ...part }))
+                                    : null,
+                                tax_facts: component.tax_facts ? { ...component.tax_facts } : null,
+                            }))
+                            : null,
                     })),
                     payment_method: method,
                     // Cash Received / Wapsi — server stores cash_received + change_due

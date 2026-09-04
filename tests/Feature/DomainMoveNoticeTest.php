@@ -17,15 +17,22 @@ class DomainMoveNoticeTest extends TestCase
         }
     }
 
-    public function test_notice_is_daily_for_exactly_seven_calendar_days(): void
+    public function test_notice_is_per_login_session_for_exactly_seven_days_and_closable(): void
     {
         $markup = file_get_contents(resource_path('views/components/domain-move-notice.blade.php'));
 
         $this->assertStringContainsString('create(2026, 9, 4, 0, 0, 0, \'Asia/Karachi\')', $markup);
         $this->assertStringContainsString('->addDays(7)', $markup);
-        $this->assertStringContainsString("timeZone: 'Asia/Karachi'", $markup);
-        $this->assertStringContainsString("'taxnest-domain-move-seen-v1'", $markup);
-        $this->assertStringContainsString('lastSeen !== today', $markup);
+        $this->assertStringContainsString("session()->get('taxnest_domain_agent_notice_key')", $markup);
+        $this->assertStringContainsString("'taxnest-domain-agent-seen-{{ \$domainAgentNoticeKey }}'", $markup);
+        $this->assertStringContainsString("localStorage.getItem(storageKey) === '1'", $markup);
+        $this->assertStringContainsString("localStorage.setItem(storageKey, '1')", $markup);
+        $this->assertStringContainsString('id="tn-domain-move-close"', $markup);
+        $this->assertStringContainsString('id="tn-domain-move-dismiss"', $markup);
+        $this->assertStringContainsString('max-h-[92vh]', $markup);
         $this->assertStringContainsString('https://taxnest.pk', $markup);
+        $this->assertStringContainsString('https://taxnest.pk/download', $markup);
+        $this->assertStringContainsString("__('pos.domain_agent_update_title')", $markup);
+        $this->assertStringContainsString("__('pos.domain_agent_step_one')", $markup);
     }
 }

@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260904-domain-cutover'; // sole-domain cutover: purge cached old-origin-era pages and surface the 7-day notice
+const CACHE_VERSION = 'taxnest-20260904-login-agent-announcement'; // refresh cached panel pages for the per-login domain + Agent update notice
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create

@@ -18,6 +18,14 @@ assert.strictEqual(
   DEFAULT_SERVER_URL
 );
 assert.strictEqual(
+  canonicalAgentServerUrl('HTTPS://TAXNEST.COM.PK/api/agent/'),
+  DEFAULT_SERVER_URL
+);
+assert.strictEqual(
+  canonicalAgentServerUrl('https://www.taxnest.com.pk'),
+  DEFAULT_SERVER_URL
+);
+assert.strictEqual(
   canonicalAgentServerUrl(DEFAULT_SERVER_URL),
   DEFAULT_SERVER_URL
 );

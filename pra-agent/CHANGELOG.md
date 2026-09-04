@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.2 (2026-09-05)
+**Purana domain har raste se khud theek — aur settings screen bhi foran new domain dikhaye**
+
+- Settings read, manual Test/Save, Agent startup aur network-client boundary sab exact legacy `taxnest.com.pk` URL ko `https://taxnest.pk/api/agent` par normalize karte hain.
+- POS login se auto-configuration ke baad Settings form foran reload hota hai; purana stored domain screen par stale nazar nahi rehta.
+- Server-side legacy Agent bridge purane URL par phansay update-capable Agents ko heartbeat aur self-update lene deta hai; browser/app traffic ka sole official domain `taxnest.pk` hi rehta hai.
+
 ## v1.13.1 (2026-09-04)
 **Purana domain khud theek — chalti hui shops automatically `taxnest.pk` par**
 

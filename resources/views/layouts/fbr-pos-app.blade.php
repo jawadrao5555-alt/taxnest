@@ -11,6 +11,12 @@
     // "What's New" app updates (popup + bell) — same conventions as PRA POS layout:
     // admin/manager only, skip pending companies + read-only impersonation, fail
     // silent if table missing on prod, master switch pos_whats_new_enabled.
+    // The shared domain/Agent announcement is the single interruption during
+    // its fixed service window; unread updates remain available from the bell.
+    $sharedDomainAgentNoticeLive = now('Asia/Karachi')->betweenIncluded(
+        \Carbon\CarbonImmutable::create(2026, 9, 5, 0, 0, 0, 'Asia/Karachi'),
+        \Carbon\CarbonImmutable::create(2026, 9, 5, 0, 0, 0, 'Asia/Karachi')->addDays(7)->subSecond()
+    );
     $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null;
     try {
         $wnAllowed = $fbrUser && $fbrUser->isPosAdmin();
@@ -30,8 +36,8 @@
                     ->whereIn('app_update_id', $whatsNewList->pluck('id'))->pluck('app_update_id')->all();
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
-                $whatsNewPopup = $whatsNewUnseen->first();
-                $whatsNewPopupList = $whatsNewUnseen->take(1)->values();
+                $whatsNewPopup = $sharedDomainAgentNoticeLive ? null : $whatsNewUnseen->first();
+                $whatsNewPopupList = $sharedDomainAgentNoticeLive ? collect() : $whatsNewUnseen->take(1)->values();
                 // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
                 // the popup renders in celebratory hero style with that update on top.
                 // ?? false: column may not exist yet mid-deploy (missing attr = null).

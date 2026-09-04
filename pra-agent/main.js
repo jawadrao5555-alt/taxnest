@@ -36,7 +36,7 @@ const {
 } = require('./src/server-url');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260904-1';
+const BUILD_TIMESTAMP = '20260905-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -1198,14 +1198,18 @@ function getDeviceUid() {
 // Attach the real app version/build so heartbeats report them to the server
 // (the server piggybacks `agent_update` info on the heartbeat response).
 function withAppMeta(config) {
+  // Final boundary guard: every network client receives a canonical TaxNest
+  // URL even if an older renderer or stored payload somehow supplied the
+  // retired hostname.
+  const normalized = migrateAgentConfig(config).config || config || {};
   return {
-    ...config,
+    ...normalized,
     appVersion: app.getVersion(),
     appBuild: BUILD_TIMESTAMP,
     deviceUid: getDeviceUid(),
     hostname: (() => { try { return os.hostname(); } catch (e) { return null; } })(),
     // PC Name (v1.9.0): shopkeeper-entered friendly label; empty = not set.
-    pcName: (config && config.pcName) ? String(config.pcName).trim() : '',
+    pcName: normalized.pcName ? String(normalized.pcName).trim() : '',
   };
 }
 
@@ -1228,7 +1232,10 @@ function sendStatusUpdate(status) {
 }
 
 ipcMain.handle('get-config', () => {
-  const cfg = store.get('config') || {};
+  // Reading Settings is also a repair operation. This closes the gap where
+  // the running Agent had migrated but the form still displayed stale
+  // taxnest.com.pk data from electron-store.
+  const cfg = getMigratedAgentConfig() || {};
   // Always surface pcName and receiptPrinter so the UI fields load correctly.
   return { ...cfg, pcName: cfg.pcName || '', receiptPrinter: cfg.receiptPrinter || '' };
 });
@@ -1237,6 +1244,7 @@ ipcMain.handle('save-config', async (event, config) => {
   // Persist pcName + receiptPrinter alongside the other config fields.
   const toStore = {
     ...config,
+    serverUrl: canonicalAgentServerUrl(config.serverUrl || DEFAULT_SERVER_URL),
     pcName: (config.pcName || '').trim(),
     receiptPrinter: (config.receiptPrinter || '').trim(),
   };
@@ -1597,8 +1605,9 @@ ipcMain.handle('install-fbr-ims', async () => {
 ipcMain.handle('test-connection', async (event, config) => {
   const axios = require('axios');
   try {
+    const serverUrl = canonicalAgentServerUrl(config.serverUrl || DEFAULT_SERVER_URL);
     const res = await axios.post(
-      `${config.serverUrl}/heartbeat`,
+      `${serverUrl}/heartbeat`,
       { version: app.getVersion(), company_id: config.companyId },
       {
         headers: { Authorization: `Bearer ${config.apiKey}` },

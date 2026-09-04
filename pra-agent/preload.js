@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('agentAPI', {
   testConnection: (config) => ipcRenderer.invoke('test-connection', config),
   onStatusUpdate: (callback) =>
     ipcRenderer.on('status-update', (event, status) => callback(status)),
+  onConfigAutofilled: (callback) =>
+    ipcRenderer.on('config-autofilled', (event, info) => callback(info)),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   openDownload: () => ipcRenderer.invoke('open-download'),
   getVersion: () => ipcRenderer.invoke('get-version'),

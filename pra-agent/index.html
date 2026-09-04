@@ -378,6 +378,18 @@
     await loadPrinters(savedPrinter);
   }
 
+  // Login-based auto configuration happens in the main process. Refresh the
+  // visible form immediately so it can never keep showing the pre-login legacy
+  // hostname after the Agent has already switched to taxnest.pk.
+  if (window.agentAPI.onConfigAutofilled) {
+    window.agentAPI.onConfigAutofilled(async () => {
+      await loadConfig();
+      const tr = $('testResult');
+      tr.style.color = '#10b981';
+      tr.textContent = 'Agent settings taxnest.pk par automatically update ho gayi hain.';
+    });
+  }
+
   function renderStatus(s) {
     const badge = $('statusBadge');
     if (s.running && s.connected) {

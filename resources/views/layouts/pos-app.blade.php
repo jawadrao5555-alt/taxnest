@@ -83,6 +83,12 @@
     // "What's New" app updates (popup + bell). Admin-controlled via SystemSetting
     // pos_whats_new_enabled. NEVER break POS pages if the table is missing on prod
     // (schema-drift self-heal convention) — fail silent.
+    // The shared domain/Agent announcement is the single interruption during
+    // its fixed service window; unread updates remain available from the bell.
+    $sharedDomainAgentNoticeLive = now('Asia/Karachi')->betweenIncluded(
+        \Carbon\CarbonImmutable::create(2026, 9, 5, 0, 0, 0, 'Asia/Karachi'),
+        \Carbon\CarbonImmutable::create(2026, 9, 5, 0, 0, 0, 'Asia/Karachi')->addDays(7)->subSecond()
+    );
     $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null;
     try {
         // ADMIN/MANAGER ONLY (owner rule, Jul 2026): "What's New" popup + bell must
@@ -112,10 +118,10 @@
                     ->whereIn('app_update_id', $whatsNewList->pluck('id'))->pluck('app_update_id')->all();
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
-                $whatsNewPopup = $whatsNewUnseen->first();
+                $whatsNewPopup = $sharedDomainAgentNoticeLive ? null : $whatsNewUnseen->first();
                 // Auto-popup only the latest unseen update. The remaining unread
                 // rows stay unread and can be opened individually from the bell.
-                $whatsNewPopupList = $whatsNewUnseen->take(1)->values();
+                $whatsNewPopupList = $sharedDomainAgentNoticeLive ? collect() : $whatsNewUnseen->take(1)->values();
                 // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
                 // the popup renders in celebratory hero style with that update on top.
                 // ?? false: column may not exist yet mid-deploy (missing attr = null).

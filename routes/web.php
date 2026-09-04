@@ -942,6 +942,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('pos.api.customer-addresses');
     Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('pos.api.customer-addresses.store');
     Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('pos.api.customer-addresses.delete');
+    Route::patch('/api/customers/{id}/name', [PosController::class, 'apiUpdateCustomerName'])->name('pos.api.customers.name');
     Route::get('/api/failed-bills', [PosController::class, 'apiFailedBills'])->name('pos.api.failed-bills');
     Route::post('/api/failed-bills/{id}/retry', [PosController::class, 'apiRetryFailed'])->name('pos.api.failed.retry');
     // Offline queue telemetry — the sale screen reports bills still held on the
@@ -1855,6 +1856,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('fbrpos.api.customer-addresses');
     Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('fbrpos.api.customer-addresses.store');
     Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('fbrpos.api.customer-addresses.delete');
+    Route::patch('/api/customers/{id}/name', [PosController::class, 'apiUpdateCustomerName'])->name('fbrpos.api.customers.name');
     // Caller ID popup poll (Task 1353) — exact FBR mirrors of the PRA sale-screen
     // endpoints. Same handlers: the plan gate (Unlimited) + caller_id_enabled
     // check live INSIDE them, so a non-Unlimited or toggled-off FBR shop gets the

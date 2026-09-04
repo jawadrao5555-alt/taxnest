@@ -4869,6 +4869,7 @@ function restaurantPos() {
         selectedCustomer: null,
         customerPhoneQuery: '',
         customerPhoneResults: [],
+        editingCustomerId: null,
         customerPhoneDropdown: false,
         custHiIndex: 0,
         customerPhoneTimer: null,
@@ -10006,6 +10007,40 @@ function restaurantPos() {
             else { this.customerAddresses = []; this.selectedDeliveryAddress = ''; }
             this.showToast(window.TXT.customer_prefix + cr.name + (cr.stats && cr.stats.is_frequent ? ' (VIP)' : ''), 'success');
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+        },
+
+        async editCustomerName(cr) {
+            if (!cr || this.editingCustomerId) return;
+            const entered = window.prompt(window.TXT.edit_customer_name, cr.name || '');
+            if (entered === null) return;
+            const name = entered.trim();
+            if (!name) { this.showToast(window.TXT.customer_name_required, 'error'); return; }
+
+            this.editingCustomerId = cr.id;
+            try {
+                const res = await fetch('/pos/api/customers/' + encodeURIComponent(cr.id) + '/name', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    this.showToast(data.message || window.TXT.failed_update_customer_name, 'error');
+                    return;
+                }
+                cr.name = data.customer.name;
+                const baked = (this.allCustomers || []).find(c => Number(c.id) === Number(cr.id));
+                if (baked) baked.name = data.customer.name;
+                if (this.selectedCustomer && Number(this.selectedCustomer.id) === Number(cr.id)) {
+                    this.selectedCustomer.name = data.customer.name;
+                    this.customerPhoneQuery = data.customer.name + (data.customer.phone ? ' · ' + data.customer.phone : '');
+                }
+                this.showToast(window.TXT.customer_name_updated, 'success');
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            } finally {
+                this.editingCustomerId = null;
+            }
         },
 
         async saveNewCustomer() {

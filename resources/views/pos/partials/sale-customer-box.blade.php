@@ -29,15 +29,20 @@
                 {{-- Item #2 (owner, Jul 2026): ↑↓ arrow-key navigation — custHiIndex is the
                      keyboard-highlighted row; Enter picks IT (not always the first result). --}}
                 <template x-for="(cr, ci) in customerPhoneResults" :key="cr.id">
-                    <button @click="selectCustomerFromPhone(cr)" @mouseenter="custHiIndex = ci" :data-cust-row="ci" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === custHiIndex ? 'bg-blue-100 dark:bg-blue-900/30' : ''">
-                        <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs font-semibold text-gray-900 dark:text-white truncate" x-text="cr.name"></p>
-                            <p class="text-xs text-gray-400" x-text="cr.phone + (cr.stats ? ' • ' + cr.stats.total_orders + ' orders • Rs.' + Number(cr.stats.total_spent).toLocaleString() : '')"></p>
-                            <template x-if="cr.address"><p class="text-xs text-gray-400 truncate" x-text="cr.address"></p></template>
-                        </div>
-                        <template x-if="cr.stats && cr.stats.is_frequent"><span class="freq-badge">VIP</span></template>
-                    </button>
+                    <div @mouseenter="custHiIndex = ci" :data-cust-row="ci" class="w-full flex items-stretch border-b border-gray-50 dark:border-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" :class="ci === custHiIndex ? 'bg-blue-100 dark:bg-blue-900/30' : ''">
+                        <button type="button" @click="selectCustomerFromPhone(cr)" class="flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 text-left">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-gray-900 dark:text-white truncate" x-text="cr.name"></p>
+                                <p class="text-xs text-gray-400" x-text="cr.phone + (cr.stats ? ' • ' + cr.stats.total_orders + ' orders • Rs.' + Number(cr.stats.total_spent).toLocaleString() : '')"></p>
+                                <template x-if="cr.address"><p class="text-xs text-gray-400 truncate" x-text="cr.address"></p></template>
+                            </div>
+                            <template x-if="cr.stats && cr.stats.is_frequent"><span class="freq-badge">VIP</span></template>
+                        </button>
+                        <button type="button" @click.stop="editCustomerName(cr)" :disabled="editingCustomerId === cr.id" title="{{ __('pos.edit_customer_name') }}" class="flex-shrink-0 px-3 text-gray-400 hover:text-blue-600 disabled:opacity-50" aria-label="{{ __('pos.edit_customer_name') }}">
+                            <svg class="w-4 h-4" :class="editingCustomerId === cr.id ? 'animate-pulse' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.586-6.586a2 2 0 112.828 2.828L11.828 13.828A2 2 0 0110.414 14.414L7 15l.586-3.414A2 2 0 018.172 10.172L9 11zm-2 8h8"/></svg>
+                        </button>
+                    </div>
                 </template>
             </div>
 

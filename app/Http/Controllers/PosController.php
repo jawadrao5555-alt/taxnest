@@ -9684,6 +9684,50 @@ class PosController extends Controller
         return response()->json(['addresses' => $addresses]);
     }
 
+    /**
+     * Correct a customer's display name from the sale screen.
+     *
+     * This endpoint intentionally accepts only the name. Phone is the stable
+     * customer identity used by caller ID, offline replay and deduplication, so
+     * it must never be changed by this quick day-to-day correction flow.
+     */
+    public function apiUpdateCustomerName(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $name = trim($validated['name']);
+        if ($name === '') {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.customer_name_required'),
+            ], 422);
+        }
+
+        $customer = \App\Models\PosCustomer::where('company_id', $companyId)
+            ->find((int) $id);
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.customer_not_found'),
+            ], 404);
+        }
+
+        $customer->update(['name' => $name]);
+
+        return response()->json([
+            'success' => true,
+            'customer' => [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'address' => $customer->address,
+            ],
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
     public function apiStoreCustomerAddress(Request $request)
     {
         $companyId = app('currentCompanyId');

@@ -197,4 +197,18 @@ class DealProductComposerMarkupTest extends TestCase
         $this->assertStringContainsString("route('fbrpos.deals')", $fbr);
         $this->assertStringNotContainsString("route('pos.deals')", $fbr);
     }
+
+    public function test_pra_navigation_hides_the_entire_inventory_section_when_inventory_is_off(): void
+    {
+        $pra = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
+
+        $this->assertStringContainsString(
+            '@if($inventoryEnabledLayout && $posNavCan(\'inventory\', !$isCashierLayout))',
+            $pra
+        );
+        $this->assertStringNotContainsString(
+            '@if(!$inventoryEnabledLayout)<span',
+            $pra
+        );
+    }
 }

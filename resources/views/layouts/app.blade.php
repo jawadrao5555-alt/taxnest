@@ -288,6 +288,7 @@
 
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
+                <x-domain-move-notice />
 
                 @php
                     // DI Android app banners — both wrapped in try/catch so any failure

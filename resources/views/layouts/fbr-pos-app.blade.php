@@ -954,6 +954,7 @@
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg @unless(request()->is('*invoice/create') || request()->is('*kds*') || request()->is('*waiter*') || request()->is('*riders/tracking*')) tn-fab-pad @endunless" style="min-width: 0;">
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
+                <x-domain-move-notice />
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts"
                     :dismiss-route="route('fbrpos.bio-sync.dismiss-pin-alert')"
                     :setup-route="route('fbrpos.bio-sync.setup')" />

@@ -216,7 +216,7 @@
                 <div>
                     <label class="block text-xs font-medium text-gray-400 mb-1">SMTP Host</label>
                     <input type="text" name="smtp_host" value="{{ old('smtp_host', $smtp['host']) }}"
-                           placeholder="e.g. mail.taxnest.com.pk"
+                           placeholder="e.g. mail.taxnest.pk"
                            class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
                     @error('smtp_host') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
                 </div>

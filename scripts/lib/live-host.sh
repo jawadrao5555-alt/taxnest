@@ -32,11 +32,8 @@ LIVE_WEB_GROUP="${LIVE_WEB_GROUP:-apache}"
 LIVE_FPM_SERVICE="${LIVE_FPM_SERVICE:-php-fpm}"
 LIVE_QUEUE_SERVICE="${LIVE_QUEUE_SERVICE:-taxnest-queue}"
 
-# Canonical public address (matches APP_URL on the box). taxnest.com.pk still
-# serves the same app through Cloudflare and must keep working, but anything
-# we generate or verify uses the canonical one.
+# Sole canonical public address (matches APP_URL on the box).
 LIVE_URL="${LIVE_URL:-https://taxnest.pk}"
-LIVE_ALT_URL="${LIVE_ALT_URL:-https://taxnest.com.pk}"
 
 # ------------------------------------------------------------- state on live
 # Small files the deploy toolchain owns. In the user's home, not in the app

@@ -105,15 +105,21 @@ class PosSaleCustomerNameEditTest extends TestCase
         $this->assertSame('Ali Raza', $customer->fresh()->name);
     }
 
-    public function test_both_sale_screens_expose_the_name_edit_action(): void
+    public function test_every_sale_screen_exposes_a_discoverable_name_edit_action(): void
     {
         $pra = file_get_contents(resource_path('views/pos/partials/sale-customer-box.blade.php'));
         $praScript = file_get_contents(resource_path('views/pos/universal.blade.php'));
         $fbr = file_get_contents(resource_path('views/fbr-pos/universal.blade.php'));
+        $restaurant = file_get_contents(resource_path('views/pos/restaurant/pos.blade.php'));
 
         $this->assertStringContainsString('@click.stop="editCustomerName(cr)"', $pra);
+        $this->assertStringContainsString("<span>{{ __('pos.edit') }}</span>", $pra);
         $this->assertStringContainsString('/pos/api/customers/', $praScript);
         $this->assertStringContainsString('@click.stop="editCustomerName(cr)"', $fbr);
+        $this->assertStringContainsString("<span>{{ __('pos.edit') }}</span>", $fbr);
         $this->assertStringContainsString('/fbr-pos/api/customers/', $fbr);
+        $this->assertStringContainsString('@click.stop="editCustomerName(cr)"', $restaurant);
+        $this->assertStringContainsString("<span>{{ __('pos.edit') }}</span>", $restaurant);
+        $this->assertStringContainsString('/pos/api/customers/', $restaurant);
     }
 }

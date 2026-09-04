@@ -770,8 +770,9 @@ window.addEventListener('popstate', function() {
                             </div>
                             <template x-if="cr.stats && cr.stats.is_frequent"><span class="freq-badge">VIP</span></template>
                         </button>
-                        <button type="button" @click.stop="editCustomerName(cr)" :disabled="editingCustomerId === cr.id" title="{{ __('pos.edit_customer_name') }}" class="flex-shrink-0 px-3 text-gray-400 hover:text-blue-600 disabled:opacity-50" aria-label="{{ __('pos.edit_customer_name') }}">
+                        <button type="button" @click.stop="editCustomerName(cr)" :disabled="editingCustomerId === cr.id" title="{{ __('pos.edit_customer_name') }}" class="flex-shrink-0 self-center mr-2 px-2 py-1.5 inline-flex items-center gap-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 text-[10px] font-bold" aria-label="{{ __('pos.edit_customer_name') }}">
                             <svg class="w-4 h-4" :class="editingCustomerId === cr.id ? 'animate-pulse' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.586-6.586a2 2 0 112.828 2.828L11.828 13.828A2 2 0 0110.414 14.414L7 15l.586-3.414A2 2 0 018.172 10.172L9 11zm-2 8h8"/></svg>
+                            <span>{{ __('pos.edit') }}</span>
                         </button>
                     </div>
                 </template>

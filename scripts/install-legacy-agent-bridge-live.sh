@@ -26,6 +26,12 @@ cat > "$TMP_HTTP" <<'APACHE'
     DocumentRoot /var/www/taxnest/public
     Alias /.well-known/acme-challenge/ /var/www/taxnest/public/.well-known/acme-challenge/
 
+    <Directory /var/www/taxnest/public>
+        AllowOverride All
+        Require all granted
+        Options -Indexes +FollowSymLinks
+    </Directory>
+
     <Directory /var/www/taxnest/public/.well-known/acme-challenge>
         AllowOverride None
         Options None
@@ -34,9 +40,11 @@ cat > "$TMP_HTTP" <<'APACHE'
 
     RewriteEngine On
     RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/ [NC]
-    RewriteCond %{REQUEST_URI} ^/api/agent(?:/|$) [NC]
-    RewriteRule ^ https://taxnest.com.pk%{REQUEST_URI} [R=308,L,NE]
-    RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/ [NC]
+    # Old HTTP-configured Agents must make one authenticated recovery request.
+    # A cross-scheme redirect strips Authorization in common HTTP clients, so
+    # serve only the Agent API locally; v1.13.2 then persists the HTTPS URL.
+    # THE_REQUEST survives Laravel's internal /index.php rewrite.
+    RewriteCond %{THE_REQUEST} !\s/+api/agent(?:[/?\s]) [NC]
     RewriteRule ^ https://taxnest.pk%{REQUEST_URI} [R=308,L,NE]
 </VirtualHost>
 APACHE
@@ -59,6 +67,12 @@ cat > "$TMP_FINAL" <<'APACHE'
     DocumentRoot /var/www/taxnest/public
     Alias /.well-known/acme-challenge/ /var/www/taxnest/public/.well-known/acme-challenge/
 
+    <Directory /var/www/taxnest/public>
+        AllowOverride All
+        Require all granted
+        Options -Indexes +FollowSymLinks
+    </Directory>
+
     <Directory /var/www/taxnest/public/.well-known/acme-challenge>
         AllowOverride None
         Options None
@@ -67,9 +81,7 @@ cat > "$TMP_FINAL" <<'APACHE'
 
     RewriteEngine On
     RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/ [NC]
-    RewriteCond %{REQUEST_URI} ^/api/agent(?:/|$) [NC]
-    RewriteRule ^ https://taxnest.com.pk%{REQUEST_URI} [R=308,L,NE]
-    RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/ [NC]
+    RewriteCond %{THE_REQUEST} !\s/+api/agent(?:[/?\s]) [NC]
     RewriteRule ^ https://taxnest.pk%{REQUEST_URI} [R=308,L,NE]
 </VirtualHost>
 
@@ -123,4 +135,14 @@ if [[ "$STATUS" != "401" ]]; then
   exit 1
 fi
 
-echo "Legacy Agent HTTPS/API bridge verified."
+HTTP_STATUS=$(curl -sS -o /tmp/taxnest-legacy-agent-http-probe.json -w '%{http_code}' \
+  -X POST http://taxnest.com.pk/api/agent/heartbeat \
+  -H 'Accept: application/json' -H 'Authorization: Bearer invalid-probe' \
+  -H 'Content-Type: application/json' --data '{"version":"1.0.0"}')
+rm -f /tmp/taxnest-legacy-agent-http-probe.json
+if [[ "$HTTP_STATUS" != "401" ]]; then
+  echo "Legacy HTTP Agent API verification failed (HTTP $HTTP_STATUS, expected 401)" >&2
+  exit 1
+fi
+
+echo "Legacy Agent HTTP + HTTPS API bridge verified."

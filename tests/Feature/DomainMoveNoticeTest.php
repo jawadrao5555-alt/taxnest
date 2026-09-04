@@ -49,6 +49,10 @@ class DomainMoveNoticeTest extends TestCase
         $this->assertStringContainsString('id="tn-domain-move-dismiss"', $markup);
         $this->assertStringContainsString('max-h-[92vh]', $markup);
         $this->assertStringContainsString('style="display:none; z-index:10000;"', $markup);
+        $this->assertStringContainsString('.tn-domain-move-card {', $markup);
+        $this->assertStringContainsString('background: #fffdf7;', $markup);
+        $this->assertStringContainsString('background: #075b5d;', $markup);
+        $this->assertStringContainsString('background: #e8bf63;', $markup);
         $this->assertStringContainsString('aria-describedby="tn-domain-move-summary"', $markup);
         $this->assertStringContainsString('https://taxnest.pk', $markup);
         $this->assertStringContainsString('https://taxnest.pk/download', $markup);

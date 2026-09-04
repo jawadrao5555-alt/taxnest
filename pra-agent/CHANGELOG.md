@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.13.1 (2026-09-04)
+**Purana domain khud theek — chalti hui shops automatically `taxnest.pk` par**
+
+- Startup par exact legacy `taxnest.com.pk` / `www.taxnest.com.pk` Agent configuration automatically `https://taxnest.pk/api/agent` par migrate hoti hai.
+- Shop ke custom, localhost aur LAN server URLs bilkul nahi badalte.
+- Same-company auto-configuration ab credentials ke sath server URL bhi verify karti hai, is liye purana domain silently config mein reh nahi sakta.
+
 ## v1.13.0 (2026-09-03)
 **Realtime silent printing — server par repeated polling kam, receipt/KOT wake signal par foran pick hoti hai**
 

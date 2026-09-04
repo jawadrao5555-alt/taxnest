@@ -29,9 +29,14 @@ const { createSaleAcceptance } = require('./src/local-core/sale-acceptance');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
+const {
+  DEFAULT_SERVER_URL,
+  canonicalAgentServerUrl,
+  migrateAgentConfig,
+} = require('./src/server-url');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260903-1';
+const BUILD_TIMESTAMP = '20260904-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -305,6 +310,15 @@ const store = new Store();
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+
+function getMigratedAgentConfig() {
+  const migrated = migrateAgentConfig(store.get('config'));
+  if (migrated.changed) {
+    store.set('config', migrated.config);
+    console.log('[server-url] legacy TaxNest domain migrated to taxnest.pk');
+  }
+  return migrated.config;
+}
 
 // ─── NestPOS Desktop (POS screen shell) settings ────────────────────────────
 function getPosSettings() {
@@ -725,14 +739,9 @@ async function applyLanSettings() {
   return srv.status();
 }
 
-// Zero-config default (v1.5.0): the POS window can open BEFORE the agent is
-// configured — it just loads the live POS on the default server. After login,
-// autoConfigureAgent() below feeds the agent credentials automatically.
-const DEFAULT_SERVER_URL = 'https://taxnest.pk/api/agent';
-
 function openPos() {
   try {
-    const config = store.get('config');
+    const config = getMigratedAgentConfig();
     const posConfig =
       config && config.serverUrl ? config : { serverUrl: DEFAULT_SERVER_URL };
     const s = getPosSettings();
@@ -778,7 +787,7 @@ function openPos() {
 // Failure here must never touch the agent or the PRA POS window.
 function openFbrPos() {
   try {
-    const config = store.get('config');
+    const config = getMigratedAgentConfig();
     const posConfig =
       config && config.serverUrl ? config : { serverUrl: DEFAULT_SERVER_URL };
     openFbrPosWindow(posConfig, { isQuitting: () => isQuitting });
@@ -861,17 +870,21 @@ function createNestposShortcuts(showNote) {
 // same company with a regenerated key also self-heals.
 async function autoConfigureAgent(ses, origin) {
   try {
-    const existing = store.get('config');
+    const existing = getMigratedAgentConfig();
     const res = await ses.fetch(origin + '/pos/desktop/agent-config', {
       headers: { Accept: 'application/json' },
     });
     if (!res.ok) return false;
     const data = await res.json();
     if (!data || !data.success || !data.api_key || !data.company_id) return false;
+    const serverUrl = canonicalAgentServerUrl(
+      data.server_url || origin + '/api/agent'
+    );
     if (
       existing && existing.serverUrl && existing.apiKey && existing.companyId &&
       String(existing.companyId) === String(data.company_id) &&
-      existing.apiKey === data.api_key
+      existing.apiKey === data.api_key &&
+      existing.serverUrl === serverUrl
     ) {
       return true; // same company, same key — already configured
     }
@@ -880,7 +893,7 @@ async function autoConfigureAgent(ses, origin) {
       String(existing.companyId) !== String(data.company_id)
     );
     const config = {
-      serverUrl: data.server_url || origin + '/api/agent',
+      serverUrl,
       apiKey: data.api_key,
       companyId: data.company_id,
     };
@@ -1134,7 +1147,7 @@ if (!gotInstanceLock) {
       openAsHidden: true,
     });
 
-    const config = store.get('config');
+    const config = getMigratedAgentConfig();
     if (config && config.serverUrl && config.apiKey && config.companyId) {
       startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
     }

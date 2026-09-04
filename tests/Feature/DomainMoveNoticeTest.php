@@ -32,6 +32,7 @@ class DomainMoveNoticeTest extends TestCase
         $posLayout = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
         $this->assertStringContainsString('if ($sharedDomainAgentNoticeLive)', $posLayout);
         $this->assertStringContainsString('$surveyDismissedSession = true;', $posLayout);
+        $this->assertStringContainsString('@if($praElaanShow && !$sharedDomainAgentNoticeLive', $posLayout);
     }
 
     public function test_notice_is_per_login_session_for_exactly_seven_days_and_closable(): void
@@ -47,6 +48,7 @@ class DomainMoveNoticeTest extends TestCase
         $this->assertStringContainsString('id="tn-domain-move-close"', $markup);
         $this->assertStringContainsString('id="tn-domain-move-dismiss"', $markup);
         $this->assertStringContainsString('max-h-[92vh]', $markup);
+        $this->assertStringContainsString('style="display:none; z-index:10000;"', $markup);
         $this->assertStringContainsString('aria-describedby="tn-domain-move-summary"', $markup);
         $this->assertStringContainsString('https://taxnest.pk', $markup);
         $this->assertStringContainsString('https://taxnest.pk/download', $markup);

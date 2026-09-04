@@ -1619,11 +1619,11 @@
             </div>
         </div>
         @endif
-        @if($praElaanShow && !$whatsNewPopup && !($surveyPopup && !$surveyDismissedSession))
+        @if($praElaanShow && !$sharedDomainAgentNoticeLive && !$whatsNewPopup && !($surveyPopup && !$surveyDismissedSession))
         {{-- Task 1202: PRA provisional-billing elaan + raay collection popup.
-             Renders ONLY when no What's New / survey popup is pending this
-             pageload (no stacked backdrops — it simply appears on a later page
-             once those are done). Answer OR "Baad mein" both stamp
+             Renders ONLY when the shared service notice is outside its fixed
+             seven-day window and no What's New / survey popup is pending this
+             pageload (no stacked backdrops). Answer OR "Baad mein" both stamp
              users.pra_elaan_seen_at server-side → never re-appears (no dismiss
              loop). Responses go to feature-suggestions with source='pra_elaan'. --}}
         <div x-data="{ peOpen: true, peChoice: '', peComment: '', peDone: false, peBusy: false,

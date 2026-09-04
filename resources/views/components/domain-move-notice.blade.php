@@ -20,7 +20,7 @@
          aria-modal="true"
          aria-labelledby="tn-domain-move-title"
          aria-describedby="tn-domain-move-summary"
-         style="display:none"
+         style="display:none; z-index:10000;"
          data-domain-agent-login-notice
          class="fixed inset-0 z-[10000] items-center justify-center bg-slate-950/75 px-3 py-4 sm:px-5 sm:py-8 backdrop-blur-sm">
         <div class="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[1.75rem] border border-teal-800/25 bg-[#fffdf7] shadow-[0_24px_70px_rgba(9,53,58,0.34)] dark:border-teal-400/25 dark:bg-[#102b2e]">

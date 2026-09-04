@@ -54,6 +54,13 @@
     // Cashiers see it only when the company switch (Customize) or a Custom
     // Access tick re-opens it — same verdict as the route guards.
     $dayCloseNavDefault = \App\Services\PosAccessService::dayCloseAllowed($posUserLayout, $companyLayout);
+    // Deals management is privileged and plan-bound. Custom-access users must
+    // have the existing Customize grant explicitly; an absent grant defaults
+    // to denied for cashiers and every confined role.
+    $dealsNavVisible = $posUserLayout
+        && $posUserLayout->isPosAdmin()
+        && $posNavCan('customize', !$isCashierLayout)
+        && \App\Services\PosFeatureService::planAllows($companyLayout, 'deals_enabled');
     // POS UNIFICATION: every company (restaurant or retail) now bills on the single
     // universal sale screen (pos.universal). The legacy restaurant sale screen and its
     // per-company opt-out were retired — restaurant behavior is driven by feature flags.
@@ -540,6 +547,10 @@
                             <a href="{{ route('pos.products') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.products') ? 'active text-white' : 'text-white' }}">{{ __('pos.products_word') }}</a>
                             @endif
+                            @if($dealsNavVisible)
+                            <a href="{{ route('pos.deals') }}"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.deals*') ? 'active text-white' : 'text-white' }}">{{ __('pos.deals_title') }}</a>
+                            @endif
                             @if($posNavCan('reports'))
                             <a href="{{ route('pos.reports') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.reports') ? 'active text-white' : 'text-white' }}">{{ __('pos.reports') }}</a>
@@ -781,6 +792,12 @@
                                         {{ __('pos.products_word') }}
                                     </a>
                                     @endif
+                                    @if($dealsNavVisible)
+                                    <a href="{{ route('pos.deals') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7m16 0H4m16 0a2 2 0 100-4h-5.5M4 12a2 2 0 110-4h5.5M12 8v13m0-13H9.5A2.5 2.5 0 1112 5.5V8zm0 0h2.5A2.5 2.5 0 1012 5.5V8z"/></svg>
+                                        {{ __('pos.deals_title') }}
+                                    </a>
+                                    @endif
                                     @if($posNavCan('customers'))
                                     <a href="{{ route('pos.customers') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -1004,6 +1021,9 @@
                     @if($posNavCan('products'))
                     <a href="{{ route('pos.products') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.products_word') }}</a>
                     @endif
+                    @if($dealsNavVisible)
+                    <a href="{{ route('pos.deals') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.deals_title') }}</a>
+                    @endif
                     @if($posNavCan('reports'))
                     <a href="{{ route('pos.reports') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.reports') }}</a>
                     @endif
@@ -1124,6 +1144,7 @@
                     $posNavCan('dashboard') ? ['label' => __('pos.dashboard'), 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''] : null,
                     $posNavCan('orders') ? ['label' => __('pos.nav_orders_transactions'), 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''] : null,
                     $posNavCan('products') ? ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''] : null,
+                    $dealsNavVisible ? ['label' => __('pos.deals_title'), 'url' => route('pos.deals'), 'icon' => '◇', 'kbd' => ''] : null,
                     $posNavCan('customers') ? ['label' => __('pos.nav_customers'), 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''] : null,
                     $posNavCan('reports') ? ['label' => __('pos.reports'), 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''] : null,
                     $posNavCan('day_close', $dayCloseNavDefault) ? ['label' => __('pos.nav_day_close'), 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''] : null,

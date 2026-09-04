@@ -652,6 +652,26 @@ class FbrDealStockAndAllocationTest extends TestCase
         $this->assertSame(1, (int) DB::table('fbr_pos_deal_usages')->value('units_used'));
     }
 
+    public function test_special_quota_reservation_rolls_back_when_component_stock_fails(): void
+    {
+        DB::table('fbr_pos_deals')->where('id', $this->dealId)->update([
+            'deal_type' => 'special',
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->toDateString(),
+            'special_start_time' => '00:00',
+            'special_end_time' => '23:59',
+            'total_deal_units_limit' => 1,
+            'daily_deal_units_limit' => 1,
+        ]);
+        DB::table('inventory_stocks')->where('product_id', $this->drinkId)->update(['quantity' => 1]);
+
+        $message = $this->expectStoreRejection($this->dealPayload(1));
+
+        $this->assertStringContainsString('Cola 345ml', $message);
+        $this->assertSame(0, DB::table('fbr_pos_deal_usages')->count());
+        $this->assertSame(0, DB::table('fbr_pos_transactions')->count());
+    }
+
     public function test_offline_queued_deal_replay_rejected(): void
     {
         // Deals never ride the offline queue: the sale screen blocks offline
@@ -826,5 +846,24 @@ class FbrDealStockAndAllocationTest extends TestCase
         $m->invoke(new FbrPosController(), $deal, [[
             'group_id' => $groupId, 'product_id' => $this->burgerId,
         ]]);
+    }
+
+    public function test_required_fbr_choice_group_with_only_inactive_options_is_rejected(): void
+    {
+        $groupId = (int) DB::table('fbr_pos_deal_choice_groups')->insertGetId([
+            'deal_id' => $this->dealId, 'label' => 'Drink', 'quantity' => 1,
+            'sort_order' => 0, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('fbr_pos_deal_choice_options')->insert([
+            'group_id' => $groupId, 'product_id' => $this->drinkId,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('products')->where('id', $this->drinkId)->update(['is_active' => false]);
+
+        $deal = FbrPosDeal::with(['items', 'choiceGroups.options'])->findOrFail($this->dealId);
+        $m = new \ReflectionMethod(FbrPosController::class, 'fbrAllocateDealUnits');
+        $m->setAccessible(true);
+        $this->expectException(ValidationException::class);
+        $m->invoke(new FbrPosController(), $deal, []);
     }
 }

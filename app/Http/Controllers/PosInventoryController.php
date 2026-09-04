@@ -909,22 +909,24 @@ class PosInventoryController extends Controller
         $recipeItems = [];
         foreach ($items as $item) {
             if (($item['type'] ?? 'product') === 'product'
-                && RecipeInventoryService::hasRecipe($companyId, (int) ($item['item_id'] ?? 0))) {
+                && RecipeInventoryService::itemUsesRecipe($companyId, $item)) {
                 $recipeItems[] = $item;
             }
         }
-        try {
-            // One shared path for retail POS and restaurant settlement.  This
-            // happens before direct-product deduction so a mixed cart remains
-            // atomic from the kitchen ledger's point of view.
-            RecipeInventoryService::consumeForInvoice(
-                $companyId, $recipeItems, $transactionId, $invoiceNumber, $userId, $branchId
-            );
-        } catch (\Throwable $e) {
-            Log::error('Recipe inventory consumption failed', [
-                'company_id' => $companyId, 'transaction_id' => $transactionId, 'error' => $e->getMessage(),
-            ]);
-            return ['skipped' => false, 'warnings' => ['Kitchen stock could not be updated: ' . $e->getMessage()]];
+        if ($recipeItems) {
+            try {
+                // One shared path for retail POS and restaurant settlement. This
+                // happens before direct-product deduction so a mixed cart remains
+                // atomic from the kitchen ledger's point of view.
+                RecipeInventoryService::consumeForInvoice(
+                    $companyId, $recipeItems, $transactionId, $invoiceNumber, $userId, $branchId
+                );
+            } catch (\Throwable $e) {
+                Log::error('Recipe inventory consumption failed', [
+                    'company_id' => $companyId, 'transaction_id' => $transactionId, 'error' => $e->getMessage(),
+                ]);
+                return ['skipped' => false, 'warnings' => ['Kitchen stock could not be updated: ' . $e->getMessage()]];
+            }
         }
 
         foreach ($items as $item) {
@@ -934,8 +936,9 @@ class PosInventoryController extends Controller
 
             $productId = (int) $item['item_id'];
             $qty = (float) ($item['quantity'] ?? 0);
+            $dealDerived = !empty($item['_deal_derived']);
             if ($qty <= 0) continue;
-            if (RecipeInventoryService::hasRecipe($companyId, $productId)) {
+            if (RecipeInventoryService::itemUsesRecipe($companyId, $item)) {
                 // A recipe dish consumes ingredients, never a finished-product
                 // stock row.  This also prevents the old restaurant path from
                 // double-counting a dish after it uses the shared service.
@@ -944,6 +947,14 @@ class PosInventoryController extends Controller
 
             try {
                 $stock = BranchStockService::stockRow($companyId, $productId, $branchId, false);
+
+                if ($dealDerived && (!$stock || (float) $stock->quantity < $qty)) {
+                    $productName = \App\Models\PosProduct::where('company_id', $companyId)
+                        ->whereKey($productId)->value('name') ?? "Product #{$productId}";
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'items' => ["Insufficient stock for '{$productName}'."],
+                    ]);
+                }
 
                 if (!$stock) {
                     // Company-scoped lookup — PosProduct has no global scope, so
@@ -990,6 +1001,8 @@ class PosInventoryController extends Controller
                     'notes' => 'POS sale deduction',
                     'created_by' => $userId,
                 ]);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                throw $e;
             } catch (\Exception $e) {
                 $productName = \App\Models\PosProduct::find($productId)?->name ?? "Product #{$productId}";
                 $warnings[] = "Inventory update skipped for {$productName}: " . $e->getMessage();

@@ -149,14 +149,17 @@ class PosDealQuotaService
                 'updated_at' => now(),
             ]);
         } else {
-            DB::table($table)->insert([
+            $attributes = [
                 'company_id' => (int) $deal->company_id,
                 'deal_id' => (int) $deal->id,
                 'usage_date' => $date,
                 'units_used' => $units,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            ];
+            if ($table === 'pos_deal_usages') {
+                \App\Models\PosDealUsage::create($attributes);
+            } else {
+                DB::table($table)->insert($attributes + ['created_at' => now(), 'updated_at' => now()]);
+            }
         }
     }
 

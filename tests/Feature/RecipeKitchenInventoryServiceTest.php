@@ -154,6 +154,48 @@ class RecipeKitchenInventoryServiceTest extends TestCase
         $this->assertEquals(1.0, (float) \DB::table('recipe_consumptions')->where('transaction_id', 101)->value('quantity'));
     }
 
+    public function test_deal_component_consumes_frozen_recipe_not_later_live_recipe(): void
+    {
+        $company = Company::create(['name' => 'Frozen Deal', 'inventory_enabled' => true]);
+        $a = Ingredient::create(['company_id' => $company->id, 'name' => 'A', 'unit' => 'kg', 'current_stock' => 10]);
+        $b = Ingredient::create(['company_id' => $company->id, 'name' => 'B', 'unit' => 'kg', 'current_stock' => 10]);
+        $product = PosProduct::create(['company_id' => $company->id, 'name' => 'Meal']);
+        ProductRecipe::create([
+            'company_id' => $company->id, 'product_id' => $product->id,
+            'ingredient_id' => $b->id, 'quantity_needed' => 3, 'recipe_version' => 2,
+        ]);
+
+        RecipeInventoryService::consumeForInvoice($company->id, [[
+            'type' => 'product', 'item_id' => $product->id, 'quantity' => 2,
+            '_deal_derived' => true, 'deal_id' => 44, 'mode' => 'recipe', 'has_recipe' => true,
+            'recipe_snapshot' => [[
+                'stock_id' => 'ingredient-' . $a->id, 'quantity' => 1,
+                'company_id' => $company->id, 'recipe_version' => 1,
+            ]],
+        ]], 144, 'P144');
+
+        $this->assertSame('8.0000', Ingredient::find($a->id)->current_stock);
+        $this->assertSame('10.0000', Ingredient::find($b->id)->current_stock);
+        $snapshot = json_decode((string) \DB::table('recipe_consumptions')->where('transaction_id', 144)->value('snapshot'), true);
+        $this->assertSame($a->id, $snapshot[0]['ingredient_id']);
+        $this->assertSame(44, $snapshot[0]['deal_id']);
+    }
+
+    public function test_deal_component_frozen_direct_mode_ignores_later_live_recipe(): void
+    {
+        $company = Company::create(['name' => 'Frozen Direct', 'inventory_enabled' => true]);
+        $ingredient = Ingredient::create(['company_id' => $company->id, 'name' => 'A', 'unit' => 'kg', 'current_stock' => 10]);
+        $product = PosProduct::create(['company_id' => $company->id, 'name' => 'Meal']);
+        ProductRecipe::create([
+            'company_id' => $company->id, 'product_id' => $product->id,
+            'ingredient_id' => $ingredient->id, 'quantity_needed' => 1,
+        ]);
+        $this->assertFalse(RecipeInventoryService::itemUsesRecipe($company->id, [
+            'item_id' => $product->id, '_deal_derived' => true,
+            'mode' => 'direct', 'has_recipe' => false, 'recipe_snapshot' => [],
+        ]));
+    }
+
     public function test_snapshot_is_used_for_partial_normal_return_and_recipe_change_is_safe(): void
     {
         $company = Company::create(['name' => 'Snapshot', 'inventory_enabled' => true]);

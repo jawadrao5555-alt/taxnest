@@ -9,6 +9,7 @@ use App\Models\ProductRecipe;
 use App\Models\PosTransaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The kitchen side of POS inventory.
@@ -39,7 +40,8 @@ class RecipeInventoryService
      */
     public static function requirementsForItems(int $companyId, array $items): array
     {
-        if (!Schema::hasTable('product_recipes')) {
+        if (!Schema::hasTable('product_recipes')
+            && !collect($items)->contains(fn ($item) => !empty($item['_deal_derived']))) {
             return [];
         }
         $requirements = [];
@@ -49,6 +51,49 @@ class RecipeInventoryService
             $productId = (int) ($item['item_id'] ?? 0);
             $saleQty = (float) ($item['quantity'] ?? 0);
             if ($type !== 'product' || $productId <= 0 || $saleQty <= 0) {
+                continue;
+            }
+
+            if (!self::itemUsesRecipe($companyId, $item)) {
+                continue;
+            }
+            if (!empty($item['_deal_derived'])) {
+                foreach ((array) ($item['recipe_snapshot'] ?? []) as $part) {
+                    $stockId = is_array($part) ? (string) ($part['stock_id'] ?? '') : '';
+                    $perUnit = is_array($part) ? (float) ($part['quantity'] ?? 0) : 0;
+                    if (!preg_match('/^(?:ingredient[:\\-])?(\\d+)$/', $stockId, $match)
+                        || $perUnit <= 0
+                        || (int) ($part['company_id'] ?? 0) !== $companyId) {
+                        throw ValidationException::withMessages(['items' => ['The frozen deal recipe is invalid.']]);
+                    }
+                    $ingredientId = (int) $match[1];
+                    $ingredientQuery = Ingredient::where('company_id', $companyId)->whereKey($ingredientId);
+                    if (Schema::hasColumn('ingredients', 'is_active')) {
+                        $ingredientQuery->where('is_active', true);
+                    }
+                    $ingredient = $ingredientQuery->first();
+                    if (!$ingredient) {
+                        throw ValidationException::withMessages(['items' => ['A frozen deal recipe ingredient is unavailable.']]);
+                    }
+                    $needed = round($perUnit * $saleQty, 4);
+                    if (!isset($requirements[$ingredientId])) {
+                        $requirements[$ingredientId] = [
+                            'ingredient_id' => $ingredientId, 'quantity' => 0.0,
+                            'unit' => (string) $ingredient->unit,
+                            'cost_per_unit' => (float) ($ingredient->cost_per_unit ?? 0),
+                            'components' => [], 'snapshot' => [],
+                        ];
+                    }
+                    $requirements[$ingredientId]['quantity'] = round($requirements[$ingredientId]['quantity'] + $needed, 4);
+                    $requirements[$ingredientId]['components'][(string) $productId] =
+                        round(($requirements[$ingredientId]['components'][(string) $productId] ?? 0) + $needed, 4);
+                    $requirements[$ingredientId]['snapshot'][] = [
+                        'product_id' => $productId, 'sale_quantity' => $saleQty,
+                        'recipe_version' => (int) ($part['recipe_version'] ?? $part['version'] ?? 1),
+                        'quantity_needed' => $perUnit, 'ingredient_id' => $ingredientId,
+                        'ingredient_unit' => (string) $ingredient->unit, 'deal_id' => $item['deal_id'] ?? null,
+                    ];
+                }
                 continue;
             }
 
@@ -470,9 +515,21 @@ class RecipeInventoryService
         return $query->exists();
     }
 
+    public static function itemUsesRecipe(int $companyId, array $item): bool
+    {
+        if (!empty($item['_deal_derived'])) {
+            return ($item['mode'] ?? null) === 'recipe'
+                && !empty($item['has_recipe'])
+                && is_array($item['recipe_snapshot'] ?? null)
+                && !empty($item['recipe_snapshot']);
+        }
+        return self::hasRecipe($companyId, (int) ($item['item_id'] ?? 0));
+    }
+
     public static function stockErrors(int $companyId, array $items, ?int $branchId = null): array
     {
-        if (!Schema::hasTable('product_recipes')) {
+        if (!Schema::hasTable('product_recipes')
+            && !collect($items)->contains(fn ($item) => !empty($item['_deal_derived']))) {
             return [];
         }
         $errors = [];

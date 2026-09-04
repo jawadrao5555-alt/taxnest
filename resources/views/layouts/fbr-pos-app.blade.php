@@ -62,6 +62,7 @@
     $fbrPlanKhata   = \App\Services\PosFeatureService::planAllows($fbrCompany, 'khata_enabled');
     $fbrPlanDeals   = \App\Services\PosFeatureService::planAllows($fbrCompany, 'deals_enabled');
     $fbrPlanLoyalty = \App\Services\PosFeatureService::planAllows($fbrCompany, 'loyalty_enabled');
+    $fbrDealsNavVisible = $fbrPlanDeals && $fbrUser && $fbrUser->isPosAdmin();
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -550,6 +551,12 @@
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                         {{ __('pos.products_word') }}
                                     </a>
+                                    @if($fbrDealsNavVisible)
+                                    <a href="{{ route('fbrpos.deals') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7m16 0H4m16 0a2 2 0 100-4h-5.5M4 12a2 2 0 110-4h5.5M12 8v13m0-13H9.5A2.5 2.5 0 1112 5.5V8zm0 0h2.5A2.5 2.5 0 1012 5.5V8z"/></svg>
+                                        {{ __('pos.deals_title') }}
+                                    </a>
+                                    @endif
                                     {{-- Task 1260: Customers page — every role may view/add (mirrors PRA);
                                          manage actions are cashier-blocked in the controller. --}}
                                     <a href="{{ route('fbrpos.customers') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
@@ -787,6 +794,12 @@
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                             {{ __('pos.products_word') }}
                         </a>
+                        @if($fbrDealsNavVisible)
+                        <a href="{{ route('fbrpos.deals') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.deals*') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7m16 0H4m16 0a2 2 0 100-4h-5.5M4 12a2 2 0 110-4h5.5M12 8v13m0-13H9.5A2.5 2.5 0 1112 5.5V8zm0 0h2.5A2.5 2.5 0 1012 5.5V8z"/></svg>
+                            {{ __('pos.deals_title') }}
+                        </a>
+                        @endif
                         <a href="{{ route('fbrpos.products.create') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.products.create') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             {{ __('pos.nav_add_product') }}

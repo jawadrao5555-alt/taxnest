@@ -2492,38 +2492,29 @@ class PosController extends Controller
                 return $fixed->merge($choices);
             })->unique();
             $dealProductsById = PosProduct::where('company_id', $companyId)
+                ->where('is_active', true)
                 ->whereIn('id', $dealProductIds)->get()->keyBy('id');
             foreach ($activeDeals as $deal) {
+                // A fixed component is mandatory. If it was deleted, moved to
+                // another tenant, or deactivated, do not expose the deal as a
+                // generic sellable Item which can only fail at checkout.
+                $fixedIds = $deal->items->pluck('pos_product_id')->map(fn ($id) => (int) $id);
+                if ($fixedIds->contains(fn ($id) => !$dealProductsById->has($id))) {
+                    continue;
+                }
+                if ($choiceTablesReady && $deal->choiceGroups->contains(fn ($group) =>
+                    !$group->options->contains(fn ($option) => $dealProductsById->has((int) $option->pos_product_id))
+                )) {
+                    continue;
+                }
                 $componentsText = $deal->items
                     ->map(fn ($di) => $di->quantity . 'x ' . ($dealProductsById[$di->pos_product_id]->name ?? 'Item'))
                     ->implode(' + ');
-                $dealVersion = optional($deal->updated_at)->toJSON() ?: 'legacy';
                 $snapshotComponent = function (int $productId, int $quantity) use (
-                    $companyId, $deal, $dealVersion, $dealProductsById, $recipes
+                    $companyId, $deal, $dealProductsById
                 ): array {
                     $product = $dealProductsById->get($productId);
-                    $recipe = $recipes->get($productId, collect())->map(fn ($row) => [
-                        'stock_id' => 'ingredient-' . (int) $row->ingredient_id,
-                        'quantity' => (float) $row->quantity_needed,
-                    ])->values()->all();
-                    return [
-                        'deal_id' => (int) $deal->id,
-                        'deal_version' => $dealVersion,
-                        'deal_name' => (string) $deal->name,
-                        'deal_price' => (float) $deal->price,
-                        'product_id' => $productId,
-                        'name' => (string) ($product?->name ?? 'Item'),
-                        'qty' => $quantity,
-                        'quantity' => $quantity,
-                        'mode' => $recipe ? 'recipe' : 'direct',
-                        'has_recipe' => (bool) $recipe,
-                        'recipe_snapshot' => $recipe,
-                        'tax_facts' => [
-                            'is_tax_exempt' => (bool) ($product?->is_tax_exempt ?? false),
-                            'is_third_schedule' => (bool) ($product?->is_third_schedule ?? false),
-                            'company_id' => (int) $companyId,
-                        ],
-                    ];
+                    return $this->dealComponentSnapshot($deal, $product, $quantity, $companyId);
                 };
                 $dealsForJs[] = [
                     'id' => $deal->id,
@@ -2552,12 +2543,16 @@ class PosController extends Controller
                     // deal into a dead-end choice modal. Edit replaces all group
                     // rows atomically and is the deliberate cleanup path.
                     'choice_groups' => $choiceTablesReady ? $deal->choiceGroups
-                        ->filter(fn ($group) => $group->options->isNotEmpty())
+                        ->filter(fn ($group) => $group->options->contains(
+                            fn ($option) => $dealProductsById->has((int) $option->pos_product_id)
+                        ))
                         ->map(fn ($group) => [
                         'id' => (int) $group->id,
                         'label' => (string) $group->label,
                         'quantity' => (int) $group->quantity,
-                        'options' => $group->options->map(fn ($option) => [
+                        'options' => $group->options
+                            ->filter(fn ($option) => $dealProductsById->has((int) $option->pos_product_id))
+                            ->map(fn ($option) => [
                             'product_id' => (int) $option->pos_product_id,
                             'name' => (string) ($dealProductsById[(int) $option->pos_product_id]->name ?? 'Item'),
                             'deal_component_snapshot' => $snapshotComponent(
@@ -3217,7 +3212,7 @@ class PosController extends Controller
         ], $companyItems));
         $recipeItemsForStock = array_values(array_filter($stockItemsForRecipe, fn ($item) =>
             ($item['type'] ?? 'product') === 'product'
-            && \App\Services\RecipeInventoryService::hasRecipe($companyId, (int) ($item['item_id'] ?? 0))
+            && \App\Services\RecipeInventoryService::itemUsesRecipe($companyId, $item)
         ));
         $recipeBranchId = $request->filled('offline_branch_id')
             ? (int) $request->input('offline_branch_id')
@@ -3783,7 +3778,7 @@ class PosController extends Controller
                     $invoiceNumber,
                     auth('pos')->id()
                 );
-            } else {
+            } elseif ($recipeItemsForStock) {
                 \App\Services\RecipeInventoryService::consumeForInvoice(
                     $companyId,
                     $recipeItemsForStock,
@@ -3793,8 +3788,27 @@ class PosController extends Controller
                     $transaction->branch_id ?? null
                 );
             }
+            if (!$agentCoreInventorySale) {
+                // Direct stock now belongs to the same atomic unit as the bill,
+                // Special Deal quota, and recipe consumption. Recipe rows are
+                // idempotent, so this shared routine will not consume them twice.
+                $inventoryResult = PosInventoryController::deductStockForInvoice(
+                    $companyId,
+                    $stockItemsForRecipe,
+                    (int) $transaction->id,
+                    $invoiceNumber,
+                    auth('pos')->id(),
+                    $transaction->branch_id ?? null
+                );
+            }
 
             DB::commit();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            // Deal quota/stale-snapshot checks deliberately occur after the
+            // transaction starts. Preserve Laravel's normal client-validation
+            // contract while still rolling back any reservation/write.
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             $errMsg = __('pos.failed_create_invoice', ['error' => $e->getMessage()]);
@@ -3812,22 +3826,7 @@ class PosController extends Controller
             \App\Services\RiderPushService::queuePush((int) $riderId);
         }
 
-        // Deduct from the RESOLVED items (not raw request): resolved rows carry the
-        // frozen deal_snapshot so deal components move stock too (deal lines
-        // themselves are type 'deal' → skipped by the deduction loop).
-        $stockItems = $stockItemsForRecipe;
-        $inventoryResult = $agentCoreInventorySale
-            ? ['skipped' => false, 'warnings' => []]
-            : PosInventoryController::deductStockForInvoice(
-                $companyId,
-                $stockItems,
-                $transaction->id,
-                $invoiceNumber,
-                auth('pos')->id(),
-                // Per-branch stock (Task 1354): the goods leave the shop that made
-                // the bill — take the branch from the transaction, never the session.
-                $transaction->branch_id ?? null
-            );
+        $inventoryResult ??= ['skipped' => false, 'warnings' => []];
 
         // F3 Dine-In (Jul 2026): a table reserved from the universal sale screen is
         // auto-freed the moment its bill is stored (final OR provisional). Only
@@ -7695,8 +7694,24 @@ class PosController extends Controller
         return null;
     }
 
+    private function dealsAdminGate()
+    {
+        $user = auth('pos')->user();
+        $custom = $user?->posCustomAllows('customize');
+        if (!$user || !$user->isPosAdmin() || $custom === false) {
+            if (request()->expectsJson()) {
+                abort(403, __('pos.custom_access_denied'));
+            }
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        return null;
+    }
+
     public function deals()
     {
+        if ($r = $this->dealsAdminGate()) {
+            return $r;
+        }
         if ($r = $this->planGate('deals_enabled')) {
             return $r;
         }
@@ -7885,6 +7900,9 @@ class PosController extends Controller
 
     public function storeDeal(Request $request)
     {
+        if ($r = $this->dealsAdminGate()) {
+            return $r;
+        }
         if ($r = $this->planGate('deals_enabled')) {
             return $r;
         }
@@ -7907,6 +7925,9 @@ class PosController extends Controller
 
     public function updateDeal(Request $request, $id)
     {
+        if ($r = $this->dealsAdminGate()) {
+            return $r;
+        }
         if ($r = $this->planGate('deals_enabled')) {
             return $r;
         }
@@ -7929,6 +7950,9 @@ class PosController extends Controller
 
     public function deleteDeal($id)
     {
+        if ($r = $this->dealsAdminGate()) {
+            return $r;
+        }
         if ($r = $this->planGate('deals_enabled')) {
             return $r;
         }
@@ -11881,11 +11905,22 @@ class PosController extends Controller
             return [[], []];
         }
 
-        // Legacy/test rows may retain a group after its option rows were
-        // removed. It is not a required choice: treating it as one blocks an
-        // otherwise fixed deal forever. The deal editor replaces these rows on
-        // its next successful update; snapshots for completed sales stay frozen.
-        $groups = $deal->choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())->values();
+        // Every configured group is required. Filter eligibility exactly like
+        // sale boot: only active products owned by this company may be picked.
+        $activeOptionIds = PosProduct::where('company_id', $companyId)->where('is_active', true)
+            ->whereIn('id', $deal->choiceGroups->flatMap(fn ($group) => $group->options->pluck('pos_product_id'))->unique())
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $groups = $deal->choiceGroups->map(function ($group) use ($activeOptionIds) {
+            $group->setRelation('options', $group->options->filter(
+                fn ($option) => in_array((int) $option->pos_product_id, $activeOptionIds, true)
+            )->values());
+            return $group;
+        })->values();
+        if ($groups->contains(fn ($group) => $group->options->isEmpty())) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+            ]);
+        }
         $postedChoices = is_array($postedChoices) ? array_values($postedChoices) : [];
         if ($groups->isEmpty()) {
             if (!empty($postedChoices)) {
@@ -11930,7 +11965,7 @@ class PosController extends Controller
 
         // An option that was deactivated after setup must not remain sellable.
         $products = PosProduct::where('company_id', $companyId)->where('is_active', true)
-            ->whereIn('id', array_unique($requiredProductIds))->get(['id', 'name'])->keyBy('id');
+            ->whereIn('id', array_unique($requiredProductIds))->get()->keyBy('id');
         if ($products->count() !== count(array_unique($requiredProductIds))) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
@@ -11942,16 +11977,94 @@ class PosController extends Controller
         foreach ($groups as $group) {
             $gid = (int) $group->id;
             $pid = $byGroup[$gid];
-            $snapshot[] = [
-                'product_id' => $pid,
-                'name' => (string) $products[$pid]->name,
-                'qty' => (int) $group->quantity,
+            $snapshot[] = array_merge(
+                $this->dealComponentSnapshot($deal, $products[$pid], (int) $group->quantity, $companyId),
+                [
                 'choice_group_id' => $gid,
                 'choice_group_label' => (string) $group->label,
-            ];
+                ]
+            );
             $normalizedChoices[] = ['group_id' => $gid, 'product_id' => $pid];
         }
         return [$snapshot, $normalizedChoices];
+    }
+
+    /**
+     * Freeze every mutable fact needed to consume/restore a deal component.
+     * Tenant markers are intentionally repeated inside each component/recipe
+     * part so authenticated Local Core snapshots remain verifiable even after
+     * the source product, deal, or recipe is retired.
+     */
+    private function dealComponentSnapshot(PosDeal $deal, PosProduct $product, int $quantity, int $companyId): array
+    {
+        $recipe = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('product_recipes')) {
+            $recipeQuery = \Illuminate\Support\Facades\DB::table('product_recipes')
+                ->where('company_id', $companyId)
+                ->where('product_id', $product->id);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('product_recipes', 'is_active')) {
+                $recipeQuery->where('is_active', true);
+            }
+            $recipe = $recipeQuery->get()
+                ->map(fn ($row) => [
+                    'stock_id' => 'ingredient-' . (int) $row->ingredient_id,
+                    'quantity' => (float) $row->quantity_needed,
+                    'company_id' => $companyId,
+                    'recipe_version' => (int) ($row->recipe_version ?? 1),
+                ])->values()->all();
+        }
+
+        return [
+            'deal_id' => (int) $deal->id,
+            'deal_version' => optional($deal->updated_at)->toJSON() ?: 'legacy',
+            'deal_name' => (string) $deal->name,
+            'deal_price' => (float) $deal->price,
+            'product_id' => (int) $product->id,
+            'name' => (string) $product->name,
+            'qty' => $quantity,
+            'quantity' => $quantity,
+            'mode' => $recipe ? 'recipe' : 'direct',
+            'has_recipe' => (bool) $recipe,
+            'recipe_snapshot' => $recipe,
+            'tax_facts' => [
+                'is_tax_exempt' => (bool) ($product->is_tax_exempt ?? false),
+                'is_third_schedule' => (bool) ($product->is_third_schedule ?? false),
+                'tax_rate' => (float) ($product->tax_rate ?? 0),
+                'company_id' => $companyId,
+            ],
+        ];
+    }
+
+    private function dealSnapshotComparable(array $snapshot): array
+    {
+        return collect($snapshot)->map(function ($component) {
+            $recipe = collect(is_array($component['recipe_snapshot'] ?? null) ? $component['recipe_snapshot'] : [])
+                ->map(fn ($part) => [
+                    'stock_id' => (string) ($part['stock_id'] ?? ''),
+                    'quantity' => round((float) ($part['quantity'] ?? 0), 4),
+                    'company_id' => (int) ($part['company_id'] ?? 0),
+                    'recipe_version' => (int) ($part['recipe_version'] ?? $part['version'] ?? 1),
+                ])->values()->all();
+            $tax = is_array($component['tax_facts'] ?? null) ? $component['tax_facts'] : [];
+            return [
+                'deal_id' => (int) ($component['deal_id'] ?? 0),
+                'deal_version' => (string) ($component['deal_version'] ?? ''),
+                'deal_name' => (string) ($component['deal_name'] ?? ''),
+                'deal_price' => round((float) ($component['deal_price'] ?? 0), 2),
+                'product_id' => (int) ($component['product_id'] ?? 0),
+                'name' => (string) ($component['name'] ?? ''),
+                'qty' => (int) ($component['qty'] ?? 0),
+                'mode' => (string) ($component['mode'] ?? ''),
+                'has_recipe' => (bool) ($component['has_recipe'] ?? false),
+                'recipe_snapshot' => $recipe,
+                'tax_facts' => [
+                    'company_id' => (int) ($tax['company_id'] ?? 0),
+                    'is_tax_exempt' => (bool) ($tax['is_tax_exempt'] ?? false),
+                    'is_third_schedule' => (bool) ($tax['is_third_schedule'] ?? false),
+                    'tax_rate' => round((float) ($tax['tax_rate'] ?? 0), 4),
+                ],
+            ];
+        })->values()->all();
     }
 
     /**
@@ -11995,31 +12108,27 @@ class PosController extends Controller
             // set or later deduct/restore the wrong products.
             $componentIds = $deal->items->pluck('pos_product_id')->map(fn ($id) => (int) $id)->values();
             $componentNames = PosProduct::where('company_id', $companyId)
+                ->where('is_active', true)
                 ->whereIn('id', $componentIds)
-                ->get(['id', 'name'])
+                ->get()
                 ->keyBy('id');
             if ($componentNames->count() !== $componentIds->unique()->count()) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
                 ]);
             }
-            $fixedSnapshot = $deal->items->map(fn ($dealItem) => [
-                'product_id' => (int) $dealItem->pos_product_id,
-                'name' => (string) ($componentNames[(int) $dealItem->pos_product_id]->name ?? 'Item'),
-                'qty' => (int) $dealItem->quantity,
-            ])->values()->all();
+            $fixedSnapshot = $deal->items->map(fn ($dealItem) =>
+                $this->dealComponentSnapshot(
+                    $deal,
+                    $componentNames[(int) $dealItem->pos_product_id],
+                    (int) $dealItem->quantity,
+                    $companyId
+                )
+            )->values()->all();
             [$choiceSnapshot] = $this->resolveDealChoiceSnapshot($deal, $item['deal_choices'] ?? [], $companyId);
             $expectedSnapshot = array_merge($fixedSnapshot, $choiceSnapshot);
-            $postedSnapshot = collect($item['deal_snapshot'] ?? [])->map(fn ($component) => [
-                'product_id' => (int) ($component['product_id'] ?? 0),
-                'name' => (string) ($component['name'] ?? ''),
-                'qty' => (int) ($component['qty'] ?? 0),
-            ])->values()->all();
-            $expectedComparable = collect($expectedSnapshot)->map(fn ($component) => [
-                'product_id' => (int) $component['product_id'],
-                'name' => (string) $component['name'],
-                'qty' => (int) $component['qty'],
-            ])->values()->all();
+            $postedSnapshot = $this->dealSnapshotComparable($item['deal_snapshot'] ?? []);
+            $expectedComparable = $this->dealSnapshotComparable($expectedSnapshot);
             if ($postedSnapshot !== $expectedComparable) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
@@ -12040,13 +12149,20 @@ class PosController extends Controller
                 ]);
             }
 
-            if ($deal->isSpecial() && $deal->items->isEmpty()) {
+            if ($expectedSnapshot === []) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
                 ]);
             }
 
-            \App\Services\PosDealQuotaService::reserve($deal, (int) round($quantity));
+            try {
+                \App\Services\PosDealQuotaService::reserve($deal, (int) round($quantity));
+            } catch (\RuntimeException $e) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => [$e->getMessage()],
+                ]);
+            }
+
         }
     }
 
@@ -12067,33 +12183,93 @@ class PosController extends Controller
             $itemName = trim($item['name'] ?? '');
             $itemPrice = (float) ($item['unit_price'] ?? 0);
             $qty = (float) ($item['quantity'] ?? 0);
+            $bypassProductAutoCreate = false;
             // Cashier's per-line T-toggle is authoritative — frontend already initializes
             // is_tax_exempt from product master default when item is added to cart, then
             // user may flip it via T-key. We MUST honor that override here.
             $isExempt = !empty($item['is_tax_exempt']);
+            $frozenTax = $authoritativeSnapshot && is_array($item['tax_snapshot'] ?? null)
+                ? $item['tax_snapshot']
+                : null;
+            if ($frozenTax) {
+                $isExempt = (bool) ($frozenTax['exempt'] ?? false);
+            }
 
             $dealSnapshot = null;
             $dealChoices = [];
             if ($itemId) {
                 if ($itemType === 'product') {
-                    $obj = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
-                    if (!$obj) {
-                        $itemId = null;
+                    if ($authoritativeSnapshot) {
+                        $obj = PosProduct::whereKey($itemId)->first();
+                        if ($obj && (int) $obj->company_id !== $companyId) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => ['The immutable product snapshot belongs to another company.'],
+                            ]);
+                        }
+                        if (!$obj) {
+                            // Signed Local Core history survives catalogue
+                            // retirement, but must never recreate that product.
+                            $itemId = null;
+                            $bypassProductAutoCreate = true;
+                        }
+                    } else {
+                        $obj = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
+                        if (!$obj) {
+                            $itemId = null;
+                        }
                     }
                     // NOTE: Do NOT overwrite $isExempt from $obj->is_tax_exempt here.
                     // Cart payload already reflects user's intent (master default OR T-toggle override).
                 } elseif ($itemType === 'deal') {
                     if ($authoritativeSnapshot) {
                         $deal = PosDeal::where('company_id', $companyId)->whereKey($itemId)->first();
-                        if (!$deal || !is_array($item['deal_snapshot'] ?? null) || empty($item['deal_snapshot'])) {
+                        if (!is_array($item['deal_snapshot'] ?? null) || empty($item['deal_snapshot'])) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
                                 'items' => ['The immutable deal snapshot is invalid or outside the company.'],
                             ]);
                         }
                         // Never re-read mutable deal components or price for an
                         // accepted offline sale. canonicalConsumptions already
-                        // tenant-validates every frozen component.
+                        // tenant-validates inventory sales; repeat the immutable
+                        // tenant/shape boundary here because inventory may be off.
                         $dealSnapshot = array_values($item['deal_snapshot']);
+                        foreach ($dealSnapshot as $component) {
+                            $pid = (int) (is_array($component) ? ($component['product_id'] ?? 0) : 0);
+                            $facts = is_array($component) ? ($component['tax_facts'] ?? null) : null;
+                            $mode = is_array($component) ? ($component['mode'] ?? null) : null;
+                            $recipe = is_array($component) ? ($component['recipe_snapshot'] ?? null) : null;
+                            $existingProductCompany = $pid > 0
+                                ? PosProduct::whereKey($pid)->value('company_id')
+                                : null;
+                            if ($pid < 1
+                                || !is_array($facts)
+                                || (int) ($facts['company_id'] ?? 0) !== $companyId
+                                || ($existingProductCompany !== null && (int) $existingProductCompany !== $companyId)
+                                || !in_array($mode, ['direct', 'recipe'], true)
+                                || !is_array($recipe)
+                                || ($mode === 'recipe') !== !empty($recipe)) {
+                                throw \Illuminate\Validation\ValidationException::withMessages([
+                                    'items' => ['The immutable deal snapshot was tampered with or belongs to another company.'],
+                                ]);
+                            }
+                            foreach ($recipe as $part) {
+                                $stockId = is_array($part) ? (string) ($part['stock_id'] ?? '') : '';
+                                if (!preg_match('/^(?:ingredient[:\\-])?(\\d+)$/', $stockId, $match)) {
+                                    throw \Illuminate\Validation\ValidationException::withMessages([
+                                        'items' => ['The immutable deal recipe snapshot was tampered with or belongs to another company.'],
+                                    ]);
+                                }
+                                $ingredientCompany = \App\Models\Ingredient::whereKey((int) $match[1])->value('company_id');
+                                $partCompany = (int) ($part['company_id'] ?? 0);
+                                if (($ingredientCompany !== null && (int) $ingredientCompany !== $companyId)
+                                    || ($ingredientCompany === null && $partCompany !== $companyId)
+                                    || ($partCompany !== 0 && $partCompany !== $companyId)) {
+                                    throw \Illuminate\Validation\ValidationException::withMessages([
+                                        'items' => ['The immutable deal recipe snapshot was tampered with or belongs to another company.'],
+                                    ]);
+                                }
+                            }
+                        }
                         $obj = $deal;
                     } else {
                     // Deals (Jul 2026): MANDATORY explicit branch — without it a deal's
@@ -12114,19 +12290,43 @@ class PosController extends Controller
                         }
                         $itemPrice = (float) $deal->price;
                         $componentIds = $deal->items->pluck('pos_product_id');
-                        $componentNames = PosProduct::where('company_id', $companyId)
-                            ->whereIn('id', $componentIds)->pluck('name', 'id');
-                        $dealSnapshot = $deal->items->map(fn ($di) => [
-                            'product_id' => (int) $di->pos_product_id,
-                            'name' => $componentNames[$di->pos_product_id] ?? 'Item',
-                            'qty' => (int) $di->quantity,
-                        ])->values()->all();
+                        $componentProducts = PosProduct::where('company_id', $companyId)
+                            ->where('is_active', true)->whereIn('id', $componentIds)->get()->keyBy('id');
+                        if ($componentProducts->count() !== $componentIds->unique()->count()) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                            ]);
+                        }
+                        $dealSnapshot = $deal->items->map(fn ($di) =>
+                            $this->dealComponentSnapshot(
+                                $deal,
+                                $componentProducts[(int) $di->pos_product_id],
+                                (int) $di->quantity,
+                                $companyId
+                            )
+                        )->values()->all();
                         [$choiceSnapshot, $dealChoices] = $this->resolveDealChoiceSnapshot(
                             $deal,
                             $item['deal_choices'] ?? [],
                             $companyId
                         );
                         $dealSnapshot = array_merge($dealSnapshot, $choiceSnapshot);
+                        $postedDealSnapshot = $item['deal_snapshot'] ?? null;
+                        $postedIsRich = is_array($postedDealSnapshot)
+                            && collect($postedDealSnapshot)->contains(fn ($component) =>
+                                is_array($component) && (
+                                    array_key_exists('mode', $component)
+                                    || array_key_exists('recipe_snapshot', $component)
+                                    || array_key_exists('tax_facts', $component)
+                                )
+                            );
+                        if ($postedIsRich
+                            && $this->dealSnapshotComparable($postedDealSnapshot)
+                                !== $this->dealSnapshotComparable($dealSnapshot)) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+                            ]);
+                        }
                     } else {
                         // Deal lines are never allowed to degrade into a
                         // client-priced/manual line when a stale or tampered
@@ -12149,7 +12349,8 @@ class PosController extends Controller
             // ad-hoc entries (Quick Type unmatched + "+ Manual" button in
             // inventory-OFF mode) and must NOT pollute the product master.
             // Frontend sends `_manual: true` in the payload to flag them.
-            if (!$itemId && $itemType === 'product' && $itemName !== '' && empty($item['_manual'])) {
+            if (!$itemId && $itemType === 'product' && $itemName !== ''
+                && empty($item['_manual']) && !$bypassProductAutoCreate) {
                 $existing = PosProduct::where('company_id', $companyId)
                     ->whereRaw('LOWER(name) = ?', [strtolower($itemName)])
                     ->first();
@@ -12179,7 +12380,10 @@ class PosController extends Controller
             // For manual lines (no item_id), the flag is always false; cashiers
             // cannot self-exempt manual ad-hoc lines via this flag.
             $isThirdSchedule = false;
-            if ($itemId && $itemType === 'product') {
+            if ($frozenTax && array_key_exists('third_schedule', $frozenTax)) {
+                $isThirdSchedule = (bool) $frozenTax['third_schedule'];
+            }
+            if (!$authoritativeSnapshot && $itemId && $itemType === 'product') {
                 // Company-scoped lookup prevents cross-company flag injection
                 $dbProduct = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
                 if ($dbProduct) {
@@ -12271,6 +12475,15 @@ class PosController extends Controller
                     'item_id' => $pid,
                     'quantity' => $dealQty * $compQty,
                     'unit_price' => 0,
+                    '_deal_derived' => true,
+                    'deal_id' => $comp['deal_id'] ?? ($item['item_id'] ?? null),
+                    'deal_version' => $comp['deal_version'] ?? null,
+                    'deal_name' => $comp['deal_name'] ?? ($item['name'] ?? null),
+                    'deal_price' => $comp['deal_price'] ?? ($item['price'] ?? null),
+                    'mode' => $comp['mode'] ?? 'direct',
+                    'has_recipe' => (bool) ($comp['has_recipe'] ?? false),
+                    'recipe_snapshot' => is_array($comp['recipe_snapshot'] ?? null) ? $comp['recipe_snapshot'] : [],
+                    'tax_facts' => is_array($comp['tax_facts'] ?? null) ? $comp['tax_facts'] : [],
                 ];
             }
         }

@@ -106,12 +106,14 @@ class InventoryService
     {
         $products = [];
         $ingredients = [];
+        $unprojectable = [];
+        $sourceProducts = [];
         $items = $sale['items'] ?? null;
         if (!is_array($items) || !$items) {
             throw ValidationException::withMessages(['payload.sale.items' => ['A non-empty immutable item snapshot is required.']]);
         }
 
-        $expand = function (array $line, float $multiplier = 1.0) use (&$expand, &$products, &$ingredients, $companyId): void {
+        $expand = function (array $line, float $multiplier = 1.0) use (&$expand, &$products, &$ingredients, &$unprojectable, &$sourceProducts, $companyId): void {
             $type = (string) ($line['type'] ?? 'product');
             $quantity = $line['quantity'] ?? $line['qty'] ?? null;
             if (!is_numeric($quantity) || !is_finite((float) $quantity) || (float) $quantity <= 0) {
@@ -129,9 +131,16 @@ class InventoryService
                     if (!is_array($component)) {
                         throw ValidationException::withMessages(['payload.sale.items' => ['A deal component snapshot is invalid.']]);
                     }
-                    if ((isset($component['deal_id']) && (int) $component['deal_id'] !== $dealId)
-                        || (isset($component['tax_facts']['company_id'])
-                            && (int) $component['tax_facts']['company_id'] !== $companyId)
+                    $taxFacts = $component['tax_facts'] ?? null;
+                    if (!is_array($taxFacts)
+                        || (int) ($taxFacts['company_id'] ?? 0) !== $companyId
+                        || !is_bool($taxFacts['is_tax_exempt'] ?? null)
+                        || !is_bool($taxFacts['is_third_schedule'] ?? null)
+                        // tax_rate was added to snapshots after the original
+                        // immutable format shipped. Preserve already-accepted
+                        // legacy snapshots, but validate it whenever present.
+                        || (array_key_exists('tax_rate', $taxFacts) && !is_numeric($taxFacts['tax_rate']))
+                        || (isset($component['deal_id']) && (int) $component['deal_id'] !== $dealId)
                         || (isset($component['mode'])
                             && !in_array((string) $component['mode'], ['direct', 'recipe'], true))
                         || (($component['mode'] ?? null) === 'recipe' && empty($component['recipe_snapshot']))
@@ -155,9 +164,21 @@ class InventoryService
             }
 
             $productId = (int) ($line['item_id'] ?? $line['product_id'] ?? 0);
-            if ($productId < 1 || !PosProduct::where('company_id', $companyId)->whereKey($productId)->exists()) {
+            $product = $productId > 0 ? PosProduct::whereKey($productId)->first(['id', 'company_id']) : null;
+            $snapshotCompanyId = (int) (($line['tax_facts']['company_id'] ?? 0));
+            if ($productId < 1
+                || ($product && (int) $product->company_id !== $companyId)
+                || (!$product && $snapshotCompanyId !== $companyId)) {
                 throw ValidationException::withMessages(['payload.sale.items' => ['A product or deal component is outside the company.']]);
             }
+            // A signed Local Core sale is historical fact. A product can be
+            // retired after it was accepted, so keep the bill but never create
+            // an orphan InventoryStock/Movement row for an ID no longer present.
+            if (!$product) {
+                $unprojectable['products'][$productId] = 'product_deleted';
+                return;
+            }
+            $sourceProducts[$productId] = true;
             $recipe = $line['recipe_snapshot'] ?? [];
             if (!is_array($recipe)) {
                 throw ValidationException::withMessages(['payload.sale.items' => ['recipe_snapshot must be an array.']]);
@@ -166,6 +187,8 @@ class InventoryService
                 throw ValidationException::withMessages(['payload.sale.items' => ['A recipe product requires its immutable recipe snapshot.']]);
             }
             if ($recipe) {
+                $recipeParts = [];
+                $recipeUnavailable = false;
                 foreach ($recipe as $part) {
                     if (!is_array($part) || !is_numeric($part['quantity'] ?? null)
                         || !is_finite((float) $part['quantity']) || (float) $part['quantity'] <= 0) {
@@ -176,9 +199,25 @@ class InventoryService
                         throw ValidationException::withMessages(['payload.sale.items' => ['A recipe component stock id is invalid.']]);
                     }
                     $ingredientId = (int) $match[1];
-                    if (!Ingredient::where('company_id', $companyId)->whereKey($ingredientId)->exists()) {
+                    $ingredient = Ingredient::whereKey($ingredientId)->first(['id', 'company_id']);
+                    $partCompanyId = (int) ($part['company_id'] ?? 0);
+                    if (($ingredient && (int) $ingredient->company_id !== $companyId)
+                        || (!$ingredient && $partCompanyId !== $companyId)
+                        || ($partCompanyId !== 0 && $partCompanyId !== $companyId)) {
                         throw ValidationException::withMessages(['payload.sale.items' => ['A recipe component is outside the company.']]);
                     }
+                    if (!$ingredient) {
+                        $recipeUnavailable = true;
+                    }
+                    $recipeParts[] = [$part, $ingredientId];
+                }
+                if ($recipeUnavailable) {
+                    // Projecting only the surviving ingredients would make the
+                    // cloud ledger lie about a completed immutable sale.
+                    $unprojectable['products'][$productId] = 'recipe_ingredient_deleted';
+                    return;
+                }
+                foreach ($recipeParts as [$part, $ingredientId]) {
                     $needed = round($quantity * (float) $part['quantity'], 4);
                     $ingredients[$ingredientId]['quantity'] = round(($ingredients[$ingredientId]['quantity'] ?? 0) + $needed, 4);
                     $ingredients[$ingredientId]['products'][(string) $productId] =
@@ -204,7 +243,12 @@ class InventoryService
         }
         ksort($products);
         ksort($ingredients);
-        return ['products' => $products, 'ingredients' => $ingredients];
+        return [
+            'products' => $products,
+            'ingredients' => $ingredients,
+            'unprojectable' => $unprojectable,
+            'source_products' => array_keys($sourceProducts),
+        ];
     }
 
     /**
@@ -223,12 +267,34 @@ class InventoryService
             return ['idempotent' => true];
         }
 
+        $skipped = $consumptions['unprojectable'] ?? [];
         $productIds = array_keys($consumptions['products']);
-        if ($productIds) {
-            PosProduct::where('company_id', $companyId)->whereIn('id', $productIds)
-                ->orderBy('id')->lockForUpdate()->get();
-        }
+        $sourceProductIds = array_values(array_unique(array_merge(
+            $productIds, array_map('intval', $consumptions['source_products'] ?? [])
+        )));
+        $lockedProducts = $sourceProductIds
+            ? PosProduct::where('company_id', $companyId)->whereIn('id', $sourceProductIds)
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id')
+            : collect();
+        $ingredientIds = array_keys($consumptions['ingredients']);
+        $lockedIngredients = $ingredientIds
+            ? Ingredient::where('company_id', $companyId)->whereIn('id', $ingredientIds)
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id')
+            : collect();
+        [$consumptions, $raceSkips] = self::filterConsumptionsForLockedSources(
+            $consumptions,
+            $lockedProducts->keys()->map(fn ($id) => (int) $id)->all(),
+            $lockedIngredients->keys()->map(fn ($id) => (int) $id)->all()
+        );
+        $skipped = array_replace_recursive($skipped, $raceSkips);
+        $productIds = array_keys($consumptions['products']);
+        /* A source product can disappear after canonical validation but before
+           its lock is acquired. Never firstOrCreate stock for that orphan. */
         foreach ($productIds as $productId) {
+            if (!$lockedProducts->has($productId)) {
+                $skipped['products'][$productId] = 'product_deleted_during_projection';
+                continue;
+            }
             $stock = InventoryStock::where('company_id', $companyId)->where('product_id', $productId)
                 ->where('branch_id', $branchId)->lockForUpdate()->first();
             if (!$stock) {
@@ -251,11 +317,11 @@ class InventoryService
         }
 
         $ingredientIds = array_keys($consumptions['ingredients']);
-        $lockedIngredients = $ingredientIds
-            ? Ingredient::where('company_id', $companyId)->whereIn('id', $ingredientIds)
-                ->orderBy('id')->lockForUpdate()->get()->keyBy('id')
-            : collect();
         foreach ($ingredientIds as $ingredientId) {
+            if (!$lockedIngredients->has($ingredientId)) {
+                $skipped['ingredients'][$ingredientId] = 'ingredient_deleted_during_projection';
+                continue;
+            }
             $ingredient = $lockedIngredients[$ingredientId];
             $requirement = $consumptions['ingredients'][$ingredientId];
             $qty = (float) $requirement['quantity'];
@@ -304,7 +370,56 @@ class InventoryService
                 ]);
             }
         }
-        return ['idempotent' => false, 'consumptions' => $consumptions];
+        return ['idempotent' => false, 'consumptions' => $consumptions, 'skipped' => $skipped];
+    }
+
+    /**
+     * @internal Deterministic race boundary used after all source locks exist.
+     */
+    public static function filterConsumptionsForLockedSources(
+        array $consumptions, array $lockedProductIds, array $lockedIngredientIds
+    ): array {
+        $skipped = [];
+        foreach (array_keys($consumptions['products'] ?? []) as $productId) {
+            if (!in_array((int) $productId, $lockedProductIds, true)) {
+                unset($consumptions['products'][$productId]);
+                $skipped['products'][$productId] = 'product_deleted_during_projection';
+            }
+        }
+        $missingRecipeProducts = [];
+        foreach (($consumptions['ingredients'] ?? []) as $requirement) {
+            foreach (array_keys($requirement['products'] ?? []) as $productId) {
+                if (!in_array((int) $productId, $lockedProductIds, true)) {
+                    $missingRecipeProducts[(int) $productId] = true;
+                }
+            }
+        }
+        foreach (($consumptions['ingredients'] ?? []) as $ingredientId => $requirement) {
+            if (!in_array((int) $ingredientId, $lockedIngredientIds, true)) {
+                foreach (array_keys($requirement['products'] ?? []) as $productId) {
+                    $missingRecipeProducts[(int) $productId] = true;
+                }
+                $skipped['ingredients'][$ingredientId] = 'ingredient_deleted_during_projection';
+            }
+        }
+        foreach (($consumptions['ingredients'] ?? []) as $ingredientId => &$requirement) {
+            foreach (array_keys($requirement['products'] ?? []) as $productId) {
+                if (isset($missingRecipeProducts[(int) $productId])) {
+                    unset($requirement['products'][$productId]);
+                    $skipped['products'][$productId] = 'recipe_ingredient_deleted_during_projection';
+                }
+            }
+            $requirement['snapshot'] = array_values(array_filter(
+                $requirement['snapshot'] ?? [],
+                fn ($row) => !isset($missingRecipeProducts[(int) ($row['product_id'] ?? 0)])
+            ));
+            $requirement['quantity'] = round(array_sum($requirement['products'] ?? []), 4);
+            if ($requirement['quantity'] <= 0) {
+                unset($consumptions['ingredients'][$ingredientId]);
+            }
+        }
+        unset($requirement);
+        return [$consumptions, $skipped];
     }
 
     public static function addStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null)

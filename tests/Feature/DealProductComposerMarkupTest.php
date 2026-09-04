@@ -112,7 +112,7 @@ class DealProductComposerMarkupTest extends TestCase
         $this->assertSame(2, substr_count($fbr, "@include('pos.partials.deal-product-composer'"));
     }
 
-    public function test_sale_screens_ignore_stale_choice_groups_without_options(): void
+    public function test_sale_screens_require_every_configured_choice_group_to_have_usable_options(): void
     {
         $praSale = file_get_contents(resource_path('views/pos/universal.blade.php'));
         $fbrSale = file_get_contents(resource_path('views/fbr-pos/universal.blade.php'));
@@ -121,12 +121,12 @@ class DealProductComposerMarkupTest extends TestCase
 
         foreach ([$praSale, $fbrSale] as $sale) {
             $this->assertStringContainsString('Array.isArray(group.options) && group.options.length > 0', $sale);
-            $this->assertStringContainsString('this.pendingDeal = { ...deal, choice_groups: groups }', $sale);
         }
-        $this->assertStringContainsString('->filter(fn ($group) => $group->options->isNotEmpty())', $praPayload);
+        $this->assertStringContainsString('where(\'is_active\', true)', $praPayload);
+        $this->assertStringContainsString('choiceGroups->contains', $praPayload);
         $this->assertStringContainsString('$usableChoiceGroups', $fbrPayload);
-        $this->assertStringContainsString('choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())', $praPayload);
-        $this->assertStringContainsString('choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())', $fbrPayload);
+        $this->assertStringContainsString('$usableChoiceGroups->count() !== $dealRow->choiceGroups->count()', $fbrPayload);
+        $this->assertStringContainsString('where(\'is_active\', true)', $fbrPayload);
     }
 
     public function test_fbr_edit_failure_restores_every_scalar_control_only_for_its_edit_card(): void
@@ -150,5 +150,23 @@ class DealProductComposerMarkupTest extends TestCase
         }
         $this->assertStringContainsString("\$restoringEditDeal ? old('items', []) : \$dealItemsJson", $fbr);
         $this->assertStringContainsString("\$restoringEditDeal ? old('choice_groups', []) : \$dealChoiceGroupsJson", $fbr);
+    }
+
+    public function test_deals_navigation_uses_the_correct_panel_routes_and_permission_plan_gates(): void
+    {
+        $pra = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
+        $fbr = file_get_contents(resource_path('views/layouts/fbr-pos-app.blade.php'));
+
+        $this->assertStringContainsString('$dealsNavVisible', $pra);
+        $this->assertStringContainsString('$posUserLayout->isPosAdmin()', $pra);
+        $this->assertStringContainsString('$posNavCan(\'customize\', !$isCashierLayout)', $pra);
+        $this->assertStringContainsString("planAllows(\$companyLayout, 'deals_enabled')", $pra);
+        $this->assertStringContainsString("route('pos.deals')", $pra);
+        $this->assertStringNotContainsString("route('fbrpos.deals')", $pra);
+
+        $this->assertStringContainsString('$fbrDealsNavVisible', $fbr);
+        $this->assertStringContainsString('$fbrPlanDeals && $fbrUser && $fbrUser->isPosAdmin()', $fbr);
+        $this->assertStringContainsString("route('fbrpos.deals')", $fbr);
+        $this->assertStringNotContainsString("route('pos.deals')", $fbr);
     }
 }

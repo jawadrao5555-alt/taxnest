@@ -32,6 +32,11 @@ class PosDealChoiceSnapshotTest extends TestCase
         parent::setUp();
         Schema::dropAllTables();
 
+        Schema::create('companies', function (Blueprint $table) {
+            $table->id();
+            $table->boolean('inventory_enabled')->default(false);
+            $table->softDeletes();
+        });
         Schema::create('pos_products', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');
@@ -78,6 +83,10 @@ class PosDealChoiceSnapshotTest extends TestCase
             $table->timestamps();
         });
 
+        DB::table('companies')->insert([
+            ['id' => $this->companyId, 'inventory_enabled' => false],
+            ['id' => $this->otherCompanyId, 'inventory_enabled' => false],
+        ]);
         $this->fixedId = $this->product($this->companyId, 'Garlic Bread');
         $this->pizzaId = $this->product($this->companyId, 'Tikka Pizza');
         $this->drinkId = $this->product($this->companyId, 'Cola');
@@ -166,5 +175,101 @@ class PosDealChoiceSnapshotTest extends TestCase
         $this->resolve([
             ['group_id' => $this->pizzaGroupId, 'product_id' => $this->pizzaId],
         ]);
+    }
+
+    public function test_special_deal_with_only_choice_groups_can_reserve_for_billing(): void
+    {
+        DB::table('pos_deal_items')->where('deal_id', $this->dealId)->delete();
+        DB::table('pos_deals')->where('id', $this->dealId)->update([
+            'deal_type' => 'special',
+            'starts_on' => now()->toDateString(),
+            'ends_on' => now()->toDateString(),
+            'special_start_time' => '00:00',
+            'special_end_time' => '23:59',
+        ]);
+        $choices = [
+            ['group_id' => $this->pizzaGroupId, 'product_id' => $this->pizzaId],
+            ['group_id' => $this->drinkGroupId, 'product_id' => $this->drinkId],
+        ];
+        [$snapshot] = $this->resolve($choices);
+
+        $method = new \ReflectionMethod(PosController::class, 'reserveDealUnitsForInvoice');
+        $method->setAccessible(true);
+        $method->invoke(new PosController(), [[
+            'type' => 'deal',
+            'item_id' => $this->dealId,
+            'name' => 'Family Combo',
+            'price' => 999,
+            'quantity' => 1,
+            'deal_snapshot' => $snapshot,
+            'deal_choices' => $choices,
+        ]], $this->companyId);
+
+        $this->assertCount(2, $snapshot);
+        $this->assertSame($this->companyId, $snapshot[0]['tax_facts']['company_id']);
+        $this->assertArrayHasKey('recipe_snapshot', $snapshot[0]);
+    }
+
+    public function test_required_choice_group_with_no_active_option_is_rejected(): void
+    {
+        DB::table('pos_products')->where('id', $this->pizzaId)->update(['is_active' => false]);
+
+        $this->expectException(ValidationException::class);
+        $this->resolve([
+            ['group_id' => $this->pizzaGroupId, 'product_id' => $this->pizzaId],
+            ['group_id' => $this->drinkGroupId, 'product_id' => $this->drinkId],
+        ]);
+    }
+
+    public function test_deleted_authoritative_product_keeps_history_without_recreating_catalogue_row(): void
+    {
+        $deletedId = $this->pizzaId;
+        DB::table('pos_products')->where('id', $deletedId)->delete();
+        $before = DB::table('pos_products')->count();
+        $method = new \ReflectionMethod(PosController::class, 'resolveItemExemptions');
+        $method->setAccessible(true);
+
+        $resolved = $method->invoke(new PosController(), [[
+            'type' => 'product', 'item_id' => $deletedId, 'name' => 'Historical Pizza',
+            'quantity' => 1, 'unit_price' => 100,
+            'tax_snapshot' => ['exempt' => false, 'third_schedule' => false],
+        ]], $this->companyId, null, true);
+
+        $this->assertSame('product', $resolved[0]['type']);
+        $this->assertSame('Historical Pizza', $resolved[0]['name']);
+        $this->assertNull($resolved[0]['item_id']);
+        $this->assertSame($before, DB::table('pos_products')->count());
+    }
+
+    public function test_authoritative_product_with_existing_foreign_id_is_rejected(): void
+    {
+        $method = new \ReflectionMethod(PosController::class, 'resolveItemExemptions');
+        $method->setAccessible(true);
+        $this->expectException(ValidationException::class);
+        $method->invoke(new PosController(), [[
+            'type' => 'product', 'item_id' => $this->foreignId, 'name' => 'Foreign Product',
+            'quantity' => 1, 'unit_price' => 100,
+            'tax_snapshot' => ['exempt' => false, 'third_schedule' => false],
+        ]], $this->companyId, null, true);
+    }
+
+    public function test_rich_posted_deal_snapshot_with_tampered_tax_facts_is_rejected(): void
+    {
+        [$snapshot] = $this->resolve([
+            ['group_id' => $this->pizzaGroupId, 'product_id' => $this->pizzaId],
+            ['group_id' => $this->drinkGroupId, 'product_id' => $this->drinkId],
+        ]);
+        $snapshot[0]['tax_facts']['is_tax_exempt'] = !$snapshot[0]['tax_facts']['is_tax_exempt'];
+        $method = new \ReflectionMethod(PosController::class, 'resolveItemExemptions');
+        $method->setAccessible(true);
+        $this->expectException(ValidationException::class);
+        $method->invoke(new PosController(), [[
+            'type' => 'deal', 'item_id' => $this->dealId, 'name' => 'Family Combo',
+            'quantity' => 1, 'unit_price' => 999, 'deal_snapshot' => $snapshot,
+            'deal_choices' => [
+                ['group_id' => $this->pizzaGroupId, 'product_id' => $this->pizzaId],
+                ['group_id' => $this->drinkGroupId, 'product_id' => $this->drinkId],
+            ],
+        ]], $this->companyId);
     }
 }

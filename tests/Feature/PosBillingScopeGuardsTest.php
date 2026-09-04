@@ -258,6 +258,58 @@ class PosBillingScopeGuardsTest extends TestCase
             $table->integer('deleted_final_count')->default(0);
             $table->timestamps();
         });
+        Schema::create('pos_products', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name');
+            $table->decimal('price', 12, 2); $table->decimal('stock_quantity', 12, 3)->nullable();
+            $table->boolean('is_active')->default(true); $table->boolean('is_tax_exempt')->default(false);
+            $table->boolean('is_third_schedule')->default(false); $table->timestamps();
+        });
+        Schema::create('pos_deals', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name'); $table->decimal('price', 12, 2);
+            $table->string('deal_type')->default('regular'); $table->boolean('is_active')->default(true);
+            $table->date('starts_on')->nullable(); $table->date('ends_on')->nullable();
+            $table->time('special_start_time')->nullable(); $table->time('special_end_time')->nullable();
+            $table->json('active_days')->nullable(); $table->unsignedInteger('total_deal_units_limit')->nullable();
+            $table->unsignedInteger('daily_deal_units_limit')->nullable(); $table->timestamps();
+        });
+        Schema::create('pos_deal_items', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('deal_id'); $table->unsignedBigInteger('pos_product_id');
+            $table->unsignedInteger('quantity')->default(1); $table->timestamps();
+        });
+        Schema::create('pos_deal_usages', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('deal_id');
+            $table->date('usage_date'); $table->unsignedInteger('units_used')->default(0); $table->timestamps();
+            $table->unique(['company_id', 'deal_id', 'usage_date']);
+        });
+        Schema::create('inventory_stocks', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('branch_id')->nullable(); $table->decimal('quantity', 12, 3);
+            $table->timestamps();
+        });
+        Schema::create('ingredients', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->string('name'); $table->string('unit')->default('kg');
+            $table->decimal('current_stock', 12, 4)->default(0); $table->decimal('cost_per_unit', 12, 2)->default(0);
+            $table->boolean('is_active')->default(true); $table->timestamps();
+        });
+        Schema::create('product_recipes', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('ingredient_id'); $table->decimal('quantity_needed', 12, 4);
+            $table->unsignedInteger('recipe_version')->default(1); $table->boolean('is_active')->default(true); $table->timestamps();
+        });
+        Schema::create('inventory_movements', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('product_id');
+            $table->unsignedBigInteger('branch_id')->nullable(); $table->string('type'); $table->decimal('quantity', 12, 4);
+            $table->decimal('unit_price', 12, 2)->default(0); $table->decimal('total_price', 12, 2)->default(0);
+            $table->decimal('balance_after', 12, 4); $table->string('reference_type')->nullable();
+            $table->unsignedBigInteger('reference_id')->nullable(); $table->string('reference_number')->nullable();
+            $table->text('notes')->nullable(); $table->unsignedBigInteger('created_by')->nullable(); $table->timestamps();
+        });
+        Schema::create('recipe_consumptions', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('company_id'); $table->unsignedBigInteger('transaction_id');
+            $table->unsignedBigInteger('ingredient_id'); $table->unsignedBigInteger('branch_id')->nullable();
+            $table->decimal('quantity', 12, 4); $table->json('components'); $table->json('snapshot');
+            $table->string('invoice_number')->nullable(); $table->timestamps();
+        });
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -336,6 +388,7 @@ class PosBillingScopeGuardsTest extends TestCase
             'is_trial'     => false,
             'invoice_limit' => -1,
             'user_limit'   => null,
+            'deals_enabled' => true,
             'created_at'   => now(),
             'updated_at'   => now(),
         ]);
@@ -787,6 +840,185 @@ class PosBillingScopeGuardsTest extends TestCase
         $stored = DB::table('pos_transactions')->where('id', $draftId)->first();
         $this->assertSame(42, (int) $stored->bill_token,
             'draft-resume must preserve the originally frozen bill_token=42, not overwrite with counter token 1');
+    }
+
+    public function test_special_deal_stock_failure_returns_422_and_rolls_back_bill_quota_and_stock(): void
+    {
+        $cid = $this->makeCompany(['inventory_enabled' => true]);
+        $this->subscribe($cid);
+        $owner = $this->makeOwner($cid);
+        $productId = (int) DB::table('pos_products')->insertGetId([
+            'company_id' => $cid, 'name' => 'Limited Burger', 'price' => 100,
+            'stock_quantity' => 99, 'is_active' => true, 'is_tax_exempt' => false,
+            'is_third_schedule' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $dealId = (int) DB::table('pos_deals')->insertGetId([
+            'company_id' => $cid, 'name' => 'Lunch Special', 'price' => 100,
+            'deal_type' => 'special', 'is_active' => true, 'starts_on' => now()->toDateString(),
+            'ends_on' => now()->toDateString(), 'special_start_time' => '00:00',
+            'special_end_time' => '23:59', 'total_deal_units_limit' => 1,
+            'daily_deal_units_limit' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('pos_deal_items')->insert([
+            'deal_id' => $dealId, 'pos_product_id' => $productId, 'quantity' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('inventory_stocks')->insert([
+            'company_id' => $cid, 'product_id' => $productId, 'branch_id' => null,
+            'quantity' => 0, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $payload = [
+            'items' => [[
+                'type' => 'deal', 'item_id' => $dealId, 'name' => 'Lunch Special',
+                'quantity' => 1, 'unit_price' => 100, 'is_tax_exempt' => false,
+                'deal_snapshot' => [[
+                    'product_id' => $productId, 'name' => 'Limited Burger', 'qty' => 1,
+                ]],
+            ]],
+            'payment_method' => 'cash', 'discount_type' => 'amount', 'discount_value' => 0,
+        ];
+
+        $this->actingAs($owner, 'pos')->postJson('/pos/invoice/store', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('items');
+
+        $this->assertSame(0, DB::table('pos_transactions')->count());
+        $this->assertSame(0, DB::table('pos_transaction_items')->count());
+        $this->assertSame(0, DB::table('pos_payments')->count());
+        $this->assertSame(0, DB::table('pos_deal_usages')->count());
+        $this->assertSame(0.0, (float) DB::table('inventory_stocks')->value('quantity'));
+        $this->assertSame(99.0, (float) DB::table('pos_products')->where('id', $productId)->value('stock_quantity'));
+
+        DB::table('pos_deals')->where('id', $dealId)->update(['is_active' => false]);
+        $this->actingAs($owner, 'pos')->postJson('/pos/invoice/store', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('items');
+        $this->assertSame(0, DB::table('pos_transactions')->count());
+        $this->assertSame(0, DB::table('pos_deal_usages')->count());
+    }
+
+    public function test_special_deal_commits_frozen_recipe_when_live_recipe_changes_after_quota_reservation(): void
+    {
+        $cid = $this->makeCompany(['inventory_enabled' => true]);
+        $this->subscribe($cid);
+        $owner = $this->makeOwner($cid);
+        $productId = (int) DB::table('pos_products')->insertGetId([
+            'company_id' => $cid, 'name' => 'Recipe Meal', 'price' => 200,
+            'stock_quantity' => null, 'is_active' => true, 'is_tax_exempt' => false,
+            'is_third_schedule' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $a = (int) DB::table('ingredients')->insertGetId([
+            'company_id' => $cid, 'name' => 'Ingredient A', 'unit' => 'kg',
+            'current_stock' => 10, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $b = (int) DB::table('ingredients')->insertGetId([
+            'company_id' => $cid, 'name' => 'Ingredient B', 'unit' => 'kg',
+            'current_stock' => 10, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $recipeId = (int) DB::table('product_recipes')->insertGetId([
+            'company_id' => $cid, 'product_id' => $productId, 'ingredient_id' => $a,
+            'quantity_needed' => 2, 'recipe_version' => 1, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $dealId = (int) DB::table('pos_deals')->insertGetId([
+            'company_id' => $cid, 'name' => 'Frozen Recipe Special', 'price' => 200,
+            'deal_type' => 'special', 'is_active' => true, 'starts_on' => now()->toDateString(),
+            'ends_on' => now()->toDateString(), 'special_start_time' => '00:00', 'special_end_time' => '23:59',
+            'total_deal_units_limit' => 1, 'daily_deal_units_limit' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('pos_deal_items')->insert([
+            'deal_id' => $dealId, 'pos_product_id' => $productId, 'quantity' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\Event::listen(
+            'eloquent.created: App\Models\PosDealUsage',
+            function ($usage) use ($dealId, $recipeId, $b): void {
+                if ((int) $usage->deal_id === $dealId) {
+                    DB::table('product_recipes')->where('id', $recipeId)->update([
+                        'ingredient_id' => $b, 'quantity_needed' => 3,
+                        'recipe_version' => 2, 'updated_at' => now(),
+                    ]);
+                }
+            }
+        );
+
+        $this->actingAs($owner, 'pos')->postJson('/pos/invoice/store', [
+            'items' => [[
+                'type' => 'deal', 'item_id' => $dealId, 'name' => 'Frozen Recipe Special',
+                'quantity' => 1, 'unit_price' => 200, 'is_tax_exempt' => false,
+                // Legacy/simple browser snapshot is accepted and upgraded.
+                'deal_snapshot' => [['product_id' => $productId, 'name' => 'Recipe Meal', 'qty' => 1]],
+            ]],
+            'payment_method' => 'cash', 'discount_type' => 'amount', 'discount_value' => 0,
+        ])->assertOk()->assertJson(['success' => true]);
+
+        $this->assertSame(8.0, (float) DB::table('ingredients')->where('id', $a)->value('current_stock'));
+        $this->assertSame(10.0, (float) DB::table('ingredients')->where('id', $b)->value('current_stock'));
+        $snapshot = json_decode((string) DB::table('recipe_consumptions')->value('snapshot'), true);
+        $this->assertSame($a, $snapshot[0]['ingredient_id']);
+        $this->assertSame(1, DB::table('pos_deal_usages')->value('units_used'));
+        $this->assertSame(1, DB::table('pos_transactions')->count());
+        $this->assertSame(1, DB::table('pos_transaction_items')->count());
+        $this->assertSame(1, DB::table('pos_payments')->count());
+    }
+
+    public function test_special_deal_keeps_frozen_direct_mode_when_recipe_is_added_after_quota_reservation(): void
+    {
+        $cid = $this->makeCompany(['inventory_enabled' => true]);
+        $this->subscribe($cid);
+        $owner = $this->makeOwner($cid);
+        $productId = (int) DB::table('pos_products')->insertGetId([
+            'company_id' => $cid, 'name' => 'Ready Snack', 'price' => 150,
+            'stock_quantity' => 5, 'is_active' => true, 'is_tax_exempt' => false,
+            'is_third_schedule' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('inventory_stocks')->insert([
+            'company_id' => $cid, 'product_id' => $productId, 'branch_id' => null,
+            'quantity' => 5, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $ingredientId = (int) DB::table('ingredients')->insertGetId([
+            'company_id' => $cid, 'name' => 'Late Recipe Ingredient', 'unit' => 'kg',
+            'current_stock' => 10, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $dealId = (int) DB::table('pos_deals')->insertGetId([
+            'company_id' => $cid, 'name' => 'Frozen Direct Special', 'price' => 150,
+            'deal_type' => 'special', 'is_active' => true, 'starts_on' => now()->toDateString(),
+            'ends_on' => now()->toDateString(), 'special_start_time' => '00:00', 'special_end_time' => '23:59',
+            'total_deal_units_limit' => 1, 'daily_deal_units_limit' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('pos_deal_items')->insert([
+            'deal_id' => $dealId, 'pos_product_id' => $productId, 'quantity' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\Event::listen(
+            'eloquent.created: App\Models\PosDealUsage',
+            function ($usage) use ($dealId, $cid, $productId, $ingredientId): void {
+                if ((int) $usage->deal_id === $dealId) {
+                    DB::table('product_recipes')->insert([
+                        'company_id' => $cid, 'product_id' => $productId,
+                        'ingredient_id' => $ingredientId, 'quantity_needed' => 2,
+                        'recipe_version' => 1, 'is_active' => true,
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
+            }
+        );
+
+        $this->actingAs($owner, 'pos')->postJson('/pos/invoice/store', [
+            'items' => [[
+                'type' => 'deal', 'item_id' => $dealId, 'name' => 'Frozen Direct Special',
+                'quantity' => 1, 'unit_price' => 150, 'is_tax_exempt' => false,
+                'deal_snapshot' => [['product_id' => $productId, 'name' => 'Ready Snack', 'qty' => 1]],
+            ]],
+            'payment_method' => 'cash', 'discount_type' => 'amount', 'discount_value' => 0,
+        ])->assertOk()->assertJson(['success' => true]);
+
+        $this->assertSame(4.0, (float) DB::table('inventory_stocks')->where('product_id', $productId)->value('quantity'));
+        $this->assertSame(4.0, (float) DB::table('pos_products')->where('id', $productId)->value('stock_quantity'));
+        $this->assertSame(10.0, (float) DB::table('ingredients')->where('id', $ingredientId)->value('current_stock'));
+        $this->assertSame(0, DB::table('recipe_consumptions')->count());
+        $this->assertSame(1, DB::table('inventory_movements')->where('type', 'sale')->count());
+        $this->assertSame(1, DB::table('pos_deal_usages')->value('units_used'));
     }
 
     // ════════════════════════════════════════════════════════════════════════

@@ -425,10 +425,20 @@ class FbrPosController extends Controller
         if (!$this->fbrDealChoiceTablesReady()) {
             return [];
         }
-        // An empty persisted group is stale configuration, not an invoiceable
-        // choice. Ignore it here as well as in the sale payload so a fixed-only
-        // deal can still sell before its next editor update removes the row.
-        $groups = $deal->choiceGroups->filter(fn ($group) => $group->options->isNotEmpty())->values();
+        $activeOptionIds = Product::where('company_id', $deal->company_id)->where('is_active', true)
+            ->whereIn('id', $deal->choiceGroups->flatMap(fn ($group) => $group->options->pluck('product_id'))->unique())
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $groups = $deal->choiceGroups->map(function ($group) use ($activeOptionIds) {
+            $group->setRelation('options', $group->options->filter(
+                fn ($option) => in_array((int) $option->product_id, $activeOptionIds, true)
+            )->values());
+            return $group;
+        })->values();
+        if ($groups->contains(fn ($group) => $group->options->isEmpty())) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => [__('pos.deal_unavailable_line', ['name' => (string) $deal->name])],
+            ]);
+        }
         $postedChoices = is_array($postedChoices) ? array_values($postedChoices) : [];
         if ($groups->isEmpty()) {
             if (!empty($postedChoices)) {
@@ -1451,6 +1461,12 @@ class FbrPosController extends Controller
                     ->filter(fn ($group) => $group->options->contains(
                         fn ($option) => $choiceOptionProducts->has((int) $option->product_id)
                     )) : collect();
+                // A persisted choice group is required. Do not offer a deal
+                // whose group has no active company-owned option; checkout uses
+                // the identical rule under the deal lock.
+                if ($choiceTablesReady && $usableChoiceGroups->count() !== $dealRow->choiceGroups->count()) {
+                    continue;
+                }
                 $previewChoices = $usableChoiceGroups->map(function ($group) use ($choiceOptionProducts) {
                     $option = $group->options->first(
                         fn ($option) => $choiceOptionProducts->has((int) $option->product_id)

@@ -2754,6 +2754,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'payment_error_prefix' => 'Payment error: ',
     'payment_failed' => 'Payment fail ho gayi',
     'pay_timeout_retry' => 'Server ka jawab waqt par nahi aaya — dobara Pay dabayen, bill duplicate NAHI banega.',
+    'pay_network_retry' => 'Save karte waqt connection toot gaya — dobara Pay dabayen. Yehi bill check hoga aur duplicate NAHI banega.',
     'payment_label' => 'Payment',
     'payment_method' => 'Payment ka tareeqa',
     'payment_method_summary_month' => 'Payment tareeqay ka khulasa (is mahine)',

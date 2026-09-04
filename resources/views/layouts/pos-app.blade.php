@@ -1095,6 +1095,10 @@
             </div>
             @endif
 
+            {{-- Full-screen login-session notice must remain outside scrollable
+                 <main>; otherwise sale-screen containment clips it into a banner. --}}
+            <x-domain-move-notice />
+
             {{-- tn-fab-pad: room at the end of the page so the floating Madadgar
                  button (fixed bottom-left) stops covering the last card's corner
                  on phones. Full-height screens (sale, KDS, waiter) opt out — they
@@ -1102,7 +1106,6 @@
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade @unless(request()->is('*invoice/create') || request()->is('*kds*') || request()->is('*waiter*') || request()->is('*riders/tracking*')) tn-fab-pad @endunless" style="min-width: 0;">
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
-                <x-domain-move-notice />
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts" />
                 <x-trial-restaurant-notice />
                 @if(session('success'))

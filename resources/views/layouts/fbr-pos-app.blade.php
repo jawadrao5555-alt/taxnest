@@ -949,12 +949,15 @@
                 </div>
             </aside>
 
+            {{-- Full-screen login-session notice must remain outside scrollable
+                 <main>; otherwise sale-screen containment clips it into a banner. --}}
+            <x-domain-move-notice />
+
             {{-- tn-fab-pad — see pos-app.blade.php: clearance for the floating
                  Madadgar button on phones; full-height screens opt out. --}}
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll page-fade fbr-page-bg @unless(request()->is('*invoice/create') || request()->is('*kds*') || request()->is('*waiter*') || request()->is('*riders/tracking*')) tn-fab-pad @endunless" style="min-width: 0;">
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
-                <x-domain-move-notice />
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts"
                     :dismiss-route="route('fbrpos.bio-sync.dismiss-pin-alert')"
                     :setup-route="route('fbrpos.bio-sync.setup')" />

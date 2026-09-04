@@ -9826,9 +9826,14 @@ function restaurantPos() {
             this.showCustomerPicker = false;
             this.showToast(window.TXT.customer_prefix + c.name, 'success');
             if (c.phone) {
+                const selectedId = Number(c.id);
                 try {
                     const res = await fetch('/pos/restaurant/api/customer-lookup?phone=' + encodeURIComponent(c.phone));
                     const data = await res.json();
+                    // The cashier may choose another customer while this slower
+                    // enrichment request is in flight. Never apply old stats or
+                    // an old address to the newer selection.
+                    if (Number(this.selectedCustomer?.id) !== selectedId) return;
                     if (data.found) {
                         this.customerStats = data.stats;
                         if (data.customer.address && !this.selectedCustomer.address) {
@@ -9842,7 +9847,10 @@ function restaurantPos() {
         onCustomerPhoneInput() {
             if (this.customerPhoneTimer) clearTimeout(this.customerPhoneTimer);
             const q = this.customerPhoneQuery.trim();
-            if (this.selectedCustomer) {
+            // Keep the attached customer stable while the cashier searches for a
+            // possible replacement. Detach only when the field is deliberately
+            // emptied or when another result/walk-in is explicitly selected.
+            if (this.selectedCustomer && q.length === 0) {
                 this.selectedCustomer = null;
                 this.customerStats = null;
             }
@@ -10864,7 +10872,7 @@ function restaurantPos() {
             // first attempt succeeded but lost the response mid-flight.
             if (!this.payAttemptUuid) this.payAttemptUuid = this._newOfflineUuid();
             try {
-                const holdRes = await this.fetchWithTimeout('{{ route("pos.restaurant.orders.hold") }}', {
+                const holdRequest = () => this.fetchWithTimeout('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     // billing_flow — this is the INTERNAL hold-then-pay billing pass-through
                     // (normal final sale on restaurant companies), NOT an explicit Hold/KOT
@@ -10873,6 +10881,18 @@ function restaurantPos() {
                     // stays gated client + server.
                     body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, pay_uuid: this.payAttemptUuid, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
                 });
+                let holdRes;
+                try {
+                    holdRes = await holdRequest();
+                } catch (firstNetworkError) {
+                    // One automatic retry fixes brief Wi-Fi/proxy drops. The same
+                    // pay_uuid rides both attempts, so a lost successful response
+                    // replays the original bill instead of creating a duplicate.
+                    if (this._isTimeoutError(firstNetworkError)) throw firstNetworkError;
+                    console.warn('[processPayment] hold fetch failed once — retrying safely', firstNetworkError);
+                    await new Promise(resolve => setTimeout(resolve, 700));
+                    holdRes = await holdRequest();
+                }
                 if (!holdRes.ok) {
                     const bodyText = await holdRes.text().catch(() => '');
                     console.error('[holdOrder] HTTP', holdRes.status, holdRes.statusText, bodyText.slice(0, 500));
@@ -10926,8 +10946,13 @@ function restaurantPos() {
                 if (this._isTimeoutError(e)) {
                     this.showToast(window.TXT.pay_timeout_retry, 'error');
                 } else {
-                    this.showToast(window.TXT.submit_failed_prefix + (e?.message || e?.name || 'unknown') + ' — check console (F12)', 'error');
+                    this.showToast(window.TXT.pay_network_retry, 'error');
                 }
+                // Keep the payment sheet open with the complete cart intact. A
+                // second Pay press reuses payAttemptUuid and is safe by design.
+                this.showPayModal = true;
+                this.submitting = false;
+                return;
             }
             this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
         },

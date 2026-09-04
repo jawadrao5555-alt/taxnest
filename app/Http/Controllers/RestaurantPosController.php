@@ -3094,26 +3094,25 @@ class RestaurantPosController extends Controller
         $topProducts = RestaurantOrderItem::select('item_name',
             DB::raw('SUM(quantity) as total_qty'),
             DB::raw('SUM(subtotal) as total_revenue'))
-            ->whereHas('order', function ($q) use ($companyId, $today) {
+            ->whereHas('order', function ($q) use ($companyId, $cxFrom, $cxTo) {
                 $q->where('company_id', $companyId)
                     ->where('status', 'completed')
-                    ->where('created_at', '>=', $today->copy()->subDays(7));
+                    ->where('created_at', '>=', $cxFrom)
+                    ->where('created_at', '<', $cxTo);
             })
             ->groupBy('item_name')
             ->orderByDesc('total_qty')
             ->limit(8)
             ->get();
 
-        // Keep the widget a compact preview and send its "View all" action to
-        // the shared POS Reports implementation. The report owns stream,
-        // cashier and active-branch filtering; the dates reproduce this
-        // dashboard's seven business-day window.
+        // Top Selling is a current-business-day view. Do not force a historical
+        // range into "View all": the canonical Reports resolver defaults a
+        // date-less visit to Today while preserving any dates the user later
+        // selects explicitly.
         $topItemsReportUrl = route('pos.reports', [
             'top_items' => 1,
             'tab' => ($user?->posBillingScope() ?? 'both') === 'local' ? 'local' : 'pra',
             'cashier' => 'all',
-            'from' => \Carbon\Carbon::parse($bizDate, config('app.timezone'))->subDays(6)->toDateString(),
-            'to' => $bizDate,
         ]);
 
         // Inventory master switch — when company has inventory_enabled = false,

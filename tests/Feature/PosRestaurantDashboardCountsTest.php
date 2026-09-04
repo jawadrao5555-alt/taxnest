@@ -536,6 +536,25 @@ class PosRestaurantDashboardCountsTest extends TestCase
         }
     }
 
+    public function test_restaurant_top_sellers_and_view_all_default_to_the_current_business_day(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/RestaurantPosController.php'));
+        $start = strpos($controller, '$topProducts = RestaurantOrderItem::select');
+        $end = strpos($controller, '// Inventory master switch', $start);
+        $topSellerBlock = substr($controller, $start, $end - $start);
+
+        $this->assertStringContainsString("->where('created_at', '>=', \$cxFrom)", $topSellerBlock);
+        $this->assertStringContainsString("->where('created_at', '<', \$cxTo)", $topSellerBlock);
+        $this->assertStringNotContainsString('subDays(7)', $topSellerBlock);
+
+        $urlStart = strpos($topSellerBlock, '$topItemsReportUrl = route');
+        $urlBlock = substr($topSellerBlock, $urlStart);
+        $this->assertStringContainsString("'top_items' => 1", $urlBlock);
+        $this->assertStringContainsString("'cashier' => 'all'", $urlBlock);
+        $this->assertStringNotContainsString("'from' =>", $urlBlock);
+        $this->assertStringNotContainsString("'to' =>", $urlBlock);
+    }
+
     public function test_detailed_top_seller_report_uses_report_filters_and_business_dates_without_a_limit(): void
     {
         // This is deliberately source-focused: the report method is private,

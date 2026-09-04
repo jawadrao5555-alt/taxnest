@@ -13,5 +13,7 @@ assert(script.includes("path.join(dist, 'TaxNest-PRA-Agent')"));
 assert(script.includes("path.join(dist, 'TaxNest-PRA-Agent-Windows.zip')"));
 assert(script.includes("fs.copyFileSync(path.join(root, 'install.bat')"));
 assert(script.includes("fs.rmSync(unpacked, { recursive: true, force: true })"));
+assert(script.includes("'$ErrorActionPreference = \"Stop\";'"));
+assert(script.includes("].join(' ')"));
 
 console.log('portable packaging guard tests passed');

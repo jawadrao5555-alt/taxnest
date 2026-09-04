@@ -22,10 +22,10 @@ fs.copyFileSync(path.join(root, 'install.bat'), path.join(stage, 'install.bat'))
 let result;
 if (process.platform === 'win32') {
   const ps = [
-    '$ErrorActionPreference = "Stop"',
+    '$ErrorActionPreference = "Stop";',
     `Compress-Archive -Path '${stage.replace(/'/g, "''")}'`,
     `-DestinationPath '${output.replace(/'/g, "''")}' -Force`,
-  ].join('; ');
+  ].join(' ');
   result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], {
     cwd: dist,
     stdio: 'inherit',

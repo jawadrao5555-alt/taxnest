@@ -6,6 +6,7 @@
 - Settings read, manual Test/Save, Agent startup aur network-client boundary sab exact legacy `taxnest.com.pk` URL ko `https://taxnest.pk/api/agent` par normalize karte hain.
 - POS login se auto-configuration ke baad Settings form foran reload hota hai; purana stored domain screen par stale nazar nahi rehta.
 - Server-side legacy Agent bridge purane URL par phansay update-capable Agents ko heartbeat aur self-update lene deta hai; browser/app traffic ka sole official domain `taxnest.pk` hi rehta hai.
+- Windows release build canonical top-level-folder ZIP khud banata hai, taa-ke self-update asset workflow ke flat ZIP se overwrite na ho.
 
 ## v1.13.1 (2026-09-04)
 **Purana domain khud theek — chalti hui shops automatically `taxnest.pk` par**

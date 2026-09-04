@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "node scripts/ensure-deps.js && npx --yes electron-builder@26.15.3 --win --x64 --publish never && node scripts/verify-asar.js",
+    "build:win": "node scripts/ensure-deps.js && npx --yes electron-builder@26.15.3 --win --x64 --publish never && node scripts/verify-asar.js && node scripts/package-portable.js",
     "publish:win": "electron-builder --win --x64 --publish always"
   },
   "dependencies": {

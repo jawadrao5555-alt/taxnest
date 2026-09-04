@@ -741,6 +741,62 @@
                         <span class="shrink-0 text-[10px] font-semibold text-gray-400" x-show="savingLB" x-cloak>{{ __('pos.saving_ellipsis') }}</span>
                     </div>
                     <div class="space-y-3">
+                        @php
+                            $localNumberStyle = in_array(($company->local_number_style ?? 'serial'), ['serial', 'token', 'daily'], true)
+                                ? $company->local_number_style
+                                : 'serial';
+                        @endphp
+                        <div class="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-900/20 p-3"
+                             x-data="{
+                                style: {{ Js::from($localNumberStyle) }},
+                                savedStyle: {{ Js::from($localNumberStyle) }},
+                                busy: false,
+                                msg: '',
+                                err: '',
+                                save() {
+                                    if (this.busy || this.style === this.savedStyle) return;
+                                    const previous = this.savedStyle;
+                                    this.busy = true; this.msg = ''; this.err = '';
+                                    fetch('{{ route('pos.settings.local-billing.number-style', [], false) }}', {
+                                        method: 'POST',
+                                        headers: {'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},
+                                        body: JSON.stringify({style: this.style})
+                                    }).then(r => r.json().then(d => ({ok:r.ok,d})))
+                                      .then(({ok,d}) => {
+                                          if (ok && d && d.success === true && d.style === this.style) {
+                                              this.savedStyle = d.style;
+                                              this.msg = d.message || '';
+                                          } else {
+                                              this.style = previous;
+                                              this.err = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }};
+                                          }
+                                      })
+                                      .catch(() => {
+                                          this.style = previous;
+                                          this.err = {{ Js::from(__('pos.setting_save_failed')) }};
+                                      })
+                                      .finally(() => { this.busy = false; });
+                                }
+                             }">
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-[13px] font-bold text-indigo-900 dark:text-indigo-200">
+                                        {{ __('pos.local_number_display_title') }}
+                                        <x-new-badge feature="local_daily_number" class="ml-1" />
+                                    </p>
+                                    <p class="text-[11px] text-indigo-800 dark:text-indigo-300 mt-0.5">{{ __('pos.local_number_display_sub') }}</p>
+                                </div>
+                                <select x-model="style" @change="save()" :disabled="busy"
+                                    class="w-full sm:w-72 rounded-lg border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-900 text-sm font-semibold text-gray-800 dark:text-gray-100 focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="daily">{{ __('pos.number_style_daily') }}</option>
+                                    <option value="serial">{{ __('pos.number_style_serial') }}</option>
+                                    <option value="token">{{ __('pos.number_style_token') }}</option>
+                                </select>
+                            </div>
+                            <p class="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">{{ __('pos.number_style_daily_hint') }}</p>
+                            <p x-show="msg" x-cloak class="mt-2 text-[11px] font-bold text-emerald-700 dark:text-emerald-400" x-text="msg"></p>
+                            <p x-show="err" x-cloak class="mt-2 text-[11px] font-bold text-red-700 dark:text-red-400" x-text="err"></p>
+                        </div>
                         <div class="flex items-center justify-between gap-3 flex-wrap">
                             <div class="min-w-0">
                                 <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{{ __('pos.final_local_bills') }}</p>
@@ -887,7 +943,7 @@
                     </div>
                     {{-- Explicit reset is available only after every issued L-reference
                          is gone. It never runs as part of day close or Clear. --}}
-                    @if($localSeries['can_reset'] ?? false)
+                    @if(($localSeries['can_reset'] ?? false) && $localNumberStyle !== 'daily')
                     <div class="pt-3 border-t border-gray-100 dark:border-gray-800"
                          x-data="{ lrBusy: false, lrDone: false, lrMsg: '', lrErr: '', resetSeries() { if (this.lrBusy) return; this.lrBusy = true; this.lrErr = ''; fetch('{{ route('pos.settings.local-billing.reset-numbering', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:'{}'}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{ if (ok && d && d.success === true) { this.lrMsg = d.message || ''; this.lrDone = true; } else { this.lrErr = (d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}; } }).catch(()=>{ this.lrErr = {{ Js::from(__('pos.setting_save_failed')) }}; }).finally(()=>{ this.lrBusy = false; }); } }">
                         <div x-show="!lrDone" class="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-300 dark:border-teal-700">

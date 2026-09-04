@@ -676,12 +676,21 @@ class PosLocalSeriesResetTest extends TestCase
         $routes = file_get_contents(base_path('routes/web.php'));
 
         $this->assertStringContainsString("__('pos.local_billing_numbering_never_resets')", $customize);
+        $this->assertStringContainsString("route('pos.settings.local-billing.number-style'", $customize);
+        $this->assertStringContainsString("__('pos.local_number_display_sub')", $customize);
+        $this->assertStringContainsString("&& \$localNumberStyle !== 'daily'", $customize);
         $this->assertStringContainsString('reset-numbering', $customize);
         $this->assertStringContainsString('reset-numbering', $routes);
+        $this->assertStringContainsString('local-billing/number-style', $routes);
+
+        $receiptSettings = file_get_contents(base_path('resources/views/pos/receipt-settings.blade.php'));
+        $this->assertStringContainsString("['serial', 'token', 'daily']", $receiptSettings);
+        $this->assertStringContainsString('value="daily"', $receiptSettings);
 
         foreach (['en', 'rur', 'ur'] as $locale) {
             $copy = file_get_contents(base_path("lang/{$locale}/pos.php"));
             $this->assertStringContainsString("'local_billing_numbering_never_resets'", $copy);
+            $this->assertStringContainsString("'local_number_display_sub'", $copy);
             $this->assertStringContainsString("'spend_records_hint'", $copy);
             $this->assertStringContainsString("'auto_dayclose_6am_sub'", $copy);
         }

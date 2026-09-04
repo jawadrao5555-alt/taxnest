@@ -8204,6 +8204,37 @@ class PosController extends Controller
     }
 
     /**
+     * Receipt-facing local bill number style, exposed beside Local Billing so
+     * shops do not confuse the safe daily L001 display with rewinding the
+     * durable invoice reference. The underlying L-series is never changed.
+     */
+    public function updateLocalNumberStyle(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $validated = $request->validate([
+            'style' => 'required|in:serial,token,daily',
+        ]);
+
+        $company = Company::find(app('currentCompanyId'));
+        if (!$company || !\Illuminate\Support\Facades\Schema::hasColumn('companies', 'local_number_style')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 422);
+        }
+
+        $company->local_number_style = $validated['style'];
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'style' => $company->local_number_style,
+            'message' => __('pos.local_number_style_saved'),
+        ]);
+    }
+
+    /**
      * ARCHIVED local bills eligible for permanent cleanup.
      *
      * L-references are monotonic and remain consumed in the durable company

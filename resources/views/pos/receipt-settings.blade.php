@@ -430,10 +430,12 @@
              (PRA billing / Offline billing) apna numaya receipt number chunta hai —
              chalti serial ya roz ka token (subah 6 baje reset). Serial andar se
              hamesha chalta rahta hai (khata / search / return / PRA reporting). --}}
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
+        <div id="bill-number-style" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
             @php
                 $praNumPref = ($company->pra_number_style ?? 'serial') === 'token' ? 'token' : 'serial';
-                $localNumPref = ($company->local_number_style ?? 'serial') === 'token' ? 'token' : 'serial';
+                $localNumPref = in_array(($company->local_number_style ?? 'serial'), ['serial', 'token', 'daily'], true)
+                    ? $company->local_number_style
+                    : 'serial';
             @endphp
             <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">🎫 {{ __('pos.number_style_title') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.number_style_scope') }}</span></label>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.number_style_intro') }}</p>

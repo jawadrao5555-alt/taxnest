@@ -351,6 +351,44 @@ class PosBillingScopeGuardsTest extends TestCase
         ]);
     }
 
+    public function test_owner_can_choose_automatic_daily_local_number_without_rewinding_the_serial(): void
+    {
+        $companyId = $this->makeCompany([
+            'local_number_style' => 'serial',
+            'bill_token_counter_local' => 42,
+        ]);
+        $owner = $this->makeOwner($companyId);
+
+        $this->actingAs($owner, 'pos')
+            ->postJson('/pos/settings/local-billing/number-style', ['style' => 'daily'])
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'style' => 'daily',
+            ]);
+
+        $company = DB::table('companies')->where('id', $companyId)->first();
+        $this->assertSame('daily', $company->local_number_style);
+        $this->assertSame(42, (int) $company->bill_token_counter_local, 'Changing display style must not rewind a counter');
+    }
+
+    public function test_cashier_cannot_change_local_number_style_and_invalid_styles_are_rejected(): void
+    {
+        $companyId = $this->makeCompany();
+        $cashier = $this->makeUser($companyId);
+        $owner = $this->makeOwner($companyId);
+
+        $this->actingAs($cashier, 'pos')
+            ->postJson('/pos/settings/local-billing/number-style', ['style' => 'daily'])
+            ->assertForbidden();
+
+        $this->actingAs($owner, 'pos')
+            ->postJson('/pos/settings/local-billing/number-style', ['style' => 'reset'])
+            ->assertUnprocessable();
+
+        $this->assertSame('serial', DB::table('companies')->where('id', $companyId)->value('local_number_style'));
+    }
+
     /**
      * Insert a completed POS transaction.
      * 'local' stream: invoice_mode='local', pra_status='local' (provisional)

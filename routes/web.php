@@ -891,6 +891,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/restock-toggle', [PosController::class, 'updateRestockToggle'])->name('pos.settings.restock-toggle');
     Route::post('/settings/auto-purge-local-toggle', [PosController::class, 'toggleAutoPurgeLocal'])->name('pos.settings.auto-purge-local-toggle');
     Route::post('/settings/local-billing', [PosController::class, 'updateLocalBillingSettings'])->name('pos.settings.local-billing');
+    Route::post('/settings/local-billing/number-style', [PosController::class, 'updateLocalNumberStyle'])->name('pos.settings.local-billing.number-style');
     // Task 1358: owner-confirmed clear of ARCHIVED local bill detail (admin-only,
     // permanent — never runs on its own and never resets the L-series).
     Route::post('/settings/local-billing/clear-archived', [PosController::class, 'clearArchivedLocalBills'])->name('pos.settings.local-billing.clear-archived');

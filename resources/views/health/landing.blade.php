@@ -82,8 +82,15 @@
                     <p class="mt-2 text-xs text-gray-600 leading-relaxed flex-1">{{ $vertical['blurb'] ?? '' }}</p>
                     @if($vertical['live'] ?? false)
                         <div class="mt-5 flex flex-wrap gap-2">
-                            <a href="{{ url(NestErps::registerPath($key)) }}"
-                               class="px-5 py-2.5 rounded-xl bg-[#0A4D5C] hover:bg-[#083c48] text-white text-sm font-bold transition">Start your organisation</a>
+                            {{-- "Live" here means the vertical is built and deployed, which is
+                                 not the same as being open to strangers. While it is pre-pilot
+                                 the front door stays shut, so the sign-up call-to-action asks
+                                 the same predicate the route guard does — the page can never
+                                 offer a door the server will answer with a 404. --}}
+                            @if(HealthPanel::registrationOpen())
+                                <a href="{{ url(NestErps::registerPath($key)) }}"
+                                   class="px-5 py-2.5 rounded-xl bg-[#0A4D5C] hover:bg-[#083c48] text-white text-sm font-bold transition">Start your organisation</a>
+                            @endif
                             <a href="{{ url(NestErps::loginPath($key)) }}"
                                class="px-5 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-[#0A4D5C] text-sm font-bold transition">Log in</a>
                         </div>

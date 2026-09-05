@@ -76,6 +76,9 @@ class HealthAccessService
             'billing.view', 'billing.charge',
             'accounts.view',
             'hr.view', 'hr.manage',
+            'hr.attendance.view', 'hr.attendance.correct', 'hr.attendance.approve',
+            'hr.leave.approve',
+            'hr.payroll.view',
             'reports.view',
             'departments.manage',
             'staff.manage',
@@ -129,12 +132,15 @@ class HealthAccessService
         // Owns the money side. Reaches an inpatient stay to post its charges,
         // take advances and clear the bill — but holds neither clinical.view
         // nor ipd.manage, so every screen withholds the clinical narrative and
-        // no ward move is possible from this account.
+        // no ward move is possible from this account. Reads the payroll handoff
+        // too, because somebody has to pay the staff, but cannot alter the
+        // attendance it is built from.
         'health_accountant' => [
             'dashboard.view',
             'billing.view', 'billing.charge',
             'ipd.view', 'ipd.charge', 'ipd.discharge',
             'accounts.view', 'accounts.manage',
+            'hr.view', 'hr.payroll.view',
             'reports.view',
         ],
         // Read-only by definition (see READ_ONLY_ROLES). Clinical notes are
@@ -149,6 +155,7 @@ class HealthAccessService
             'lab.view',
             'billing.view',
             'accounts.view',
+            'hr.view', 'hr.attendance.view', 'hr.payroll.view',
             'reports.view',
             'audit.view',
         ],
@@ -161,10 +168,16 @@ class HealthAccessService
             'billing.view', 'billing.charge',
             'ipd.charge',
         ],
-        // Staff records and attendance. Never patients, never money.
+        // Staff records, rosters, leave and attendance — the whole HR desk.
+        // Never patients, never the ledger. Holds the payroll handoff because
+        // HR is who hands it over, but it stays an attendance export, not a
+        // payroll run.
         'health_hr' => [
             'dashboard.view',
             'hr.view', 'hr.manage',
+            'hr.attendance.view', 'hr.attendance.correct', 'hr.attendance.approve',
+            'hr.leave.approve',
+            'hr.payroll.view',
             'reports.view',
         ],
     ];
@@ -192,8 +205,14 @@ class HealthAccessService
     /** Roles that may never hold a write capability, however they were granted. */
     public const READ_ONLY_ROLES = ['health_auditor'];
 
-    /** Capability suffixes that count as a write for READ_ONLY_ROLES. */
-    private const WRITE_SUFFIXES = ['manage', 'write', 'charge', 'dispense', 'collect', 'result', 'record'];
+    /**
+     * Capability suffixes that count as a write for READ_ONLY_ROLES.
+     *
+     * `correct` and `approve` joined the list with healthcare HR: approving a
+     * colleague's attendance correction or leave is a write in every sense that
+     * matters, so an auditor must not hold it however it was granted.
+     */
+    private const WRITE_SUFFIXES = ['manage', 'write', 'charge', 'dispense', 'collect', 'result', 'record', 'correct', 'approve'];
 
     /** Capabilities only the organisation owner may ever exercise. */
     public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate'];
@@ -437,6 +456,13 @@ class HealthAccessService
         '#^health/lab#'               => 'lab.view',
         '#^health/billing#'           => 'billing.view',
         '#^health/accounts#'          => 'accounts.view',
+        // First match wins, so the HR sub-desks sit above the generic rule.
+        // The payroll handoff is the one an accountant reaches without holding
+        // hr.manage, and attendance is the one a duty manager reaches without
+        // seeing anybody's salary.
+        '#^health/hr/payroll#'        => 'hr.payroll.view',
+        '#^health/hr/attendance#'     => 'hr.attendance.view',
+        '#^health/hr/corrections#'    => 'hr.attendance.view',
         '#^health/hr#'                => 'hr.view',
         '#^health/audit#'             => 'audit.view',
         '#^health/reports#'           => 'reports.view',

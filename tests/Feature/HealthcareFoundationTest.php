@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
+use App\Models\HealthAttendancePunch;
 use App\Models\HealthDepartment;
 use App\Models\User;
 use App\Services\HealthAccessService;
+use App\Services\HealthHrService;
 use App\Services\HealthModuleService;
 use App\Services\HealthScopeService;
 use App\Support\HealthPanel;
@@ -369,9 +371,15 @@ class HealthcareFoundationTest extends TestCase
             'health_nurse'        => [['nursing.record', 'ipd.manage'], ['clinical.write', 'billing.view']],
             'health_pharmacist'   => [['pharmacy.dispense'], ['clinical.write', 'lab.result']],
             'health_lab_tech'     => [['lab.collect', 'lab.result'], ['clinical.view', 'pharmacy.dispense']],
-            'health_accountant'   => [['accounts.manage', 'billing.charge'], ['patients.view', 'clinical.view']],
+            'health_accountant'   => [
+                ['accounts.manage', 'billing.charge', 'hr.payroll.view'],
+                ['patients.view', 'clinical.view', 'hr.manage', 'hr.attendance.correct', 'hr.attendance.approve'],
+            ],
             'health_cashier'      => [['billing.charge'], ['accounts.manage', 'clinical.view']],
-            'health_hr'           => [['hr.manage'], ['patients.view', 'billing.view']],
+            'health_hr'           => [
+                ['hr.manage', 'hr.attendance.view', 'hr.attendance.correct', 'hr.attendance.approve', 'hr.leave.approve', 'hr.payroll.view'],
+                ['patients.view', 'billing.view'],
+            ],
             'health_admin'        => [['staff.manage', 'settings.manage'], ['clinical.write', 'lab.result']],
         ];
 
@@ -411,6 +419,18 @@ class HealthcareFoundationTest extends TestCase
         $this->assertFalse(HealthAccessService::can($auditor, 'accounts.manage', $company));
         $this->assertFalse(HealthAccessService::can($auditor, 'billing.charge', $company));
         $this->assertFalse(HealthAccessService::can($auditor, 'clinical.write', $company));
+
+        // Reading attendance is fine for an audit; deciding on it is not.
+        $this->assertTrue(HealthAccessService::can($auditor, 'hr.attendance.view', $company));
+        $auditor->health_permissions = json_encode([
+            'hr.attendance.correct', 'hr.attendance.approve', 'hr.leave.approve',
+        ]);
+        $auditor->save();
+        $this->forgetHealthCaches();
+
+        $this->assertFalse(HealthAccessService::can($auditor, 'hr.attendance.correct', $company));
+        $this->assertFalse(HealthAccessService::can($auditor, 'hr.attendance.approve', $company));
+        $this->assertFalse(HealthAccessService::can($auditor, 'hr.leave.approve', $company));
 
         // Delegation refuses the auditor outright.
         $this->assertNull(HealthAccessService::setCustomSet($auditor, ['accounts.manage'], $company));
@@ -677,6 +697,341 @@ class HealthcareFoundationTest extends TestCase
         $this->get('/health/settings')->assertStatus(403);
         // The dashboard needs no capability.
         $this->get('/health/dashboard')->assertStatus(200);
+    }
+
+    public function test_the_attendance_export_hands_no_salary_to_an_attendance_only_manager(): void
+    {
+        // Hospital package, so the HR module is actually sold, plus the real
+        // HR schema — this export reads it.
+        $this->upgradeToHospital();
+        DB::table('companies')->where('id', $this->healthCompanyId)
+            ->update(['health_modules' => json_encode(HealthModuleService::MODULES)]);
+        (require base_path('database/migrations/2026_10_09_100000_create_healthcare_hr_attendance.php'))->up();
+        $this->forgetHealthCaches();
+
+        $company = $this->healthCompany();
+
+        // Somebody who runs the attendance desk and nothing else: the roster
+        // and the punches are theirs, the salaries are not.
+        $manager = $this->makeStaff('health_hr');
+        HealthAccessService::setCustomSet($manager, ['hr.view', 'hr.attendance.view'], $company);
+        $this->forgetHealthCaches();
+        $manager->refresh();
+
+        $this->assertTrue(HealthAccessService::can($manager, 'hr.attendance.view', $company));
+        $this->assertFalse(HealthAccessService::can($manager, 'hr.payroll.view', $company));
+
+        $this->actingAs($manager, HealthPanel::GUARD);
+
+        // The payroll screen and its export are closed outright.
+        $this->get('/health/hr/payroll')->assertStatus(403);
+        $this->get('/health/hr/payroll/export')->assertStatus(403);
+
+        // The attendance export opens — WITHOUT the money columns. Absent, not
+        // blanked: nothing about anybody's pay travels on this file.
+        $response = $this->get('/health/hr/attendance/reports/export?year=2026&month=3');
+        $response->assertStatus(200);
+        $csv = $response->streamedContent();
+
+        foreach (['Basic Salary', 'Basic Earned', 'Overtime Pay', 'Gross'] as $column) {
+            $this->assertStringNotContainsString($column, $csv, $column . ' must not reach an attendance-only manager');
+        }
+        $this->assertStringContainsString('Payable Days', $csv);
+        $this->assertStringContainsString('Overtime Hours', $csv);
+
+        // And for whoever does hold the payroll permission, the same export
+        // still carries them.
+        HealthAccessService::setCustomSet($manager, null, $company);
+        $this->forgetHealthCaches();
+        $manager->refresh();
+
+        $this->actingAs($manager, HealthPanel::GUARD);
+        $paid = $this->get('/health/hr/attendance/reports/export?year=2026&month=3');
+        $paid->assertStatus(200);
+        $this->assertStringContainsString('Basic Salary', $paid->streamedContent());
+    }
+
+    /**
+     * The geofence has to MEASURE something.
+     *
+     * "Location required" used to mean only that the phone sent a coordinate,
+     * and a phone will happily send any coordinate at all. A staff member at
+     * home could clock in for a shift they never came to. Distance from the
+     * configured site is now checked on the server, and a site nobody has
+     * configured REFUSES the punch instead of waving it through.
+     */
+    public function test_a_location_check_in_refuses_forged_coordinates(): void
+    {
+        $this->prepareHrModule();
+        $nurse = $this->makeStaff('health_nurse');
+
+        $policy = HealthHrService::policy($this->healthCompanyId);
+        $policy->forceFill([
+            'geo_required'  => true,
+            'geo_radius_m'  => 200,
+            'geo_latitude'  => 33.6844,   // the hospital
+            'geo_longitude' => 73.0479,
+        ])->save();
+        HealthHrService::forget();
+
+        $this->actingAs($nurse, HealthPanel::GUARD);
+
+        // Somebody 1,100 km away, sending perfectly valid numbers.
+        $far = $this->postJson('/health/my/punch', [
+            'channel'   => 'web',
+            'latitude'  => 24.8607,
+            'longitude' => 67.0011,
+        ]);
+        $far->assertStatus(422);
+        $this->assertSame(0, HealthAttendancePunch::withoutGlobalScopes()
+            ->where('user_id', $nurse->id)->count(), 'a forged punch must not be recorded');
+
+        // The same person standing at the door.
+        $near = $this->postJson('/health/my/punch', [
+            'channel'   => 'web',
+            'latitude'  => 33.6846,
+            'longitude' => 73.0481,
+        ]);
+        $near->assertStatus(200);
+        $this->assertSame(1, HealthAttendancePunch::withoutGlobalScopes()
+            ->where('user_id', $nurse->id)->count());
+    }
+
+    public function test_a_location_check_in_refuses_when_no_site_has_been_configured(): void
+    {
+        $this->prepareHrModule();
+        $nurse = $this->makeStaff('health_nurse');
+
+        // The switch is on, but nobody ever set a centre for it.
+        $policy = HealthHrService::policy($this->healthCompanyId);
+        $policy->forceFill(['geo_required' => true, 'geo_radius_m' => 200])->save();
+        HealthHrService::forget();
+
+        $this->actingAs($nurse, HealthPanel::GUARD);
+
+        $response = $this->postJson('/health/my/punch', [
+            'channel'   => 'web',
+            'latitude'  => 33.6844,
+            'longitude' => 73.0479,
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertSame(0, HealthAttendancePunch::withoutGlobalScopes()
+            ->where('user_id', $nurse->id)->count());
+    }
+
+    /**
+     * Cross-branch OFF has to actually stop something.
+     *
+     * The calculation can only ever FLAG a cross-branch day after it happened.
+     * The switch is honoured where a decision is still open: a person tapping
+     * check-in at a branch that is not their posting.
+     */
+    public function test_cross_branch_off_refuses_a_punch_at_another_branch(): void
+    {
+        $this->prepareHrModule();
+
+        $mainId = DB::table('branches')->insertGetId([
+            'company_id' => $this->healthCompanyId, 'name' => 'Main',
+            'is_head_office' => true, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $annexId = DB::table('branches')->insertGetId([
+            'company_id' => $this->healthCompanyId, 'name' => 'Annex',
+            'is_head_office' => false, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $nurse = $this->makeStaff('health_nurse');
+
+        // Posted to the Annex, standing in Main (which is where a plain
+        // employee's branch context lands).
+        $profile = HealthHrService::profile($this->healthCompanyId, (int) $nurse->id);
+        $profile->forceFill(['branch_id' => $annexId])->save();
+
+        $policy = HealthHrService::policy($this->healthCompanyId);
+        $policy->forceFill(['cross_branch_allowed' => false])->save();
+        HealthHrService::forget();
+
+        $this->actingAs($nurse, HealthPanel::GUARD);
+        $this->postJson('/health/my/punch', ['channel' => 'web'])->assertStatus(422);
+        $this->assertSame(0, HealthAttendancePunch::withoutGlobalScopes()
+            ->where('user_id', $nurse->id)->count());
+
+        // With the switch back on, the same punch is welcome.
+        $policy = HealthHrService::policy($this->healthCompanyId);
+        $policy->forceFill(['cross_branch_allowed' => true])->save();
+        HealthHrService::forget();
+
+        $this->postJson('/health/my/punch', ['channel' => 'web'])->assertStatus(200);
+        $this->assertSame(1, HealthAttendancePunch::withoutGlobalScopes()
+            ->where('user_id', $nurse->id)->count());
+        $this->assertSame($mainId, (int) HealthAttendancePunch::withoutGlobalScopes()
+            ->where('user_id', $nurse->id)->value('branch_id'));
+    }
+
+    /**
+     * A nurse can withdraw her own leave request.
+     *
+     * The cancel button used to point at the HR desk's URL, which needs
+     * hr.view — a permission ordinary staff do not hold, so the button 403'd
+     * for exactly the people it was drawn for.
+     */
+    public function test_staff_can_withdraw_their_own_leave_without_hr_access(): void
+    {
+        $this->prepareHrModule();
+        HealthHrService::ensureLeaveTypes($this->healthCompanyId);
+        $typeId = (int) DB::table('health_leave_types')
+            ->where('company_id', $this->healthCompanyId)->value('id');
+
+        $nurse = $this->makeStaff('health_nurse');
+        $this->actingAs($nurse, HealthPanel::GUARD);
+
+        // The HR leave desk is not hers.
+        $this->get('/health/hr/leave')->assertStatus(403);
+
+        $this->post('/health/my/leave', [
+            'health_leave_type_id' => $typeId,
+            'start_date'           => now()->addDays(3)->toDateString(),
+            'end_date'             => now()->addDays(4)->toDateString(),
+            'reason'               => 'Family matter',
+        ]);
+
+        $leaveId = (int) DB::table('health_leave_requests')
+            ->where('user_id', $nurse->id)->value('id');
+        $this->assertNotSame(0, $leaveId, 'the request must have been created');
+
+        $this->post('/health/my/leave/' . $leaveId . '/cancel');
+
+        $this->assertSame('cancelled', DB::table('health_leave_requests')
+            ->where('id', $leaveId)->value('status'));
+    }
+
+    /** The switch and the centre it measures from live on the same screen. */
+    public function test_the_policy_screen_offers_a_site_location(): void
+    {
+        $this->prepareHrModule();
+
+        DB::table('branches')->insert([
+            'company_id' => $this->healthCompanyId, 'name' => 'Annex',
+            'is_head_office' => false, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $owner = User::where('email', 'owner@shifa.test')->firstOrFail();
+        $this->actingAs($owner, HealthPanel::GUARD);
+
+        $response = $this->get('/health/hr/policy');
+        $response->assertStatus(200);
+        $response->assertSee('name="geo_latitude"', false);
+        $response->assertSee('name="geo_longitude"', false);
+    }
+
+    /**
+     * Bulk publish is how a roster is really built, so the pattern it writes
+     * has to pass the SAME checks as a single cell.
+     *
+     * Roster rows carry no foreign keys, so an id nobody checked is stored
+     * happily and only surfaces later as a duty that resolves to nothing, or
+     * as attendance attributed to a branch the person was never posted to.
+     */
+    public function test_bulk_roster_refuses_a_foreign_branch_a_foreign_shift_and_a_blocked_cross_branch_run(): void
+    {
+        $this->prepareHrModule();
+
+        $annexId = DB::table('branches')->insertGetId([
+            'company_id' => $this->healthCompanyId, 'name' => 'Annex',
+            'is_head_office' => false, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $otherCompanyBranchId = DB::table('branches')->insertGetId([
+            'company_id' => $this->posCompanyId, 'name' => 'Somebody Else',
+            'is_head_office' => true, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $nurse = $this->makeStaff('health_nurse');
+        $owner = User::where('email', 'owner@shifa.test')->firstOrFail();
+
+        // A shift belonging to another company entirely.
+        $foreignShiftId = DB::table('health_shifts')->insertGetId([
+            'company_id' => $this->posCompanyId, 'name' => 'Not ours',
+            'start_time' => '09:00:00', 'end_time' => '17:00:00',
+            'crosses_midnight' => false, 'break_minutes' => 0, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $ourShiftId = DB::table('health_shifts')->insertGetId([
+            'company_id' => $this->healthCompanyId, 'name' => 'Morning',
+            'start_time' => '09:00:00', 'end_time' => '17:00:00',
+            'crosses_midnight' => false, 'break_minutes' => 0, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($owner, HealthPanel::GUARD);
+
+        $base = [
+            'user_ids'   => [$nurse->id],
+            'from'       => '2026-04-01',
+            'to'         => '2026-04-03',
+            'entry_type' => 'shift',
+        ];
+
+        // 1. A branch that is not this company's.
+        $this->post('/health/hr/roster/bulk', $base + [
+            'health_shift_id' => $ourShiftId,
+            'branch_id'       => $otherCompanyBranchId,
+        ])->assertSessionHas('error');
+
+        // 2. A shift that is not this company's.
+        $this->post('/health/hr/roster/bulk', $base + [
+            'health_shift_id' => $foreignShiftId,
+        ])->assertSessionHas('error');
+
+        $this->assertSame(0, DB::table('health_roster_entries')->count(),
+            'nothing may be written by a refused bulk run');
+
+        // 3. Cross-branch off, and the pattern points somewhere that is not
+        //    this nurse's own posting.
+        $profile = HealthHrService::profile($this->healthCompanyId, (int) $nurse->id);
+        $profile->forceFill(['branch_id' => $annexId])->save();
+
+        $policy = HealthHrService::policy($this->healthCompanyId);
+        $policy->forceFill(['cross_branch_allowed' => false])->save();
+        HealthHrService::forget();
+
+        $mainId = DB::table('branches')->insertGetId([
+            'company_id' => $this->healthCompanyId, 'name' => 'Main',
+            'is_head_office' => true, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->post('/health/hr/roster/bulk', $base + [
+            'health_shift_id' => $ourShiftId,
+            'branch_id'       => $mainId,
+        ])->assertSessionHas('error');
+
+        $this->assertSame(0, DB::table('health_roster_entries')->count(),
+            'a cross-branch bulk run must write nothing at all');
+
+        // The same run at her OWN branch goes through.
+        $this->post('/health/hr/roster/bulk', $base + [
+            'health_shift_id' => $ourShiftId,
+            'branch_id'       => $annexId,
+        ]);
+
+        $this->assertSame(3, DB::table('health_roster_entries')->count());
+    }
+
+    /** Hospital package + every module on + the real HR schema. */
+    private function prepareHrModule(): void
+    {
+        $this->upgradeToHospital();
+        DB::table('companies')->where('id', $this->healthCompanyId)
+            ->update(['health_modules' => json_encode(HealthModuleService::MODULES)]);
+        (require base_path('database/migrations/2026_10_09_100000_create_healthcare_hr_attendance.php'))->up();
+        (require base_path('database/migrations/2026_10_16_100000_add_health_site_geofence.php'))->up();
+        $this->forgetHealthCaches();
+        HealthHrService::forget();
     }
 
     public function test_only_the_owner_reaches_the_module_switchboard(): void

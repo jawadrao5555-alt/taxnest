@@ -42,6 +42,14 @@
         ['key' => 'billing',      'route' => 'health.billing',      'cap' => 'billing.view',        'module' => 'accounts', 'label' => 'health.nav_billing'],
         ['key' => 'accounts',     'route' => 'health.accounts',     'cap' => 'accounts.view',       'module' => 'accounts', 'label' => 'health.nav_accounts'],
         ['key' => 'hr',           'route' => 'health.hr',           'cap' => 'hr.view',             'module' => 'hr',       'label' => 'health.nav_hr'],
+        /*
+         * My Duty — the self-service half of HR: your own attendance, your own
+         * leave, your own correction requests. It rides on dashboard.view, the
+         * one capability every panel member holds, because everybody who works
+         * here has attendance — including the auditor, whose read-only
+         * guarantee covers other people's records, not their own punch clock.
+         */
+        ['key' => 'myduty',       'route' => 'health.my.attendance', 'cap' => 'dashboard.view',     'module' => 'hr',       'label' => 'health.nav_my_duty'],
         ['key' => 'reports',      'route' => 'health.reports',      'cap' => 'reports.view',        'module' => null,       'label' => 'health.nav_reports'],
         ['key' => 'audit',        'route' => 'health.audit',        'cap' => 'audit.view',          'module' => null,       'label' => 'health.nav_audit'],
         ['key' => 'departments',  'route' => 'health.departments',  'cap' => 'departments.manage',  'module' => null,       'label' => 'health.nav_departments'],
@@ -75,6 +83,7 @@
         'billing'      => 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z',
         'accounts'     => 'M9 7h6m-6 4h6m-6 4h4M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z',
         'hr'           => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+        'myduty'       => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
         'reports'      => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
         'audit'        => 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
         'departments'  => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',

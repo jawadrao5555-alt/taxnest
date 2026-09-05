@@ -90,7 +90,18 @@ class HealthModuleService
             'billing.view', 'billing.charge', 'accounts.view', 'accounts.manage',
         ],
         'hr' => [
+            // Staff records, work patterns, rosters, holidays, leave types.
             'hr.view', 'hr.manage',
+            // The attendance half is split from the records half on purpose: a
+            // duty manager who fixes rosters and reads the floor's attendance
+            // has no business seeing anybody's salary, and the person who
+            // approves a correction is not automatically the person who
+            // approves the leave that caused it.
+            'hr.attendance.view', 'hr.attendance.correct', 'hr.attendance.approve',
+            'hr.leave.approve',
+            // Reads the payroll handoff (payable days, overtime, indicative
+            // gross). Nothing here files anything with anybody.
+            'hr.payroll.view',
         ],
     ];
 

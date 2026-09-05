@@ -71,6 +71,11 @@ use App\Http\Controllers\FbrPosAuthController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HealthAuthController;
 use App\Http\Controllers\HealthDepartmentController;
+use App\Http\Controllers\HealthAttendanceController;
+use App\Http\Controllers\HealthHrController;
+use App\Http\Controllers\HealthLeaveController;
+use App\Http\Controllers\HealthRosterController;
+use App\Http\Controllers\HealthSelfServiceController;
 use App\Http\Controllers\HealthTeamController;
 use App\Http\Controllers\Health\HealthAdmissionController;
 use App\Http\Controllers\Health\HealthAppointmentController;
@@ -1952,6 +1957,112 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
 
     Route::middleware('health.can:reports.view')->group(function () {
         Route::get('/reports', [HealthOpdReportController::class, 'index'])->name('health.reports');
+    });
+
+    /*
+     * ══════════════ HR & ATTENDANCE ══════════════
+     *
+     * Two prefixes, deliberately:
+     *
+     *   /health/hr  — the HR desk. Every path here is capability-gated, and
+     *                 HealthAuth ALSO derives the capability from the path, so
+     *                 a forgotten middleware argument below still cannot open a
+     *                 screen. The sub-desks (attendance, corrections, payroll)
+     *                 sit above the generic hr.view rule in that path map.
+     *
+     *   /health/my  — self-service. Gated by the HR module only, because
+     *                 everybody who works here has attendance, including the
+     *                 read-only auditor. Nothing under it takes a user id.
+     */
+    Route::middleware('health.module:hr')->group(function () {
+
+        // ── The HR desk: records, patterns, rosters, leave ──
+        Route::middleware('health.can:hr.view')->group(function () {
+            Route::get('/hr', [HealthHrController::class, 'index'])->name('health.hr');
+            Route::get('/hr/staff', [HealthHrController::class, 'staff'])->name('health.hr.staff');
+            Route::get('/hr/shifts', [HealthHrController::class, 'shifts'])->name('health.hr.shifts');
+            Route::get('/hr/policy', [HealthHrController::class, 'policy'])->name('health.hr.policy');
+            Route::get('/hr/devices', [HealthHrController::class, 'devices'])->name('health.hr.devices');
+            Route::get('/hr/roster', [HealthRosterController::class, 'index'])->name('health.hr.roster');
+            Route::get('/hr/leave', [HealthLeaveController::class, 'index'])->name('health.hr.leave');
+        });
+
+        // Writes to the records half. Each controller re-checks hr.manage, so
+        // the gate holds even if a route is later moved out of this group.
+        Route::middleware('health.can:hr.manage')->group(function () {
+            Route::put('/hr/staff/{userId}', [HealthHrController::class, 'updateStaff'])->name('health.hr.staff.update');
+
+            Route::post('/hr/shifts', [HealthHrController::class, 'storeShift'])->name('health.hr.shifts.store');
+            Route::put('/hr/shifts/{id}', [HealthHrController::class, 'updateShift'])->name('health.hr.shifts.update');
+            // Deactivate / reactivate, never delete: rosters and history point here.
+            Route::post('/hr/shifts/{id}/toggle', [HealthHrController::class, 'toggleShift'])->name('health.hr.shifts.toggle');
+
+            Route::post('/hr/holidays', [HealthHrController::class, 'storeHoliday'])->name('health.hr.holidays.store');
+            Route::delete('/hr/holidays/{id}', [HealthHrController::class, 'destroyHoliday'])->name('health.hr.holidays.destroy');
+
+            Route::post('/hr/leave-types', [HealthHrController::class, 'storeLeaveType'])->name('health.hr.leave-types.store');
+            Route::put('/hr/leave-types/{id}', [HealthHrController::class, 'updateLeaveType'])->name('health.hr.leave-types.update');
+
+            Route::post('/hr/policy', [HealthHrController::class, 'updatePolicy'])->name('health.hr.policy.update');
+
+            // Biometric devices: the SHARED hardware integration, viewed from
+            // healthcare. The ADMS push endpoint itself is registered once,
+            // panel-agnostically, near the top of this file.
+            Route::post('/hr/devices', [HealthHrController::class, 'storeDevice'])->name('health.hr.devices.store');
+            Route::post('/hr/devices/{id}/toggle', [HealthHrController::class, 'toggleDevice'])->name('health.hr.devices.toggle');
+            Route::post('/hr/devices/map', [HealthHrController::class, 'mapPin'])->name('health.hr.devices.map');
+            Route::post('/hr/devices/sync', [HealthHrController::class, 'syncDevices'])->name('health.hr.devices.sync');
+
+            Route::post('/hr/roster', [HealthRosterController::class, 'store'])->name('health.hr.roster.store');
+            Route::post('/hr/roster/bulk', [HealthRosterController::class, 'bulk'])->name('health.hr.roster.bulk');
+            Route::post('/hr/roster/clear', [HealthRosterController::class, 'clear'])->name('health.hr.roster.clear');
+
+            Route::post('/hr/leave', [HealthLeaveController::class, 'store'])->name('health.hr.leave.store');
+        });
+
+        // Leave decisions are their own permission: the person who files the
+        // roster is not automatically the person who grants time off it.
+        Route::post('/hr/leave/{id}/review', [HealthLeaveController::class, 'review'])
+            ->middleware('health.can:hr.leave.approve')->name('health.hr.leave.review');
+        // Cancel is reachable by the requester too — the controller decides.
+        Route::post('/hr/leave/{id}/cancel', [HealthLeaveController::class, 'cancel'])->name('health.hr.leave.cancel');
+
+        // ── The attendance desk ──
+        Route::middleware('health.can:hr.attendance.view')->group(function () {
+            Route::get('/hr/attendance', [HealthAttendanceController::class, 'index'])->name('health.hr.attendance');
+            Route::get('/hr/attendance/reports', [HealthAttendanceController::class, 'reports'])->name('health.hr.attendance.reports');
+            Route::get('/hr/attendance/reports/export', [HealthAttendanceController::class, 'exportReport'])->name('health.hr.attendance.reports.export');
+            Route::get('/hr/attendance/{userId}/{date}', [HealthAttendanceController::class, 'day'])->name('health.hr.attendance.day');
+            Route::get('/hr/corrections', [HealthAttendanceController::class, 'corrections'])->name('health.hr.corrections');
+        });
+
+        Route::middleware('health.can:hr.attendance.correct')->group(function () {
+            Route::post('/hr/attendance/recompute', [HealthAttendanceController::class, 'recompute'])->name('health.hr.attendance.recompute');
+            Route::post('/hr/corrections', [HealthAttendanceController::class, 'storeCorrection'])->name('health.hr.corrections.store');
+        });
+
+        // Deciding a correction, and locking a month, are the same authority.
+        Route::middleware('health.can:hr.attendance.approve')->group(function () {
+            Route::post('/hr/corrections/{id}/review', [HealthAttendanceController::class, 'reviewCorrection'])->name('health.hr.corrections.review');
+            Route::post('/hr/payroll/lock', [HealthAttendanceController::class, 'lock'])->name('health.hr.payroll.lock');
+            Route::post('/hr/payroll/unlock', [HealthAttendanceController::class, 'unlock'])->name('health.hr.payroll.unlock');
+        });
+
+        // ── The payroll handoff ──
+        Route::middleware('health.can:hr.payroll.view')->group(function () {
+            Route::get('/hr/payroll', [HealthAttendanceController::class, 'payroll'])->name('health.hr.payroll');
+            Route::get('/hr/payroll/export', [HealthAttendanceController::class, 'exportPayroll'])->name('health.hr.payroll.export');
+        });
+
+        // ── Self-service: your own duty, your own leave, your own corrections ──
+        Route::get('/my/attendance', [HealthSelfServiceController::class, 'attendance'])->name('health.my.attendance');
+        Route::post('/my/punch', [HealthSelfServiceController::class, 'punch'])
+            ->middleware('throttle:30,1')->name('health.my.punch');
+        Route::post('/my/leave', [HealthSelfServiceController::class, 'storeLeave'])->name('health.my.leave');
+        // Withdrawing your own pending request is self-service. The HR path
+        // needs hr.view, which ordinary staff do not hold.
+        Route::post('/my/leave/{id}/cancel', [HealthSelfServiceController::class, 'cancelLeave'])->name('health.my.leave.cancel');
+        Route::post('/my/correction', [HealthSelfServiceController::class, 'storeCorrection'])->name('health.my.correction');
     });
 });
 

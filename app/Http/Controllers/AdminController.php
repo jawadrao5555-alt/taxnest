@@ -1018,7 +1018,7 @@ class AdminController extends Controller
             // The master columns follow the flags on EVERY write path (see
             // PosFeatureService::masterSwitches) — otherwise an admin save
             // would leave them contradicting the modules.
-            $update += \App\Services\PosFeatureService::masterSwitchesFor($company, $flags);
+            $update += \App\Services\PosFeatureService::masterSwitches($flags);
         }
 
         // use_universal_pos was force-written true on EVERY save — a bare/stale

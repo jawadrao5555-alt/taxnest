@@ -975,30 +975,23 @@ class PosFeatureService
      * contradictory answers (the old inventory dual-switch trap). Anything that
      * persists feature_flags must merge this in.
      *
-     * restaurant_mode is derived on the PRA panel ONLY. On the FBR panel the
-     * raw 'kitchen' flag means something else entirely (per-item Store notes on
-     * the store slip), so deriving there would put an FBR retailer into
-     * restaurant mode the moment it switched Store notes on.
+     * Both panels derive the same way. The FBR sale screen already computes its
+     * own restaurant mode from kitchen/kot/tables, so an FBR-only exception
+     * would just let the column drift away from the screen. (FBR's per-item
+     * Store notes ride 'kitchen_notes', which is NOT one of these flags.)
      */
-    public static function masterSwitches(array $flags, string $panel = 'pra'): array
+    public static function masterSwitches(array $flags): array
     {
-        $columns = ['inventory_enabled' => (bool) ($flags['inventory'] ?? false)];
-
-        if ($panel === 'pra') {
-            $columns['restaurant_mode'] = self::restaurantModeFrom($flags);
-        }
+        $columns = [
+            'inventory_enabled' => (bool) ($flags['inventory'] ?? false),
+            'restaurant_mode'   => self::restaurantModeFrom($flags),
+        ];
 
         return array_filter(
             $columns,
             fn ($column) => \Illuminate\Support\Facades\Schema::hasColumn('companies', $column),
             ARRAY_FILTER_USE_KEY
         );
-    }
-
-    /** Same, resolved from the company's own panel. */
-    public static function masterSwitchesFor(?Company $company, array $flags): array
-    {
-        return self::masterSwitches($flags, self::panelFor($company));
     }
 
     /**

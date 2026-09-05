@@ -11,7 +11,11 @@ class ProductImageService
     public static function fetchForProduct(string $productName, int $companyId): ?string
     {
         $company = \App\Models\Company::find($companyId);
-        $category = strtolower((string) ($company?->business_category ?? 'retail'));
+        // Same resolver as every other preset consumer: a pre-split shop with no
+        // business_category must still get ITS OWN image hints, not retail ones.
+        $category = $company
+            ? strtolower(PosFeatureService::resolveCategory($company))
+            : 'retail';
         $hints = self::categoryKeywords($category);
 
         $cleanName = preg_replace('/[^a-zA-Z0-9\s]/', ' ', $productName);

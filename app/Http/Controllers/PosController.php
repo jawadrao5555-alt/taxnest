@@ -324,7 +324,7 @@ class PosController extends Controller
             // re-derived from the flags we are actually storing — never from
             // the request alone.
             $company->update(['feature_flags' => $flags]
-                + \App\Services\PosFeatureService::masterSwitchesFor($company, $flags));
+                + \App\Services\PosFeatureService::masterSwitches($flags));
         }
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
@@ -2992,7 +2992,7 @@ class PosController extends Controller
             // and restaurant mode is a feature the shop switches on rather than
             // something its registration category decided for it — so a hotel
             // or marquee can run a kitchen and a restaurant can drop one.
-            $companyUpdates += PosFeatureService::masterSwitchesFor($company, $flags);
+            $companyUpdates += PosFeatureService::masterSwitches($flags);
         }
 
         // use_universal_pos rides a hidden input, so its absence is unambiguous:
@@ -3035,7 +3035,7 @@ class PosController extends Controller
         $company->update([
             'business_category' => $category,
             'feature_flags' => $defaults,
-        ] + PosFeatureService::masterSwitchesFor($company, $defaults));
+        ] + PosFeatureService::masterSwitches($defaults));
         return redirect()->route('pos.features')->with('success', __('pos.features_reset_defaults', ['category' => $category]));
     }
 

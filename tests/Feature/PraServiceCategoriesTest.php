@@ -349,25 +349,28 @@ class PraServiceCategoriesTest extends TestCase
     // ── registration ────────────────────────────────────────────────────────
 
     /**
-     * The FBR panel must never derive restaurant mode from a feature flag.
+     * The master COLUMNS are derived from the flags we store — on BOTH panels.
      *
-     * On the FBR side the raw 'kitchen' flag drives per-item Store notes on the
-     * store slip — nothing to do with a kitchen — so deriving there would drop
-     * a retailer into restaurant mode the moment it switched Store notes on.
+     * The FBR sale screen computes its own restaurant mode from exactly these
+     * flags, so an FBR-only exception would just let the column drift away from
+     * the screen. (FBR's per-item Store notes ride 'kitchen_notes', which is
+     * deliberately not one of them.)
      */
-    public function test_restaurant_mode_is_derived_on_the_pra_panel_only(): void
+    public function test_master_columns_are_derived_from_the_stored_flags(): void
     {
-        $flags = ['kitchen' => true, 'inventory' => true];
+        $on = PosFeatureService::masterSwitches(['kitchen' => true, 'inventory' => true]);
+        $this->assertTrue($on['restaurant_mode']);
+        $this->assertTrue($on['inventory_enabled']);
 
-        $pra = PosFeatureService::masterSwitches($flags, 'pra');
-        $this->assertTrue($pra['restaurant_mode']);
-        $this->assertTrue($pra['inventory_enabled']);
+        $off = PosFeatureService::masterSwitches(['kitchen_notes' => true]);
+        $this->assertFalse($off['restaurant_mode'],
+            'Store notes are not a kitchen.');
+        $this->assertFalse($off['inventory_enabled']);
 
-        $fbr = PosFeatureService::masterSwitches($flags, 'fbr');
-        $this->assertArrayNotHasKey('restaurant_mode', $fbr,
-            'An FBR shop with Store notes on is not a restaurant.');
-        $this->assertTrue($fbr['inventory_enabled'],
-            'The inventory master bit still follows its flag on both panels.');
+        foreach (['kot', 'tables'] as $flag) {
+            $this->assertTrue(PosFeatureService::masterSwitches([$flag => true])['restaurant_mode'],
+                "'$flag' alone is enough to be running a restaurant floor.");
+        }
     }
 
     /** Neither signup page may hard-code its own category list. */

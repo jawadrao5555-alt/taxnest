@@ -4633,12 +4633,10 @@ class FbrPosController extends Controller
             $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
             $flags['inventory'] = $enabled;
             $flags = \App\Services\PosFeatureService::normalize($flags);
-            // Master columns re-derived from what we are storing. On the FBR
-            // panel that is inventory only — the raw 'kitchen' flag here means
-            // per-item Store notes, not a kitchen, so restaurant_mode is never
-            // derived from it.
+            // Master columns are re-derived from what we are actually storing,
+            // never from the request alone (normalize() can cascade children off).
             $company->update(['feature_flags' => $flags]
-                + \App\Services\PosFeatureService::masterSwitchesFor($company, $flags));
+                + \App\Services\PosFeatureService::masterSwitches($flags));
         }
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
@@ -4709,7 +4707,8 @@ class FbrPosController extends Controller
                 $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
                 if (!empty($flags['kitchen_notes'])) {
                     $flags['kitchen_notes'] = false;
-                    $company->update(['feature_flags' => $flags]);
+                    $company->update(['feature_flags' => $flags]
+                        + \App\Services\PosFeatureService::masterSwitches($flags));
                 }
             }
 
@@ -4738,7 +4737,8 @@ class FbrPosController extends Controller
         }
 
         $flags = \App\Services\PosFeatureService::normalize($flags);
-        $company->update(['feature_flags' => $flags]);
+        $company->update(['feature_flags' => $flags]
+            + \App\Services\PosFeatureService::masterSwitches($flags));
 
         // Report what actually STUCK after normalization, never what was asked for.
         return response()->json(['success' => true, 'enabled' => (bool) ($flags[$flag] ?? false)]);

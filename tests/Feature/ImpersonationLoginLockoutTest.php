@@ -87,6 +87,42 @@ class ImpersonationLoginLockoutTest extends TestCase
         $this->assertTrue($panelLoggedOut, 'The panel login the impersonation opened must be closed with it.');
     }
 
+    public function test_orphaned_impersonation_closes_the_company_panel_login_on_a_plain_page_view(): void
+    {
+        // Security side of the same rule: company access exists only because a live
+        // admin session granted it. Once that session is gone the panel login must
+        // go with it — including on an ordinary GET, which no block would ever reach.
+        $panelLoggedOut = false;
+        $this->fakeGuards(adminLoggedIn: false, panelLoggedIn: true, panelLoggedOut: $panelLoggedOut);
+
+        $request = $this->request('GET', 'pos/dashboard', [
+            'impersonation' => ['admin_id' => 1, 'company_id' => 7, 'guard' => 'pos', 'readonly' => true],
+        ]);
+
+        (new ReadOnlyImpersonation())->handle($request, fn () => new Response('ok'));
+
+        $this->assertTrue($panelLoggedOut, 'The company panel login must not outlive the admin session.');
+        $this->assertNull($request->session()->get('impersonation'));
+    }
+
+    public function test_orphaned_full_access_impersonation_cannot_keep_writing_as_the_company(): void
+    {
+        // Full-access mode does not block writes, so nothing else would notice the
+        // dead admin session — the write would land and be audited against a stale
+        // admin id. Closing the panel guard here is what stops it.
+        $panelLoggedOut = false;
+        $this->fakeGuards(adminLoggedIn: false, panelLoggedIn: true, panelLoggedOut: $panelLoggedOut);
+
+        $request = $this->request('POST', 'pos/settings', [
+            'impersonation' => ['admin_id' => 1, 'company_id' => 7, 'guard' => 'pos', 'readonly' => false],
+        ]);
+
+        (new ReadOnlyImpersonation())->handle($request, fn () => new Response('ok'));
+
+        $this->assertTrue($panelLoggedOut, 'A dead admin session must revoke company write access.');
+        $this->assertNull($request->session()->get('impersonation'));
+    }
+
     public function test_live_impersonation_still_refuses_a_login_but_sends_the_admin_to_the_exit_banner(): void
     {
         $panelLoggedOut = false;

@@ -403,6 +403,10 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
     public function test_readonly_impersonation_skips_popup_on_pra_layout(): void
     {
+        // A real impersonation always has the admin's own login alive in the same
+        // session — without it the flag is orphaned and gets cleared on sight.
+        auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+
         $resp = $this->actingAs(User::find($this->posAdminId), 'pos')
             ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->posCompanyId]])
             ->get('/pos/my-profile');
@@ -414,6 +418,8 @@ class WhatsNewAudienceTargetingTest extends TestCase
 
     public function test_readonly_impersonation_skips_popup_on_fbr_layout(): void
     {
+        auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+
         $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
             ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->fbrCompanyId]])
             ->get('/fbr-pos/my-profile');

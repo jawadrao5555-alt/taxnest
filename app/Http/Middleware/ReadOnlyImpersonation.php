@@ -36,6 +36,27 @@ class ReadOnlyImpersonation
             return $next($request);
         }
 
+        // ORPHANED FLAG (owner report, 5 Sep 2026): the flag can outlive the admin
+        // session that created it — that session expired, was cleared, or the browser
+        // simply kept a stale cookie. Company access is only ever granted BY a live
+        // admin session, so once that session is gone the impersonation is over:
+        // close the panel login it opened (the panel's own auth middleware then sends
+        // the visitor to its login page) and drop the flag.
+        //
+        // Leaving the flag in place was what locked the owner out: with no admin
+        // behind it, the refusal below still bounced every login POST back to the
+        // very page it came from, and no banner existed anywhere to press "Exit" on —
+        // so signing in looked like it did nothing at all.
+        if (!auth('admin')->check()) {
+            $guard = $imp['guard'] ?? null;
+            if ($guard && auth($guard)->check()) {
+                auth($guard)->logout();
+            }
+            $request->session()->forget('impersonation');
+
+            return $next($request);
+        }
+
         $path = ltrim($request->path(), '/');
 
         // Admin panel is always allowed (admin guard actions + exit/lock routes).
@@ -66,24 +87,6 @@ class ReadOnlyImpersonation
         $blockedWrite = !empty($imp['readonly']) && $isWrite;
 
         if ($isIdentitySwap || $blockedWrite) {
-            // ORPHANED FLAG (owner report, 5 Sep 2026): the flag can outlive the admin
-            // session that created it — that session expired, was cleared, or the
-            // browser simply kept a stale cookie. With no admin behind it there is
-            // nobody to protect and no banner anywhere to press "Exit" on, yet the
-            // refusal below would still bounce EVERY login attempt straight back to
-            // the same login page — the sign-in button appears to do nothing at all.
-            // So at the exact point the flag would bite: drop it, close the panel
-            // login it opened, and let the request continue as an ordinary one.
-            if (!auth('admin')->check()) {
-                $guard = $imp['guard'] ?? null;
-                if ($guard && auth($guard)->check()) {
-                    auth($guard)->logout();
-                }
-                $request->session()->forget('impersonation');
-
-                return $next($request);
-            }
-
             $message = $isIdentitySwap
                 ? 'You cannot switch or sign out of this account while acting as a company — use "Exit" to leave.'
                 : 'View-only mode — you are viewing this company as admin. Changes are disabled.';

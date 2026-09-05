@@ -301,6 +301,12 @@
                     <p>{{ session('error') }}</p>
                 </div>
                 @endif
+
+                @if(session('status'))
+                <div class="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 rounded-lg p-3 text-sm">
+                    <p>{{ session('status') }}</p>
+                </div>
+                @endif
                 <button type="submit" class="w-full btn-solid btn-gold font-bold">
                     Sign In to Dashboard
                 </button>

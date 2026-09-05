@@ -263,6 +263,10 @@ class PosSurveyTest extends TestCase
 
     public function test_readonly_impersonation_never_gets_popup(): void
     {
+        // A real impersonation always has the admin's own login alive in the same
+        // session — without it the flag is orphaned and gets cleared on sight.
+        auth('admin')->setUser((new \App\Models\AdminUser())->forceFill(['id' => 1]));
+
         $resp = $this->actingAs(User::find($this->adminId), 'pos')
             ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1]])
             ->get('/pos/my-profile');

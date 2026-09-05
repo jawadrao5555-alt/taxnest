@@ -64,6 +64,29 @@ class ProductImageService
             'advertising'                         => 'advertising,billboard,marketing',
             'it_services'                         => 'computer,software,technology',
             'security_services'                   => 'security,guard,cctv',
+            // ---- Remaining PRA service families (Sep 2026) ----
+            // A new type must never fall through to the generic retail
+            // keywords: a clinic asking for "product,retail,shop" pictures gets
+            // a shelf of goods for a blood test.
+            'clinic'                              => 'clinic,doctor,laboratory',
+            'education'                           => 'school,classroom,education',
+            'consultant'                          => 'consulting,office,documents',
+            'architect'                           => 'architecture,blueprint,design',
+            'construction'                        => 'construction,building,site',
+            'manpower'                            => 'workers,staff,team',
+            'cargo'                               => 'cargo,freight,logistics',
+            'warehouse'                           => 'warehouse,storage,pallet',
+            'cleaning'                            => 'cleaning,hygiene,sanitation',
+            'repair_service'                      => 'repair,technician,tools',
+            'printing'                            => 'printing,press,paper',
+            'media_production'                    => 'video,studio,production',
+            'entertainment'                       => 'cinema,gaming,entertainment',
+            'financial_services'                  => 'finance,insurance,money',
+            'equipment_rental'                    => 'machinery,generator,equipment',
+            'tailoring'                           => 'tailor,sewing,fabric',
+            // The catch-all is a SERVICE business, so it gets service imagery
+            // rather than the retail shelf.
+            'other_service'                       => 'service,business,professional',
             'retail', 'shop', 'store', ''         => 'product,retail,shop',
             default                               => 'product',
         };

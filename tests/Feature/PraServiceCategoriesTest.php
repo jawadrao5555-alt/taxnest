@@ -895,6 +895,208 @@ class PraServiceCategoriesTest extends TestCase
             'A shoot is billed by how long it runs.');
     }
 
+    // ── full PRA service coverage (Sep 2026) ────────────────────────────────
+
+    /**
+     * The only PRA types that may own a kitchen.
+     *
+     * PRA taxes SERVICES, and only a handful of those services cook. Every
+     * other offered type — clinic, courier, consultant, cargo agent, tailor —
+     * must be unable to derive restaurant mode from its own defaults, which is
+     * exactly what used to happen when an unlisted trade fell through to the
+     * restaurant default at sign-up.
+     */
+    private const FOOD_TYPES = [
+        'restaurant', 'cafe', 'quick_service', 'hotel', 'marquee', 'catering',
+    ];
+
+    /** Every offered PRA type is a real, complete, nameable business type. */
+    public function test_every_offered_pra_type_resolves_to_a_real_preset_and_label(): void
+    {
+        foreach (PosFeatureService::categories('pra') as $type) {
+            $defaults = PosFeatureService::defaultsForCategory($type);
+            $this->assertNotSame([], $defaults,
+                "'$type' is offered at sign-up but has no preset defaults.");
+
+            $meta = PosFeatureService::presetMeta($type);
+            foreach (['label', 'description', 'icon'] as $piece) {
+                $this->assertNotSame('', trim((string) ($meta[$piece] ?? '')),
+                    "'$type' is offered but has no $piece — the shop would see a raw slug.");
+            }
+            // A raw slug leaking through as the label is the exact failure the
+            // shop reports as "my business type shows as some code".
+            $this->assertNotSame($type, $meta['label'],
+                "'$type' shows its own slug as its label.");
+            $this->assertStringNotContainsString('_', $meta['label'],
+                "'$type' label looks like a slug, not a business name.");
+
+            $this->assertNotContains($type, self::GOODS,
+                "'$type' is a goods business and cannot be a PRA taxpayer.");
+        }
+    }
+
+    /** No non-food PRA type may boot with a kitchen, KOT tickets or tables. */
+    public function test_no_non_food_pra_type_can_derive_restaurant_mode(): void
+    {
+        foreach (PosFeatureService::categories('pra') as $type) {
+            if (in_array($type, self::FOOD_TYPES, true)) {
+                continue;
+            }
+
+            $defaults = PosFeatureService::defaultsForCategory($type);
+            foreach (PosFeatureService::RESTAURANT_FLAGS as $kitchenFlag) {
+                $this->assertFalse((bool) ($defaults[$kitchenFlag] ?? false),
+                    "'$type' does not cook — '$kitchenFlag' must stay off.");
+            }
+            $this->assertFalse(PosFeatureService::restaurantModeFrom($defaults),
+                "'$type' must never open in restaurant mode.");
+            $this->assertFalse(
+                (bool) (PosFeatureService::masterSwitches($defaults)['restaurant_mode'] ?? false),
+                "'$type' must not have its restaurant_mode master column set."
+            );
+        }
+    }
+
+    /**
+     * Every offered type on EITHER panel is nameable in all three languages and
+     * has its own auto-image hint.
+     */
+    public function test_every_offered_type_is_named_three_ways_and_has_an_image_hint(): void
+    {
+        $keywords = new \ReflectionMethod(\App\Services\ProductImageService::class, 'categoryKeywords');
+        $keywords->setAccessible(true);
+        $generic = $keywords->invoke(null, 'retail');
+
+        foreach (['pra', 'fbr'] as $panel) {
+            foreach (PosFeatureService::categories($panel) as $type) {
+                foreach (['en', 'rur', 'ur'] as $locale) {
+                    $key = 'pos.auth_bt_' . $type;
+                    $label = __($key, [], $locale);
+                    $this->assertNotSame($key, $label,
+                        "'$type' needs a sign-up name in '$locale'.");
+                    $this->assertNotSame('', trim((string) $label));
+                }
+
+                if ($type === 'retail') {
+                    continue;
+                }
+                $this->assertNotSame($generic, $keywords->invoke(null, $type),
+                    "'$type' falls back to generic retail image keywords — "
+                    . 'auto-fetched pictures would not match the trade.');
+                $this->assertNotSame('', trim(PosFeatureService::categorySearchTerms($type)),
+                    "'$type' cannot be found by typing in the sign-up filter.");
+            }
+        }
+    }
+
+    /** Urdu names for the new list carry no Latin words. */
+    public function test_urdu_business_type_names_are_free_of_latin_words(): void
+    {
+        foreach (PosFeatureService::categories('pra') as $type) {
+            $urdu = (string) __('pos.auth_bt_' . $type, [], 'ur');
+            $this->assertMatchesRegularExpression('/\p{Arabic}/u', $urdu,
+                "'$type' has no real Urdu name.");
+        }
+    }
+
+    /** The honest "my business is not listed" card exists and works. */
+    public function test_the_catch_all_service_type_is_offered_and_resolves(): void
+    {
+        $this->assertContains('other_service', PosFeatureService::categories('pra'),
+            'A service business with no matching family must be able to say so.');
+        $this->assertNotContains('other_service', PosFeatureService::categories('fbr'));
+
+        $defaults = PosFeatureService::defaultsForCategory('other_service');
+        $this->assertNotSame([], $defaults);
+        $this->assertFalse(PosFeatureService::restaurantModeFrom($defaults));
+        $this->assertTrue((bool) $defaults['service_jobs']);
+
+        $this->assertNotSame('other_service', PosFeatureService::presetMeta('other_service')['label']);
+    }
+
+    /** Grouping the picker may never hide an offered type. */
+    public function test_the_picker_groups_cover_every_offered_type_exactly_once(): void
+    {
+        foreach (['pra', 'fbr'] as $panel) {
+            $groups  = PosFeatureService::categoryGroups($panel);
+            $grouped = array_merge(...array_values($groups));
+
+            $offered = PosFeatureService::categories($panel);
+            sort($offered);
+            $seen = $grouped;
+            sort($seen);
+
+            $this->assertSame($offered, $seen,
+                "The $panel picker groups must contain exactly the offered list.");
+            $this->assertSame(count($grouped), count(array_unique($grouped)),
+                "A type appears in two $panel families.");
+
+            foreach (array_keys($groups) as $heading) {
+                foreach (['en', 'rur', 'ur'] as $locale) {
+                    $key = 'pos.auth_btg_' . $heading;
+                    $this->assertNotSame($key, __($key, [], $locale),
+                        "Family heading '$heading' needs wording in '$locale'.");
+                }
+            }
+        }
+    }
+
+    /** The longer PRA picker keeps its filter box and its mobile grid rule. */
+    public function test_the_pra_picker_survives_the_longer_list(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/auth/register.blade.php'));
+
+        $this->assertStringContainsString("categoryGroups('pra')", $blade,
+            'The PRA picker must group the tiles from the shared family map.');
+        $this->assertStringContainsString('auth_bt_filter_ph', $blade,
+            'The PRA picker needs a type-to-filter box at this size.');
+        // mobile.css collapses a raw grid-cols-3 to ONE column below 640px on
+        // guest layouts — without the keep class the whole catalogue stacks.
+        $this->assertStringContainsString('grid-cols-3-keep', $blade,
+            'The tile grid must keep three columns on a phone.');
+
+        // The FBR picker stays short and ungrouped.
+        $fbr = file_get_contents(resource_path('views/fbr-pos/auth/register.blade.php'));
+        $this->assertStringNotContainsString("categoryGroups(", $fbr,
+            'The goods panel keeps its current short list.');
+    }
+
+    /** The SaaS admin's Industry Preset picker accepts every newly offered type. */
+    public function test_the_admin_preset_picker_offers_and_accepts_the_new_types(): void
+    {
+        $company = \App\Models\Company::find($this->companyId);
+        $allowed = PosFeatureService::categoriesForCompany($company);
+
+        foreach (PosFeatureService::categories('pra') as $type) {
+            $this->assertContains($type, $allowed,
+                "A super admin must be able to file this shop as '$type'.");
+        }
+
+        // The admin handler must derive its `in:` rule from that same list —
+        // a hard-coded list is how the panels drifted apart before.
+        $admin = file_get_contents(
+            (new \ReflectionClass(\App\Http\Controllers\AdminController::class))->getFileName()
+        );
+        $this->assertStringContainsString('categoriesForCompany($company)', $admin,
+            'The admin category validator must read the shared offered list.');
+    }
+
+    /** Existing shops on retired or legacy types resolve exactly as before. */
+    public function test_legacy_and_retired_types_are_untouched_by_the_new_list(): void
+    {
+        foreach (array_keys(PosFeatureService::LEGACY_CATEGORIES) as $legacy) {
+            $this->assertNotContains($legacy, PosFeatureService::categories('pra'),
+                "'$legacy' is retired — it must not reappear on the sign-up list.");
+            $this->assertNotSame([], PosFeatureService::defaultsForCategory($legacy),
+                "'$legacy' must still resolve for the shops sitting on it.");
+        }
+
+        // Widening the wording of a live card must not change what it switches on.
+        $this->assertTrue((bool) PosFeatureService::defaultsForCategory('salon')['service_jobs']);
+        $this->assertTrue((bool) PosFeatureService::defaultsForCategory('workshop')['inventory']);
+        $this->assertTrue((bool) PosFeatureService::defaultsForCategory('courier')['delivery']);
+    }
+
     // ── schema / seed ───────────────────────────────────────────────────────
 
     private function seedShop(): void

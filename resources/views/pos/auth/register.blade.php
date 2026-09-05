@@ -65,8 +65,25 @@
                             (array) old('requested_addons', $requestedAddonQuote['codes'] ?? []),
                             (string) old('requested_addon_cycle', $requestedAddonQuote['cycle'] ?? 'annual')
                         );
+
+                        // Business-type picker data. The offered list, its family
+                        // grouping and the words each type can be found by all come
+                        // from PosFeatureService, so signup, the admin preset chooser
+                        // and Customize can never disagree about what PRA offers.
+                        // Icons come from the preset meta; the filter index adds the
+                        // LOCALIZED label so a shop can type what it actually reads.
+                        $praBusinessTypeGroups = \App\Services\PosFeatureService::categoryGroups('pra');
+                        $praBusinessTypeIcons  = [];
+                        $praBusinessTypeTerms  = [];
+                        foreach (\App\Services\PosFeatureService::categories('pra') as $praCategory) {
+                            $praBusinessTypeIcons[$praCategory] = \App\Services\PosFeatureService::presetMeta($praCategory)['icon'];
+                            $praBusinessTypeTerms[$praCategory] = mb_strtolower(
+                                \App\Services\PosFeatureService::categorySearchTerms($praCategory)
+                                . ' ' . __('pos.auth_bt_' . $praCategory)
+                            );
+                        }
                     @endphp
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), btFilter: '', btTerms: @js($praBusinessTypeTerms), btMatch(k) { const q = (this.btFilter || '').trim().toLowerCase(); if (! q) return true; const hay = this.btTerms[k] || ''; return q.split(/\s+/).every(w => hay.includes(w)); }, btGroupHas(keys) { return keys.some(k => this.btMatch(k)); }, get btAnyMatch() { return Object.keys(this.btTerms).some(k => this.btMatch(k)); }, priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
                         @csrf
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at
@@ -145,33 +162,46 @@
                              s.2(38): a service is "anything which is not goods"). Goods retail
                              is federal and belongs to the FBR panel, so only service businesses
                              are offered here. --}}
-                        @php
-                            // Icons only — the offered list itself comes from
-                            // PosFeatureService::categories('pra') so signup, the admin preset
-                            // chooser and Customize can never disagree about what PRA offers.
-                            $praBusinessTypeIcons = [];
-                            foreach (\App\Services\PosFeatureService::categories('pra') as $praCategory) {
-                                $praBusinessTypeIcons[$praCategory] = \App\Services\PosFeatureService::presetMeta($praCategory)['icon'];
-                            }
-                        @endphp
-
-                        {{-- 19 tiles now, and some labels are two or three words
-                             ("Event Management", "Security Services"). Fewer columns on
-                             narrow screens + a fixed min-height keeps every label fully
-                             readable in all three languages instead of clipping it.
-                             grid-cols-3-keep is required: mobile.css collapses every raw
-                             grid-cols-3 to a single column below 640px on guest layouts,
-                             which would stack all 19 tiles vertically. --}}
-                        <div class="grid grid-cols-3 grid-cols-3-keep sm:grid-cols-4 lg:grid-cols-5 gap-2">
-                            @foreach($praBusinessTypeIcons as $btKey => $btIcon)
-                            <label class="relative cursor-pointer" @click="posType = @js($btKey)">
-                                <div class="flex flex-col items-center justify-start gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card h-full" style="min-height: 74px;" :class="posType === @js($btKey) ? 'cat-active' : ''">
-                                    <span class="text-xl leading-none">{{ $btIcon }}</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight break-words w-full">{{ __('pos.auth_bt_' . $btKey) }}</span>
-                                </div>
-                            </label>
-                            @endforeach
+                        {{-- Every PRA-taxable service family is offered here, so the list
+                             is long enough that scanning it is the real problem. Two
+                             things keep it usable: a type-to-filter box (matches the
+                             localized label AND the trade's own words, Roman Urdu
+                             spellings included), and short family headings so a shop
+                             can jump straight to its own part of the list. --}}
+                        <div class="relative">
+                            <input type="text" x-model="btFilter" autocomplete="off"
+                                   placeholder="{{ __('pos.auth_bt_filter_ph') }}"
+                                   class="w-full rounded-xl px-3 py-2 text-xs text-white placeholder-purple-200/40 focus:outline-none"
+                                   style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);">
+                            <button type="button" x-show="btFilter" x-cloak @click="btFilter = ''"
+                                    class="absolute top-1/2 -translate-y-1/2 text-purple-200/60 hover:text-white text-sm leading-none"
+                                    style="{{ app()->getLocale() === 'ur' ? 'left: 10px;' : 'right: 10px;' }}">&times;</button>
                         </div>
+
+                        {{-- Labels run two or three words ("Event Management", "Cleaning /
+                             Pest Control"). Fewer columns on narrow screens + a fixed
+                             min-height keeps every label fully readable in all three
+                             languages instead of clipping it. grid-cols-3-keep is
+                             required: mobile.css collapses every raw grid-cols-3 to a
+                             single column below 640px on guest layouts, which would
+                             stack the whole catalogue vertically. --}}
+                        @foreach($praBusinessTypeGroups as $btGroup => $btGroupKeys)
+                        <div x-show="btGroupHas(@js($btGroupKeys))" x-cloak class="space-y-2">
+                            <p class="text-[10px] font-semibold text-purple-300/45 uppercase tracking-wider">{{ __('pos.auth_btg_' . $btGroup) }}</p>
+                            <div class="grid grid-cols-3 grid-cols-3-keep sm:grid-cols-4 lg:grid-cols-5 gap-2">
+                                @foreach($btGroupKeys as $btKey)
+                                <label class="relative cursor-pointer" x-show="btMatch(@js($btKey))" @click="posType = @js($btKey)">
+                                    <div class="flex flex-col items-center justify-start gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card h-full" style="min-height: 74px;" :class="posType === @js($btKey) ? 'cat-active' : ''">
+                                        <span class="text-xl leading-none">{{ $praBusinessTypeIcons[$btKey] }}</span>
+                                        <span class="text-[10px] font-semibold text-white/80 leading-tight break-words w-full">{{ __('pos.auth_bt_' . $btKey) }}</span>
+                                    </div>
+                                </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        @endforeach
+
+                        <p x-show="! btAnyMatch" x-cloak class="text-[11px] text-amber-200/80">{{ __('pos.auth_bt_filter_none') }}</p>
 
                         {{-- A goods shop cannot be a PRA taxpayer at all. Send it to the FBR
                              panel here rather than letting it register on the wrong authority. --}}

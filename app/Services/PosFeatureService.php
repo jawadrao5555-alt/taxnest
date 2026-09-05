@@ -260,6 +260,84 @@ class PosFeatureService
             'service_jobs' => true, 'customer_profile' => true,
             'multi_branch' => true,
         ],
+
+        // ---- Remaining PRA service families added Sep 2026 ----
+        // Same hard rule as the block above: NOT ONE of these is a food
+        // business, so none may switch on kot / kitchen / kitchen_notes /
+        // recipes / tables. restaurantModeFrom() reads exactly those switches,
+        // and a clinic or a cargo agent handed a kitchen, KOT tickets and a
+        // floor map is precisely the bug this task exists to close.
+        // The modules are assembled from the EXISTING switch set only:
+        // service_jobs for appointment/job trades, inventory where the trade
+        // consumes parts or materials, delivery where goods actually move,
+        // multi_branch for multi-site trades.
+        'clinic' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true,
+        ],
+        'education' => [
+            'service_jobs' => true, 'customer_profile' => true,
+            'multi_branch' => true,
+        ],
+        'consultant' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'architect' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'construction' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true,
+        ],
+        'manpower' => [
+            'service_jobs' => true, 'customer_profile' => true,
+            'multi_branch' => true,
+        ],
+        'cargo' => [
+            'service_jobs' => true, 'delivery' => true,
+            'customer_profile' => true, 'multi_branch' => true,
+        ],
+        'warehouse' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true, 'multi_branch' => true,
+        ],
+        'cleaning' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true,
+        ],
+        'repair_service' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true,
+        ],
+        'printing' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true,
+        ],
+        'media_production' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'entertainment' => [
+            'service_jobs' => true, 'customer_profile' => true,
+            'customer_loyalty' => true,
+        ],
+        'financial_services' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'equipment_rental' => [
+            'service_jobs' => true, 'inventory' => true,
+            'delivery' => true, 'customer_profile' => true,
+        ],
+        'tailoring' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+        ],
+        // The honest "my business is not on the list" card. A service business
+        // we have no family for must be able to say so instead of picking a
+        // trade it does not run. Deliberately bare — it starts simple and
+        // switches modules on from Customize.
+        'other_service' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
     ];
 
     /**
@@ -350,9 +428,12 @@ class PosFeatureService
             'badge' => null,
             'color' => 'red',
         ],
+        // Wording widened Sep 2026: a beauty clinic or a massage & pedicure
+        // centre is the same trade, but its owner could not tell that from a
+        // card that only said "Salon / Spa".
         'salon' => [
-            'label' => 'Salon / Spa',
-            'description' => 'Service jobs, staff bookings, loyalty rewards',
+            'label' => 'Salon / Spa / Beauty Clinic',
+            'description' => 'Beauty, massage & pedicure jobs, staff bookings, loyalty rewards',
             'icon' => '💇',
             'badge' => null,
             'color' => 'pink',
@@ -395,8 +476,8 @@ class PosFeatureService
             'color' => 'emerald',
         ],
         'workshop' => [
-            'label' => 'Auto Workshop / Service Station',
-            'description' => 'Job cards, parts consumption, customer vehicles',
+            'label' => 'Auto Workshop / Service Station / Car Wash',
+            'description' => 'Job cards, service station & car wash work, parts, customer vehicles',
             'icon' => '🔩',
             'badge' => 'New',
             'color' => 'slate',
@@ -404,15 +485,15 @@ class PosFeatureService
 
         // ---- Second Schedule service families added Sep 2026 ----
         'courier' => [
-            'label' => 'Courier / Delivery Service',
-            'description' => 'Booking jobs, pickup & delivery, branches, customer loyalty',
+            'label' => 'Courier / Express Cargo',
+            'description' => 'Booking jobs, express cargo, pickup & delivery, branches, loyalty',
             'icon' => '📦',
             'badge' => 'New',
             'color' => 'orange',
         ],
         'photography' => [
-            'label' => 'Photography / Videography',
-            'description' => 'Shoot bookings, session duration, customer profiles',
+            'label' => 'Photography / Videography Studio',
+            'description' => 'Photo & video shoot bookings, session duration, customer profiles',
             'icon' => '📸',
             'badge' => 'New',
             'color' => 'violet',
@@ -453,8 +534,8 @@ class PosFeatureService
             'color' => 'red',
         ],
         'it_services' => [
-            'label' => 'IT Services / Software House',
-            'description' => 'Project jobs, assigned staff, client profiles',
+            'label' => 'IT Services / Call Centre',
+            'description' => 'Software house, call centre & outsourcing projects, assigned staff',
             'icon' => '💻',
             'badge' => 'New',
             'color' => 'indigo',
@@ -465,6 +546,127 @@ class PosFeatureService
             'icon' => '🛡️',
             'badge' => 'New',
             'color' => 'zinc',
+        ],
+
+        // ---- Remaining PRA service families added Sep 2026 ----
+        'clinic' => [
+            'label' => 'Clinic / Diagnostic Lab',
+            'description' => 'Patient visits, test & procedure jobs, consumable stock',
+            'icon' => '🩺',
+            'badge' => 'New',
+            'color' => 'emerald',
+        ],
+        'education' => [
+            'label' => 'Education & Training',
+            'description' => 'School, academy, tuition & coaching fees, multi-campus',
+            'icon' => '📚',
+            'badge' => 'New',
+            'color' => 'blue',
+        ],
+        'consultant' => [
+            'label' => 'Professional Consultant',
+            'description' => 'Tax, legal, accounts, audit & management assignments',
+            'icon' => '📑',
+            'badge' => 'New',
+            'color' => 'slate',
+        ],
+        'architect' => [
+            'label' => 'Architect & Engineering',
+            'description' => 'Design, survey & interior assignments billed as jobs',
+            'icon' => '📐',
+            'badge' => 'New',
+            'color' => 'cyan',
+        ],
+        'construction' => [
+            'label' => 'Construction Contractor',
+            'description' => 'Contract jobs, material consumption, client profiles',
+            'icon' => '🏗️',
+            'badge' => 'New',
+            'color' => 'amber',
+        ],
+        'manpower' => [
+            'label' => 'Manpower & Recruitment',
+            'description' => 'Labour supply, staffing & recruitment jobs, multi-site',
+            'icon' => '🧑‍🤝‍🧑',
+            'badge' => 'New',
+            'color' => 'indigo',
+        ],
+        'cargo' => [
+            'label' => 'Cargo & Logistics',
+            'description' => 'Freight, clearing & movers jobs, pickup, branches',
+            'icon' => '🚚',
+            'badge' => 'New',
+            'color' => 'orange',
+        ],
+        'warehouse' => [
+            'label' => 'Warehouse & Cold Storage',
+            'description' => 'Storage & yard jobs, stored stock, multi-site',
+            'icon' => '🏬',
+            'badge' => 'New',
+            'color' => 'stone',
+        ],
+        'cleaning' => [
+            'label' => 'Cleaning & Pest Control',
+            'description' => 'Janitorial, fumigation & sanitation jobs, supplies stock',
+            'icon' => '🧹',
+            'badge' => 'New',
+            'color' => 'teal',
+        ],
+        'repair_service' => [
+            'label' => 'Repair & Maintenance',
+            'description' => 'Mobile, electronics, AC & appliance job cards with parts',
+            'icon' => '🛠️',
+            'badge' => 'New',
+            'color' => 'zinc',
+        ],
+        'printing' => [
+            'label' => 'Printing & Graphics',
+            'description' => 'Print orders, design jobs, paper & ink stock',
+            'icon' => '🖨️',
+            'badge' => 'New',
+            'color' => 'purple',
+        ],
+        'media_production' => [
+            'label' => 'Media Production / Studio',
+            'description' => 'Video, recording, sound & lights bookings',
+            'icon' => '🎬',
+            'badge' => 'New',
+            'color' => 'violet',
+        ],
+        'entertainment' => [
+            'label' => 'Entertainment & Gaming',
+            'description' => 'Cinema, gaming zone, play area & snooker club entries',
+            'icon' => '🎮',
+            'badge' => 'New',
+            'color' => 'fuchsia',
+        ],
+        'financial_services' => [
+            'label' => 'Financial & Agency Services',
+            'description' => 'Insurance, money exchange, brokerage & commission work',
+            'icon' => '🏦',
+            'badge' => 'New',
+            'color' => 'lime',
+        ],
+        'equipment_rental' => [
+            'label' => 'Equipment & Machinery Rental',
+            'description' => 'Generator, machinery & event equipment hire with delivery',
+            'icon' => '⚙️',
+            'badge' => 'New',
+            'color' => 'sky',
+        ],
+        'tailoring' => [
+            'label' => 'Tailoring & Boutique',
+            'description' => 'Stitching orders, dress design jobs, cloth & trimming stock',
+            'icon' => '🧵',
+            'badge' => 'New',
+            'color' => 'rose',
+        ],
+        'other_service' => [
+            'label' => 'Other Service Business',
+            'description' => 'Any service not listed above — start simple, add modules later',
+            'icon' => '🗂️',
+            'badge' => 'New',
+            'color' => 'gray',
         ],
 
         // ---- Retired goods categories (FBR panel owns these) ----
@@ -917,6 +1119,18 @@ class PosFeatureService
             'courier', 'photography', 'event_management', 'travel_agent',
             'rent_a_car', 'property_dealer', 'advertising', 'it_services',
             'security_services',
+            // The rest of the PRA-taxable service families (Sep 2026). Before
+            // this, a clinic, an academy, a consultant, an architect, a
+            // contractor, a cargo agent, a warehouse, a cleaning firm, a repair
+            // shop, a printing press, a studio, a gaming zone, an insurance
+            // agent, a manpower agency, an equipment renter and a tailor had no
+            // card at all and had to sign up as something they are not.
+            'clinic', 'education', 'consultant', 'architect', 'construction',
+            'manpower', 'cargo', 'warehouse', 'cleaning', 'repair_service',
+            'printing', 'media_production', 'entertainment',
+            'financial_services', 'equipment_rental', 'tailoring',
+            // ...and an honest way to say "my business is still not listed".
+            'other_service',
         ],
         // Goods file with the FBR. 'restaurant' and 'salon' stay on this list on
         // purpose: the FBR panel also serves ICT, where those services are a
@@ -931,11 +1145,126 @@ class PosFeatureService
     ];
 
     /**
+     * Short family headings the offered types are grouped under.
+     *
+     * The PRA list is 36 cards long; an ungrouped wall of tiles is unreadable,
+     * so the sign-up picker shows them family by family. Membership lives HERE,
+     * beside PANEL_CATEGORIES, so a type can never be offered and yet fall out
+     * of the picker: categoryGroups() intersects with the offered list and
+     * sweeps anything ungrouped into the catch-all heading.
+     *
+     * The keys are heading slugs — 'pos.auth_btg_<key>' carries the wording.
+     */
+    public const CATEGORY_GROUPS = [
+        'food'         => ['restaurant', 'cafe', 'quick_service', 'catering', 'hotel', 'marquee'],
+        'personal'     => ['salon', 'gym', 'laundry', 'tailoring'],
+        'health_edu'   => ['clinic', 'education'],
+        'professional' => ['consultant', 'architect', 'it_services', 'advertising', 'financial_services', 'property_dealer'],
+        'transport'    => ['courier', 'cargo', 'travel_agent', 'rent_a_car', 'warehouse'],
+        'technical'    => ['workshop', 'repair_service', 'construction', 'cleaning', 'equipment_rental', 'security_services', 'manpower'],
+        'media'        => ['photography', 'media_production', 'printing', 'event_management', 'entertainment'],
+        'trade'        => ['retail', 'pharmacy', 'grocery', 'clothing', 'electronics', 'hardware', 'autoparts', 'bakery'],
+    ];
+
+    /**
+     * Extra words a shop might TYPE to find its own trade, including the
+     * obvious Roman Urdu spellings. Matched alongside the localized label, so
+     * this map only has to carry what the label itself does not say.
+     */
+    public const CATEGORY_SEARCH_TERMS = [
+        'restaurant'         => 'restaurant hotel khana dine food dhaba',
+        'cafe'               => 'cafe coffee chai tea bakery counter',
+        'quick_service'      => 'fast food burger pizza dhaba takeaway tikka',
+        'salon'              => 'salon spa parlour beauty clinic hair massage pedicure facial',
+        'hotel'              => 'hotel guest house rooms motel rihaish',
+        'marquee'            => 'marquee marriage hall club shadi banquet lawn',
+        'catering'           => 'catering caterer khana supply degh',
+        'laundry'            => 'laundry dry cleaner press kapre dhulai',
+        'gym'                => 'gym fitness club yoga workout warzish',
+        'workshop'           => 'workshop auto mechanic service station car wash denting painting',
+        'courier'            => 'courier parcel express cargo delivery bhijwana',
+        'photography'        => 'photography photographer videography studio shoot camera',
+        'event_management'   => 'event management decor wedding planner tqreeb',
+        'travel_agent'       => 'travel agent tour ticket umrah hajj visa safar',
+        'rent_a_car'         => 'rent a car vehicle hire gaari kiraya taxi',
+        'property_dealer'    => 'property dealer real estate estate agent jaidad plot',
+        'advertising'        => 'advertising agency marketing billboard panaflex ishtihar',
+        'it_services'        => 'it services software house call centre call center outsourcing web development',
+        'security_services'  => 'security guards guard cctv chowkidar',
+        'clinic'             => 'clinic doctor hospital dental dentist lab laboratory diagnostic pathology vet medical daktar',
+        'education'          => 'school academy tuition coaching training institute computer college taleem',
+        'consultant'         => 'consultant tax legal lawyer advocate accounts accountant audit management advisory',
+        'architect'          => 'architect engineer engineering surveyor interior designer naqsha',
+        'construction'       => 'construction contractor builder developer civil works tameer',
+        'manpower'           => 'manpower recruitment labour supply staffing agency mazdoor',
+        'cargo'              => 'cargo freight forwarding clearing agent packers movers goods transport',
+        'warehouse'          => 'warehouse cold storage godown storage parking yard container',
+        'cleaning'           => 'cleaning janitorial fumigation pest control sanitation safai',
+        'repair_service'     => 'repair maintenance mobile electronics ac appliance machinery marammat',
+        'printing'           => 'printing press screen printing design print flex publisher chapai',
+        'media_production'   => 'media production video studio recording sound lights dj production house',
+        'entertainment'      => 'cinema gaming zone play area kids snooker sports club amusement park arcade',
+        'financial_services' => 'insurance money changer exchange broker brokerage commission agent auctioneer',
+        'equipment_rental'   => 'equipment rental generator machinery crane event equipment kiraya',
+        'tailoring'          => 'tailor tailoring boutique dress designer stitching darzi silai',
+        'other_service'      => 'other service business not listed koi aur',
+        'retail'             => 'retail store shop general store',
+        'pharmacy'           => 'pharmacy medical store chemist dawa',
+        'grocery'            => 'grocery kiryana mart supermarket',
+        'clothing'           => 'clothing garments cloth kapre boutique',
+        'electronics'        => 'electronics mobile computer appliances',
+        'hardware'           => 'hardware building material sanitary paint',
+        'autoparts'          => 'auto parts spare parts tyre battery',
+        'bakery'             => 'bakery bread cake sweets',
+    ];
+
+    /**
      * Categories a shop may CHOOSE on one panel. Defaults to PRA.
      */
     public static function categories(?string $panel = null): array
     {
         return self::PANEL_CATEGORIES[$panel ?? 'pra'] ?? self::PANEL_CATEGORIES['pra'];
+    }
+
+    /**
+     * The offered list of a panel, split into family headings.
+     *
+     * Returns heading-slug => [category, ...] and NEVER drops a category: an
+     * offered type that nobody put in a family lands under 'other', so the
+     * picker can only ever show more than the list, not less.
+     */
+    public static function categoryGroups(?string $panel = null): array
+    {
+        $offered = self::categories($panel);
+        $groups  = [];
+        $placed  = [];
+
+        foreach (self::CATEGORY_GROUPS as $heading => $members) {
+            $rows = array_values(array_intersect($members, $offered));
+            if ($rows) {
+                $groups[$heading] = $rows;
+                $placed = array_merge($placed, $rows);
+            }
+        }
+
+        $leftover = array_values(array_diff($offered, $placed));
+        if ($leftover) {
+            $groups['other'] = array_merge($groups['other'] ?? [], $leftover);
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Lower-cased words a type can be found by when the shop types into the
+     * picker's filter box. Includes the type's own slug so a scripted search
+     * still works, but never the label — the page adds the LOCALIZED label
+     * itself, which is the one the shop can actually read.
+     */
+    public static function categorySearchTerms(string $category): string
+    {
+        return trim($category . ' ' . str_replace('_', ' ', $category) . ' '
+            . (self::CATEGORY_SEARCH_TERMS[$category] ?? ''));
     }
 
     /**

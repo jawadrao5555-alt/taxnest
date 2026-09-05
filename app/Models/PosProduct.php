@@ -76,6 +76,28 @@ class PosProduct extends Model
             'it_services' => ['service_duration', 'staff_assignment'],
             'security_services' => ['service_duration', 'staff_assignment'],
 
+            // The remaining PRA service families (Sep 2026). Same rule: a
+            // service item never borrows a goods-only field. Trades that
+            // consume materials bill by unit, duration trades carry how long
+            // the work runs and who is on it, rentals carry the asset.
+            'clinic' => ['service_duration', 'staff_assignment'],
+            'education' => ['service_duration', 'staff_assignment'],
+            'consultant' => ['service_duration', 'staff_assignment'],
+            'architect' => ['service_duration', 'staff_assignment'],
+            'construction' => ['service_duration', 'unit_type'],
+            'manpower' => ['service_duration', 'staff_assignment'],
+            'cargo' => ['weight_based', 'unit_type'],
+            'warehouse' => ['service_duration', 'unit_type', 'weight_based'],
+            'cleaning' => ['service_duration', 'staff_assignment'],
+            'repair_service' => ['service_duration', 'staff_assignment'],
+            'printing' => ['unit_type', 'service_duration'],
+            'media_production' => ['service_duration', 'staff_assignment'],
+            'entertainment' => ['service_duration'],
+            'financial_services' => ['service_duration'],
+            'equipment_rental' => ['service_duration', 'unit_type'],
+            'tailoring' => ['service_duration', 'unit_type'],
+            'other_service' => ['service_duration'],
+
             // ---- Goods businesses (FBR panel) ----
             'pharmacy' => ['batch_number', 'expiry_date', 'drug_type', 'prescription_required'],
             'grocery' => ['weight_based', 'unit_type', 'barcode'],

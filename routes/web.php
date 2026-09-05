@@ -72,6 +72,11 @@ use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HealthAuthController;
 use App\Http\Controllers\HealthDepartmentController;
 use App\Http\Controllers\HealthTeamController;
+use App\Http\Controllers\Health\HealthAppointmentController;
+use App\Http\Controllers\Health\HealthClinicalController;
+use App\Http\Controllers\Health\HealthDoctorController;
+use App\Http\Controllers\Health\HealthOpdReportController;
+use App\Http\Controllers\Health\HealthPatientController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\AnnouncementController;
@@ -1715,6 +1720,62 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         // Owner-only delegation — re-checked inside the controller, because the
         // route gate only proves the actor may manage staff at all.
         Route::post('/team/{id}/permissions', [HealthTeamController::class, 'permissions'])->name('health.team.permissions');
+    });
+
+    /*
+    | ── Patient & OPD core (Task 1548) ──────────────────────────────────────
+    | The patient register is CORE (a lab or a pharmacy still needs to know who
+    | walked in), so it is not behind the OPD module. Everything that is an
+    | out-patient consultation — the diary, the token queue, the encounter and
+    | the prescription — is, via health.module:opd.
+    */
+    Route::middleware('health.can:patients.view')->group(function () {
+        Route::get('/patients', [HealthPatientController::class, 'index'])->name('health.patients');
+        Route::get('/patients/duplicates', [HealthPatientController::class, 'duplicates'])->name('health.patients.duplicates');
+        Route::get('/patients/new', [HealthPatientController::class, 'create'])->name('health.patients.create');
+        Route::post('/patients', [HealthPatientController::class, 'store'])->name('health.patients.store');
+        Route::get('/patients/{id}', [HealthPatientController::class, 'show'])->whereNumber('id')->name('health.patients.show');
+        Route::get('/patients/{id}/edit', [HealthPatientController::class, 'edit'])->whereNumber('id')->name('health.patients.edit');
+        Route::put('/patients/{id}', [HealthPatientController::class, 'update'])->whereNumber('id')->name('health.patients.update');
+        Route::post('/patients/{id}/toggle-active', [HealthPatientController::class, 'toggleActive'])->whereNumber('id')->name('health.patients.toggle-active');
+    });
+
+    Route::middleware(['health.module:opd', 'health.can:doctors.manage'])->group(function () {
+        Route::get('/doctors', [HealthDoctorController::class, 'index'])->name('health.doctors');
+        Route::post('/doctors', [HealthDoctorController::class, 'store'])->name('health.doctors.store');
+        Route::put('/doctors/{id}', [HealthDoctorController::class, 'update'])->whereNumber('id')->name('health.doctors.update');
+        Route::post('/doctors/{id}/toggle-active', [HealthDoctorController::class, 'toggleActive'])->whereNumber('id')->name('health.doctors.toggle-active');
+        Route::post('/doctors/{id}/slots', [HealthDoctorController::class, 'saveSlots'])->whereNumber('id')->name('health.doctors.slots');
+    });
+
+    Route::middleware(['health.module:opd', 'health.can:appointments.view'])->group(function () {
+        Route::get('/appointments', [HealthAppointmentController::class, 'index'])->name('health.appointments');
+        Route::get('/appointments/patient-search', [HealthAppointmentController::class, 'searchPatients'])->name('health.appointments.patient-search');
+        Route::post('/appointments', [HealthAppointmentController::class, 'store'])->name('health.appointments.store');
+        Route::post('/appointments/{id}/reschedule', [HealthAppointmentController::class, 'reschedule'])->whereNumber('id')->name('health.appointments.reschedule');
+        Route::post('/appointments/{id}/check-in', [HealthAppointmentController::class, 'checkIn'])->whereNumber('id')->name('health.appointments.check-in');
+        Route::post('/appointments/{id}/cancel', [HealthAppointmentController::class, 'cancel'])->whereNumber('id')->name('health.appointments.cancel');
+        Route::post('/appointments/{id}/no-show', [HealthAppointmentController::class, 'noShow'])->whereNumber('id')->name('health.appointments.no-show');
+        // The fee is captured against the ENCOUNTER, but recorded by reception.
+        Route::post('/appointments/visits/{visitId}/fee', [HealthAppointmentController::class, 'updateFee'])->whereNumber('visitId')->name('health.appointments.fee');
+    });
+
+    Route::middleware(['health.module:opd', 'health.can:clinical.view,nursing.record'])->group(function () {
+        Route::get('/clinical', [HealthClinicalController::class, 'queue'])->name('health.clinical');
+        Route::get('/clinical/visits/{id}', [HealthClinicalController::class, 'show'])->whereNumber('id')->name('health.clinical.visit');
+        Route::post('/clinical/visits/{id}/start', [HealthClinicalController::class, 'start'])->whereNumber('id')->name('health.clinical.start');
+        Route::post('/clinical/visits/{id}/vitals', [HealthClinicalController::class, 'saveVitals'])->whereNumber('id')->name('health.clinical.vitals');
+        Route::post('/clinical/visits/{id}/notes', [HealthClinicalController::class, 'saveNotes'])->whereNumber('id')->name('health.clinical.notes');
+        Route::post('/clinical/visits/{id}/reopen', [HealthClinicalController::class, 'reopen'])->whereNumber('id')->name('health.clinical.reopen');
+        Route::post('/clinical/visits/{id}/attachments', [HealthClinicalController::class, 'uploadAttachment'])->whereNumber('id')->name('health.clinical.attachments.store');
+        Route::get('/clinical/attachments/{id}', [HealthClinicalController::class, 'downloadAttachment'])->whereNumber('id')->name('health.clinical.attachments.download');
+        Route::delete('/clinical/attachments/{id}', [HealthClinicalController::class, 'deleteAttachment'])->whereNumber('id')->name('health.clinical.attachments.delete');
+        Route::post('/clinical/visits/{id}/prescription', [HealthClinicalController::class, 'savePrescription'])->whereNumber('id')->name('health.clinical.prescription');
+        Route::get('/clinical/prescriptions/{id}/print', [HealthClinicalController::class, 'printPrescription'])->whereNumber('id')->name('health.clinical.prescription.print');
+    });
+
+    Route::middleware('health.can:reports.view')->group(function () {
+        Route::get('/reports', [HealthOpdReportController::class, 'index'])->name('health.reports');
     });
 });
 

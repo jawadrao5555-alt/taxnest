@@ -66,6 +66,7 @@ class HealthAccessService
             'dashboard.view',
             'patients.view', 'patients.manage',
             'appointments.view', 'appointments.manage',
+            'doctors.manage',
             'clinical.view',
             'pharmacy.view', 'pharmacy.manage',
             'ipd.view', 'ipd.manage',
@@ -405,8 +406,11 @@ class HealthAccessService
         '#^health/departments#'       => 'departments.manage',
         '#^health/team#'              => 'staff.manage',
         '#^health/patients#'          => 'patients.view',
+        '#^health/doctors#'           => 'doctors.manage',
         '#^health/appointments#'      => 'appointments.view',
-        '#^health/clinical#'          => 'clinical.view',
+        // OR: a ward nurse holds nursing.record without general clinical
+        // reading. The screen itself decides what each of them may write.
+        '#^health/clinical#'          => 'clinical.view|nursing.record',
         '#^health/pharmacy#'          => 'pharmacy.view',
         '#^health/ipd#'               => 'ipd.view',
         '#^health/lab#'               => 'lab.view',
@@ -417,7 +421,13 @@ class HealthAccessService
         '#^health/reports#'           => 'reports.view',
     ];
 
-    /** The capability a request path requires, or null when it needs none. */
+    /**
+     * The capability a request path requires, or null when it needs none.
+     *
+     * A value may list ALTERNATIVES separated by '|' — holding any one of
+     * them opens the path. Use it only where two different jobs legitimately
+     * reach the same screen for different reasons.
+     */
     public static function capabilityForPath(string $path): ?string
     {
         $path = ltrim($path, '/');
@@ -429,6 +439,25 @@ class HealthAccessService
         }
 
         return null;
+    }
+
+    /**
+     * Does this person hold ANY of a '|'-separated capability list?
+     *
+     * The single-capability case still goes through can(), so owner-only
+     * capabilities, module gating and custom permission sets behave exactly
+     * as they do everywhere else.
+     */
+    public static function canAny(?User $user, string $capabilities, ?Company $company = null): bool
+    {
+        foreach (explode('|', $capabilities) as $capability) {
+            $capability = trim($capability);
+            if ($capability !== '' && self::can($user, $capability, $company)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

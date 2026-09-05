@@ -68,6 +68,10 @@ Isolated POS (own auth/layouts/models); PRA integration with offline billing + a
 - Isolated FBR-integrated POS (`fbrpos` guard): FBR IMS submission, provisional + payment-confirm flow, PIN system, Edit & Retry. → `fbr-pos-ims-fiscalization.md`
 - **Universal sale screen = the ONLY FBR sale screen (classic create screen RETIRED 7 Aug 2026)**: `/fbr-pos/create` always renders `fbr-pos/universal.blade.php` (24 Jul redesign ported); `fbr_universal_enabled` no longer consulted; `fbr-pos/create.blade.php` = DEAD file on disk; SHIM `@php` pins — do NOT delete. → `fbr-universal-sale-screen.md`
 
+## Healthcare ERP (`/health`, own guard)
+- Separate healthcare panel for clinics/hospitals: modules toggled per company (`opd`, `pharmacy`, `ipd`, `lab`, `accounts`…), roles via `users.health_role` + optional `users.health_permissions` custom set; every screen goes through `HealthAccessService::can()` and `HealthScopeService` (branch + department boundary).
+- **OPD core**: patients (permanent MRN, duplicate detection, consent flags, `is_confidential`), practitioners + weekly slots + fee schedule (`doctors.manage`, admin-only), appointments/walk-in tokens, the reception→doctor visit lifecycle (vitals, notes, diagnosis, procedures, private-disk attachments, follow-up), structured prescriptions with a printable patient copy, and OPD reports (doctor workload, daily summary, appointment outcomes, no-shows). → memory `health-opd-core.md`
+
 ## UI / PWA
 - Responsive sidebar layout, dark/light modes, emerald-600 primary; DI dashboard premium gradient banners + KPI cards.
 - Three PWAs sharing ONE `/sw.js` (bump CACHE_VERSION on relevant deploys); update toast + `window.tnPwaUpdateHold` defers reload mid-sale; offline pre-caching; push notifications. → `sw-skiplist-sale-screens.md`

@@ -1101,6 +1101,13 @@ class AdminCompanyController extends Controller
             // Healthcare ERP (Task 1547): department rows are company-scoped and
             // carry no FK cascade, so they must be purged explicitly.
             'health_departments',
+            // Healthcare OPD core: same rule — every one of these tables carries
+            // company_id and NO FK cascade, so a hard delete that forgets one
+            // leaves a dead patient file behind. Children first (attachments and
+            // prescription items) so nothing is orphaned mid-purge.
+            'health_visit_attachments', 'health_prescription_items', 'health_prescriptions',
+            'health_visits', 'health_appointments', 'health_doctor_slots', 'health_doctors',
+            'health_patients', 'health_number_sequences',
         ];
         DB::transaction(function () use ($orphanTables, $id, $company) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge
@@ -1144,6 +1151,15 @@ class AdminCompanyController extends Controller
             \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('audit-packs/company_' . $id);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Audit pack directory cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
+        }
+        // Healthcare uploads live on the private disk, NOT in the database:
+        // deleting the attachment rows above leaves the lab reports and clinical
+        // photos themselves sitting on disk. A permanent delete of a hospital
+        // must take the medical documents with it.
+        try {
+            \App\Services\HealthPlatformService::purgeFiles((int) $id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Healthcare file purge failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
         AdminAuditLog::log(auth('admin')->id(), 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
         return redirect()->route('saas.admin.companies.bin')->with('success', "Company '{$companyName}' has been permanently deleted.");

@@ -57,6 +57,10 @@ class HealthModuleService
     public const MODULE_CAPABILITIES = [
         'opd' => [
             'appointments.view', 'appointments.manage',
+            // Practitioner profiles carry the fee schedule, so they are NOT
+            // part of "book an appointment": a receptionist must be able to fill
+            // the diary without being able to change what a consultation costs.
+            'doctors.manage',
             'clinical.view', 'clinical.write', 'nursing.record',
         ],
         'pharmacy' => [

@@ -89,8 +89,10 @@ class HealthAuth
         // Path-level capability enforcement (see PATH_MAP). An unmapped path
         // needs no capability — dashboard, profile, language, logout.
         $required = HealthAccessService::capabilityForPath($request->path());
-        if ($required !== null && !HealthAccessService::can($user, $required, $company)) {
-            return $this->deny($request, $required);
+        if ($required !== null && !HealthAccessService::canAny($user, $required, $company)) {
+            // Report the FIRST alternative: it is the primary reason a person
+            // would be here, so the refusal message names the right module.
+            return $this->deny($request, explode('|', $required)[0]);
         }
 
         return $next($request);

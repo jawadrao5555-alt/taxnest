@@ -43,8 +43,36 @@
             </div>
         @endif
 
-        {{-- ── Foundation counters. Only what this task actually owns: no invented
-             patient or revenue tiles for data that does not exist yet. ── --}}
+        {{-- ── Today's OPD desk. Only rendered when the module is on AND this
+             person may open the desk at all — the controller returns null
+             otherwise, so the dashboard never leaks patient volume sideways. ── --}}
+        @if(!empty($opdToday))
+            <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-base font-black">{{ __('health.dash_opd_today') }}</h2>
+                    @if(in_array('appointments.manage', $healthCapabilities ?? [], true))
+                        <a href="{{ route('health.appointments') }}" class="text-xs font-bold text-teal-700 dark:text-teal-300 hover:underline">
+                            {{ __('health.nav_appointments') }}
+                        </a>
+                    @endif
+                </div>
+                <div class="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    @foreach([
+                        'appt_count_total' => $opdToday['total'],
+                        'appt_count_waiting' => $opdToday['waiting'],
+                        'appt_count_in_consultation' => $opdToday['in_consultation'],
+                        'appt_count_completed' => $opdToday['completed'],
+                    ] as $key => $value)
+                        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                            <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('health.' . $key) }}</p>
+                            <p class="mt-1 text-2xl font-black">{{ $value }}</p>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        {{-- ── Foundation counters ── --}}
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             @php
                 $tiles = [
@@ -78,8 +106,31 @@
             @if(empty($enabledModules))
                 <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ __('health.modules_none_on') }}</p>
             @else
+                @php
+                    /* Modules whose screens actually exist. A module lands here only
+                       once its own task has shipped a route — until then the card
+                       keeps saying "coming soon" rather than offering a dead link. */
+                    $builtModules = [
+                        'opd' => ['route' => 'health.appointments', 'cap' => 'appointments.manage', 'alt' => ['health.clinical' => 'clinical.view']],
+                    ];
+                    $anyPending = false;
+                @endphp
                 <div class="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     @foreach($enabledModules as $module)
+                        @php
+                            $entry = $builtModules[$module] ?? null;
+                            $link = null;
+                            if ($entry) {
+                                $candidates = [$entry['route'] => $entry['cap']] + ($entry['alt'] ?? []);
+                                foreach ($candidates as $routeName => $cap) {
+                                    if (in_array($cap, $healthCapabilities ?? [], true) && Route::has($routeName)) {
+                                        $link = route($routeName);
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!$entry) { $anyPending = true; }
+                        @endphp
                         <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                             <div class="flex items-center gap-2">
                                 <span class="text-lg leading-none">{{ HealthModuleService::MODULE_META[$module]['icon'] ?? '•' }}</span>
@@ -88,16 +139,27 @@
                             <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                                 {{ __(HealthModuleService::moduleDescriptionKey($module)) }}
                             </p>
-                            {{-- Honest status: the module is switched on, but its own
-                                 screens ship with the module's own task. Saying so here
-                                 is why the sidebar does not carry a dead link. --}}
-                            <p class="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">
-                                {{ __('health.coming_soon') }}
-                            </p>
+                            @if($link)
+                                <a href="{{ $link }}" class="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-900/30 text-[10px] font-bold uppercase tracking-wide text-teal-800 dark:text-teal-200 hover:underline">
+                                    {{ __('health.open') }}
+                                </a>
+                            @elseif($entry)
+                                {{-- Built, but not for this role: say nothing rather than
+                                     dangle a link the person cannot follow. --}}
+                            @else
+                                {{-- Honest status: the module is switched on, but its own
+                                     screens ship with the module's own task. Saying so here
+                                     is why the sidebar does not carry a dead link. --}}
+                                <p class="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[10px] font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">
+                                    {{ __('health.coming_soon') }}
+                                </p>
+                            @endif
                         </div>
                     @endforeach
                 </div>
-                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('health.module_not_built_yet') }}</p>
+                @if($anyPending)
+                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('health.module_not_built_yet') }}</p>
+                @endif
             @endif
         </div>
 

@@ -83,6 +83,7 @@ class HealthController extends Controller
         $enabled = HealthModuleService::enabled($company);
 
         return view('health.dashboard', [
+            'opdToday' => $this->opdToday($user, $company, $enabled),
             'company' => $company,
             'orgType' => HealthPlatformService::orgType($company),
             'enabledModules' => $enabled,
@@ -95,6 +96,48 @@ class HealthController extends Controller
             'fbrReadiness' => HealthPlatformService::fbrReadiness($company),
             'setupComplete' => (bool) ($company->health_setup_completed ?? false),
         ]);
+    }
+
+    /**
+     * Today's OPD pulse for the dashboard tiles.
+     *
+     * Deliberately cheap (four counters, no rows) and deliberately silent when
+     * the module is off or the signed-in person has no business seeing the
+     * desk: the dashboard must never become a side channel that leaks patient
+     * volume to a role that cannot open a single patient file.
+     */
+    private function opdToday($user, ?Company $company, array $enabled): ?array
+    {
+        if (!in_array('opd', $enabled, true) || !$company) {
+            return null;
+        }
+
+        $maySee = HealthAccessService::can($user, 'appointments.manage', $company)
+            || HealthAccessService::can($user, 'clinical.view', $company)
+            || HealthAccessService::can($user, 'reports.view', $company);
+
+        if (!$maySee || !Schema::hasTable('health_appointments')) {
+            return null;
+        }
+
+        $today = now()->toDateString();
+
+        $base = fn () => HealthScopeService::apply(
+            \App\Models\HealthAppointment::query()->whereDate('appointment_date', $today),
+            $user
+        );
+
+        return [
+            'total' => (clone $base())->count(),
+            'waiting' => (clone $base())->whereIn('status', [
+                \App\Models\HealthAppointment::STATUS_BOOKED,
+                \App\Models\HealthAppointment::STATUS_CHECKED_IN,
+            ])->count(),
+            'in_consultation' => (clone $base())
+                ->where('status', \App\Models\HealthAppointment::STATUS_IN_CONSULTATION)->count(),
+            'completed' => (clone $base())
+                ->where('status', \App\Models\HealthAppointment::STATUS_COMPLETED)->count(),
+        ];
     }
 
     /**

@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Narrow compatibility bridge for Desktop Agents stranded on the retired host.
-# Browser/app traffic still goes to taxnest.pk; only /api/agent is served locally
+# Narrow compatibility bridge for the APPS stranded on the retired address.
+# Browsers still get redirected to taxnest.pk; the app APIs are served locally
 # so Bearer headers and POST bodies survive without a cross-host redirect.
+#
+# Why an app cannot just follow the redirect: the Android clients use
+# HttpURLConnection, which does not follow a 307/308 at all and drops the body
+# of a POST it does follow. Every rider still on an APK built before the address
+# move therefore saw its login POST answered with redirect HTML — on the phone
+# that reads as "wrong email or password". The same applies to /api/app-version,
+# which is how those apps are told an update exists, so it must be reachable too
+# or a stranded app can never learn its way out. The Caller ID app and the
+# Digital Invoice machine API are on this list for the same reason: both are
+# non-browser POST clients that may still be configured with the old address.
 
 source "$(dirname "$0")/lib/live-host.sh"
 require_live_key
@@ -42,9 +52,10 @@ cat > "$TMP_HTTP" <<'APACHE'
     RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/ [NC]
     # Old HTTP-configured Agents must make one authenticated recovery request.
     # A cross-scheme redirect strips Authorization in common HTTP clients, so
-    # serve only the Agent API locally; v1.13.2 then persists the HTTPS URL.
+    # serve the app APIs locally (Agent recovery, the rider app, and the version
+    # check every shell uses to offer its own update).
     # THE_REQUEST survives Laravel's internal /index.php rewrite.
-    RewriteCond %{THE_REQUEST} !\s/+api/agent(?:[/?\s]) [NC]
+    RewriteCond %{THE_REQUEST} !\s/+api/(?:agent|rider-app|caller-app|app-version|di)(?:[/?\s]) [NC]
     RewriteRule ^ https://taxnest.pk%{REQUEST_URI} [R=308,L,NE]
 </VirtualHost>
 APACHE
@@ -81,7 +92,7 @@ cat > "$TMP_FINAL" <<'APACHE'
 
     RewriteEngine On
     RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/ [NC]
-    RewriteCond %{THE_REQUEST} !\s/+api/agent(?:[/?\s]) [NC]
+    RewriteCond %{THE_REQUEST} !\s/+api/(?:agent|rider-app|caller-app|app-version|di)(?:[/?\s]) [NC]
     RewriteRule ^ https://taxnest.pk%{REQUEST_URI} [R=308,L,NE]
 </VirtualHost>
 
@@ -101,7 +112,7 @@ cat > "$TMP_FINAL" <<'APACHE'
     # THE_REQUEST remains the original browser/Agent request even after
     # Laravel's .htaccess internally rewrites it to /index.php. REQUEST_URI
     # changes during that second pass and would wrongly redirect Agent POSTs.
-    RewriteCond %{THE_REQUEST} !\s/+api/agent(?:[/?\s]) [NC]
+    RewriteCond %{THE_REQUEST} !\s/+api/(?:agent|rider-app|caller-app|app-version|di)(?:[/?\s]) [NC]
     RewriteRule ^ https://taxnest.pk%{REQUEST_URI} [R=308,L,NE]
 
     Header always set X-TaxNest-Legacy-Agent-Bridge "active"

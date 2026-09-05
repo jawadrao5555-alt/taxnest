@@ -156,6 +156,8 @@ class HealthAuthController extends Controller
 
     public function showRegister()
     {
+        $this->assertRegistrationOpen();
+
         if (Auth::guard(HealthPanel::GUARD)->check()) {
             return $this->redirectToPortal();
         }
@@ -168,8 +170,23 @@ class HealthAuthController extends Controller
         ]);
     }
 
+    /**
+     * Pre-pilot front door.
+     *
+     * 404, not 403: a stranger should not learn that a healthcare signup exists
+     * here at all. Enforced on BOTH register paths — hiding the buttons only
+     * hides the buttons, and the POST is the one that actually creates a
+     * company.
+     */
+    protected function assertRegistrationOpen(): void
+    {
+        abort_unless(HealthPanel::registrationOpen(), 404);
+    }
+
     public function register(Request $request)
     {
+        $this->assertRegistrationOpen();
+
         $request->validate([
             'company_name' => 'required|string|max:255',
             'company_ntn' => 'required|string|max:50|unique:companies,ntn',

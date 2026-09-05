@@ -24,7 +24,9 @@
         </a>
         <div class="flex items-center gap-2">
             <a href="{{ url('/health/login') }}" class="px-4 py-2 text-sm font-semibold text-[#0A4D5C] hover:bg-[#0A4D5C]/5 rounded-lg transition">Log In</a>
-            <a href="{{ url('/health/register') }}" class="px-4 py-2 text-sm font-bold text-white bg-[#0A4D5C] hover:bg-[#083c48] rounded-lg transition">Get Started</a>
+            @if(\App\Support\HealthPanel::registrationOpen())
+                <a href="{{ url('/health/register') }}" class="px-4 py-2 text-sm font-bold text-white bg-[#0A4D5C] hover:bg-[#083c48] rounded-lg transition">Get Started</a>
+            @endif
         </div>
     </div>
 </header>
@@ -42,7 +44,9 @@
             on the same platform that already files Pakistani tax for thousands of businesses.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
-            <a href="{{ url('/health/register') }}" class="px-6 py-3 rounded-xl bg-[#0A4D5C] hover:bg-[#0d5d70] text-white text-sm font-bold transition">Start your organisation</a>
+            @if(\App\Support\HealthPanel::registrationOpen())
+                <a href="{{ url('/health/register') }}" class="px-6 py-3 rounded-xl bg-[#0A4D5C] hover:bg-[#0d5d70] text-white text-sm font-bold transition">Start your organisation</a>
+            @endif
             <a href="{{ url('/health/login') }}" class="px-6 py-3 rounded-xl border border-white/25 hover:bg-white/10 text-white text-sm font-bold transition">Log in</a>
         </div>
     </div>
@@ -125,10 +129,12 @@
                                 @endif
                             </li>
                         </ul>
-                        <a href="{{ url('/health/register?plan=' . $plan->id) }}"
-                           class="mt-5 block text-center px-5 py-2.5 rounded-xl bg-[#0A4D5C] hover:bg-[#083c48] text-white text-sm font-bold transition">
-                            Choose {{ $plan->name }}
-                        </a>
+                        @if(\App\Support\HealthPanel::registrationOpen())
+                            <a href="{{ url('/health/register?plan=' . $plan->id) }}"
+                               class="mt-5 block text-center px-5 py-2.5 rounded-xl bg-[#0A4D5C] hover:bg-[#083c48] text-white text-sm font-bold transition">
+                                Choose {{ $plan->name }}
+                            </a>
+                        @endif
                     </div>
                 @endforeach
             </div>

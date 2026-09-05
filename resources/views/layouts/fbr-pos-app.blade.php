@@ -368,6 +368,15 @@
                                 {{ __('pos.new_sale') }}
                             </a>
                             @endunless
+                            {{-- Keep Customize discoverable exactly like PRA POS. It used to
+                                 exist only in the sidebar drawer, so owners reasonably read
+                                 the finished FBR settings hub as "gone". --}}
+                            @if($fbrUser?->role === 'company_admin')
+                            <a href="{{ route('fbrpos.customize') }}"
+                               class="nav-pill px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('fbrpos.customize') ? 'active text-white' : 'text-white/90' }}">
+                                {{ __('pos.settings') }}<x-new-badge page="fbrpos.customize" panel="fbrpos" dot class="ml-1" />
+                            </a>
+                            @endif
                         </nav>
 
                         <div class="hidden md:block ml-1">
@@ -709,6 +718,12 @@
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: rgba(12,25,41,0.9)">
                     <a href="{{ route('fbrpos.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('fbrpos.create') ? 'active text-white' : 'text-white/90' }}">{{ __('pos.new_sale') }}</a>
+                    @if($fbrUser?->role === 'company_admin')
+                    <a href="{{ route('fbrpos.customize') }}"
+                       class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('fbrpos.customize') ? 'active text-white' : 'text-white/90' }}">
+                        {{ __('pos.settings') }}<x-new-badge page="fbrpos.customize" panel="fbrpos" dot class="ml-1" />
+                    </a>
+                    @endif
                     <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>

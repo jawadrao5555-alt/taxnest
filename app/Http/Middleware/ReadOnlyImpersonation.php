@@ -66,12 +66,39 @@ class ReadOnlyImpersonation
         $blockedWrite = !empty($imp['readonly']) && $isWrite;
 
         if ($isIdentitySwap || $blockedWrite) {
+            // ORPHANED FLAG (owner report, 5 Sep 2026): the flag can outlive the admin
+            // session that created it — that session expired, was cleared, or the
+            // browser simply kept a stale cookie. With no admin behind it there is
+            // nobody to protect and no banner anywhere to press "Exit" on, yet the
+            // refusal below would still bounce EVERY login attempt straight back to
+            // the same login page — the sign-in button appears to do nothing at all.
+            // So at the exact point the flag would bite: drop it, close the panel
+            // login it opened, and let the request continue as an ordinary one.
+            if (!auth('admin')->check()) {
+                $guard = $imp['guard'] ?? null;
+                if ($guard && auth($guard)->check()) {
+                    auth($guard)->logout();
+                }
+                $request->session()->forget('impersonation');
+
+                return $next($request);
+            }
+
             $message = $isIdentitySwap
                 ? 'You cannot switch or sign out of this account while acting as a company — use "Exit" to leave.'
                 : 'View-only mode — you are viewing this company as admin. Changes are disabled.';
 
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(['error' => $message, 'view_only' => !empty($imp['readonly'])], 403);
+            }
+
+            // A refused identity swap means the visitor is sitting on a LOGIN page,
+            // and back() would drop them on that same page — the very "nothing
+            // happens, it just returns here" loop the owner hit. Send them to the
+            // admin panel instead: that is the one surface that carries the banner
+            // with the "Exit" button, i.e. the only legitimate way out.
+            if ($isIdentitySwap) {
+                return redirect('/admin/dashboard')->with('error', $message);
             }
 
             return redirect()->back()->with('error', $message);

@@ -45,6 +45,25 @@
                 </div>
                 @endif
 
+                {{-- Flashed reasons (expired session, blocked identity swap, forced exit)
+                     arrive as session('error'), NOT in $errors. Without this block the
+                     page silently re-appears and the sign-in looks like it did nothing. --}}
+                @if(session('error'))
+                <div class="mx-7 mt-3">
+                    <div class="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-2.5 text-sm">
+                        {{ session('error') }}
+                    </div>
+                </div>
+                @endif
+
+                @if(session('status'))
+                <div class="mx-7 mt-3">
+                    <div class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-lg px-4 py-2.5 text-sm">
+                        {{ session('status') }}
+                    </div>
+                </div>
+                @endif
+
                 <form method="POST" action="/admin/login" class="px-7 pb-7 pt-4 space-y-4">
                     @csrf
                     <div>

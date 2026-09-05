@@ -292,6 +292,15 @@
                     @endforeach
                 </div>
                 @endif
+
+                {{-- Flashed reasons (expired session, blocked identity swap, forced exit)
+                     never reach $errors — without this the login page just re-appears
+                     and the attempt looks like it did nothing at all. --}}
+                @if(session('error'))
+                <div class="bg-red-500/10 text-red-300 border border-red-500/20 rounded-lg p-3 text-sm">
+                    <p>{{ session('error') }}</p>
+                </div>
+                @endif
                 <button type="submit" class="w-full btn-solid btn-gold font-bold">
                     Sign In to Dashboard
                 </button>

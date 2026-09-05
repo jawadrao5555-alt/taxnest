@@ -210,7 +210,11 @@ OPT="$TMPD/opts.json"
 python3 - "$OPT" "$STAMP" <<'PY'
 import json,sys
 raw=open(sys.argv[1]).read(); stamp=sys.argv[2]
-def f(m): print("    FAIL —",m)
+# A printed FAIL that still exits 0 is worse than no check at all: the round
+# would report PASS while the stock maths was wrong. Every failure below must
+# reach the shell as a non-zero status.
+BAD=[]
+def f(m): print("    FAIL —",m); BAD.append(m)
 def o(m): print("    ok   —",m)
 try: d=json.loads(raw)
 except Exception: f("batch-options did not return JSON: "+raw[:200]); sys.exit(1)
@@ -230,6 +234,7 @@ if near and all(r.get("sellable") for r in near):
     o(f"short-dated batch warned but still sellable: {[r['batch'] for r in near]} (window {d.get('near_days')} days)")
 else:
     f("the +20-day batch is not flagged short-dated, or was wrongly blocked")
+sys.exit(1 if BAD else 0)
 PY
 [ $? -eq 0 ] || FAIL=1
 
@@ -291,13 +296,18 @@ d=json.load(open(sys.argv[1])); stamp=sys.argv[2]
 q={str(r.get("batch")):float(r.get("quantity") or 0) for r in d.get("batches",[])}
 near=q.get("QANEAR"+stamp); far=q.get("QAFAR"+stamp); old=q.get("QAOLD"+stamp)
 print(f"    batch quantities now — near={near} far={far} expired={old}")
-if near==4.0: print("    ok   — the whole-pack sale took exactly 1 off the short-dated batch")
-else: print(f"    FAIL — short-dated batch should be 4.0 after selling 1, it is {near}")
-if far==9.7: print("    ok   — the loose sale took 0.3 of a pack (3 of 10), not a whole pack")
-else: print(f"    FAIL — loose sale should leave 9.7, batch is {far}")
-if old==3.0: print("    ok   — the expired batch was never touched")
-else: print(f"    FAIL — expired batch quantity moved to {old}")
+BAD=[]
+def chk(cond,ok,bad):
+    print("    ok   — "+ok) if cond else (print("    FAIL — "+bad), BAD.append(bad))
+chk(near==4.0, "the whole-pack sale took exactly 1 off the short-dated batch",
+    f"short-dated batch should be 4.0 after selling 1, it is {near}")
+chk(far==9.7, "the loose sale took 0.3 of a pack (3 of 10), not a whole pack",
+    f"loose sale should leave 9.7, batch is {far}")
+chk(old==3.0, "the expired batch was never touched",
+    f"expired batch quantity moved to {old}")
+sys.exit(1 if BAD else 0)
 PY
+[ $? -eq 0 ] || FAIL=1
 
 # ═════════════════════════════════════════════════════════════════════════
 step "9. Return goes back onto the ORIGINAL batch"
@@ -319,11 +329,16 @@ import json,sys
 d=json.load(open(sys.argv[1])); stamp=sys.argv[2]
 q={str(r.get("batch")):float(r.get("quantity") or 0) for r in d.get("batches",[])}
 near=q.get("QANEAR"+stamp); far=q.get("QAFAR"+stamp)
-if near==5.0: print("    ok   — the refund restored the SAME short-dated batch (back to 5.0)")
-else: print(f"    FAIL — returned batch should be 5.0, it is {near}")
-if far==9.7: print("    ok   — the untouched batch did not absorb the return")
-else: print(f"    FAIL — the other batch moved to {far}; the return hit the wrong batch")
+BAD=[]
+def chk(cond,ok,bad):
+    print("    ok   — "+ok) if cond else (print("    FAIL — "+bad), BAD.append(bad))
+chk(near==5.0, "the refund restored the SAME short-dated batch (back to 5.0)",
+    f"returned batch should be 5.0, it is {near}")
+chk(far==9.7, "the untouched batch did not absorb the return",
+    f"the other batch moved to {far}; the return hit the wrong batch")
+sys.exit(1 if BAD else 0)
 PY
+    [ $? -eq 0 ] || FAIL=1
   else
     bad "could not read the return form's item id — return step not proven"
   fi

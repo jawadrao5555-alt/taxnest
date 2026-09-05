@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Narrow compatibility bridge for the APPS stranded on the retired address.
-# Browsers still get redirected to taxnest.pk; the app APIs are served locally
-# so Bearer headers and POST bodies survive without a cross-host redirect.
+# Compatibility bridge for everything stranded on the retired address.
+# The marketing pages still redirect to taxnest.pk (that is where the public
+# identity and the search ranking live); everything the shipped apps touch is
+# served locally instead, so no client has to survive a cross-host redirect.
 #
-# Why an app cannot just follow the redirect: the Android clients use
-# HttpURLConnection, which does not follow a 307/308 at all and drops the body
-# of a POST it does follow. Every rider still on an APK built before the address
-# move therefore saw its login POST answered with redirect HTML — on the phone
-# that reads as "wrong email or password". The same applies to /api/app-version,
-# which is how those apps are told an update exists, so it must be reachable too
-# or a stranded app can never learn its way out. The Caller ID app and the
-# Digital Invoice machine API are on this list for the same reason: both are
-# non-browser POST clients that may still be configured with the old address.
+# Why a shipped app cannot just follow the redirect — two separate failures:
+#
+#  1. API clients (rider app, Caller ID app, Desktop Agent, Digital Invoice
+#     machine API). The Android ones use HttpURLConnection, which does not
+#     follow a 307/308 at all and drops the body of a POST it does follow. A
+#     login POST answered with redirect HTML reads on the phone as "wrong email
+#     or password". /api/app-version belongs on the same list: it is how a
+#     stranded app is told an update exists, so without it the app can never
+#     learn its way out.
+#
+#  2. The WebView shells (POS, FBR POS, Digital Invoice, Waiter). Each shell
+#     pins the host it was built with and hands every off-host navigation to
+#     the system browser. A build from before the address move therefore opens
+#     its own login page in Chrome and shows the shop an empty app window. The
+#     panels must be served on the old address for those installs to work.
+#
+# The old address is deliberately marked noindex so serving it here cannot
+# compete with taxnest.pk in search results.
 
 source "$(dirname "$0")/lib/live-host.sh"
 require_live_key
@@ -109,12 +119,21 @@ cat > "$TMP_FINAL" <<'APACHE'
     </Directory>
 
     RewriteEngine On
-    # THE_REQUEST remains the original browser/Agent request even after
-    # Laravel's .htaccess internally rewrites it to /index.php. REQUEST_URI
-    # changes during that second pass and would wrongly redirect Agent POSTs.
-    RewriteCond %{THE_REQUEST} !\s/+api/(?:agent|rider-app|caller-app|app-version|di)(?:[/?\s]) [NC]
+    # THE_REQUEST remains the original browser/app request even after Laravel's
+    # .htaccess internally rewrites it to /index.php. REQUEST_URI changes during
+    # that second pass and would wrongly redirect POSTs on the second look.
+    #
+    # Only the public marketing surface is redirected: the home page and the
+    # standalone public pages. Panels, APIs, assets and downloads are served
+    # here, because a shipped app pinned to this address cannot follow a
+    # cross-host redirect (see the note at the top of this script).
+    RewriteCond %{THE_REQUEST} \s/+(?:\?[^\s]*)?\s [NC,OR]
+    RewriteCond %{THE_REQUEST} \s/+(?:contact|privacy|data-deletion|digital-invoice|healthcare|sitemap\.xml|robots\.txt)(?:[/?\s]) [NC]
     RewriteRule ^ https://taxnest.pk%{REQUEST_URI} [R=308,L,NE]
 
+    # Anything served from the retired address stays out of search results;
+    # taxnest.pk remains the only indexable copy.
+    Header always set X-Robots-Tag "noindex, nofollow"
     Header always set X-TaxNest-Legacy-Agent-Bridge "active"
     ErrorLog  /var/log/httpd/taxnest-legacy-agent-error.log
     CustomLog /var/log/httpd/taxnest-legacy-agent-access.log combined

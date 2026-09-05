@@ -1,7 +1,14 @@
 <x-pos-layout>
     @php
-        $currentCategory = $company->business_category ?: ($company->restaurant_mode ? 'restaurant' : 'retail');
-        $presetKeys = array_keys(\App\Services\PosFeatureService::PRESET_META);
+        // The business type is chosen at REGISTRATION and is read-only here: it
+        // decides which regulator the shop files under, so only a SaaS admin may
+        // change it. This step shows what the shop is, not a picker.
+        $currentCategory = \App\Services\PosFeatureService::resolveCategory($company);
+        $currentMeta = \App\Services\PosFeatureService::presetMeta($currentCategory);
+        // The amber "this belongs on the other panel" notice fires only when the
+        // category is genuinely the OTHER regulator's; a catch-all like
+        // 'general' belongs to nobody and must not raise it.
+        $onLegacyCategory = \App\Services\PosFeatureService::belongsToOtherPanel($company);
         // Current flag state (resolved) → seed the wizard so re-editing shows live config.
         $flagState = [];
         foreach (\App\Services\PosFeatureService::ALL_FLAGS as $f) { $flagState[$f] = (bool) $features->{$f}; }
@@ -61,38 +68,33 @@
                  leaves those blocks untouched — an outdated form and a form with
                  everything unticked are otherwise identical on the wire. --}}
             <input type="hidden" name="fs_present" value="1">
-            <input type="hidden" name="business_category" :value="selectedPreset">
             <input type="hidden" name="use_universal_pos" value="1">
 
-            {{-- ════════════════════ STEP 1 — BUSINESS TYPE ════════════════════ --}}
+            {{-- ════════════════════ STEP 1 — BUSINESS TYPE (read-only) ════════════════════ --}}
             <div x-show="step === 1" x-transition.opacity>
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 sm:p-6 shadow-sm">
-                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white">{{ __('pos.what_type_of_business') }}</h2>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">{{ __('pos.pick_closest_match') }}</p>
+                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white">{{ __('pos.business_type') }}</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.business_type_locked_note') }}</p>
 
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                        @foreach($presetKeys as $preset)
-                            @php $meta = \App\Services\PosFeatureService::presetMeta($preset); @endphp
-                            <button type="button" @click="selectPreset('{{ $preset }}')"
-                                :class="selectedPreset === '{{ $preset }}' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-400/40' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 hover:bg-purple-50/30 dark:hover:bg-purple-900/10'"
-                                class="relative p-3 rounded-xl border-2 text-left transition-all duration-150">
-                                @if($meta['badge'])
-                                    <span class="absolute top-1.5 right-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider
-                                        @if($meta['badge'] === 'Most Popular') bg-emerald-500 text-white
-                                        @elseif($meta['badge'] === 'New') bg-pink-500 text-white
-                                        @else bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 @endif">
-                                        {{ $meta['badge'] }}
-                                    </span>
-                                @endif
-                                <div class="text-3xl mb-1.5">{{ $meta['icon'] }}</div>
-                                <div class="text-sm font-bold text-gray-900 dark:text-white leading-tight mb-1">{{ $meta['label'] }}</div>
-                                <div class="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">{{ $meta['description'] }}</div>
-                                <div x-show="selectedPreset === '{{ $preset }}'" class="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center">
-                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                </div>
-                            </button>
-                        @endforeach
+                    <div class="rounded-xl border-2 border-purple-200 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-900/10 p-4 flex items-start gap-3">
+                        <span class="text-3xl leading-none">{{ $currentMeta['icon'] }}</span>
+                        <div>
+                            <p class="text-base font-extrabold text-gray-900 dark:text-white">{{ $currentMeta['label'] }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">{{ $currentMeta['description'] }}</p>
+                        </div>
                     </div>
+
+                    @if($onLegacyCategory)
+                        {{-- This shop signed up on a goods category before the services/goods
+                             split. Nothing is switched off for it — it is simply told where
+                             that kind of business actually belongs. --}}
+                        <div class="mt-4 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3.5 py-3">
+                            <p class="text-xs font-bold text-amber-900 dark:text-amber-200">{{ __('pos.legacy_goods_category_title') }}</p>
+                            <p class="mt-1 text-[11px] leading-relaxed text-amber-800 dark:text-amber-300/90">{{ __('pos.legacy_goods_category_body') }}</p>
+                        </div>
+                    @endif
+
+                    <p class="mt-4 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">{{ __('pos.business_type_features_hint') }}</p>
                 </div>
 
                 <div class="mt-4 flex items-center justify-between">
@@ -371,7 +373,9 @@
 
                 presetMeta: @json(\App\Services\PosFeatureService::PRESET_META),
                 flagMeta: @json(\App\Services\PosFeatureService::FLAG_META),
-                categoryDefaults: @json(\App\Services\PosFeatureService::CATEGORY_DEFAULTS),
+                {{-- Merged map: offered service categories PLUS the retired goods ones, so a
+                     pre-split shop's own preset still resolves in the wizard. --}}
+                categoryDefaults: @json(\App\Services\PosFeatureService::allCategoryDefaults()),
                 dependencies: @json(\App\Services\PosFeatureService::DEPENDENCIES),
                 allFlags: @json(\App\Services\PosFeatureService::ALL_FLAGS),
                 restaurantLocked: @json(!($restaurantAllowed ?? true)),
@@ -398,12 +402,6 @@
                 flagDeps(f) { return this.dependencies[f] || []; },
                 isLocked(f) { return this.restaurantLocked && this.restaurantFlags.includes(f); },
 
-                selectPreset(preset) {
-                    this.selectedPreset = preset;
-                    const defaults = this.categoryDefaults[preset] || {};
-                    this.allFlags.forEach(f => { this.flags[f] = !!defaults[f]; });
-                    this.resolveDeps();
-                },
                 onFlagChange() { this.resolveDeps(); },
                 resolveDeps() {
                     // Plan-locked restaurant flags can never switch ON client-side

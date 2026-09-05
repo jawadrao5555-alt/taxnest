@@ -48,16 +48,27 @@ class PosProduct extends Model
     public static function categoryFields(): array
     {
         return [
+            // ---- Service businesses (PRA panel) ----
+            'salon' => ['service_duration', 'staff_assignment'],
+            'gym' => ['service_duration', 'staff_assignment'],
+            'laundry' => ['service_duration', 'unit_type'],
+            'workshop' => ['service_duration', 'staff_assignment', 'vehicle_make', 'vehicle_model'],
+            'restaurant' => [],
+            'cafe' => [],
+            'quick_service' => [],
+            'hotel' => ['service_duration'],
+            'marquee' => ['service_duration'],
+            'catering' => ['weight_based', 'unit_type'],
+
+            // ---- Goods businesses (FBR panel) ----
             'pharmacy' => ['batch_number', 'expiry_date', 'drug_type', 'prescription_required'],
             'grocery' => ['weight_based', 'unit_type', 'barcode'],
             'clothing' => ['size', 'color', 'season'],
             'electronics' => ['serial_number', 'warranty_months', 'imei'],
             'hardware' => ['unit_type', 'bulk_discount_qty', 'bulk_discount_pct'],
-            'salon' => ['service_duration', 'staff_assignment'],
             'autoparts' => ['vehicle_make', 'vehicle_model', 'part_number'],
             'bakery' => ['weight_based', 'custom_order', 'box_type'],
             'retail' => [],
-            'restaurant' => [],
         ];
     }
 }

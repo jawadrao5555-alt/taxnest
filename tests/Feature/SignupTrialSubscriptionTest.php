@@ -297,7 +297,7 @@ class SignupTrialSubscriptionTest extends TestCase
             'email' => 'hina@example.com',
             'password' => 'secret-pass-123',
             'password_confirmation' => 'secret-pass-123',
-            'pos_type' => 'retail',
+            'pos_type' => 'restaurant',
         ]);
         $resp->assertSessionHasNoErrors();
 
@@ -315,7 +315,7 @@ class SignupTrialSubscriptionTest extends TestCase
             'email' => 'adeel@example.com',
             'password' => 'secret-pass-123',
             'password_confirmation' => 'secret-pass-123',
-            'pos_type' => 'retail',
+            'pos_type' => 'restaurant',
         ]);
         $resp->assertSessionHasNoErrors();
 

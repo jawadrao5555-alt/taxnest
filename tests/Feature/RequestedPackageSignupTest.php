@@ -193,7 +193,7 @@ class RequestedPackageSignupTest extends TestCase
             'email' => $email,
             'password' => 'secret-pass-123',
             'password_confirmation' => 'secret-pass-123',
-            'pos_type' => 'retail',
+            'pos_type' => 'restaurant',
         ];
         if ($requestedPlan !== null) {
             $payload['requested_plan'] = $requestedPlan;
@@ -237,7 +237,7 @@ class RequestedPackageSignupTest extends TestCase
             'email' => $email,
             'password' => 'secret-pass-123',
             'password_confirmation' => 'secret-pass-123',
-            'pos_type' => 'retail',
+            'pos_type' => 'restaurant',
             'pricing_plan_id' => $this->plan('Starter', 'pos')->id,
             'requested_addons' => $addons,
             'requested_addon_cycle' => $cycle,

@@ -69,7 +69,7 @@ class PosSettingsStaleFormGuardTest extends TestCase
         // Outdated copy of the wizard: category only, not one feature_flags key.
         $this->post('/pos/features', [
             '_token'            => csrf_token(),
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
         ]);
 
         $company = $this->company();
@@ -94,7 +94,7 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $this->actAsAdmin();
         $this->post('/pos/features', [
             '_token'            => csrf_token(),
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
         ]);
 
         $company = $this->company();
@@ -119,7 +119,7 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $this->post('/pos/features', [
             '_token'            => csrf_token(),
             'fs_present'        => '1',
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
             // feature_flags + kitchen tick-boxes absent = everything unticked
         ]);
 
@@ -284,7 +284,7 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $this->actAsAdmin();
         $this->post('/pos/features', [
             '_token'            => csrf_token(),
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
         ]);
 
         $company = $this->company();
@@ -306,7 +306,7 @@ class PosSettingsStaleFormGuardTest extends TestCase
         $this->post('/pos/features', [
             '_token'            => csrf_token(),
             'fs_present'        => '1',
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
             'pos_tax_rate_cash' => '',
             'pos_tax_rate_card' => '',
         ]);
@@ -473,6 +473,7 @@ class PosSettingsStaleFormGuardTest extends TestCase
             $t->boolean('use_universal_pos')->default(false);
             $t->string('pos_ui_density')->nullable();
             $t->boolean('pos_setup_completed')->default(false);
+            $t->boolean('restaurant_mode')->default(false);
             $t->decimal('pos_tax_rate_cash', 5, 2)->nullable();
             $t->decimal('pos_tax_rate_card', 5, 2)->nullable();
             // Kitchen / KOT settings

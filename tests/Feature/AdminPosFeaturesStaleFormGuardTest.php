@@ -83,7 +83,7 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
         // no fs_present marker, no use_universal_pos / pos_ui_density.
         $this->put($this->url(), [
             '_token'            => csrf_token(),
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
         ])->assertRedirect();
 
         $company = $this->company();
@@ -114,7 +114,7 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
             '_token'            => csrf_token(),
             'fs_present'        => '1',
             'use_universal_pos' => '1',
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
             // feature_flags absent = every module unticked
         ])->assertRedirect();
 
@@ -140,7 +140,7 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
         $this->actAsAdmin();
         $this->put($this->url(), [
             '_token'            => csrf_token(),
-            'business_category' => 'retail',
+            'business_category' => 'restaurant',
             'feature_flags'     => ['inventory' => '1'],
             // kitchen absent = unticked; inventory ticked
         ])->assertRedirect();
@@ -201,6 +201,7 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
             $t->text('feature_flags')->nullable();
             $t->string('business_category')->nullable();
             $t->boolean('inventory_enabled')->default(false);
+            $t->boolean('restaurant_mode')->default(false);
             $t->boolean('use_universal_pos')->default(false);
             $t->string('pos_ui_density')->nullable();
             $t->softDeletes();

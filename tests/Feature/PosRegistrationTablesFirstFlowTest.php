@@ -182,22 +182,23 @@ class PosRegistrationTablesFirstFlowTest extends TestCase
     }
 
     /**
-     * Same assertion for a retail (non-restaurant) POS signup — the default
-     * must also be 1 regardless of pos_type, because the flag is never
-     * explicitly written by the registration path.
+     * Same assertion for a non-restaurant POS signup — the default must also be
+     * 1 regardless of pos_type, because the flag is never explicitly written by
+     * the registration path. (PRA taxes services only, so the non-restaurant
+     * case here is a salon, not a retail shop: retail is an FBR business.)
      */
-    public function test_pos_retail_signup_has_tables_first_flow_on(): void
+    public function test_pos_non_restaurant_signup_has_tables_first_flow_on(): void
     {
         $request = $this->makeRequest('/pos/register', [
-            'company_name'          => 'Test Shop',
+            'company_name'          => 'Test Salon',
             'company_ntn'           => null,
             'company_cnic'          => null,
-            'name'                  => 'Retail Owner',
-            'email'                 => 'retail@postest.com',
+            'name'                  => 'Salon Owner',
+            'email'                 => 'salon@postest.com',
             'phone'                 => '03001111111',
             'password'              => 'Password123!',
             'password_confirmation' => 'Password123!',
-            'pos_type'              => 'retail',
+            'pos_type'              => 'salon',
             'pricing_plan_id'       => 1,
         ]);
 
@@ -207,13 +208,13 @@ class PosRegistrationTablesFirstFlowTest extends TestCase
             // intentional
         }
 
-        $company = DB::table('companies')->where('email', 'retail@postest.com')->first();
+        $company = DB::table('companies')->where('email', 'salon@postest.com')->first();
 
-        $this->assertNotNull($company, 'POS retail registration must create a company row.');
+        $this->assertNotNull($company, 'POS non-restaurant registration must create a company row.');
         $this->assertSame(
             1,
             (int) $company->tables_first_flow,
-            'POS retail signup must NOT write tables_first_flow = 0.'
+            'POS non-restaurant signup must NOT write tables_first_flow = 0.'
         );
     }
 

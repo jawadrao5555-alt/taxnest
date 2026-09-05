@@ -66,7 +66,7 @@
                             (string) old('requested_addon_cycle', $requestedAddonQuote['cycle'] ?? 'annual')
                         );
                     @endphp
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'restaurant') }}', planId: '{{ old('pricing_plan_id', $preselectedPlanId ?? '') }}', cycle: @js(old('billing_cycle', 'annual')), prices: @js($planPrices ?? []), perLabels: @js($cyclePerLabels ?? []), priceOf(id) { const row = this.prices[id] || {}; const v = row[this.cycle]; return v === undefined ? '' : Number(v).toLocaleString('en-US'); }, get perLabel() { return this.perLabels[this.cycle] || ''; } }">
                         @csrf
 
                         {{-- Package picker (owner rule Jul 2026): shop selects its plan at
@@ -141,67 +141,35 @@
 
                         <input type="hidden" name="pos_type" :value="posType">
 
+                        {{-- PRA taxes SERVICES only (Punjab Sales Tax on Services Act 2012,
+                             s.2(38): a service is "anything which is not goods"). Goods retail
+                             is federal and belongs to the FBR panel, so only service businesses
+                             are offered here. --}}
+                        @php
+                            // Driven by PosFeatureService::PANEL_CATEGORIES so the
+                            // page can never offer a type the validator rejects.
+                            $praBusinessTypes = \App\Services\PosFeatureService::categories('pra');
+                        @endphp
+
                         <div class="grid grid-cols-5 gap-2">
-                            <label class="relative cursor-pointer" @click="posType = 'retail'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'retail' ? 'cat-active' : ''">
-                                    <span class="text-xl">🛒</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_retail') }}</span>
+                            @foreach($praBusinessTypes as $btKey)
+                            <label class="relative cursor-pointer" @click="posType = @js($btKey)">
+                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === @js($btKey) ? 'cat-active' : ''">
+                                    <span class="text-xl">{{ \App\Services\PosFeatureService::presetMeta($btKey)['icon'] }}</span>
+                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_' . $btKey) }}</span>
                                 </div>
                             </label>
-                            <label class="relative cursor-pointer" @click="posType = 'restaurant'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'restaurant' ? 'cat-active' : ''">
-                                    <span class="text-xl">🍽️</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_restaurant') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'pharmacy'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'pharmacy' ? 'cat-active' : ''">
-                                    <span class="text-xl">💊</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_pharmacy') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'grocery'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'grocery' ? 'cat-active' : ''">
-                                    <span class="text-xl">🏪</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_grocery') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'clothing'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'clothing' ? 'cat-active' : ''">
-                                    <span class="text-xl">👔</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_clothing') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'electronics'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'electronics' ? 'cat-active' : ''">
-                                    <span class="text-xl">📱</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_electronics') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'hardware'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'hardware' ? 'cat-active' : ''">
-                                    <span class="text-xl">🔧</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_hardware') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'salon'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'salon' ? 'cat-active' : ''">
-                                    <span class="text-xl">💇</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_salon') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'autoparts'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'autoparts' ? 'cat-active' : ''">
-                                    <span class="text-xl">🚗</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_autoparts') }}</span>
-                                </div>
-                            </label>
-                            <label class="relative cursor-pointer" @click="posType = 'bakery'">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === 'bakery' ? 'cat-active' : ''">
-                                    <span class="text-xl">🧁</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_bakery') }}</span>
-                                </div>
-                            </label>
+                            @endforeach
+                        </div>
+
+                        {{-- A goods shop cannot be a PRA taxpayer at all. Send it to the FBR
+                             panel here rather than letting it register on the wrong authority. --}}
+                        <div class="rounded-xl px-3 py-2.5" style="background: rgba(56,189,248,0.10); border: 1px solid rgba(125,211,252,0.28);">
+                            <p class="text-[11px] leading-relaxed text-sky-100/85">
+                                <span class="font-semibold text-sky-200">{{ __('pos.auth_goods_notice_title') }}</span>
+                                {{ __('pos.auth_goods_notice_body') }}
+                                <a href="/fbr-pos/register" class="font-semibold text-cyan-200 underline hover:text-white">{{ __('pos.auth_goods_notice_link') }}</a>
+                            </p>
                         </div>
 
                         <div class="pt-1 pb-1" style="border-top: 1px solid rgba(255,255,255,0.08);">

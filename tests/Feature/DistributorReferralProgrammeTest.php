@@ -56,7 +56,7 @@ class DistributorReferralProgrammeTest extends TestCase
             'company_name' => 'POS '.$suffix, 'company_ntn' => $ntn,
             'name' => 'Owner '.$suffix, 'email' => "pos-{$suffix}@example.test",
             'password' => 'password', 'password_confirmation' => 'password',
-            'pos_type' => 'retail', 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
+            'pos_type' => 'restaurant', 'pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual',
         ];
 
         $this->post('/pos/register', $payload('valid', 'POS-REF-1') + ['distributor_reference_code' => $agent->referral_code])
@@ -78,7 +78,7 @@ class DistributorReferralProgrammeTest extends TestCase
         $payload = fn (string $suffix, string $ntn) => [
             'company_name' => 'FBR '.$suffix, 'company_ntn' => $ntn,
             'name' => 'Owner '.$suffix, 'email' => "fbr-{$suffix}@example.test",
-            'password' => 'password', 'password_confirmation' => 'password', 'pos_type' => 'retail',
+            'password' => 'password', 'password_confirmation' => 'password', 'pos_type' => 'restaurant',
         ];
 
         $this->post('/fbr-pos/register', $payload('valid', 'FBR-REF-1') + ['distributor_reference_code' => $agent->referral_code])

@@ -156,7 +156,9 @@ class FbrPosAuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
+            // FBR panel = goods businesses (see PosFeatureService::PANEL_CATEGORIES),
+            // plus the 'general' catch-all.
+            'pos_type' => 'required|in:' . implode(',', array_merge(\App\Services\PosFeatureService::categories('fbr'), ['general'])),
             'distributor_reference_code' => 'nullable|string|max:30',
         ], \App\Services\LoginIdentifierResolver::cnicMessages('company_cnic'));
 
@@ -205,11 +207,16 @@ class FbrPosAuthController extends Controller
             'status' => 'pending',
             'product_type' => 'fbrpos',
             'pos_type' => $posType,
-            'restaurant_mode' => ($posType === 'restaurant'),
             'fbr_pos_enabled' => true,
             'fbr_pos_environment' => 'sandbox',
             'fbr_reporting_enabled' => true,
-        ] + ($distributor ? ['agent_id' => $distributor->id] : []) + $storeSlipDefault + $requestedPackage);
+        ]
+            // Same rule as the PRA panel: the business type chosen here is the
+            // shop's category, and it arrives with its own modules already
+            // switched on (a pharmacy gets prescriptions and batch/expiry, a
+            // grocery gets barcodes and weight) instead of an empty POS.
+            + \App\Services\PosFeatureService::registrationAttributes($posType)
+            + ($distributor ? ['agent_id' => $distributor->id] : []) + $storeSlipDefault + $requestedPackage);
         $request->session()->forget(\App\Services\AgentReferralService::SESSION_KEY);
 
         $userData = [

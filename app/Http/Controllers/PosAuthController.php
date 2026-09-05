@@ -197,7 +197,13 @@ class PosAuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
+            // PRA taxes SERVICES only (Punjab Sales Tax on Services Act 2012,
+            // s.2(38): a service is "anything which is not goods"). Goods
+            // sellers are federal cases and register on the FBR panel, whose
+            // own list keeps the retail categories. Do NOT re-add them here.
+            // PRA panel = service businesses only (see PosFeatureService::PANEL_CATEGORIES),
+            // plus the 'general' catch-all for a service that fits none of them.
+            'pos_type' => 'required|in:' . implode(',', array_merge(\App\Services\PosFeatureService::categories('pra'), ['general'])),
             'pricing_plan_id' => 'required|integer|exists:pricing_plans,id',
             // Optional: a shop that skips the cycle picker (or posts a bad one)
             // is charged annually — see RequestedPackageService::cycleForPlan().
@@ -249,10 +255,18 @@ class PosAuthController extends Controller
             'status' => 'pending',
             'product_type' => 'pos',
             'pos_type' => $posType,
-            'restaurant_mode' => ($posType === 'restaurant'),
             'pra_reporting_enabled' => false,
             'pra_environment' => 'sandbox',
         ];
+        // The business type is now chosen ONCE, here, and is read-only on the
+        // shop's own Customize page. Registration used to write pos_type only,
+        // which left every shop resolving to the restaurant preset and starting
+        // with no modules switched on at all, so the category's own preset is
+        // applied to the company right here. restaurant_mode rides the kitchen
+        // switches (PosFeatureService::restaurantModeFrom) instead of being
+        // welded to "you registered as a restaurant" — a hotel or marquee gets a
+        // kitchen, a gym does not, and any of them can change it afterwards.
+        $companyData += \App\Services\PosFeatureService::registrationAttributes($posType);
         if ($distributor) {
             $companyData['agent_id'] = $distributor->id;
         }

@@ -320,7 +320,11 @@ class PosController extends Controller
             // Canonicalize so dependent children (e.g. recipes) cascade off in
             // STORED flags too — keeps the Features wizard display truthful.
             $flags = \App\Services\PosFeatureService::normalize($flags);
-            $company->update(['inventory_enabled' => $enabled, 'feature_flags' => $flags]);
+            // normalize() can cascade children off, so the master columns are
+            // re-derived from the flags we are actually storing — never from
+            // the request alone.
+            $company->update(['feature_flags' => $flags]
+                + \App\Services\PosFeatureService::masterSwitchesFor($company, $flags));
         }
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
@@ -2888,7 +2892,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $features = PosFeatureService::forCompany($company);
-        $categories = PosFeatureService::categories();
+        $categories = PosFeatureService::categoriesForCompany($company);
         $allFlags = PosFeatureService::ALL_FLAGS;
         // First-time setup → wizard shows welcome banner + opens on Step 1.
         $isFirstTime = $request->boolean('welcome') || !($company->pos_setup_completed ?? false);
@@ -2916,9 +2920,12 @@ class PosController extends Controller
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
 
-        $allowedCategories = PosFeatureService::categories();
+        // The business category is fixed at registration and may afterwards be
+        // changed by SaaS admins only: it decides which regulator the shop
+        // belongs to, so a shop must not be able to re-file itself as a
+        // different kind of business from its own Customize page. Anything the
+        // request sends under that name is ignored, not validated.
         $data = $request->validate([
-            'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
             'use_universal_pos' => 'nullable|boolean',
             'pos_ui_density'    => 'nullable|in:simple,standard,premium',
             'feature_flags'     => 'nullable|array',
@@ -2944,7 +2951,6 @@ class PosController extends Controller
         ]);
 
         $companyUpdates = [
-            'business_category' => $data['business_category'] ?? $company->business_category,
             'pos_ui_density'    => $data['pos_ui_density'] ?? $company->pos_ui_density ?? 'standard',
             // Finishing the wizard marks setup complete so it never auto-launches again.
             'pos_setup_completed' => true,
@@ -2981,9 +2987,12 @@ class PosController extends Controller
             // required parent is OFF (mirrors the wizard's client-side resolveDeps).
             $flags = PosFeatureService::normalize($flags);
             $companyUpdates['feature_flags'] = $flags;
-            // Master inventory module switch follows the wizard's
-            // "Inventory Tracking" flag so both surfaces always agree.
-            $companyUpdates['inventory_enabled'] = (bool) ($flags['inventory'] ?? false);
+            // The two master COLUMNS that sit beside the flag map must be
+            // rewritten with it: inventory_enabled follows the inventory flag,
+            // and restaurant mode is a feature the shop switches on rather than
+            // something its registration category decided for it — so a hotel
+            // or marquee can run a kitchen and a restaurant can drop one.
+            $companyUpdates += PosFeatureService::masterSwitchesFor($company, $flags);
         }
 
         // use_universal_pos rides a hidden input, so its absence is unambiguous:
@@ -3018,17 +3027,15 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
-        $allowedCategories = PosFeatureService::categories();
-        $data = $request->validate([
-            'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
-        ]);
-        $category = $data['business_category'] ?? ($company->business_category ?: 'retail');
+        // Reset means "put MY features back to my own category's defaults".
+        // It is not a way to change category: that is fixed at registration and
+        // editable by SaaS admins only, so no category arrives from the request.
+        $category = PosFeatureService::resolveCategory($company);
         $defaults = PosFeatureService::defaultsForCategory($category);
         $company->update([
             'business_category' => $category,
             'feature_flags' => $defaults,
-            'inventory_enabled' => (bool) ($defaults['inventory'] ?? false),
-        ]);
+        ] + PosFeatureService::masterSwitchesFor($company, $defaults));
         return redirect()->route('pos.features')->with('success', __('pos.features_reset_defaults', ['category' => $category]));
     }
 
@@ -9870,7 +9877,10 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $products = PosProduct::where('company_id', $companyId)->orderBy('name')->get();
         $company = \App\Models\Company::find($companyId);
-        $posType = $company->pos_type ?? 'retail';
+        // The product form's category-specific fields must follow the SAME
+        // answer as every other preset consumer: business_category first (an
+        // admin may have re-filed the shop), pos_type only as the fallback.
+        $posType = \App\Services\PosFeatureService::resolveCategory($company);
         $categoryFields = PosProduct::categoryFields()[$posType] ?? [];
         // For unified Product+Recipe modal: existing ingredients dropdown source
         $ingredients = \App\Models\Ingredient::where('company_id', $companyId)

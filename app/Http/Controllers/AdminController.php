@@ -975,7 +975,12 @@ class AdminController extends Controller
      */
     public function updatePosFeatures(Request $request, Company $company)
     {
-        $allowedCategories = \App\Services\PosFeatureService::categories();
+        // Panel-aware: PRA companies get the service categories, FBR companies
+        // the goods ones, and a company still sitting on an off-panel category
+        // may keep re-saving its own value (categoriesForCompany pins it).
+        // This is the ONLY surface that may change a company's category — the
+        // shop's own Customize page cannot.
+        $allowedCategories = \App\Services\PosFeatureService::categoriesForCompany($company);
         $data = $request->validate([
             'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
             'pos_ui_density'    => 'nullable|in:simple,standard,premium',
@@ -1010,6 +1015,10 @@ class AdminController extends Controller
                 $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
             }
             $update['feature_flags'] = $flags;
+            // The master columns follow the flags on EVERY write path (see
+            // PosFeatureService::masterSwitches) — otherwise an admin save
+            // would leave them contradicting the modules.
+            $update += \App\Services\PosFeatureService::masterSwitchesFor($company, $flags);
         }
 
         // use_universal_pos was force-written true on EVERY save — a bare/stale

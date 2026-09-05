@@ -4633,7 +4633,12 @@ class FbrPosController extends Controller
             $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
             $flags['inventory'] = $enabled;
             $flags = \App\Services\PosFeatureService::normalize($flags);
-            $company->update(['inventory_enabled' => $enabled, 'feature_flags' => $flags]);
+            // Master columns re-derived from what we are storing. On the FBR
+            // panel that is inventory only — the raw 'kitchen' flag here means
+            // per-item Store notes, not a kitchen, so restaurant_mode is never
+            // derived from it.
+            $company->update(['feature_flags' => $flags]
+                + \App\Services\PosFeatureService::masterSwitchesFor($company, $flags));
         }
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }

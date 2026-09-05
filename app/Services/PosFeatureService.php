@@ -158,6 +158,19 @@ class PosFeatureService
         ],
     ];
 
+    /**
+     * PRA business categories.
+     *
+     * PRA (Punjab Revenue Authority) can only tax SERVICES — the Punjab Sales
+     * Tax on Services Act 2012 s.2(38) defines a service as "anything which is
+     * not goods". Supply of goods is federal (Sales Tax Act 1990) and belongs
+     * to the FBR panel, which carries the goods categories.
+     *
+     * So every category offered here must be a service business. Categories
+     * that sell goods (retail, pharmacy, grocery, wholesale, ...) live in
+     * LEGACY_CATEGORIES below: still resolvable for shops that were signed up
+     * on them before this split, never offered to anybody new.
+     */
     public const CATEGORY_DEFAULTS = [
         'restaurant' => [
             'kot' => true, 'tables' => true, 'kitchen' => true,
@@ -174,16 +187,63 @@ class PosFeatureService
             'inventory' => true, 'delivery' => true,
             'customer_profile' => true,
         ],
+        // No 'tables': a salon books staff and chairs through service jobs, and
+        // floor tables would switch the shop into restaurant mode (see
+        // restaurantModeFrom()) and hand it a kitchen it does not have.
+        'salon' => [
+            'service_jobs' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+        ],
+        'hotel' => [
+            'tables' => true, 'kot' => true, 'kitchen' => true,
+            'service_jobs' => true, 'multi_branch' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+        ],
+        'marquee' => [
+            'tables' => true, 'kot' => true, 'kitchen' => true,
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'catering' => [
+            'kitchen' => true, 'recipes' => true, 'inventory' => true,
+            'service_jobs' => true, 'delivery' => true,
+            'customer_profile' => true,
+        ],
+        'laundry' => [
+            'service_jobs' => true, 'delivery' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+        ],
+        'gym' => [
+            'service_jobs' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+        ],
+        'workshop' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true,
+        ],
+    ];
+
+    /**
+     * Goods categories retired from the PRA panel (they belong to FBR).
+     *
+     * Kept ONLY so shops that were signed up on them keep a real label and a
+     * working preset in Customize. categories() never returns these, so no new
+     * shop can pick one.
+     */
+    public const LEGACY_CATEGORIES = [
+        // The catch-all. Neither panel OFFERS it, but registration falls back to
+        // it when no type was picked, so it needs a preset of its own — without
+        // one a plain shop used to resolve to 'restaurant' and get a kitchen it
+        // never asked for. Deliberately bare: a shop nobody classified starts
+        // simple and switches modules on from Customize.
+        'general' => [
+            'customer_profile' => true,
+        ],
         'retail' => [
             'barcode' => true, 'inventory' => true, 'customer_profile' => true,
         ],
         'pharmacy' => [
             'barcode' => true, 'inventory' => true,
             'prescription' => true, 'delivery' => true, 'customer_profile' => true,
-        ],
-        'salon' => [
-            'tables' => true, 'service_jobs' => true,
-            'customer_profile' => true, 'customer_loyalty' => true,
         ],
         'grocery' => [
             'barcode' => true, 'inventory' => true, 'delivery' => true,
@@ -197,9 +257,38 @@ class PosFeatureService
             'kot' => true, 'kitchen' => true,
             'customer_profile' => true, 'customer_loyalty' => true,
         ],
+
+        // These five were never Customize presets — they only ever arrived as a
+        // registration pos_type. resolveCategory() falls back to pos_type when a
+        // pre-split shop has no business_category, so they need a real preset
+        // here or such a shop would resolve to nothing.
+        'clothing' => [
+            'barcode' => true, 'inventory' => true, 'customer_profile' => true,
+        ],
+        'electronics' => [
+            'barcode' => true, 'inventory' => true,
+            'customer_profile' => true, 'multi_branch' => true,
+        ],
+        'hardware' => [
+            'barcode' => true, 'inventory' => true, 'bulk_pricing' => true,
+        ],
+        'autoparts' => [
+            'barcode' => true, 'inventory' => true, 'customer_profile' => true,
+        ],
+        'bakery' => [
+            'barcode' => true, 'inventory' => true, 'kitchen' => true,
+            'recipes' => true, 'customer_profile' => true,
+        ],
     ];
 
     public const PRESET_META = [
+        'general' => [
+            'label' => 'General Business',
+            'description' => 'Simple billing to start with — switch modules on as you need them.',
+            'icon' => '🏪',
+            'badge' => null,
+            'color' => 'gray',
+        ],
         'restaurant' => [
             'label' => 'Restaurant Dine-in',
             'description' => 'Table service, KOT, KDS, recipes, dine-in & delivery',
@@ -221,20 +310,6 @@ class PosFeatureService
             'badge' => null,
             'color' => 'red',
         ],
-        'retail' => [
-            'label' => 'Retail Store',
-            'description' => 'Barcode scanning, inventory, customer database',
-            'icon' => '🛒',
-            'badge' => 'Most Popular',
-            'color' => 'blue',
-        ],
-        'pharmacy' => [
-            'label' => 'Pharmacy / Medical',
-            'description' => 'Prescription tracking, batch/expiry, compliance-ready',
-            'icon' => '💊',
-            'badge' => null,
-            'color' => 'green',
-        ],
         'salon' => [
             'label' => 'Salon / Spa',
             'description' => 'Service jobs, staff bookings, loyalty rewards',
@@ -242,26 +317,121 @@ class PosFeatureService
             'badge' => null,
             'color' => 'pink',
         ],
+        'hotel' => [
+            'label' => 'Hotel / Guest House',
+            'description' => 'Rooms, in-house dining, multi-branch, guest loyalty',
+            'icon' => '🏨',
+            'badge' => 'New',
+            'color' => 'cyan',
+        ],
+        'marquee' => [
+            'label' => 'Marriage Hall / Marquee',
+            'description' => 'Event bookings, hall service, kitchen & catering',
+            'icon' => '🎪',
+            'badge' => 'New',
+            'color' => 'rose',
+        ],
+        'catering' => [
+            'label' => 'Caterer / Catering',
+            'description' => 'Order-based cooking, recipes, delivery & event jobs',
+            'icon' => '🍲',
+            'badge' => 'New',
+            'color' => 'amber',
+        ],
+        'laundry' => [
+            'label' => 'Laundry / Dry Cleaning',
+            'description' => 'Job tickets, pickup & delivery, customer loyalty',
+            'icon' => '🧺',
+            'badge' => 'New',
+            'color' => 'sky',
+        ],
+        'gym' => [
+            'label' => 'Gym / Fitness Club',
+            'description' => 'Memberships, service jobs, loyalty rewards',
+            'icon' => '🏋️',
+            'badge' => 'New',
+            'color' => 'emerald',
+        ],
+        'workshop' => [
+            'label' => 'Auto Workshop / Service Station',
+            'description' => 'Job cards, parts consumption, customer vehicles',
+            'icon' => '🔩',
+            'badge' => 'New',
+            'color' => 'slate',
+        ],
+
+        // ---- Retired goods categories (FBR panel owns these) ----
+        // Never offered. Present only so a shop signed up on one before the
+        // split still sees a real label instead of a raw slug.
+        'retail' => [
+            'label' => 'Retail Store',
+            'description' => 'Goods retail — belongs to the FBR panel',
+            'icon' => '🛒',
+            'badge' => null,
+            'color' => 'blue',
+        ],
+        'pharmacy' => [
+            'label' => 'Pharmacy / Medical',
+            'description' => 'Goods retail — belongs to the FBR panel',
+            'icon' => '💊',
+            'badge' => null,
+            'color' => 'green',
+        ],
         'grocery' => [
             'label' => 'Grocery / Mart',
-            'description' => 'Barcode-heavy, inventory + delivery support',
+            'description' => 'Goods retail — belongs to the FBR panel',
             'icon' => '🥬',
             'badge' => null,
             'color' => 'lime',
         ],
         'wholesale' => [
             'label' => 'Wholesale / Distributor',
-            'description' => 'Bulk pricing tiers, multi-branch, B2B customers',
+            'description' => 'Goods supply — belongs to the FBR panel',
             'icon' => '📦',
             'badge' => null,
             'color' => 'indigo',
         ],
         'hybrid_cafe_retail' => [
             'label' => 'Hybrid (Cafe + Retail)',
-            'description' => 'Coffee shop with retail counter — best of both',
+            'description' => 'Part goods retail — the retail half belongs to FBR',
             'icon' => '🌟',
-            'badge' => 'New',
+            'badge' => null,
             'color' => 'purple',
+        ],
+        'clothing' => [
+            'label' => 'Clothing / Garments',
+            'description' => 'Goods retail — belongs to the FBR panel',
+            'icon' => '👕',
+            'badge' => null,
+            'color' => 'pink',
+        ],
+        'electronics' => [
+            'label' => 'Electronics',
+            'description' => 'Goods retail — belongs to the FBR panel',
+            'icon' => '🔌',
+            'badge' => null,
+            'color' => 'cyan',
+        ],
+        'hardware' => [
+            'label' => 'Hardware / Building Material',
+            'description' => 'Goods retail — belongs to the FBR panel',
+            'icon' => '🔧',
+            'badge' => null,
+            'color' => 'stone',
+        ],
+        'autoparts' => [
+            'label' => 'Auto Parts',
+            'description' => 'Goods retail — belongs to the FBR panel',
+            'icon' => '🛞',
+            'badge' => null,
+            'color' => 'zinc',
+        ],
+        'bakery' => [
+            'label' => 'Bakery',
+            'description' => 'Counter sale of goods — belongs to the FBR panel',
+            'icon' => '🥐',
+            'badge' => null,
+            'color' => 'amber',
         ],
     ];
 
@@ -616,13 +786,239 @@ class PosFeatureService
 
     public static function defaultsForCategory(string $category): array
     {
-        $defaults = self::CATEGORY_DEFAULTS[$category] ?? [];
+        $defaults = self::allCategoryDefaults()[$category] ?? [];
         return array_merge(self::baseDefaults(), $defaults);
     }
 
-    public static function categories(): array
+    /**
+     * Which categories each panel OFFERS.
+     *
+     * PRA taxes services only (Punjab Sales Tax on Services Act 2012, s.2(38):
+     * a service is "anything which is not goods"), so its panel offers service
+     * businesses. Supply of goods is federal (Sales Tax Act 1990), so the FBR
+     * panel carries the goods businesses — plus restaurant and salon, because
+     * FBR POS is used outside Punjab (e.g. Islamabad Capital Territory) where
+     * those services are federal cases too.
+     */
+    public const PANEL_CATEGORIES = [
+        'pra' => [
+            'restaurant', 'cafe', 'quick_service', 'salon', 'hotel',
+            'marquee', 'catering', 'laundry', 'gym', 'workshop',
+        ],
+        // Goods file with the FBR. 'restaurant' and 'salon' stay on this list on
+        // purpose: the FBR panel also serves ICT, where those services are a
+        // FEDERAL case (ICT Tax on Services Ordinance 2001), not a PRA one.
+        // 'wholesale' is deliberately absent — it is a resolvable legacy preset,
+        // not something the FBR signup page has ever offered.
+        'fbr' => [
+            'retail', 'pharmacy', 'grocery', 'clothing', 'electronics',
+            'hardware', 'autoparts', 'bakery',
+            'restaurant', 'salon',
+        ],
+    ];
+
+    /**
+     * Categories a shop may CHOOSE on one panel. Defaults to PRA.
+     */
+    public static function categories(?string $panel = null): array
     {
-        return array_keys(self::CATEGORY_DEFAULTS);
+        return self::PANEL_CATEGORIES[$panel ?? 'pra'] ?? self::PANEL_CATEGORIES['pra'];
+    }
+
+    /**
+     * Every category we can still RESOLVE, including the retired goods ones
+     * that pre-split shops are sitting on.
+     */
+    public static function allCategoryDefaults(): array
+    {
+        return self::CATEGORY_DEFAULTS + self::LEGACY_CATEGORIES;
+    }
+
+    /** Does this slug resolve to a real preset (any panel)? */
+    public static function isKnownCategory(?string $category): bool
+    {
+        return $category !== null && array_key_exists($category, self::allCategoryDefaults());
+    }
+
+    /**
+     * Which panel a company belongs to — 'fbr' for the federal goods panel,
+     * 'pra' for the Punjab services panel. product_type is the discriminator
+     * the auth middleware itself uses (PosAuth vs FbrPosAuth).
+     */
+    public static function panelFor(?Company $company): string
+    {
+        return ($company?->product_type === 'fbrpos') ? 'fbr' : 'pra';
+    }
+
+    /** The categories a company's own panel offers, plus its own if off-panel. */
+    public static function categoriesForCompany(?Company $company): array
+    {
+        $list    = self::categories(self::panelFor($company));
+        $current = self::resolveCategory($company);
+
+        if (!in_array($current, $list, true)) {
+            $list[] = $current;
+        }
+        return $list;
+    }
+
+    /**
+     * Is this company sitting on a category its own panel does not offer?
+     *
+     * True for a PRA shop registered on a goods category before the
+     * services/goods split. Nothing is switched off for it — the page just
+     * tells it where that kind of business belongs.
+     */
+    public static function isOffPanelCategory(?Company $company): bool
+    {
+        return !in_array(
+            self::resolveCategory($company),
+            self::categories(self::panelFor($company)),
+            true
+        );
+    }
+
+    /**
+     * Restaurant mode is a FEATURE, not an identity.
+     *
+     * companies.restaurant_mode used to be welded to "you registered as a
+     * restaurant", which left a hotel or a marquee without a kitchen and a
+     * restaurant unable to drop one. It now follows the shop's own kitchen
+     * switches — exactly the way inventory_enabled follows the inventory flag —
+     * so every write path that touches feature_flags must re-derive it.
+     */
+    public static function restaurantModeFrom(array $flags): bool
+    {
+        return (bool) ($flags['kitchen'] ?? false)
+            || (bool) ($flags['kot'] ?? false)
+            || (bool) ($flags['tables'] ?? false);
+    }
+
+    public static function isLegacyCategory(?string $category): bool
+    {
+        return $category !== null && array_key_exists($category, self::LEGACY_CATEGORIES);
+    }
+
+    /**
+     * The category a company is actually on — the single place that decides it.
+     *
+     * business_category is the stored answer, but shops registered before the
+     * services/goods split only ever had their choice written to pos_type, so a
+     * null category falls back to that. Anything we cannot resolve to a real
+     * preset lands on restaurant: the PRA panel's default is a service, never a
+     * retail shop, because PRA cannot tax goods at all.
+     */
+    public static function resolveCategory(?Company $company): string
+    {
+        if (!$company) {
+            return 'restaurant';
+        }
+
+        $known = self::allCategoryDefaults();
+
+        $stored = $company->business_category;
+        if (is_string($stored) && isset($known[$stored])) {
+            return $stored;
+        }
+
+        $posType = $company->pos_type ?? null;
+        if (is_string($posType) && isset($known[$posType])) {
+            return $posType;
+        }
+
+        return 'restaurant';
+    }
+
+    /**
+     * What a brand-new company starts on, from the type it picked at signup.
+     *
+     * A shop used to register and then land on an EMPTY POS, because the
+     * category only reached feature_flags if the owner walked the Customize
+     * wizard. The choice is made once now, so it has to configure the shop:
+     *   - business_category   the stored answer for every preset consumer
+     *   - feature_flags       that category's own modules, already on
+     *   - inventory_enabled   the master switch mirroring the inventory flag
+     *   - restaurant_mode     the master bit mirroring the kitchen flags
+     *
+     * Every column is hasColumn-guarded: signup must never 500 on a deployment
+     * whose migrations have not fully landed (see the PROD schema-drift rule).
+     * 'general' is the catch-all for a shop that picked nothing; it stores a
+     * bare preset rather than nothing at all, so the shop resolves to itself
+     * instead of silently reading as a restaurant.
+     */
+    public static function registrationAttributes(?string $posType): array
+    {
+        if (!self::isKnownCategory($posType)) {
+            return [];
+        }
+
+        $defaults = self::defaultsForCategory($posType);
+        $columns  = [
+            'business_category' => $posType,
+            'feature_flags'     => $defaults,
+            'inventory_enabled' => (bool) ($defaults['inventory'] ?? false),
+            'restaurant_mode'   => self::restaurantModeFrom($defaults),
+        ];
+
+        return array_filter(
+            $columns,
+            fn ($column) => \Illuminate\Support\Facades\Schema::hasColumn('companies', $column),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    /**
+     * The master COLUMNS that must be rewritten whenever feature_flags are.
+     *
+     * Two switches have a column of their own beside the flag map, and a write
+     * path that touches the map without rewriting them leaves the shop with two
+     * contradictory answers (the old inventory dual-switch trap). Anything that
+     * persists feature_flags must merge this in.
+     *
+     * restaurant_mode is derived on the PRA panel ONLY. On the FBR panel the
+     * raw 'kitchen' flag means something else entirely (per-item Store notes on
+     * the store slip), so deriving there would put an FBR retailer into
+     * restaurant mode the moment it switched Store notes on.
+     */
+    public static function masterSwitches(array $flags, string $panel = 'pra'): array
+    {
+        $columns = ['inventory_enabled' => (bool) ($flags['inventory'] ?? false)];
+
+        if ($panel === 'pra') {
+            $columns['restaurant_mode'] = self::restaurantModeFrom($flags);
+        }
+
+        return array_filter(
+            $columns,
+            fn ($column) => \Illuminate\Support\Facades\Schema::hasColumn('companies', $column),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    /** Same, resolved from the company's own panel. */
+    public static function masterSwitchesFor(?Company $company, array $flags): array
+    {
+        return self::masterSwitches($flags, self::panelFor($company));
+    }
+
+    /**
+     * Is this shop sitting on a category that belongs to the OTHER regulator?
+     *
+     * Only true when the category is genuinely offered by the other panel — a
+     * catch-all like 'general' is nobody's, so it must not raise the notice.
+     */
+    public static function belongsToOtherPanel(?Company $company): bool
+    {
+        if (!$company) {
+            return false;
+        }
+
+        $panel   = self::panelFor($company);
+        $other   = $panel === 'pra' ? 'fbr' : 'pra';
+        $current = self::resolveCategory($company);
+
+        return !in_array($current, self::categories($panel), true)
+            && in_array($current, self::categories($other), true);
     }
 
     public static function flagMeta(string $flag): array

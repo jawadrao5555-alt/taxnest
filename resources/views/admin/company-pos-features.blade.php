@@ -14,8 +14,17 @@
     @php
         $flagsByCat = \App\Services\PosFeatureService::flagsByCategory();
         $deps = \App\Services\PosFeatureService::dependencies();
-        $presets = array_keys(\App\Services\PosFeatureService::PRESET_META);
-        $currentCategory = $company->business_category ?: 'retail';
+        // Panel-aware: a PRA company is offered the Punjab SERVICE categories, an
+        // FBR company the federal GOODS ones (plus restaurant/salon, which are a
+        // federal case in ICT), and a company still sitting on an off-panel
+        // category keeps seeing its own card. This page is the ONLY place a
+        // category may be changed — the shop's Customize page shows it read-only.
+        $currentCategory = \App\Services\PosFeatureService::resolveCategory($company);
+        $presets = \App\Services\PosFeatureService::categoriesForCompany($company);
+        // The amber "this belongs on the other panel" notice fires only when the
+        // category is genuinely the OTHER regulator's; a catch-all like
+        // 'general' belongs to nobody and must not raise it.
+        $onLegacyCategory = \App\Services\PosFeatureService::belongsToOtherPanel($company);
     @endphp
 
     <div class="py-6">
@@ -57,7 +66,16 @@
 
                 {{-- Industry Preset --}}
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
-                    <h3 class="text-base font-extrabold text-gray-900 dark:text-white mb-3">Industry Preset</h3>
+                    <h3 class="text-base font-extrabold text-gray-900 dark:text-white mb-1">Industry Preset</h3>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-3">PRA taxes services only, so only service businesses are offered here. Goods categories live on the FBR panel.</p>
+                    @if($onLegacyCategory)
+                        <div class="mb-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
+                            <p class="text-xs font-bold text-amber-900 dark:text-amber-200">This company is on a retired goods category</p>
+                            <p class="mt-0.5 text-[11px] leading-relaxed text-amber-800 dark:text-amber-300/90">
+                                It signed up before the services/goods split. Nothing is switched off — its card is pinned below so it stays saveable. A goods business belongs on the FBR POS panel.
+                            </p>
+                        </div>
+                    @endif
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
                         @foreach($presets as $preset)
                             @php $meta = \App\Services\PosFeatureService::presetMeta($preset); @endphp
@@ -136,7 +154,7 @@
         function adminFeatureSettings() {
             return {
                 selectedPreset: @json($currentCategory),
-                categoryDefaults: @json(\App\Services\PosFeatureService::CATEGORY_DEFAULTS),
+                categoryDefaults: @json(\App\Services\PosFeatureService::allCategoryDefaults()),
                 allFlags: @json(\App\Services\PosFeatureService::ALL_FLAGS),
                 selectPreset(preset) {
                     this.selectedPreset = preset;

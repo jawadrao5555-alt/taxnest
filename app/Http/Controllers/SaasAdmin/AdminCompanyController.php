@@ -1141,6 +1141,15 @@ class AdminCompanyController extends Controller
             'health_visit_attachments', 'health_prescription_items', 'health_prescriptions',
             'health_visits', 'health_appointments', 'health_doctor_slots', 'health_doctors',
             'health_patients', 'health_number_sequences',
+            // Healthcare IPD, wards, beds, stay charges and theatre. Same rule:
+            // company_id with NO FK cascade, so each one is purged by hand.
+            // Deepest children first — team and consumables before the
+            // operation, charges/payments/events before the admission, beds
+            // before rooms before wards.
+            'health_operation_consumables', 'health_operation_team', 'health_operations',
+            'health_operation_theatres', 'health_procedures',
+            'health_admission_payments', 'health_admission_charges', 'health_admission_events',
+            'health_admissions', 'health_beds', 'health_rooms', 'health_wards',
         ];
         DB::transaction(function () use ($orphanTables, $id, $company) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge

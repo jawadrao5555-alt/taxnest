@@ -217,3 +217,9 @@ Schedule::command('site:uptime-watch')->everyTwoMinutes()->withoutOverlapping();
 // an account runs past the fair-use figure printed on its package, so a custom
 // arrangement can be discussed instead of it surfacing months later.
 Schedule::command('di:fair-use-alerts')->dailyAt('06:40')->withoutOverlapping();
+// Healthcare inpatient: post each open stay's bed-day and nursing charge for
+// the day just gone. Runs just after midnight so the ward bill is right before
+// the morning round, and is idempotent (dedupe key per admission+date+bed), so
+// a retry or a manual press of the same button on the stay screen never bills
+// twice.
+Schedule::command('health:ipd-daily-charges')->dailyAt('00:20')->withoutOverlapping();

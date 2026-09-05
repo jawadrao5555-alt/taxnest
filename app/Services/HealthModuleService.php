@@ -66,8 +66,22 @@ class HealthModuleService
         'pharmacy' => [
             'pharmacy.view', 'pharmacy.dispense', 'pharmacy.manage',
         ],
+        // Inpatient AND the operation theatre. They are one module because a
+        // theatre without a ward to admit into is not a product anybody buys,
+        // and splitting them would let an owner switch off the half that pays
+        // for the other.
         'ipd' => [
             'ipd.view', 'ipd.manage',
+            // Posting money onto a stay and signing a patient out are separate
+            // from running the ward: the sister moves the patient, accounts
+            // clears the bill, and neither should be able to do the other's job
+            // by accident.
+            'ipd.charge', 'ipd.discharge',
+            // Ward, room and bed setup carries the DAY RATE, so it is separated
+            // from day-to-day admitting for the same reason doctors.manage is
+            // separated from appointments.manage.
+            'wards.manage',
+            'operations.view', 'operations.manage',
         ],
         'lab' => [
             'lab.view', 'lab.collect', 'lab.result',

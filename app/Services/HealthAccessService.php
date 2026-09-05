@@ -69,7 +69,9 @@ class HealthAccessService
             'doctors.manage',
             'clinical.view',
             'pharmacy.view', 'pharmacy.manage',
-            'ipd.view', 'ipd.manage',
+            'ipd.view', 'ipd.manage', 'ipd.charge', 'ipd.discharge',
+            'wards.manage',
+            'operations.view', 'operations.manage',
             'lab.view',
             'billing.view', 'billing.charge',
             'accounts.view',
@@ -92,7 +94,12 @@ class HealthAccessService
             'patients.view',
             'appointments.view', 'appointments.manage',
             'clinical.view', 'clinical.write',
-            'ipd.view',
+            // A consultant admits, rounds and writes the discharge order. The
+            // RELEASE itself (ipd.discharge) stays with accounts — a doctor
+            // saying "she can go home" and the hospital letting her walk out
+            // past an unpaid bill are two different decisions.
+            'ipd.view', 'ipd.manage',
+            'operations.view', 'operations.manage',
             'lab.view',
             'pharmacy.view',
         ],
@@ -103,6 +110,7 @@ class HealthAccessService
             'appointments.view',
             'clinical.view', 'nursing.record',
             'ipd.view', 'ipd.manage',
+            'operations.view',
             'lab.view',
         ],
         // Reads the prescription, dispenses against it, keeps the counter.
@@ -118,10 +126,14 @@ class HealthAccessService
             'patients.view',
             'lab.view', 'lab.collect', 'lab.result',
         ],
-        // Owns the money side. No clinical data at all.
+        // Owns the money side. Reaches an inpatient stay to post its charges,
+        // take advances and clear the bill — but holds neither clinical.view
+        // nor ipd.manage, so every screen withholds the clinical narrative and
+        // no ward move is possible from this account.
         'health_accountant' => [
             'dashboard.view',
             'billing.view', 'billing.charge',
+            'ipd.view', 'ipd.charge', 'ipd.discharge',
             'accounts.view', 'accounts.manage',
             'reports.view',
         ],
@@ -133,17 +145,21 @@ class HealthAccessService
             'patients.view',
             'pharmacy.view',
             'ipd.view',
+            'operations.view',
             'lab.view',
             'billing.view',
             'accounts.view',
             'reports.view',
             'audit.view',
         ],
-        // Takes the payment at the counter. Nothing else.
+        // Takes the payment at the counter. Nothing else — including on a
+        // stay: an advance may be received, but the bill may not be cleared
+        // and no concession may be approved.
         'health_cashier' => [
             'dashboard.view',
             'patients.view',
             'billing.view', 'billing.charge',
+            'ipd.charge',
         ],
         // Staff records and attendance. Never patients, never money.
         'health_hr' => [
@@ -412,7 +428,12 @@ class HealthAccessService
         // reading. The screen itself decides what each of them may write.
         '#^health/clinical#'          => 'clinical.view|nursing.record',
         '#^health/pharmacy#'          => 'pharmacy.view',
-        '#^health/ipd#'               => 'ipd.view',
+        // OR: the accounts counter reaches a stay to take an advance and clear
+        // the bill without holding the ward's own view. The screens themselves
+        // withhold the clinical narrative from anyone who only holds the money
+        // capabilities.
+        '#^health/ipd#'               => 'ipd.view|ipd.charge|ipd.discharge',
+        '#^health/operations#'        => 'operations.view',
         '#^health/lab#'               => 'lab.view',
         '#^health/billing#'           => 'billing.view',
         '#^health/accounts#'          => 'accounts.view',

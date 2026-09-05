@@ -28,6 +28,8 @@ class HealthNumberService
     public const KEY_VISIT = 'visit';
     public const KEY_PRESCRIPTION = 'prescription';
     public const KEY_TOKEN = 'token';
+    public const KEY_ADMISSION = 'admission';
+    public const KEY_OPERATION = 'operation';
 
     /**
      * Consume the next value of a counter and return it.
@@ -108,6 +110,18 @@ class HealthNumberService
     public static function prescriptionNumber(int $companyId): string
     {
         return 'RX' . str_pad((string) self::next($companyId, self::KEY_PRESCRIPTION), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** IPD000123 — one inpatient stay, for the lifetime of that stay. */
+    public static function admissionNumber(int $companyId): string
+    {
+        return 'IPD' . str_pad((string) self::next($companyId, self::KEY_ADMISSION), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** OT000123 — one scheduled or performed operation. */
+    public static function operationNumber(int $companyId): string
+    {
+        return 'OT' . str_pad((string) self::next($companyId, self::KEY_OPERATION), 6, '0', STR_PAD_LEFT);
     }
 
     /**

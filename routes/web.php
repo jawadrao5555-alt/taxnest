@@ -72,10 +72,14 @@ use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HealthAuthController;
 use App\Http\Controllers\HealthDepartmentController;
 use App\Http\Controllers\HealthTeamController;
+use App\Http\Controllers\Health\HealthAdmissionController;
 use App\Http\Controllers\Health\HealthAppointmentController;
 use App\Http\Controllers\Health\HealthClinicalController;
 use App\Http\Controllers\Health\HealthDoctorController;
+use App\Http\Controllers\Health\HealthIpdReportController;
 use App\Http\Controllers\Health\HealthOpdReportController;
+use App\Http\Controllers\Health\HealthOperationController;
+use App\Http\Controllers\Health\HealthWardController;
 use App\Http\Controllers\Health\HealthPatientController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
@@ -1772,6 +1776,99 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         Route::delete('/clinical/attachments/{id}', [HealthClinicalController::class, 'deleteAttachment'])->whereNumber('id')->name('health.clinical.attachments.delete');
         Route::post('/clinical/visits/{id}/prescription', [HealthClinicalController::class, 'savePrescription'])->whereNumber('id')->name('health.clinical.prescription');
         Route::get('/clinical/prescriptions/{id}/print', [HealthClinicalController::class, 'printPrescription'])->whereNumber('id')->name('health.clinical.prescription.print');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Inpatient, ward, bed and theatre (Task 1550)
+    |--------------------------------------------------------------------------
+    | One module (`ipd`) but FOUR capabilities, kept apart because four
+    | different people meet on these screens: wards.manage prices a bed,
+    | ipd.manage moves the patient, ipd.charge posts the money, ipd.discharge
+    | clears the bill and opens the door. Theatre work carries its own
+    | operations.* pair so a surgeon writing operative notes never needs the
+    | ward's capabilities and a ward sister never needs the surgeon's.
+    */
+    Route::middleware('health.module:ipd')->group(function () {
+        // Bed board + the stays running on it. Reachable by the accounts
+        // counter too (ipd.charge / ipd.discharge) — the screens themselves
+        // withhold the clinical narrative from anyone without ward access.
+        Route::middleware('health.can:ipd.view,ipd.charge,ipd.discharge')->group(function () {
+            Route::get('/ipd', [HealthAdmissionController::class, 'index'])->name('health.ipd');
+            Route::get('/ipd/admissions/{id}', [HealthAdmissionController::class, 'show'])->whereNumber('id')->name('health.ipd.show');
+        });
+
+        Route::middleware('health.can:ipd.manage')->group(function () {
+            Route::post('/ipd/admissions', [HealthAdmissionController::class, 'store'])->name('health.ipd.store');
+            Route::post('/ipd/admissions/{id}/admit', [HealthAdmissionController::class, 'admit'])->whereNumber('id')->name('health.ipd.admit');
+            Route::post('/ipd/admissions/{id}/reserve', [HealthAdmissionController::class, 'reserve'])->whereNumber('id')->name('health.ipd.reserve');
+            Route::post('/ipd/admissions/{id}/transfer', [HealthAdmissionController::class, 'transfer'])->whereNumber('id')->name('health.ipd.transfer');
+            Route::post('/ipd/admissions/{id}/care', [HealthAdmissionController::class, 'recordCare'])->whereNumber('id')->name('health.ipd.care');
+            Route::post('/ipd/admissions/{id}/discharge-request', [HealthAdmissionController::class, 'requestDischarge'])->whereNumber('id')->name('health.ipd.discharge-request');
+            Route::post('/ipd/admissions/{id}/cancel', [HealthAdmissionController::class, 'cancel'])->whereNumber('id')->name('health.ipd.cancel');
+            Route::post('/ipd/beds/{id}/status', [HealthWardController::class, 'setBedStatus'])->whereNumber('id')->name('health.ipd.bed-status');
+        });
+
+        Route::middleware('health.can:ipd.charge')->group(function () {
+            Route::post('/ipd/admissions/{id}/charges', [HealthAdmissionController::class, 'storeCharge'])->whereNumber('id')->name('health.ipd.charges.store');
+            Route::post('/ipd/admissions/{id}/charges/{chargeId}/reverse', [HealthAdmissionController::class, 'reverseCharge'])->whereNumber('id')->whereNumber('chargeId')->name('health.ipd.charges.reverse');
+            Route::post('/ipd/admissions/{id}/payments', [HealthAdmissionController::class, 'storePayment'])->whereNumber('id')->name('health.ipd.payments.store');
+            Route::post('/ipd/admissions/{id}/run-daily', [HealthAdmissionController::class, 'runDailyCharges'])->whereNumber('id')->name('health.ipd.run-daily');
+        });
+
+        Route::middleware('health.can:ipd.discharge')->group(function () {
+            Route::post('/ipd/admissions/{id}/clear', [HealthAdmissionController::class, 'clear'])->whereNumber('id')->name('health.ipd.clear');
+            Route::post('/ipd/admissions/{id}/discharge', [HealthAdmissionController::class, 'discharge'])->whereNumber('id')->name('health.ipd.discharge');
+        });
+
+        // Facility setup carries the DAY RATE, so reading it needs ward access
+        // and writing it needs the pricing capability.
+        Route::middleware('health.can:wards.manage,ipd.view')->group(function () {
+            Route::get('/ipd/facility', [HealthWardController::class, 'index'])->name('health.ipd.facility');
+        });
+
+        Route::middleware('health.can:wards.manage')->group(function () {
+            Route::post('/ipd/wards', [HealthWardController::class, 'storeWard'])->name('health.ipd.wards.store');
+            Route::put('/ipd/wards/{id}', [HealthWardController::class, 'updateWard'])->whereNumber('id')->name('health.ipd.wards.update');
+            Route::post('/ipd/wards/{id}/toggle', [HealthWardController::class, 'toggleWard'])->whereNumber('id')->name('health.ipd.wards.toggle');
+            Route::post('/ipd/rooms', [HealthWardController::class, 'storeRoom'])->name('health.ipd.rooms.store');
+            Route::put('/ipd/rooms/{id}', [HealthWardController::class, 'updateRoom'])->whereNumber('id')->name('health.ipd.rooms.update');
+            Route::post('/ipd/rooms/{id}/toggle', [HealthWardController::class, 'toggleRoom'])->whereNumber('id')->name('health.ipd.rooms.toggle');
+            Route::post('/ipd/beds', [HealthWardController::class, 'storeBed'])->name('health.ipd.beds.store');
+            Route::put('/ipd/beds/{id}', [HealthWardController::class, 'updateBed'])->whereNumber('id')->name('health.ipd.beds.update');
+            Route::post('/ipd/beds/{id}/toggle', [HealthWardController::class, 'toggleBed'])->whereNumber('id')->name('health.ipd.beds.toggle');
+        });
+
+        // Inpatient + theatre reporting. Needs BOTH the reporting capability
+        // and ward sight — reports.view alone must not hand somebody the ward's
+        // numbers when they cannot open the ward.
+        Route::middleware('health.can:reports.view')->group(function () {
+            Route::get('/ipd/reports', [HealthIpdReportController::class, 'index'])->name('health.ipd.reports');
+        });
+
+        /* ── operation theatre ── */
+        Route::middleware('health.can:operations.view')->group(function () {
+            Route::get('/operations', [HealthOperationController::class, 'index'])->name('health.operations');
+            Route::get('/operations/catalogue', [HealthOperationController::class, 'catalogue'])->name('health.operations.catalogue');
+            Route::get('/operations/{id}', [HealthOperationController::class, 'show'])->whereNumber('id')->name('health.operations.show');
+        });
+
+        Route::middleware('health.can:operations.manage')->group(function () {
+            Route::post('/operations', [HealthOperationController::class, 'store'])->name('health.operations.store');
+            Route::post('/operations/{id}/reschedule', [HealthOperationController::class, 'reschedule'])->whereNumber('id')->name('health.operations.reschedule');
+            Route::post('/operations/{id}/pre-op', [HealthOperationController::class, 'savePreOp'])->whereNumber('id')->name('health.operations.pre-op');
+            Route::post('/operations/{id}/start', [HealthOperationController::class, 'start'])->whereNumber('id')->name('health.operations.start');
+            Route::post('/operations/{id}/complete', [HealthOperationController::class, 'complete'])->whereNumber('id')->name('health.operations.complete');
+            Route::post('/operations/{id}/cancel', [HealthOperationController::class, 'cancel'])->whereNumber('id')->name('health.operations.cancel');
+            Route::post('/operations/{id}/team', [HealthOperationController::class, 'saveTeam'])->whereNumber('id')->name('health.operations.team');
+            Route::post('/operations/{id}/consumables', [HealthOperationController::class, 'saveConsumables'])->whereNumber('id')->name('health.operations.consumables');
+            Route::post('/operations/procedures', [HealthOperationController::class, 'storeProcedure'])->name('health.operations.procedures.store');
+            Route::put('/operations/procedures/{id}', [HealthOperationController::class, 'updateProcedure'])->whereNumber('id')->name('health.operations.procedures.update');
+            Route::post('/operations/procedures/{id}/toggle', [HealthOperationController::class, 'toggleProcedure'])->whereNumber('id')->name('health.operations.procedures.toggle');
+            Route::post('/operations/theatres', [HealthOperationController::class, 'storeTheatre'])->name('health.operations.theatres.store');
+            Route::put('/operations/theatres/{id}', [HealthOperationController::class, 'updateTheatre'])->whereNumber('id')->name('health.operations.theatres.update');
+            Route::post('/operations/theatres/{id}/toggle', [HealthOperationController::class, 'toggleTheatre'])->whereNumber('id')->name('health.operations.theatres.toggle');
+        });
     });
 
     Route::middleware('health.can:reports.view')->group(function () {

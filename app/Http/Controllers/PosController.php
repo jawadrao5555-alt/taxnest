@@ -2892,7 +2892,10 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $features = PosFeatureService::forCompany($company);
-        $categories = PosFeatureService::categoriesForCompany($company);
+        // NOTE: the list of selectable categories is deliberately NOT handed to
+        // this view. The business category decides which regulator the shop
+        // files under, so it is a SaaS-admin-only decision — the page shows the
+        // shop its own type and nothing else about any other type.
         $allFlags = PosFeatureService::ALL_FLAGS;
         // First-time setup → wizard shows welcome banner + opens on Step 1.
         $isFirstTime = $request->boolean('welcome') || !($company->pos_setup_completed ?? false);
@@ -2907,7 +2910,7 @@ class PosController extends Controller
         // (will lapse); trial-ended = flags were on but the trial expired.
         $restaurantAccessSource = PosFeatureService::restaurantAccessSource($company);
         $restaurantTrialEnded = PosFeatureService::restaurantLostToTrialExpiry($company);
-        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime', 'globalTaxRates', 'restaurantAllowed', 'restaurantAccessSource', 'restaurantTrialEnded'));
+        return view('pos.feature-settings', compact('company', 'features', 'allFlags', 'isFirstTime', 'globalTaxRates', 'restaurantAllowed', 'restaurantAccessSource', 'restaurantTrialEnded'));
     }
 
     public function updateFeatureSettings(Request $request)

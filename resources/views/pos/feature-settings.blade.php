@@ -5,6 +5,31 @@
         // change it. This step shows what the shop is, not a picker.
         $currentCategory = \App\Services\PosFeatureService::resolveCategory($company);
         $currentMeta = \App\Services\PosFeatureService::presetMeta($currentCategory);
+        // ONLY this shop's own preset is shipped into the page (Task 1559). The
+        // whole catalogue used to ride along in the wizard's x-data, so every
+        // other business type — its name, icon, description and default module
+        // set — was readable in Customize even though the card is read-only.
+        // A shop sitting on a retired/unknown category still gets a working
+        // page: presetMeta() falls back to a real card and the flag map falls
+        // back to empty (everything simply lands under "Extra").
+        $currentDefaults = \App\Services\PosFeatureService::categoryFlagMap($currentCategory);
+        $currentMetaLite = [
+            'label' => $currentMeta['label'],
+            'description' => $currentMeta['description'],
+            'icon' => $currentMeta['icon'],
+        ];
+        // Flag meta for the wizard, WITHOUT the internal grouping key — that
+        // value ('restaurant', 'inventory', ...) is a flag section, not a
+        // business type, and the wizard never reads it.
+        $flagMetaLite = [];
+        foreach (\App\Services\PosFeatureService::ALL_FLAGS as $f) {
+            $m = \App\Services\PosFeatureService::flagMeta($f);
+            $flagMetaLite[$f] = [
+                'label' => $m['label'] ?? $f,
+                'description' => $m['description'] ?? '',
+                'icon' => $m['icon'] ?? '•',
+            ];
+        }
         // The amber "this belongs on the other panel" notice fires only when the
         // category is genuinely the OTHER regulator's; a catch-all like
         // 'general' belongs to nobody and must not raise it.
@@ -363,7 +388,6 @@
                     { n: 2, label: @js(__('pos.step_features')) },
                     { n: 3, label: @js(__('pos.step_review')) },
                 ],
-                selectedPreset: @json($currentCategory),
                 flags: @json($flagState),
                 density: @json($company->pos_ui_density ?? 'standard'),
                 autoPrintKot: @json((bool)($company->auto_print_kot ?? false)),
@@ -371,25 +395,24 @@
                 kotLastAddon: @json((bool)($company->kot_last_addon_enabled ?? true)),
                 guidedFlow: @json((bool)($company->pos_guided_flow_enabled ?? true)),
 
-                presetMeta: @json(\App\Services\PosFeatureService::PRESET_META),
-                flagMeta: @json(\App\Services\PosFeatureService::FLAG_META),
-                {{-- Merged map: offered service categories PLUS the retired goods ones, so a
-                     pre-split shop's own preset still resolves in the wizard. --}}
-                categoryDefaults: @json(\App\Services\PosFeatureService::allCategoryDefaults()),
+                {{-- This shop's OWN business type only — the category is admin-only,
+                     so no other type's name, icon, description or default module
+                     set may be shipped into the page. --}}
+                selectedPresetMeta: @json($currentMetaLite),
+                {{-- The shop's own preset flag map (recommended vs extra split). --}}
+                categoryDefaults: @json($currentDefaults),
+                flagMeta: @json($flagMetaLite),
                 dependencies: @json(\App\Services\PosFeatureService::DEPENDENCIES),
                 allFlags: @json(\App\Services\PosFeatureService::ALL_FLAGS),
                 restaurantLocked: @json(!($restaurantAllowed ?? true)),
                 restaurantFlags: @json(\App\Services\PosFeatureService::RESTAURANT_FLAGS),
 
-                get selectedPresetMeta() {
-                    return this.presetMeta[this.selectedPreset] || { label: @js(__('pos.custom_word')), icon: '⚙️', description: '' };
-                },
                 get recommendedFlags() {
-                    const d = this.categoryDefaults[this.selectedPreset] || {};
+                    const d = this.categoryDefaults || {};
                     return this.allFlags.filter(f => d[f]);
                 },
                 get extraFlags() {
-                    const d = this.categoryDefaults[this.selectedPreset] || {};
+                    const d = this.categoryDefaults || {};
                     return this.allFlags.filter(f => !d[f]);
                 },
                 get enabledFlags() {

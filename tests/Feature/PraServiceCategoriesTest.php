@@ -225,6 +225,55 @@ class PraServiceCategoriesTest extends TestCase
             'Only a SaaS admin may move a shop onto another business category.');
     }
 
+    /**
+     * Customize POS knows ONE business type: the shop's own.
+     *
+     * The card has always been read-only, but the page still shipped the whole
+     * catalogue in its own embedded wizard data — every other type's key,
+     * label, description, icon and default module set was readable from the
+     * shop's own page. The category picks the shop's REGULATOR, so nothing
+     * about any other type belongs there.
+     */
+    public function test_customize_page_carries_only_the_shops_own_business_type(): void
+    {
+        $this->setCategory('salon', 'salon');
+        $this->actAsAdmin();
+
+        $html = $this->get('/pos/features')->assertOk()->getContent();
+
+        $own = PosFeatureService::presetMeta('salon');
+        $this->assertStringContainsString($own['label'], $html,
+            'The shop must still see its OWN business type.');
+
+        foreach (PosFeatureService::allCategoryDefaults() as $key => $ignored) {
+            if ($key === 'salon') {
+                continue;
+            }
+            $meta = PosFeatureService::presetMeta($key);
+
+            $this->assertStringNotContainsString('"' . $key . '"', $html,
+                "Customize POS must not carry the category key '$key'.");
+            $this->assertStringNotContainsString($meta['label'], $html,
+                "Customize POS must not name another business type ('{$meta['label']}').");
+            $this->assertStringNotContainsString($meta['description'], $html,
+                "Customize POS must not describe another business type ('$key').");
+        }
+    }
+
+    /** A shop on a retired category still gets a usable page, not a blank card. */
+    public function test_customize_page_still_renders_for_a_retired_category(): void
+    {
+        $this->setCategory('pharmacy', 'pharmacy');
+        $this->actAsAdmin();
+
+        $html = $this->get('/pos/features')->assertOk()->getContent();
+
+        $this->assertStringContainsString(PosFeatureService::presetMeta('pharmacy')['label'], $html,
+            'A pre-split shop must still see a real business-type card.');
+        $this->assertStringContainsString(__('pos.legacy_goods_category_title'), $html,
+            'The off-panel notice must survive the catalogue removal.');
+    }
+
     /** A legacy shop can still save its features — the page is never unusable. */
     public function test_legacy_shop_can_still_save_its_features(): void
     {
@@ -564,6 +613,15 @@ class PraServiceCategoriesTest extends TestCase
             $t->boolean('kot_on_final_if_unsent')->default(false);
             $t->boolean('restaurant_mode')->default(false);
             $t->softDeletes();
+            $t->timestamps();
+        });
+
+        // Read by the Customize page's Sales Tax Rates card.
+        Schema::create('pos_tax_rules', function (Blueprint $t) {
+            $t->id();
+            $t->string('payment_method');
+            $t->decimal('tax_rate', 5, 2);
+            $t->boolean('is_active')->default(true);
             $t->timestamps();
         });
 

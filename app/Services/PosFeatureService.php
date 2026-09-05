@@ -947,6 +947,22 @@ class PosFeatureService
         return self::CATEGORY_DEFAULTS + self::LEGACY_CATEGORIES;
     }
 
+    /**
+     * ONE category's raw preset flag map — the modules that category switches
+     * on, with no base defaults merged in. This is what the Customize wizard
+     * splits into "recommended" and "extra", and it is deliberately per
+     * category: the shop's page must never carry the whole catalogue, because
+     * the business type is a SaaS-admin-only decision (it picks the regulator).
+     * An unknown/retired slug yields an empty map, so the page still renders.
+     */
+    public static function categoryFlagMap(?string $category): array
+    {
+        if ($category === null) {
+            return [];
+        }
+        return self::allCategoryDefaults()[$category] ?? [];
+    }
+
     /** Does this slug resolve to a real preset (any panel)? */
     public static function isKnownCategory(?string $category): bool
     {

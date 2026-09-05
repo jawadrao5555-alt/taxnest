@@ -20,7 +20,13 @@
         // category keeps seeing its own card. This page is the ONLY place a
         // category may be changed — the shop's Customize page shows it read-only.
         $currentCategory = \App\Services\PosFeatureService::resolveCategory($company);
-        $presets = \App\Services\PosFeatureService::categoriesForCompany($company);
+        // Changing the category re-files the shop under a different regulator,
+        // so it is a SUPER-ADMIN-only action (Task 1559). Every other admin
+        // role sees the current preset read-only and its POST is ignored
+        // server-side, exactly the way the shop's own page is treated.
+        $canChangeCategory = (bool) (auth('admin')->user()?->isSuperAdmin());
+        $presets = $canChangeCategory ? \App\Services\PosFeatureService::categoriesForCompany($company) : [];
+        $currentPresetMeta = \App\Services\PosFeatureService::presetMeta($currentCategory);
         // The amber "this belongs on the other panel" notice fires only when the
         // category is genuinely the OTHER regulator's; a catch-all like
         // 'general' belongs to nobody and must not raise it.
@@ -62,7 +68,9 @@
                      keeps it ON (its historical force-write) while the controller
                      no longer flips it blind on a marker-less POST. --}}
                 <input type="hidden" name="use_universal_pos" value="1" />
-                <input type="hidden" name="business_category" :value="selectedPreset" />
+                @if($canChangeCategory)
+                    <input type="hidden" name="business_category" :value="selectedPreset" />
+                @endif
 
                 {{-- Industry Preset --}}
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
@@ -76,20 +84,34 @@
                             </p>
                         </div>
                     @endif
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                        @foreach($presets as $preset)
-                            @php $meta = \App\Services\PosFeatureService::presetMeta($preset); @endphp
-                            <button type="button" @click="selectPreset('{{ $preset }}')"
-                                :class="selectedPreset === '{{ $preset }}' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-400/40' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'"
-                                class="relative p-2.5 rounded-xl border-2 text-left transition group">
-                                <div class="text-2xl mb-1">{{ $meta['icon'] }}</div>
-                                <div class="text-xs font-bold text-gray-900 dark:text-white leading-tight">{{ $meta['label'] }}</div>
-                                <div x-show="selectedPreset === '{{ $preset }}'" class="absolute top-1 right-1 w-4 h-4 rounded-full bg-purple-600 flex items-center justify-center">
-                                    <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                </div>
-                            </button>
-                        @endforeach
-                    </div>
+                    @if($canChangeCategory)
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                            @foreach($presets as $preset)
+                                @php $meta = \App\Services\PosFeatureService::presetMeta($preset); @endphp
+                                <button type="button" @click="selectPreset('{{ $preset }}')"
+                                    :class="selectedPreset === '{{ $preset }}' ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-400/40' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'"
+                                    class="relative p-2.5 rounded-xl border-2 text-left transition group">
+                                    <div class="text-2xl mb-1">{{ $meta['icon'] }}</div>
+                                    <div class="text-xs font-bold text-gray-900 dark:text-white leading-tight">{{ $meta['label'] }}</div>
+                                    <div x-show="selectedPreset === '{{ $preset }}'" class="absolute top-1 right-1 w-4 h-4 rounded-full bg-purple-600 flex items-center justify-center">
+                                        <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </button>
+                            @endforeach
+                        </div>
+                    @else
+                        {{-- Read-only for every non-super-admin role. The server
+                             ignores a category from them too, so this card never
+                             promises something the save will not honour. --}}
+                        <div class="rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3.5 flex items-start gap-3">
+                            <span class="text-2xl leading-none">{{ $currentPresetMeta['icon'] }}</span>
+                            <div>
+                                <p class="text-sm font-extrabold text-gray-900 dark:text-white">{{ $currentPresetMeta['label'] }}</p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">{{ $currentPresetMeta['description'] }}</p>
+                            </div>
+                        </div>
+                        <p class="mt-2 text-[11px] font-semibold text-gray-500 dark:text-gray-400">Only a super admin can change the industry preset.</p>
+                    @endif
                 </div>
 
                 {{-- UI Density --}}
@@ -154,7 +176,9 @@
         function adminFeatureSettings() {
             return {
                 selectedPreset: @json($currentCategory),
-                categoryDefaults: @json(\App\Services\PosFeatureService::allCategoryDefaults()),
+                {{-- Only the super admin can switch preset, so only their page
+                     needs the preset -> defaults map. --}}
+                categoryDefaults: @json($canChangeCategory ? \App\Services\PosFeatureService::allCategoryDefaults() : []),
                 allFlags: @json(\App\Services\PosFeatureService::ALL_FLAGS),
                 selectPreset(preset) {
                     this.selectedPreset = preset;

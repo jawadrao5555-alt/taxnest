@@ -981,12 +981,23 @@ class AdminController extends Controller
         // This is the ONLY surface that may change a company's category — the
         // shop's own Customize page cannot.
         $allowedCategories = \App\Services\PosFeatureService::categoriesForCompany($company);
-        $data = $request->validate([
-            'business_category' => 'nullable|string|in:' . implode(',', $allowedCategories),
+
+        // Changing the category re-files the company under a different
+        // regulator, so only a SUPER ADMIN may do it. For every other admin
+        // role the field is ignored — not validated and not rejected — exactly
+        // the way the shop's own Customize handler ignores it: their feature
+        // save must still succeed, silently keeping the stored category.
+        $isSuperAdmin = (bool) (auth('admin')->user()?->isSuperAdmin());
+
+        $rules = [
             'pos_ui_density'    => 'nullable|in:simple,standard,premium',
             'use_universal_pos' => 'nullable|boolean',
             'feature_flags'     => 'nullable|array',
-        ]);
+        ];
+        if ($isSuperAdmin) {
+            $rules['business_category'] = 'nullable|string|in:' . implode(',', $allowedCategories);
+        }
+        $data = $request->validate($rules);
 
         $oldFlags = is_array($company->feature_flags) ? $company->feature_flags : [];
         $oldCategory = $company->business_category;
@@ -1005,7 +1016,9 @@ class AdminController extends Controller
         $flagsPresent = $request->has('fs_present') || $request->has('feature_flags');
 
         $update = [
-            'business_category' => $data['business_category'] ?? $company->business_category,
+            'business_category' => $isSuperAdmin
+                ? ($data['business_category'] ?? $company->business_category)
+                : $company->business_category,
         ];
 
         $flags = $oldFlags;

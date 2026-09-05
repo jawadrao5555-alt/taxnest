@@ -151,6 +151,65 @@ class AdminPosFeaturesStaleFormGuardTest extends TestCase
         $this->assertTrue((bool) ($flags['inventory'] ?? false));
     }
 
+    // ── category is super-admin-only (Task 1559) ────────────────────────────
+
+    /**
+     * The business category picks the shop's REGULATOR, so only a super admin
+     * may change it. A non-super admin's POST that carries one is ignored the
+     * same silent way the shop's own handler ignores it: stored category kept,
+     * no validation error, and the rest of that admin's feature save lands.
+     */
+    public function test_non_super_admin_cannot_change_the_business_category(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'business_category' => 'salon',
+            'feature_flags'     => json_encode(['kitchen' => true, 'inventory' => true]),
+        ]);
+
+        $support = AdminUser::create([
+            'name'     => 'Support Admin',
+            'email'    => 'support@adminguard.test',
+            'password' => Hash::make('Admin@98765'),
+            'role'     => 'support',
+        ]);
+
+        $this->actingAs($support, 'admin');
+        $this->put($this->url(), [
+            '_token'            => csrf_token(),
+            'fs_present'        => '1',
+            'business_category' => 'gym',
+            'feature_flags'     => ['inventory' => '1'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $company = $this->company();
+        $this->assertSame('salon', $company->business_category,
+            'A non-super admin must not be able to re-file the shop under another category');
+
+        $flags = $company->feature_flags ?? [];
+        $this->assertTrue((bool) ($flags['inventory'] ?? false),
+            'The rest of the non-super admin feature save must still succeed');
+        $this->assertFalse((bool) ($flags['kitchen'] ?? true),
+            'Unticked modules on that same save must still persist');
+    }
+
+    /** A super admin still changes the preset exactly as before. */
+    public function test_super_admin_can_still_change_the_business_category(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'business_category' => 'salon',
+        ]);
+
+        $this->actAsAdmin();
+        $this->put($this->url(), [
+            '_token'            => csrf_token(),
+            'fs_present'        => '1',
+            'business_category' => 'gym',
+            'feature_flags'     => ['inventory' => '1'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('gym', $this->company()->business_category);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function seedShop(): void

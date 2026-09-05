@@ -44,6 +44,15 @@ class AdminCompanyController extends Controller
 
     public function store(Request $request)
     {
+        // Which POS panel (if any) this company is being created on. The
+        // business type is a POS-only question: Digital Invoice and healthcare
+        // companies are created exactly as they always were.
+        $posPanel = match ($request->input('product_type')) {
+            'fbrpos' => 'fbr',
+            'pos'    => 'pra',
+            default  => null,
+        };
+
         $request->validate([
             'name' => 'required|string|max:255',
             'owner_name' => 'required|string|max:255',
@@ -60,6 +69,12 @@ class AdminCompanyController extends Controller
             'province' => 'nullable|string|max:100',
             'business_activity' => 'nullable|string|max:255',
             'website' => 'nullable|string|max:255',
+            // Business type — POS products only, and only the types that panel
+            // is allowed to use (the same list the signup screens offer, plus
+            // the 'general' catch-all). Nothing picked = general.
+            'pos_type' => $posPanel
+                ? 'nullable|string|in:' . implode(',', \App\Services\PosFeatureService::choosableCategories($posPanel))
+                : 'nullable|string|max:50',
             'status' => 'required|in:approved,pending',
             'franchise_id' => 'nullable|exists:franchises,id',
             'agent_id' => 'nullable|exists:agents,id',
@@ -98,6 +113,24 @@ class AdminCompanyController extends Controller
         if ($request->product_type === 'pos') {
             $companyData['pra_reporting_enabled'] = false;
             $companyData['pra_environment'] = 'sandbox';
+        }
+
+        // A POS company created here must open exactly like one that signed
+        // itself up (Task 1562): the business type staff picked is stored WITH
+        // that trade's module map and the master switches derived from it, so
+        // the owner never lands on an empty POS. It goes through the one shared
+        // registration-preset helper the signup screens use, so the admin path
+        // can never drift from them. Nothing picked = the 'general' catch-all,
+        // which stores a bare preset rather than nothing at all (a shop with no
+        // stored type silently reads as a restaurant). Every column the helper
+        // writes is hasColumn-guarded there, so a partly-migrated deployment
+        // still creates companies instead of 500ing.
+        if ($posPanel !== null) {
+            $posType = $request->filled('pos_type') ? $request->input('pos_type') : 'general';
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_type')) {
+                $companyData['pos_type'] = $posType;
+            }
+            $companyData += \App\Services\PosFeatureService::registrationAttributes($posType);
         }
 
         // Healthcare ERP (Task 1547): a new healthcare company starts as a

@@ -44,6 +44,30 @@
             </div>
         </div>
 
+        {{-- Business type (Task 1562) — POS products only. The type stores the
+             company's category AND switches that trade's modules on, exactly
+             the way a shop that signs itself up is configured, so an
+             admin-created shop never opens on an empty POS. Each panel offers
+             only its own list (PRA services / FBR goods), and the hidden select
+             is DISABLED so a switch of product type can never submit the other
+             panel's value. Nothing picked = General Business. --}}
+        <div x-show="productType === 'pos' || productType === 'fbrpos'" x-cloak class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-white mb-1">Business Type</h3>
+            <p class="text-xs text-gray-500 mb-4">The shop opens with this trade's modules already switched on. Leave it on General Business if you are not sure — the owner can change nothing here, but a super admin can re-file it later from the company's POS Features page.</p>
+            @foreach(['pos' => 'pra', 'fbrpos' => 'fbr'] as $product => $panel)
+                <div x-show="productType === '{{ $product }}'">
+                    <label class="text-xs text-gray-400 mb-1 block">{{ $product === 'pos' ? 'PRA POS' : 'FBR POS' }} business type</label>
+                    <select name="pos_type" :disabled="productType !== '{{ $product }}'"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                        @foreach(\App\Services\PosFeatureService::choosableCategories($panel) as $category)
+                            @php $meta = \App\Services\PosFeatureService::presetMeta($category); @endphp
+                            <option value="{{ $category }}" {{ old('pos_type', 'general') === $category ? 'selected' : '' }}>{{ $meta['icon'] }} {{ $meta['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endforeach
+        </div>
+
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-4">Company Information</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

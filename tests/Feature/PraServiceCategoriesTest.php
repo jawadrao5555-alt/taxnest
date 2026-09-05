@@ -1097,6 +1097,268 @@ class PraServiceCategoriesTest extends TestCase
         $this->assertTrue((bool) PosFeatureService::defaultsForCategory('courier')['delivery']);
     }
 
+    // ── however the shop came into existence, its type configures it ────────
+
+    /** Create a company the way SaaS admin staff do, from the admin panel. */
+    private function adminCreatesCompany(array $fields): Company
+    {
+        $adminId = DB::table('admin_users')->insertGetId([
+            'name'       => 'Staff',
+            'email'      => 'staff' . uniqid() . '@pracategories.test',
+            'password'   => bcrypt('secret'),
+            'role'       => 'super_admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->actingAs(\App\Models\AdminUser::find($adminId), 'admin');
+
+        $unique = uniqid();
+        app(\App\Http\Controllers\SaasAdmin\AdminCompanyController::class)->store(
+            Request::create('/admin/companies', 'POST', array_merge([
+                'name'           => 'Admin Made Shop',
+                'owner_name'     => 'Shop Owner',
+                'email'          => "shop$unique@pracategories.test",
+                'status'         => 'approved',
+                'admin_name'     => 'Shop Admin',
+                'admin_email'    => "shopadmin$unique@pracategories.test",
+                'admin_password' => 'secret123',
+            ], $fields))
+        );
+
+        return Company::orderByDesc('id')->first();
+    }
+
+    /**
+     * A POS company created from the SaaS admin panel opens on its trade.
+     *
+     * Staff create companies by hand all the time (sales, migration, a shop
+     * that phoned in). That path asked for no business type and stored none, so
+     * the owner signed in to a POS with every module off — the very thing the
+     * signup preset was built to end. It now applies the SAME shared preset,
+     * so the two ways into the product cannot drift apart.
+     */
+    public function test_an_admin_created_pos_company_opens_on_its_business_type(): void
+    {
+        $company = $this->adminCreatesCompany(['product_type' => 'pos', 'pos_type' => 'cafe']);
+
+        $this->assertSame('cafe', $company->business_category,
+            'The type staff picked must be stored, not just asked for.');
+        $this->assertSame('cafe', $company->pos_type);
+
+        $signup = PosFeatureService::registrationAttributes('cafe');
+        $this->assertSame($signup['feature_flags'], $company->feature_flags,
+            'An admin-created shop must get exactly what the same type gives a shop that signs itself up.');
+        $this->assertTrue((bool) ($company->feature_flags['kitchen'] ?? false),
+            'A cafe runs a kitchen, so it opens with one.');
+        $this->assertTrue((bool) $company->restaurant_mode,
+            'The restaurant master switch must agree with the modules.');
+        $this->assertTrue((bool) $company->inventory_enabled,
+            'The inventory master switch must agree with the modules.');
+    }
+
+    /** The FBR panel's own list applies the same way. */
+    public function test_an_admin_created_fbr_pos_company_opens_on_its_business_type(): void
+    {
+        $company = $this->adminCreatesCompany(['product_type' => 'fbrpos', 'pos_type' => 'pharmacy']);
+
+        $this->assertSame('pharmacy', $company->business_category);
+        $this->assertTrue((bool) ($company->feature_flags['prescription'] ?? false),
+            'An FBR pharmacy must open with prescriptions on.');
+        $this->assertTrue((bool) $company->inventory_enabled);
+        $this->assertFalse((bool) $company->restaurant_mode,
+            'A pharmacy has no kitchen.');
+    }
+
+    /** Staff who skip the picker get the general/unclassified type, not nothing. */
+    public function test_an_admin_created_pos_company_defaults_to_the_general_type(): void
+    {
+        $company = $this->adminCreatesCompany(['product_type' => 'pos']);
+
+        $this->assertSame('general', $company->business_category,
+            'A shop nobody classified must still be STORED as general, or it resolves as a restaurant.');
+        $this->assertSame('general', PosFeatureService::resolveCategory($company));
+        $this->assertFalse((bool) $company->restaurant_mode,
+            'The catch-all must not hand an unclassified shop a kitchen.');
+    }
+
+    /** A type from the other panel is refused, not silently stored. */
+    public function test_the_admin_create_form_offers_only_the_panel_it_is_creating_on(): void
+    {
+        $this->assertContains('general', PosFeatureService::choosableCategories('pra'),
+            'The catch-all must be pickable on both panels.');
+        $this->assertContains('general', PosFeatureService::choosableCategories('fbr'));
+        $this->assertNotContains('pharmacy', PosFeatureService::choosableCategories('pra'),
+            'PRA cannot tax goods, so a PRA company must not be creatable as a pharmacy.');
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->adminCreatesCompany(['product_type' => 'pos', 'pos_type' => 'pharmacy']);
+    }
+
+    /** Every other product is created exactly as it was before. */
+    public function test_an_admin_created_digital_invoice_company_is_untouched(): void
+    {
+        $company = $this->adminCreatesCompany(['product_type' => 'di', 'pos_type' => 'cafe']);
+
+        $this->assertNull($company->business_category,
+            'Digital Invoice has no business type — creating one must store none.');
+        $this->assertNull($company->pos_type);
+        $this->assertNull($company->feature_flags,
+            'A DI company must not be handed a POS module map.');
+        $this->assertFalse((bool) $company->inventory_enabled);
+        $this->assertFalse((bool) $company->restaurant_mode);
+    }
+
+    // ── filling in the shops that never got a module map ────────────────────
+
+    /** Run the one-time fill-in exactly as a deployment would. */
+    private function runTheFillIn(): void
+    {
+        (require database_path('migrations/2026_10_09_000000_backfill_business_type_presets.php'))->up();
+    }
+
+    /** The columns the fill-in is allowed to touch, for a before/after capture. */
+    private function configurationOf(int $companyId): array
+    {
+        $row = DB::table('companies')
+            ->select('feature_flags', 'business_category', 'pos_type', 'inventory_enabled', 'restaurant_mode')
+            ->where('id', $companyId)->first();
+
+        return (array) $row;
+    }
+
+    private function seedCompany(array $attributes): int
+    {
+        return DB::table('companies')->insertGetId(array_merge([
+            'name'           => 'Seeded Shop',
+            'product_type'   => 'pos',
+            'status'         => 'approved',
+            'company_status' => 'active',
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ], $attributes));
+    }
+
+    /**
+     * A shop that registered before the preset existed is filled in.
+     *
+     * It told us its business at signup, but only the type was written — the
+     * module map is simply ABSENT, so the runtime resolves every module off and
+     * the shop is still on the empty POS the preset was meant to end.
+     */
+    public function test_the_fill_in_configures_a_shop_that_never_had_a_module_map(): void
+    {
+        $byCategory = $this->seedCompany([
+            'business_category' => 'restaurant', 'pos_type' => 'restaurant', 'feature_flags' => null,
+        ]);
+        // Pre-split shop: the choice only ever reached pos_type.
+        $byPosType = $this->seedCompany([
+            'business_category' => null, 'pos_type' => 'salon', 'feature_flags' => null,
+        ]);
+
+        $this->runTheFillIn();
+
+        $restaurant = Company::find($byCategory);
+        $this->assertSame(
+            PosFeatureService::registrationAttributes('restaurant')['feature_flags'],
+            $restaurant->feature_flags,
+            'A filled-in shop must end up exactly where a new shop of that type starts.'
+        );
+        $this->assertTrue((bool) $restaurant->restaurant_mode, 'Master switches ride along.');
+        $this->assertTrue((bool) $restaurant->inventory_enabled);
+
+        $salon = Company::find($byPosType);
+        $this->assertTrue((bool) ($salon->feature_flags['service_jobs'] ?? false),
+            'A shop with only its registration pos_type must be filled in from that.');
+        $this->assertFalse((bool) $salon->restaurant_mode,
+            'A salon is not a restaurant.');
+    }
+
+    /** A module the shop already uses is never taken away by the fill-in. */
+    public function test_the_fill_in_never_switches_a_live_module_off(): void
+    {
+        $id = $this->seedCompany([
+            'business_category' => 'salon', 'pos_type' => 'salon',
+            'feature_flags'     => null,
+            'inventory_enabled' => true,
+        ]);
+
+        $this->runTheFillIn();
+
+        $company = Company::find($id);
+        $this->assertTrue((bool) $company->inventory_enabled,
+            'A shop tracking stock today must keep it, even though the salon preset alone would not switch it on.');
+        $this->assertTrue((bool) ($company->feature_flags['inventory'] ?? false),
+            'The map and the master column must agree — the dual-switch trap.');
+    }
+
+    /** Anything already configured — or unresolvable — is left completely alone. */
+    public function test_the_fill_in_leaves_every_configured_shop_untouched(): void
+    {
+        $untouchable = [
+            'a shop with modules on' => $this->seedCompany([
+                'business_category' => 'restaurant', 'pos_type' => 'restaurant',
+                'feature_flags'     => json_encode(['inventory' => true]),
+                'inventory_enabled' => true,
+            ]),
+            // Everything deliberately switched off is a decision, not an absence.
+            'a shop with everything off' => $this->seedCompany([
+                'business_category' => 'restaurant', 'pos_type' => 'restaurant',
+                'feature_flags'     => json_encode(array_fill_keys(PosFeatureService::ALL_FLAGS, false)),
+            ]),
+            'a shop with an empty map' => $this->seedCompany([
+                'business_category' => 'cafe', 'pos_type' => 'cafe',
+                'feature_flags'     => json_encode([]),
+            ]),
+            // Configured, on a retired goods category, and plan-locked out of
+            // the restaurant module: its stored configuration still stands.
+            'a plan-locked shop on a retired category' => $this->seedCompany([
+                'business_category'   => 'pharmacy', 'pos_type' => 'pharmacy',
+                'feature_flags'       => json_encode(['kitchen' => true]),
+                'restaurant_mode'     => true,
+                'is_internal_account' => false,
+            ]),
+            'a shop on an unknown type' => $this->seedCompany([
+                'business_category' => 'not_a_business', 'pos_type' => 'not_a_business',
+                'feature_flags'     => null,
+            ]),
+            'a Digital Invoice company' => $this->seedCompany([
+                'product_type' => 'di', 'business_category' => null, 'pos_type' => null,
+                'feature_flags' => null,
+            ]),
+            // DI signups carry a registration pos_type of their own; it must
+            // not turn into a POS configuration they never asked for.
+            'a Digital Invoice company with a registration type' => $this->seedCompany([
+                'product_type' => 'di', 'business_category' => null, 'pos_type' => 'general',
+                'feature_flags' => null,
+            ]),
+        ];
+
+        $before = array_map(fn ($id) => $this->configurationOf($id), $untouchable);
+
+        $this->runTheFillIn();
+
+        foreach ($untouchable as $what => $id) {
+            $this->assertSame($before[$what], $this->configurationOf($id),
+                "The fill-in must not move $what.");
+        }
+    }
+
+    /** Running it twice changes nothing the second time. */
+    public function test_the_fill_in_is_safe_to_run_again(): void
+    {
+        $id = $this->seedCompany([
+            'business_category' => 'grocery', 'pos_type' => 'grocery', 'feature_flags' => null,
+        ]);
+
+        $this->runTheFillIn();
+        $afterFirst = $this->configurationOf($id);
+
+        $this->runTheFillIn();
+
+        $this->assertSame($afterFirst, $this->configurationOf($id),
+            'A second run must be a no-op — the shop now HAS a map of its own.');
+    }
+
     // ── schema / seed ───────────────────────────────────────────────────────
 
     private function seedShop(): void
@@ -1159,7 +1421,67 @@ class PraServiceCategoriesTest extends TestCase
             $t->boolean('delivery_kot_after_payment')->default(false);
             $t->boolean('kot_on_final_if_unsent')->default(false);
             $t->boolean('restaurant_mode')->default(false);
+            // Written by the SaaS admin's company-create path (Task 1562).
+            $t->string('owner_name')->nullable();
+            $t->string('email')->nullable();
+            $t->string('ntn')->nullable();
+            $t->string('cnic')->nullable();
+            $t->string('phone')->nullable();
+            $t->string('mobile')->nullable();
+            $t->string('address')->nullable();
+            $t->string('city')->nullable();
+            $t->string('province')->nullable();
+            $t->string('business_activity')->nullable();
+            $t->string('website')->nullable();
+            $t->unsignedBigInteger('franchise_id')->nullable();
+            $t->decimal('standard_tax_rate', 5, 2)->nullable();
+            $t->boolean('fbr_pos_enabled')->default(false);
+            $t->string('fbr_pos_environment')->nullable();
+            $t->boolean('fbr_reporting_enabled')->default(false);
+            $t->boolean('pra_reporting_enabled')->default(false);
+            $t->string('pra_environment')->nullable();
             $t->softDeletes();
+            $t->timestamps();
+        });
+
+        // The SaaS admin panel's own tables — company creation writes an audit
+        // trail under the acting admin and records the credentials it used.
+        Schema::create('admin_users', function (Blueprint $t) {
+            $t->id();
+            $t->string('name');
+            $t->string('email')->unique();
+            $t->string('password');
+            $t->string('role', 30)->default('admin');
+            $t->rememberToken();
+            $t->timestamps();
+        });
+
+        Schema::create('admin_audit_logs', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('admin_id')->nullable();
+            $t->string('action');
+            $t->string('target_type')->nullable();
+            $t->unsignedBigInteger('target_id')->nullable();
+            $t->text('metadata')->nullable();
+            $t->timestamps();
+        });
+
+        Schema::create('registered_credentials', function (Blueprint $t) {
+            $t->id();
+            $t->string('credential_type', 20);
+            $t->string('credential_value', 191);
+            $t->string('product_type', 20)->nullable();
+            $t->unsignedBigInteger('company_id')->nullable();
+            $t->timestamp('created_at')->nullable();
+            $t->unique(['credential_type', 'credential_value']);
+        });
+
+        // Empty: every new company falls back to a plan-less trial row.
+        Schema::create('pricing_plans', function (Blueprint $t) {
+            $t->id();
+            $t->string('name');
+            $t->string('product_type')->nullable();
+            $t->boolean('is_trial')->default(false);
             $t->timestamps();
         });
 
@@ -1203,6 +1525,9 @@ class PraServiceCategoriesTest extends TestCase
             $t->id();
             $t->unsignedBigInteger('company_id');
             $t->unsignedBigInteger('pricing_plan_id')->nullable();
+            $t->string('billing_cycle')->nullable();
+            $t->decimal('discount_percent', 5, 2)->default(0);
+            $t->decimal('final_price', 12, 2)->default(0);
             $t->boolean('active')->default(true);
             $t->date('start_date')->nullable();
             $t->date('end_date')->nullable();

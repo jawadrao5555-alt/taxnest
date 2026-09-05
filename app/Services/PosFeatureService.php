@@ -1227,6 +1227,21 @@ class PosFeatureService
     }
 
     /**
+     * The categories a NEW company may be created on, for one panel.
+     *
+     * Exactly what the panel offers plus the 'general' catch-all, which is
+     * never an offered card but is the fallback whenever nobody classified the
+     * shop — the same set each signup screen accepts. The SaaS admin's
+     * company-create form (which asks the same question for a shop that phoned
+     * in) is generated and validated from here, so no hard-coded second list
+     * can drift away from PANEL_CATEGORIES.
+     */
+    public static function choosableCategories(?string $panel = null): array
+    {
+        return array_merge(self::categories($panel), ['general']);
+    }
+
+    /**
      * The offered list of a panel, split into family headings.
      *
      * Returns heading-slug => [category, ...] and NEVER drops a category: an

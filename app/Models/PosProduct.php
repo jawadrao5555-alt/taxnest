@@ -60,6 +60,22 @@ class PosProduct extends Model
             'marquee' => ['service_duration'],
             'catering' => ['weight_based', 'unit_type'],
 
+            // Second Schedule service families added Sep 2026. A service item
+            // is not a retail SKU: duration-based services carry how long the
+            // job runs and who it is assigned to, courier work carries the
+            // parcel's weight/unit, and rent-a-car carries the vehicle itself.
+            // Anything that genuinely needs nothing extra stays empty rather
+            // than borrowing a goods field.
+            'courier' => ['weight_based', 'unit_type'],
+            'photography' => ['service_duration', 'staff_assignment'],
+            'event_management' => ['service_duration', 'staff_assignment'],
+            'travel_agent' => ['service_duration'],
+            'rent_a_car' => ['service_duration', 'vehicle_make', 'vehicle_model'],
+            'property_dealer' => [],
+            'advertising' => ['service_duration'],
+            'it_services' => ['service_duration', 'staff_assignment'],
+            'security_services' => ['service_duration', 'staff_assignment'],
+
             // ---- Goods businesses (FBR panel) ----
             'pharmacy' => ['batch_number', 'expiry_date', 'drug_type', 'prescription_required'],
             'grocery' => ['weight_based', 'unit_type', 'barcode'],

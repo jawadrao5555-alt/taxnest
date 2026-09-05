@@ -417,6 +417,90 @@ class PraServiceCategoriesTest extends TestCase
         }
     }
 
+    // ── the Second Schedule service families (Sep 2026) ─────────────────────
+
+    /**
+     * The service families PRA e-IMS lists but our panel had no card for.
+     *
+     * Without its own type a courier, photo studio, event planner, travel
+     * agent, rent-a-car, property dealer, ad agency, software house or
+     * security company had nothing matching its work at sign-up and fell
+     * through to the restaurant default — opening with a kitchen.
+     */
+    private const NEW_SERVICES = [
+        'courier', 'photography', 'event_management', 'travel_agent',
+        'rent_a_car', 'property_dealer', 'advertising', 'it_services',
+        'security_services',
+    ];
+
+    public function test_new_service_families_are_offered_on_the_pra_panel(): void
+    {
+        $offered = PosFeatureService::categories('pra');
+
+        foreach (self::NEW_SERVICES as $service) {
+            $this->assertContains($service, $offered,
+                "'$service' must be pickable on the PRA panel.");
+            $this->assertNotContains($service, PosFeatureService::categories('fbr'),
+                "'$service' is a service, so it must not appear on the goods panel.");
+
+            $meta = PosFeatureService::presetMeta($service);
+            $this->assertNotSame('', trim((string) ($meta['label'] ?? '')));
+            $this->assertNotSame('', trim((string) ($meta['icon'] ?? '')));
+            $this->assertNotSame('', trim((string) ($meta['description'] ?? '')));
+
+            foreach (['en', 'rur', 'ur'] as $locale) {
+                $key = 'pos.auth_bt_' . $service;
+                $this->assertNotSame($key, __($key, [], $locale),
+                    "'$service' needs a sign-up label in '$locale'.");
+            }
+        }
+    }
+
+    /** None of them is a kitchen business, so none may open in restaurant mode. */
+    public function test_new_service_families_never_switch_on_a_kitchen(): void
+    {
+        foreach (self::NEW_SERVICES as $service) {
+            $defaults = PosFeatureService::defaultsForCategory($service);
+
+            foreach (PosFeatureService::RESTAURANT_FLAGS as $kitchenFlag) {
+                $this->assertFalse((bool) ($defaults[$kitchenFlag] ?? false),
+                    "'$service' is not a kitchen business — '$kitchenFlag' must stay off.");
+            }
+            $this->assertFalse(PosFeatureService::restaurantModeFrom($defaults),
+                "'$service' must never boot into restaurant mode.");
+
+            $this->assertTrue((bool) ($defaults['service_jobs'] ?? false),
+                "'$service' sells work, so service jobs must be on.");
+            $this->assertTrue((bool) ($defaults['customer_profile'] ?? false),
+                "'$service' bills named customers, so customer profiles must be on.");
+        }
+    }
+
+    /** A service item gets fields about the work, not leftover retail fields. */
+    public function test_new_service_families_get_service_shaped_product_fields(): void
+    {
+        $goodsOnlyFields = [
+            'batch_number', 'expiry_date', 'drug_type', 'prescription_required',
+            'size', 'color', 'season', 'imei', 'serial_number', 'part_number',
+        ];
+        $map = \App\Models\PosProduct::categoryFields();
+
+        foreach (self::NEW_SERVICES as $service) {
+            $this->assertArrayHasKey($service, $map,
+                "'$service' must have a product-field map, even an empty one.");
+
+            foreach ($goodsOnlyFields as $goodsField) {
+                $this->assertNotContains($goodsField, $map[$service],
+                    "'$service' sells a service — '$goodsField' does not belong on its form.");
+            }
+        }
+
+        $this->assertContains('vehicle_make', $map['rent_a_car'],
+            'A rent-a-car item is a vehicle.');
+        $this->assertContains('service_duration', $map['photography'],
+            'A shoot is billed by how long it runs.');
+    }
+
     // ── schema / seed ───────────────────────────────────────────────────────
 
     private function seedShop(): void

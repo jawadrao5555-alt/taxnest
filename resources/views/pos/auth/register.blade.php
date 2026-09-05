@@ -146,17 +146,28 @@
                              is federal and belongs to the FBR panel, so only service businesses
                              are offered here. --}}
                         @php
-                            // Driven by PosFeatureService::PANEL_CATEGORIES so the
-                            // page can never offer a type the validator rejects.
-                            $praBusinessTypes = \App\Services\PosFeatureService::categories('pra');
+                            // Icons only — the offered list itself comes from
+                            // PosFeatureService::categories('pra') so signup, the admin preset
+                            // chooser and Customize can never disagree about what PRA offers.
+                            $praBusinessTypeIcons = [];
+                            foreach (\App\Services\PosFeatureService::categories('pra') as $praCategory) {
+                                $praBusinessTypeIcons[$praCategory] = \App\Services\PosFeatureService::presetMeta($praCategory)['icon'];
+                            }
                         @endphp
 
-                        <div class="grid grid-cols-5 gap-2">
-                            @foreach($praBusinessTypes as $btKey)
+                        {{-- 19 tiles now, and some labels are two or three words
+                             ("Event Management", "Security Services"). Fewer columns on
+                             narrow screens + a fixed min-height keeps every label fully
+                             readable in all three languages instead of clipping it.
+                             grid-cols-3-keep is required: mobile.css collapses every raw
+                             grid-cols-3 to a single column below 640px on guest layouts,
+                             which would stack all 19 tiles vertically. --}}
+                        <div class="grid grid-cols-3 grid-cols-3-keep sm:grid-cols-4 lg:grid-cols-5 gap-2">
+                            @foreach($praBusinessTypeIcons as $btKey => $btIcon)
                             <label class="relative cursor-pointer" @click="posType = @js($btKey)">
-                                <div class="flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card" :class="posType === @js($btKey) ? 'cat-active' : ''">
-                                    <span class="text-xl">{{ \App\Services\PosFeatureService::presetMeta($btKey)['icon'] }}</span>
-                                    <span class="text-[10px] font-semibold text-white/80 leading-tight">{{ __('pos.auth_bt_' . $btKey) }}</span>
+                                <div class="flex flex-col items-center justify-start gap-1 py-2.5 px-1 rounded-xl text-center transition-all cat-card h-full" style="min-height: 74px;" :class="posType === @js($btKey) ? 'cat-active' : ''">
+                                    <span class="text-xl leading-none">{{ $btIcon }}</span>
+                                    <span class="text-[10px] font-semibold text-white/80 leading-tight break-words w-full">{{ __('pos.auth_bt_' . $btKey) }}</span>
                                 </div>
                             </label>
                             @endforeach

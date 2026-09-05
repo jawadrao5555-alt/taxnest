@@ -220,6 +220,46 @@ class PosFeatureService
             'service_jobs' => true, 'inventory' => true,
             'customer_profile' => true,
         ],
+
+        // ---- Second Schedule service families added Sep 2026 ----
+        // None of these is a food business, so NOT ONE of them may switch on
+        // kot / kitchen / kitchen_notes / recipes / tables: restaurantModeFrom()
+        // reads exactly those switches, and a courier or a property dealer
+        // landing in restaurant mode would be handed a kitchen, KOT tickets and
+        // a floor map it can never use.
+        'courier' => [
+            'service_jobs' => true, 'delivery' => true,
+            'customer_profile' => true, 'customer_loyalty' => true,
+            'multi_branch' => true,
+        ],
+        'photography' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'event_management' => [
+            'service_jobs' => true, 'inventory' => true,
+            'customer_profile' => true,
+        ],
+        'travel_agent' => [
+            'service_jobs' => true, 'customer_profile' => true,
+            'multi_branch' => true,
+        ],
+        'rent_a_car' => [
+            'service_jobs' => true, 'customer_profile' => true,
+            'customer_loyalty' => true,
+        ],
+        'property_dealer' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'advertising' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'it_services' => [
+            'service_jobs' => true, 'customer_profile' => true,
+        ],
+        'security_services' => [
+            'service_jobs' => true, 'customer_profile' => true,
+            'multi_branch' => true,
+        ],
     ];
 
     /**
@@ -324,9 +364,11 @@ class PosFeatureService
             'badge' => 'New',
             'color' => 'cyan',
         ],
+        // Clubs used to hide inside this preset with no mention of their own —
+        // a club owner had no way to tell that this was their card.
         'marquee' => [
-            'label' => 'Marriage Hall / Marquee',
-            'description' => 'Event bookings, hall service, kitchen & catering',
+            'label' => 'Marriage Hall / Marquee / Club',
+            'description' => 'Event bookings, hall & club service, kitchen & catering',
             'icon' => '🎪',
             'badge' => 'New',
             'color' => 'rose',
@@ -358,6 +400,71 @@ class PosFeatureService
             'icon' => '🔩',
             'badge' => 'New',
             'color' => 'slate',
+        ],
+
+        // ---- Second Schedule service families added Sep 2026 ----
+        'courier' => [
+            'label' => 'Courier / Delivery Service',
+            'description' => 'Booking jobs, pickup & delivery, branches, customer loyalty',
+            'icon' => '📦',
+            'badge' => 'New',
+            'color' => 'orange',
+        ],
+        'photography' => [
+            'label' => 'Photography / Videography',
+            'description' => 'Shoot bookings, session duration, customer profiles',
+            'icon' => '📸',
+            'badge' => 'New',
+            'color' => 'violet',
+        ],
+        'event_management' => [
+            'label' => 'Event Management',
+            'description' => 'Event jobs, equipment stock, customer profiles',
+            'icon' => '🎉',
+            'badge' => 'New',
+            'color' => 'fuchsia',
+        ],
+        'travel_agent' => [
+            'label' => 'Travel Agent / Tour Operator',
+            'description' => 'Tour & ticket jobs, multi-office, customer profiles',
+            'icon' => '✈️',
+            'badge' => 'New',
+            'color' => 'sky',
+        ],
+        'rent_a_car' => [
+            'label' => 'Rent A Car',
+            'description' => 'Vehicle hire jobs, customer profiles, loyalty rewards',
+            'icon' => '🚗',
+            'badge' => 'New',
+            'color' => 'teal',
+        ],
+        'property_dealer' => [
+            'label' => 'Property Dealer / Real Estate',
+            'description' => 'Dealing & commission jobs, customer profiles',
+            'icon' => '🏘️',
+            'badge' => 'New',
+            'color' => 'lime',
+        ],
+        'advertising' => [
+            'label' => 'Advertising Agent',
+            'description' => 'Campaign jobs, client profiles, service billing',
+            'icon' => '📣',
+            'badge' => 'New',
+            'color' => 'red',
+        ],
+        'it_services' => [
+            'label' => 'IT Services / Software House',
+            'description' => 'Project jobs, assigned staff, client profiles',
+            'icon' => '💻',
+            'badge' => 'New',
+            'color' => 'indigo',
+        ],
+        'security_services' => [
+            'label' => 'Security Services / Guards',
+            'description' => 'Guard duty jobs, multi-site, client profiles',
+            'icon' => '🛡️',
+            'badge' => 'New',
+            'color' => 'zinc',
         ],
 
         // ---- Retired goods categories (FBR panel owns these) ----
@@ -804,6 +911,12 @@ class PosFeatureService
         'pra' => [
             'restaurant', 'cafe', 'quick_service', 'salon', 'hotel',
             'marquee', 'catering', 'laundry', 'gym', 'workshop',
+            // Second Schedule service families added Sep 2026 — these had no
+            // business type at all, so such a shop fell through to the
+            // restaurant default and opened with a kitchen it never asked for.
+            'courier', 'photography', 'event_management', 'travel_agent',
+            'rent_a_car', 'property_dealer', 'advertising', 'it_services',
+            'security_services',
         ],
         // Goods file with the FBR. 'restaurant' and 'salon' stay on this list on
         // purpose: the FBR panel also serves ICT, where those services are a

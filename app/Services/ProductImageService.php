@@ -54,6 +54,16 @@ class ProductImageService
             'stationery', 'books'                 => 'stationery,book,office',
             'toys'                                => 'toys,kids,play',
             'sports'                              => 'sports,fitness,gear',
+            // ---- PRA service families (Sep 2026) ----
+            'courier'                             => 'courier,parcel,delivery',
+            'photography'                         => 'photography,camera,studio',
+            'event_management'                    => 'event,celebration,decoration',
+            'travel_agent'                        => 'travel,tour,tourism',
+            'rent_a_car'                          => 'car,rental,vehicle',
+            'property_dealer'                     => 'property,realestate,house',
+            'advertising'                         => 'advertising,billboard,marketing',
+            'it_services'                         => 'computer,software,technology',
+            'security_services'                   => 'security,guard,cctv',
             'retail', 'shop', 'store', ''         => 'product,retail,shop',
             default                               => 'product',
         };

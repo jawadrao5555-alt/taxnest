@@ -81,6 +81,12 @@ use App\Http\Controllers\Health\HealthOpdReportController;
 use App\Http\Controllers\Health\HealthOperationController;
 use App\Http\Controllers\Health\HealthWardController;
 use App\Http\Controllers\Health\HealthPatientController;
+use App\Http\Controllers\HealthPharmacyController;
+use App\Http\Controllers\HealthPharmacyPurchaseController;
+use App\Http\Controllers\HealthPharmacyStockController;
+use App\Http\Controllers\HealthPharmacyPrescriptionController;
+use App\Http\Controllers\HealthPharmacySaleController;
+use App\Http\Controllers\HealthPharmacyReportController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\AnnouncementController;
@@ -1713,6 +1719,79 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         // Deactivate / reactivate, never delete: records are filed under these.
         Route::post('/departments/{id}/deactivate', [HealthDepartmentController::class, 'deactivate'])->name('health.departments.deactivate');
         Route::post('/departments/{id}/reactivate', [HealthDepartmentController::class, 'reactivate'])->name('health.departments.reactivate');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pharmacy (Task 1549)
+    |--------------------------------------------------------------------------
+    | Three gates stack here on purpose:
+    |   1. `health.module:pharmacy` — the organisation switched the module on,
+    |   2. HealthAuth's path map — /health/pharmacy needs `pharmacy.view`,
+    |   3. the per-route capability below, re-checked inside each controller.
+    |
+    | The hub MUST stay named `health.pharmacy`: the layout's navigation only
+    | renders an entry whose route already exists, so this name is what lights
+    | the sidebar link up.
+    */
+    Route::prefix('pharmacy')->middleware('health.module:pharmacy')->group(function () {
+        Route::get('/', [HealthPharmacyController::class, 'index'])->name('health.pharmacy');
+
+        // ── Catalogue ──
+        Route::get('/medicines', [HealthPharmacyController::class, 'medicines'])->name('health.pharmacy.medicines');
+        Route::middleware('health.can:pharmacy.manage')->group(function () {
+            Route::post('/medicines', [HealthPharmacyController::class, 'storeMedicine'])->name('health.pharmacy.medicines.store');
+            Route::put('/medicines/{id}', [HealthPharmacyController::class, 'updateMedicine'])->name('health.pharmacy.medicines.update');
+            // Switch off, never delete: batches and old bills point at this row.
+            Route::post('/medicines/{id}/toggle', [HealthPharmacyController::class, 'toggleMedicine'])->name('health.pharmacy.medicines.toggle');
+
+            Route::get('/settings', [HealthPharmacyController::class, 'settingsPage'])->name('health.pharmacy.settings');
+            Route::post('/settings', [HealthPharmacyController::class, 'updateSettings'])->name('health.pharmacy.settings.update');
+        });
+
+        // ── Purchasing & suppliers ──
+        Route::get('/purchases', [HealthPharmacyPurchaseController::class, 'index'])->name('health.pharmacy.purchases');
+        Route::middleware('health.can:pharmacy.manage')->group(function () {
+            Route::post('/purchases', [HealthPharmacyPurchaseController::class, 'store'])->name('health.pharmacy.purchases.store');
+            Route::post('/suppliers', [HealthPharmacyPurchaseController::class, 'storeSupplier'])->name('health.pharmacy.suppliers.store');
+            Route::post('/supplier-payments', [HealthPharmacyPurchaseController::class, 'storePayment'])->name('health.pharmacy.supplier-payments.store');
+        });
+
+        // ── Batch stock control ──
+        Route::get('/stock', [HealthPharmacyStockController::class, 'index'])->name('health.pharmacy.stock');
+        Route::get('/stock/movements', [HealthPharmacyStockController::class, 'movements'])->name('health.pharmacy.movements');
+        Route::middleware('health.can:pharmacy.manage')->group(function () {
+            Route::post('/stock/opening', [HealthPharmacyStockController::class, 'openingStock'])->name('health.pharmacy.stock.opening');
+            Route::post('/stock/{id}/adjust', [HealthPharmacyStockController::class, 'adjust'])->name('health.pharmacy.stock.adjust');
+            Route::post('/stock/{id}/write-off', [HealthPharmacyStockController::class, 'writeOff'])->name('health.pharmacy.stock.write-off');
+            Route::post('/stock/{id}/quarantine', [HealthPharmacyStockController::class, 'quarantine'])->name('health.pharmacy.stock.quarantine');
+            Route::post('/stock/{id}/release', [HealthPharmacyStockController::class, 'release'])->name('health.pharmacy.stock.release');
+            Route::post('/stock/{id}/transfer', [HealthPharmacyStockController::class, 'transfer'])->name('health.pharmacy.stock.transfer');
+        });
+
+        // ── Prescriptions & dispensing ──
+        Route::get('/prescriptions', [HealthPharmacyPrescriptionController::class, 'index'])->name('health.pharmacy.prescriptions');
+        Route::get('/prescriptions/{id}', [HealthPharmacyPrescriptionController::class, 'show'])->name('health.pharmacy.prescriptions.show');
+        Route::middleware('health.can:pharmacy.dispense')->group(function () {
+            Route::post('/prescriptions', [HealthPharmacyPrescriptionController::class, 'store'])->name('health.pharmacy.prescriptions.store');
+            Route::post('/prescriptions/{id}/dispense', [HealthPharmacyPrescriptionController::class, 'dispense'])->name('health.pharmacy.prescriptions.dispense');
+            Route::post('/prescriptions/{id}/cancel', [HealthPharmacyPrescriptionController::class, 'cancel'])->name('health.pharmacy.prescriptions.cancel');
+            Route::post('/prescriptions/{id}/reopen', [HealthPharmacyPrescriptionController::class, 'reopen'])->name('health.pharmacy.prescriptions.reopen');
+        });
+
+        // ── Counter, bills & returns ──
+        Route::get('/sales', [HealthPharmacySaleController::class, 'index'])->name('health.pharmacy.sales');
+        Route::get('/sales/{id}', [HealthPharmacySaleController::class, 'show'])->name('health.pharmacy.sales.show');
+        Route::get('/sales/{id}/receipt', [HealthPharmacySaleController::class, 'receipt'])->name('health.pharmacy.sales.receipt');
+        Route::middleware('health.can:pharmacy.dispense')->group(function () {
+            Route::get('/counter', [HealthPharmacySaleController::class, 'counter'])->name('health.pharmacy.counter');
+            Route::post('/counter', [HealthPharmacySaleController::class, 'store'])->name('health.pharmacy.counter.store');
+            Route::get('/counter/batches', [HealthPharmacySaleController::class, 'batches'])->name('health.pharmacy.counter.batches');
+            Route::post('/sales/{id}/return', [HealthPharmacySaleController::class, 'refund'])->name('health.pharmacy.sales.return');
+        });
+
+        // ── Reports ──
+        Route::get('/reports', [HealthPharmacyReportController::class, 'index'])->name('health.pharmacy.reports');
     });
 
     Route::middleware('health.can:staff.manage')->group(function () {

@@ -243,11 +243,18 @@
         <main class="flex-1 min-w-0">
             {{-- Flash + validation are rendered centrally, exactly once. A page
                  that renders its own would double every message. --}}
-            @if(session('success') || session('error') || $errors->any())
+            @if(session('success') || session('error') || session('warning') || $errors->any())
                 <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-4 space-y-2">
                     @if(session('success'))
                         <div class="rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
                             {{ session('success') }}
+                        </div>
+                    @endif
+                    {{-- Warning: the action DID happen, but the person needs to
+                         know something about it (short-dated stock, for one). --}}
+                    @if(session('warning'))
+                        <div class="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                            {{ session('warning') }}
                         </div>
                     @endif
                     @if(session('error'))

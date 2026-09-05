@@ -98,20 +98,33 @@ return new class extends Migration
                     continue;
                 }
 
-                // Never take a module away: a master switch already ON is a
-                // shop that is using it today, map or no map.
-                if ($hasInventory && !empty($row->inventory_enabled)) {
-                    $flags['inventory'] = true;
+                // A deploy fills in what is MISSING. It must never switch a
+                // MASTER module on behind a working shop's back: inventory
+                // changes how every bill is made (stock deduction, out-of-stock
+                // refusals) and the kitchen adds KOT printing and table screens.
+                // A shop that has run for months without them did not ask for
+                // them this morning — one click in Customize still turns them
+                // on. So the master-bearing flags are pinned to the shop's own
+                // master switches, in BOTH directions:
+                //   off today -> stays off (no surprise inventory or kitchen)
+                //   on today  -> stays on  (a live module is never taken away)
+                if ($hasInventory) {
+                    $flags['inventory'] = (bool) $row->inventory_enabled;
                 }
-                if ($hasRestaurant && !empty($row->restaurant_mode)) {
-                    $flags['kitchen'] = true;
+                if ($hasRestaurant) {
+                    if (empty($row->restaurant_mode)) {
+                        foreach (PosFeatureService::RESTAURANT_FLAGS as $restaurantFlag) {
+                            $flags[$restaurantFlag] = false;
+                        }
+                    } else {
+                        $flags['kitchen'] = true;
+                    }
                 }
 
-                // The map is stored EXACTLY as signup stores it (no extra
-                // canonicalization, or a filled-in shop would end up with a
-                // different map than one that signed up on the same type), and
-                // the master columns are derived from that same map through the
-                // shared, hasColumn-guarded derivation.
+                // The master columns are re-derived from that same map through
+                // the shared, hasColumn-guarded derivation — with the flags
+                // pinned above, that lands on the values the shop already has,
+                // so the two can never disagree (the dual-switch trap).
                 $update = ['feature_flags' => json_encode($flags)]
                     + PosFeatureService::masterSwitches($flags);
 

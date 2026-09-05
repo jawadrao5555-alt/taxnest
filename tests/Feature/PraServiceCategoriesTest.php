@@ -1258,19 +1258,55 @@ class PraServiceCategoriesTest extends TestCase
         $this->runTheFillIn();
 
         $restaurant = Company::find($byCategory);
-        $this->assertSame(
-            PosFeatureService::registrationAttributes('restaurant')['feature_flags'],
-            $restaurant->feature_flags,
-            'A filled-in shop must end up exactly where a new shop of that type starts.'
-        );
-        $this->assertTrue((bool) $restaurant->restaurant_mode, 'Master switches ride along.');
-        $this->assertTrue((bool) $restaurant->inventory_enabled);
+        $preset = PosFeatureService::registrationAttributes('restaurant')['feature_flags'];
+        foreach ($preset as $flag => $on) {
+            if ($flag === 'inventory' || in_array($flag, PosFeatureService::RESTAURANT_FLAGS, true)) {
+                continue; // master-bearing: pinned to the shop's own switches
+            }
+            $this->assertSame($on, $restaurant->feature_flags[$flag] ?? null,
+                "The fill-in must hand the shop its type's '$flag'.");
+        }
 
         $salon = Company::find($byPosType);
         $this->assertTrue((bool) ($salon->feature_flags['service_jobs'] ?? false),
             'A shop with only its registration pos_type must be filled in from that.');
         $this->assertFalse((bool) $salon->restaurant_mode,
             'A salon is not a restaurant.');
+    }
+
+    /**
+     * The fill-in never switches a MASTER module on behind a working shop.
+     *
+     * Inventory changes how every bill is made (stock deduction, out-of-stock
+     * refusals) and the kitchen adds KOT printing and table screens. A shop that
+     * has traded for months without them did not ask for them this morning — a
+     * live deploy did exactly that once, and the settings-regression guard is
+     * what caught it.
+     */
+    public function test_the_fill_in_never_switches_a_master_module_on(): void
+    {
+        $id = $this->seedCompany([
+            'business_category' => 'restaurant', 'pos_type' => 'restaurant',
+            'feature_flags'     => null,
+            'inventory_enabled' => false,
+            'restaurant_mode'   => false,
+        ]);
+
+        $this->runTheFillIn();
+
+        $company = Company::find($id);
+        $this->assertFalse((bool) $company->inventory_enabled,
+            'A trading shop must not find stock tracking switched on by a deploy.');
+        $this->assertFalse((bool) $company->restaurant_mode,
+            'Nor a kitchen it never asked for.');
+        $this->assertFalse((bool) ($company->feature_flags['inventory'] ?? false),
+            'The map must agree with the column it was pinned to.');
+        foreach (PosFeatureService::RESTAURANT_FLAGS as $flag) {
+            $this->assertFalse((bool) ($company->feature_flags[$flag] ?? false),
+                "'$flag' rides restaurant mode and must stay off with it.");
+        }
+        $this->assertTrue((bool) ($company->feature_flags['customer_profile'] ?? false),
+            'Everything the type implies that is NOT a master switch is still filled in.');
     }
 
     /** A module the shop already uses is never taken away by the fill-in. */

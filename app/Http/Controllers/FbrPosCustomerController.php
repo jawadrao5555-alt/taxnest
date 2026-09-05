@@ -434,7 +434,11 @@ class FbrPosCustomerController extends Controller
         $avgOrder = $totalOrders > 0 ? $totalSpent / $totalOrders : 0;
         $lastOrder = $transactions->first();
 
-        return view('fbr-pos.customer-history', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders', 'avgOrder', 'lastOrder'));
+        // 💊 Pharmacy Mode (Task 1558, step 8): the Rx column only exists for a
+        // pharmacy — a general store's history table is unchanged.
+        $pharmacyMode = \App\Services\PosFeatureService::pharmacyLive($company);
+
+        return view('fbr-pos.customer-history', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders', 'avgOrder', 'lastOrder', 'pharmacyMode'));
     }
 
     /**

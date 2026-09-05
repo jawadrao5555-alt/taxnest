@@ -1185,6 +1185,16 @@ class FbrPosPhase2Controller extends Controller
                     'is_tax_exempt' => $orig->is_tax_exempt,
                 ];
 
+                // 💊 Pharmacy Mode (Task 1558): the return record carries the same
+                // batch identity the sale did, so the credit note, the printed
+                // slip and any later distributor claim all name the same strip.
+                foreach (['batch_id', 'batch_number', 'batch_expiry', 'loose_units'] as $bcol) {
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', $bcol)
+                        && !empty($orig->{$bcol})) {
+                        $returnItems[count($returnItems) - 1][$bcol] = $orig->{$bcol};
+                    }
+                }
+
                 // Update parent returned_quantity
                 $orig->update(['returned_quantity' => (float) $orig->returned_quantity + $qty]);
             }
@@ -1240,9 +1250,16 @@ class FbrPosPhase2Controller extends Controller
                 'created_by' => $this->user()->id,
             ]);
 
+            // Keep the created rows by the sale line they came off: the pharmacy
+            // batch restore below has to write back onto THIS return's own row
+            // which batches it actually gave stock back to.
+            $createdReturnRows = [];
             foreach ($returnItems as $it) {
                 $it['transaction_id'] = $return->id;
-                FbrPosTransactionItem::create($it);
+                $createdRow = FbrPosTransactionItem::create($it);
+                if (!empty($it['parent_item_id'])) {
+                    $createdReturnRows[(int) $it['parent_item_id']] = $createdRow;
+                }
             }
 
             // ── KHATA REFUND (Aug 2026 — Retail Core) ────────────────────────────
@@ -1282,6 +1299,66 @@ class FbrPosPhase2Controller extends Controller
                     $restoreBranchId,
                     $this->user()->id
                 );
+
+                // ── 💊 BATCH RESTORE (Task 1558) ─────────────────────────────
+                // The aggregate restore above puts the count back on the shelf;
+                // this puts it back on the RIGHT shelf. A returned medicine goes
+                // to the exact batch it was sold from — never onto a blind total
+                // and never onto whichever batch happens to be nearest, because
+                // that would silently launder an expiring strip into a fresh one
+                // and hand it to the next customer.
+                //
+                // A partial return unwinds the sale's own allocation in REVERSE
+                // (the last batch the FEFO plan touched is the first one given
+                // back), which is the only order that keeps every intermediate
+                // state consistent with what was actually handed over.
+                //
+                // A line can come back in several partial returns, so what is
+                // unwound is the OUTSTANDING split — the sale's allocation minus
+                // everything earlier returns already put back. Restoring against
+                // the raw sale split every time would give the same batch its
+                // quantity back once per return and mint dated stock the shop
+                // never had. Each return therefore records the split it restored
+                // on its own row, which is what makes the subtraction possible.
+                if (\App\Services\PharmacyBatchService::trackingEnabled($company)) {
+                    $hasAllocCol = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'batch_allocation');
+                    foreach ($returnItems as $ri) {
+                        $parentItemId = (int) ($ri['parent_item_id'] ?? 0);
+                        $orig = $original->items->firstWhere('id', $parentItemId);
+                        if (!$orig || empty($orig->batch_allocation)) {
+                            continue;
+                        }
+                        try {
+                            $alreadyReturned = [];
+                            if ($hasAllocCol && $parentItemId > 0) {
+                                $alreadyReturned = FbrPosTransactionItem::where('parent_item_id', $parentItemId)
+                                    ->whereNotNull('batch_allocation')
+                                    ->where('transaction_id', '!=', $return->id)
+                                    ->pluck('batch_allocation')
+                                    ->map(fn ($a) => (array) $a)
+                                    ->all();
+                            }
+                            $outstanding = \App\Services\PharmacyBatchService::remainingAllocation(
+                                (array) $orig->batch_allocation,
+                                $alreadyReturned
+                            );
+                            $restored = \App\Services\PharmacyBatchService::restoreAllocation(
+                                $outstanding,
+                                (float) $ri['quantity']
+                            );
+                            if ($hasAllocCol && $restored && isset($createdReturnRows[$parentItemId])) {
+                                $createdReturnRows[$parentItemId]->update(['batch_allocation' => $restored]);
+                            }
+                        } catch (\Throwable $batchEx) {
+                            // The money side of a refund is already settled; a
+                            // batch bookkeeping problem must not strand it.
+                            \Illuminate\Support\Facades\Log::warning('FBR pharmacy batch restore failed', [
+                                'item' => $ri['parent_item_id'] ?? null,
+                                'err' => $batchEx->getMessage(),
+                            ]);
+                        }
+                    }
+                }
             }
 
             // ── FBR CREDIT NOTE (Aug 2026 — Retail Core) ─────────────────────────

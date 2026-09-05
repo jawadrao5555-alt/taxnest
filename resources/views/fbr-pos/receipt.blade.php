@@ -412,7 +412,11 @@
                 {{-- (Khata upgrade Aug 2026) Blade won't compile two adjacent
                      directives (@endif@if with no boundary) — the second stayed a
                      literal "@if", crashing the view. Compute the tags first. --}}
-                <td class="col-item">{{ $item->item_name }}@if($item->is_third_schedule)<span class="tsch-tag">3rd Sch</span>@endif @if(!empty($item->is_peti_rate))<span class="tsch-tag">{{ __('pos.peti_rate_tag') }}</span>@endif</td>
+                {{-- 💊 Pharmacy Mode (Task 1558): batch + expiry on the printed
+                     line. Only when the shop is really running batch tracking AND
+                     the line carries one — a general store's receipt is unchanged
+                     and a pharmacy's untracked legacy line stays clean. --}}
+                <td class="col-item">{{ $item->item_name }}@if($item->is_third_schedule)<span class="tsch-tag">3rd Sch</span>@endif @if(!empty($item->is_peti_rate))<span class="tsch-tag">{{ __('pos.peti_rate_tag') }}</span>@endif @if(($pharmacyPrintBatch ?? false) && !empty($item->batch_number))<span style="display:block;font-size:0.82em;">{{ __('pos.ph_batch_chip') }} {{ $item->batch_number }}@if(!empty($item->batch_expiry)) · {{ __('pos.ph_exp_short') }} {{ \Carbon\Carbon::parse($item->batch_expiry)->format('m/y') }}@endif</span>@endif @if(($pharmacyPrintBatch ?? false) && (int) ($item->loose_units ?? 0) > 0)<span style="display:block;font-size:0.82em;">{{ $item->loose_units }} {{ __('pos.ph_loose_units_sfx') }}</span>@endif</td>
                 <td class="col-uom">{{ $item->uom ?? 'U' }}</td>
                 <td class="col-qty">{{ $fmtQty($item->quantity) }}</td>
                 <td class="col-price">{{ number_format($item->unit_price, 0) }}</td>

@@ -95,6 +95,9 @@ class Company extends Model
         'pos_integration_mode',
         'kds_enabled',
         'restaurant_mode',
+        // Pharmacy Mode (Task 1558) — the shop's own master switch, kept in
+        // step with feature_flags['pharmacy'] by PosFeatureService::masterSwitches().
+        'pharmacy_mode',
         'pos_type',
         'business_category',
         'feature_flags',
@@ -226,6 +229,7 @@ class Company extends Model
         'onboarding_completed' => 'boolean',
         'standard_tax_rate' => 'float',
         'inventory_enabled' => 'boolean',
+        'pharmacy_mode' => 'boolean',
         'pos_restock_on_void' => 'boolean',
         'pos_auto_purge_local_on_dayclose' => 'boolean',
         'pos_auto_dayclose_24h' => 'boolean',

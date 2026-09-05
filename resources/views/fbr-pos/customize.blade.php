@@ -25,6 +25,18 @@
         $fbrDelivLockedOn= !$fbrRidersPlan && $fbrDeliveryOn;
         $fbrNoteLockedOn = !$fbrKotPlan    && $fbrStoreNoteOn;
 
+        // 💊 Pharmacy Mode (Task 1558). Read RAW: the pharmacy flags are masked
+        // to false by forCompany() the moment the package gate is missing, so a
+        // resolved read would show the owner an OFF switch for something that is
+        // actually ON in the DB. The same downgrade rule as above applies — a
+        // package that no longer covers pharmacy leaves a working off-only
+        // switch, never a dead padlock over live batch tracking.
+        $fbrPharmacyOn    = \App\Services\PosFeatureService::rawFlag($company, 'pharmacy');
+        $fbrBatchExpOn    = \App\Services\PosFeatureService::rawFlag($company, 'batch_expiry');
+        $fbrLooseSaleOn   = \App\Services\PosFeatureService::rawFlag($company, 'loose_sale');
+        $fbrPharmacyPlan  = \App\Services\PosFeatureService::planAllows($company, 'pharmacy_enabled');
+        $fbrPharmLockedOn = !$fbrPharmacyPlan && $fbrPharmacyOn;
+
         // Card sections — every FBR POS setting reachable from this one hub.
         $sections = [
             [
@@ -109,6 +121,7 @@
             'storeslip'  => __('pos.fbr_feat_store_slip_title') . ' ' . __('pos.fbr_feat_store_slip_sub') . ' store slip kitchen parchi chapai print rasoi',
             'delivery'   => __('pos.fbr_feat_delivery_title') . ' ' . __('pos.fbr_feat_delivery_sub') . ' delivery rider riders home ghar bhejo',
             'storenote'  => __('pos.fbr_feat_store_notes_title') . ' ' . __('pos.fbr_feat_store_notes_sub') . ' note notes hidayat item special store slip',
+            'pharmacy'   => __('pos.fbr_feat_pharmacy_title') . ' ' . __('pos.fbr_feat_pharmacy_sub') . ' pharmacy medical store medicine dawa batch expiry salt generic loose tablet strip',
             'quicktype'  => __('pos.quick_type_mode') . ' ' . __('pos.quick_type_mode_sub') . ' quick type fast tez keyboard input',
             'cashrecv'   => __('pos.cash_received_toggle') . ' ' . __('pos.cash_received_toggle_sub') . ' cash received change wapsi paise pay',
             'autoclose'  => __('pos.receipt_popup_autoclose') . ' ' . __('pos.receipt_popup_autoclose_sub') . ' receipt popup autoclose rasid band second timer',
@@ -122,7 +135,7 @@
             'daycutoff'  => __('pos.day_cutoff_title') . ' ' . __('pos.fbr_card_dayclose_settings_desc') . ' day close cutoff auto din band time',
         ];
         $kwAppearance = trim(__('pos.appearance_experience') . ' ' . $kw['theme'] . ' ' . $kw['guided'] . ' ' . $kw['whatsapp'] . ' ' . $kw['dashboard'] . ' ' . $kw['language']);
-        $kwFeatures   = trim(__('pos.fbr_features_section') . ' ' . $kw['storeslip'] . ' ' . $kw['delivery'] . ' ' . $kw['storenote']);
+        $kwFeatures   = trim(__('pos.fbr_features_section') . ' ' . $kw['storeslip'] . ' ' . $kw['delivery'] . ' ' . $kw['storenote'] . ' ' . $kw['pharmacy']);
         $kwSale       = trim(__('pos.sec_sale_billing') . ' ' . $kw['quicktype'] . ' ' . $kw['cashrecv'] . ' ' . $kw['autoclose'] . ' ' . $kw['autoslip'] . ' ' . $kw['slipreprint'] . ' ' . $kw['inventory'] . ' ' . $kw['callerid'] . ' ' . $kw['restock']);
         $kwDayclose   = trim(__('pos.sec_local_bills_dayclose') . ' ' . $kw['pending'] . ' ' . $kw['cashierdc'] . ' ' . $kw['daycutoff']);
         // Card-hub shortcuts join the searchable blob too (label + desc + badge),
@@ -170,6 +183,11 @@
             slipOffOnly: {{ $fbrSlipLockedOn ? 'true' : 'false' }},
             delivOffOnly: {{ $fbrDelivLockedOn ? 'true' : 'false' }},
             noteOffOnly: {{ $fbrNoteLockedOn ? 'true' : 'false' }},
+            {{-- 💊 Pharmacy Mode (Task 1558) — master + its two children --}}
+            pharmacyOn: {{ $fbrPharmacyOn ? 'true' : 'false' }}, savingPharmacy: false,
+            batchExpOn: {{ $fbrBatchExpOn ? 'true' : 'false' }}, savingBatchExp: false,
+            looseSaleOn: {{ $fbrLooseSaleOn ? 'true' : 'false' }}, savingLooseSale: false,
+            pharmOffOnly: {{ $fbrPharmLockedOn ? 'true' : 'false' }},
             featSave(feature, prop, savingProp) {
                 if (this[savingProp]) return;
                 const want = !this[prop];
@@ -186,6 +204,34 @@
                         if (feature === 'store_slip' && !this[prop]) { this.autoKotOn = false; this.storeNoteOn = false; }
                     })
                     .catch(() => { this[prop] = !want; alert({{ Js::from(__('pos.setting_save_failed')) }}); })
+                    .finally(() => { this[savingProp] = false; });
+            },
+            {{-- 💊 Pharmacy Mode (Task 1558). Same honesty contract as featSave —
+                 r.ok AND the JSON contract, roll back on failure — but the reply
+                 carries the WHOLE resolved pharmacy family, because switching
+                 the master on forces batch tracking and inventory on and
+                 switching it off drops both children. Painting only the clicked
+                 switch would leave the two child rows lying until reload. --}}
+            pharmSave(feature, prop, savingProp) {
+                if (this[savingProp]) return;
+                const want = !this[prop];
+                const prev = this[prop];
+                this[prop] = want;
+                this[savingProp] = true;
+                fetch('/fbr-pos/settings/feature-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({feature:feature, enabled:want})})
+                    .then(r => r.json().catch(() => null))
+                    .then(d => {
+                        if (!d || d.success !== true) { this[prop] = prev; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); return; }
+                        if (d.flags) {
+                            this.pharmacyOn = !!d.flags.pharmacy;
+                            this.batchExpOn = !!d.flags.batch_expiry;
+                            this.looseSaleOn = !!d.flags.loose_sale;
+                            this.invOn = !!d.flags.inventory;
+                        } else {
+                            this[prop] = !!d.enabled;
+                        }
+                    })
+                    .catch(() => { this[prop] = prev; alert({{ Js::from(__('pos.setting_save_failed')) }}); })
                     .finally(() => { this[savingProp] = false; });
             },
             setRc(s) { if (this.rcSecs === s || this.savingRc) return; const prev = this.rcSecs; this.rcSecs = s; this.savingRc = true; fetch('/fbr-pos/settings/receipt-autoclose', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({seconds:s})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { this.rcSecs = prev; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ this.rcSecs = prev; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ this.savingRc = false; }); },
@@ -693,6 +739,79 @@
                         <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.fbr_feat_needs_store_slip') }}</p>
                     </div>
                     @endunless
+                </div>
+
+                {{-- 💊 Pharmacy Mode (Task 1558) — feature_flags.pharmacy plus its
+                     two children. The master carries the whole module: switch it
+                     off and every pharmacy screen, nav entry and sale-screen
+                     batch behaviour disappears with it. Children only render
+                     while the master is on, because that is the only state in
+                     which they mean anything. Spans both columns — this is a
+                     whole business mode, not one more toggle. --}}
+                <div class="sm:col-span-2 rounded-2xl border-2 border-emerald-200 dark:border-emerald-900/50 bg-white dark:bg-gray-900 p-5 shadow-sm" x-show="hit(kw.pharmacy)">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center shrink-0 text-lg">💊</div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">{{ __('pos.fbr_feat_pharmacy_title') }} <x-new-badge feature="fbr_pharmacy_mode" /></p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_feat_pharmacy_sub') }}</p>
+                        </div>
+                        @if($fbrPharmacyPlan || $fbrPharmLockedOn)
+                        <button type="button" :disabled="savingPharmacy || (pharmOffOnly && !pharmacyOn)" @click="pharmSave('pharmacy', 'pharmacyOn', 'savingPharmacy')"
+                            class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="pharmacyOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
+                            <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="pharmacyOn && 'translate-x-6'"></span>
+                        </button>
+                        @else
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">🔒</span>
+                        @endif
+                    </div>
+
+                    @unless($fbrPharmacyPlan)
+                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                        <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400">{{ __('pos.plan_locked_feature') }}</p>
+                        @if($fbrPharmLockedOn)<p x-show="pharmacyOn" class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.plan_locked_off_only') }}</p>@endif
+                        <a href="{{ route('fbrpos.billing') }}" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                            <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                            {{ __('pos.upgrade_plan_btn') }}
+                        </a>
+                    </div>
+                    @endunless
+
+                    <div x-show="pharmacyOn" x-cloak class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+                        {{-- Batch & expiry — the reason the mode exists. --}}
+                        <div class="flex items-center gap-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[13px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">{{ __('pos.ph_feat_batch_title') }} <x-new-badge feature="fbr_pharmacy_batch_expiry" /></p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.ph_feat_batch_sub') }}</p>
+                            </div>
+                            <button type="button" :disabled="savingBatchExp" @click="pharmSave('batch_expiry', 'batchExpOn', 'savingBatchExp')"
+                                class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="batchExpOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
+                                <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="batchExpOn && 'translate-x-6'"></span>
+                            </button>
+                        </div>
+                        {{-- Loose / broken-strip sale --}}
+                        <div class="flex items-center gap-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[13px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">{{ __('pos.ph_feat_loose_title') }} <x-new-badge feature="fbr_pharmacy_loose_sale" /></p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.ph_feat_loose_sub') }}</p>
+                            </div>
+                            <button type="button" :disabled="savingLooseSale" @click="pharmSave('loose_sale', 'looseSaleOn', 'savingLooseSale')"
+                                class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="looseSaleOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
+                                <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="looseSaleOn && 'translate-x-6'"></span>
+                            </button>
+                        </div>
+                        {{-- Route links are server-gated on the SAVED switch, not
+                             just x-show: a shop with pharmacy off must not carry
+                             links to screens its own middleware would refuse.
+                             (The card itself stays — it holds the switch.) --}}
+                        @if($fbrPharmacyOn)
+                        <div class="flex flex-wrap gap-2 pt-1">
+                            <a href="{{ route('fbrpos.pharmacy.batches') }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100">{{ __('pos.ph_nav_batches') }} →</a>
+                            <a href="{{ route('fbrpos.pharmacy.claims') }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100">{{ __('pos.ph_nav_claims') }} →</a>
+                            <a href="{{ route('fbrpos.pharmacy.reports') }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100">{{ __('pos.ph_nav_reports') }} →</a>
+                        </div>
+                        @endif
+                        <p class="text-[11px] text-gray-400">{{ __('pos.ph_nav_after_save_hint') }}</p>
+                    </div>
                 </div>
             </div>
         </section>

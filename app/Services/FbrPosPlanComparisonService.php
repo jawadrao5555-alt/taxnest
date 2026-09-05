@@ -115,6 +115,11 @@ class FbrPosPlanComparisonService
             'label'  => 'Business analytics',
             'hint'   => 'Trends, best sellers and profit views on top of the plain reports.',
         ],
+        'pharmacy' => [
+            'column' => 'pharmacy_enabled',
+            'label'  => 'Pharmacy mode (batch & expiry)',
+            'hint'   => 'Medicine catalogue with salt name and schedule, batch-wise stock with expiry, and distributor expiry claims.',
+        ],
     ];
 
     /**
@@ -175,6 +180,9 @@ class FbrPosPlanComparisonService
         'riders_enabled',
         'hazri_enabled',
         'whatsapp_enabled',
+        // Pharmacy Mode (Task 1558) — a real /fbr-pos/pharmacy/* surface reads
+        // this, so it must carry a customer-facing row of its own.
+        'pharmacy_enabled',
     ];
 
     /** Business is the flagged column on both the cards and the table. */

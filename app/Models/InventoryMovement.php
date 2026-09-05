@@ -24,6 +24,13 @@ class InventoryMovement extends Model
         // would look instantly-received again.
         'transfer_status',
         'received_quantity',
+        // Pharmacy Mode (Task 1558): every movement of a batched medicine names
+        // its batch, so the ledger can still answer "which batch?" long after
+        // the batch row itself was emptied or written off. NULL on every
+        // non-pharmacy movement, which is exactly how it was before.
+        'batch_id',
+        'batch_number',
+        'batch_expiry',
         'notes',
         'created_by',
     ];
@@ -34,6 +41,7 @@ class InventoryMovement extends Model
         'total_price' => 'float',
         'balance_after' => 'float',
         'received_quantity' => 'float',
+        'batch_expiry' => 'date',
     ];
 
     const TYPE_PURCHASE = 'purchase';

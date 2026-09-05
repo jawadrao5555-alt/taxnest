@@ -6,6 +6,14 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.sales_reports') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.month_overview', ['month' => now()->format('F Y')]) }}</p>
         </div>
+        <div class="flex items-center gap-2">
+        {{-- 💊 Pharmacy reports (Task 1558) — only reachable when the mode is
+             genuinely on, so the button never leads to a redirect. --}}
+        @if(\App\Services\PosFeatureService::pharmacyLive($company) && !in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
+        <a href="{{ route('fbrpos.pharmacy.reports') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
+            💊 {{ __('pos.ph_reports_title') }}
+        </a>
+        @endif
         @if(auth('fbrpos')->user()?->isPosAdmin() && \App\Services\PosFeatureService::planAllows($company, 'hazri_enabled'))
         {{-- Staff Hazri — FBR mirror (Task #560) — ADMIN/MANAGER-ONLY --}}
         <a href="{{ route('fbrpos.reports.hazri') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition">
@@ -13,6 +21,7 @@
             {{ __('pos.staff_hazri') }}
         </a>
         @endif
+        </div>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

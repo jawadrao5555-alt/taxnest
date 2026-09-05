@@ -2202,6 +2202,20 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
     Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
 
+    // 💊 Pharmacy Mode (Task 1558) — batch/expiry stock, distributor expiry
+    // claims and pharmacy reports. Every action re-checks pharmacyLive() in
+    // the controller, so a bookmarked URL cannot walk around the nav hiding.
+    Route::get('/pharmacy/batches', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batches'])->name('fbrpos.pharmacy.batches');
+    Route::post('/pharmacy/batches', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeBatch'])->name('fbrpos.pharmacy.batch.store')->middleware('plan.limit:inventory');
+    Route::post('/pharmacy/batches/{id}/action', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batchAction'])->name('fbrpos.pharmacy.batch.action')->middleware('plan.limit:inventory');
+    Route::get('/pharmacy/batch-options', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batchOptions'])->name('fbrpos.pharmacy.batch.options');
+    Route::get('/pharmacy/claims', [\App\Http\Controllers\FbrPosPharmacyController::class, 'claims'])->name('fbrpos.pharmacy.claims');
+    Route::post('/pharmacy/claims', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeClaim'])->name('fbrpos.pharmacy.claim.store')->middleware('plan.limit:inventory');
+    Route::get('/pharmacy/claims/{id}', [\App\Http\Controllers\FbrPosPharmacyController::class, 'showClaim'])->name('fbrpos.pharmacy.claim');
+    Route::get('/pharmacy/claims/{id}/print', [\App\Http\Controllers\FbrPosPharmacyController::class, 'printClaim'])->name('fbrpos.pharmacy.claim.print');
+    Route::post('/pharmacy/claims/{id}/status', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateClaimStatus'])->name('fbrpos.pharmacy.claim.status')->middleware('plan.limit:inventory');
+    Route::get('/pharmacy/reports', [\App\Http\Controllers\FbrPosPharmacyController::class, 'reports'])->name('fbrpos.pharmacy.reports');
+
     // 🚚 Delivery Riders (Aug 2026 — FBR port of PRA PosRiderController)
     // Board + mutations: admin + cashier. Rider CRUD: admin-only (checked in controller).
     Route::get('/deliveries', [\App\Http\Controllers\FbrPosRiderController::class, 'deliveries'])->name('fbrpos.deliveries');

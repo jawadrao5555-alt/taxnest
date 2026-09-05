@@ -104,6 +104,22 @@ class PosPlanComparisonService
     ];
 
     /**
+     * Gate columns that belong to the OTHER panel, with the reason.
+     *
+     * PLAN_GATES is one shared list because planAllows() is one shared gate,
+     * but not every module is sold on both panels. A column named here has no
+     * /pos/ surface at all, so demanding a PRA comparison row for it would
+     * force us to advertise something a PRA shop can never reach — the exact
+     * dishonesty the audit exists to prevent. The other panel's comparison
+     * service still has to carry its own row (FBR's audit enforces that).
+     */
+    public const OTHER_PANEL_COLUMNS = [
+        // Pharmacy Mode (Task 1558): PRA is the SERVICES regulator and a
+        // medical store sells goods, so the whole module is FBR-panel only.
+        'pharmacy_enabled' => 'FBR POS only — see FbrPosPlanComparisonService',
+    ];
+
+    /**
      * Gate columns that can be BOUGHT as paid add-ons.
      *
      * Until 23 Aug 2026 this also meant "no package may include them", so they
@@ -648,6 +664,10 @@ class PosPlanComparisonService
         $gateColumns = array_merge(PosFeatureService::PLAN_GATES, ['restaurant_enabled'], $extraGateColumns);
         foreach ($gateColumns as $column) {
             if (in_array($column, $named, true) || isset(self::COVERED_BY[$column])) {
+                continue;
+            }
+            // Sold on the other panel only — no PRA surface reads it.
+            if (isset(self::OTHER_PANEL_COLUMNS[$column])) {
                 continue;
             }
             // Add-on-sold gates: the customer-facing name is the add-on

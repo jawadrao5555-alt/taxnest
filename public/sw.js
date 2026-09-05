@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260905-112844-91ea7c32'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260905-183000-ph1558a1'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -280,7 +280,12 @@ self.addEventListener('fetch', e => {
         '/pos/features',                    // PRA-only (Customize wizard; FBR has no twin)
         '/pos/restaurant/kitchen-settings', // PRA-only (KOT settings)
     ];
-    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/return', '/pos/restaurant/tables', '/track/', ...SETTINGS_PAGES];
+    // 💊 Pharmacy Mode (Task 1558): batch stock, expiry claims and the pharmacy
+    // reports are live inventory/money screens behind an authenticated session —
+    // a runtime-cached copy would survive logout and could show the NEXT user a
+    // previous shop's stock. Network-only, like every other authenticated
+    // stock/settings screen.
+    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/return', '/pos/restaurant/tables', '/track/', '/fbr-pos/pharmacy/', ...SETTINGS_PAGES];
     if (skipPatterns.some(p => url.pathname.includes(p))) return;
 
     // HTML pages: network-first → cache → offline page

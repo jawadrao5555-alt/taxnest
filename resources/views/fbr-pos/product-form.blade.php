@@ -230,6 +230,96 @@
                         @endforeach
                     </select>
                 </div>
+                @if($pharmacyMode ?? false)
+                {{-- 💊 Pharmacy Mode (Task 1558) — the medicine fields a medical
+                     store actually bills on. Present ONLY when pharmacy mode is
+                     live; a general store's form is byte-for-byte unchanged.
+                     Single mode only: multi-row entry shares defaults, and a
+                     medicine's salt/strength is never a shared default. --}}
+                <div class="col-span-2" x-show="mode === 'single'">
+                    <div class="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/20 p-3">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-lg">💊</span>
+                            <h3 class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">{{ __('pos.ph_medicine_details') }}</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_generic_name') }}</label>
+                                <input type="text" name="generic_name" value="{{ old('generic_name', $product->generic_name ?? '') }}" :disabled="mode === 'multi'"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm"
+                                    placeholder="{{ __('pos.ph_generic_name_ph') }}">
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.ph_generic_name_hint') }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_strength') }}</label>
+                                <input type="text" name="strength" value="{{ old('strength', $product->strength ?? '') }}" :disabled="mode === 'multi'"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm"
+                                    placeholder="{{ __('pos.ph_strength_ph') }}">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_dosage_form') }}</label>
+                                @php $curDosage = old('dosage_form', $product->dosage_form ?? ''); @endphp
+                                <select name="dosage_form" :disabled="mode === 'multi'" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm">
+                                    <option value="">—</option>
+                                    @foreach(\App\Models\Product::DOSAGE_FORMS as $df)
+                                        <option value="{{ $df }}" {{ $curDosage === $df ? 'selected' : '' }}>{{ __('pos.ph_dosage_' . $df) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_manufacturer') }}</label>
+                                <input type="text" name="manufacturer" value="{{ old('manufacturer', $product->manufacturer ?? '') }}" :disabled="mode === 'multi'"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm"
+                                    placeholder="{{ __('pos.ph_manufacturer_ph') }}">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_drug_schedule') }}</label>
+                                @php $curSched = old('drug_schedule', $product->drug_schedule ?? ''); @endphp
+                                <select name="drug_schedule" :disabled="mode === 'multi'" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm">
+                                    <option value="">—</option>
+                                    @foreach(\App\Models\Product::DRUG_SCHEDULES as $ds)
+                                        <option value="{{ $ds }}" {{ $curSched === $ds ? 'selected' : '' }}>{{ $ds }} — {{ __('pos.ph_sched_' . strtolower($ds)) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_shelf_location') }}</label>
+                                <input type="text" name="shelf_location" value="{{ old('shelf_location', $product->shelf_location ?? '') }}" :disabled="mode === 'multi'"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm font-mono"
+                                    placeholder="{{ __('pos.ph_shelf_location_ph') }}">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_strips_per_pack') }}</label>
+                                <input type="number" name="strips_per_pack" min="1" step="1" value="{{ old('strips_per_pack', $product->strips_per_pack ?? '') }}" :disabled="mode === 'multi'"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm" placeholder="10">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.ph_units_per_strip') }}</label>
+                                <input type="number" name="units_per_strip" min="1" step="1" value="{{ old('units_per_strip', $product->units_per_strip ?? '') }}" :disabled="mode === 'multi'"
+                                    class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm text-sm" placeholder="10">
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.ph_pack_composition_hint') }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex flex-col gap-2">
+                            <label class="inline-flex items-center gap-2">
+                                <input type="hidden" name="prescription_required" value="0">
+                                <input type="checkbox" name="prescription_required" value="1" :disabled="mode === 'multi'"
+                                    {{ old('prescription_required', $product->prescription_required ?? false) ? 'checked' : '' }}
+                                    class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('pos.ph_prescription_required') }}</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2">
+                                <input type="hidden" name="allow_loose_sale" value="0">
+                                <input type="checkbox" name="allow_loose_sale" value="1" :disabled="mode === 'multi'"
+                                    {{ old('allow_loose_sale', $product->allow_loose_sale ?? false) ? 'checked' : '' }}
+                                    class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ __('pos.ph_allow_loose_sale') }}</span>
+                            </label>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.ph_allow_loose_sale_hint') }}</p>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 {{-- Peti (Wholesale) Rate (Task 1414): pieces-per-peti. Single mode
                      only (multi-entry rows share defaults; peti is per-product).
                      Blank ⇒ this product stays out of the peti feature. --}}

@@ -286,6 +286,10 @@ class FbrPosStockController extends Controller
             'recentPurchasesData' => $this->serializePurchases($recentPurchases),
             'purchasesHasMore' => $purchasesHasMore,
             'stockEnabled' => (bool) $company->inventory_enabled,
+            // 💊 Pharmacy Mode (Task 1558): the receiving form only grows batch
+            // number / expiry / retail inputs for a shop that actually tracks
+            // batches. Every other FBR shop renders exactly the old form.
+            'batchTracking' => \App\Services\PharmacyBatchService::trackingEnabled($company),
         ]));
     }
 
@@ -656,6 +660,13 @@ class FbrPosStockController extends Controller
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.unit_price' => 'required|numeric|min:0',
+            // 💊 Pharmacy Mode (Task 1558): batch identity arrives WITH the
+            // goods. Always accepted (harmless for a non-pharmacy shop, which
+            // simply never renders these inputs), only acted on when batch
+            // tracking is genuinely live.
+            'items.*.batch_number' => 'nullable|string|max:60',
+            'items.*.expiry_date' => 'nullable|string|max:20',
+            'items.*.retail_price' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:300',
         ]);
 
@@ -706,17 +717,52 @@ class FbrPosStockController extends Controller
                 'created_by' => $this->user()->id,
             ]);
 
+            // 💊 Pharmacy Mode (Task 1558): does this shop record batches?
+            $batchTracking = \App\Services\PharmacyBatchService::trackingEnabled(Company::find($companyId));
+
             foreach ($request->items as $row) {
                 $qty = (float) $row['quantity'];
                 $price = (float) $row['unit_price'];
-                PurchaseOrderItem::create([
+                $itemData = [
                     'purchase_order_id' => $po->id,
                     'product_id' => (int) $row['product_id'],
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'total_price' => round($qty * $price, 2),
                     'received_quantity' => $qty,
-                ]);
+                ];
+
+                $batch = null;
+                if ($batchTracking) {
+                    // The purchase line keeps its own copy of the batch identity
+                    // so a void can find it again even if the batch row was
+                    // later emptied by sales.
+                    foreach (['batch_number' => \App\Services\PharmacyBatchService::cleanBatchNumber($row['batch_number'] ?? null),
+                              'expiry_date' => \App\Services\PharmacyBatchService::normalizeExpiry($row['expiry_date'] ?? null),
+                              'retail_price' => isset($row['retail_price']) && $row['retail_price'] !== '' ? (float) $row['retail_price'] : null] as $col => $val) {
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('purchase_order_items', $col)) {
+                            $itemData[$col] = $val;
+                        }
+                    }
+
+                    $batch = \App\Services\PharmacyBatchService::receive(
+                        $companyId,
+                        (int) $row['product_id'],
+                        $branchId,
+                        $qty,
+                        $row['batch_number'] ?? null,
+                        $row['expiry_date'] ?? null,
+                        $price,
+                        [
+                            'retail_price' => $row['retail_price'] ?? null,
+                            'supplier_id' => $supplier?->id,
+                            'purchase_order_id' => $po->id,
+                            'created_by' => $this->user()->id,
+                        ]
+                    );
+                }
+
+                PurchaseOrderItem::create($itemData);
 
                 InventoryService::addStock(
                     $companyId,
@@ -727,7 +773,12 @@ class FbrPosStockController extends Controller
                     $branchId,
                     ['type' => 'purchase_order', 'id' => $po->id, 'number' => $po->po_number],
                     null,
-                    $this->user()->id
+                    $this->user()->id,
+                    $batch ? [
+                        'batch_id' => $batch->id,
+                        'batch_number' => $batch->batch_number,
+                        'batch_expiry' => $batch->expiry_date?->toDateString(),
+                    ] : []
                 );
             }
 
@@ -837,6 +888,27 @@ class FbrPosStockController extends Controller
                     $this->user()->id,
                     $fallback !== null ? (float) $fallback : null
                 );
+
+                // 💊 Pharmacy Mode (Task 1558): the batch identity that arrived
+                // with this line has to leave with it, or the batch ledger keeps
+                // claiming stock the aggregate no longer has. Only the quantity
+                // still standing on that batch is taken back — some of it may
+                // already have been sold, and the aggregate reversal above
+                // (which deliberately allows a negative) already covered that.
+                $batchNo = \App\Services\PharmacyBatchService::cleanBatchNumber($item->batch_number ?? null);
+                if ($batchNo !== null) {
+                    $batch = \App\Models\ProductBatch::where('company_id', $companyId)
+                        ->where('product_id', $item->product_id)
+                        ->where('branch_id', $branchId)
+                        ->where('batch_number', $batchNo)
+                        ->where('purchase_order_id', $po->id)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($batch) {
+                        $batch->quantity = round(max(0, (float) $batch->quantity - $qty), 3);
+                        $batch->save();
+                    }
+                }
             }
 
             $locked->update(['status' => PurchaseOrder::STATUS_CANCELLED]);
@@ -955,6 +1027,25 @@ class FbrPosStockController extends Controller
                 if ($branchAmbiguous) {
                     $skippedStockEdit = true;
                 } else {
+                    // 💊 Pharmacy Mode (Task 1558): a correction may only move
+                    // the UNTRACKED remainder. Pushing the aggregate below what
+                    // the batch ledger already accounts for would leave batches
+                    // claiming stock that no longer exists — and would let a
+                    // typo quietly destroy expiry data. Removing dated stock has
+                    // its own honest path: quarantine or write off the batch.
+                    if (\App\Services\PharmacyBatchService::trackingEnabled(Company::find($companyId))) {
+                        $trackedQty = (float) \App\Models\ProductBatch::where('company_id', $companyId)
+                            ->where('product_id', $product->id)
+                            ->where('branch_id', $stockBranchId)
+                            ->whereIn('status', [\App\Models\ProductBatch::STATUS_ACTIVE, \App\Models\ProductBatch::STATUS_QUARANTINED])
+                            ->sum('quantity');
+                        if ($newQty < $trackedQty - 0.0005) {
+                            return redirect()->route('fbrpos.stock')->with('error', __('pos.ph_correction_below_batches', [
+                                'tracked' => rtrim(rtrim(number_format($trackedQty, 3, '.', ''), '0'), '.'),
+                            ]));
+                        }
+                    }
+
                     $reason = trim((string) ($request->qty_reason ?? ''));
                     $note = 'Stock correction (quick edit)' . ($reason !== '' ? ' — ' . $reason : '');
                     DB::transaction(function () use ($companyId, $product, $newQty, $note, $stockBranchId, &$changedAny) {
@@ -1074,12 +1165,46 @@ class FbrPosStockController extends Controller
 
                 $destination = BranchStockService::stockRow($companyId, (int) $product->id, $to);
 
+                // 💊 Pharmacy Mode (Task 1558): batch identity travels with the
+                // goods. Shortest-dated batches move first (the same FEFO rule
+                // the counter sells by — you send the shop that needs it the
+                // stock that will die first), and each one is re-created or
+                // topped up on the receiving shelf under the SAME batch number
+                // and expiry date. A shop with no batch data just moves the
+                // untracked remainder exactly as before.
+                $movedBatches = [];
+                if (\App\Services\PharmacyBatchService::trackingEnabled(Company::find($companyId))) {
+                    $plan = \App\Services\PharmacyBatchService::planAllocation(
+                        $companyId, $product, $from, $qty, null, true
+                    );
+                    foreach ($plan['allocations'] as $alloc) {
+                        \App\Services\PharmacyBatchService::applyAllocation([$alloc]);
+                        $source_batch = \App\Models\ProductBatch::find($alloc['batch_id']);
+                        \App\Services\PharmacyBatchService::receive(
+                            $companyId,
+                            (int) $product->id,
+                            $to,
+                            (float) $alloc['quantity'],
+                            $alloc['batch_number'],
+                            $alloc['expiry'],
+                            (float) $alloc['cost'],
+                            [
+                                'retail_price' => $source_batch?->retail_price,
+                                'supplier_id' => $source_batch?->supplier_id,
+                                'created_by' => Auth::guard('fbrpos')->id(),
+                            ]
+                        );
+                        $movedBatches[] = $alloc['batch_number'];
+                    }
+                }
+
                 $reference = 'TRF-' . now()->format('ymdHis') . '-' . $product->id;
                 $userId = Auth::guard('fbrpos')->id();
                 $note = trim(__('pos.transfer_movement_note', [
                     'from' => BranchStockService::branchName($companyId, $from) ?? '—',
                     'to' => BranchStockService::branchName($companyId, $to) ?? '—',
-                ]) . ($request->filled('notes') ? ' — ' . $request->notes : ''));
+                ]) . ($request->filled('notes') ? ' — ' . $request->notes : '')
+                    . (!empty($movedBatches) ? ' — Batch: ' . implode(', ', array_unique($movedBatches)) : ''));
 
                 $sourceQty = round((float) $source->quantity - $qty, 3);
                 $source->update(['quantity' => $sourceQty]);

@@ -122,7 +122,8 @@
                 </div>
 
                 <template x-for="(row, i) in purchaseRows" :key="row.product_id">
-                    <div class="flex items-center gap-2 mb-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
+                    <div class="mb-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
+                    <div class="flex items-center gap-2">
                         <input type="hidden" :name="`items[${i}][product_id]`" :value="row.product_id">
                         <span class="flex-1 text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="row.name"></span>
                         <input type="number" :name="`items[${i}][quantity]`" x-model="row.quantity" step="0.001" min="0.001" required
@@ -131,7 +132,27 @@
                                placeholder="{{ __('pos.stock_kharid_rate_ph') }}" class="w-28 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
                         <button type="button" @click="purchaseRows.splice(i, 1)" class="text-red-500 hover:text-red-700 font-bold px-1">&times;</button>
                     </div>
+                    @if($batchTracking ?? false)
+                    {{-- 💊 Pharmacy Mode (Task 1558): batch identity rides along
+                         with the goods. Leaving all three blank still receives
+                         the maal — it just lands on the untracked remainder and
+                         gets no expiry control, which is a real pharmacy case
+                         (loose items, non-medicine sundries). --}}
+                    <div class="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 shrink-0">💊</span>
+                        <input type="text" :name="`items[${i}][batch_number]`" x-model="row.batch_number" maxlength="60" autocomplete="off"
+                               placeholder="{{ __('pos.ph_col_batch') }}" class="flex-1 min-w-0 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <input type="text" :name="`items[${i}][expiry_date]`" x-model="row.expiry_date" maxlength="20" autocomplete="off"
+                               placeholder="{{ __('pos.ph_expiry_ph') }}" class="w-32 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <input type="number" :name="`items[${i}][retail_price]`" x-model="row.retail_price" step="0.01" min="0"
+                               placeholder="{{ __('pos.ph_col_retail') }}" class="w-28 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                    </div>
+                    @endif
+                    </div>
                 </template>
+                @if($batchTracking ?? false)
+                <p class="text-[11px] text-gray-400 mb-2">{{ __('pos.ph_expiry_hint') }}</p>
+                @endif
 
                 <input type="text" name="notes" maxlength="300" placeholder="{{ __('pos.stock_note_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mt-2 mb-3">
@@ -798,7 +819,7 @@ function stockPage() {
         pickFirst() { if (this.prodResults.length > 0) this.addRow(this.prodResults[0]); },
         addRow(p) {
             if (!this.purchaseRows.find(r => r.product_id === p.id)) {
-                this.purchaseRows.push({ product_id: p.id, name: p.name, uom: p.uom || 'U', quantity: '', unit_price: '' });
+                this.purchaseRows.push({ product_id: p.id, name: p.name, uom: p.uom || 'U', quantity: '', unit_price: '', batch_number: '', expiry_date: '', retail_price: '' });
             }
             this.prodSearch = '';
             this.prodResults = [];

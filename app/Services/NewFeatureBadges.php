@@ -104,6 +104,24 @@ class NewFeatureBadges
             'panel' => 'pos',
             'pages' => ['pos.receipt-settings'],
         ],
+        // 💊 5 Sep 2026 — Pharmacy / Medical Store mode FBR panel par: dawa ka
+        // catalogue (salt/strength), batch aur expiry wala stock, aur khuli
+        // (loose) patti ki farokht. Teenon switch aik hi card par baithe hain.
+        'fbr_pharmacy_mode' => [
+            'since' => '2026-09-05',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.customize'],
+        ],
+        'fbr_pharmacy_batch_expiry' => [
+            'since' => '2026-09-05',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.customize'],
+        ],
+        'fbr_pharmacy_loose_sale' => [
+            'since' => '2026-09-05',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.customize'],
+        ],
     ];
 
     /** Sirf tests ke liye — asli register ki jagah naqli entries. */

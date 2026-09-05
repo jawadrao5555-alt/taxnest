@@ -47,6 +47,10 @@ class FbrPosTransaction extends Model
         // or enqueued — separates a first print from a reprint (FBR twin of
         // pos_transactions.kot_sent_at, read by isTransactionReprint()).
         'kot_sent_at',
+        // 💊 Pharmacy Mode (Task 1558): prescription capture — who prescribed,
+        // for whom, and the photographed slip. Recorded on the bill so a
+        // schedule-medicine sale can be answered for later.
+        'doctor_name', 'patient_name', 'prescription_image',
     ];
 
     protected static function booted()

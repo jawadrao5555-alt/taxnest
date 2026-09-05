@@ -25,6 +25,13 @@ class FbrPosController extends Controller
     // Per FBR PRAL spec: weight/volume/length UoMs accept decimal qty; piece-based UoMs do not.
     const VALUE_MODE_UOMS = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
 
+    // 💊 Pharmacy Mode (Task 1558) — how many catalogue rows the sale screen is
+    // allowed to bake into its x-data. Beyond this the screen serves lookups
+    // from /fbr-pos/api/products/search and keeps only this many rows as the
+    // instant/OFFLINE fallback (a 10,000-medicine pharmacy otherwise spends
+    // seconds parsing JSON before the counter can take its first sale).
+    const PRODUCT_BAKE_CAP = 800;
+
     // ═══════════════════════════════════════════════════════════════════
     // 🎯 Universal Header API — Local (Provisional) Bills + Failed Bills
     // Powers the F10 / F11 header shortcuts available on every FBR POS page
@@ -1328,7 +1335,30 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $products = Product::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
+
+        // 💊 Pharmacy Mode (Task 1558) — Step 9, scale. A medical store runs a
+        // 10,000-medicine catalogue; baking every row into the sale screen's
+        // x-data froze the counter on boot (the PRA 11k-customer lesson). Above
+        // the cap only the grid-visible subset is baked as an instant/OFFLINE
+        // fallback and /fbr-pos/api/products/search becomes the source of truth
+        // for lookups. A normal FBR shop is nowhere near the cap, so its screen
+        // is baked exactly as before.
+        $pharmacyMode = \App\Services\PosFeatureService::pharmacyLive($company);
+        $pharmacyBatchTracking = \App\Services\PharmacyBatchService::trackingEnabled($company);
+        $pharmacyLooseSale = $pharmacyMode
+            && (bool) (\App\Services\PosFeatureService::forCompany($company)->loose_sale ?? false);
+        $pharmacyNearDays = \App\Services\PharmacyBatchService::NEAR_EXPIRY_DAYS;
+
+        $prodBase = Product::where('company_id', $companyId)->where('is_active', true);
+        $productsTruncated = (clone $prodBase)->count() > self::PRODUCT_BAKE_CAP;
+        $products = $productsTruncated
+            // Grid-visible items first (those are the ones a tap can reach at
+            // all), then the rest by name until the cap is full.
+            ? (clone $prodBase)->orderByDesc('show_on_sale')->orderBy('name')
+                ->limit(self::PRODUCT_BAKE_CAP)->get()
+                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()
+            : $prodBase->orderBy('name')->get();
+
         $fbrReportingEnabled = (bool) $company->fbr_reporting_enabled;
         // The setup warning is an owner/company-admin concern. Keep the flag
         // server-side so cashier pages do not even render the notice.
@@ -1544,7 +1574,10 @@ class FbrPosController extends Controller
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
             'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed',
             'userGridPrefs', 'activeDeals', 'isFbrCompanyAdmin', 'canManageKhata', 'canKotReprint',
-            'petiRates', 'petiRateEnabled'
+            'petiRates', 'petiRateEnabled',
+            // 💊 Pharmacy Mode (Task 1558)
+            'pharmacyMode', 'pharmacyBatchTracking', 'pharmacyLooseSale', 'pharmacyNearDays',
+            'productsTruncated'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('X-TaxNest-Sale-Document', 'fbr')
@@ -1636,6 +1669,13 @@ class FbrPosController extends Controller
             // The switch alone rides posConfigRev, but a plan change or an add-on
             // purchase moves the verdict WITHOUT touching the column.
             (bool) \App\Services\PosFeatureService::callerIdLive($company),
+            // 💊 Pharmacy Mode (Task 1558): the mode, batch tracking and loose
+            // sale are all BAKED into the screen (medicine block on every product
+            // row, batch chip, loose button, Rx chip). Turning the mode on while a
+            // cached copy is open must refresh it, and the same verdict rides a
+            // plan change/add-on that never touches the company row.
+            (bool) \App\Services\PosFeatureService::pharmacyLive($company),
+            (bool) \App\Services\PharmacyBatchService::trackingEnabled($company),
         ]));
 
         $screenPath = resource_path('views/fbr-pos/universal.blade.php');
@@ -1823,6 +1863,13 @@ class FbrPosController extends Controller
             // matches the column and the write-path trim, so an over-long note is
             // rejected up front instead of being silently shortened on save.
             'items.*.special_notes' => 'nullable|string|max:190',
+            // 💊 Pharmacy Mode (Task 1558). Both are HINTS: batch_id is the
+            // cashier's manual override of FEFO (re-resolved and re-checked
+            // server-side), loose_units is the count of single tablets handed
+            // over (the billed fraction is derived here, never trusted from the
+            // client). Outside pharmacy mode both are ignored outright.
+            'items.*.batch_id' => 'nullable|integer|min:1',
+            'items.*.loose_units' => 'nullable|integer|min:1|max:100000',
             'customer_name' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:20',
             'customer_ntn' => 'nullable|string|max:30',
@@ -1861,6 +1908,14 @@ class FbrPosController extends Controller
             // per-customer udhaar hadd. A cashier posting this flag is still
             // hard-blocked below — the flag alone never bypasses the limit.
             'khata_limit_override' => 'nullable|boolean',
+            // 💊 Prescription capture (Task 1558, step 8). Pharmacy-only: the
+            // fields are IGNORED outright below unless the mode is live, so a
+            // non-pharmacy shop cannot use the bill as a file-upload channel.
+            // The image arrives as a data URL because the bill posts as JSON
+            // (and may sit in the offline queue before it ever reaches us).
+            'doctor_name' => 'nullable|string|max:150',
+            'patient_name' => 'nullable|string|max:150',
+            'prescription_image' => 'nullable|string|max:6000000',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('FBR POS Store: validation failed', [
@@ -2097,6 +2152,27 @@ class FbrPosController extends Controller
                 // NULL-column / negative default safely).
                 $petiMargin = \App\Services\FbrPetiRateService::marginFraction($company);
 
+                // ── 💊 PHARMACY MODE (Task 1558) ─────────────────────────────────
+                // Resolved ONCE, exactly like the peti switch: a sale screen left
+                // open after the owner turns the mode off must not keep posting
+                // loose counts, MRP claims or batch ids. Batch tracking is a
+                // further switch beneath it (a pharmacy may run the catalogue
+                // without recording batches yet).
+                $pharmacyMode = \App\Services\PosFeatureService::pharmacyLive($company);
+                $batchTracking = $pharmacyMode
+                    && \App\Services\PharmacyBatchService::trackingEnabled($company);
+
+                // ── 💊 PRESCRIPTION CAPTURE (Task 1558, step 8) ──────────────────
+                // Doctor / patient / prescription image are recorded on the BILL,
+                // and are only DEMANDED for the medicines the shop itself marked
+                // as schedule / prescription-required. Everything else in the
+                // pharmacy bills exactly as before. Outside pharmacy mode the
+                // three fields are dropped on the floor.
+                $rxFields = [];
+                if ($pharmacyMode) {
+                    $rxFields = $this->resolvePrescriptionFields($request, $companyId);
+                }
+
                 foreach ($request->items as $item) {
                     // ── 🍔 DEAL LINE (Task 1273): fixed-price combo → REAL component
                     // rows, each at its own FBR tax rate, gross summing EXACTLY to
@@ -2291,8 +2367,41 @@ class FbrPosController extends Controller
                         ]);
                     }
 
+                    // ─── 💊 LOOSE SALE (Task 1558) — server-authoritative ────────────────
+                    // A medical store sells 3 tablets out of a 10-tablet strip. Stock
+                    // stays measured in the STOCKED pack (one unit of measure across
+                    // reports, receipts and the FBR payload), so a loose line is simply
+                    // a FRACTION of a pack: 3 of 10 ⇒ qty 0.3 at the full pack price.
+                    // The money, the stock movement and the margin all stay correct
+                    // without inventing a second unit anywhere.
+                    // The posted loose count is only honoured when the catalogue really
+                    // allows it and really says how many units are in a pack — otherwise
+                    // "half a strip" has no arithmetic behind it and the count would drift.
+                    // The divisor is the units in a STOCKED PACK, which for a box of
+                    // 10 strips of 10 tablets is 100, not 10. Dividing by the strip
+                    // alone would sell 3 tablets as three-tenths of a whole box and
+                    // take ten times the stock (and ten times the money) off a
+                    // multi-strip pack. Product::looseUnitsPerPack() is the one place
+                    // that arithmetic lives, so the counter and the server agree.
+                    $looseUnits = 0;
+                    $loosePerPack = $lineProduct ? $lineProduct->looseUnitsPerPack() : null;
+                    if ($pharmacyMode && $lineProduct
+                        && !empty($lineProduct->allow_loose_sale)
+                        && $loosePerPack
+                        && (int) ($item['loose_units'] ?? 0) > 0) {
+                        $looseUnits = (int) $item['loose_units'];
+                        $qty = round($looseUnits / $loosePerPack, 4);
+                        if ($qty <= 0) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [__('pos.ph_loose_invalid', ['name' => (string) $item['item_name']])],
+                            ]);
+                        }
+                    }
+
                     // 🚫 Decimal qty NOT allowed for unit-based UoMs (PCS/U/BOX/PKT/...)
-                    if (!in_array($uom, self::VALUE_MODE_UOMS, true) && abs($qty - round($qty)) > 0.0001) {
+                    // 💊 …except a pharmacy loose line, which is a deliberate fraction
+                    // of a pack (see above) and would otherwise be rejected here.
+                    if ($looseUnits === 0 && !in_array($uom, self::VALUE_MODE_UOMS, true) && abs($qty - round($qty)) > 0.0001) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
                             'items' => "Decimal quantity not allowed for unit-based UoM '{$uom}' on item '{$item['item_name']}'. Use whole numbers only (or switch UoM to KG/LTR for value-mode).",
                         ]);
@@ -2343,6 +2452,19 @@ class FbrPosController extends Controller
                     // discount it nor sneak a fake peti marker past the equality check.
                     if ($forcedRetail && $lineProduct) {
                         $price = (float) $lineProduct->default_price;
+                    }
+
+                    // ─── 💊 MRP DISCIPLINE (Task 1558) — server-authoritative ────────────
+                    // A medicine carries its maximum retail price printed on the pack.
+                    // Billing above it is not a pricing choice, it is an offence the
+                    // customer can read off the box, so the ceiling is enforced here
+                    // rather than trusted to the counter. Discount BELOW the MRP stays
+                    // completely free — that is the everyday pharmacy discount.
+                    if ($pharmacyMode && $lineProduct && (float) ($lineProduct->mrp ?? 0) > 0) {
+                        $mrpCeiling = (float) $lineProduct->mrp;
+                        if ($price > $mrpCeiling + 0.005) {
+                            $price = $mrpCeiling;
+                        }
                     }
 
                     // ─── Third Schedule: resolve from DB FIRST (authoritative) ───────────
@@ -2472,6 +2594,57 @@ class FbrPosController extends Controller
                     if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'is_peti_rate')) {
                         $itemDataRow['is_peti_rate'] = $petiLine;
                     }
+
+                    // ─── 💊 BATCH SELECTION (Task 1558) ──────────────────────────────────
+                    // The counter never picks a batch by hand unless it means to: the
+                    // shortest-dated usable batch goes first (FEFO), because that is the
+                    // one that will otherwise become a write-off. Expired stock is the
+                    // single hard refusal in this whole sale path — everything else that
+                    // cannot be matched to a batch simply falls through to the shop's
+                    // pre-batch remainder, so a pharmacy that has not finished entering
+                    // batches keeps billing exactly as it does today.
+                    if ($looseUnits > 0 && \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'loose_units')) {
+                        $itemDataRow['loose_units'] = $looseUnits;
+                    }
+                    if ($batchTracking && $lineProduct && $qty > 0) {
+                        // Manual batch override is an OWNER/MANAGER decision, and the
+                        // decision is taken here, not in the browser. A cashier's
+                        // posted batch_id is ignored outright (not refused — the sale
+                        // must still go through), so the line simply falls back to
+                        // FEFO. Without this the "owner override" would be nothing
+                        // but a hidden field anybody at the counter could set.
+                        $forceBatchId = !empty($item['batch_id']) ? (int) $item['batch_id'] : null;
+                        $saleUser = Auth::guard('fbrpos')->user();
+                        if ($forceBatchId && $saleUser && $saleUser->isPosCashier()) {
+                            $forceBatchId = null;
+                        }
+                        $plan = \App\Services\PharmacyBatchService::planAllocation(
+                            $companyId, $lineProduct, $billBranchId, $qty, $forceBatchId
+                        );
+                        if ($plan['error']) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                'items' => [$plan['error']],
+                            ]);
+                        }
+                        if (!empty($plan['allocations'])) {
+                            $primary = $plan['primary'];
+                            foreach ([
+                                'batch_id' => $primary['batch_id'] ?? null,
+                                'batch_number' => $primary['batch_number'] ?? null,
+                                'batch_expiry' => $primary['expiry'] ?? null,
+                                // The FULL split is stored, not just the primary: a
+                                // three-batch line must refund to those exact three
+                                // batches, and guessing the proportions later would
+                                // put expired stock back on a live shelf.
+                                'batch_allocation' => $plan['allocations'],
+                            ] as $col => $val) {
+                                if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', $col)) {
+                                    $itemDataRow[$col] = $val;
+                                }
+                            }
+                        }
+                    }
+
                     $itemsData[] = $itemDataRow;
                 }
 
@@ -2682,7 +2855,7 @@ class FbrPosController extends Controller
                     ? ['offline_uuid' => $offlineUuid]
                     : [];
 
-                $transaction = FbrPosTransaction::create($orderTypeFields + $omFields + $offlineUuidField + [
+                $transaction = FbrPosTransaction::create($orderTypeFields + $omFields + $offlineUuidField + $rxFields + [
                     'company_id' => $companyId,
                     // Offline sync: book under the branch the bill was RUNG UP on
                     // (company-verified above), not whoever's session synced it.
@@ -2857,8 +3030,23 @@ class FbrPosController extends Controller
                                     $billBranchId,
                                     ['type' => 'fbr_pos_transaction', 'id' => $transaction->id, 'number' => $invoiceNumber],
                                     null,
-                                    Auth::guard('fbrpos')->id()
+                                    Auth::guard('fbrpos')->id(),
+                                    // 💊 Stamp the batch onto the ledger line so a
+                                    // later "which batch did we sell them?" has an
+                                    // answer that does not depend on the bill row.
+                                    !empty($itemData['batch_id']) ? [
+                                        'batch_id' => $itemData['batch_id'],
+                                        'batch_number' => $itemData['batch_number'] ?? null,
+                                        'batch_expiry' => $itemData['batch_expiry'] ?? null,
+                                    ] : []
                                 );
+                                // 💊 Draw the sold quantity down on the batch
+                                // sub-ledger, in the SAME transaction as the
+                                // aggregate — a rolled-back sale must never leave
+                                // the batch ledger short.
+                                if (!empty($itemData['batch_allocation'])) {
+                                    \App\Services\PharmacyBatchService::applyAllocation($itemData['batch_allocation']);
+                                }
                             } catch (\Throwable $stockEx) {
                                 // Stock failure must NEVER kill a sale — log and move on.
                                 Log::warning('FBR POS stock deduct failed', ['tx' => $transaction->id, 'err' => $stockEx->getMessage()]);
@@ -3113,6 +3301,99 @@ class FbrPosController extends Controller
             }
             return back()->withInput()->with('error', __('pos.failed_create_sale', ['error' => $e->getMessage()]));
         }
+    }
+
+    /**
+     * 💊 PHARMACY MODE (Task 1558, step 8) — prescription capture.
+     *
+     * Returns the doctor / patient / image columns to write onto the bill, and
+     * refuses the sale when the cart carries a medicine the shop itself marked
+     * schedule / prescription-required and NOTHING was recorded against it.
+     * Deliberately lenient about WHICH detail was captured: some counters keep
+     * the doctor's name, some photograph the slip. Demanding all three would
+     * only teach the cashier to type a dot.
+     *
+     * Called only when pharmacy mode is live (see store()).
+     *
+     * @return array<string,mixed> hasColumn-guarded fields for the insert
+     */
+    private function resolvePrescriptionFields(Request $request, int $companyId): array
+    {
+        $doctor = trim((string) ($request->input('doctor_name') ?? ''));
+        $patient = trim((string) ($request->input('patient_name') ?? ''));
+        $rawImage = (string) ($request->input('prescription_image') ?? '');
+
+        // Which of these medicines actually needs a prescription behind it?
+        $needsRx = false;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'prescription_required')) {
+            $productIds = collect($request->input('items', []))
+                ->pluck('product_id')->filter()->map(fn ($v) => (int) $v)->unique()->all();
+            if (!empty($productIds)) {
+                $needsRx = Product::where('company_id', $companyId)
+                    ->whereIn('id', $productIds)
+                    ->where('prescription_required', true)
+                    ->exists();
+            }
+        }
+
+        if ($needsRx && $doctor === '' && $patient === '' && $rawImage === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'prescription' => [__('pos.ph_rx_required')],
+            ]);
+        }
+
+        $stored = null;
+        if ($rawImage !== '' && \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'prescription_image')) {
+            $stored = $this->storePrescriptionImage($rawImage, $companyId);
+        }
+
+        $fields = [];
+        foreach ([
+            'doctor_name' => $doctor !== '' ? substr($doctor, 0, 150) : null,
+            'patient_name' => $patient !== '' ? substr($patient, 0, 150) : null,
+            'prescription_image' => $stored,
+        ] as $column => $value) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', $column)) {
+                $fields[$column] = $value;
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * The slip arrives as a data URL (the bill posts as JSON and may have sat
+     * in the offline queue for hours, where a File object could not survive).
+     * Only real raster images are accepted — anything else is dropped rather
+     * than written to disk, so the bill endpoint can never become a general
+     * file drop. Returns the public-disk path, or null.
+     */
+    private function storePrescriptionImage(string $dataUrl, int $companyId): ?string
+    {
+        if (!preg_match('#^data:image/(jpeg|jpg|png|webp);base64,#i', $dataUrl, $m)) {
+            return null;
+        }
+        $ext = strtolower($m[1]) === 'jpeg' ? 'jpg' : strtolower($m[1]);
+        $binary = base64_decode(substr($dataUrl, strpos($dataUrl, ',') + 1), true);
+        if ($binary === false || strlen($binary) === 0 || strlen($binary) > 4 * 1024 * 1024) {
+            return null;
+        }
+        // Second gate: the DECODED bytes must really be an image, not a script
+        // wearing an image mime type.
+        $info = @getimagesizefromstring($binary);
+        if ($info === false) {
+            return null;
+        }
+
+        $path = 'prescriptions/' . $companyId . '/' . date('Y-m') . '/rx_' . uniqid('', true) . '.' . $ext;
+        try {
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $binary);
+        } catch (\Throwable $e) {
+            Log::warning('FBR POS: prescription image could not be stored', ['error' => $e->getMessage()]);
+            return null;
+        }
+
+        return $path;
     }
 
     public function transactions(Request $request)
@@ -4664,7 +4945,7 @@ class FbrPosController extends Controller
         if ($resp = $this->fbrSettingGate()) return $resp;
 
         $data = $request->validate([
-            'feature' => 'required|in:store_slip,delivery,store_notes',
+            'feature' => 'required|in:store_slip,delivery,store_notes,pharmacy,batch_expiry,loose_sale',
             'enabled' => 'required|boolean',
         ]);
         $feature = $data['feature'];
@@ -4675,7 +4956,13 @@ class FbrPosController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 404);
         }
 
-        $planColumn = $feature === 'delivery' ? 'riders_enabled' : 'kot_enabled';
+        $planColumn = match ($feature) {
+            'delivery' => 'riders_enabled',
+            // Pharmacy Mode (Task 1558) — master and both children ride the one
+            // package gate; the children additionally need the master ON below.
+            'pharmacy', 'batch_expiry', 'loose_sale' => 'pharmacy_enabled',
+            default => 'kot_enabled',
+        };
         if ($enabled && !\App\Services\PosFeatureService::planAllows($company, $planColumn)) {
             return response()->json(['success' => false, 'message' => __('pos.plan_locked_feature')], 403);
         }
@@ -4713,6 +5000,63 @@ class FbrPosController extends Controller
             }
 
             return response()->json(['success' => true, 'enabled' => (bool) $company->kitchen_printer_enabled]);
+        }
+
+        // ── Pharmacy Mode (Task 1558) ────────────────────────────────────
+        // The master switch and its two children. Switching the master OFF must
+        // also drop the children, exactly like the Store-slip family: their
+        // cards disappear, so a stale true would silently spring back to life
+        // on the next upgrade and start blocking sales on expired batches.
+        if (in_array($feature, ['pharmacy', 'batch_expiry', 'loose_sale'], true)) {
+            $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
+
+            if ($feature === 'pharmacy') {
+                $flags['pharmacy'] = $enabled;
+                if ($enabled) {
+                    // Batch/expiry is the whole point of the module and it needs
+                    // inventory underneath it — a pharmacy that switches the mode
+                    // on and finds no batch tracking has been sold nothing.
+                    $flags['inventory'] = true;
+                    $flags['batch_expiry'] = true;
+                } else {
+                    $flags['batch_expiry'] = false;
+                    $flags['loose_sale'] = false;
+                    // 'inventory' is deliberately LEFT ALONE: plenty of shops ran
+                    // stock long before pharmacy mode, and this click was about
+                    // pharmacy, not about emptying their inventory module.
+                }
+            } else {
+                // A child cannot be switched on while the master is off — the UI
+                // hides its card entirely, so an accepted ON would be a success
+                // message for something the shop can never see.
+                if ($enabled && empty($flags['pharmacy'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => __('pos.fbr_feat_needs_pharmacy'),
+                    ], 422);
+                }
+                $flags[$feature] = $enabled;
+                if ($feature === 'batch_expiry' && $enabled) {
+                    $flags['inventory'] = true;
+                }
+            }
+
+            $flags = \App\Services\PosFeatureService::normalize($flags);
+            $company->update(['feature_flags' => $flags]
+                + \App\Services\PosFeatureService::masterSwitches($flags));
+            \App\Services\PosFeatureService::flushGateCaches();
+
+            // Report what actually STUCK, never what was asked for.
+            return response()->json([
+                'success' => true,
+                'enabled' => (bool) ($flags[$feature] ?? false),
+                'flags' => [
+                    'pharmacy' => (bool) ($flags['pharmacy'] ?? false),
+                    'batch_expiry' => (bool) ($flags['batch_expiry'] ?? false),
+                    'loose_sale' => (bool) ($flags['loose_sale'] ?? false),
+                    'inventory' => (bool) ($flags['inventory'] ?? false),
+                ],
+            ]);
         }
 
         // Store notes ride ON the slip: without it there is nothing to print the
@@ -5281,7 +5625,11 @@ class FbrPosController extends Controller
             }
         }
 
-        return view('fbr-pos.receipt', compact('transaction', 'company', 'khataSnapshot'));
+        // 💊 Pharmacy Mode (Task 1558): batch + expiry ride the printed line only
+        // for a shop that actually keeps batches. Everyone else prints as before.
+        $pharmacyPrintBatch = \App\Services\PharmacyBatchService::trackingEnabled($company);
+
+        return view('fbr-pos.receipt', compact('transaction', 'company', 'khataSnapshot', 'pharmacyPrintBatch'));
     }
 
     public function reports(Request $request)
@@ -7704,9 +8052,20 @@ class FbrPosController extends Controller
         $query = Product::where('company_id', $companyId);
         if ($search) {
             $like = \App\Helpers\DbCompat::like();
-            $query->where(function ($q) use ($search, $like) {
+            // Pharmacy Mode (Task 1558): a counter looks a medicine up by its
+            // salt, its strength or the company that made it just as often as
+            // by the printed brand name. Only added when those columns exist,
+            // so a non-pharmacy shop's search plan is unchanged.
+            $medicineCols = array_values(array_filter(
+                ['generic_name', 'manufacturer', 'strength', 'shelf_location'],
+                fn ($c) => \Illuminate\Support\Facades\Schema::hasColumn('products', $c)
+            ));
+            $query->where(function ($q) use ($search, $like, $medicineCols) {
                 $q->where('name', $like, "%{$search}%")
                   ->orWhere('hs_code', $like, "%{$search}%");
+                foreach ($medicineCols as $col) {
+                    $q->orWhere($col, $like, "%{$search}%");
+                }
             });
         }
 
@@ -7726,9 +8085,73 @@ class FbrPosController extends Controller
         return view('fbr-pos.product-form', [
             'suppliers' => $suppliers,
             'inventoryAllowed' => $inventoryAllowed,
+            // Pharmacy Mode (Task 1558): medicine fields appear ONLY here.
+            'pharmacyMode' => \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId)),
             // Save-and-continue sticky defaults (one-request flash from store).
             'sticky' => session('fbr_product_sticky', []),
         ]);
+    }
+
+    /**
+     * Pharmacy Mode (Task 1558): the medicine fields a medical store bills on.
+     *
+     * Returns [] for every non-pharmacy shop, so a general store's product save
+     * writes exactly the columns it always did. Column-guarded on top of that,
+     * because the product form is shared and a box that has not run the
+     * pharmacy migration must not start throwing "Unknown column".
+     */
+    private function pharmacyProductFields(Request $request, int $companyId): array
+    {
+        if (!\App\Services\PosFeatureService::pharmacyLive(Company::find($companyId))) {
+            return [];
+        }
+
+        $out = [];
+        $map = [
+            'generic_name' => fn () => $request->filled('generic_name') ? trim((string) $request->generic_name) : null,
+            'strength' => fn () => $request->filled('strength') ? trim((string) $request->strength) : null,
+            'dosage_form' => fn () => in_array($request->input('dosage_form'), Product::DOSAGE_FORMS, true) ? $request->input('dosage_form') : null,
+            'manufacturer' => fn () => $request->filled('manufacturer') ? trim((string) $request->manufacturer) : null,
+            'drug_schedule' => fn () => in_array($request->input('drug_schedule'), Product::DRUG_SCHEDULES, true) ? $request->input('drug_schedule') : null,
+            'prescription_required' => fn () => $request->boolean('prescription_required'),
+            'shelf_location' => fn () => $request->filled('shelf_location') ? trim((string) $request->shelf_location) : null,
+            'strips_per_pack' => fn () => $request->filled('strips_per_pack') ? max(1, (int) $request->strips_per_pack) : null,
+            'units_per_strip' => fn () => $request->filled('units_per_strip') ? max(1, (int) $request->units_per_strip) : null,
+            'allow_loose_sale' => fn () => $request->boolean('allow_loose_sale'),
+        ];
+        foreach ($map as $column => $resolve) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('products', $column)) {
+                $out[$column] = $resolve();
+            }
+        }
+
+        // A medicine cannot be broken open unless it says how many units are in
+        // a pack — otherwise "half a strip" has no arithmetic behind it and the
+        // stock count would drift on the first loose sale.
+        if (isset($out['allow_loose_sale']) && $out['allow_loose_sale'] && empty($out['units_per_strip'])) {
+            $out['allow_loose_sale'] = false;
+        }
+
+        return $out;
+    }
+
+    /** Validation rules for the pharmacy medicine fields (empty when off). */
+    private function pharmacyProductRules(int $companyId): array
+    {
+        if (!\App\Services\PosFeatureService::pharmacyLive(Company::find($companyId))) {
+            return [];
+        }
+
+        return [
+            'generic_name' => 'nullable|string|max:190',
+            'strength' => 'nullable|string|max:60',
+            'dosage_form' => 'nullable|string|in:' . implode(',', Product::DOSAGE_FORMS),
+            'manufacturer' => 'nullable|string|max:150',
+            'drug_schedule' => 'nullable|string|in:' . implode(',', Product::DRUG_SCHEDULES),
+            'shelf_location' => 'nullable|string|max:60',
+            'strips_per_pack' => 'nullable|integer|min:1|max:9999',
+            'units_per_strip' => 'nullable|integer|min:1|max:9999',
+        ];
     }
 
     public function storeProduct(Request $request)
@@ -7767,7 +8190,7 @@ class FbrPosController extends Controller
             'new_supplier_phone' => 'nullable|string|max:30',
             'new_supplier_city' => 'nullable|string|max:80',
             'save_action' => 'nullable|in:stay,list',
-        ]);
+        ] + $this->pharmacyProductRules((int) app('currentCompanyId')));
 
         $taxType = $request->tax_type;
         $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
@@ -7803,6 +8226,8 @@ class FbrPosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size')) {
             $createFbrData['pack_size'] = $request->filled('pack_size') ? (int) $request->pack_size : null;
         }
+        // Pharmacy Mode (Task 1558): medicine catalogue fields — [] when off.
+        $createFbrData += $this->pharmacyProductFields($request, (int) $companyId);
 
         // Supplier (Task 1261): existing supplier validated BEFORE any write;
         // quick-added supplier is created inside the same transaction as the
@@ -7981,7 +8406,8 @@ class FbrPosController extends Controller
         $suppliers = $inventoryAllowed
             ? \App\Models\Supplier::forCompany($companyId)->active()->orderBy('name')->get(['id', 'name', 'city'])
             : collect();
-        return view('fbr-pos.product-form', compact('product', 'suppliers', 'inventoryAllowed'));
+        $pharmacyMode = \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId));
+        return view('fbr-pos.product-form', compact('product', 'suppliers', 'inventoryAllowed', 'pharmacyMode'));
     }
 
     public function updateProduct(Request $request, $id)
@@ -8021,7 +8447,7 @@ class FbrPosController extends Controller
             'supplier_id' => 'nullable|integer',
             'new_qty' => 'nullable|required_if:stock_action,correct|numeric|min:0',
             'qty_reason' => 'nullable|string|max:200',
-        ]);
+        ] + $this->pharmacyProductRules((int) $companyId));
 
         $taxType = $request->tax_type;
         $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
@@ -8073,6 +8499,9 @@ class FbrPosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size')) {
             $updateFbrData['pack_size'] = $request->filled('pack_size') ? (int) $request->pack_size : null;
         }
+        // Pharmacy Mode (Task 1558): medicine catalogue fields — [] when off,
+        // so a non-pharmacy shop's edit never touches these columns.
+        $updateFbrData += $this->pharmacyProductFields($request, (int) $companyId);
 
         // Stock-adjustment supplier resolved BEFORE any write (review fix): a
         // forged / inactive / cross-company supplier id must fail the request
@@ -8738,12 +9167,28 @@ class FbrPosController extends Controller
         // export MUST round-trip it or an exported file can't be re-imported.
         // Column K = Pack Size (Peti) — pieces per carton, Peti Rate (Task 1414).
         $headers = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)', 'MRP (Retail Price)', 'Pack Size (Peti)'];
+        // 💊 Pharmacy Mode (Task 1558): L..U carry the medicine catalogue so the
+        // bulk round trip is complete — a pharmacy that exports, edits salt
+        // names in Excel and re-imports must not silently lose them. Columns
+        // appear ONLY for a pharmacy; every other shop's file is unchanged.
+        $pharmacyExcel = \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId));
+        if ($pharmacyExcel) {
+            $headers = array_merge($headers, [
+                'Generic / Salt', 'Strength', 'Dosage Form', 'Manufacturer', 'Drug Schedule',
+                'Prescription Required (Yes/No)', 'Shelf Location', 'Strips per Pack', 'Units per Strip', 'Loose Sale (Yes/No)',
+            ]);
+        }
+        $lastCol = $pharmacyExcel ? 'U' : 'K';
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:K1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:K1')->getFill()
+        $sheet->getStyle('A1:' . $lastCol . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:' . $lastCol . '1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('BFDBFE');
-        foreach (['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20, 'J' => 16, 'K' => 16] as $col => $w) {
+        $widths = ['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20, 'J' => 16, 'K' => 16];
+        if ($pharmacyExcel) {
+            $widths += ['L' => 26, 'M' => 12, 'N' => 14, 'O' => 22, 'P' => 14, 'Q' => 26, 'R' => 14, 'S' => 14, 'T' => 14, 'U' => 16];
+        }
+        foreach ($widths as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
         // SKU + Barcode + HS Code columns forced to TEXT so Excel never converts
@@ -8763,7 +9208,7 @@ class FbrPosController extends Controller
             }
         } else {
             foreach ($existingProducts as $p) {
-                $this->writeFbrProductRow($sheet, $rowNum++, [
+                $this->writeFbrProductRow($sheet, $rowNum++, array_merge([
                     $p->name,
                     (float) $p->default_price,
                     $p->hs_code ?? '',
@@ -8776,7 +9221,18 @@ class FbrPosController extends Controller
                     ($p->mrp !== null && (float) $p->mrp > 0) ? (float) $p->mrp : '',
                     // Pack Size (Peti Rate, Task 1414): blank when not a peti product.
                     ((int) ($p->pack_size ?? 0) > 0) ? (int) $p->pack_size : '',
-                ]);
+                ], $pharmacyExcel ? [
+                    $p->generic_name ?? '',
+                    $p->strength ?? '',
+                    $p->dosage_form ?? '',
+                    $p->manufacturer ?? '',
+                    $p->drug_schedule ?? '',
+                    !empty($p->prescription_required) ? 'Yes' : 'No',
+                    $p->shelf_location ?? '',
+                    ((int) ($p->strips_per_pack ?? 0) > 0) ? (int) $p->strips_per_pack : '',
+                    ((int) ($p->units_per_strip ?? 0) > 0) ? (int) $p->units_per_strip : '',
+                    !empty($p->allow_loose_sale) ? 'Yes' : 'No',
+                ] : []));
             }
         }
 
@@ -8809,6 +9265,14 @@ class FbrPosController extends Controller
         $sheet->setCellValue('J' . $rowNum, $vals[9] ?? '');
         // K = Pack Size (Peti Rate, Task 1414) — plain integer or blank.
         $sheet->setCellValue('K' . $rowNum, $vals[10] ?? '');
+        // 💊 L..U = the pharmacy medicine catalogue (Task 1558) — written only
+        // when the caller supplied them, so a non-pharmacy row still ends at K.
+        foreach (['L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'] as $offset => $col) {
+            if (!array_key_exists(11 + $offset, $vals)) {
+                break;
+            }
+            $sheet->setCellValue($col . $rowNum, $vals[11 + $offset]);
+        }
     }
 
     public function importProducts(Request $request)
@@ -8889,6 +9353,73 @@ class FbrPosController extends Controller
         // product out of the peti feature. Column absent entirely ⇒ never touched.
         $packIdx = $this->findFbrColumn($header, ['pack size (peti)', 'pack size', 'pack_size', 'peti', 'peti size', 'carton size']);
         $hasPackCol = \Illuminate\Support\Facades\Schema::hasColumn('products', 'pack_size');
+
+        // 💊 Pharmacy Mode (Task 1558): the medicine catalogue columns. Resolved
+        // only for a pharmacy AND only when the column really exists, so a
+        // general store's import walks exactly the code it always did, and an
+        // exported pharmacy file re-imports without losing its salt names.
+        $pharmacyImport = \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId));
+        $phIdx = [];
+        if ($pharmacyImport) {
+            $phAliases = [
+                'generic_name' => ['generic / salt', 'generic/salt', 'generic name', 'generic', 'salt', 'salt name', 'formula'],
+                'strength' => ['strength', 'potency', 'mg'],
+                'dosage_form' => ['dosage form', 'dosage_form', 'form', 'type'],
+                'manufacturer' => ['manufacturer', 'company', 'maker', 'brand company'],
+                'drug_schedule' => ['drug schedule', 'drug_schedule', 'schedule'],
+                'prescription_required' => ['prescription required (yes/no)', 'prescription required', 'prescription', 'rx', 'rx required'],
+                'shelf_location' => ['shelf location', 'shelf_location', 'shelf', 'rack', 'rack location'],
+                'strips_per_pack' => ['strips per pack', 'strips_per_pack', 'strips'],
+                'units_per_strip' => ['units per strip', 'units_per_strip', 'tablets per strip', 'units'],
+                'allow_loose_sale' => ['loose sale (yes/no)', 'loose sale', 'allow_loose_sale', 'loose'],
+            ];
+            foreach ($phAliases as $column => $aliases) {
+                if (!\Illuminate\Support\Facades\Schema::hasColumn('products', $column)) {
+                    continue;
+                }
+                $found = $this->findFbrColumn($header, $aliases);
+                if ($found !== false) {
+                    $phIdx[$column] = $found;
+                }
+            }
+        }
+        /**
+         * Read this row's medicine cells. A BLANK cell always means "leave it
+         * alone" — never "clear it" — because the most common pharmacy import
+         * is a partial price-update file, and wiping a salt name the shop typed
+         * by hand would be worse than ignoring the column entirely.
+         */
+        $readPharmacyCells = function (array $data) use ($phIdx): array {
+            $out = [];
+            foreach ($phIdx as $column => $idx) {
+                $raw = trim((string) ($data[$idx] ?? ''));
+                if ($raw === '') {
+                    continue;
+                }
+                if (in_array($column, ['prescription_required', 'allow_loose_sale'], true)) {
+                    $out[$column] = in_array(strtolower($raw), ['yes', 'y', '1', 'true', 'haan', 'han'], true);
+                } elseif (in_array($column, ['strips_per_pack', 'units_per_strip'], true)) {
+                    $n = (int) round((float) preg_replace('/[^0-9.\-]/', '', $raw));
+                    if ($n >= 1) {
+                        $out[$column] = $n;
+                    }
+                } elseif ($column === 'dosage_form') {
+                    $v = strtolower($raw);
+                    if (in_array($v, Product::DOSAGE_FORMS, true)) {
+                        $out[$column] = $v;
+                    }
+                } elseif ($column === 'drug_schedule') {
+                    $v = strtoupper($raw);
+                    if (in_array($v, Product::DRUG_SCHEDULES, true)) {
+                        $out[$column] = $v;
+                    }
+                } else {
+                    $out[$column] = mb_substr($raw, 0, 190);
+                }
+            }
+
+            return $out;
+        };
 
         // 🔒 ATOMIC QUOTA ADMISSION (Task 361 review): the whole catalog read +
         // allowance computation + row writes run in ONE transaction under a
@@ -9075,6 +9606,9 @@ class FbrPosController extends Controller
                 if ($hasPackCol && $packProvided) {
                     $updateData['pack_size'] = $packVal;
                 }
+                // 💊 Medicine catalogue (Task 1558) — blank cells leave the
+                // existing values alone (see $readPharmacyCells).
+                $updateData += $readPharmacyCells($data);
                 $existing->update($updateData);
                 $updated++;
                 $product = $existing;
@@ -9109,6 +9643,7 @@ class FbrPosController extends Controller
                 if ($hasPackCol && $packProvided) {
                     $createData['pack_size'] = $packVal;
                 }
+                $createData += $readPharmacyCells($data);
                 $product = Product::create($createData);
                 $added++;
                 if ($planRemaining !== null) { $planRemaining--; }
@@ -9232,16 +9767,57 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $q = trim((string) $request->get('q', ''));
         $like = \App\Helpers\DbCompat::like();
+
+        // Pharmacy Mode (Task 1558): a medical store's counter must be able to
+        // find a medicine by its salt, strength or manufacturer — not only by
+        // the brand printed on the box — and it must see the fields it bills
+        // on. Both the extra search columns and the extra returned columns are
+        // pharmacy-only, so a general store's payload stays exactly as it was.
+        $pharmacy = \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId));
+        $extraSearch = [];
+        $columns = ['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'is_price_editable', 'default_tax_rate', 'tax_type', 'uom'];
+        if ($pharmacy) {
+            foreach (['generic_name', 'manufacturer', 'strength'] as $c) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('products', $c)) {
+                    $extraSearch[] = $c;
+                }
+            }
+            foreach (['generic_name', 'strength', 'dosage_form', 'manufacturer', 'drug_schedule', 'prescription_required', 'shelf_location', 'strips_per_pack', 'units_per_strip', 'allow_loose_sale', 'mrp'] as $c) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('products', $c)) {
+                    $columns[] = $c;
+                }
+            }
+        }
+
+        // A pharmacy typing "para" wants more than 15 hits — the same salt is
+        // stocked under a dozen brands.
+        $limit = $pharmacy ? 40 : 15;
+
         $products = Product::where('company_id', $companyId)
             ->where('is_active', true)
-            ->where(function ($query) use ($q, $like) {
+            ->where(function ($query) use ($q, $like, $extraSearch) {
                 $query->where('name', $like, "%{$q}%")
                       ->orWhere('hs_code', $like, "%{$q}%")
                       ->orWhere('barcode', $like, "%{$q}%")
                       ->orWhere('sku', $like, "%{$q}%");
+                foreach ($extraSearch as $col) {
+                    $query->orWhere($col, $like, "%{$q}%");
+                }
             })
-            ->take(15)
-            ->get(['id', 'name', 'hs_code', 'barcode', 'sku', 'default_price', 'is_price_editable', 'default_tax_rate', 'tax_type', 'uom']);
+            ->orderBy('name')
+            ->take($limit)
+            ->get($columns);
+
+        // A loose count is divided by the units in a whole stocked pack, and
+        // that number is derived (strips × units), not a column. The sale
+        // screen bakes it for its own products, so a searched-in product must
+        // arrive carrying the same figure or the two paths would price a
+        // broken strip differently.
+        if ($pharmacy) {
+            $products->each(function ($p) {
+                $p->setAttribute('loose_units_per_pack', (int) ($p->looseUnitsPerPack() ?? 0));
+            });
+        }
 
         return response()->json($products);
     }

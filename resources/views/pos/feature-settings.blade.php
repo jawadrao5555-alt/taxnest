@@ -21,8 +21,11 @@
         // Flag meta for the wizard, WITHOUT the internal grouping key — that
         // value ('restaurant', 'inventory', ...) is a flag section, not a
         // business type, and the wizard never reads it.
+        // Panel-scoped: another panel's business mode (Pharmacy) is not part of
+        // this shop's catalogue, so its key/label/description never ship here.
+        $panelFlags = \App\Services\PosFeatureService::flagsForPanel('pos');
         $flagMetaLite = [];
-        foreach (\App\Services\PosFeatureService::ALL_FLAGS as $f) {
+        foreach ($panelFlags as $f) {
             $m = \App\Services\PosFeatureService::flagMeta($f);
             $flagMetaLite[$f] = [
                 'label' => $m['label'] ?? $f,
@@ -35,8 +38,16 @@
         // 'general' belongs to nobody and must not raise it.
         $onLegacyCategory = \App\Services\PosFeatureService::belongsToOtherPanel($company);
         // Current flag state (resolved) → seed the wizard so re-editing shows live config.
+        // Dependencies are scoped the same way — a PRA shop's wizard must not
+        // learn that some other panel's flag depends on 'pharmacy'.
+        $panelDeps = [];
+        foreach (\App\Services\PosFeatureService::DEPENDENCIES as $child => $parents) {
+            if (!in_array($child, $panelFlags, true)) { continue; }
+            $kept = array_values(array_intersect($parents, $panelFlags));
+            if ($kept) { $panelDeps[$child] = $kept; }
+        }
         $flagState = [];
-        foreach (\App\Services\PosFeatureService::ALL_FLAGS as $f) { $flagState[$f] = (bool) $features->{$f}; }
+        foreach ($panelFlags as $f) { $flagState[$f] = (bool) $features->{$f}; }
         $isFirstTime = $isFirstTime ?? false;
     @endphp
 
@@ -402,8 +413,8 @@
                 {{-- The shop's own preset flag map (recommended vs extra split). --}}
                 categoryDefaults: @json($currentDefaults),
                 flagMeta: @json($flagMetaLite),
-                dependencies: @json(\App\Services\PosFeatureService::DEPENDENCIES),
-                allFlags: @json(\App\Services\PosFeatureService::ALL_FLAGS),
+                dependencies: @json($panelDeps),
+                allFlags: @json($panelFlags),
                 restaurantLocked: @json(!($restaurantAllowed ?? true)),
                 restaurantFlags: @json(\App\Services\PosFeatureService::RESTAURANT_FLAGS),
 

@@ -47,6 +47,12 @@
                         <th class="px-4 py-3">{{ __('pos.invoice_no_col') }}</th>
                         <th class="px-4 py-3 text-center hidden sm:table-cell">{{ __('pos.mode_col') }}</th>
                         <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.payment') }}</th>
+                        {{-- 💊 Pharmacy Mode (Task 1558, step 8): a schedule-medicine bill
+                             must be findable again months later — doctor, patient and the
+                             photographed slip live on the bill, so surface them here. --}}
+                        @if($pharmacyMode ?? false)
+                        <th class="px-4 py-3 hidden lg:table-cell">{{ __('pos.ph_rx_col') }}</th>
+                        @endif
                         <th class="px-4 py-3 text-right hidden sm:table-cell">{{ __('pos.receipt_tax') }}</th>
                         <th class="px-4 py-3 text-right">{{ __('pos.total_word') }}</th>
                     </tr>
@@ -63,11 +69,29 @@
                             </span>
                         </td>
                         <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ ucwords(str_replace('_', ' ', (string) $t->payment_method)) }}</td>
+                        @if($pharmacyMode ?? false)
+                        <td class="px-4 py-3 hidden lg:table-cell text-xs">
+                            @if(!empty($t->doctor_name) || !empty($t->patient_name) || !empty($t->prescription_image))
+                                @if(!empty($t->patient_name))
+                                    <span class="block text-gray-700 dark:text-gray-300">{{ $t->patient_name }}</span>
+                                @endif
+                                @if(!empty($t->doctor_name))
+                                    <span class="block text-gray-500">{{ __('pos.ph_dr_prefix') }} {{ $t->doctor_name }}</span>
+                                @endif
+                                @if(!empty($t->prescription_image))
+                                    <a href="{{ asset('storage/' . $t->prescription_image) }}" target="_blank" rel="noopener"
+                                       class="inline-block mt-0.5 font-bold text-blue-600 hover:underline">{{ __('pos.ph_view_slip') }}</a>
+                                @endif
+                            @else
+                                <span class="text-gray-300 dark:text-gray-600">—</span>
+                            @endif
+                        </td>
+                        @endif
                         <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{{ number_format($t->tax_amount, 0) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($t->total_amount, 0) }}</td>
                     </tr>
                     @empty
-                    <tr><td colspan="6" class="px-4 py-12 text-center text-gray-500">{{ __('pos.no_purchase_history') }}</td></tr>
+                    <tr><td colspan="{{ ($pharmacyMode ?? false) ? 7 : 6 }}" class="px-4 py-12 text-center text-gray-500">{{ __('pos.no_purchase_history') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

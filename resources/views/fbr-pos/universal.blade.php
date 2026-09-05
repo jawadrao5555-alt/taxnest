@@ -917,7 +917,18 @@ window.addEventListener('popstate', function() {
                         <div class="flex-1 min-w-0">
                             <span class="text-sm font-semibold truncate block" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
                             <div class="flex items-center gap-1.5">
-                                <span class="text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? window.TXT.service_word : s.category"></span>
+                                {{-- 💊 Pharmacy (Task 1558): a medical store searches by salt,
+                                     strength or manufacturer — show WHY the row matched, or the
+                                     cashier cannot tell a dozen brands of the same salt apart. --}}
+                                <template x-if="pharmacyMode && phSubtitle(s)">
+                                    <span class="text-[10px] truncate" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.75);' : 'color:#6b7280;'" x-text="phSubtitle(s)"></span>
+                                </template>
+                                <template x-if="!(pharmacyMode && phSubtitle(s))">
+                                    <span class="text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? window.TXT.service_word : s.category"></span>
+                                </template>
+                                <template x-if="pharmacyMode && s.shelf_location">
+                                    <span class="text-[9px] font-bold px-1 rounded" :style="i === highlightIndex ? 'background:rgba(255,255,255,0.25); color:white;' : 'background:#ecfdf5; color:#047857;'" x-text="s.shelf_location"></span>
+                                </template>
                                 @if($company->inventory_enabled)
                                 <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
                                 @endif
@@ -1427,6 +1438,53 @@ window.addEventListener('popstate', function() {
                                 <span class="text-[10px] text-gray-400 truncate min-w-0">{{ __('pos.save_esc_hint') }}</span>
                             </div>
                         </template>
+                        {{-- 💊 PHARMACY LINE STRIP (Task 1558) — batch/expiry, loose sale, MRP.
+                             Rendered ONLY in pharmacy mode: a general store's cart row is
+                             untouched (the whole template collapses to nothing). --}}
+                        <template x-if="pharmacyMode && item.item_type === 'product'">
+                            <div class="mt-1.5 flex flex-wrap items-center gap-1" @click.stop>
+                                {{-- Batch chip: what the counter is actually handing over --}}
+                                <template x-if="batchTracking">
+                                    <button type="button" @click.stop="phOpenBatchPicker(item)"
+                                        :disabled="!batchOverrideAllowed"
+                                        class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap max-w-[190px] truncate"
+                                        :class="item.batch_id
+                                            ? (item.batch_short_dated ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 ring-1 ring-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 ring-1 ring-emerald-400')
+                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-emerald-600'"
+                                        x-text="item.batch_id
+                                            ? (window.TXT.ph_batch_chip + ' ' + (item.batch_label || '—') + (item.batch_expiry ? ' · ' + item.batch_expiry : ''))
+                                            : window.TXT.ph_batch_auto"></button>
+                                </template>
+                                <template x-if="batchTracking && item.batch_id">
+                                    <button type="button" @click.stop="phClearBatch(item)"
+                                        class="text-[9px] font-bold px-1 py-1 rounded-md text-gray-400 hover:text-red-500"
+                                        x-text="window.TXT.ph_batch_auto_back"></button>
+                                </template>
+                                {{-- Short-dated warning: sellable, but the cashier must know --}}
+                                <template x-if="batchTracking && item.batch_short_dated">
+                                    <span class="text-[9px] font-bold px-1.5 py-1 rounded-md bg-amber-500 text-white whitespace-nowrap"
+                                          x-text="window.TXT.ph_short_dated"></span>
+                                </template>
+                                {{-- Loose (broken strip) --}}
+                                <template x-if="phCanSellLoose(item)">
+                                    <button type="button" @click.stop="phOpenLoose(item)"
+                                        class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap"
+                                        :class="(item.loose_units || 0) > 0 ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 ring-1 ring-purple-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-purple-600'"
+                                        x-text="(item.loose_units || 0) > 0 ? (item.loose_units + ' ' + window.TXT.ph_loose_units_sfx) : window.TXT.ph_loose_btn"></button>
+                                </template>
+                                <template x-if="(item.loose_units || 0) > 0">
+                                    <button type="button" @click.stop="phClearLoose(item)"
+                                        class="text-[9px] font-bold px-1 py-1 rounded-md text-gray-400 hover:text-red-500"
+                                        x-text="window.TXT.ph_loose_full_pack"></button>
+                                </template>
+                                {{-- MRP ceiling: the server pins the line down anyway, so say so --}}
+                                <template x-if="phOverMrp(item)">
+                                    <button type="button" @click.stop="phPinToMrp(index)"
+                                        class="text-[9px] font-bold px-1.5 py-1 rounded-md bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 ring-1 ring-red-400 whitespace-nowrap"
+                                        x-text="window.TXT.ph_over_mrp + ' Rs.' + phMrp(item)"></button>
+                                </template>
+                            </div>
+                        </template>
                         {{-- Cart rows v3 (Aug 2026): TAX/Disc/FBR only visible on active row — cart stays clean.
                              Deal lines (Task 1273) hide the whole strip: price/tax are server-enforced. --}}
                         <div class="flex items-center gap-1.5 mt-1.5 justify-end" x-show="item.item_type !== 'deal' && (activeCartIndex === index || item.is_tax_exempt || (item.item_discount_value || 0) > 0 || item.showFbrPanel || item.hs_code)">
@@ -1490,6 +1548,15 @@ window.addEventListener('popstate', function() {
                     <button @click="showDiscount = !showDiscount" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 border-orange-200 dark:border-orange-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
                         <span x-text="discountAmount > 0 ? window.TXT.discount_minus_rs + Number(discountAmount).toLocaleString() : window.TXT.plus_discount"></span>
                     </button>
+                    {{-- 💊 Prescription chip (Task 1558): pharmacy-only. Turns red the
+                         moment a schedule medicine enters the cart with nothing
+                         recorded — the same condition the server refuses on. --}}
+                    <button x-show="pharmacyMode" x-cloak @click="phOpenRx()"
+                        class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition"
+                        :class="phRxCaptured()
+                            ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                            : (phRxNeeded() ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200')"
+                        x-text="phRxCaptured() ? window.TXT.ph_rx_chip_done : (phRxNeeded() ? window.TXT.ph_rx_chip_needed : window.TXT.ph_rx_chip)"></button>
                     <span class="text-[8px] text-gray-400" x-text="window.TXT.limit_colon + effectiveDiscountLimit + '%'"></span>
                     <button x-show="!managerOverrideActive && hasManagerPin && posRole !== 'pos_admin'" @click="requestManagerOverride()" class="text-[8px] font-bold text-blue-600 hover:text-blue-800 px-1">{{ __('pos.override') }}</button>
                     <span x-show="managerOverrideActive" class="text-[8px] font-bold text-green-600 px-1">{{ __('pos.unlocked') }}</span>
@@ -3416,6 +3483,138 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
     </div>
+{{-- ═══════════════════════════════════════════════════════════════════════
+     💊 PHARMACY MODE MODALS (Task 1558) — batch override, loose sale,
+     prescription capture. All three live INSIDE the x-data component (an
+     @include at end-of-file would land outside it and silently never open).
+
+     Server-gated, not merely x-show'd: a general store must not ship three
+     dead modals in the HTML its counter downloads on every boot. The Alpine
+     helpers behind them already return early when pharmacyMode is false, so
+     the component stays valid with the markup absent.
+     ═══════════════════════════════════════════════════════════════════════ --}}
+@if($pharmacyMode ?? false)
+<div x-show="batchPickerUid" x-cloak @keydown.escape.window="phCloseBatchPicker()"
+     class="fixed inset-0 z-[125] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div @click.away="phCloseBatchPicker()" class="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="px-4 py-3 bg-emerald-600 text-white flex items-center justify-between">
+            <div>
+                <p class="text-sm font-extrabold">{{ __('pos.ph_pick_batch_title') }}</p>
+                <p class="text-[10px] opacity-80">{{ __('pos.ph_pick_batch_sub') }}</p>
+            </div>
+            <button type="button" @click="phCloseBatchPicker()" class="text-white/80 hover:text-white text-lg leading-none px-2">&times;</button>
+        </div>
+        <div class="max-h-[55vh] overflow-y-auto">
+            <template x-if="batchPickerLoading">
+                <p class="p-6 text-center text-xs text-gray-400">{{ __('pos.loading') }}</p>
+            </template>
+            <template x-if="!batchPickerLoading && batchPickerRows.length === 0">
+                <p class="p-6 text-center text-xs text-gray-400">{{ __('pos.ph_no_batches_on_line') }}</p>
+            </template>
+            <template x-for="row in batchPickerRows" :key="row.id">
+                <button type="button" @click="phPickBatch(row)" :disabled="row.expired || !row.sellable"
+                    class="w-full text-left px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-extrabold text-gray-900 dark:text-white truncate" x-text="row.batch || '—'"></p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400">
+                            <span x-text="row.expiry || window.TXT.ph_no_expiry"></span>
+                            <template x-if="row.expired">
+                                <span class="ml-1 font-bold text-red-600" x-text="window.TXT.ph_status_expired"></span>
+                            </template>
+                            <template x-if="!row.expired && row.short_dated">
+                                <span class="ml-1 font-bold text-amber-600" x-text="row.days + ' ' + window.TXT.ph_days_left"></span>
+                            </template>
+                            <template x-if="!row.sellable && !row.expired">
+                                <span class="ml-1 font-bold text-gray-500" x-text="window.TXT.ph_status_quarantined"></span>
+                            </template>
+                        </p>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <p class="text-xs font-bold text-gray-700 dark:text-gray-200" x-text="row.quantity"></p>
+                        <p class="text-[10px] text-gray-400" x-text="row.retail ? 'Rs.' + row.retail : ''"></p>
+                    </div>
+                </button>
+            </template>
+            <template x-if="!batchPickerLoading && batchPickerUntracked > 0">
+                <p class="px-4 py-2 text-[10px] text-gray-400">
+                    {{ __('pos.ph_untracked_remainder') }} <span class="font-bold" x-text="batchPickerUntracked"></span>
+                </p>
+            </template>
+        </div>
+        <div class="p-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+            <button type="button" @click="phCloseBatchPicker()" class="flex-1 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">{{ __('pos.cancel_esc') }}</button>
+            <button type="button" @click="phClearBatch(cart.find(c => c.cart_uid === batchPickerUid) || {})" class="flex-1 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white">{{ __('pos.ph_batch_auto_pick') }}</button>
+        </div>
+    </div>
+</div>
+
+<div x-show="looseModalUid" x-cloak @keydown.escape.window="phCloseLoose()"
+     class="fixed inset-0 z-[125] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div @click.away="phCloseLoose()" class="w-full max-w-xs bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="px-4 py-3 bg-purple-600 text-white">
+            <p class="text-sm font-extrabold">{{ __('pos.ph_loose_title') }}</p>
+            <p class="text-[10px] opacity-80">{{ __('pos.ph_loose_sub') }}</p>
+        </div>
+        <div class="p-4 space-y-2">
+            <input type="number" min="1" step="1" x-ref="looseInput" x-model="looseModalUnits"
+                @keydown.enter.prevent="phApplyLoose()"
+                placeholder="{{ __('pos.ph_loose_units_ph') }}"
+                class="w-full text-center text-lg font-extrabold bg-gray-50 dark:bg-gray-800 border-2 border-purple-300 dark:border-purple-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            <p class="text-[10px] text-gray-400 text-center">
+                {{ __('pos.ph_loose_per_strip') }}
+                <span class="font-bold" x-text="phUnitsPerStrip(cart.find(c => c.cart_uid === looseModalUid) || {})"></span>
+            </p>
+        </div>
+        <div class="p-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+            <button type="button" @click="phCloseLoose()" class="flex-1 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">{{ __('pos.cancel_esc') }}</button>
+            <button type="button" @click="phApplyLoose()" class="flex-1 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white">{{ __('pos.apply') }}</button>
+        </div>
+    </div>
+</div>
+
+<div x-show="showPrescription" x-cloak @keydown.escape.window="phCloseRx()"
+     class="fixed inset-0 z-[126] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div @click.away="phCloseRx()" class="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="px-4 py-3 bg-blue-600 text-white flex items-center justify-between">
+            <div>
+                <p class="text-sm font-extrabold">{{ __('pos.ph_rx_title') }}</p>
+                <p class="text-[10px] opacity-80">{{ __('pos.ph_rx_sub') }}</p>
+            </div>
+            <button type="button" @click="phCloseRx()" class="text-white/80 hover:text-white text-lg leading-none px-2">&times;</button>
+        </div>
+        <div class="p-4 space-y-2.5">
+            <template x-if="phRxNeeded()">
+                <p class="text-[10px] font-bold text-red-600 dark:text-red-400">{{ __('pos.ph_rx_required') }}</p>
+            </template>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.ph_doctor_name') }}</label>
+                <input type="text" x-model="rxDoctor" maxlength="150" autocomplete="off"
+                    placeholder="{{ __('pos.ph_doctor_name_ph') }}"
+                    class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.ph_patient_name') }}</label>
+                <input type="text" x-model="rxPatient" maxlength="150" autocomplete="off"
+                    placeholder="{{ __('pos.ph_patient_name_ph') }}"
+                    class="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.ph_rx_image') }}</label>
+                <input type="file" accept="image/*" capture="environment" @change="phRxFile($event)"
+                    class="w-full text-[11px] text-gray-600 dark:text-gray-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/30 dark:file:text-blue-300">
+                <template x-if="rxImageName">
+                    <p class="text-[10px] text-emerald-600 mt-1 truncate" x-text="rxImageName"></p>
+                </template>
+            </div>
+        </div>
+        <div class="p-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+            <button type="button" @click="phClearRx(); phCloseRx()" class="flex-1 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">{{ __('pos.clear') }}</button>
+            <button type="button" @click="phCloseRx()" class="flex-1 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white">{{ __('pos.save') }}</button>
+        </div>
+    </div>
+</div>
+@endif
+
 @include('pos.partials.offline-queue-modal')
 </div>
 
@@ -3429,8 +3628,30 @@ window.addEventListener('popstate', function() {
 // rides along so the client can decide "quantity >= peti" purely from baked,
 // non-confidential numbers. Products without a rate simply carry peti_rate:null.
 $petiRatesMap = $petiRates ?? [];
-$productsJson = $products->map(function($p) use ($petiRatesMap) {
-    return [
+// 💊 Pharmacy Mode (Task 1558): the medicine fields the COUNTER needs, and only
+// those — salt/strength/manufacturer so a search hit can show why it matched,
+// the strip size so a loose sale can be entered, MRP so the ceiling is visible,
+// and the schedule flags so a prescription can be demanded. Baked ONLY in
+// pharmacy mode: a general store's product payload is byte-for-byte unchanged.
+$phMode = (bool) ($pharmacyMode ?? false);
+$productsJson = $products->map(function($p) use ($petiRatesMap, $phMode) {
+    $medicine = $phMode ? [
+        'generic_name' => (string) ($p->generic_name ?? ''),
+        'strength' => (string) ($p->strength ?? ''),
+        'dosage_form' => (string) ($p->dosage_form ?? ''),
+        'manufacturer' => (string) ($p->manufacturer ?? ''),
+        'drug_schedule' => (string) ($p->drug_schedule ?? ''),
+        'prescription_required' => (bool) ($p->prescription_required ?? false),
+        'shelf_location' => (string) ($p->shelf_location ?? ''),
+        'units_per_strip' => (int) ($p->units_per_strip ?? 0),
+        // The divisor a loose line is measured against is the whole STOCKED
+        // pack (10 strips of 10 = 100), not one strip. Baked from the model so
+        // the counter can never disagree with what the server will charge.
+        'loose_units_per_pack' => (int) ($p->looseUnitsPerPack() ?? 0),
+        'allow_loose_sale' => (bool) ($p->allow_loose_sale ?? false),
+        'mrp' => ($p->mrp ?? 0) > 0 ? (float) $p->mrp : null,
+    ] : [];
+    return $medicine + [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
         'price' => (float) ($p->default_price ?? 0), 'category' => null,
         'show_on_sale' => (bool) ($p->show_on_sale ?? true),
@@ -3539,6 +3760,35 @@ function restaurantPos() {
         // When false, ALL stock UI/logic is suppressed (badges, popup, blocking).
         // Use isInventoryEnabled() helper everywhere — never reference this directly.
         inventoryEnabled: {{ ($inventoryEnabled ?? false) ? 'true' : 'false' }},
+        {{-- 💊 Pharmacy Mode (Task 1558). All three default to false, so every
+             pharmacy helper below returns early on a normal FBR shop and the
+             screen behaves exactly as it did before the feature existed. --}}
+        pharmacyMode: {{ ($pharmacyMode ?? false) ? 'true' : 'false' }},
+        batchTracking: {{ ($pharmacyBatchTracking ?? false) ? 'true' : 'false' }},
+        // Choosing a batch by hand is an owner/manager decision (the server
+        // ignores a cashier's choice outright), so a cashier gets the batch
+        // chip as information only — never a picker that quietly does nothing.
+        batchOverrideAllowed: {{ auth('fbrpos')->user()?->isPosCashier() ? 'false' : 'true' }},
+        looseSaleOn: {{ ($pharmacyLooseSale ?? false) ? 'true' : 'false' }},
+        nearExpiryDays: {{ (int) ($pharmacyNearDays ?? 90) }},
+        {{-- Step 9 (scale): TRUE when the catalogue is bigger than the bake cap,
+             so allProducts is only the fallback subset and lookups must reach
+             /fbr-pos/api/products/search. Offline → the baked subset stands. --}}
+        productsBakedPartial: {{ !empty($productsTruncated) ? 'true' : 'false' }},
+        prodServerResults: null,
+        prodSearchTimer: null,
+        {{-- Per-line batch picker + prescription capture state --}}
+        batchPickerUid: null,
+        batchPickerRows: [],
+        batchPickerLoading: false,
+        batchPickerUntracked: 0,
+        looseModalUid: null,
+        looseModalUnits: '',
+        showPrescription: false,
+        rxDoctor: '',
+        rxPatient: '',
+        rxImage: null,
+        rxImageName: '',
         isInventoryEnabled() { return this.inventoryEnabled === true; },
         // Peti (Wholesale) Rate (Task 1414): baked master switch. OFF ⇒ every
         // peti helper below returns early, so the sale screen behaves exactly
@@ -4893,9 +5143,262 @@ function restaurantPos() {
                     this.searchSuggestions = out;
                     this.highlightIndex = 0;
                     this.showSearchDropdown = true;
+                    // 💊 Step 9 (scale): on a catalogue bigger than the bake cap
+                    // the baked rows are only a fallback — the server holds the
+                    // rest. Fire the lookup alongside (never instead of) the
+                    // local pass so the dropdown stays instant and simply gets
+                    // better a moment later. Offline: the local pass stands.
+                    if (this.productsBakedPartial && q.length >= 2) {
+                        if (this.prodSearchTimer) clearTimeout(this.prodSearchTimer);
+                        this.prodSearchTimer = setTimeout(() => this.prodServerSearch(this.searchQuery.trim()), 220);
+                    }
                 }
             }, 60);
         },
+
+        // 💊 Step 9 (scale): server-side catalogue lookup for a pharmacy-sized
+        // product list. Results are merged into the baked pool so every later
+        // path (cart add, tax lookup, batch picker, MRP ceiling) can still find
+        // the row by id — the sale screen assumes allProducts is the catalogue.
+        async prodServerSearch(q) {
+            if (!q) return;
+            try {
+                const res = await fetch('{{ route('fbrpos.api.products.search', [], false) }}?q=' + encodeURIComponent(q), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) return;
+                const rows = await res.json();
+                if (!Array.isArray(rows)) return;
+                if (q !== this.searchQuery.trim()) return; // stale-response guard
+                const known = new Set(this.allProducts.map(p => p.id));
+                const added = [];
+                rows.forEach(r => {
+                    if (known.has(r.id)) return;
+                    const exempt = (r.tax_type || 'standard') === 'exempt';
+                    const row = {
+                        id: r.id, type: 'product', name: r.name,
+                        price: parseFloat(r.default_price || 0), category: null,
+                        show_on_sale: true, cost_price: 0,
+                        is_tax_exempt: exempt,
+                        is_third_schedule: !!r.is_third_schedule,
+                        tax_rate: (exempt || r.is_third_schedule) ? 0 : parseFloat(r.default_tax_rate ?? 18),
+                        hs_code: r.hs_code ?? null, uom: r.uom || 'U', barcode: r.barcode ?? null,
+                        is_price_editable: r.is_price_editable === undefined ? true : !!r.is_price_editable,
+                        hasRecipe: false, image: null, stockStatus: null,
+                        pack_size: null, peti_rate: null,
+                        generic_name: r.generic_name || '', strength: r.strength || '',
+                        dosage_form: r.dosage_form || '', manufacturer: r.manufacturer || '',
+                        drug_schedule: r.drug_schedule || '',
+                        prescription_required: !!r.prescription_required,
+                        shelf_location: r.shelf_location || '',
+                        units_per_strip: parseInt(r.units_per_strip || 0, 10) || 0,
+                        loose_units_per_pack: parseInt(r.loose_units_per_pack || 0, 10) || 0,
+                        allow_loose_sale: !!r.allow_loose_sale,
+                        mrp: (r.mrp && parseFloat(r.mrp) > 0) ? parseFloat(r.mrp) : null,
+                    };
+                    this.allProducts.push(row);
+                    known.add(r.id);
+                    added.push(row);
+                });
+                if (added.length > 0) {
+                    // Re-rank with the newly known rows in the pool.
+                    this.onSearchInputImmediate(q);
+                }
+            } catch (e) { /* OFFLINE → baked subset stands */ }
+        },
+        // Re-run just the ranking pass (no debounce, no server round trip).
+        onSearchInputImmediate(q) {
+            const lower = String(q || '').toLowerCase();
+            if (!lower) return;
+            let all;
+            if (this.activeCategory === 'services') all = [...this.allServices];
+            else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
+            else all = [...this.allProducts, ...this.allServices];
+            const ranked = [];
+            for (let i = 0; i < all.length; i++) {
+                const it = all[i];
+                if (!it.name) continue;
+                if (!(parseFloat(it.price) > 0) && ((it.type || 'product') !== 'product' || this.isInventoryEnabled())) continue;
+                const r = this.nameMatchRank(it.name, lower, this.searchAnyWord);
+                if (r > 0) ranked.push({ it, r });
+            }
+            ranked.sort((a, b) => b.r - a.r);
+            this.searchSuggestions = ranked.slice(0, 12).map(x => x.it);
+            this.highlightIndex = 0;
+            this.showSearchDropdown = true;
+            this.filterProducts();
+        },
+
+        // ═══════════════════════════════════════════════════════════════
+        // 💊 PHARMACY MODE (Task 1558) — batch, loose sale, MRP, prescription
+        // Every helper returns early when pharmacyMode is false, so a normal
+        // FBR shop never pays for any of this.
+        // ═══════════════════════════════════════════════════════════════
+
+        /** The catalogue row behind a cart line (medicine fields live there). */
+        phProduct(item) {
+            if (!this.pharmacyMode || !item || item.item_type !== 'product') return null;
+            return this.allProducts.find(p => p.id === item.item_id) || null;
+        },
+        /** One-line "Panadol 500mg Tab · GSK" subtitle for a search suggestion. */
+        phSubtitle(p) {
+            if (!this.pharmacyMode || !p) return '';
+            return [p.generic_name, p.strength, p.dosage_form, p.manufacturer]
+                .filter(v => v && String(v).trim() !== '').join(' · ');
+        },
+        /** The MRP ceiling the server will enforce, or null when there is none. */
+        phMrp(item) {
+            const p = this.phProduct(item);
+            const m = p && p.mrp ? parseFloat(p.mrp) : 0;
+            return m > 0 ? m : null;
+        },
+        phOverMrp(item) {
+            const mrp = this.phMrp(item);
+            return mrp !== null && parseFloat(item.unit_price || 0) > mrp + 0.0001;
+        },
+        /** Pull the line back to the printed MRP (the server does this anyway). */
+        phPinToMrp(index) {
+            const item = this.cart[index];
+            const mrp = this.phMrp(item);
+            if (mrp === null) return;
+            item.unit_price = mrp;
+            if (item.peti_retail_price !== undefined) item.peti_retail_price = mrp;
+            this.showToast(window.TXT.ph_pinned_to_mrp || 'MRP', 'success');
+        },
+
+        // ── Batch picker ────────────────────────────────────────────────
+        phCanPickBatch(item) {
+            return this.batchTracking && item && item.item_type === 'product' && item.item_id;
+        },
+        async phOpenBatchPicker(item) {
+            if (!this.batchOverrideAllowed) return;
+            if (!this.phCanPickBatch(item)) return;
+            this.batchPickerUid = item.cart_uid;
+            this.batchPickerRows = [];
+            this.batchPickerUntracked = 0;
+            this.batchPickerLoading = true;
+            try {
+                const res = await fetch('{{ route('fbrpos.pharmacy.batch.options', [], false) }}?product_id=' + encodeURIComponent(item.item_id), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = res.ok ? await res.json() : null;
+                if (data && data.success) {
+                    this.batchPickerRows = data.batches || [];
+                    this.batchPickerUntracked = parseFloat(data.untracked || 0);
+                    if (data.near_days) this.nearExpiryDays = parseInt(data.near_days, 10);
+                } else {
+                    this.showToast(window.TXT.ph_batch_load_failed, 'error');
+                    this.batchPickerUid = null;
+                }
+            } catch (e) {
+                // Offline: the counter keeps billing, the server picks FEFO itself.
+                this.showToast(window.TXT.ph_batch_offline, 'error');
+                this.batchPickerUid = null;
+            } finally {
+                this.batchPickerLoading = false;
+            }
+        },
+        phCloseBatchPicker() { this.batchPickerUid = null; this.batchPickerRows = []; },
+        /** Pin a line to one specific batch (owner override of FEFO). */
+        phPickBatch(row) {
+            const item = this.cart.find(c => c.cart_uid === this.batchPickerUid);
+            if (!item || !row) return;
+            if (row.expired) { this.showToast(window.TXT.ph_batch_expired_block_short, 'error'); return; }
+            item.batch_id = row.id;
+            item.batch_label = row.batch;
+            item.batch_expiry = row.expiry;
+            item.batch_short_dated = !!row.short_dated;
+            // A batch that prints its own retail price wins over the catalogue
+            // price — that is the number on the box the customer is holding.
+            if (row.retail !== null && row.retail !== undefined && parseFloat(row.retail) > 0) {
+                item.unit_price = parseFloat(row.retail);
+            }
+            this.phCloseBatchPicker();
+        },
+        /** Drop the override and hand the line back to automatic FEFO. */
+        phClearBatch(item) {
+            item.batch_id = null; item.batch_label = null;
+            item.batch_expiry = null; item.batch_short_dated = false;
+            this.phCloseBatchPicker();
+        },
+
+        // ── Loose (broken-strip) sale ───────────────────────────────────
+        phCanSellLoose(item) {
+            const p = this.phProduct(item);
+            return this.looseSaleOn && !!p && !!p.allow_loose_sale && (this.phUnitsPerStrip(item) > 0);
+        },
+        // Units in a whole stocked pack — the number a loose count is divided
+        // by, server-side too. Falls back to the strip only when the catalogue
+        // never said how many strips are in the pack.
+        phUnitsPerStrip(item) {
+            const p = this.phProduct(item);
+            if (!p) return 0;
+            const perPack = parseInt(p.loose_units_per_pack || 0, 10) || 0;
+            return perPack > 0 ? perPack : (parseInt(p.units_per_strip || 0, 10) || 0);
+        },
+        phOpenLoose(item) {
+            if (!this.phCanSellLoose(item)) return;
+            this.looseModalUid = item.cart_uid;
+            this.looseModalUnits = item.loose_units ? String(item.loose_units) : '';
+            this.$nextTick(() => this.$refs.looseInput?.focus());
+        },
+        phCloseLoose() { this.looseModalUid = null; this.looseModalUnits = ''; },
+        /**
+         * A loose line is a FRACTION of a pack, never a unit of its own: 3
+         * tablets of a 10-tablet strip is quantity 0.3 at the full strip price.
+         * The client only ever posts loose_units — the server re-derives the
+         * fraction from the catalogue, so a tampered quantity changes nothing.
+         */
+        phApplyLoose() {
+            const item = this.cart.find(c => c.cart_uid === this.looseModalUid);
+            if (!item) { this.phCloseLoose(); return; }
+            const perStrip = this.phUnitsPerStrip(item);
+            const units = parseInt(this.looseModalUnits || 0, 10);
+            if (!perStrip || !(units > 0)) { this.phCloseLoose(); return; }
+            if (units >= perStrip) {
+                // A full strip (or more) is not a loose sale — bill it normally.
+                item.loose_units = 0;
+                item.quantity = Math.floor(units / perStrip);
+                const rem = units % perStrip;
+                if (rem > 0) {
+                    item.loose_units = rem;
+                    item.quantity = this.r2(units / perStrip);
+                }
+            } else {
+                item.loose_units = units;
+                item.quantity = Math.round((units / perStrip) * 10000) / 10000;
+            }
+            this.phCloseLoose();
+        },
+        phClearLoose(item) { item.loose_units = 0; item.quantity = 1; },
+
+        // ── Prescription capture ────────────────────────────────────────
+        /** Does anything in the cart need a prescription against it? */
+        phRxNeeded() {
+            if (!this.pharmacyMode) return false;
+            return (this.cart || []).some(c => {
+                const p = this.phProduct(c);
+                return !!(p && p.prescription_required);
+            });
+        },
+        phRxCaptured() {
+            return String(this.rxDoctor || '').trim() !== ''
+                || String(this.rxPatient || '').trim() !== ''
+                || !!this.rxImage;
+        },
+        phOpenRx() { this.showPrescription = true; },
+        phCloseRx() { this.showPrescription = false; },
+        phRxFile(e) {
+            const f = e?.target?.files?.[0];
+            if (!f) { this.rxImage = null; this.rxImageName = ''; return; }
+            // Kept as a data URL: the bill posts as JSON (and can queue offline),
+            // so a File object would not survive the trip.
+            if (f.size > 4 * 1024 * 1024) { this.showToast(window.TXT.ph_rx_too_big, 'error'); e.target.value = ''; return; }
+            const reader = new FileReader();
+            reader.onload = () => { this.rxImage = reader.result; this.rxImageName = f.name; };
+            reader.readAsDataURL(f);
+        },
+        phClearRx() { this.rxDoctor = ''; this.rxPatient = ''; this.rxImage = null; this.rxImageName = ''; },
         moveHighlight(dir) {
             if (!this.showSearchDropdown || this.searchSuggestions.length === 0) return;
             this.highlightIndex = Math.max(0, Math.min(this.searchSuggestions.length - 1, this.highlightIndex + dir));
@@ -6486,7 +6989,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); this.billUuid = this._newBillUuid();
+        clearCart() { this.phClearRx(); this.batchPickerUid = null; this.looseModalUid = null; this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); this.billUuid = this._newBillUuid();
             // Order Matching (Aug 2026): reset token/code so a brand-new sale
             // never inherits an identifier from the previous order.
             this.currentTokenNo = null; this.currentOrderCode = null; this.lastHeldId = null;
@@ -7168,6 +7671,17 @@ function restaurantPos() {
 
             if (this.cart.length === 0) return;
 
+            // 💊 Pharmacy (Task 1558, step 8): a schedule / prescription-required
+            // medicine may not leave the counter with nothing recorded against
+            // it. The server refuses such a bill too — this only means the
+            // cashier meets the prescription form instead of an error toast.
+            if (this.phRxNeeded() && !this.phRxCaptured()) {
+                this.showPayModal = false;
+                this.phOpenRx();
+                this.showToast(window.TXT.ph_rx_required, 'error');
+                return;
+            }
+
             // Manual-cart bypass — when cart contains "+ Manual" or Quick Type
             // manual entries (item_id=null, item_type='manual'), the restaurant
             // hold endpoint rejects them (validates item_id required|integer).
@@ -7264,9 +7778,24 @@ function restaurantPos() {
                         // this just records WHY the rate was low. store()
                         // re-validates it against pack_size + qty server-side.
                         is_peti_rate: !!c.is_peti_rate,
+                        // 💊 Pharmacy (Task 1558): batch_id is only the cashier's
+                        // OVERRIDE of FEFO — the server re-checks the batch (same
+                        // company/product/branch, not expired, not quarantined)
+                        // and falls back to its own shortest-expiry pick when the
+                        // line carries none. loose_units is the ONLY loose input
+                        // the server trusts: it re-derives the pack fraction from
+                        // the catalogue, so the quantity above cannot be gamed.
+                        batch_id: c.batch_id || null,
+                        loose_units: (parseInt(c.loose_units || 0, 10) > 0) ? parseInt(c.loose_units, 10) : null,
                         // store() takes ABSOLUTE Rs per-line discount (caps at line gross).
                         item_discount: this.getItemDiscount(c),
                     })),
+                    // 💊 Prescription capture (Task 1558, step 8): only sent in
+                    // pharmacy mode; the server demands it when a schedule /
+                    // prescription-required medicine is on the bill.
+                    doctor_name: this.pharmacyMode ? ((this.rxDoctor || '').trim() || null) : null,
+                    patient_name: this.pharmacyMode ? ((this.rxPatient || '').trim() || null) : null,
+                    prescription_image: this.pharmacyMode ? (this.rxImage || null) : null,
                     payment_method: method,
                     discount_type: this.discountType || 'percentage',
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,

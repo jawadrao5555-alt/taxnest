@@ -422,9 +422,16 @@ class InventoryService
         return [$consumptions, $skipped];
     }
 
-    public static function addStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null)
+    /**
+     * @param array $batchMeta  Pharmacy Mode (Task 1558): optional
+     *   ['batch_id','batch_number','batch_expiry'] stamped onto the movement so
+     *   the ledger can still answer "which batch?" after the batch row itself
+     *   was emptied. Empty (the default) leaves every existing caller and every
+     *   non-pharmacy movement byte-for-byte as it was.
+     */
+    public static function addStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null, array $batchMeta = [])
     {
-        return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId) {
+        return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId, $batchMeta) {
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],
                 ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
@@ -459,10 +466,33 @@ class InventoryService
                 'reference_number' => $reference['number'] ?? null,
                 'notes' => $notes,
                 'created_by' => $userId,
-            ]);
+            ] + self::batchMovementFields($batchMeta));
 
             return $stock;
         });
+    }
+
+    /**
+     * Pharmacy Mode (Task 1558): the batch columns for a movement row.
+     *
+     * Column-guarded because the movement write is on a path every panel uses,
+     * and a PROD box that has not run the pharmacy migration yet must not start
+     * throwing "Unknown column" on ordinary purchases.
+     */
+    protected static function batchMovementFields(array $batchMeta): array
+    {
+        if (!$batchMeta) {
+            return [];
+        }
+        $out = [];
+        foreach (['batch_id', 'batch_number', 'batch_expiry'] as $column) {
+            if (array_key_exists($column, $batchMeta)
+                && \Illuminate\Support\Facades\Schema::hasColumn('inventory_movements', $column)) {
+                $out[$column] = $batchMeta[$column];
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -537,9 +567,10 @@ class InventoryService
         });
     }
 
-    public static function deductStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null)
+    /** @param array $batchMeta see addStock() — Pharmacy Mode (Task 1558). */
+    public static function deductStock($companyId, $productId, $quantity, $unitPrice, $type, $branchId = null, $reference = [], $notes = null, $userId = null, array $batchMeta = [])
     {
-        return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId) {
+        return DB::transaction(function () use ($companyId, $productId, $quantity, $unitPrice, $type, $branchId, $reference, $notes, $userId, $batchMeta) {
             $stock = InventoryStock::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'product_id' => $productId, 'branch_id' => $branchId],
                 ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
@@ -562,7 +593,7 @@ class InventoryService
                 'reference_number' => $reference['number'] ?? null,
                 'notes' => $notes,
                 'created_by' => $userId,
-            ]);
+            ] + self::batchMovementFields($batchMeta));
 
             return $stock;
         });

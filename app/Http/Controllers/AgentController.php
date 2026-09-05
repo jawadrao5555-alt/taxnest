@@ -1629,7 +1629,10 @@ class AgentController extends Controller
                 return response()->json(['error' => 'Transaction not found'], 404);
             }
             $this->setPrintLocale($transaction->creator?->language, $job, $company);
-            return response(view('fbr-pos.receipt', compact('transaction', 'company'))->render())
+            // 💊 Pharmacy Mode (Task 1558): the silently-printed copy must carry
+            // the same batch/expiry line the on-screen receipt shows.
+            $pharmacyPrintBatch = \App\Services\PharmacyBatchService::trackingEnabled($company);
+            return response(view('fbr-pos.receipt', compact('transaction', 'company', 'pharmacyPrintBatch'))->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 

@@ -11,6 +11,9 @@ class PosFeatureService
         'inventory', 'delivery', 'barcode', 'prescription',
         'service_jobs', 'customer_profile', 'bulk_pricing',
         'multi_branch', 'customer_loyalty',
+        // Pharmacy Mode (Task 1558) — 'pharmacy' is the master child flag that
+        // companies.pharmacy_mode mirrors; the other two are its own children.
+        'pharmacy', 'batch_expiry', 'loose_sale',
     ];
 
     /**
@@ -23,8 +26,23 @@ class PosFeatureService
      */
     public const RESTAURANT_FLAGS = ['kot', 'tables', 'kitchen', 'kitchen_notes', 'recipes'];
 
+    /**
+     * Plan-gated Pharmacy flags (Task 1558) — the exact same shape as
+     * RESTAURANT_FLAGS, for the same reason.
+     *
+     * 'pharmacy' is the master: companies.pharmacy_mode mirrors it through
+     * masterSwitches(), so the column can never drift away from the flag map.
+     * The other three only mean anything underneath it, so forCompany() masks
+     * ALL of them off when the package does not carry pharmacy_enabled —
+     * stored configuration survives untouched, ready for an upgrade.
+     */
+    public const PHARMACY_FLAGS = ['pharmacy', 'prescription', 'batch_expiry', 'loose_sale'];
+
     /** Per-request cache: company_id => bool */
     protected static array $restaurantAllowedCache = [];
+
+    /** Per-request cache: company_id => bool (Pharmacy module, Task 1558) */
+    protected static array $pharmacyAllowedCache = [];
 
     /** company_id => [plan_column => bool] cache for plan feature gates. */
     protected static array $planGateCache = [];
@@ -36,7 +54,7 @@ class PosFeatureService
      * active trial passes (evaluate-before-buying), otherwise the active
      * plan's column decides.
      */
-    public const PLAN_GATES = ['deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled', 'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled', 'qr_menu_enabled', 'offline_enabled', 'excel_enabled', 'khata_enabled', 'loyalty_enabled', 'kot_enabled', 'caller_id_enabled', 'whatsapp_enabled'];
+    public const PLAN_GATES = ['deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled', 'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled', 'qr_menu_enabled', 'offline_enabled', 'excel_enabled', 'khata_enabled', 'loyalty_enabled', 'kot_enabled', 'caller_id_enabled', 'whatsapp_enabled', 'pharmacy_enabled'];
 
     public const FLAG_META = [
         'kot' => [
@@ -111,11 +129,37 @@ class PosFeatureService
             'icon' => '⭐',
             'category' => 'customer',
         ],
+        // Pharmacy Mode (Task 1558) is an FBR-panel module: goods, not services.
+        // The 'panel' key keeps it out of the PRA wizard's own catalogue — a
+        // salon's settings page must not carry another panel's business mode.
+        // ('prescription' deliberately has no panel key: it predates this task
+        // and has always been offered on both panels.)
+        'pharmacy' => [
+            'label' => 'Pharmacy / Medical Store Mode',
+            'description' => 'Medicine catalogue (salt, strength, schedule), batch & expiry stock, expiry claims and pharmacy reports.',
+            'icon' => '⚕️',
+            'category' => 'specialty',
+            'panel' => 'fbrpos',
+        ],
         'prescription' => [
             'label' => 'Prescription (Pharmacy)',
             'description' => 'Capture doctor name, prescription image, drug schedule for pharmacy compliance.',
             'icon' => '💊',
             'category' => 'specialty',
+        ],
+        'batch_expiry' => [
+            'label' => 'Batch & Expiry Tracking',
+            'description' => 'Receive stock batch-wise with an expiry date; the counter sells the shortest-dated batch first.',
+            'icon' => '📅',
+            'category' => 'specialty',
+            'panel' => 'fbrpos',
+        ],
+        'loose_sale' => [
+            'label' => 'Loose / Broken Strip Sale',
+            'description' => 'Sell single tablets out of a strip or box without the stock count drifting.',
+            'icon' => '✂️',
+            'category' => 'specialty',
+            'panel' => 'fbrpos',
         ],
         'service_jobs' => [
             'label' => 'Service Jobs (Salon/Workshop)',
@@ -359,8 +403,13 @@ class PosFeatureService
         'retail' => [
             'barcode' => true, 'inventory' => true, 'customer_profile' => true,
         ],
+        // Pharmacy Mode (Task 1558): the signup preset finally switches on
+        // something real. 'pharmacy' is the master flag masterSwitches() mirrors
+        // into companies.pharmacy_mode, and batch/expiry + prescription are the
+        // two things a medical store cannot open without.
         'pharmacy' => [
             'barcode' => true, 'inventory' => true,
+            'pharmacy' => true, 'batch_expiry' => true, 'loose_sale' => true,
             'prescription' => true, 'delivery' => true, 'customer_profile' => true,
         ],
         'grocery' => [
@@ -750,6 +799,11 @@ class PosFeatureService
         'delivery' => ['customer_profile'],
         'prescription' => ['customer_profile'],
         'customer_loyalty' => ['customer_profile'],
+        // Pharmacy Mode (Task 1558). Batch/expiry and loose sale are stock
+        // behaviour, so they cannot exist without inventory tracking, and both
+        // are meaningless outside the pharmacy module itself.
+        'batch_expiry' => ['pharmacy', 'inventory'],
+        'loose_sale' => ['pharmacy'],
     ];
 
     public static function forCompany(?Company $company): object
@@ -770,6 +824,17 @@ class PosFeatureService
         // dependency resolution so children of masked parents drop too.
         if (!self::restaurantAllowed($company)) {
             foreach (self::RESTAURANT_FLAGS as $flag) {
+                $flags[$flag] = false;
+            }
+        }
+
+        // Pharmacy Mode (Task 1558): same masking rule, same reason. A shop
+        // whose package does not carry the module loses the master flag AND
+        // every child underneath it, so no pharmacy screen, menu entry or
+        // batch-aware billing path can be reached — while the stored setup
+        // waits intact for the day the package covers it again.
+        if (!self::pharmacyAllowed($company)) {
+            foreach (self::PHARMACY_FLAGS as $flag) {
                 $flags[$flag] = false;
             }
         }
@@ -842,6 +907,86 @@ class PosFeatureService
     {
         return (bool) ($company?->caller_id_enabled ?? false)
             && self::planAllows($company, 'caller_id_enabled');
+    }
+
+    /**
+     * Does this company's PACKAGE carry the Pharmacy module? (Task 1558)
+     *
+     * The module rides the ordinary PLAN_GATES machinery — pharmacy_enabled on
+     * pricing_plans — so internal accounts, blanket overrides, an active trial
+     * and a paid add-on all behave exactly as they do for every other premium
+     * feature, with no second entitlement rule to keep in step.
+     */
+    public static function pharmacyAllowed(?Company $company): bool
+    {
+        if (!$company) {
+            return false;
+        }
+        if (array_key_exists($company->id, self::$pharmacyAllowedCache)) {
+            return self::$pharmacyAllowedCache[$company->id];
+        }
+
+        return self::$pharmacyAllowedCache[$company->id]
+            = self::planAllows($company, 'pharmacy_enabled');
+    }
+
+    /**
+     * Pharmacy mode live RIGHT NOW — the single truth for navigation, the
+     * settings card, every pharmacy route guard and every pharmacy-only field.
+     *
+     * Two things must both be true: the shop's own switch AND the package gate,
+     * the same pairing callerIdLive() enforces. Reading the raw column alone
+     * would leave a downgraded shop staring at menu entries and batch pickers
+     * whose controllers would only ever answer 403 — the panel must never
+     * advertise a feature it will refuse.
+     */
+    public static function pharmacyLive(?Company $company): bool
+    {
+        if (!$company) {
+            return false;
+        }
+        if (!self::pharmacyAllowed($company)) {
+            return false;
+        }
+
+        // The column is the fast answer, but a shop whose feature_flags were
+        // written before the column existed (PROD schema-drift window) must
+        // still resolve correctly, so the flag map is the fallback.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pharmacy_mode')) {
+            return (bool) $company->pharmacy_mode;
+        }
+
+        return self::rawFlag($company, 'pharmacy');
+    }
+
+    /**
+     * WHY the company has (or doesn't have) the Pharmacy module.
+     * Returns 'internal' | 'override' | 'plan' | 'trial' | 'addon' | null.
+     * Used by the locked settings card to say something truthful instead of a
+     * flat "upgrade" — a trial shop especially needs to know its access ends.
+     */
+    public static function pharmacyAccessSource(?Company $company): ?string
+    {
+        if (!$company || !self::pharmacyAllowed($company)) {
+            return null;
+        }
+        if ($company->is_internal_account) {
+            return 'internal';
+        }
+        $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
+        if ($sub) {
+            if ($sub->hasActiveOverride() && self::overrideGrantsEverything($sub)) {
+                return 'override';
+            }
+            if ($sub->pricingPlan && !empty($sub->pricingPlan->pharmacy_enabled)) {
+                return $sub->hasActiveOverride() ? 'override' : 'plan';
+            }
+            if ($sub->isTrialActive()) {
+                return 'trial';
+            }
+        }
+
+        return 'addon';
     }
 
     public static function rawFlag(?Company $company, string $flag): bool
@@ -943,6 +1088,7 @@ class PosFeatureService
     {
         self::$planGateCache = [];
         self::$restaurantAllowedCache = [];
+        self::$pharmacyAllowedCache = [];
         \App\Services\PosAddonService::flushCache();
     }
 
@@ -1367,6 +1513,21 @@ class PosFeatureService
             || (bool) ($flags['tables'] ?? false);
     }
 
+    /**
+     * Pharmacy mode is a FEATURE, not an identity either (Task 1558).
+     *
+     * Unlike restaurant mode there is ONE explicit master flag rather than a
+     * family of switches: a medical store either runs the medicine catalogue,
+     * batch/expiry stock and claim workflow, or it does not. Deriving it from
+     * the children instead (batch_expiry || prescription) would let a general
+     * store that merely wanted a prescription note find itself in pharmacy
+     * mode, which is exactly the drift the restaurant column used to suffer.
+     */
+    public static function pharmacyModeFrom(array $flags): bool
+    {
+        return (bool) ($flags['pharmacy'] ?? false);
+    }
+
     public static function isLegacyCategory(?string $category): bool
     {
         return $category !== null && array_key_exists($category, self::LEGACY_CATEGORIES);
@@ -1431,6 +1592,9 @@ class PosFeatureService
             'feature_flags'     => $defaults,
             'inventory_enabled' => (bool) ($defaults['inventory'] ?? false),
             'restaurant_mode'   => self::restaurantModeFrom($defaults),
+            // Pharmacy Mode (Task 1558): a shop that signs up as a medical
+            // store now lands on the REAL switch, not a flag nobody reads.
+            'pharmacy_mode'     => self::pharmacyModeFrom($defaults),
         ];
 
         return array_filter(
@@ -1462,6 +1626,10 @@ class PosFeatureService
         $columns = [
             'inventory_enabled' => (bool) ($flags['inventory'] ?? false),
             'restaurant_mode'   => self::restaurantModeFrom($flags),
+            // Pharmacy Mode (Task 1558): a THIRD column beside the flag map, so
+            // it obeys the same rule — any path that writes feature_flags must
+            // rewrite it, or the shop ends up with two contradictory answers.
+            'pharmacy_mode'     => self::pharmacyModeFrom($flags),
         ];
 
         return array_filter(
@@ -1532,6 +1700,26 @@ class PosFeatureService
 
         return !in_array($current, self::categories($panel), true)
             && in_array($current, self::categories($other), true);
+    }
+
+    /**
+     * The flags a given panel is allowed to know about.
+     *
+     * Most flags are shared, so FLAG_META carries no 'panel' key for them. A
+     * flag that names another panel's business mode (Pharmacy Mode, Task 1558)
+     * sets it, and is then invisible to the other panel's settings wizard —
+     * a salon must not be able to read a medical store's module out of its own
+     * page, exactly as the business-type catalogue is already scoped.
+     *
+     * @param  string  $panel  'pos' (PRA) or 'fbrpos'
+     * @return array<int,string>
+     */
+    public static function flagsForPanel(string $panel): array
+    {
+        return array_values(array_filter(self::ALL_FLAGS, function (string $flag) use ($panel) {
+            $only = self::FLAG_META[$flag]['panel'] ?? null;
+            return $only === null || $only === $panel;
+        }));
     }
 
     public static function flagMeta(string $flag): array

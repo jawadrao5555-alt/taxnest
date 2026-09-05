@@ -63,10 +63,10 @@ $EXPECTED_GATE_ORDER = [
     'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled',
     'qr_menu_enabled', 'offline_enabled', 'excel_enabled',
     'khata_enabled', 'loyalty_enabled', 'kot_enabled', 'caller_id_enabled',
-    'whatsapp_enabled',
+    'whatsapp_enabled', 'pharmacy_enabled',
 ];
 $MATRIX = [
-    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id, whatsapp]
+    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot, caller_id, whatsapp, pharmacy]
     // 23 Aug 2026 (owner): Pro and Pro Max are RETIRED — Pro was merged into
     // Business, which keeps the name and takes Pro's whole feature set at
     // Rs 27,999/yr. Three sellable packages remain: Starter, Business,
@@ -86,9 +86,14 @@ $MATRIX = [
     // was gated on them before). The FBR ladder flip comes later.
     // 13 Aug 2026 (owner, market-capture move): Business gains Kitchen mode
     // (restaurant_enabled — asserted separately below) + Analytics.
-    'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false],
-    'Business'  => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, true],
-    'Unlimited' => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, true,  true],
+    // Task 1558 (Pharmacy Mode): pharmacy_enabled is an FBR-panel module —
+    // PRA is the SERVICES regulator and a medical store sells goods, so no PRA
+    // package carries it. The column stays FALSE on every PRA row; an active
+    // PRA trial still opens it by the blanket trial rule, which is harmless
+    // because the pharmacy screens live on the FBR panel only.
+    'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true, false, false, false],
+    'Business'  => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, false, true,  false],
+    'Unlimited' => [true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true, true, true, true,  true,  false],
 ];
 // Branch ladder (owner-approved 21 Aug 2026): har package apne card wali
 // branches MUFT deta hai; us se ooper har branch Rs 10,000 SAALANA paid add-on
@@ -521,14 +526,14 @@ try {
     //       migration didn't run or someone hand-edited the rows. ────────
     $fbrGateCols = ['inventory_enabled', 'offline_enabled', 'excel_enabled', 'khata_enabled',
                     'reports_enabled', 'deals_enabled', 'loyalty_enabled', 'kot_enabled',
-                    'analytics_enabled'];
+                    'analytics_enabled', 'pharmacy_enabled'];
     $FBR_MATRIX = [
-        // name => [annual price, inventory, offline, excel, khata, reports, deals, loyalty, kot, analytics]
-        'Starter'  => [17999, true,  false, false, false, false, false, false, false, false],
-        'Business' => [27999, true,  true,  true,  true,  true,  true,  true,  true,  true],
+        // name => [annual price, inventory, offline, excel, khata, reports, deals, loyalty, kot, analytics, pharmacy]
+        'Starter'  => [17999, true,  false, false, false, false, false, false, false, false, false],
+        'Business' => [27999, true,  true,  true,  true,  true,  true,  true,  true,  true,  true],
         // Trial gate COLUMNS stay false (PRA convention): active trial unlocks
         // via isTrialActive; true columns would leak features to EXPIRED trials.
-        'Trial'    => [0,     true,  false, false, false, false, false, false, false, false],
+        'Trial'    => [0,     true,  false, false, false, false, false, false, false, false, false],
     ];
     // Annual-only since 23 Aug 2026: the hand-set shorter-cycle columns are
     // frozen legacy data, so they are no longer asserted — what matters is that
@@ -590,6 +595,33 @@ try {
                   'deals_enabled', 'loyalty_enabled', 'kot_enabled', 'analytics_enabled'] as $g) {
             check(PosFeatureService::planAllows($c, $g) === true, "fbrpos Business sub: {$g} must be open");
         }
+
+        // Pharmacy Mode (Task 1558): the module needs BOTH the package gate and
+        // the shop's own switch. A Starter pharmacy must stay dark even with the
+        // column flipped on, or navigation advertises screens the controllers
+        // will only ever refuse.
+        $c = $mkFbrCompany('PharmacyStarter');
+        $mkSub($c, $fbrPlans['Starter']->id);
+        $c->pharmacy_mode = true;
+        $c->save();
+        PosFeatureService::flushGateCaches();
+        check(PosFeatureService::planAllows($c->fresh(), 'pharmacy_enabled') === false,
+            'fbrpos Starter sub: pharmacy_enabled must be locked');
+        check(PosFeatureService::pharmacyLive($c->fresh()) === false,
+            'fbrpos Starter sub: pharmacyLive() must stay false even with the shop switch ON');
+
+        $c = $mkFbrCompany('PharmacyBusiness');
+        $mkSub($c, $fbrPlans['Business']->id);
+        PosFeatureService::flushGateCaches();
+        check(PosFeatureService::planAllows($c->fresh(), 'pharmacy_enabled') === true,
+            'fbrpos Business sub: pharmacy_enabled must be open');
+        check(PosFeatureService::pharmacyLive($c->fresh()) === false,
+            'fbrpos Business sub: pharmacyLive() must be false until the shop switches it on');
+        $c->pharmacy_mode = true;
+        $c->save();
+        PosFeatureService::flushGateCaches();
+        check(PosFeatureService::pharmacyLive($c->fresh()) === true,
+            'fbrpos Business sub: pharmacyLive() must be true once package AND shop switch agree');
 
         $c = $mkFbrCompany('TrialActive');
         $mkSub($c, $fbrPlans['Trial']->id, ['trial_ends_at' => now()->addDays(3)]);

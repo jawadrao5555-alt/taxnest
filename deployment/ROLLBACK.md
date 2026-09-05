@@ -158,17 +158,23 @@ hospital pharmacy module, healthcare HR and attendance, patient/OPD core,
 inpatient and operations, the healthcare foundation, and the business-type and
 preset changes that touch every panel's signup.
 
+It shipped in two runs. The first carried the batch itself; while it was being
+verified, the Nest ERPS product-line rename and a healthcare patient-billing
+core merged onto main, so a second run shipped those and everything was
+re-proven against the final revision. The table below is the state that matters.
+
 | | |
 |---|---|
-| Live commit after the deploy | `36a70430` |
-| **Rollback target** (what live was on before) | `5651e0ce` |
-| Backup | taken pre-deploy and **restored into a scratch database** before shipping |
-| Settings baseline | `~/.taxnest-settings-task1572-before.json` on the live host |
+| Live commit after the deploy | `035b92c2` |
+| **Rollback target** (what live was on before the second run) | `17075bf6` |
+| Rollback target for the whole batch (before the first run) | `5651e0ce` |
+| Backup | `~/backup-pre-task1572-r2-*.sql.gz`, 233 tables; the first run's backup was **restored into a scratch database** to prove the procedure |
+| Settings baseline | taken by the deploy itself, immediately before migrating |
 
 Rollback is section 1 above. The one command that matters:
 
 ```bash
-cd /var/www/taxnest && git reset --hard 5651e0ce
+cd /var/www/taxnest && git reset --hard 17075bf6   # or 5651e0ce to undo the whole batch
 ```
 
 …followed by the composer install, the cache rebuild, **the PHP-FPM reload and
@@ -177,9 +183,15 @@ older release ignores them.
 
 ## What was proven on live, not assumed
 
+Everything below was re-run against the final revision, `035b92c2`.
+
 - **The commit** — read from the server itself, not from the deploy output.
-- **The schema** — all 48 new tables and all 52 added columns queried directly
-  on the live database. A `migrate` status line was not accepted as evidence.
+- **The schema** — all 48 new tables and all 52 added columns from the first run,
+  plus the eight `health_*` billing tables and the `erps_vertical` column from
+  the second, queried directly on the live database (241 tables in total). A
+  `migrate` status line was not accepted as evidence.
+- **No shop's settings moved** — the deploy's own before/after comparison
+  reported one added column and *no existing value changed*.
 - **The pharmacy round** (`scripts/fbr-live-pharmacy-round.sh`, against the
   standing live FBR QA shop): the mode gate refuses the screens and hides the
   nav entry while off; medicine fields persist; three batches received with
@@ -216,3 +228,13 @@ run each:
 - Live runs with `APP_DEBUG` off, so a thrown error arrives as an anonymous 500
   page and the probe learns nothing. Swap in an exception handler that
   re-throws.
+
+And one that applies to every probe, not just these: **a check that prints
+`FAIL` but still exits 0 is worse than no check at all.** The pharmacy round
+originally computed its stock assertions in an embedded Python block that only
+printed; the round would have reported PASS while the expiry, loose-sale and
+return-to-original-batch maths was wrong. Every assertion now returns a non-zero
+status and the shell propagates it into the run's verdict. Copy the scripts onto
+the host into the repo's own `scripts/` directory — they resolve
+`vendor/autoload.php` relative to themselves, so `/tmp` fails — and delete them
+in the same command, so a throwaway probe never outlives its incident.

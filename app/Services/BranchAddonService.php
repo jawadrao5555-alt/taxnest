@@ -37,8 +37,27 @@ class BranchAddonService
     /** Rs per extra branch, per YEAR. */
     public const PRICE_PER_YEAR = 10000;
 
-    /** Product lines jin par ye add-on chalta hai. */
+    /**
+     * Product lines jin par ye add-on chalta hai.
+     *
+     * Digital Invoice aur Nest ERPS (Task 1568) is list se BAHAR hain — donon
+     * branch slots nahi bechte. Ye list hi wahid faisla hai; isEligible() se
+     * poochein, kahin bhi product type ka apna match na likhein.
+     */
     public const PRODUCT_TYPES = ['pos', 'fbrpos'];
+
+    /**
+     * Kya is product line par extra-branch add-on bikta hai?
+     *
+     * Nest ERPS ke liye jawab sochi-samjhi 'nahi' hai: uske panels branches
+     * platform ke shared branch service se lete hain, per-branch slot bech kar
+     * nahi. Ye sawal yahan explicit hai taake koi buying path unmatched value
+     * ke zariye Digital Invoice ke default par na gir jaye.
+     */
+    public static function isEligible(?string $productType): bool
+    {
+        return $productType !== null && in_array($productType, self::PRODUCT_TYPES, true);
+    }
 
     /** Ek request mein maximum slots (operator-error guard). */
     public const MAX_QTY = 20;

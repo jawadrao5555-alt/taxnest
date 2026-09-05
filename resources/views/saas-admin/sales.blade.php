@@ -21,6 +21,7 @@
                         <option value="di">Digital Invoice only</option>
                         <option value="pos">PRA POS only</option>
                         <option value="fbrpos">FBR POS only</option>
+                        <option value="{{ \App\Support\NestErps::PRODUCT_TYPE }}">{{ \App\Support\NestErps::LABEL }} only</option>
                     </select>
                 </div>
                 <div>
@@ -48,7 +49,9 @@
         <div class="divide-y divide-gray-800">
             @foreach($campaigns as $c)
             @php
-                $scopeLabels = ['all' => 'All Products', 'di' => 'Digital Invoice', 'pos' => 'PRA POS', 'fbrpos' => 'FBR POS'];
+                // Labels come from the catalogue so a product line can never
+                // show here as a raw discriminator.
+                $scopeLabels = ['all' => 'All Products'] + \App\Support\ProductCatalog::options();
                 $status = $c->status_label;
                 $statusColors = [
                     'Live' => 'bg-emerald-900/40 text-emerald-300',

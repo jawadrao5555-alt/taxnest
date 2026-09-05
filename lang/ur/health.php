@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Healthcare ERP panel — Urdu.
+ * Nest ERPS — Healthcare panel — Urdu.
  *
  * THREE-WAY KEY SYNC: lang/en/health.php, lang/rur/health.php and
  * lang/ur/health.php must always hold exactly the same keys.
@@ -13,9 +13,13 @@
 return [
 
     /* ─── Product ─── */
-    'panel_name' => 'ہیلتھ کیئر ای آر پی',
+    // نیسٹ ای آر پی ایس مصنوعہ ہے؛ ہیلتھ کیئر اس کے اندر کا شعبہ ہے۔
+    'product_name' => 'نیسٹ ای آر پی ایس',
+    'product_tagline' => 'ایک ہی ای آر پی خاندان — ہر شعبے کا اپنا نظام',
+    'vertical_name' => 'ہیلتھ کیئر',
+    'panel_name' => 'نیسٹ ای آر پی ایس — ہیلتھ کیئر',
     'panel_tagline' => 'کلینک، ہسپتال، لیبارٹری اور فارمیسی — سب ایک ہی نظام پر',
-    'brand_short' => 'ہیلتھ کیئر',
+    'brand_short' => 'نیسٹ ای آر پی ایس',
 
     /* ─── Organisation types ─── */
     'org_type' => 'ادارے کی قسم',
@@ -26,7 +30,7 @@ return [
 
     /* ─── Authentication ─── */
     'login' => 'داخل ہوں',
-    'login_title' => 'ہیلتھ کیئر ای آر پی میں داخلہ',
+    'login_title' => 'نیسٹ ای آر پی ایس میں داخلہ',
     'login_subtitle' => 'وہی اکاؤنٹ استعمال کریں جو آپ کے ادارے نے دیا ہے',
     'login_identifier' => 'ای میل، فون، این ٹی این یا صارف نام',
     'password' => 'خفیہ لفظ',
@@ -34,7 +38,7 @@ return [
     'remember_me' => 'مجھے یاد رکھیں',
     'logout' => 'باہر نکلیں',
     'register' => 'نیا اکاؤنٹ بنائیں',
-    'register_title' => 'اپنا طبی ادارہ رجسٹر کریں',
+    'register_title' => 'اپنا طبی ادارہ نیسٹ ای آر پی ایس پر رجسٹر کریں',
     'register_subtitle' => 'تین دن مفت۔ کارڈ کی ضرورت نہیں۔',
     'already_registered' => 'پہلے سے اکاؤنٹ ہے؟',
     'need_account' => 'اکاؤنٹ چاہیے؟',
@@ -43,7 +47,7 @@ return [
     'auth_deactivated' => 'آپ کا اکاؤنٹ بند کر دیا گیا ہے۔',
     'auth_no_company' => 'آپ کے اکاؤنٹ کے ساتھ کوئی ادارہ منسلک نہیں۔',
     'auth_company_missing' => 'ادارہ نہیں ملا۔ معاونت سے رابطہ کریں۔',
-    'auth_not_healthcare' => 'یہ داخلہ صفحہ صرف طبی اداروں کے لیے ہے۔',
+    'auth_not_healthcare' => 'یہ داخلہ صفحہ صرف نیسٹ ای آر پی ایس کے طبی اداروں کے لیے ہے۔',
     'auth_no_role' => 'آپ کے اکاؤنٹ کا طبی عہدہ ابھی مقرر نہیں۔ اپنے منتظم سے کہیں۔',
 
     /* ─── Registration form ─── */
@@ -256,7 +260,7 @@ return [
     /* ─── Settings ─── */
     'settings' => 'ترتیبات',
     'settings_title' => 'ترتیبات',
-    'settings_subtitle' => 'آپ کے طبی نظام کی بنیادی ترتیب۔',
+    'settings_subtitle' => 'آپ کے نیسٹ ای آر پی ایس نظام کی بنیادی ترتیب۔',
     'settings_modules_card' => 'حصے',
     'settings_modules_card_desc' => 'نظام کے جو حصے آپ چلاتے ہیں انہیں چالو یا بند کریں۔',
     'settings_departments_card' => 'شعبے',

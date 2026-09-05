@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\PricingPlan;
+use App\Support\NestErps;
+use App\Support\ProductCatalog;
 
 /**
  * "Is this package still on the shelf?" — one product-aware answer.
@@ -39,7 +41,19 @@ class PlanSellabilityService
             return false;
         }
 
-        return match ($plan->product_type ?? null) {
+        $type = $plan->product_type ?? null;
+
+        // Nest ERPS keeps NO retirement allowlist yet: the line is sold on
+        // enquiry, so every package the admin prices is on the shelf. This arm
+        // is spelled out rather than left to `default` so the umbrella can
+        // never reach a Digital Invoice answer by accident, and so the day the
+        // owner retires a Nest ERPS package there is one obvious place to
+        // plug its comparison service in.
+        if (NestErps::isProductType($type)) {
+            return false;
+        }
+
+        return match ($type) {
             'pos'    => !PosPlanComparisonService::isSellablePlan($plan),
             'fbrpos' => !FbrPosPlanComparisonService::isSellablePlan($plan),
             'di'     => !DiPlanComparisonService::isSellablePlan($plan),
@@ -67,12 +81,13 @@ class PlanSellabilityService
 
     public static function productLabel(?PricingPlan $plan): string
     {
-        return match ($plan->product_type ?? null) {
-            'pos'    => 'PRA POS',
-            'fbrpos' => 'FBR POS',
-            'di'     => 'Digital Invoice',
-            'health' => 'Healthcare ERP',
-            default  => 'package',
-        };
+        $type = $plan->product_type ?? null;
+
+        // Nest ERPS names its vertical underneath the product ("Nest ERPS — Healthcare").
+        if (NestErps::isProductType($type)) {
+            return NestErps::label(NestErps::verticalOf($plan));
+        }
+
+        return ProductCatalog::label($type);
     }
 }

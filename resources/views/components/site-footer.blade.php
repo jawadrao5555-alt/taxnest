@@ -12,7 +12,7 @@
             <div class="md:col-span-2">
                 <img src="{{ asset('images/brand/taxnest-logo-white.svg') }}" alt="TaxNest" class="h-8 w-auto mb-5">
                 <p class="text-sm text-white/60 leading-relaxed max-w-sm mb-6">
-                    Pakistan's tax compliance platform — FBR Digital Invoicing, PRA Point of Sale, and FBR POS, engineered under one roof.
+                    Pakistan's tax compliance platform — FBR Digital Invoicing, PRA Point of Sale and FBR POS — plus {{ \App\Support\NestErps::LABEL }}, our on-demand ERP line, engineered under one roof.
                 </p>
                 <ul class="space-y-2.5 text-sm text-white/60">
                     @if($footerEmail)
@@ -42,6 +42,7 @@
                     <li><a href="/digital-invoice" class="hover:text-white transition-colors">Digital Invoice</a></li>
                     <li><a href="/pos" class="hover:text-white transition-colors">NestPOS (PRA)</a></li>
                     <li><a href="/fbr-pos-landing" class="hover:text-white transition-colors">FBR POS</a></li>
+                    <li><a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="hover:text-white transition-colors">{{ \App\Support\NestErps::LABEL }}</a></li>
                     <li><a href="/#compare" class="hover:text-white transition-colors">Compare</a></li>
                     <li><a href="/download" class="hover:text-white transition-colors">Downloads</a></li>
                 </ul>

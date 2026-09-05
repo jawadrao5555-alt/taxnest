@@ -137,8 +137,9 @@
                         <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                     </span>
                     <span class="min-w-0">
-                        <span class="block text-sm font-black text-white leading-tight truncate">{{ __('health.panel_name') }}</span>
-                        <span class="block text-[11px] text-white/75 leading-tight truncate">{{ $hCompany->name ?? '' }}</span>
+                        {{-- Product on top, vertical as the sub-label (Task 1568). --}}
+                        <span class="block text-sm font-black text-white leading-tight truncate">{{ __('health.product_name') }}</span>
+                        <span class="block text-[11px] text-white/75 leading-tight truncate">{{ __('health.vertical_name') }}@if($hCompany->name ?? null) · {{ $hCompany->name }}@endif</span>
                     </span>
                 </a>
             </div>

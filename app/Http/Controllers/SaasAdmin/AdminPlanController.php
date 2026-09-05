@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Collection;
 use App\Services\PosAddonPricingService;
 use App\Services\PosPlanComparisonService;
+use App\Support\NestErps;
+use App\Support\ProductCatalog;
 
 class AdminPlanController extends Controller
 {
@@ -29,16 +31,21 @@ class AdminPlanController extends Controller
                 ->orderBy('price')
                 ->get();
             $fbrposPlans = PricingPlan::where('product_type', 'fbrpos')->orderBy('price')->get();
-            // Healthcare ERP (Task 1547) — the Clinic / Hospital shelf. Without
-            // its own bucket a health package would be invisible here and the
-            // admin could not price or edit what the migration seeded.
-            $healthPlans = PricingPlan::where('product_type', 'health')->orderBy('price')->get();
+            // Nest ERPS (Task 1568) — the umbrella's shelf, every vertical's
+            // packages together. Without its own bucket an ERPS package would
+            // be invisible here and the admin could not price or edit it.
+            // whereIn(): rows may still carry the pre-umbrella spelling.
+            $erpsPlans = PricingPlan::whereIn('product_type', NestErps::PRODUCT_TYPES)
+                ->orderBy('price')->get();
         } else {
             $diPlans = PricingPlan::orderBy('price')->get();
             $posPlans = new Collection();
             $fbrposPlans = new Collection();
-            $healthPlans = new Collection();
+            $erpsPlans = new Collection();
         }
+
+        // Which verticals a Nest ERPS package may be filed under.
+        $erpsVerticals = NestErps::verticals();
 
         // A ladder that is ALREADY broken must not be invisible — the editor
         // only blocks NEW breakage, so an old one would otherwise sit there
@@ -47,7 +54,7 @@ class AdminPlanController extends Controller
 
         $posAddons = PosAddonPricingService::catalog();
 
-        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'healthPlans', 'ladderWarnings', 'posAddons'));
+        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'erpsPlans', 'erpsVerticals', 'ladderWarnings', 'posAddons'));
     }
 
     public function updateAddonPricing(Request $request)
@@ -151,7 +158,9 @@ class AdminPlanController extends Controller
             'invoice_limit' => 'required|integer|min:-1',
             'ai_page_limit' => 'nullable|integer|min:-1',
             'fair_use_limit' => 'nullable|integer|min:0',
-            'product_type' => 'required|in:di,pos,fbrpos,health',
+            'product_type' => 'required|' . ProductCatalog::validationRule(),
+            // Which vertical of the umbrella this package belongs to (Nest ERPS only).
+            'erps_vertical' => 'nullable|in:' . implode(',', NestErps::verticalKeys()),
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -161,6 +170,14 @@ class AdminPlanController extends Controller
         ]);
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
+
+        // Canonical type + vertical BEFORE the write: a stale open form may
+        // still post the pre-umbrella spelling, and a Nest ERPS package with no
+        // vertical would be filed under nothing.
+        $productType = ProductCatalog::normalize($data['product_type']) ?? $data['product_type'];
+        $erpsVertical = NestErps::isProductType($productType)
+            ? NestErps::normalizeVertical($request->input('erps_vertical'))
+            : null;
 
         // Ladder check BEFORE the write (Task 1455) — a new half-configured
         // package dropped into the middle of a ladder is the classic way a
@@ -174,7 +191,8 @@ class AdminPlanController extends Controller
         // columns like is_trial can't be injected via crafted POST data.
         $plan = PricingPlan::create($this->onlyExistingColumns([
             'name' => $data['name'],
-            'product_type' => $data['product_type'],
+            'product_type' => $productType,
+            NestErps::VERTICAL_COLUMN => $erpsVertical,
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],
@@ -209,7 +227,9 @@ class AdminPlanController extends Controller
             'invoice_limit' => 'required|integer|min:-1',
             'ai_page_limit' => 'nullable|integer|min:-1',
             'fair_use_limit' => 'nullable|integer|min:0',
-            'product_type' => 'required|in:di,pos,fbrpos,health',
+            'product_type' => 'required|' . ProductCatalog::validationRule(),
+            // Which vertical of the umbrella this package belongs to (Nest ERPS only).
+            'erps_vertical' => 'nullable|in:' . implode(',', NestErps::verticalKeys()),
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -217,6 +237,14 @@ class AdminPlanController extends Controller
         ]);
 
         $features = array_filter(array_map('trim', explode("\n", $request->input('features_text', ''))));
+
+        // Canonical type + vertical BEFORE the write: a stale open form may
+        // still post the pre-umbrella spelling, and a Nest ERPS package with no
+        // vertical would be filed under nothing.
+        $productType = ProductCatalog::normalize($data['product_type']) ?? $data['product_type'];
+        $erpsVertical = NestErps::isProductType($productType)
+            ? NestErps::normalizeVertical($request->input('erps_vertical'))
+            : null;
 
         // Ladder check BEFORE the write (Task 1455) — reports switched off on a
         // costlier package, a tightened cap or a reprice that reorders the
@@ -230,7 +258,8 @@ class AdminPlanController extends Controller
         // columns like is_trial can't be injected via crafted POST data.
         $plan->update($this->onlyExistingColumns([
             'name' => $data['name'],
-            'product_type' => $data['product_type'],
+            'product_type' => $productType,
+            NestErps::VERTICAL_COLUMN => $erpsVertical,
             'price' => $data['price'],
             'price_yearly' => $data['price_yearly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],

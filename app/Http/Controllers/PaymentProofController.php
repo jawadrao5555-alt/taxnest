@@ -706,7 +706,7 @@ class PaymentProofController extends Controller
             }
 
             $companyName = $company->name ?? ('Company #' . $proof->company_id);
-            $panel = strtoupper($plan->product_type ?? 'di');
+            $panel = \App\Support\ProductCatalog::shortLabel($plan->product_type ?? 'di');
             $cycle = ucwords(str_replace('_', ' ', (string) $proof->billing_cycle));
             $amount = $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : 'Not specified';
             $methodLabels = ['bank' => 'Bank Transfer', 'jazzcash' => 'JazzCash', 'easypaisa' => 'EasyPaisa', 'other' => 'Other'];

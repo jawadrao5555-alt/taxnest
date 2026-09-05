@@ -215,6 +215,9 @@ class Company extends Model
         'health_org_type',
         'health_modules',
         'health_setup_completed',
+        // Nest ERPS (Task 1568): which vertical of the umbrella product line
+        // this company runs. Same fillable rule as above.
+        'erps_vertical',
     ];
 
     protected $casts = [

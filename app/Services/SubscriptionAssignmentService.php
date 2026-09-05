@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Subscription;
 use App\Services\DiPlanComparisonService;
 use App\Services\PlanSellabilityService;
+use App\Support\NestErps;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -101,8 +102,8 @@ class SubscriptionAssignmentService
         // but nothing reads them for a sale anymore.
         $cycle = self::purchaseCycle($cycle, $type);
 
-        if ($type === 'pos' || $type === 'fbrpos' || $type === 'standalone' || $type === 'health') {
-            // Both POS lines, standalone and healthcare store the ANNUAL total
+        if ($type === 'pos' || $type === 'fbrpos' || $type === 'standalone' || NestErps::isProductType($type)) {
+            // Both POS lines, standalone and Nest ERPS store the ANNUAL total
             // in `price` (6% already baked in) — use it as-is, never × 12.
             return [
                 'cycle' => 'annual',

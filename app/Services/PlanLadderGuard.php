@@ -53,6 +53,10 @@ class PlanLadderGuard
         'pos'    => 'PRA POS',
         'fbrpos' => 'FBR POS',
         'di'     => 'Digital Invoice',
+        // Nest ERPS keeps no comparison ladder yet (it is sold on enquiry, not
+        // from a public price grid), so supports() stays false for it — the
+        // label exists so any surface that prints a product name has one.
+        \App\Support\NestErps::PRODUCT_TYPE => \App\Support\NestErps::LABEL,
     ];
 
     public static function supports(?string $productType): bool

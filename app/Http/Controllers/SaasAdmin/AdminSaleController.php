@@ -25,7 +25,9 @@ class AdminSaleController extends Controller
     {
         $data = $request->validate([
             'name' => 'nullable|string|max:100',
-            'scope' => 'required|in:all,di,pos,fbrpos',
+            // The product list comes from the catalogue: a new product line must
+            // never be silently unselectable here.
+            'scope' => 'required|in:all,' . implode(',', array_keys(\App\Support\ProductCatalog::options())),
             'discount_percent' => 'required|numeric|min:1|max:100',
             'starts_at' => 'nullable|date',
             'ends_at' => 'nullable|date',

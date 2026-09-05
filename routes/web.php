@@ -113,7 +113,7 @@ Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessio
     ->where('role', 'super_admin|company_admin|demo');
 
 // Infrastructure diagnostic. It used to sit on /health, which is wrong twice
-// over: that prefix now belongs to the Healthcare ERP panel, and the payload
+// over: that prefix now belongs to the Nest ERPS Healthcare panel, and the payload
 // (database host/user, session and cache drivers, a slice of the Replit DB
 // file) has no business being readable without signing in. Moved behind the
 // SaaS admin guard on its own path.
@@ -1681,13 +1681,21 @@ Route::post('/fbr-pos/guest-language', function (\Illuminate\Http\Request $reque
 
 /*
 |--------------------------------------------------------------------------
-| Healthcare ERP (Task 1547) — its own panel, its own guard, its own prefix.
+| Nest ERPS — Healthcare (Tasks 1547, 1568): the umbrella product line's FIRST
+| vertical. Its own panel, its own guard, its own prefix.
 |--------------------------------------------------------------------------
 | Nothing here is reachable from a DI / PRA POS / FBR POS session: health.auth
-| refuses any company whose product_type is not 'health', and those panels
-| never link to /health. The public page lives at /healthcare so the /health
-| prefix stays entirely the panel's.
+| refuses any company that is not a Nest ERPS company, and those panels never
+| link to /health. The public hub lives at /nest-erps so the /health prefix
+| stays entirely the panel's.
+|
+| A FUTURE VERTICAL registers itself in App\Support\NestErps::VERTICALS and adds
+| a block like this one — its own prefix, guard and screens. It needs no new
+| product type, no new billing branch and no new admin allow-list edit.
 */
+// The line's public hub. /healthcare was the page's original address and is
+// kept working for good — saved links and printed material must not break.
+Route::get(\App\Support\NestErps::LANDING_PATH, [HealthController::class, 'landing'])->name('erps.landing');
 Route::get('/healthcare', [HealthController::class, 'landing'])->name('health.landing');
 
 Route::get('/health/login', [HealthAuthController::class, 'showLogin'])->name('health.login');

@@ -35,7 +35,7 @@ class TrialSubscriptionService
 
         // Prefer the product's own trial plan; fall back to any trial plan so a
         // missing seed row never leaves the company subscription-less.
-        $trialPlan = PricingPlan::where('product_type', $productType)
+        $trialPlan = PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($productType))
             ->where('is_trial', true)
             ->first()
             ?? PricingPlan::where('is_trial', true)->first();

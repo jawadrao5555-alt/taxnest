@@ -332,6 +332,14 @@ class SubscriptionAccessService
                 ->count();
         }
 
+        // Nest ERPS counts through its VERTICAL's own registry entry (Task
+        // 1568). Without this arm an ERPS company would be measured by the
+        // Digital Invoice fallback below — a table it never writes to, so a
+        // usage-capped grant would read 0 forever and never expire.
+        if (\App\Support\NestErps::isProductType($company->product_type)) {
+            return \App\Support\NestErps::billableCount($company, $since);
+        }
+
         // Digital Invoice uses the invoices table. Since the Sep 2026 package
         // restructure only invoices that REACHED FBR are billable — drafts and
         // failed submissions never eat a grant allowance or a trial.

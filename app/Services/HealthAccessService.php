@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Healthcare access control — the ONE place that answers "may this person do
- * this?" for the Healthcare ERP panel.
+ * this?" for the Nest ERPS Healthcare panel.
  *
  * Three layers, applied in this order:
  *

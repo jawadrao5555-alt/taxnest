@@ -4,10 +4,9 @@
         <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
         <h1 class="text-2xl font-bold text-white">Edit: {{ $company->name }}</h1>
         @php
-            $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400'];
-            $typeLabels = ['di' => 'Digital Invoice', 'pos' => 'NestPOS', 'fbrpos' => 'FBR POS'];
+
         @endphp
-        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? '' }}">{{ $typeLabels[$company->product_type] ?? $company->product_type }}</span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::label($company->product_type, \App\Support\NestErps::verticalOf($company)) }}</span>
     </div>
 
     <form method="POST" action="{{ route('saas.admin.companies.update', $company->id) }}" class="space-y-6">

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Healthcare ERP panel shell: the dashboard every role lands on, the owner's
+ * Nest ERPS — Healthcare panel shell: the dashboard every role lands on, the owner's
  * module switchboard, and the small per-user preferences the panel shares with
  * the rest of the platform.
  *
@@ -35,17 +35,17 @@ class HealthController extends Controller
     }
 
     /**
-     * Public product page for /healthcare.
+     * Public hub for the Nest ERPS line (/nest-erps, and /healthcare which is
+     * kept working for saved links).
      *
      * Guest route on purpose: it is where a signed-out visitor (and the logout
-     * redirect) lands. Packages come from the sellability service, never a raw
-     * product_type query — a retired package must disappear from the public
-     * page the moment it stops being sellable.
+     * redirect) lands. The page lists the line's verticals and asks for an
+     * enquiry — it publishes no prices, because Nest ERPS is quoted per
+     * organisation until the owner sets public rates.
      */
     public function landing()
     {
         return view('health.landing', [
-            'plans' => HealthPlatformService::sellablePlans(),
             'modules' => HealthModuleService::MODULES,
             'moduleMeta' => HealthModuleService::MODULE_META,
         ]);

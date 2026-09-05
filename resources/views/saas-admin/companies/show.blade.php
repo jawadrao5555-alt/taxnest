@@ -5,11 +5,12 @@
         <h1 class="text-2xl font-bold text-white min-w-0 break-words">{{ $company->name }}</h1>
         @php
             $sc = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'active' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400'];
-            $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400'];
-            $typeLabels = ['di' => 'Digital Invoice', 'pos' => 'PRA POS', 'fbrpos' => 'FBR POS'];
+            // Product label + colour come from the catalogue: a hand-written
+            // map here used to leave a new product line grey and unnamed.
+            $erpsVertical = \App\Support\NestErps::verticalOf($company);
         @endphp
         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
-        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? 'bg-gray-800 text-gray-400' }}">{{ $typeLabels[$company->product_type] ?? $company->product_type }}</span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::label($company->product_type, $erpsVertical) }}</span>
         @if(!$company->trashed())
         <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
             @if(($company->company_status ?? null) === 'active')
@@ -346,7 +347,13 @@
             <h3 class="text-sm font-semibold text-white mb-3">Usage & Revenue</h3>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Users</span><span class="text-white font-medium text-right min-w-0">{{ $extraStats['total_users'] }}</span></div>
-                @if($company->product_type === 'di')
+                @if(!empty($extraStats['erps']))
+                {{-- Nest ERPS: billable documents, not invoices and not POS
+                     sales — the two tables its verticals never write to. --}}
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Vertical</span><span class="text-teal-400 font-medium text-right min-w-0">{{ $extraStats['erps_vertical_label'] }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Billable Documents</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['billable_documents'] ?? 0) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">This Month</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['billable_this_month'] ?? 0) }}</span></div>
+                @elseif($company->product_type === 'di')
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Invoices</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['total_invoices']) }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Locked (FBR)</span><span class="text-emerald-400 font-medium text-right min-w-0">{{ number_format($extraStats['locked_invoices']) }}</span></div>
                 <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Drafts</span><span class="text-amber-400 font-medium text-right min-w-0">{{ number_format($extraStats['draft_invoices']) }}</span></div>
@@ -470,7 +477,7 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Change Company Type</h3>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice, NestPOS (PRA), and FBR POS.</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Switch between Digital Invoice, NestPOS (PRA), FBR POS and {{ \App\Support\NestErps::LABEL }}.</p>
         <div class="flex flex-wrap items-center gap-3">
             @if($company->product_type !== 'di')
             <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}">
@@ -491,6 +498,20 @@
                 @csrf
                 <input type="hidden" name="product_type" value="fbrpos">
                 <button type="submit" onclick="return confirm('Are you sure? This will change the company type to FBR POS.')" class="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-sm rounded-lg transition font-medium border border-blue-800">Switch to FBR POS</button>
+            </form>
+            @endif
+            {{-- Nest ERPS: the vertical rides with the switch, so the company
+                 never lands on the umbrella with no vertical recorded. --}}
+            @if(!\App\Support\NestErps::isProductType($company->product_type))
+            <form method="POST" action="{{ route('saas.admin.companies.changeType', $company->id) }}" class="flex items-center gap-2">
+                @csrf
+                <input type="hidden" name="product_type" value="{{ \App\Support\NestErps::PRODUCT_TYPE }}">
+                <select name="erps_vertical" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                    @foreach(\App\Support\NestErps::verticals() as $vKey => $vMeta)
+                    <option value="{{ $vKey }}">{{ $vMeta['label'] }}</option>
+                    @endforeach
+                </select>
+                <button type="submit" onclick="return confirm('Are you sure? This will change the company type to {{ \App\Support\NestErps::LABEL }}.')" class="px-4 py-2 bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 text-sm rounded-lg transition font-medium border border-teal-800">Switch to {{ \App\Support\NestErps::LABEL }}</button>
             </form>
             @endif
         </div>

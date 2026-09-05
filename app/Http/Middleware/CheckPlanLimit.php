@@ -83,6 +83,13 @@ class CheckPlanLimit
         // plan companies (max_products = -1) from creating any products.
         switch ($resource) {
             case 'terminals':
+                // Nest ERPS sells no counters at all: its panels have no
+                // terminal register, so a max_terminals value on one of its
+                // packages must not be enforced against the PRA table (which
+                // would read another product's rows through the fallback).
+                if (\App\Support\NestErps::isProductType($plan->product_type ?? null)) {
+                    break;
+                }
                 if ($plan->max_terminals !== null && (int) $plan->max_terminals >= 0) {
                     // FBR POS counters live in fbr_pos_terminals — counting the
                     // PRA table here would let fbrpos companies add unlimited
@@ -170,6 +177,15 @@ class CheckPlanLimit
                 // here would wrongly stop provisional saves at quota-full);
                 // di / legacy NULL product rows = lifetime DI invoice count.
                 $productType = $plan->product_type ?? 'di';
+                // Nest ERPS (Task 1568) has NO invoice/bill quota: the line's
+                // verticals do not write to the invoices, pos_transactions or
+                // fbr_pos_transactions tables at all. Spelled out rather than
+                // left to the `else`, which would count Digital Invoice rows
+                // this company can never own and therefore always pass — an
+                // umbrella other verticals inherit cannot sit on that.
+                if (\App\Support\NestErps::isProductType($productType)) {
+                    break;
+                }
                 if ($productType === 'fbrpos') {
                     // REPLAY GUARD BEFORE QUOTA (offline-first invariant): a retry
                     // of an already-saved bill (same offline_uuid) must reach the

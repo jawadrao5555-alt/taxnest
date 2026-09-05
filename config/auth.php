@@ -48,7 +48,7 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
-        // Healthcare ERP panel (Task 1547). Same users table as the other
+        // Nest ERPS — Healthcare panel. Same users table as the other
         // company panels — isolation comes from the guard + HealthAuth, exactly
         // like pos / fbrpos, so one browser can never carry a POS session into
         // a hospital's patient desk.

@@ -10,7 +10,7 @@
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-4">Company Type</h3>
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <label :class="productType === 'di' ? 'border-emerald-500 bg-emerald-900/20' : 'border-gray-700 hover:border-gray-600'" class="relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition">
                     <input type="radio" name="product_type" value="di" x-model="productType" class="hidden">
                     <div :class="productType === 'di' ? 'bg-emerald-600' : 'bg-gray-700'" class="w-10 h-10 rounded-lg flex items-center justify-center transition">
@@ -41,7 +41,32 @@
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">FBR integrated POS</p>
                     </div>
                 </label>
+                {{-- Nest ERPS (Task 1568) — one card for the whole umbrella. A
+                     future vertical joins the picker below, never as a fourth
+                     product card. --}}
+                <label :class="productType === '{{ \App\Support\NestErps::PRODUCT_TYPE }}' ? 'border-teal-500 bg-teal-900/20' : 'border-gray-700 hover:border-gray-600'" class="relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition">
+                    <input type="radio" name="product_type" value="{{ \App\Support\NestErps::PRODUCT_TYPE }}" x-model="productType" class="hidden">
+                    <div :class="productType === '{{ \App\Support\NestErps::PRODUCT_TYPE }}' ? 'bg-teal-600' : 'bg-gray-700'" class="w-10 h-10 rounded-lg flex items-center justify-center transition">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-white">{{ \App\Support\NestErps::LABEL }}</p>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ \App\Support\NestErps::TAGLINE }}</p>
+                    </div>
+                </label>
             </div>
+        </div>
+
+        {{-- Which ERP inside the line this organisation runs. Only shown for
+             Nest ERPS; the controller nulls it for the other three products. --}}
+        <div x-show="productType === '{{ \App\Support\NestErps::PRODUCT_TYPE }}'" x-cloak class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-white mb-1">{{ \App\Support\NestErps::LABEL }} vertical</h3>
+            <p class="text-xs text-gray-500 mb-4">Which ERP inside the line this organisation runs. The panel opens with that vertical's default modules already switched on.</p>
+            <select name="erps_vertical" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                @foreach(\App\Support\NestErps::verticals() as $vKey => $vMeta)
+                <option value="{{ $vKey }}" {{ old('erps_vertical', \App\Support\NestErps::DEFAULT_VERTICAL) === $vKey ? 'selected' : '' }}>{{ $vMeta['label'] }}</option>
+                @endforeach
+            </select>
         </div>
 
         {{-- Business type (Task 1562) — POS products only. The type stores the

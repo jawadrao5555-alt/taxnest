@@ -26,7 +26,7 @@
             @foreach($offlineAgents as $oa)
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <a href="{{ route('saas.admin.companies.show', $oa->id) }}" class="text-white font-semibold hover:text-red-300 transition">{{ $oa->name }}</a>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-800 text-gray-400">{{ $oa->product_type }}</span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-800 text-gray-400">{{ \App\Support\ProductCatalog::shortLabel($oa->product_type) }}</span>
                 <span class="text-red-400">
                     @if($oa->agent_last_seen)
                         Last seen {{ $oa->agent_last_seen->diffForHumans() }} ({{ $oa->agent_last_seen->format('d M, h:i A') }})
@@ -49,6 +49,7 @@
                 <option value="di" {{ request('product_type') === 'di' ? 'selected' : '' }}>Digital Invoice</option>
                 <option value="pos" {{ request('product_type') === 'pos' ? 'selected' : '' }}>PRA POS</option>
                 <option value="fbrpos" {{ request('product_type') === 'fbrpos' ? 'selected' : '' }}>FBR POS</option>
+                <option value="{{ \App\Support\NestErps::PRODUCT_TYPE }}" {{ \App\Support\NestErps::isProductType(request('product_type')) ? 'selected' : '' }}>{{ \App\Support\NestErps::LABEL }}</option>
             </select>
             <select name="status" class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
                 <option value="">All Statuses</option>
@@ -78,7 +79,7 @@
                     @forelse($companies as $company)
                     @php
                         $statusColors = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'active' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400'];
-                        $typeColors = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400'];
+
                     @endphp
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">
@@ -107,7 +108,7 @@
                         </td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->ntn ?? '—' }}</td>
                         <td class="px-4 py-3 text-center">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $typeColors[$company->product_type] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->product_type }}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::shortLabel($company->product_type) }}</span>
                         </td>
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $statusColors[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>

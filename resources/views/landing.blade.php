@@ -180,10 +180,10 @@
             },
             {
                 "@@type": "Question",
-                "name": "Are the three products connected to each other?",
+                "name": "Are the products connected to each other?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "No — by design. Digital Invoice, NestPOS and FBR POS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean."
+                    "text": "No — by design. Digital Invoice, NestPOS, FBR POS and Nest ERPS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean."
                 }
             },
             {
@@ -231,6 +231,7 @@
                     <a href="/digital-invoice" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Digital Invoice</a>
                     <a href="/pos" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">NestPOS (PRA)</a>
                     <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">FBR POS</a>
+                    <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">{{ \App\Support\NestErps::LABEL }}</a>
                     <a href="#compare" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Compare</a>
                     <a href="/download" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Downloads</a>
                     <a href="/tutorials" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Tutorials</a>
@@ -249,6 +250,7 @@
                 <a href="/digital-invoice" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Digital Invoice</a>
                 <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">NestPOS (PRA POS)</a>
                 <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">FBR POS</a>
+                <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">{{ \App\Support\NestErps::LABEL }}</a>
                 <a href="#compare" @click="mobileOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Compare Products</a>
                 <a href="/tutorials" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Tutorials</a>
                 <a href="/download" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Downloads</a>
@@ -545,6 +547,28 @@
                     </div>
                 </div>
 
+                {{-- Nest ERPS (Task 1568): a deliberately compact strip, not a
+                     fourth full-size product block. The line is sold on
+                     enquiry, so it carries no price and no feature ladder that
+                     would compete with the three regulator products above. --}}
+                <div class="card-solid rounded-lg p-8 lg:p-10 fade-in-up border-l-4 border-[#0A4D5C]">
+                    <div class="flex flex-col lg:flex-row lg:items-center gap-6">
+                        <div class="flex-1">
+                            <span class="inline-block text-[11px] font-bold tracking-widest uppercase text-[#0A4D5C] mb-3">Also from TaxNest</span>
+                            <h3 class="text-2xl font-serif text-[#052730] mb-3">{{ \App\Support\NestErps::LABEL }}</h3>
+                            <p class="text-sm text-gray-600 leading-relaxed max-w-2xl">
+                                {{ \App\Support\NestErps::TAGLINE }}. Not a tax product — a line of full ERPs, one per
+                                kind of organisation.
+                                <span class="text-[#052730] font-semibold">{{ \App\Support\NestErps::verticalLabel(\App\Support\NestErps::HEALTH) }}</span>
+                                is live today for clinics, hospitals, laboratories and pharmacies; the rest are built on demand.
+                            </p>
+                        </div>
+                        <div class="flex gap-4 flex-shrink-0">
+                            <a href="{{ \App\Support\NestErps::LANDING_PATH }}" class="btn-solid btn-primary">Explore the line</a>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </section>
@@ -676,10 +700,10 @@
                 </div>
                 <div class="card-solid rounded-lg">
                     <button @click="open = (open === 2 ? null : 2)" class="w-full flex items-center justify-between p-5 text-left">
-                        <span class="font-semibold text-[#052730]">Are the three products connected to each other?</span>
+                        <span class="font-semibold text-[#052730]">Are the products connected to each other?</span>
                         <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 2 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">No — by design. Digital Invoice, NestPOS and FBR POS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean.</div>
+                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-sm text-gray-600 leading-relaxed">No — by design. Digital Invoice, NestPOS, FBR POS and Nest ERPS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean.</div>
                 </div>
                 <div class="card-solid rounded-lg">
                     <button @click="open = (open === 3 ? null : 3)" class="w-full flex items-center justify-between p-5 text-left">

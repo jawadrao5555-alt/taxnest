@@ -26,7 +26,9 @@
             <a href="{{ url('/healthcare') }}" class="inline-flex w-16 h-16 rounded-2xl bg-white/15 ring-1 ring-white/25 items-center justify-center">
                 <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             </a>
-            <h1 class="mt-4 text-2xl font-black text-white tracking-tight">{{ __('health.panel_name') }}</h1>
+            {{-- Product first, vertical underneath it (Task 1568). --}}
+            <h1 class="mt-4 text-2xl font-black text-white tracking-tight">{{ __('health.product_name') }}</h1>
+            <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-[#E7BF3B] mt-1">{{ __('health.vertical_name') }}</p>
             <p class="text-teal-100/85 text-sm mt-1">{{ __('health.panel_tagline') }}</p>
         </div>
 

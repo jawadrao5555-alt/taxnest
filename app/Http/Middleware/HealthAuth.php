@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Healthcare ERP panel gate.
+ * Nest ERPS — Healthcare panel gate.
  *
  * Modelled on FbrPosAuth so the panel behaves exactly like the others where it
  * should (inactive account, missing company, wrong product, tenant + branch
@@ -55,7 +55,7 @@ class HealthAuth
 
         // Product isolation, both ways: a healthcare panel only ever serves a
         // healthcare company, and a POS / DI company can never reach it.
-        if (($company->product_type ?? null) !== HealthPanel::PRODUCT_TYPE) {
+        if (!HealthPanel::isProductType($company->product_type ?? null)) {
             Auth::guard($guard)->logout();
             return $this->toLogin()->with('error', __('health.auth_not_healthcare'));
         }

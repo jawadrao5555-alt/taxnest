@@ -12,6 +12,7 @@ use App\Services\HealthPlatformService;
 use App\Services\LoginIdentifierResolver;
 use App\Services\RequestedPackageService;
 use App\Support\HealthPanel;
+use App\Support\NestErps;
 use App\Support\PosLocale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +24,7 @@ use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Healthcare ERP authentication.
+ * Nest ERPS — Healthcare authentication.
  *
  * Deliberately the same three-step shape as the POS panels — admin first, then
  * a STRICTLY product-isolated user lookup, then one generic failure message —
@@ -132,7 +133,8 @@ class HealthAuthController extends Controller
                         ->orWhere('ntn', $digits)->orWhere('cnic', $digits)
                         ->orWhereRaw("REPLACE(REPLACE(cnic, '-', ''), ' ', '') = ?", [$digits]);
                 })->get();
-                $company = $matches->firstWhere('product_type', HealthPanel::PRODUCT_TYPE) ?? $matches->first();
+                $company = $matches->first(fn ($c) => HealthPanel::isProductType($c->product_type ?? null))
+                    ?? $matches->first();
                 if ($company) {
                     $user = User::where('company_id', $company->id)
                         ->where('role', 'company_admin')
@@ -143,7 +145,7 @@ class HealthAuthController extends Controller
             return $user;
         }
 
-        $resolved = LoginIdentifierResolver::resolveUsername($login, [HealthPanel::PRODUCT_TYPE]);
+        $resolved = LoginIdentifierResolver::resolveUsername($login, \App\Support\NestErps::PRODUCT_TYPES);
         if ($resolved['ambiguous']) {
             RateLimiter::hit($throttleKey);
             $ambiguous = true;
@@ -206,6 +208,11 @@ class HealthAuthController extends Controller
             // Plain array: the model casts this column, so a pre-encoded
             // string would be stored as JSON inside JSON.
             $healthDefaults['health_modules'] = HealthModuleService::defaultsForOrgType($orgType);
+        }
+        // Which vertical of the product line this signup belongs to. Stamped at
+        // birth so no company ever sits on the umbrella with no vertical named.
+        if (Schema::hasColumn('companies', NestErps::VERTICAL_COLUMN)) {
+            $healthDefaults[NestErps::VERTICAL_COLUMN] = NestErps::HEALTH;
         }
 
         $company = Company::create([

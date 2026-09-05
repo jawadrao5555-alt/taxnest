@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Healthcare ERP panel — Roman Urdu.
+ * Nest ERPS — Healthcare panel — Roman Urdu.
  *
  * THREE-WAY KEY SYNC: lang/en/health.php, lang/rur/health.php and
  * lang/ur/health.php must always hold exactly the same keys.
@@ -10,9 +10,13 @@
 return [
 
     /* ─── Product ─── */
-    'panel_name' => 'Healthcare ERP',
+    // Nest ERPS product hai; Healthcare us ke andar ka vertical hai.
+    'product_name' => 'Nest ERPS',
+    'product_tagline' => 'Aik hi ERP line — har zarurat ka apna vertical',
+    'vertical_name' => 'Healthcare',
+    'panel_name' => 'Nest ERPS — Healthcare',
     'panel_tagline' => 'Clinic, hospital, lab aur pharmacy — sab aik hi system par',
-    'brand_short' => 'Healthcare',
+    'brand_short' => 'Nest ERPS',
 
     /* ─── Organisation types ─── */
     'org_type' => 'Idaray ki qism',
@@ -23,7 +27,7 @@ return [
 
     /* ─── Authentication ─── */
     'login' => 'Login karein',
-    'login_title' => 'Healthcare ERP mein login',
+    'login_title' => 'Nest ERPS mein login',
     'login_subtitle' => 'Wohi account istemal karein jo aap ke idaray ne diya hai',
     'login_identifier' => 'Email, phone, NTN ya username',
     'password' => 'Password',
@@ -31,7 +35,7 @@ return [
     'remember_me' => 'Mujhe yaad rakhein',
     'logout' => 'Logout',
     'register' => 'Naya account banayein',
-    'register_title' => 'Apna healthcare idara register karein',
+    'register_title' => 'Apna healthcare idara Nest ERPS par register karein',
     'register_subtitle' => 'Teen din muft. Card ki zarurat nahi.',
     'already_registered' => 'Pehle se account hai?',
     'need_account' => 'Account chahiye?',
@@ -40,7 +44,7 @@ return [
     'auth_deactivated' => 'Aap ka account band kar diya gaya hai.',
     'auth_no_company' => 'Aap ke account ke sath koi idara juda hua nahi.',
     'auth_company_missing' => 'Idara nahi mila. Support se rabta karein.',
-    'auth_not_healthcare' => 'Yeh login sirf Healthcare ERP idaron ke liye hai.',
+    'auth_not_healthcare' => 'Yeh login sirf Nest ERPS ke healthcare idaron ke liye hai.',
     'auth_no_role' => 'Aap ke account ka healthcare role abhi set nahi. Apne administrator se kahein.',
 
     /* ─── Registration form ─── */
@@ -253,7 +257,7 @@ return [
     /* ─── Settings ─── */
     'settings' => 'Settings',
     'settings_title' => 'Settings',
-    'settings_subtitle' => 'Aap ke Healthcare ERP panel ka bunyadi setup.',
+    'settings_subtitle' => 'Aap ke Nest ERPS panel ka bunyadi setup.',
     'settings_modules_card' => 'Modules',
     'settings_modules_card_desc' => 'System ke jo hissay aap chalatay hain unhein chalu ya band karein.',
     'settings_departments_card' => 'Shobay',

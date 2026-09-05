@@ -322,12 +322,12 @@ class AdminController extends Controller
     private function sendActivationNotification(Company $company): void
     {
         try {
-            [$productLabel, $panelName, $ctaUrl] = match ($company->product_type) {
-                'pos'    => ['NestPOS', 'NestPOS — PRA Point of Sale', url('/pos/login')],
-                'fbrpos' => ['FBR POS', 'Nest FBR POS', url('/fbr-pos/login')],
-                'health' => ['TaxNest Healthcare ERP', 'Healthcare ERP', url('/health/login')],
-                default  => ['TaxNest Digital Invoice', 'Digital Invoicing', url('/login')],
-            };
+            // One catalogue, so a product line can never be missing from a
+            // hand-written map and email the wrong name / login URL.
+            [$productLabel, $panelName, $ctaUrl] = \App\Support\ProductCatalog::cta(
+                $company->product_type,
+                \App\Support\NestErps::verticalOf($company)
+            );
 
             $title   = 'Account approved — welcome to ' . $productLabel;
             $message = "Your {$productLabel} account has been approved. You can now log in and start using the system.";

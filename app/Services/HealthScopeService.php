@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Branch AND department boundaries for the Healthcare ERP panel.
+ * Branch AND department boundaries for the Nest ERPS Healthcare panel.
  *
  * Branch scoping deliberately reuses the platform's existing
  * BranchContextService (active-branch session, branch_user pivot, owner "all

@@ -27,14 +27,13 @@
                 </thead>
                 <tbody class="divide-y divide-gray-800">
                     @forelse($companies as $company)
-                    @php $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400']; @endphp
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">
                             <span class="text-white font-medium">{{ $company->name }}</span>
                             <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->ntn ?? '' }} &middot; {{ $company->owner_name ?? '' }}</p>
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->product_type }}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($company->product_type) }}">{{ \App\Support\ProductCatalog::shortLabel($company->product_type) }}</span>
                         </td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->deleted_reason ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden sm:table-cell">{{ $company->deleted_at->format('d M Y, h:i A') }}</td>

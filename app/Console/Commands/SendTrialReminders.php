@@ -258,11 +258,16 @@ class SendTrialReminders extends Command
      */
     private function panelCta(Company $company): array
     {
-        return match ($company->product_type ?? 'di') {
-            'pos' => ['NestPOS — PRA Point of Sale', url('/pos/login')],
-            'fbrpos' => ['Nest FBR POS', url('/fbr-pos/login')],
-            default => ['Digital Invoicing', url('/login')],
-        };
+        // Nest ERPS (Task 1568) reaches its own vertical's login page through
+        // the catalogue. Left to the old `default` an ERPS organisation was
+        // mailed the Digital Invoice portal, where its guard-isolated account
+        // can only ever answer "Invalid credentials".
+        [, $panelName, $ctaUrl] = \App\Support\ProductCatalog::cta(
+            $company->product_type ?? 'di',
+            \App\Support\NestErps::verticalOf($company)
+        );
+
+        return [$panelName, $ctaUrl];
     }
 
     private function recipientEmail(Company $company): ?string

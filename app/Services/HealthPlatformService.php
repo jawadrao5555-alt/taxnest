@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * The seam between the Healthcare ERP and the shared TaxNest platform.
+ * The seam between the Nest ERPS Healthcare vertical and the shared TaxNest platform.
  *
  * Healthcare code must NOT reach into company, branch, subscription,
  * notification, file-storage or FBR internals directly. It asks this class
@@ -37,8 +37,41 @@ class HealthPlatformService
     /** Is this a healthcare company at all? */
     public static function isHealthcareCompany(?Company $company): bool
     {
+        // Tolerant of the value rows held before the Nest ERPS umbrella
+        // existed — see NestErps::PRODUCT_TYPES.
         return $company !== null
-            && ($company->product_type ?? null) === HealthPanel::PRODUCT_TYPE;
+            && HealthPanel::isProductType($company->product_type ?? null);
+    }
+
+    /**
+     * The healthcare vertical's BILLABLE DOCUMENTS — what a usage-capped grant
+     * measures for a Nest ERPS organisation (registered as this vertical's
+     * `billable` entry in NestErps::VERTICALS).
+     *
+     * Outpatient visits and pharmacy sales are the two documents this vertical
+     * actually issues to a patient. Both are counted defensively: a database
+     * without the module's tables (minimal test schema, deploy-before-migrate)
+     * must return a number, never throw on a billing screen.
+     */
+    public static function billableCount(int $companyId, $since = null): int
+    {
+        $count = 0;
+
+        foreach (['health_visits', 'health_pharmacy_sales'] as $table) {
+            try {
+                if (!Schema::hasTable($table)) {
+                    continue;
+                }
+                $count += (int) \Illuminate\Support\Facades\DB::table($table)
+                    ->where('company_id', $companyId)
+                    ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
+                    ->count();
+            } catch (\Throwable $e) {
+                // A missing column or table is not a billing failure.
+            }
+        }
+
+        return $count;
     }
 
     /** The company behind the current healthcare request (never a lazy load). */
@@ -162,7 +195,7 @@ class HealthPlatformService
     public static function sellablePlans()
     {
         try {
-            return PricingPlan::where('product_type', HealthPanel::PRODUCT_TYPE)
+            return PricingPlan::whereIn('product_type', \App\Support\NestErps::PRODUCT_TYPES)
                 ->where('is_trial', false)
                 ->orderBy('price')
                 ->get()

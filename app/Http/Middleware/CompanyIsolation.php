@@ -67,6 +67,20 @@ class CompanyIsolation
                 return redirect('/fbr-pos/login')->with('error', 'This is an FBR POS account. Please login from the FBR POS portal.');
             }
 
+            // Nest ERPS (Task 1568) — panel isolation, spelled out. Without this
+            // arm an ERPS company that reached a Digital Invoice URL fell through
+            // to the DI panel and was silently treated as a DI account. Each
+            // vertical is sent to its OWN login page, from the registry.
+            if ($company && \App\Support\NestErps::isProductType($company->product_type)) {
+                $vertical = \App\Support\NestErps::verticalOf($company);
+                auth()->logout();
+
+                return redirect(\App\Support\NestErps::loginPath($vertical))->with(
+                    'error',
+                    'This is a ' . \App\Support\NestErps::label($vertical) . ' account. Please login from its own portal.'
+                );
+            }
+
             if (!$request->is('onboarding*') && !$request->is('billing/*') && !$request->is('api/*')) {
                 if ($company && !$company->onboarding_completed && !$company->is_internal_account) {
                     if (!$request->is('branches*') && !$request->is('company/fbr-settings*') && !$request->is('products*') && !$request->is('invoice*') && !$request->is('invoices*')) {

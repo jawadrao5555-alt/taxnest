@@ -76,13 +76,16 @@ class ReadOnlyImpersonation
         //     admin's own session mid-impersonation AND let the write escape the
         //     LogImpersonatedWrites audit trail.
         $isDemoLogin = $path === 'demo-login' || str_starts_with($path, 'demo-login/');
-        $identityPaths = [
+        $identityPaths = array_merge([
             'login', 'logout',
             'pos/login', 'pos/logout',
             'fbr-pos/login', 'fbr-pos/logout',
-            // Healthcare ERP (Task 1547) — same rule, its own paths.
-            'health/login', 'health/logout',
-        ];
+        ],
+            // Nest ERPS (Task 1568) — same rule, one pair of paths per vertical,
+            // read from the registry so a future vertical is covered the day it
+            // registers rather than the day someone remembers this list.
+            \App\Support\NestErps::identityPaths()
+        );
         $isIdentitySwap = $isDemoLogin || ($isWrite && in_array($path, $identityPaths, true));
 
         // View-only mode additionally blocks anything that can change state.

@@ -38,7 +38,9 @@ class RequestedPackageService
             return null;
         }
 
-        $plan = PricingPlan::where('product_type', $productType)
+        // storedTypesFor(): Nest ERPS rows may still carry the spelling they had
+        // before the umbrella existed, and a ?plan= link must resolve either way.
+        $plan = PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($productType))
             ->where('is_trial', false)
             ->get()
             ->first(fn (PricingPlan $plan) => mb_strtolower($plan->name) === mb_strtolower($name));

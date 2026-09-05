@@ -6,8 +6,12 @@
             @if(!$plan->is_trial && \Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', 'is_public') && !$plan->is_public)
                 <span class="text-[10px] px-1.5 py-0.5 bg-amber-900/50 text-amber-300 rounded font-bold" title="Kept for existing subscriptions, hidden from every buying surface">RETIRED</span>
             @endif
-            @php $badgeColors = ['di' => 'bg-emerald-900/50 text-emerald-300', 'pos' => 'bg-purple-900/50 text-purple-300', 'fbrpos' => 'bg-blue-900/50 text-blue-300']; @endphp
-            <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {{ $badgeColors[$plan->product_type ?? 'di'] ?? 'bg-gray-900/50 text-gray-300' }}">{{ strtoupper($plan->product_type ?? 'di') }}</span>
+            {{-- Badge colour + text come from the catalogue, so a product line
+                 can never render here grey and unnamed. --}}
+            <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {{ \App\Support\ProductCatalog::badgeClass($plan->product_type ?? 'di') }}">{{ \App\Support\ProductCatalog::shortLabel($plan->product_type ?? 'di') }}</span>
+            @if(\App\Support\NestErps::isProductType($plan->product_type ?? null))
+            <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-teal-900/30 text-teal-400">{{ \App\Support\NestErps::verticalLabel(\App\Support\NestErps::verticalOf($plan)) }}</span>
+            @endif
         </div>
         <button @click="editing = !editing" class="text-xs px-2 py-1 rounded transition" :class="editing ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30'" x-text="editing ? 'Cancel' : 'Edit'"></button>
     </div>
@@ -31,7 +35,7 @@
             <p class="text-[10px] text-amber-400/80 mt-1.5">Worked out from the stored monthly base: 12 months less the 6% annual discount.</p>
             @endif
         </div>
-        @elseif(in_array($plan->product_type, ['pos', 'fbrpos']))
+        @elseif(in_array($plan->product_type, ['pos', 'fbrpos']) || \App\Support\NestErps::isProductType($plan->product_type ?? null))
         <div class="mb-3 pb-3 border-b border-gray-800">
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase mb-1.5">Annual rate (what checkout charges)</p>
             <div class="flex justify-between gap-2 text-[11px]"><span class="text-gray-400">Annual</span><span class="text-gray-200 font-medium">{{ number_format($annualRate['final_price']) }}</span></div>
@@ -86,10 +90,21 @@
                     <option value="di" {{ $plan->product_type === 'di' ? 'selected' : '' }}>Digital Invoice</option>
                     <option value="pos" {{ $plan->product_type === 'pos' ? 'selected' : '' }}>PRA POS</option>
                     <option value="fbrpos" {{ $plan->product_type === 'fbrpos' ? 'selected' : '' }}>FBR POS</option>
+                    <option value="{{ \App\Support\NestErps::PRODUCT_TYPE }}" {{ \App\Support\NestErps::isProductType($plan->product_type ?? null) ? 'selected' : '' }}>{{ \App\Support\NestErps::LABEL }}</option>
                 </select>
             </div>
+            @if(\App\Support\NestErps::isProductType($plan->product_type ?? null))
             <div>
-                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ in_array($plan->product_type, ['pos', 'fbrpos', 'standalone']) ? '/yr' : '/mo' }})</label>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">{{ \App\Support\NestErps::LABEL }} vertical</label>
+                <select name="erps_vertical" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+                    @foreach(\App\Support\NestErps::verticals() as $vKey => $vMeta)
+                    <option value="{{ $vKey }}" {{ \App\Support\NestErps::verticalOf($plan) === $vKey ? 'selected' : '' }}>{{ $vMeta['label'] }}</option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
+            <div>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Price (PKR{{ (in_array($plan->product_type, ['pos', 'fbrpos', 'standalone']) || \App\Support\NestErps::isProductType($plan->product_type ?? null)) ? '/yr' : '/mo' }})</label>
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             @if($plan->product_type === 'di')

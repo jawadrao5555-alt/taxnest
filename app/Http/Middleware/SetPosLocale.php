@@ -39,11 +39,13 @@ class SetPosLocale
                 $guard = 'fbrpos';
             } elseif ($request->is('pos') || $request->is('pos/*')) {
                 $guard = 'pos';
-            } elseif ($request->is('health') || $request->is('health/*')) {
-                // Healthcare ERP panel (Task 1547) — same three locales, same
+            } elseif ($erpsVertical = \App\Support\NestErps::verticalForPath($request->path())) {
+                // Nest ERPS panels (Task 1568) — same three locales, same
                 // guard-by-URL-prefix rule: never a blind fallback, because a
-                // browser can hold a POS and a healthcare session at once.
-                $guard = 'health';
+                // browser can hold a POS and a Nest ERPS session at once.
+                // Derived from the vertical registry, so a future vertical is
+                // covered the day it registers its prefix and guard.
+                $guard = \App\Support\NestErps::guardFor($erpsVertical);
             }
             if ($guard) {
                 $user = auth()->guard($guard)->user();

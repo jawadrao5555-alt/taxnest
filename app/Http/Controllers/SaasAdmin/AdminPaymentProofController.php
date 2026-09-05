@@ -715,12 +715,11 @@ class AdminPaymentProofController extends Controller
             $company = $proof->company;
             $plan = $proof->pricingPlan;
 
-            $productLabel = match ($plan?->product_type ?? 'di') {
-                'pos' => 'NestPOS',
-                'fbrpos' => 'FBR POS',
-                'health' => 'TaxNest Healthcare ERP',
-                default => 'TaxNest Digital Invoice',
-            };
+            // Labels, panel name and CTA all come from the product catalogue —
+            // a product line that is missing from a hand-written map here
+            // silently emails the wrong product's name and login URL.
+            $erpsVertical = \App\Support\NestErps::verticalOf($plan ?? $company);
+            $productLabel = \App\Support\ProductCatalog::emailLabel($plan?->product_type ?? 'di', $erpsVertical);
             $cycleLabels = [
                 'monthly' => 'Monthly',
                 'quarterly' => 'Quarterly',
@@ -733,12 +732,7 @@ class AdminPaymentProofController extends Controller
                 ? ($plan->name . ($cycleLabel ? ' (' . $cycleLabel . ')' : ''))
                 : null;
 
-            [$panelName, $ctaUrl] = match ($plan?->product_type ?? 'di') {
-                'pos' => ['NestPOS — PRA Point of Sale', url('/pos/login')],
-                'fbrpos' => ['Nest FBR POS', url('/fbr-pos/login')],
-                'health' => ['Healthcare ERP', url('/health/login')],
-                default => ['Digital Invoicing', url('/login')],
-            };
+            [, $panelName, $ctaUrl] = \App\Support\ProductCatalog::cta($plan?->product_type ?? 'di', $erpsVertical);
 
             // AI Reader page top-up: package ki baat hi nahi — sirf pages.
             if ($proof->isAiPages()) {

@@ -3,16 +3,24 @@
 namespace App\Support;
 
 /**
- * The healthcare panel's identity — one place, so nothing has to guess.
+ * The HEALTHCARE VERTICAL's identity — one place, so nothing has to guess.
  *
- * Every other product line spells its own identity out in string literals
- * scattered across controllers; the healthcare line keeps it here instead so a
- * rename can never leave one path pointing at the old value.
+ * Healthcare is not a product line of its own: it is the first vertical of
+ * Nest ERPS (see App\Support\NestErps). This class therefore no longer owns the
+ * product name or the product discriminator — it reads both from the umbrella
+ * and adds only what is specific to healthcare (organisation types, and the
+ * vertical's own paths pulled out of the registry).
+ *
+ * A second vertical does NOT copy this file: it registers one entry in
+ * NestErps::VERTICALS and builds its own screens.
  */
 final class HealthPanel
 {
-    /** companies.product_type / pricing_plans.product_type value. */
-    public const PRODUCT_TYPE = 'health';
+    /** Which Nest ERPS vertical this panel is. */
+    public const VERTICAL = NestErps::HEALTH;
+
+    /** companies.product_type / pricing_plans.product_type value (the UMBRELLA's). */
+    public const PRODUCT_TYPE = NestErps::PRODUCT_TYPE;
 
     /** Auth guard name (config/auth.php). */
     public const GUARD = 'health';
@@ -20,13 +28,19 @@ final class HealthPanel
     /** URL prefix owned by this panel (no leading slash). */
     public const PATH_PREFIX = 'health';
 
-    /** Public product name. */
-    public const LABEL = 'Healthcare ERP';
+    /** Public product name — the line, with this vertical as its sub-label. */
+    public const LABEL = NestErps::LABEL . ' — Healthcare';
 
     /** Login page, path-relative on purpose (forced-https absolutes break dev). */
     public const LOGIN_PATH = '/health/login';
 
-    /** Landing page for signed-out visitors. */
+    /**
+     * Landing page for signed-out visitors.
+     *
+     * Still /healthcare: saved links, bookmarks and the logout redirect must
+     * keep working. It now serves the Nest ERPS hub, which the canonical
+     * NestErps::LANDING_PATH also serves.
+     */
     public const LANDING_PATH = '/healthcare';
 
     /** Organisation types a healthcare company can be. */
@@ -56,5 +70,16 @@ final class HealthPanel
         $path = ltrim($path, '/');
 
         return $path === self::PATH_PREFIX || str_starts_with($path, self::PATH_PREFIX . '/');
+    }
+
+    /**
+     * Does this stored product_type belong to the panel?
+     *
+     * Tolerant of the value rows held before the umbrella existed — see
+     * NestErps::PRODUCT_TYPES.
+     */
+    public static function isProductType(?string $productType): bool
+    {
+        return NestErps::isProductType($productType);
     }
 }

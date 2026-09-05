@@ -56,7 +56,7 @@ class AdminCompanyController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'owner_name' => 'required|string|max:255',
-            'product_type' => 'required|in:di,pos,fbrpos,health',
+            'product_type' => 'required|' . \App\Support\ProductCatalog::validationRule(),
             'email' => 'required|email|max:255',
             'ntn' => 'nullable|string|max:50',
             // Shared CNIC truth (Task 580): 13 digits, dash-tolerant, GLOBAL
@@ -82,6 +82,14 @@ class AdminCompanyController extends Controller
             'admin_password' => 'required|string|min:6',
             'admin_name' => 'required|string|max:255',
         ], \App\Services\LoginIdentifierResolver::cnicMessages());
+
+        // Canonical product type BEFORE anything reads it: a form still open in
+        // another tab may post the old healthcare spelling, and a company that
+        // stored it would look like an unknown product to the money paths.
+        $request->merge([
+            'product_type' => \App\Support\ProductCatalog::normalize($request->input('product_type'))
+                ?? $request->input('product_type'),
+        ]);
 
         // Store plain digits — the login lookup digit-compares, and plain
         // storage keeps every panel's CNIC matching trivially exact.
@@ -133,16 +141,23 @@ class AdminCompanyController extends Controller
             $companyData += \App\Services\PosFeatureService::registrationAttributes($posType);
         }
 
-        // Healthcare ERP (Task 1547): a new healthcare company starts as a
-        // clinic with that org type's default modules, so the owner signs in to
-        // a working panel rather than an empty one. Schema guards keep an
-        // un-migrated column from breaking company creation.
-        if ($request->product_type === \App\Support\HealthPanel::PRODUCT_TYPE) {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_org_type')) {
-                $companyData['health_org_type'] = 'clinic';
+        // Nest ERPS (Task 1568): the company is stamped with the vertical it
+        // runs, and that vertical's own preset is applied — a healthcare
+        // organisation starts as a clinic with that org type's default modules,
+        // so the owner signs in to a working panel rather than an empty one.
+        // Schema guards keep an un-migrated column from breaking creation.
+        if (\App\Support\NestErps::isProductType($request->product_type)) {
+            $vertical = \App\Support\NestErps::normalizeVertical($request->input('erps_vertical'));
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', \App\Support\NestErps::VERTICAL_COLUMN)) {
+                $companyData[\App\Support\NestErps::VERTICAL_COLUMN] = $vertical;
             }
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_modules')) {
-                $companyData['health_modules'] = \App\Services\HealthModuleService::ORG_TYPE_DEFAULTS['clinic'];
+            if ($vertical === \App\Support\NestErps::HEALTH) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_org_type')) {
+                    $companyData['health_org_type'] = 'clinic';
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_modules')) {
+                    $companyData['health_modules'] = \App\Services\HealthModuleService::ORG_TYPE_DEFAULTS['clinic'];
+                }
             }
         }
 
@@ -260,6 +275,11 @@ class AdminCompanyController extends Controller
 
         if ($company->product_type === 'di') {
             $fields = array_merge($fields, ['fbr_environment', 'fbr_registration_no', 'fbr_business_name', 'fbr_pos_enabled', 'fbr_pos_environment', 'fbr_pos_id']);
+        } elseif (\App\Support\NestErps::isProductType($company->product_type)) {
+            // Nest ERPS files with no regulator, so it takes NEITHER field set.
+            // Left on the `else` below it was offered PRA credentials it can
+            // never use — and could have them written onto its row.
+            $fields = array_merge($fields, [\App\Support\NestErps::VERTICAL_COLUMN]);
         } else {
             $fields = array_merge($fields, ['pra_environment', 'pra_pos_id']);
         }
@@ -284,7 +304,9 @@ class AdminCompanyController extends Controller
         $query = Company::query()->with(['franchise', 'activeSubscription', 'requestedPlan']);
 
         if ($request->filled('product_type')) {
-            $query->where('product_type', $request->product_type);
+            // storedTypesFor(): a Nest ERPS filter must also match any row still
+            // carrying the spelling the line had before the umbrella existed.
+            $query->whereIn('product_type', \App\Support\NestErps::storedTypesFor($request->product_type));
         }
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -343,6 +365,17 @@ class AdminCompanyController extends Controller
             $extraStats['locked_invoices'] = Invoice::where('company_id', $id)->where('status', 'locked')->count();
             $extraStats['total_revenue'] = Invoice::where('company_id', $id)->where('status', 'locked')->sum('total_amount');
             $extraStats['draft_invoices'] = Invoice::where('company_id', $id)->where('status', 'draft')->count();
+        } elseif (\App\Support\NestErps::isProductType($company->product_type)) {
+            // Nest ERPS (Task 1568) — its verticals write no invoices and no
+            // POS transactions, so BOTH branches below would show a hard zero
+            // and read as a dead account. Its own billable-document count comes
+            // from the vertical's registry entry, the same number billing uses.
+            $extraStats['erps'] = true;
+            $extraStats['erps_vertical_label'] = \App\Support\NestErps::verticalLabel(
+                \App\Support\NestErps::verticalOf($company)
+            );
+            $extraStats['billable_documents'] = \App\Support\NestErps::billableCount($company);
+            $extraStats['billable_this_month'] = \App\Support\NestErps::billableCount($company, now()->startOfMonth());
         } elseif ($company->product_type === 'fbrpos') {
             // FBR POS sales live in fbr_pos_transactions — NOT pos_transactions.
             // Querying the PRA table here always returned zero for FBR companies.
@@ -401,7 +434,7 @@ class AdminCompanyController extends Controller
 
         // Packages the temporary-access grant may be given ON: this company's
         // own product only, and never a retired package.
-        $grantPlans = PricingPlan::where('product_type', $company->product_type)
+        $grantPlans = PricingPlan::whereIn('product_type', \App\Support\NestErps::storedTypesFor($company->product_type))
             ->where(function ($q) { $q->where('is_trial', false)->orWhereNull('is_trial'); })
             ->orderBy('price')
             ->get()
@@ -502,12 +535,18 @@ class AdminCompanyController extends Controller
         }
 
         // Map product type → panel guard + dashboard.
-        $guard = match ($company->product_type) {
-            'pos' => 'pos',
-            'fbrpos' => 'fbrpos',
-            // Healthcare ERP (Task 1547) — its own guard, same coexistence rule:
-            // the admin guard survives, and Exit is the only way out.
-            'health' => 'health',
+        // Nest ERPS (Task 1568) — each vertical has its own guard, taken from
+        // the registry, so a future vertical needs no edit here. Same
+        // coexistence rule as the POS panels: the admin guard survives, and
+        // Exit is the only way out.
+        $erpsVertical = \App\Support\NestErps::isProductType($company->product_type)
+            ? \App\Support\NestErps::verticalOf($company)
+            : null;
+
+        $guard = match (true) {
+            $company->product_type === 'pos' => 'pos',
+            $company->product_type === 'fbrpos' => 'fbrpos',
+            $erpsVertical !== null => \App\Support\NestErps::guardFor($erpsVertical),
             default => 'web',
         };
 
@@ -575,10 +614,10 @@ class AdminCompanyController extends Controller
             ]
         );
 
-        $dashboard = match ($guard) {
-            'pos' => '/pos/dashboard',
-            'fbrpos' => '/fbr-pos/dashboard',
-            'health' => '/health/dashboard',
+        $dashboard = match (true) {
+            $guard === 'pos' => '/pos/dashboard',
+            $guard === 'fbrpos' => '/fbr-pos/dashboard',
+            $erpsVertical !== null => \App\Support\NestErps::dashboardPath($erpsVertical),
             default => '/dashboard',
         };
 
@@ -883,12 +922,12 @@ class AdminCompanyController extends Controller
     private function sendActivationNotification(Company $company): void
     {
         try {
-            [$productLabel, $panelName, $ctaUrl] = match ($company->product_type) {
-                'pos'    => ['NestPOS', 'NestPOS — PRA Point of Sale', url('/pos/login')],
-                'fbrpos' => ['FBR POS', 'Nest FBR POS', url('/fbr-pos/login')],
-                'health' => ['TaxNest Healthcare ERP', 'Healthcare ERP', url('/health/login')],
-                default  => ['TaxNest Digital Invoice', 'Digital Invoicing', url('/login')],
-            };
+            // One catalogue, so a product line can never be missing from a
+            // hand-written map and email the wrong name / login URL.
+            [$productLabel, $panelName, $ctaUrl] = \App\Support\ProductCatalog::cta(
+                $company->product_type,
+                \App\Support\NestErps::verticalOf($company)
+            );
 
             $title   = 'Account approved — welcome to ' . $productLabel;
             $message = "Your {$productLabel} account has been approved. You can now log in and start using the system.";
@@ -1210,13 +1249,26 @@ class AdminCompanyController extends Controller
     public function changeProductType(Request $request, $id)
     {
         $company = Company::findOrFail($id);
-        $request->validate(['product_type' => 'required|in:di,pos,fbrpos,health']);
+        $request->validate(['product_type' => 'required|' . \App\Support\ProductCatalog::validationRule()]);
         $old = $company->product_type;
-        $company->update(['product_type' => $request->product_type]);
+        $new = \App\Support\ProductCatalog::normalize($request->product_type) ?? $request->product_type;
+
+        $changes = ['product_type' => $new];
+        // Moving INTO Nest ERPS must record which vertical the company runs —
+        // an ERPS row with no vertical would fall back to the default one.
+        if (\App\Support\NestErps::isProductType($new)
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', \App\Support\NestErps::VERTICAL_COLUMN)) {
+            $changes[\App\Support\NestErps::VERTICAL_COLUMN] = \App\Support\NestErps::normalizeVertical(
+                $request->input('erps_vertical', $company->getAttribute(\App\Support\NestErps::VERTICAL_COLUMN))
+            );
+        }
+
+        $company->update($changes);
         AdminAuditLog::log(auth('admin')->id(), 'Company type changed', 'Company', $id, [
-            'name' => $company->name, 'from' => $old, 'to' => $request->product_type
+            'name' => $company->name, 'from' => $old, 'to' => $new
         ]);
-        return back()->with('success', "Company type changed to " . strtoupper($request->product_type) . ".");
+        return back()->with('success', 'Company type changed to '
+            . \App\Support\ProductCatalog::label($new, \App\Support\NestErps::verticalOf($company->fresh())) . '.');
     }
 
     // ------------------------------------------------------------------------
@@ -1320,7 +1372,8 @@ class AdminCompanyController extends Controller
         $plan = null;
         if ($request->filled('pricing_plan_id')) {
             $plan = PricingPlan::find((int) $request->input('pricing_plan_id'));
-            if (!$plan || $plan->product_type !== $company->product_type) {
+            if (!$plan || \App\Support\ProductCatalog::normalize($plan->product_type)
+                !== \App\Support\ProductCatalog::normalize($company->product_type)) {
                 return back()->with('error', 'That package belongs to a different product — pick a package of this company\'s own product.');
             }
             if (\App\Services\PlanSellabilityService::isRetired($plan)) {

@@ -33,6 +33,9 @@ class PricingPlan extends Model
         // many departments it allows. Fillable or the seeder writes nothing.
         'health_modules',
         'health_department_limit',
+        // Nest ERPS (Task 1568): which vertical of the umbrella product line
+        // this package belongs to. Fillable or the admin plan form writes nothing.
+        'erps_vertical',
     ];
 
     protected $casts = [

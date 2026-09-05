@@ -1,9 +1,7 @@
 @php
-    $domainMoveStarts = \Carbon\CarbonImmutable::create(2026, 9, 5, 0, 0, 0, 'Asia/Karachi');
-    $domainMoveEnds = $domainMoveStarts->addDays(7);
-    $domainMoveNow = \Carbon\CarbonImmutable::now('Asia/Karachi');
-    $showDomainMoveNotice = $domainMoveNow->greaterThanOrEqualTo($domainMoveStarts)
-        && $domainMoveNow->lessThan($domainMoveEnds);
+    // The announcement window has exactly one owner so this notice and the POS
+    // popup-suppression rule can never disagree about whether it is live.
+    $showDomainMoveNotice = \App\Support\SharedServiceNotice::isLive();
 
     // One dismissal per authenticated login session. Logout invalidates the
     // Laravel session, so the next login receives a fresh browser-storage key.

@@ -39,8 +39,9 @@ class DomainMoveNoticeTest extends TestCase
     {
         $markup = file_get_contents(resource_path('views/components/domain-move-notice.blade.php'));
 
-        $this->assertStringContainsString('create(2026, 9, 5, 0, 0, 0, \'Asia/Karachi\')', $markup);
-        $this->assertStringContainsString('->addDays(7)', $markup);
+        // The window has ONE owner; the component must not re-derive dates.
+        $this->assertStringContainsString('\App\Support\SharedServiceNotice::isLive()', $markup);
+        $this->assertStringNotContainsString('Asia/Karachi', $markup);
         $this->assertStringContainsString("session()->get('taxnest_domain_agent_notice_key')", $markup);
         $this->assertStringContainsString("'taxnest-domain-agent-seen-{{ \$domainAgentNoticeKey }}'", $markup);
         $this->assertStringContainsString("localStorage.getItem(storageKey) === '1'", $markup);

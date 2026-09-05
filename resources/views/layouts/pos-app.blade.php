@@ -88,10 +88,10 @@
     // (schema-drift self-heal convention) — fail silent.
     // The shared domain/Agent announcement is the single interruption during
     // its fixed service window; unread updates remain available from the bell.
-    $sharedDomainAgentNoticeLive = now('Asia/Karachi')->betweenIncluded(
-        \Carbon\CarbonImmutable::create(2026, 9, 5, 0, 0, 0, 'Asia/Karachi'),
-        \Carbon\CarbonImmutable::create(2026, 9, 5, 0, 0, 0, 'Asia/Karachi')->addDays(7)->subSecond()
-    );
+    // The window itself lives in ONE place (App\Support\SharedServiceNotice) so
+    // both POS panels and the notice component can never drift apart, and so a
+    // future announcement is scheduled by editing a single file.
+    $sharedDomainAgentNoticeLive = \App\Support\SharedServiceNotice::isLive();
     $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null;
     try {
         // ADMIN/MANAGER ONLY (owner rule, Jul 2026): "What's New" popup + bell must

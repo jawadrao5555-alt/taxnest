@@ -9,6 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\ControlsSharedServiceNotice;
 use Tests\TestCase;
 
 /**
@@ -22,6 +23,13 @@ use Tests\TestCase;
  *   2. Only non-featured unseen updates → NORMAL popup (no hero marker).
  *   3. Featured update already seen → no popup at all (dismiss sticks).
  *   4. Cashier never sees the hero popup (same isPosAdmin gate).
+ *   5. While a shared domain/Agent announcement window is live, NO What's New
+ *      popup opens on either panel — the announcement is the only interruption.
+ *
+ * Because of (5) these tests must own the clock: they travel outside the
+ * announcement window for the cases that expect a popup and inside it for the
+ * suppression cases. Both instants come from App\Support\SharedServiceNotice,
+ * so scheduling the next announcement can never turn this file red.
  *
  * Pattern: APP_ENV=testing + sqlite :memory: + minimal Schema::create in
  * setUp (see WhatsNewAudienceTargetingTest).
@@ -33,7 +41,11 @@ use Tests\TestCase;
  */
 class FeaturedWhatsNewTest extends TestCase
 {
+    use ControlsSharedServiceNotice;
+
     private const HERO_MARKER = 'data-wn-featured="1"';
+    /** Present in BOTH popup styles, and only when a popup is actually due. */
+    private const WN_POPUP_MARKER = 'wnOpen: true';
     private const T_FEATURED_POS = 'WNFEAT-PRA-HERO-91xa1';
     private const T_FEATURED_FBR = 'WNFEAT-FBR-HERO-91xa2';
     private const T_PLAIN = 'WNFEAT-PLAIN-91xa3';
@@ -47,6 +59,10 @@ class FeaturedWhatsNewTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Default for this file: no shared announcement is live, so the What's
+        // New popup behaves the way every case below describes.
+        $this->travelOutsideAnnouncementWindow();
 
         Schema::dropAllTables();
 
@@ -168,6 +184,14 @@ class FeaturedWhatsNewTest extends TestCase
         $this->seedFixtures();
     }
 
+    protected function tearDown(): void
+    {
+        // Static override + frozen clock would otherwise leak into later files.
+        $this->releaseAnnouncementWindow();
+
+        parent::tearDown();
+    }
+
     private function seedFixtures(): void
     {
         $now = now();
@@ -285,5 +309,65 @@ class FeaturedWhatsNewTest extends TestCase
         $resp->assertStatus(200);
         $resp->assertDontSee(self::HERO_MARKER, false);
         $resp->assertDontSee(self::T_FEATURED_POS);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 5. Shared announcement window → every What's New popup stays closed
+    //    (deliberate: the announcement must be the only interruption)
+    // ════════════════════════════════════════════════════════════════════
+
+    public function test_announcement_window_suppresses_hero_popup_on_pra_layout(): void
+    {
+        $this->travelInsideAnnouncementWindow();
+        $this->makeUpdate(self::T_FEATURED_POS, 'pos', true);
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::HERO_MARKER, false);
+    }
+
+    public function test_announcement_window_suppresses_hero_popup_on_fbr_layout(): void
+    {
+        $this->travelInsideAnnouncementWindow();
+        $this->makeUpdate(self::T_FEATURED_FBR, 'fbr_pos', true);
+
+        $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::HERO_MARKER, false);
+    }
+
+    public function test_announcement_window_suppresses_plain_popup_on_both_panels(): void
+    {
+        $this->travelInsideAnnouncementWindow();
+        $this->makeUpdate(self::T_PLAIN, 'all', false);
+
+        $pra = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+        $pra->assertStatus(200);
+        $pra->assertDontSee(self::WN_POPUP_MARKER, false);
+
+        $fbr = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile');
+        $fbr->assertStatus(200);
+        $fbr->assertDontSee(self::WN_POPUP_MARKER, false);
+    }
+
+    /**
+     * The suppression is a pause, not a dismissal: the same unseen update
+     * opens its popup again as soon as the announcement window has passed.
+     */
+    public function test_popup_returns_once_the_announcement_window_has_passed(): void
+    {
+        $this->travelInsideAnnouncementWindow();
+        $this->makeUpdate(self::T_FEATURED_POS, 'pos', true);
+
+        $during = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+        $during->assertDontSee(self::HERO_MARKER, false);
+
+        $this->travelOutsideAnnouncementWindow();
+
+        $after = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+        $after->assertStatus(200);
+        $after->assertSee(self::HERO_MARKER, false);
     }
 }

@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdminUser;
 use App\Models\FeatureSuggestion;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\ControlsSharedServiceNotice;
 use Tests\TestCase;
 
 /**
@@ -25,6 +27,13 @@ use Tests\TestCase;
  *      (source='pra_elaan') per user even on repeat posts, and stamps seen_at.
  *   5. POST /pos/pra-elaan/dismiss → stamps seen_at without creating a row.
  *   6. Bad choice → 422; cashier POST → 403.
+ *   7. While a shared domain/Agent announcement window is live the elaan popup
+ *      stays closed — the announcement is the only allowed interruption.
+ *
+ * Because of (7) this file owns the clock: it travels OUTSIDE the announcement
+ * window by default and inside it for the suppression cases. Both instants are
+ * derived from App\Support\SharedServiceNotice, never hardcoded, so scheduling
+ * the next announcement can never turn this file red.
  *
  * Pattern: APP_ENV=testing + sqlite :memory: + minimal Schema::create in setUp
  * (identical convention to PosSurveyTest / WhatsNewAudienceTargetingTest).
@@ -36,8 +45,14 @@ use Tests\TestCase;
  */
 class PraElaanPopupTest extends TestCase
 {
+    use ControlsSharedServiceNotice;
+
     /** Unique marker so grep-assertions never match other content. */
     private const MARKER = 'data-pra-elaan-popup';
+
+    /** Survey modal auto-open state, rendered straight into its x-data. */
+    private const SURVEY_OPEN_MARKER = 'svOpen: true';
+    private const SURVEY_CLOSED_MARKER = 'svOpen: false';
 
     private int $companyId;
     private int $pendingCompanyId;
@@ -50,6 +65,10 @@ class PraElaanPopupTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Default for this file: no shared announcement is live, so the elaan
+        // popup is gated only by the rules each case below describes.
+        $this->travelOutsideAnnouncementWindow();
 
         Schema::dropAllTables();
 
@@ -175,6 +194,14 @@ class PraElaanPopupTest extends TestCase
         $this->seedFixtures();
     }
 
+    protected function tearDown(): void
+    {
+        // Static override + frozen clock would otherwise leak into later files.
+        $this->releaseAnnouncementWindow();
+
+        parent::tearDown();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     private function seedFixtures(): void
@@ -285,6 +312,11 @@ class PraElaanPopupTest extends TestCase
 
     public function test_popup_never_renders_for_readonly_impersonation(): void
     {
+        // A real impersonation always has the admin's own login alive in the same
+        // session — without it the flag is orphaned and gets cleared on sight.
+        // (Same idiom as PosSurveyTest / WhatsNewAudienceTargetingTest.)
+        auth('admin')->setUser((new AdminUser())->forceFill(['id' => 1]));
+
         $resp = $this->actingAs(User::find($this->adminId), 'pos')
             ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1]])
             ->get('/pos/my-profile');
@@ -670,5 +702,110 @@ class PraElaanPopupTest extends TestCase
             FeatureSuggestion::PRA_ELAAN_CHOICES['jari'],
             $rows->firstWhere('user_id', $this->managerId)->title
         );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 9. Shared announcement window — the elaan popup stands down
+    //    (deliberate: the announcement must be the only interruption)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function test_elaan_hidden_while_a_shared_announcement_is_live(): void
+    {
+        $this->travelInsideAnnouncementWindow();
+
+        $resp = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::MARKER, false);
+    }
+
+    public function test_elaan_hidden_for_manager_while_a_shared_announcement_is_live(): void
+    {
+        $this->travelInsideAnnouncementWindow();
+
+        $resp = $this->actingAs(User::find($this->managerId), 'pos')
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::MARKER, false);
+    }
+
+    /**
+     * The announcement only PAUSES the elaan — it must never be treated as a
+     * dismissal, so the same unseen user gets it once the window has passed.
+     */
+    public function test_elaan_returns_once_the_announcement_window_has_passed(): void
+    {
+        $this->travelInsideAnnouncementWindow();
+
+        $during = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+        $during->assertStatus(200);
+        $during->assertDontSee(self::MARKER, false);
+
+        // Nothing was stamped server-side while the announcement was live.
+        $this->assertNull(User::find($this->adminId)->pra_elaan_seen_at);
+
+        $this->travelOutsideAnnouncementWindow();
+
+        $after = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+        $after->assertStatus(200);
+        $after->assertSee(self::MARKER, false);
+    }
+
+    /**
+     * The survey auto-open is suppressed by the same rule: inside an
+     * announcement window the survey modal must not open itself, even though
+     * the survey is active and the user has not dismissed it this session.
+     */
+    public function test_survey_does_not_auto_open_while_a_shared_announcement_is_live(): void
+    {
+        $this->createSurveyTables();
+        \App\Models\SystemSetting::set('pos_surveys_enabled', '1', 'test');
+
+        $this->travelInsideAnnouncementWindow();
+
+        DB::table('surveys')->insert([
+            'title'        => 'Caller ID Survey',
+            'audience'     => 'pos_all',
+            'is_published' => true,
+            'closed_at'    => null,
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
+
+        $resp = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        // svOpen is rendered from ($surveyDismissedSession || $whatsNewPopup):
+        // inside the window the layout forces the dismissed flag, so the modal
+        // stays closed while the pill remains available in the header.
+        $resp->assertSee(self::SURVEY_CLOSED_MARKER, false);
+        $resp->assertDontSee(self::SURVEY_OPEN_MARKER, false);
+    }
+
+    /** Same survey, outside the window → it does auto-open as designed. */
+    public function test_survey_auto_opens_outside_the_announcement_window(): void
+    {
+        $this->createSurveyTables();
+        \App\Models\SystemSetting::set('pos_surveys_enabled', '1', 'test');
+
+        DB::table('surveys')->insert([
+            'title'        => 'Caller ID Survey',
+            'audience'     => 'pos_all',
+            'is_published' => true,
+            'closed_at'    => null,
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
+
+        $resp = $this->actingAs(User::find($this->adminId), 'pos')
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertSee(self::SURVEY_OPEN_MARKER, false);
     }
 }

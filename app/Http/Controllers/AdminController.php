@@ -946,7 +946,13 @@ class AdminController extends Controller
 
     public function toggleInventory(Request $request, Company $company)
     {
-        $company->update(['inventory_enabled' => !$company->inventory_enabled]);
+        // The master column is only half the switch: the shop's feature map
+        // carries an 'inventory' flag too, and the next features save re-derives
+        // the column FROM that map — so a column-only write reverted itself.
+        $company->update(\App\Services\PosFeatureService::inventoryToggleUpdates(
+            $company,
+            !$company->inventory_enabled
+        ));
         AuditLogService::log(
             $company->inventory_enabled ? 'inventory_enabled' : 'inventory_disabled',
             'Company', $company->id, null,
@@ -1027,11 +1033,14 @@ class AdminController extends Controller
             foreach (\App\Services\PosFeatureService::ALL_FLAGS as $flag) {
                 $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
             }
-            $update['feature_flags'] = $flags;
-            // The master columns follow the flags on EVERY write path (see
-            // PosFeatureService::masterSwitches) — otherwise an admin save
-            // would leave them contradicting the modules.
-            $update += \App\Services\PosFeatureService::masterSwitches($flags);
+            // ONE derivation entry point (PosFeatureService::featureUpdates):
+            // the ticked boxes are canonicalized FIRST and the master columns
+            // read from the map we actually store. Deriving from the raw ticks
+            // let this page write "KOT on, kitchen off" — the shop was marked a
+            // restaurant while the runtime resolved every restaurant feature
+            // back off, so it got the restaurant dashboard with no kitchen.
+            $update += \App\Services\PosFeatureService::featureUpdates($flags);
+            $flags = $update['feature_flags'] ?? $flags;
         }
 
         // use_universal_pos was force-written true on EVERY save — a bare/stale

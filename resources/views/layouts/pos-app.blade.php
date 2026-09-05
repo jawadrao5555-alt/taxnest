@@ -17,8 +17,11 @@
         ? $posOwnStyleLayout
         : ($companyLayout->pos_dashboard_style ?? 'default');
     // Restaurant nav features (Tables, KDS, Ingredients, Recipes) gate.
-    // Single source of truth = companies.restaurant_mode (toggle in Business Profile).
-    // Disable that toggle → restaurant nav items disappear immediately, regardless of business_category or pos_type.
+    // companies.restaurant_mode is not a switch of its own any more: it is the
+    // master COLUMN derived from the shop's kitchen / KOT / tables features
+    // (PosFeatureService::masterSwitches), rewritten by every path that stores
+    // feature_flags. Switch those modules off → the column clears and the
+    // restaurant nav disappears, regardless of business_category or pos_type.
     $isRestaurantLayout = $companyLayout && (bool) $companyLayout->restaurant_mode;
     // Nav visibility for Tables/KDS follows the EFFECTIVE feature flags (Task Jul 2026):
     // matches what the restaurant.only middleware actually allows, regardless of

@@ -1108,6 +1108,10 @@ class PosFeatureService
      * own restaurant mode from kitchen/kot/tables, so an FBR-only exception
      * would just let the column drift away from the screen. (FBR's per-item
      * Store notes ride 'kitchen_notes', which is NOT one of these flags.)
+     *
+     * This derives from the map EXACTLY as given. Anything persisting a feature
+     * map must go through featureUpdates() instead, which resolves dependencies
+     * first — see the note there.
      */
     public static function masterSwitches(array $flags): array
     {
@@ -1121,6 +1125,49 @@ class PosFeatureService
             fn ($column) => \Illuminate\Support\Facades\Schema::hasColumn('companies', $column),
             ARRAY_FILTER_USE_KEY
         );
+    }
+
+    /**
+     * The ONE way to persist a feature map — every write path uses this.
+     *
+     * Returns the company columns for a feature-map write: the CANONICAL map
+     * (dependencies resolved) plus the master columns derived from that same
+     * map. Deriving before resolving is how a surface stored a combination the
+     * runtime immediately undoes — "KOT on, kitchen off" left a shop marked as
+     * a restaurant while forCompany() switched every restaurant feature back
+     * off, so it got the restaurant dashboard with no kitchen anywhere.
+     *
+     * feature_flags itself is hasColumn-guarded like the master columns: a
+     * deployment whose migrations have not fully landed must still be able to
+     * flip what it does have (PROD schema-drift rule).
+     */
+    public static function featureUpdates(array $flags): array
+    {
+        $flags  = self::resolve($flags);
+        $update = self::masterSwitches($flags);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'feature_flags')) {
+            $update['feature_flags'] = $flags;
+        }
+
+        return $update;
+    }
+
+    /**
+     * Columns for ONE inventory master-switch flip, wherever it comes from.
+     *
+     * inventory_enabled is a column AND a feature flag (the dual-switch trap).
+     * A switch that wrote only the column silently reverted at the next
+     * features save, because that save re-derives the column FROM the stale
+     * map. Both surfaces of the switch move together, through the same shared
+     * derivation as the settings toggles.
+     */
+    public static function inventoryToggleUpdates(?Company $company, bool $enabled): array
+    {
+        $flags = is_array($company?->feature_flags) ? $company->feature_flags : [];
+        $flags['inventory'] = $enabled;
+
+        return self::featureUpdates($flags);
     }
 
     /**

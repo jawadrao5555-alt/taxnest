@@ -883,9 +883,23 @@ class PosInventoryController extends Controller
 
     public function toggleInventory(Request $request)
     {
+        // Same refusal as the sibling switch on /pos/settings/inventory-toggle:
+        // whether a shop tracks stock is an owner/manager decision, never a
+        // cashier's.
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            abort(403, __('pos.only_admin_change_setting'));
+        }
+
         $companyId = app('currentCompanyId');
         $company = Company::findOrFail($companyId);
-        $company->update(['inventory_enabled' => !$company->inventory_enabled]);
+        // The master column is only HALF the switch — the inventory feature
+        // flag is the other half, and the next features save re-derives the
+        // column from that map. Writing only the column silently reverted.
+        $company->update(\App\Services\PosFeatureService::inventoryToggleUpdates(
+            $company,
+            !$company->inventory_enabled
+        ));
 
         $status = $company->inventory_enabled ? 'enabled' : 'disabled';
         return back()->with('success', "Inventory module has been {$status}.");

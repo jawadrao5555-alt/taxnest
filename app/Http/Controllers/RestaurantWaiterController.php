@@ -31,8 +31,11 @@ class RestaurantWaiterController extends Controller
     /** Restaurant surfaces are Pro/Unlimited only (P2) — same flags the sale screen uses. */
     private function restaurantOn(Company $company): bool
     {
+        // Decided from the REAL resolved switches. There is no restaurant_mode
+        // on the features object — it is a company COLUMN derived from exactly
+        // these three flags — so reading it here was a permanently-false clause.
         $features = PosFeatureService::forCompany($company);
-        return (bool) (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->restaurant_mode ?? false));
+        return (bool) (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false));
     }
 
     /**

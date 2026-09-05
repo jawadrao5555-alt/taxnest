@@ -314,17 +314,13 @@ class PosController extends Controller
         $company = Company::find($companyId);
         if ($company) {
             // Keep the Features-wizard "Inventory Tracking" flag in lockstep
-            // with the master module switch so both surfaces always agree.
-            $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
-            $flags['inventory'] = $enabled;
-            // Canonicalize so dependent children (e.g. recipes) cascade off in
-            // STORED flags too — keeps the Features wizard display truthful.
-            $flags = \App\Services\PosFeatureService::normalize($flags);
-            // normalize() can cascade children off, so the master columns are
-            // re-derived from the flags we are actually storing — never from
-            // the request alone.
-            $company->update(['feature_flags' => $flags]
-                + \App\Services\PosFeatureService::masterSwitches($flags));
+            // with the master module switch so both surfaces always agree —
+            // one shared derivation canonicalizes the map (dependent children
+            // such as recipes cascade off) and re-derives the master columns
+            // from what is actually being stored, never from the request.
+            $company->update(
+                \App\Services\PosFeatureService::inventoryToggleUpdates($company, $enabled)
+            );
         }
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
@@ -2977,25 +2973,31 @@ class PosController extends Controller
                 $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
             }
             // Restaurant module plan gating (Jul 2026): when the plan doesn't
-            // include it, IGNORE the request for restaurant flags and PRESERVE the
-            // stored values — runtime masking keeps them inert, and a later plan
-            // upgrade restores the shop's previous kitchen configuration.
+            // include it, a restaurant flag may never be switched ON — but
+            // switching one OFF is always allowed, exactly like disabling
+            // inventory. Preserving the stored value in BOTH directions left a
+            // downgraded shop unable to close its kitchen: restaurant_mode
+            // stayed on for good, so the dashboard, day-close, transactions
+            // filter, receipt settings and Customize cards all kept treating it
+            // as a restaurant while the features themselves were masked off.
+            // A flag that is ON stays ON unless this save asks for it off, so an
+            // untouched shop keeps its configuration for a later upgrade.
             if (!PosFeatureService::restaurantAllowed($company)) {
                 $stored = is_array($company->feature_flags) ? $company->feature_flags : [];
                 foreach (PosFeatureService::RESTAURANT_FLAGS as $flag) {
-                    $flags[$flag] = (bool) ($stored[$flag] ?? false);
+                    $flags[$flag] = $flags[$flag] && (bool) ($stored[$flag] ?? false);
                 }
             }
-            // Canonicalize server-side: a child feature can't persist ON while its
-            // required parent is OFF (mirrors the wizard's client-side resolveDeps).
-            $flags = PosFeatureService::normalize($flags);
-            $companyUpdates['feature_flags'] = $flags;
-            // The two master COLUMNS that sit beside the flag map must be
-            // rewritten with it: inventory_enabled follows the inventory flag,
-            // and restaurant mode is a feature the shop switches on rather than
-            // something its registration category decided for it — so a hotel
-            // or marquee can run a kitchen and a restaurant can drop one.
-            $companyUpdates += PosFeatureService::masterSwitches($flags);
+            // One derivation entry point: the map is canonicalized (a child
+            // feature can't persist ON while its required parent is OFF —
+            // mirrors the wizard's client-side resolveDeps) and the two master
+            // COLUMNS beside it are re-derived from what is actually stored.
+            // inventory_enabled follows the inventory flag, and restaurant mode
+            // is a feature the shop switches on rather than something its
+            // registration category decided for it — so a hotel or marquee can
+            // run a kitchen and a restaurant can drop one.
+            $companyUpdates += PosFeatureService::featureUpdates($flags);
+            $flags = $companyUpdates['feature_flags'] ?? $flags;
         }
 
         // use_universal_pos rides a hidden input, so its absence is unambiguous:
@@ -3035,10 +3037,10 @@ class PosController extends Controller
         // editable by SaaS admins only, so no category arrives from the request.
         $category = PosFeatureService::resolveCategory($company);
         $defaults = PosFeatureService::defaultsForCategory($category);
-        $company->update([
-            'business_category' => $category,
-            'feature_flags' => $defaults,
-        ] + PosFeatureService::masterSwitches($defaults));
+        $company->update(
+            ['business_category' => $category]
+            + PosFeatureService::featureUpdates($defaults)
+        );
         return redirect()->route('pos.features')->with('success', __('pos.features_reset_defaults', ['category' => $category]));
     }
 

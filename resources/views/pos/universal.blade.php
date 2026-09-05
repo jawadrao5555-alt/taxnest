@@ -781,7 +781,7 @@ window.addEventListener('popstate', function() {
                     </div>
                     @endif
 
-                    @if($features->restaurant_mode ?? false)
+                    @if(($features->kitchen ?? false) || ($features->kot ?? false) || ($features->tables ?? false))
                     {{-- Order Sound (owner request, 1 Aug 2026): chime when a NEW waiter
                          order lands. DEVICE-level pref (localStorage) — sound is a
                          per-counter choice, not a company setting. Default ON. --}}

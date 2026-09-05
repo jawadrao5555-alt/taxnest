@@ -4630,13 +4630,12 @@ class FbrPosController extends Controller
         $enabled = $request->boolean('enabled');
         $company = Company::find(app('currentCompanyId'));
         if ($company) {
-            $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
-            $flags['inventory'] = $enabled;
-            $flags = \App\Services\PosFeatureService::normalize($flags);
-            // Master columns are re-derived from what we are actually storing,
-            // never from the request alone (normalize() can cascade children off).
-            $company->update(['feature_flags' => $flags]
-                + \App\Services\PosFeatureService::masterSwitches($flags));
+            // Flag map + master columns move together, through the one shared
+            // derivation (it can cascade children off, so the columns are read
+            // from what we actually store — never from the request alone).
+            $company->update(
+                \App\Services\PosFeatureService::inventoryToggleUpdates($company, $enabled)
+            );
         }
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
@@ -4699,16 +4698,17 @@ class FbrPosController extends Controller
             // die with it. Clearing the flag server-side keeps the DB agreeing
             // with what the Customize card shows right after the flip — otherwise
             // the note switch springs back to ON on the next page load.
-            // Written WITHOUT normalize() on purpose: kitchen_notes is a leaf (no
-            // flag depends on it), and normalize() walks the whole map — it would
-            // quietly switch off any other pair that happens to be inconsistent
-            // today. This click was about the slip; it must change nothing else.
+            // Like every other feature-map write this goes through
+            // featureUpdates(): the map is resolved first and the master columns
+            // derived from what is actually stored. Storing an unresolved map
+            // here would leave a historically inconsistent shop (say KOT on with
+            // no kitchen) marked as a restaurant while the runtime resolves all
+            // of its restaurant features back off.
             if (!$enabled) {
                 $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
                 if (!empty($flags['kitchen_notes'])) {
                     $flags['kitchen_notes'] = false;
-                    $company->update(['feature_flags' => $flags]
-                        + \App\Services\PosFeatureService::masterSwitches($flags));
+                    $company->update(\App\Services\PosFeatureService::featureUpdates($flags));
                 }
             }
 
@@ -4737,8 +4737,7 @@ class FbrPosController extends Controller
         }
 
         $flags = \App\Services\PosFeatureService::normalize($flags);
-        $company->update(['feature_flags' => $flags]
-            + \App\Services\PosFeatureService::masterSwitches($flags));
+        $company->update(\App\Services\PosFeatureService::featureUpdates($flags));
 
         // Report what actually STUCK after normalization, never what was asked for.
         return response()->json(['success' => true, 'enabled' => (bool) ($flags[$flag] ?? false)]);

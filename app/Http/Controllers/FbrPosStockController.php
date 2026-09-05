@@ -22,8 +22,9 @@ use Illuminate\Support\Facades\DB;
  * in the shared `products` table so the native product() relation works.
  *
  * Design decisions:
- *  - Stock tracking is gated on companies.inventory_enabled (single switch
- *    for FBR POS — the PRA POS dual-switch trap does not apply here).
+ *  - Stock tracking is gated on companies.inventory_enabled, which is DERIVED
+ *    from the shop's 'inventory' feature flag on every write path — the same
+ *    dual-switch rule as PRA POS, so this page's toggle must move both.
  *  - Sales are NEVER blocked by stock; negative quantities show red.
  *  - Purchase entry = one-shot "stock received" (PO created as RECEIVED and
  *    stock added immediately) — small retailers don't do draft/ordered flows.
@@ -550,7 +551,13 @@ class FbrPosStockController extends Controller
     {
         $this->assertNotCashier();
         $company = Company::find($this->companyId());
-        $company->update(['inventory_enabled' => (bool) $request->boolean('enabled')]);
+        // Stock tracking has TWO surfaces: the master column and the inventory
+        // feature flag. Writing only the column let the next features save
+        // (which re-derives the column FROM the map) flip this straight back.
+        $company->update(\App\Services\PosFeatureService::inventoryToggleUpdates(
+            $company,
+            $request->boolean('enabled')
+        ));
         return redirect()->route('fbrpos.stock')
             ->with('success', $company->inventory_enabled ? 'Stock tracking ON ho gaya.' : 'Stock tracking OFF ho gaya.');
     }

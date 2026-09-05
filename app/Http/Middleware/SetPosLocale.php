@@ -39,6 +39,11 @@ class SetPosLocale
                 $guard = 'fbrpos';
             } elseif ($request->is('pos') || $request->is('pos/*')) {
                 $guard = 'pos';
+            } elseif ($request->is('health') || $request->is('health/*')) {
+                // Healthcare ERP panel (Task 1547) — same three locales, same
+                // guard-by-URL-prefix rule: never a blind fallback, because a
+                // browser can hold a POS and a healthcare session at once.
+                $guard = 'health';
             }
             if ($guard) {
                 $user = auth()->guard($guard)->user();

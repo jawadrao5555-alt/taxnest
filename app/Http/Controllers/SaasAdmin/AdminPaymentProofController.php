@@ -718,6 +718,7 @@ class AdminPaymentProofController extends Controller
             $productLabel = match ($plan?->product_type ?? 'di') {
                 'pos' => 'NestPOS',
                 'fbrpos' => 'FBR POS',
+                'health' => 'TaxNest Healthcare ERP',
                 default => 'TaxNest Digital Invoice',
             };
             $cycleLabels = [
@@ -735,6 +736,7 @@ class AdminPaymentProofController extends Controller
             [$panelName, $ctaUrl] = match ($plan?->product_type ?? 'di') {
                 'pos' => ['NestPOS — PRA Point of Sale', url('/pos/login')],
                 'fbrpos' => ['Nest FBR POS', url('/fbr-pos/login')],
+                'health' => ['Healthcare ERP', url('/health/login')],
                 default => ['Digital Invoicing', url('/login')],
             };
 

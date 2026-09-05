@@ -74,6 +74,7 @@
         <button @click="activeTab = 'di'" :class="activeTab === 'di' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Digital Invoice Plans</button>
         <button @click="activeTab = 'pos'" :class="activeTab === 'pos' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">PRA POS Plans</button>
         <button @click="activeTab = 'fbrpos'" :class="activeTab === 'fbrpos' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">FBR POS Plans</button>
+        <button @click="activeTab = 'health'" :class="activeTab === 'health' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'" class="px-4 py-2 rounded-lg text-sm font-semibold transition">Healthcare Plans</button>
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
@@ -90,6 +91,7 @@
                         <option value="di">Digital Invoice</option>
                         <option value="pos">PRA POS</option>
                         <option value="fbrpos">FBR POS</option>
+                        <option value="health">Healthcare ERP</option>
                     </select>
                 </div>
                 <input type="number" name="price" placeholder="Price (PKR — DI = stored monthly base, POS/FBR POS = annual)" step="1" required class="bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
@@ -152,6 +154,25 @@
             @include('saas-admin.partials.plan-card', ['plan' => $plan, 'color' => 'blue'])
             @endforeach
         </div>
+    </div>
+
+    {{-- Healthcare ERP (Task 1547). Which MODULES a package sells lives in its
+         own column and is not editable from this generic form — it is seeded per
+         package, because a module set is a product decision, not a price. --}}
+    <div x-show="activeTab === 'health'" x-cloak>
+        <div class="flex items-center gap-2 mb-4">
+            <div class="w-2 h-2 rounded-full bg-teal-500"></div>
+            <h2 class="text-lg font-bold text-white">Healthcare ERP Plans</h2>
+            <span class="text-xs text-gray-500 dark:text-gray-400">({{ $healthPlans->count() }} plans — prices are annual)</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach($healthPlans as $plan)
+            @include('saas-admin.partials.plan-card', ['plan' => $plan, 'color' => 'teal'])
+            @endforeach
+        </div>
+        @if($healthPlans->isEmpty())
+        <p class="text-sm text-gray-500">No healthcare packages yet.</p>
+        @endif
     </div>
 
 </div>

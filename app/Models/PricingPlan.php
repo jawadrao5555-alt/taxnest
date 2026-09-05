@@ -29,6 +29,10 @@ class PricingPlan extends Model
         'ai_page_limit',
         'fair_use_limit',
         'is_public',
+        // Healthcare ERP (Task 1547): which modules this package SELLS, and how
+        // many departments it allows. Fillable or the seeder writes nothing.
+        'health_modules',
+        'health_department_limit',
     ];
 
     protected $casts = [
@@ -49,6 +53,9 @@ class PricingPlan extends Model
         'ai_page_limit' => 'integer',
         'fair_use_limit' => 'integer',
         'is_public' => 'boolean',
+        // Healthcare ERP (Task 1547)
+        'health_modules' => 'array',
+        'health_department_limit' => 'integer',
     ];
 
     /**

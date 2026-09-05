@@ -47,7 +47,7 @@ class AdminCompanyController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'owner_name' => 'required|string|max:255',
-            'product_type' => 'required|in:di,pos,fbrpos',
+            'product_type' => 'required|in:di,pos,fbrpos,health',
             'email' => 'required|email|max:255',
             'ntn' => 'nullable|string|max:50',
             // Shared CNIC truth (Task 580): 13 digits, dash-tolerant, GLOBAL
@@ -98,6 +98,19 @@ class AdminCompanyController extends Controller
         if ($request->product_type === 'pos') {
             $companyData['pra_reporting_enabled'] = false;
             $companyData['pra_environment'] = 'sandbox';
+        }
+
+        // Healthcare ERP (Task 1547): a new healthcare company starts as a
+        // clinic with that org type's default modules, so the owner signs in to
+        // a working panel rather than an empty one. Schema guards keep an
+        // un-migrated column from breaking company creation.
+        if ($request->product_type === \App\Support\HealthPanel::PRODUCT_TYPE) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_org_type')) {
+                $companyData['health_org_type'] = 'clinic';
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'health_modules')) {
+                $companyData['health_modules'] = \App\Services\HealthModuleService::ORG_TYPE_DEFAULTS['clinic'];
+            }
         }
 
         // Only super admin sees/sets the agent dropdown (Agents section is
@@ -459,6 +472,9 @@ class AdminCompanyController extends Controller
         $guard = match ($company->product_type) {
             'pos' => 'pos',
             'fbrpos' => 'fbrpos',
+            // Healthcare ERP (Task 1547) — its own guard, same coexistence rule:
+            // the admin guard survives, and Exit is the only way out.
+            'health' => 'health',
             default => 'web',
         };
 
@@ -529,6 +545,7 @@ class AdminCompanyController extends Controller
         $dashboard = match ($guard) {
             'pos' => '/pos/dashboard',
             'fbrpos' => '/fbr-pos/dashboard',
+            'health' => '/health/dashboard',
             default => '/dashboard',
         };
 
@@ -836,6 +853,7 @@ class AdminCompanyController extends Controller
             [$productLabel, $panelName, $ctaUrl] = match ($company->product_type) {
                 'pos'    => ['NestPOS', 'NestPOS — PRA Point of Sale', url('/pos/login')],
                 'fbrpos' => ['FBR POS', 'Nest FBR POS', url('/fbr-pos/login')],
+                'health' => ['TaxNest Healthcare ERP', 'Healthcare ERP', url('/health/login')],
                 default  => ['TaxNest Digital Invoice', 'Digital Invoicing', url('/login')],
             };
 
@@ -1080,6 +1098,9 @@ class AdminCompanyController extends Controller
             // consultant_commissions is deliberately EXCLUDED — money ledger
             // keeps history via nullable FK + company_name snapshot.
             'consultant_client_links', 'consultant_invites',
+            // Healthcare ERP (Task 1547): department rows are company-scoped and
+            // carry no FK cascade, so they must be purged explicitly.
+            'health_departments',
         ];
         DB::transaction(function () use ($orphanTables, $id, $company) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge
@@ -1097,6 +1118,16 @@ class AdminCompanyController extends Controller
                 $fbrDealIds = DB::table('fbr_pos_deals')->where('company_id', $id)->pluck('id');
                 if ($fbrDealIds->isNotEmpty()) {
                     DB::table('fbr_pos_deal_items')->whereIn('deal_id', $fbrDealIds)->delete();
+                }
+            }
+            // health_department_user hangs off health_departments (no company_id
+            // of its own) — purge by parent department ids BEFORE the loop below
+            // removes the departments, or the pivot rows outlive the company.
+            if (\Illuminate\Support\Facades\Schema::hasTable('health_departments')
+                && \Illuminate\Support\Facades\Schema::hasTable('health_department_user')) {
+                $healthDeptIds = DB::table('health_departments')->where('company_id', $id)->pluck('id');
+                if ($healthDeptIds->isNotEmpty()) {
+                    DB::table('health_department_user')->whereIn('health_department_id', $healthDeptIds)->delete();
                 }
             }
             foreach ($orphanTables as $tbl) {
@@ -1121,7 +1152,7 @@ class AdminCompanyController extends Controller
     public function changeProductType(Request $request, $id)
     {
         $company = Company::findOrFail($id);
-        $request->validate(['product_type' => 'required|in:di,pos,fbrpos']);
+        $request->validate(['product_type' => 'required|in:di,pos,fbrpos,health']);
         $old = $company->product_type;
         $company->update(['product_type' => $request->product_type]);
         AdminAuditLog::log(auth('admin')->id(), 'Company type changed', 'Company', $id, [

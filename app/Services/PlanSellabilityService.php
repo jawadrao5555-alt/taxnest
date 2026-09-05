@@ -71,6 +71,7 @@ class PlanSellabilityService
             'pos'    => 'PRA POS',
             'fbrpos' => 'FBR POS',
             'di'     => 'Digital Invoice',
+            'health' => 'Healthcare ERP',
             default  => 'package',
         };
     }

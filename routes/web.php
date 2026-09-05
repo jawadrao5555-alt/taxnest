@@ -68,6 +68,10 @@ use App\Http\Controllers\InvoiceImportController;
 use App\Http\Controllers\AiInvoiceReaderController;
 use App\Http\Controllers\FbrPosController;
 use App\Http\Controllers\FbrPosAuthController;
+use App\Http\Controllers\HealthController;
+use App\Http\Controllers\HealthAuthController;
+use App\Http\Controllers\HealthDepartmentController;
+use App\Http\Controllers\HealthTeamController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\AnnouncementController;
@@ -88,7 +92,12 @@ Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebho
 Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
     ->where('role', 'super_admin|company_admin|demo');
 
-Route::get('/health', function () {
+// Infrastructure diagnostic. It used to sit on /health, which is wrong twice
+// over: that prefix now belongs to the Healthcare ERP panel, and the payload
+// (database host/user, session and cache drivers, a slice of the Replit DB
+// file) has no business being readable without signing in. Moved behind the
+// SaaS admin guard on its own path.
+Route::get('/__diag/infrastructure', function () {
     $replitdbContent = '';
     if (file_exists('/tmp/replitdb')) {
         $raw = trim(file_get_contents('/tmp/replitdb'));
@@ -148,7 +157,7 @@ Route::get('/health', function () {
         $info['db_error'] = substr($e->getMessage(), 0, 300);
     }
     return response()->json($info);
-});
+})->middleware('auth:admin');
 
 Route::get('/', function () {
     // Perf (Jul 2026): these 4 COUNTs over big tables cost ~250ms on EVERY
@@ -1649,6 +1658,65 @@ Route::post('/fbr-pos/guest-language', function (\Illuminate\Http\Request $reque
     }
     return back();
 })->name('fbrpos.guest-language');
+
+/*
+|--------------------------------------------------------------------------
+| Healthcare ERP (Task 1547) — its own panel, its own guard, its own prefix.
+|--------------------------------------------------------------------------
+| Nothing here is reachable from a DI / PRA POS / FBR POS session: health.auth
+| refuses any company whose product_type is not 'health', and those panels
+| never link to /health. The public page lives at /healthcare so the /health
+| prefix stays entirely the panel's.
+*/
+Route::get('/healthcare', [HealthController::class, 'landing'])->name('health.landing');
+
+Route::get('/health/login', [HealthAuthController::class, 'showLogin'])->name('health.login');
+Route::post('/health/login', [HealthAuthController::class, 'login']);
+Route::get('/health/register', [HealthAuthController::class, 'showRegister'])->name('health.register');
+Route::post('/health/register', [HealthAuthController::class, 'register']);
+Route::post('/health/logout', [HealthAuthController::class, 'logout'])->name('health.logout');
+// Session-only language choice for signed-out visitors (same three locales).
+Route::post('/health/guest-language', [HealthController::class, 'guestLanguage'])->name('health.guest-language');
+
+Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(function () {
+    Route::get('/', fn () => redirect()->route('health.dashboard'));
+    Route::get('/dashboard', [HealthController::class, 'dashboard'])->name('health.dashboard');
+
+    // Per-user display preferences — every signed-in member owns their own.
+    Route::post('/set-dark-mode', [HealthController::class, 'toggleDarkMode'])->name('health.set-dark-mode');
+    Route::post('/set-language', [HealthController::class, 'setLanguage'])->name('health.set-language');
+
+    // Settings hub. The capability is also derived from the PATH by HealthAuth,
+    // so a forgotten middleware argument here still cannot open the screen.
+    Route::get('/settings', [HealthController::class, 'settings'])
+        ->middleware('health.can:settings.manage')->name('health.settings');
+
+    // Module switchboard: owner only, both here and in HealthAuth's path map.
+    Route::get('/settings/modules', [HealthController::class, 'modules'])
+        ->middleware('health.can:settings.manage.modules')->name('health.settings.modules');
+    Route::post('/settings/modules', [HealthController::class, 'updateModules'])
+        ->middleware('health.can:settings.manage.modules')->name('health.settings.modules.update');
+
+    Route::middleware('health.can:departments.manage')->group(function () {
+        Route::get('/departments', [HealthDepartmentController::class, 'index'])->name('health.departments');
+        Route::post('/departments', [HealthDepartmentController::class, 'store'])->name('health.departments.store');
+        Route::put('/departments/{id}', [HealthDepartmentController::class, 'update'])->name('health.departments.update');
+        // Deactivate / reactivate, never delete: records are filed under these.
+        Route::post('/departments/{id}/deactivate', [HealthDepartmentController::class, 'deactivate'])->name('health.departments.deactivate');
+        Route::post('/departments/{id}/reactivate', [HealthDepartmentController::class, 'reactivate'])->name('health.departments.reactivate');
+    });
+
+    Route::middleware('health.can:staff.manage')->group(function () {
+        Route::get('/team', [HealthTeamController::class, 'index'])->name('health.team');
+        Route::post('/team', [HealthTeamController::class, 'store'])->name('health.team.store');
+        Route::put('/team/{id}', [HealthTeamController::class, 'update'])->name('health.team.update');
+        Route::post('/team/{id}/toggle-active', [HealthTeamController::class, 'toggleActive'])->name('health.team.toggle-active');
+        Route::post('/team/{id}/departments', [HealthTeamController::class, 'syncDepartments'])->name('health.team.departments');
+        // Owner-only delegation — re-checked inside the controller, because the
+        // route gate only proves the actor may manage staff at all.
+        Route::post('/team/{id}/permissions', [HealthTeamController::class, 'permissions'])->name('health.team.permissions');
+    });
+});
 
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
     // Same shared users.dark_mode preference as PRA POS. This is deliberately

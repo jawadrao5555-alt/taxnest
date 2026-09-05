@@ -29,10 +29,15 @@ class AdminPlanController extends Controller
                 ->orderBy('price')
                 ->get();
             $fbrposPlans = PricingPlan::where('product_type', 'fbrpos')->orderBy('price')->get();
+            // Healthcare ERP (Task 1547) — the Clinic / Hospital shelf. Without
+            // its own bucket a health package would be invisible here and the
+            // admin could not price or edit what the migration seeded.
+            $healthPlans = PricingPlan::where('product_type', 'health')->orderBy('price')->get();
         } else {
             $diPlans = PricingPlan::orderBy('price')->get();
             $posPlans = new Collection();
             $fbrposPlans = new Collection();
+            $healthPlans = new Collection();
         }
 
         // A ladder that is ALREADY broken must not be invisible — the editor
@@ -42,7 +47,7 @@ class AdminPlanController extends Controller
 
         $posAddons = PosAddonPricingService::catalog();
 
-        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'ladderWarnings', 'posAddons'));
+        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'healthPlans', 'ladderWarnings', 'posAddons'));
     }
 
     public function updateAddonPricing(Request $request)
@@ -146,7 +151,7 @@ class AdminPlanController extends Controller
             'invoice_limit' => 'required|integer|min:-1',
             'ai_page_limit' => 'nullable|integer|min:-1',
             'fair_use_limit' => 'nullable|integer|min:0',
-            'product_type' => 'required|in:di,pos,fbrpos',
+            'product_type' => 'required|in:di,pos,fbrpos,health',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -204,7 +209,7 @@ class AdminPlanController extends Controller
             'invoice_limit' => 'required|integer|min:-1',
             'ai_page_limit' => 'nullable|integer|min:-1',
             'fair_use_limit' => 'nullable|integer|min:0',
-            'product_type' => 'required|in:di,pos,fbrpos',
+            'product_type' => 'required|in:di,pos,fbrpos,health',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',

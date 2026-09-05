@@ -325,6 +325,7 @@ class AdminController extends Controller
             [$productLabel, $panelName, $ctaUrl] = match ($company->product_type) {
                 'pos'    => ['NestPOS', 'NestPOS — PRA Point of Sale', url('/pos/login')],
                 'fbrpos' => ['FBR POS', 'Nest FBR POS', url('/fbr-pos/login')],
+                'health' => ['TaxNest Healthcare ERP', 'Healthcare ERP', url('/health/login')],
                 default  => ['TaxNest Digital Invoice', 'Digital Invoicing', url('/login')],
             };
 

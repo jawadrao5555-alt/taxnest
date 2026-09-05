@@ -58,7 +58,8 @@ class SubscriptionAssignmentService
      * Product-type-aware price computation. Price semantics differ per product:
      *  - di:               sale_price is the MONTHLY base  → apply the cycle discount.
      *  - pos / standalone: sale_price is ALREADY the ANNUAL total (6% baked in) → use as-is (annual only).
-     *  - fbrpos:           sale_price is MONTHLY           → annual = sale_price × 12 × 0.94 (6% off).
+     *  - fbrpos:           sale_price is ALREADY the ANNUAL total              → use as-is (annual only).
+     *  - health:           sale_price is ALREADY the ANNUAL total              → use as-is (annual only).
      *
      * Pass $company to get the TOTAL the shop actually pays: base package +
      * paid extra-branch slots (Rs 10,000/branch/year, PRA POS only). Every
@@ -100,9 +101,9 @@ class SubscriptionAssignmentService
         // but nothing reads them for a sale anymore.
         $cycle = self::purchaseCycle($cycle, $type);
 
-        if ($type === 'pos' || $type === 'fbrpos' || $type === 'standalone') {
-            // Both POS lines and standalone store the ANNUAL total in `price`
-            // (6% already baked in) — use it as-is, never × 12.
+        if ($type === 'pos' || $type === 'fbrpos' || $type === 'standalone' || $type === 'health') {
+            // Both POS lines, standalone and healthcare store the ANNUAL total
+            // in `price` (6% already baked in) — use it as-is, never × 12.
             return [
                 'cycle' => 'annual',
                 'final_price' => round((float) $plan->sale_price),

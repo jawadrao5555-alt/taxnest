@@ -43,6 +43,12 @@ class User extends Authenticatable
         'pra_reporting_enabled',
         'pos_team_password_enc',
         'pos_billing_scope',  // stream lock (07 Aug 2026); must be fillable so storeCashier User::create() persists it
+        // Healthcare ERP panel (Task 1547). Fillable on purpose: a non-fillable
+        // column is dropped SILENTLY by Eloquent, so a staff account would be
+        // created with no role and be unable to sign in.
+        'health_role',
+        'health_department_id',
+        'health_permissions',
     ];
 
     /**

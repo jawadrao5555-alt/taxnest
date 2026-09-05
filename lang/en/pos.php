@@ -6009,5 +6009,5 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'domain_agent_sale_payment' => 'A payment retry is protected from creating a duplicate payment.',
     'domain_agent_sale_customer' => 'Customer selection is now more stable at checkout.',
     'domain_agent_outcome' => 'For a fresh installation, always download from taxnest.pk/download. Existing update-capable Agents do not need to be reinstalled.',
-    'domain_agent_dismiss' => 'Samajh gaya',
+    'domain_agent_dismiss' => 'Got it',
 ];

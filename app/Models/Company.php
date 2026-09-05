@@ -206,6 +206,12 @@ class Company extends Model
         'public_profile_slug',
         'public_profile_settings',
         'rider_bill_preview_prefs',
+        // Healthcare ERP (Task 1547). Must be fillable — Eloquent drops writes
+        // to a non-fillable column SILENTLY, so a healthcare signup would land
+        // with no organisation type and no default modules.
+        'health_org_type',
+        'health_modules',
+        'health_setup_completed',
     ];
 
     protected $casts = [
@@ -252,6 +258,9 @@ class Company extends Model
         'di_branding' => 'array',
         'public_profile_settings' => 'array',
         'rider_bill_preview_prefs' => 'array',
+        // Healthcare ERP (Task 1547)
+        'health_modules' => 'array',
+        'health_setup_completed' => 'boolean',
         'use_universal_pos' => 'boolean',
         'auto_print_kot' => 'boolean',
         'dine_in_auto_kot' => 'boolean',

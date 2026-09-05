@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Two impersonation modes share one session flag ('impersonation'):
  *   - VIEW-ONLY  (readonly === true):  every state-changing request inside the
- *     company panels (web / pos / fbrpos) is blocked.
+ *     company panels (web / pos / fbrpos / health) is blocked.
  *   - FULL-ACCESS (readonly falsey):   writes pass through (and are audited by
  *     LogImpersonatedWrites); only identity-swaps are still blocked.
  *
@@ -80,6 +80,8 @@ class ReadOnlyImpersonation
             'login', 'logout',
             'pos/login', 'pos/logout',
             'fbr-pos/login', 'fbr-pos/logout',
+            // Healthcare ERP (Task 1547) — same rule, its own paths.
+            'health/login', 'health/logout',
         ];
         $isIdentitySwap = $isDemoLogin || ($isWrite && in_array($path, $identityPaths, true));
 

@@ -68,6 +68,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'rate_limit_company' => \App\Http\Middleware\RateLimitByCompany::class,
             'pos.auth' => \App\Http\Middleware\PosAuth::class,
             'fbrpos.auth' => \App\Http\Middleware\FbrPosAuth::class,
+            // Healthcare ERP panel (Task 1547) — panel gate, module gate, capability gate.
+            'health.auth' => \App\Http\Middleware\HealthAuth::class,
+            'health.module' => \App\Http\Middleware\HealthModuleEnabled::class,
+            'health.can' => \App\Http\Middleware\HealthCan::class,
             'admin.auth' => \App\Http\Middleware\AdminAuth::class,
             'agent.auth' => \App\Http\Middleware\AgentAuth::class,
             'agent.core.enabled' => \App\Http\Middleware\AgentCoreEnabled::class,
@@ -180,6 +184,9 @@ return Application::configure(basePath: dirname(__DIR__))
             if (str_starts_with($path, 'fbr-pos/') || $path === 'fbr-pos') {
                 return redirect(auth('fbrpos')->check() ? '/fbr-pos/dashboard' : '/fbr-pos/login')->with('error', $message);
             }
+            if (str_starts_with($path, 'health/') || $path === 'health') {
+                return redirect(auth('health')->check() ? '/health/dashboard' : '/health/login')->with('error', $message);
+            }
             if (str_starts_with($path, 'admin/') || $path === 'admin') {
                 return redirect(auth('admin')->check() ? '/admin/dashboard' : '/admin/login')->with('error', $message);
             }
@@ -230,6 +237,12 @@ return Application::configure(basePath: dirname(__DIR__))
                     return redirect()->back()->with('error', 'Your session expired. Please try again.');
                 }
                 return redirect('/fbr-pos/login')->with('error', 'Session expired. Please log in again.');
+            }
+            if (str_starts_with($path, 'health/') || str_starts_with($path, 'health')) {
+                if (auth('health')->check()) {
+                    return redirect()->back()->with('error', 'Your session expired. Please try again.');
+                }
+                return redirect('/health/login')->with('error', 'Session expired. Please log in again.');
             }
 
             if (auth()->check()) {

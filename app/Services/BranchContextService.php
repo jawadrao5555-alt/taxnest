@@ -274,6 +274,19 @@ class BranchContextService
             return ($user->default_branch_id ?? null) ? 'cashier' : 'company_admin';
         }
 
+        // Healthcare ERP roles live in their own column (users.health_role) and
+        // are mapped onto the branch tiers this service already understands:
+        // owner/administrator run the whole organisation, everybody else is
+        // limited to the branches they are actually posted to (branch_user),
+        // which is the 'manager' tier here. This mirrors
+        // HealthAccessService::isAdministrative() — keep the two in step.
+        $healthRole = $user->health_role ?? null;
+        if ($healthRole) {
+            return in_array($healthRole, ['health_owner', 'health_admin'], true)
+                ? 'company_admin'
+                : 'manager';
+        }
+
         return match ($role) {
             'pos_admin', 'admin' => 'company_admin',
             'pos_manager' => 'manager',
@@ -302,7 +315,11 @@ class BranchContextService
 
     private function currentUser()
     {
-        foreach (['fbrpos', 'pos', 'web'] as $guard) {
+        // 'health' joins the list so the Healthcare ERP panel reuses the SAME
+        // branch context (active branch, branch_user pivot, owner "all
+        // branches") instead of growing a second notion of "which branch am I
+        // in". Left out, every healthcare page saw a branch-less company.
+        foreach (['fbrpos', 'pos', 'health', 'web'] as $guard) {
             $user = Auth::guard($guard)->user();
             if ($user) return $user;
         }

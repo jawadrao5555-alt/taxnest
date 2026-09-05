@@ -81,13 +81,11 @@
                 </div>
                 @if(!empty($agents) && $agents->count() && (auth('admin')->user()->role ?? null) === 'super_admin')
                 <div>
-                    <label class="text-xs text-gray-400 mb-1 block">Introduced by Agent</label>
-                    <select name="agent_id" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
-                        <option value="">None</option>
-                        @foreach($agents as $ag)
-                        <option value="{{ $ag->id }}" {{ old('agent_id', $company->agent_id) == $ag->id ? 'selected' : '' }}>{{ $ag->name }}{{ $ag->territory ? ' — ' . $ag->territory : '' }}</option>
-                        @endforeach
-                    </select>
+                    <label class="text-xs text-gray-400 mb-1 block">Distributor attribution</label>
+                    <div class="w-full bg-gray-900 border border-gray-700 rounded-lg text-gray-300 text-sm px-3 py-2">
+                        {{ optional($agents->firstWhere('id', $company->agent_id))->name ?? 'Direct Customer' }}
+                    </div>
+                    <p class="text-[11px] text-gray-500 mt-1">Change this only from the audited Distributor Attribution action on the distributor record.</p>
                 </div>
                 @endif
                 <div>

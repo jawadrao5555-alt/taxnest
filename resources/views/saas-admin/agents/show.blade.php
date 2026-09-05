@@ -2,13 +2,13 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-            <a href="{{ route('saas.admin.agents') }}" class="text-xs text-gray-500 hover:text-gray-300">&larr; Agents / Partners</a>
+            <a href="{{ route('saas.admin.agents') }}" class="text-xs text-gray-500 hover:text-gray-300">&larr; Distributors</a>
             <h1 class="text-2xl font-bold text-white mt-1">{{ $agent->name }}
                 <span class="ml-2 align-middle inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $agent->status === 'active' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400' }}">{{ $agent->status }}</span>
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {{ $agent->cnic ?? 'CNIC —' }} · {{ $agent->phone ?? 'Phone —' }} · {{ $agent->territory ?? 'Territory —' }}
-                · Schedule A: New {{ rtrim(rtrim(number_format($agent->rate_new, 2), '0'), '.') }}% / Renewal {{ rtrim(rtrim(number_format($agent->rate_renewal, 2), '0'), '.') }}%
+                · Customer discount allowance: {{ rtrim(rtrim(number_format($agent->discount_percent, 2), '0'), '.') }}%
             </p>
             <p class="text-xs text-indigo-400 mt-1">Referral code: {{ $agent->referral_code }} · {{ url('/register?ref='.$agent->referral_code) }}</p>
         </div>
@@ -17,7 +17,7 @@
     {{-- Edit agent --}}
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showEdit: false }">
         <div class="flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-white">Agent Profile</h3>
+            <h3 class="text-sm font-semibold text-white">Distributor Profile</h3>
             <button @click="showEdit = !showEdit" class="text-xs text-indigo-400 hover:underline" x-text="showEdit ? 'Hide' : 'Edit'"></button>
         </div>
         <form x-show="showEdit" method="POST" action="{{ route('saas.admin.agents.update', $agent->id) }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end mt-3">
@@ -30,18 +30,19 @@
                 <input type="text" name="phone" value="{{ old('phone', $agent->phone) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Email</label>
                 <input type="email" name="email" value="{{ old('email', $agent->email) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
-            <div><label class="text-xs text-gray-400 mb-1 block">New Portal Password</label>
-                <input type="password" name="password" minlength="8" placeholder="Leave blank to keep current" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Territory</label>
                 <input type="text" name="territory" value="{{ old('territory', $agent->territory) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
-            <div><label class="text-xs text-gray-400 mb-1 block">New Sale % *</label>
-                <input type="number" name="rate_new" required step="0.01" min="0" max="100" value="{{ old('rate_new', $agent->rate_new) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
-            <div><label class="text-xs text-gray-400 mb-1 block">Renewal % *</label>
-                <input type="number" name="rate_renewal" required step="0.01" min="0" max="100" value="{{ old('rate_renewal', $agent->rate_renewal) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
+            <div><label class="text-xs text-gray-400 mb-1 block">Customer discount allowance %</label>
+                <input type="number" name="discount_percent" step="0.01" min="0" max="10" value="{{ old('discount_percent', $agent->discount_percent) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Notes</label>
                 <input type="text" name="notes" value="{{ old('notes', $agent->notes) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Save (rates apply to future commissions)</button>
         </form>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
+        <div class="flex justify-between"><h3 class="text-sm font-semibold text-white">Quarterly Incentive Awards</h3><form method="POST" action="{{ route('saas.admin.agents.incentives.store',$agent->id) }}" class="flex gap-2">@csrf <input name="quarter" value="{{ now()->format('Y') }}-Q{{ now()->quarter }}" class="bg-gray-800 border border-gray-700 rounded text-white text-xs px-2"><button class="text-xs text-emerald-400">Calculate award</button></form></div>
+        @foreach($awards as $award)<div class="flex justify-between border-t border-gray-800 mt-2 pt-2 text-sm"><span>{{ $award->quarter }} · {{ $award->qualified_companies }} companies · {{ $award->rate_percent }}% · Rs {{ number_format($award->amount,2) }}</span><span>{{ $award->status }} @if($award->status==='pending')<form class="inline" method="POST" action="{{ route('saas.admin.agents.incentives.approve',[$agent->id,$award->id]) }}">@csrf<button class="text-indigo-400">Approve</button></form>@elseif($award->status==='approved')<form class="inline" method="POST" action="{{ route('saas.admin.agents.incentives.paid',[$agent->id,$award->id]) }}">@csrf<button class="text-emerald-400">Mark paid</button></form>@endif</span></div>@endforeach
     </div>
 
     {{-- Monthly commission report --}}
@@ -144,7 +145,7 @@
                             <th class="px-3 py-2">Company</th>
                             <th class="px-3 py-2">Product</th>
                             <th class="px-3 py-2">Status</th>
-                            <th class="px-3 py-2">Since</th>
+                            <th class="px-3 py-2">Attribution</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-800">
@@ -159,7 +160,7 @@
                             </td>
                             <td class="px-3 py-2 text-gray-400 uppercase text-xs">{{ $c->product_type }}</td>
                             <td class="px-3 py-2"><span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $c->company_status === 'active' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-amber-900/30 text-amber-400' }}">{{ $c->company_status ?? $c->status }}</span></td>
-                            <td class="px-3 py-2 text-gray-400 whitespace-nowrap">{{ optional($c->created_at)->format('d M Y') }}</td>
+                            <td class="px-3 py-2 text-gray-400 whitespace-nowrap">{{ optional($c->created_at)->format('d M Y') }}<form method="POST" action="{{ route('saas.admin.companies.distributor-attribution',$c->id) }}" class="mt-1 flex gap-1 flex-wrap">@csrf<select name="agent_id" class="bg-gray-800 text-xs"><option value="">Direct</option>@foreach($allDistributors as $d)<option value="{{ $d->id }}" {{ $d->id===$c->agent_id?'selected':'' }}>{{ $d->name }}</option>@endforeach</select><input type="hidden" name="reason" value="SaaS Admin attribution correction"><button class="text-xs text-indigo-400">Save</button><label class="text-[10px] text-amber-400"><input type="checkbox" name="super_admin_override" value="1"> override locked</label></form></td>
                         </tr>
                         @empty
                         <tr><td colspan="4" class="px-3 py-8 text-center text-gray-500 dark:text-gray-400">No companies linked yet. Set "Introduced by Agent" on a company's edit page.</td></tr>

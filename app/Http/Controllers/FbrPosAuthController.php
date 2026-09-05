@@ -134,6 +134,7 @@ class FbrPosAuthController extends Controller
         if (Auth::guard('fbrpos')->check()) {
             return $this->redirectToPortal();
         }
+        \App\Services\AgentReferralService::rememberFromRequest(request());
 
         // Task 1483/1484: the landing's comparison table sends the shop here
         // with ?plan=<package name>, so the page can name the column it clicked
@@ -156,7 +157,10 @@ class FbrPosAuthController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
+            'distributor_reference_code' => 'nullable|string|max:30',
         ], \App\Services\LoginIdentifierResolver::cnicMessages('company_cnic'));
+
+        $distributor = \App\Services\AgentReferralService::agentFromSignup($request);
 
         // Anti free-trial-abuse: block re-use of any previously-registered credential.
         if ($usedType = CredentialLedgerService::firstUsed([
@@ -205,7 +209,8 @@ class FbrPosAuthController extends Controller
             'fbr_pos_enabled' => true,
             'fbr_pos_environment' => 'sandbox',
             'fbr_reporting_enabled' => true,
-        ] + $storeSlipDefault + $requestedPackage);
+        ] + ($distributor ? ['agent_id' => $distributor->id] : []) + $storeSlipDefault + $requestedPackage);
+        $request->session()->forget(\App\Services\AgentReferralService::SESSION_KEY);
 
         $userData = [
             'name' => $request->name,

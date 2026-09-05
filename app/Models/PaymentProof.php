@@ -31,6 +31,8 @@ class PaymentProof extends Model
         'verified_at',
         'reject_reason',
         'file_pruned_at',
+        'distributor_quote_snapshot',
+        'distributor_net_amount',
     ];
 
     protected $casts = [
@@ -41,6 +43,8 @@ class PaymentProof extends Model
         'file_pruned_at' => 'datetime',
         'extra_branch_qty' => 'integer',
         'addon_quote_snapshot' => 'array',
+        'distributor_quote_snapshot' => 'array',
+        'distributor_net_amount' => 'decimal:2',
     ];
 
     /** Non-package request lanes. Anything NOT listed here is a renewal proof. */

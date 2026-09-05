@@ -190,6 +190,16 @@
                 Save Settings
             </button>
         </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+            <h2 class="text-sm font-semibold text-white">Distributor Program Policy</h2>
+            <p class="text-xs text-gray-500">Annual subscriptions only. First-year base plus quarterly incentive is capped at 20%.</p>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                @foreach(['year1'=>'Year 1 %','year2'=>'Year 2 %','year3'=>'Year 3 %','max_discount'=>'Max customer discount %','hold_days'=>'Payout hold days'] as $key=>$label)
+                <div><label class="text-xs text-gray-400 block mb-1">{{ $label }}</label><input name="distributor_{{ $key }}" type="number" step="0.01" min="0" value="{{ old('distributor_'.$key, $settings['distributor_'.$key] ?: \App\Services\DistributorPolicyService::DEFAULTS[$key]) }}" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2"></div>
+                @endforeach
+            </div>
+            <div><label class="text-xs text-gray-400 block mb-1">Quarterly tiers (JSON)</label><input name="distributor_tiers" value="{{ old('distributor_tiers', $settings['distributor_tiers'] ?: json_encode(\App\Services\DistributorPolicyService::DEFAULTS['tiers'])) }}" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2"><p class="text-[11px] text-gray-500 mt-1">Default: [{&quot;companies&quot;:3,&quot;rate&quot;:2},{&quot;companies&quot;:6,&quot;rate&quot;:3},{&quot;companies&quot;:10,&quot;rate&quot;:5}]</p></div>
+        </div>
     </form>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">

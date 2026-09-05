@@ -1557,6 +1557,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/agents/{id}/toggle', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'toggle'])->name('saas.admin.agents.toggle');
     Route::get('/agents/{id}/export', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'export'])->name('saas.admin.agents.export');
     Route::post('/agents/{id}/clawback', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'clawback'])->name('saas.admin.agents.clawback');
+    Route::post('/companies/{id}/distributor-attribution', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'updateAttribution'])->name('saas.admin.companies.distributor-attribution');
+    Route::post('/agents/{id}/incentives', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'createAward'])->name('saas.admin.agents.incentives.store');
+    Route::post('/agents/{id}/incentives/{awardId}/approve', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'approveAward'])->name('saas.admin.agents.incentives.approve');
+    Route::post('/agents/{id}/incentives/{awardId}/paid', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'payAward'])->name('saas.admin.agents.incentives.paid');
 
     // Consultant program oversight: consultants, links, commissions, payouts.
     Route::get('/consultants', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'index'])->name('saas.admin.consultants');
@@ -1600,7 +1604,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
 Route::get('/agent/login', [\App\Http\Controllers\AgentPortalAuthController::class, 'showLogin'])->name('agent.login');
 Route::post('/agent/login', [\App\Http\Controllers\AgentPortalAuthController::class, 'login'])->name('agent.login.submit');
 Route::post('/agent/logout', [\App\Http\Controllers\AgentPortalAuthController::class, 'logout'])->name('agent.logout');
-Route::prefix('agent')->middleware('agent.portal.auth')->group(function () {
+Route::prefix('agent')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\AgentPortalController::class, 'dashboard'])->name('agent.dashboard');
     Route::get('/companies', [\App\Http\Controllers\AgentPortalController::class, 'companies'])->name('agent.companies');
     Route::get('/commissions', [\App\Http\Controllers\AgentPortalController::class, 'commissions'])->name('agent.commissions');

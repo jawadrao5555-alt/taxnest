@@ -16,13 +16,16 @@ class AgentPortalAuthController extends Controller
 
     public function showLogin()
     {
-        return auth('agent')->check()
-            ? redirect()->route('agent.dashboard')
-            : view('agent.login');
+        return response('Not Found', 404);
     }
 
     public function login(Request $request)
     {
+        // Distributors are referral-only records. Historical credentials remain
+        // in storage for audit/backward compatibility, but can never establish
+        // a session or expose company/commission data.
+        return response('Not Found', 404);
+
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
@@ -57,9 +60,6 @@ class AgentPortalAuthController extends Controller
 
     public function logout(Request $request)
     {
-        Auth::guard('agent')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-        return redirect('/agent/login');
+        return response('Not Found', 404);
     }
 }

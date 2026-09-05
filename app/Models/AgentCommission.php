@@ -26,6 +26,9 @@ class AgentCommission extends Model
         'paid_at',
         'paid_by_admin_id',
         'created_by_admin_id',
+        'commission_year',
+        'hold_until',
+        'decision_key',
     ];
 
     protected $casts = [
@@ -34,6 +37,7 @@ class AgentCommission extends Model
         'amount' => 'decimal:2',
         'period_month' => 'date',
         'paid_at' => 'datetime',
+        'hold_until' => 'datetime',
     ];
 
     public function agent()

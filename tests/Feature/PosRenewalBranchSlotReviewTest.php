@@ -257,6 +257,7 @@ class PosRenewalBranchSlotReviewTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), array_merge([
                 'pricing_plan_id' => $plan->id,
                 'billing_cycle' => $cycle,
+                'verified_received_amount' => (float) $proof->amount,
             ], $extra));
     }
 

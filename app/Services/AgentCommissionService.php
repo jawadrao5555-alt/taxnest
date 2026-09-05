@@ -87,7 +87,11 @@ class AgentCommissionService
 
     private static function createEarnLine(PaymentProof $proof): void
     {
-        if ($proof->status !== 'verified' || (float) $proof->amount <= 0) {
+        if ($proof->status !== 'verified' || (float) $proof->amount <= 0
+            // Legacy verified proofs predate billing_cycle; retain their
+            // historical subscription-lane behaviour. New explicit cycles are
+            // annual-only.
+            || ($proof->billing_cycle !== null && !in_array($proof->billing_cycle, ['annual', 'yearly'], true))) {
             return;
         }
 
@@ -114,7 +118,7 @@ class AgentCommissionService
         // time, so a later reactivation + backfill can never retroactively award
         // commission for the terminated period.
         if (!$agent->wasActiveAt($when)) {
-            $line = AgentCommission::create([
+            $skipAttrs = [
                 'agent_id' => $agent->id,
                 'company_id' => $company->id,
                 'company_name' => $company->name,
@@ -125,8 +129,9 @@ class AgentCommissionService
                 'amount' => 0,
                 'period_month' => $when->copy()->startOfMonth()->toDateString(),
                 'description' => "No commission — agent terminated when payment cleared (proof #{$proof->id})",
-            ]);
-            self::auditCreated($line);
+            ];
+            $line = self::createDecision($skipAttrs);
+            if ($line?->wasRecentlyCreated) self::auditCreated($line);
             return;
         }
 
@@ -147,10 +152,39 @@ class AgentCommissionService
             ->exists();
 
         $type = $earlierProofExists ? 'renewal' : 'new';
-        $rate = (float) ($type === 'new' ? $agent->rate_new : $agent->rate_renewal);
-        $base = (float) $proof->amount;
+        // Subscription payments are annual. Their ordinal is the contractual
+        // commission year; no year-four-and-later earn line may be created.
+        $year = PaymentProof::subscriptionKind()->where('company_id', $company->id)
+            ->where('status', 'verified')->where(function ($q) use ($proof) {
+                $ts = $proof->verified_at ?? $proof->created_at;
+                $q->where('verified_at', '<', $ts)->orWhere(function ($q) use ($ts, $proof) {
+                    $q->where('verified_at', '=', $ts)->where('id', '<=', $proof->id);
+                });
+            })->count();
+        // Verified proofs created before billing_cycle snapshots used each
+        // distributor's own frozen new/renewal rates. Preserve those historical
+        // contracts; only explicit annual proofs use the global 3-year policy.
+        $legacyProof = $proof->billing_cycle === null;
+        $rate = $legacyProof
+            ? (float) ($type === 'new' ? $agent->rate_new : $agent->rate_renewal)
+            : \App\Services\DistributorPolicyService::rateForYear($year);
+        $base = (float) ($proof->distributor_net_amount ?? $proof->amount);
+        if ($rate <= 0) {
+            $skipAttrs = [
+                'agent_id'=>$agent->id, 'company_id'=>$company->id, 'company_name'=>$company->name,
+                'payment_proof_id'=>$proof->id, 'type'=>'skipped', 'base_amount'=>round($base,2),
+                'rate_percent'=>0, 'amount'=>0,
+                'period_month'=>$when->copy()->startOfMonth()->toDateString(),
+                'description'=>"No distributor commission after year 3 (proof #{$proof->id})",
+            ];
+            if (Schema::hasColumn('agent_commissions', 'commission_year')) $skipAttrs['commission_year'] = $year;
+            $line = self::createDecision($skipAttrs);
+            if ($line?->wasRecentlyCreated) self::auditCreated($line);
+            return;
+        }
+        $holdDays = (int) \App\Services\DistributorPolicyService::policy()['hold_days'];
 
-        $line = AgentCommission::create([
+        $attrs = [
             'agent_id' => $agent->id,
             'company_id' => $company->id,
             'company_name' => $company->name,
@@ -160,9 +194,35 @@ class AgentCommissionService
             'rate_percent' => round($rate, 2),
             'amount' => round($base * $rate / 100, 2),
             'period_month' => $when->copy()->startOfMonth()->toDateString(),
-            'description' => ($type === 'new' ? 'New sale' : 'Renewal') . " — payment proof #{$proof->id}",
-        ]);
-        self::auditCreated($line);
+            'description' => ($type === 'new' ? 'New annual sale' : "Year {$year} renewal") . " — payment proof #{$proof->id}",
+        ];
+        if (Schema::hasColumn('agent_commissions', 'commission_year')) $attrs['commission_year'] = $year;
+        if (Schema::hasColumn('agent_commissions', 'hold_until')) $attrs['hold_until'] = $when->copy()->addDays($holdDays);
+        $line = self::createDecision($attrs);
+        if ($line?->wasRecentlyCreated) self::auditCreated($line);
+    }
+
+    /**
+     * The nullable unique key applies only to the earn/skip decision; clawback
+     * adjustments intentionally keep sharing payment_proof_id with that line.
+     * firstOrCreate is duplicate-safe when approval and dashboard backfill race.
+     */
+    private static function createDecision(array $attrs): ?AgentCommission
+    {
+        if (Schema::hasColumn('agent_commissions', 'decision_key')) {
+            $key = 'proof:' . $attrs['payment_proof_id'];
+            return AgentCommission::firstOrCreate(
+                ['decision_key' => $key],
+                $attrs
+            );
+        }
+
+        // Compatibility for pre-migration and deliberately minimal unit schemas.
+        if (AgentCommission::where('payment_proof_id', $attrs['payment_proof_id'])
+            ->whereIn('type', ['new', 'renewal', 'skipped'])->exists()) {
+            return null;
+        }
+        return AgentCommission::create($attrs);
     }
 
     private static function auditCreated(AgentCommission $line): void

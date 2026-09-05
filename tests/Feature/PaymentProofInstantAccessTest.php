@@ -457,6 +457,7 @@ class PaymentProofInstantAccessTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 1000,
             ])
             ->assertRedirect();
 
@@ -486,6 +487,7 @@ class PaymentProofInstantAccessTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 1000,
             ])
             ->assertRedirect();
 
@@ -518,6 +520,7 @@ class PaymentProofInstantAccessTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
                 'billing_cycle' => 'quarterly',
+                'verified_received_amount' => 14999,
             ])
             ->assertSessionHasErrors('billing_cycle');
 
@@ -542,6 +545,7 @@ class PaymentProofInstantAccessTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $plan->id,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 24999,
             ]);
 
         $proof->refresh();
@@ -568,6 +572,7 @@ class PaymentProofInstantAccessTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $diPlan->id,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 1500,
             ]);
 
         $proof->refresh();
@@ -593,6 +598,7 @@ class PaymentProofInstantAccessTest extends TestCase
             ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
                 'pricing_plan_id' => $retired->id,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 49999,
             ])
             ->assertSessionHas('error');
 

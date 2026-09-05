@@ -52,6 +52,7 @@ class RegisteredUserController extends Controller
             'company_name' => ['required', 'string', 'max:255'],
             'company_ntn' => ['required', 'string', 'max:50', 'unique:companies,ntn'],
             'referral_code' => ['nullable', 'string', 'max:30'],
+            'distributor_reference_code' => ['nullable', 'string', 'max:30'],
         ]);
 
         // Referral attribution (affiliate program): a provided code must match
@@ -106,6 +107,9 @@ class RegisteredUserController extends Controller
             $request->input('requested_billing_cycle')
         );
 
+        // Distributor attribution is deliberately independent from the tax
+        // consultant referral above. Nonblank invalid/inactive codes fail
+        // loudly; blank is a Direct Customer.
         $agent = \App\Services\AgentReferralService::agentFromSignup($request);
         $agentAttrs = $agent ? ['agent_id' => $agent->id] : [];
 

@@ -28,6 +28,7 @@ class Agent extends Authenticatable
         'reactivated_at',
         'termination_windows',
         'notes',
+        'discount_percent',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class Agent extends Authenticatable
         'reactivated_at' => 'datetime',
         'termination_windows' => 'array',
         'is_active' => 'boolean',
+        'discount_percent' => 'decimal:2',
         'password' => 'hashed',
     ];
 

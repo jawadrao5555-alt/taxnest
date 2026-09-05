@@ -175,21 +175,30 @@ class BillingController extends Controller
             return back()->with('error', 'That package is no longer available. Please choose one of the current packages.');
         }
 
-        $pricing = Subscription::priceForPlanCycle($plan, $cycle);
-        $months = Subscription::getMonthsForCycle($cycle);
+        [$subscription, $pricing] = \Illuminate\Support\Facades\DB::transaction(function () use ($companyId, $plan, $cycle) {
+            $company = \App\Models\Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            $pricing = Subscription::priceForPlanCycle($plan, $cycle);
+            $quote = \App\Services\DistributorDiscountService::quote($company, $plan, $cycle, true);
+            $pricing['distributor_discount_percent'] = $quote['discount_percent'];
+            $pricing['distributor_discount_amount'] = $quote['discount_amount'];
+            $pricing['final_price'] = $quote['net_quote'];
+            $months = Subscription::getMonthsForCycle($cycle);
 
-        Subscription::where('company_id', $companyId)->update(['active' => false]);
+            Subscription::where('company_id', $companyId)->update(['active' => false]);
+            $subscription = Subscription::create([
+                'company_id' => $companyId,
+                'pricing_plan_id' => $plan->id,
+                'billing_cycle' => $cycle,
+                'discount_percent' => $pricing['discount_percent'],
+                'final_price' => $pricing['final_price'],
+                'start_date' => now(),
+                'end_date' => now()->addMonths($months),
+                'active' => true,
+                'distributor_quote_snapshot' => (float) $quote['discount_percent'] > 0 ? $quote : null,
+            ]);
 
-        Subscription::create([
-            'company_id' => $companyId,
-            'pricing_plan_id' => $plan->id,
-            'billing_cycle' => $cycle,
-            'discount_percent' => $pricing['discount_percent'],
-            'final_price' => $pricing['final_price'],
-            'start_date' => now(),
-            'end_date' => now()->addMonths($months),
-            'active' => true,
-        ]);
+            return [$subscription, $pricing];
+        }, 3);
 
         SecurityLogService::log('subscription_changed', auth()->id(), [
             'plan' => $plan->name,
@@ -250,8 +259,24 @@ class BillingController extends Controller
 
         $cycle = \App\Services\SubscriptionAssignmentService::purchaseCycle($request->billing_cycle, $plan->product_type ?? null);
         $pricing = Subscription::priceForPlanCycle($plan, $cycle);
+        $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : null;
+        $pricing = $this->applyDistributorFirstPurchaseDiscount($pricing, $companyId ? \App\Models\Company::find($companyId) : null, $cycle);
 
         return response()->json($pricing);
+    }
+
+    /** Customer-visible quote; never discounts renewals, add-ons, or nonannual sales. */
+    private function applyDistributorFirstPurchaseDiscount(array $pricing, ?\App\Models\Company $company, string $cycle): array
+    {
+        if (!$company || !in_array($cycle, ['annual','yearly'], true)) return $pricing;
+        $planId = request()->input('plan_id');
+        $plan = $planId ? \App\Models\PricingPlan::find($planId) : null;
+        if (!$plan) return $pricing;
+        $quote = \App\Services\DistributorDiscountService::quote($company, $plan, $cycle, true);
+        $pricing['distributor_discount_percent']=$quote['discount_percent'];
+        $pricing['distributor_discount_amount']=$quote['discount_amount'];
+        $pricing['final_price']=$quote['net_quote'];
+        return $pricing;
     }
 
     /**

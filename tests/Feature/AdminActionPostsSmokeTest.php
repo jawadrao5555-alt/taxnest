@@ -471,6 +471,7 @@ class AdminActionPostsSmokeTest extends TestCase
             ->post("/admin/payment-proofs/{$proofId}/approve", [
                 'pricing_plan_id' => $planId,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 1500,
             ]);
 
         $response->assertRedirect('/admin/payment-proofs');
@@ -504,6 +505,7 @@ class AdminActionPostsSmokeTest extends TestCase
             ->post("/admin/payment-proofs/{$proofId}/approve", [
                 'pricing_plan_id' => $planId,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 1500,
             ])
             ->assertRedirect('/admin/payment-proofs');
 
@@ -524,6 +526,7 @@ class AdminActionPostsSmokeTest extends TestCase
             ->post("/admin/payment-proofs/{$proofId}/approve", [
                 'pricing_plan_id' => $planId,
                 'billing_cycle' => 'annual',
+                'verified_received_amount' => 1500,
             ]);
 
         $response->assertRedirect('/admin/payment-proofs');

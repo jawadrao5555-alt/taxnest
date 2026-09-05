@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
 use App\Models\AgentSaleClaim;
 use App\Models\Company;
+use App\Models\PaymentProof;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -56,6 +57,9 @@ class AdminAgentClaimController extends Controller
             if (!$company) {
                 return 'not_found';
             }
+            if (PaymentProof::subscriptionKind()->where('company_id', $company->id)->where('status', 'verified')->exists()) {
+                return 'attribution_locked';
+            }
             if ($company->agent_id !== null) {
                 return (int) $company->agent_id === (int) $lockedClaim->agent_id ? 'already_owned' : 'owned';
             }
@@ -78,6 +82,7 @@ class AdminAgentClaimController extends Controller
             'approved' => ['success', 'Claim approved and company assigned.'],
             'rejected' => ['success', 'Claim rejected.'],
             'processed' => ['error', 'This claim was already reviewed.'],
+            'attribution_locked' => ['error', 'Distributor attribution is locked after the first verified subscription payment. Use the audited super-admin override action.'],
             'not_found' => ['error', 'No company matches that identifier. Reject the claim or ask the agent to correct it.'],
             'owned' => ['error', 'This company already belongs to another agent and cannot be reassigned.'],
             'already_owned' => ['error', 'This company is already assigned to the claiming agent.'],

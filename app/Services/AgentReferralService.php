@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Agent;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AgentReferralService
 {
@@ -37,6 +38,33 @@ class AgentReferralService
 
     public static function agentFromSignup(Request $request): ?Agent
     {
-        return self::activeAgentForCode($request->session()->get(self::SESSION_KEY));
+        // The visible field is authoritative. In particular, clearing a
+        // referral-link prefill means "Direct Customer"; a stale session must
+        // never silently restore attribution.
+        $code = $request->has('distributor_reference_code')
+            ? $request->input('distributor_reference_code')
+            : $request->session()->get(self::SESSION_KEY);
+
+        if (trim((string) $code) === '') {
+            return null;
+        }
+
+        $agent = self::activeAgentForCode($code);
+        if (!$agent) {
+            throw ValidationException::withMessages([
+                'distributor_reference_code' => 'This Distributor Reference Code is invalid or inactive. Remove it for a Direct Customer signup, or ask your distributor for the correct active code.',
+            ]);
+        }
+
+        return $agent;
+    }
+
+    /** Value used to prefill the public signup field from a valid ?ref= link. */
+    public static function prefill(Request $request): string
+    {
+        return (string) old(
+            'distributor_reference_code',
+            $request->session()->get(self::SESSION_KEY, '')
+        );
     }
 }

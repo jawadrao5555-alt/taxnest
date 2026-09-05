@@ -22,6 +22,7 @@ class Subscription extends Model
         'free_invoice_limit',
         'override_reason',
         'override_by',
+        'distributor_quote_snapshot',
     ];
 
     protected $casts = [
@@ -33,6 +34,7 @@ class Subscription extends Model
         'override_until' => 'datetime',
         'override_granted_at' => 'datetime',
         'free_invoice_limit' => 'integer',
+        'distributor_quote_snapshot' => 'array',
     ];
 
     public function hasActiveOverride(): bool

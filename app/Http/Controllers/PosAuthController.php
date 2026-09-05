@@ -140,6 +140,7 @@ class PosAuthController extends Controller
         if (Auth::guard('pos')->check()) {
             return $this->redirectToPortal(Auth::guard('pos')->user());
         }
+        \App\Services\AgentReferralService::rememberFromRequest(request());
         // Package picker (owner rule Jul 2026): the shop chooses its plan at
         // sign-up; the admin sees it at approval and approves exactly that plan.
         $plans = PosPlanComparisonService::plans();
@@ -207,7 +208,10 @@ class PosAuthController extends Controller
             'requested_addons' => 'nullable|array|max:12',
             'requested_addons.*' => 'required|string|max:64',
             'requested_addon_cycle' => 'nullable|string|max:20',
+            'distributor_reference_code' => 'nullable|string|max:30',
         ], \App\Services\LoginIdentifierResolver::cnicMessages('company_cnic'));
+
+        $distributor = \App\Services\AgentReferralService::agentFromSignup($request);
 
         // The selected package must be a real, non-trial POS plan — the admin
         // approves exactly this plan for 1 year (owner rule Jul 2026).
@@ -249,6 +253,9 @@ class PosAuthController extends Controller
             'pra_reporting_enabled' => false,
             'pra_environment' => 'sandbox',
         ];
+        if ($distributor) {
+            $companyData['agent_id'] = $distributor->id;
+        }
         // PROD schema-drift guard: if the migration hasn't landed yet, register
         // must still work (defaults to PRA behaviour) instead of 500ing.
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_integration_mode')) {
@@ -264,6 +271,7 @@ class PosAuthController extends Controller
         );
 
         $company = Company::create($companyData);
+        $request->session()->forget(\App\Services\AgentReferralService::SESSION_KEY);
 
         $userData = [
             'name' => $request->name,

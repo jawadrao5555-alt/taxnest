@@ -35,6 +35,8 @@ class AdminSettingsController extends Controller
         'caller_app_plus_latest_version',
         'ai_reader_model',
         'ai_reader_model_strong',
+        'distributor_year1', 'distributor_year2', 'distributor_year3',
+        'distributor_max_discount', 'distributor_hold_days', 'distributor_tiers',
     ];
 
     public function index()
@@ -109,7 +111,20 @@ class AdminSettingsController extends Controller
             // escalation disabled. Model ids only (letters/digits . _ -).
             'ai_reader_model'        => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._\-]+$/'],
             'ai_reader_model_strong' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._\-]+$/'],
+            'distributor_year1' => ['required','numeric','min:0','max:20'],
+            'distributor_year2' => ['required','numeric','min:0','max:20'],
+            'distributor_year3' => ['required','numeric','min:0','max:20'],
+            'distributor_max_discount' => ['required','numeric','min:0','max:10'],
+            'distributor_hold_days' => ['required','integer','min:0','max:365'],
+            'distributor_tiers' => ['required','string','max:500'],
         ]);
+        $tiers = json_decode($data['distributor_tiers'], true);
+        if (!is_array($tiers) || array_filter($tiers, fn($t) => !is_array($t) || !isset($t['companies'],$t['rate']) || $t['companies'] < 1 || $t['rate'] < 0 || $t['rate'] > 20)) {
+            return back()->withErrors(['distributor_tiers' => 'Tiers must be JSON rows with companies and rate.']);
+        }
+        foreach ($tiers as $tier) {
+            if ($data['distributor_year1'] + $tier['rate'] > 20) return back()->withErrors(['distributor_tiers' => 'Year 1 commission plus any incentive may not exceed 20%.']);
+        }
 
         // Normalise the WhatsApp number to digits only (country code + number, no +).
         if (isset($data['support_whatsapp_number'])) {
@@ -123,6 +138,7 @@ class AdminSettingsController extends Controller
         AdminAuditLog::log(auth('admin')->id(), 'Support & payment settings updated', 'SystemSetting', null, [
             'whatsapp' => $data['support_whatsapp_number'] ?? '',
             'bank' => $data['payment_bank_name'] ?? '',
+            'distributor_policy' => array_intersect_key($data, array_flip(['distributor_year1','distributor_year2','distributor_year3','distributor_max_discount','distributor_hold_days','distributor_tiers'])),
         ]);
 
         // Task 1413 — surface a version/APK mismatch HERE, where it is caused,

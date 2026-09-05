@@ -175,6 +175,14 @@
                             @enderror
                         </div>
 
+                        <div>
+                            <label for="distributor_reference_code" class="block text-sm font-medium text-gray-700 mb-1.5">Distributor Reference Code <span class="text-gray-400 font-normal">(optional)</span></label>
+                            <input id="distributor_reference_code" type="text" name="distributor_reference_code" value="{{ \App\Services\AgentReferralService::prefill(request()) }}" placeholder="AG-AB12CD34 — blank means Direct Customer" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 transition" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(59,130,246,0.2); padding: 11px 14px; outline: none;">
+                            @error('distributor_reference_code')
+                            <p class="text-xs text-red-600 mt-1.5">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <div style="border-top: 1px solid rgba(59,130,246,0.1); margin-top: 8px; padding-top: 12px;">
                             <p class="text-xs font-semibold text-blue-600/60 uppercase tracking-wider">{{ __('pos.auth_admin_account') }}</p>
                         </div>

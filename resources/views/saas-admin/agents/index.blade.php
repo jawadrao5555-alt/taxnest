@@ -1,7 +1,7 @@
 <x-admin-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
-    <div class="flex items-center justify-between gap-3"><h1 class="text-2xl font-bold text-white mb-1">Agents / Partners</h1><a href="{{ route('saas.admin.agent-claims') }}" class="text-sm text-indigo-400 hover:underline">Review Sale Claims</a></div>
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Commission agents (Agency Agreement — Model A). Payments come straight to TaxNest; agents earn Schedule A rates on cleared payments of companies they introduced.</p>
+    <div class="flex items-center justify-between gap-3"><h1 class="text-2xl font-bold text-white mb-1">Distributors</h1></div>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Distributor referrals are administered by SaaS Admin. Distributors have no portal or company-data access.</p>
 
     @if($tableMissing)
         <div class="bg-amber-900/30 border border-amber-700 text-amber-300 text-sm rounded-xl p-4">The agents table does not exist yet — run migrations.</div>
@@ -9,8 +9,8 @@
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showForm: false }">
         <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-semibold text-white">Add Agent</h3>
-            <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'New Agent'"></button>
+            <h3 class="text-sm font-semibold text-white">Add Distributor</h3>
+            <button @click="showForm = !showForm" class="text-xs text-indigo-400 hover:underline" x-text="showForm ? 'Hide' : 'New Distributor'"></button>
         </div>
         <form x-show="showForm" method="POST" action="{{ route('saas.admin.agents.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
             @csrf
@@ -22,14 +22,10 @@
                 <input type="text" name="phone" value="{{ old('phone') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Email *</label>
                 <input type="email" name="email" required value="{{ old('email') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
-            <div><label class="text-xs text-gray-400 mb-1 block">Portal Password *</label>
-                <input type="password" name="password" required minlength="8" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Territory</label>
                 <input type="text" name="territory" value="{{ old('territory') }}" placeholder="e.g. Lahore, Gujranwala" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600"></div>
-            <div><label class="text-xs text-gray-400 mb-1 block">New Sale % *</label>
-                <input type="number" name="rate_new" required step="0.01" min="0" max="100" value="{{ old('rate_new') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
-            <div><label class="text-xs text-gray-400 mb-1 block">Renewal % *</label>
-                <input type="number" name="rate_renewal" required step="0.01" min="0" max="100" value="{{ old('rate_renewal') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
+            <div><label class="text-xs text-gray-400 mb-1 block">Customer discount allowance %</label>
+                <input type="number" name="discount_percent" step="0.01" min="0" max="10" value="{{ old('discount_percent', 0) }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <div><label class="text-xs text-gray-400 mb-1 block">Notes</label>
                 <input type="text" name="notes" value="{{ old('notes') }}" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500"></div>
             <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Create Agent</button>

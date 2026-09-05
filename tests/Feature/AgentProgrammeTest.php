@@ -102,31 +102,16 @@ class AgentProgrammeTest extends TestCase
         $this->assertSame('pending', $steal->fresh()->status);
     }
 
-    public function test_agent_portal_isolates_companies_and_commissions_by_authenticated_agent(): void
+    public function test_distributor_portal_never_exposes_company_or_commission_data(): void
     {
-        $this->get('/agent/dashboard')->assertRedirect('/agent/login');
-
         $agent = $this->agent('Portal Agent', 'portal-agent@example.com');
-        $other = $this->agent('Other Agent', 'other-agent@example.com');
-        $mine = Company::create(['name' => 'Visible Shop', 'ntn' => 'VISIBLE-NTN', 'agent_id' => $agent->id]);
-        $theirs = Company::create(['name' => 'Hidden Shop', 'ntn' => 'HIDDEN-NTN', 'agent_id' => $other->id]);
-
-        AgentCommission::create([
-            'agent_id' => $agent->id, 'company_id' => $mine->id, 'company_name' => $mine->name,
-            'type' => 'new', 'base_amount' => 1000, 'rate_percent' => 10, 'amount' => 100,
-            'period_month' => now()->startOfMonth(), 'description' => 'Visible commission',
-        ]);
-        AgentCommission::create([
-            'agent_id' => $other->id, 'company_id' => $theirs->id, 'company_name' => $theirs->name,
-            'type' => 'new', 'base_amount' => 1000, 'rate_percent' => 10, 'amount' => 100,
-            'period_month' => now()->startOfMonth(), 'description' => 'Hidden commission',
-        ]);
-
-        $this->actingAs($agent, 'agent')->get('/agent/companies')
-            ->assertOk()->assertSee('Visible Shop')->assertDontSee('Hidden Shop');
-        // The ledger names the company each line was earned on, so isolation is
-        // asserted on the company names the view actually prints.
-        $this->actingAs($agent, 'agent')->get('/agent/commissions')
-            ->assertOk()->assertSee('Visible Shop')->assertDontSee('Hidden Shop');
+        foreach (['/agent/login', '/agent/dashboard', '/agent/companies', '/agent/commissions', '/agent/claims'] as $path) {
+            $this->get($path)->assertNotFound();
+            $this->actingAs($agent, 'agent')->get($path)->assertNotFound();
+        }
+        $this->actingAs($agent, 'agent')->post('/agent/claims', [
+            'identifier_type' => 'ntn',
+            'identifier' => 'NEVER-EXPOSED',
+        ])->assertNotFound();
     }
 }

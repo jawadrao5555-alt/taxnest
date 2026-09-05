@@ -192,6 +192,8 @@ class PosExtraBranchPurchaseFlowTest extends TestCase
             $table->string('reject_reason')->nullable();
             $table->timestamp('auto_access_until')->nullable();
             $table->timestamp('file_pruned_at')->nullable();
+            $table->text('distributor_quote_snapshot')->nullable();
+            $table->decimal('distributor_net_amount', 12, 2)->nullable();
             $table->timestamps();
         });
 
@@ -388,6 +390,7 @@ class PosExtraBranchPurchaseFlowTest extends TestCase
         return $this->approve($proof, array_merge([
             'pricing_plan_id' => $plan->id,
             'billing_cycle' => 'annual',
+            'verified_received_amount' => (float) $proof->amount,
         ], $payload));
     }
 

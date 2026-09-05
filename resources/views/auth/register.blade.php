@@ -46,9 +46,16 @@
 
         <div class="mt-4">
             <x-input-label for="referral_code" value="Referral Code (optional)" />
-            <x-text-input id="referral_code" class="block mt-1 w-full" type="text" name="referral_code" :value="old('referral_code', request('ref'))" placeholder="e.g. TC-AB12CD" />
+            <x-text-input id="referral_code" class="block mt-1 w-full" type="text" name="referral_code" :value="old('referral_code', \App\Services\AgentReferralService::activeAgentForCode(request('ref')) ? '' : request('ref'))" placeholder="e.g. TC-AB12CD" />
             <p class="text-xs text-gray-400 mt-1">Did a tax consultant refer you? Enter their code.</p>
             <x-input-error :messages="$errors->get('referral_code')" class="mt-2" />
+        </div>
+
+        <div class="mt-4">
+            <x-input-label for="distributor_reference_code" value="Distributor Reference Code (optional)" />
+            <x-text-input id="distributor_reference_code" class="block mt-1 w-full" type="text" name="distributor_reference_code" :value="\App\Services\AgentReferralService::prefill(request())" placeholder="e.g. AG-AB12CD34" />
+            <p class="text-xs text-gray-400 mt-1">Enter the code supplied by your distributor, or leave blank for Direct Customer. This is separate from a consultant referral.</p>
+            <x-input-error :messages="$errors->get('distributor_reference_code')" class="mt-2" />
         </div>
 
         <hr class="my-4 border-gray-200 dark:border-gray-700/60">

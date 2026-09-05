@@ -76,6 +76,9 @@ class AdminPaymentProofController extends Controller
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             // Annual-only since 23 Aug 2026 (owner); 'yearly' = legacy spelling.
             'billing_cycle' => 'required|in:annual,yearly',
+            // This is independently checked against the bank receipt by the
+            // approver. It becomes the immutable commission base.
+            'verified_received_amount' => 'required|numeric|min:0.01|max:1000000000',
             // Paid extra-branch slots ka faisla, isi renewal ke sath (rakhein
             // ya kam karein). Ghair-mojood = purana behaviour, kuch na badle.
             'extra_branch_slots' => 'nullable|integer|min:0|max:' . \App\Services\BranchAddonService::MAX_QTY * 10,
@@ -109,6 +112,7 @@ class AdminPaymentProofController extends Controller
         // subscription and the customer notification must all carry THIS
         // cycle, never raw input.
         $enforcedCycle = SubscriptionAssignmentService::computePrice($plan, $requestedCycle)['cycle'];
+        $verifiedReceived = round((float) $request->input('verified_received_amount'), 2);
 
         // Renewal ka jaiza: mutawaqqa total (base + paid slots) bmuqabla jo
         // raqam shop ne likhi. Agar shop ne sirf package ke paise bheje to ab
@@ -138,10 +142,27 @@ class AdminPaymentProofController extends Controller
         }
 
         // Race-safe: lock the row, bail out if another admin already processed it.
-        $result = DB::transaction(function () use ($proof, $plan, $enforcedCycle, $slotsChosen) {
+        $result = DB::transaction(function () use ($proof, $plan, $enforcedCycle, $slotsChosen, $verifiedReceived) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return ['outcome' => 'already_processed'];
+            }
+            $attributedCompany = Company::whereKey($locked->company_id)->lockForUpdate()->first();
+            if (!$attributedCompany) return ['outcome'=>'invalid_distributor_snapshot','message'=>'Company no longer exists.'];
+            $discountSnapshot = $locked->distributor_quote_snapshot;
+            $netReceived = $verifiedReceived;
+            if ($discountSnapshot) {
+                $snapshotError = \App\Services\DistributorDiscountService::validateSnapshot(
+                    $discountSnapshot, $attributedCompany, $plan, $enforcedCycle
+                );
+                if ($snapshotError) return ['outcome'=>'invalid_distributor_snapshot','message'=>$snapshotError];
+                $expectedNet = round((float) $discountSnapshot['net_quote'], 2);
+                if (abs($netReceived - $expectedNet) > 0.01) {
+                    return [
+                        'outcome'=>'invalid_distributor_snapshot',
+                        'message'=>'Verified received amount must match the server quote of PKR '.number_format($expectedNet, 2).'.',
+                    ];
+                }
             }
 
             $slotsBefore = null;
@@ -175,7 +196,7 @@ class AdminPaymentProofController extends Controller
                 $enforcedCycle
             );
 
-            $locked->update([
+            $proofAttrs = [
                 'status' => 'verified',
                 'pricing_plan_id' => $plan->id,
                 'billing_cycle' => $enforcedCycle,
@@ -183,18 +204,28 @@ class AdminPaymentProofController extends Controller
                 'verified_by' => auth('admin')->id(),
                 'verified_at' => now(),
                 'reject_reason' => null,
-            ]);
+            ];
+            if (Schema::hasColumn('payment_proofs', 'distributor_quote_snapshot')) {
+                // Preserve the submission snapshot byte-for-byte/logically;
+                // never recompute against a later agent allowance or policy.
+                $proofAttrs['distributor_net_amount'] = round($netReceived, 2);
+            }
+            $locked->update($proofAttrs);
 
             return [
                 'outcome' => 'ok',
                 'subscription' => $sub,
                 'slots_before' => $slotsBefore,
                 'slots_after' => $slotsAfter,
+                'verified_received_amount' => $netReceived,
             ];
         });
 
         if (($result['outcome'] ?? null) === 'slots_changed') {
             return back()->with('error', 'This company\'s paid branch slots changed while you were reviewing. Reload the page and approve again.');
+        }
+        if (($result['outcome'] ?? null) === 'invalid_distributor_snapshot') {
+            return back()->with('error', 'Cannot approve: ' . $result['message']);
         }
 
         if (($result['outcome'] ?? null) !== 'ok') {
@@ -224,6 +255,7 @@ class AdminPaymentProofController extends Controller
             'subscription_id' => $subscription->id,
             'expected_total' => $review['applies'] ? $review['expected_total'] : null,
             'amount_claimed' => $review['applies'] ? $review['paid'] : null,
+            'verified_received_amount' => $result['verified_received_amount'],
             'extra_branch_slots_before' => $result['slots_before'],
             'extra_branch_slots_after' => $result['slots_after'],
         ], fn ($v) => $v !== null));

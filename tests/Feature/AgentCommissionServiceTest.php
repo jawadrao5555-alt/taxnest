@@ -45,6 +45,8 @@ class AgentCommissionServiceTest extends TestCase
             $table->unsignedBigInteger('company_id');
             $table->decimal('amount', 12, 2)->default(0);
             $table->string('status')->default('pending');
+            $table->string('billing_cycle')->nullable();
+            $table->decimal('distributor_net_amount', 12, 2)->nullable();
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();
         });
@@ -74,6 +76,8 @@ class AgentCommissionServiceTest extends TestCase
             $table->date('period_month');
             $table->string('description')->nullable();
             $table->unsignedBigInteger('created_by_admin_id')->nullable();
+            $table->unsignedTinyInteger('commission_year')->nullable();
+            $table->timestamp('hold_until')->nullable();
             $table->timestamps();
         });
     }
@@ -223,5 +227,24 @@ class AgentCommissionServiceTest extends TestCase
         // Controller-side remaining computation would now be 0 → further clawback rejected.
         $alreadyClawed = (float) AgentCommission::where('type', 'clawback')->where('payment_proof_id', $proof->id)->sum('amount');
         $this->assertSame(0.0, round((float) $earn->amount + $alreadyClawed, 2));
+    }
+
+    public function test_explicit_annual_proofs_use_global_three_year_rates_and_trusted_net_base(): void
+    {
+        [, $company] = $this->makeAgentAndCompany();
+        foreach ([['2026-01-01', 9000], ['2027-01-01', 8000], ['2028-01-01', 7000], ['2029-01-01', 6000]] as [$at, $net]) {
+            $proof = PaymentProof::create([
+                'company_id' => $company->id, 'amount' => 99999, 'distributor_net_amount' => $net,
+                'billing_cycle' => 'annual', 'status' => 'verified', 'verified_at' => $at,
+            ]);
+            AgentCommissionService::recordForProof($proof);
+        }
+
+        $lines = AgentCommission::orderBy('id')->get();
+        $this->assertSame([1,2,3,4], $lines->pluck('commission_year')->map(fn ($v) => (int) $v)->all());
+        $this->assertSame([15.0,10.0,5.0,0.0], $lines->pluck('rate_percent')->map(fn ($v) => (float) $v)->all());
+        $this->assertSame([1350.0,800.0,350.0,0.0], $lines->pluck('amount')->map(fn ($v) => (float) $v)->all());
+        $this->assertSame(9000.0, (float) $lines->first()->base_amount);
+        $this->assertSame('skipped', $lines->last()->type);
     }
 }

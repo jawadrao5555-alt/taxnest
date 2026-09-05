@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Company-facing payment-proof submission.
@@ -84,29 +86,30 @@ class PaymentProofController extends Controller
                 ->with('payment_proof', 'error');
         }
 
-        // One pending PACKAGE proof at a time — avoid duplicate review queue
-        // entries. Extra-branch requests live in their own lane (see the
-        // subscriptionKind scope) so an add-on request never hides the
-        // renewal form, and vice-versa.
-        $existing = PaymentProof::subscriptionKind()
-            ->where('company_id', $companyId)
-            ->where('status', 'pending')
-            ->exists();
-        if ($existing) {
-            return back()->with('success', 'Your payment proof is already under review. We will notify you once it is verified.')
-                ->with('payment_proof', 'pending');
-        }
-
         // Private (non-public) disk: receipts are downloadable by admins only.
         $path = $request->file('proof')->store('payment-proofs/' . $companyId, 'local');
-
-        $proof = PaymentProof::create([
+        $result = DB::transaction(function () use ($companyId, $plan, $validated, $path) {
+            $lockedCompany = \App\Models\Company::whereKey($companyId)->lockForUpdate()->firstOrFail();
+            if (PaymentProof::subscriptionKind()->where('company_id',$companyId)->where('status','pending')->exists()) {
+                return null;
+            }
+            $hasSnapshotColumn = Schema::hasColumn('payment_proofs', 'distributor_quote_snapshot');
+            $snapshot = \App\Services\DistributorDiscountService::quote(
+                $lockedCompany,
+                $plan,
+                $validated['billing_cycle'],
+                $hasSnapshotColumn
+            );
+            $proofData = [
             'company_id' => $companyId,
             'pricing_plan_id' => $plan->id,
             // Store the cycle the APPROVAL will actually assign (computePrice
             // always annual since 23 Aug 2026) so the proof row
             // and the resulting subscription can never disagree.
             'billing_cycle' => \App\Services\SubscriptionAssignmentService::computePrice($plan, $validated['billing_cycle'])['cycle'],
+            // Preserve what the shop says it transferred for the admin's bank
+            // reconciliation. The expected quote remains server-owned inside
+            // the immutable snapshot and is never derived from this input.
             'amount' => $validated['amount'] ?? null,
             'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
             'reference' => $validated['reference'] ?? null,
@@ -114,7 +117,22 @@ class PaymentProofController extends Controller
             'notes' => $validated['notes'] ?? null,
             'proof_path' => $path,
             'status' => 'pending',
-        ]);
+            ];
+            if ($hasSnapshotColumn) {
+                $proofData['distributor_quote_snapshot'] = $snapshot;
+            }
+            if (Schema::hasColumn('payment_proofs', 'distributor_net_amount')) {
+                // Frozen only when an admin independently verifies the bank amount.
+                $proofData['distributor_net_amount'] = null;
+            }
+            return PaymentProof::create($proofData);
+        });
+        if (!$result) {
+            Storage::disk('local')->delete($path);
+            return back()->with('success', 'Your payment proof is already under review. We will notify you once it is verified.')
+                ->with('payment_proof', 'pending');
+        }
+        $proof = $result;
 
         // Alert admins right away — the company is blocked from billing until an
         // admin verifies, so review speed matters. Best-effort: a mail failure

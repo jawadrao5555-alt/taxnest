@@ -137,6 +137,8 @@ class AdminCompanyController extends Controller
             'name' => $company->name,
             'type' => $request->product_type,
             'admin_email' => $request->admin_email,
+            'agent_id' => $company->agent_id,
+            'attribution_source' => $company->agent_id ? 'super_admin_company_creation' : 'direct_customer',
         ]);
 
         return redirect()->route('saas.admin.companies.show', $company->id)->with('success', "Company '{$company->name}' created successfully with admin account.");
@@ -169,7 +171,6 @@ class AdminCompanyController extends Controller
             'business_activity' => 'nullable|string|max:255',
             'website' => 'nullable|string|max:255',
             'franchise_id' => 'nullable|exists:franchises,id',
-            'agent_id' => 'nullable|exists:agents,id',
             'standard_tax_rate' => 'nullable|numeric|min:0|max:100',
             'invoice_number_prefix' => 'nullable|string|max:20',
             'fbr_environment' => 'nullable|in:sandbox,production',
@@ -215,13 +216,6 @@ class AdminCompanyController extends Controller
             $fields = array_merge($fields, ['fbr_environment', 'fbr_registration_no', 'fbr_business_name', 'fbr_pos_enabled', 'fbr_pos_environment', 'fbr_pos_id']);
         } else {
             $fields = array_merge($fields, ['pra_environment', 'pra_pos_id']);
-        }
-
-        // Agent link is super-admin-only (the field is hidden from other admins).
-        if (auth('admin')->user()?->isSuperAdmin()
-            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_id')
-            && $request->has('agent_id')) {
-            $fields[] = 'agent_id';
         }
 
         $data = $request->only($fields);

@@ -366,6 +366,14 @@
                                             <select name="billing_cycle" x-model="cycle" required class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
                                                 <option value="annual">Annual</option>
                                             </select>
+                                            <div>
+                                                <label class="block text-[11px] text-gray-400 mb-1">Amount verified in bank/receipt (PKR)</label>
+                                                <input type="number" name="verified_received_amount"
+                                                       value="{{ old('verified_received_amount', $proof->amount) }}"
+                                                       step="0.01" min="0.01" required
+                                                       class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs px-2 py-2">
+                                                <p class="text-[11px] text-gray-500 mt-1">Enter the amount you independently confirmed as received. It must match the server quote before approval.</p>
+                                            </div>
                                             @if($ebReview['applies'])
                                             {{-- Slots isi qadam mein: rakhein ya kam karein. Barhane ka
                                                  raasta shop ki apni extra-branch request hai. --}}

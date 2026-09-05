@@ -193,7 +193,7 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'owner_name' => 'nullable|string|max:255',
-            'ntn' => 'required|string|max:50|unique:companies,ntn',
+            'ntn' => ['required', 'string', 'max:50', \App\Support\IdentityScope::uniqueNtn($request->input('product_type'))],
             'cnic' => 'nullable|string|max:20',
             'fbr_registration_no' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
@@ -201,7 +201,7 @@ class AdminController extends Controller
             'business_activity' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:500',
             'admin_name' => 'nullable|string|max:255',
-            'admin_email' => 'nullable|email|unique:users,email',
+            'admin_email' => ['nullable', 'email', \App\Support\IdentityScope::uniqueEmail($request->input('product_type'))],
             'admin_password' => 'nullable|string|min:6',
         ]);
 
@@ -431,7 +431,7 @@ class AdminController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail(\App\Support\IdentityScope::ofCompanyId($request->input('company_id')))],
             'password' => 'required|string|min:6',
             'role' => 'required|in:super_admin,company_admin,employee,viewer',
             'company_id' => 'nullable|exists:companies,id',

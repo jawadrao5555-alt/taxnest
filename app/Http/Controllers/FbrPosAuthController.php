@@ -66,13 +66,15 @@ class FbrPosAuthController extends Controller
         // ═══ STEP 2 — FBR POS user lookup (strict isolation) ═══
         $user = null;
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $user = User::where('email', $login)->first();
+            // Identity is per product (5 Sep 2026) — the same email may also
+            // hold a PRA POS or DI account, so stay inside this panel.
+            $user = \App\Support\IdentityScope::findUserByEmail($login, 'fbrpos');
         } elseif (preg_match('/^\d{7,13}$/', preg_replace('/\D/', '', $login))) {
             // 7–8 digits = a real Pakistani NTN (task 433) — company lookup only.
             // 10–13 digits keep phone-first precedence, then NTN/CNIC fallback.
             $phone = preg_replace('/\D/', '', $login);
             if (strlen($phone) >= 10) {
-                $user = User::where('phone', $phone)->first();
+                $user = \App\Support\IdentityScope::findUserByPhone($phone, 'fbrpos');
             }
             if (!$user) {
                 // Frost & Brew (Aug 2026): NTN/CNIC typed WITH dashes must still
@@ -88,7 +90,11 @@ class FbrPosAuthController extends Controller
                       ->orWhere('ntn', $phone)->orWhere('cnic', $phone)
                       ->orWhereRaw("REPLACE(REPLACE(cnic, '-', ''), ' ', '') = ?", [$phone]);
                 })->get();
-                $company = $matches->firstWhere('product_type', 'fbrpos') ?? $matches->first();
+                // The same NTN/CNIC may legitimately sit on this person's PRA
+                // POS or DI company too (identity is per product, 5 Sep 2026).
+                // This panel only accepts an 'fbrpos' company — never fall
+                // back to another product's row.
+                $company = $matches->firstWhere('product_type', 'fbrpos');
                 if ($company) {
                     $user = User::where('company_id', $company->id)->where('role', 'company_admin')->orderBy('id')->first();
                 }
@@ -149,11 +155,14 @@ class FbrPosAuthController extends Controller
     {
         $request->validate([
             'company_name' => 'required|string|max:255',
-            'company_ntn' => 'required|string|max:50|unique:companies,ntn',
+            // Unique INSIDE the FBR POS line only (owner ruling, 5 Sep 2026):
+            // the same NTN legitimately runs a hotel on PRA POS and a Tier-1
+            // outlet here.
+            'company_ntn' => ['required', 'string', 'max:50', \App\Support\IdentityScope::uniqueNtn('fbrpos')],
             // Task 579: optional owner CNIC — becomes a login identifier.
-            'company_cnic' => \App\Services\LoginIdentifierResolver::cnicRules(),
+            'company_cnic' => \App\Services\LoginIdentifierResolver::cnicRules(null, 'fbrpos'),
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => ['required', 'string', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail('fbrpos')],
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             // FBR panel = goods businesses (see PosFeatureService::PANEL_CATEGORIES),
@@ -169,7 +178,7 @@ class FbrPosAuthController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'ntn' => $request->company_ntn,
-        ])) {
+        ], 'fbrpos')) {
             [$field, $message] = CredentialLedgerService::rejectionFor($usedType);
             throw ValidationException::withMessages([$field => $message]);
         }

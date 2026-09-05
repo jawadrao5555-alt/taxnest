@@ -12,9 +12,32 @@ use App\Models\User;
 
 class PasswordResetLinkController extends Controller
 {
-    public function create(): View
+    /**
+     * Which product line this reset belongs to. Since 5 Sep 2026 the same
+     * email can hold a PRA POS, an FBR POS and a Digital Invoice account, so
+     * "reset my password" is ambiguous until we know the panel. Every login
+     * page passes ?panel=…; when it is missing and the email really does exist
+     * on more than one product, we ASK instead of guessing.
+     */
+    private function panel(Request $request): string
     {
-        return view('auth.forgot-password');
+        return \App\Support\IdentityScope::normalize($request->input('panel'));
+    }
+
+    /** PROD schema-drift guard for the new password_reset_otps column. */
+    private function otpScoped(): bool
+    {
+        static $has = null;
+        if ($has === null) {
+            $has = \Illuminate\Support\Facades\Schema::hasColumn('password_reset_otps', 'product_type');
+        }
+
+        return $has;
+    }
+
+    public function create(Request $request): View
+    {
+        return view('auth.forgot-password', ['panel' => $this->panel($request)]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -28,22 +51,48 @@ class PasswordResetLinkController extends Controller
 
         $neutralStatus = __('pos.auth_fp_status_sent');
 
-        $user = User::where('email', $request->email)->first();
+        $panel = $this->panel($request);
+        $accounts = User::where('email', $request->email)->orderBy('id')->get()
+            ->groupBy(fn ($candidate) => \App\Support\IdentityScope::ofCompanyId($candidate->company_id));
+
+        if ($panel !== '') {
+            $user = $accounts->get($panel)?->first();
+        } elseif ($accounts->count() === 1) {
+            $panel = (string) $accounts->keys()->first();
+            $user = $accounts->first()->first();
+        } elseif ($accounts->count() > 1) {
+            // One email, several products. Never reset a password the visitor
+            // did not mean — let them pick the account.
+            return back()->withInput()->with('panelChoices', $accounts->keys()->all());
+        } else {
+            $user = null;
+        }
+
         if (!$user) {
             // Neutral response: do not reveal whether the email is registered.
-            return redirect()->route('password.verify.otp', ['email' => $request->email])
-                ->with('status', $neutralStatus);
+            // An empty panel is left OUT of the URL entirely — a trailing
+            // ?panel= would make the unknown-email reply look different from
+            // the panel-less one it is supposed to be indistinguishable from.
+            return redirect()->route('password.verify.otp', array_filter([
+                'email' => $request->email,
+                'panel' => $panel,
+            ], fn ($v) => $v !== '' && $v !== null))->with('status', $neutralStatus);
         }
+
+        $scoped = $this->otpScoped();
 
         DB::table('password_reset_otps')
             ->where('email', $request->email)
+            ->when($scoped, fn ($q) => $q->where(function ($inner) use ($panel) {
+                $inner->where('product_type', $panel)->orWhereNull('product_type');
+            }))
             ->where('used', false)
             ->update(['used' => true]);
 
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $token = bin2hex(random_bytes(32));
 
-        DB::table('password_reset_otps')->insert([
+        $row = [
             'email' => $request->email,
             'otp' => $otp,
             'token' => $token,
@@ -51,9 +100,14 @@ class PasswordResetLinkController extends Controller
             'used' => false,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ];
+        if ($scoped) {
+            $row['product_type'] = $panel;
+        }
+        DB::table('password_reset_otps')->insert($row);
 
-        $resetLink = url("/reset-password-link?token={$token}&email=" . urlencode($request->email));
+        $resetLink = url("/reset-password-link?token={$token}&email=" . urlencode($request->email)
+            . ($panel !== '' ? "&panel=" . urlencode($panel) : ''));
 
         // Render the email in the user's chosen language (session pos_locale, fallback en)
         $sessionLocale = $request->hasSession() ? $request->session()->get(\App\Support\PosLocale::SESSION_KEY) : null;
@@ -88,7 +142,10 @@ class PasswordResetLinkController extends Controller
 
     public function showOtpForm(Request $request): View
     {
-        return view('auth.verify-otp', ['email' => $request->query('email', '')]);
+        return view('auth.verify-otp', [
+            'email' => $request->query('email', ''),
+            'panel' => $this->panel($request),
+        ]);
     }
 
     public function verifyOtp(Request $request): RedirectResponse
@@ -103,9 +160,14 @@ class PasswordResetLinkController extends Controller
             'otp.size' => __('pos.auth_val_otp_size'),
         ]);
 
+        $panel = $this->panel($request);
+
         $record = DB::table('password_reset_otps')
             ->where('email', $request->email)
             ->where('otp', $request->otp)
+            ->when($this->otpScoped(), fn ($q) => $q->where(function ($inner) use ($panel) {
+                $inner->where('product_type', $panel)->orWhereNull('product_type');
+            }))
             ->where('used', false)
             ->where('expires_at', '>', now())
             ->first();
@@ -120,7 +182,13 @@ class PasswordResetLinkController extends Controller
             ->where('id', $record->id)
             ->update(['used' => true, 'updated_at' => now()]);
 
-        session(['password_reset_token' => $tempToken, 'password_reset_email' => $request->email]);
+        // The product travels with the reset, so the new password lands on the
+        // account the OTP was actually issued for.
+        session([
+            'password_reset_token'   => $tempToken,
+            'password_reset_email'   => $request->email,
+            'password_reset_product' => $record->product_type ?? $panel,
+        ]);
 
         return redirect()->route('password.reset.form', ['token' => $tempToken, 'email' => $request->email]);
     }
@@ -150,7 +218,12 @@ class PasswordResetLinkController extends Controller
             ->update(['used' => true, 'updated_at' => now()]);
 
         $sessionToken = bin2hex(random_bytes(32));
-        session(['password_reset_token' => $sessionToken, 'password_reset_email' => $email]);
+        session([
+            'password_reset_token'   => $sessionToken,
+            'password_reset_email'   => $email,
+            // The link carries its own product; the row is the safer source.
+            'password_reset_product' => $record->product_type ?? $this->panel($request),
+        ]);
 
         return redirect()->route('password.reset.form', ['token' => $sessionToken, 'email' => $email]);
     }

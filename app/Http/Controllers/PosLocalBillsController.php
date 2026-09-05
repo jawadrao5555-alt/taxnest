@@ -223,7 +223,7 @@ class PosLocalBillsController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:100',
-            'email' => 'required|email|max:190|unique:users,email',
+            'email' => ['required', 'email', 'max:190', \App\Support\IdentityScope::uniqueEmail('pos')],
             'password' => 'required|string|min:8',
         ]);
 
@@ -259,7 +259,7 @@ class PosLocalBillsController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:100',
-            'email' => 'required|email|max:190|unique:users,email,' . $viewer->id,
+            'email' => ['required', 'email', 'max:190', \App\Support\IdentityScope::uniqueEmail('pos', $viewer->id)],
             'password' => 'nullable|string|min:8',
         ]);
 

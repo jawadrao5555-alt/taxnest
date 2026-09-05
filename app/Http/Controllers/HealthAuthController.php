@@ -118,14 +118,16 @@ class HealthAuthController extends Controller
         $ambiguous = false;
 
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            return User::where('email', $login)->first();
+            // Identity is per product (5 Sep 2026) — the same email may hold a
+            // POS or DI account too, so stay inside this panel's product line.
+            return \App\Support\IdentityScope::findUserByEmail($login, \App\Support\ProductCatalog::ERPS);
         }
 
         $digits = preg_replace('/\D/', '', $login);
         if (preg_match('/^\d{7,13}$/', $digits)) {
             $user = null;
             if (strlen($digits) >= 10) {
-                $user = User::where('phone', $digits)->first();
+                $user = \App\Support\IdentityScope::findUserByPhone($digits, \App\Support\ProductCatalog::ERPS);
             }
             if (!$user) {
                 $matches = Company::where(function ($q) use ($login, $digits) {
@@ -133,8 +135,10 @@ class HealthAuthController extends Controller
                         ->orWhere('ntn', $digits)->orWhere('cnic', $digits)
                         ->orWhereRaw("REPLACE(REPLACE(cnic, '-', ''), ' ', '') = ?", [$digits]);
                 })->get();
-                $company = $matches->first(fn ($c) => HealthPanel::isProductType($c->product_type ?? null))
-                    ?? $matches->first();
+                // The same NTN/CNIC may legitimately sit on this person's POS
+                // or DI company too (identity is per product, 5 Sep 2026), and
+                // this panel only accepts its own product line.
+                $company = $matches->first(fn ($c) => HealthPanel::isProductType($c->product_type ?? null));
                 if ($company) {
                     $user = User::where('company_id', $company->id)
                         ->where('role', 'company_admin')
@@ -191,11 +195,12 @@ class HealthAuthController extends Controller
 
         $request->validate([
             'company_name' => 'required|string|max:255',
-            'company_ntn' => 'required|string|max:50|unique:companies,ntn',
-            'company_cnic' => LoginIdentifierResolver::cnicRules(),
+            // Unique INSIDE this product line only (owner ruling, 5 Sep 2026).
+            'company_ntn' => ['required', 'string', 'max:50', \App\Support\IdentityScope::uniqueNtn(\App\Support\ProductCatalog::ERPS)],
+            'company_cnic' => LoginIdentifierResolver::cnicRules(null, \App\Support\ProductCatalog::ERPS),
             'org_type' => 'required|in:' . implode(',', HealthPanel::ORG_TYPES),
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => ['required', 'string', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail(\App\Support\ProductCatalog::ERPS)],
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ], LoginIdentifierResolver::cnicMessages('company_cnic'));
@@ -205,7 +210,7 @@ class HealthAuthController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'ntn' => $request->company_ntn,
-        ])) {
+        ], \App\Support\ProductCatalog::ERPS)) {
             [$field, $message] = CredentialLedgerService::rejectionFor($usedType);
             throw ValidationException::withMessages([$field => $message]);
         }

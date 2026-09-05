@@ -43,7 +43,13 @@ class NewPasswordController extends Controller
             return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_session_invalid')]);
         }
 
-        $user = User::where('email', $request->email)->first();
+        // The reset belongs to ONE product line (5 Sep 2026). The same email
+        // may hold a PRA POS, an FBR POS and a Digital Invoice account, and
+        // the two the visitor did not ask for must stay untouched.
+        $product = session('password_reset_product');
+        $user = $product === null
+            ? User::where('email', $request->email)->first()
+            : \App\Support\IdentityScope::findUserByEmail($request->email, $product);
         if (!$user) {
             return back()->withErrors(['email' => __('pos.auth_user_not_found')]);
         }

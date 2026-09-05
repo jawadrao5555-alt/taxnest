@@ -108,7 +108,7 @@ class HealthTeamController extends Controller
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email',
+            'email' => ['required', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail(\App\Support\ProductCatalog::ERPS)],
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'health_role' => 'required|in:' . implode(',', $this->assignableRoles()),

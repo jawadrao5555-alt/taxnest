@@ -9,6 +9,50 @@ class Company extends Model
 {
     use SoftDeletes;
 
+    /**
+     * Account code + business grouping (owner ruling, 5 Sep 2026).
+     *
+     * account_code is the system's OWN identity (PRA-00026). It is stamped
+     * once, at birth, and never rewritten — not even when an admin moves the
+     * company to another product line — because support tickets, notes and
+     * conversations already quote it.
+     *
+     * Grouping is derived from identity values (CNIC / NTN / email / phone),
+     * so it must be refreshed whenever one of those changes, and forgotten
+     * when the company is purged.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (self $company) {
+            if (blank($company->getAttribute('account_code'))
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'account_code')) {
+                $code = \App\Support\IdentityScope::accountCodeFor($company->product_type, $company->id);
+                $company->forceFill(['account_code' => $code])->saveQuietly();
+            }
+            \App\Services\CompanyGroupService::syncCompany($company);
+        });
+
+        static::saved(function (self $company) {
+            \App\Support\IdentityScope::forgetCompany($company->id);
+
+            // Moving a company to another product must carry its people with
+            // it, or their (email, product_type) rows would guard the wrong
+            // product line.
+            if ($company->wasChanged('product_type') && \App\Support\IdentityScope::usersScoped()) {
+                \App\Models\User::where('company_id', $company->id)
+                    ->update(['product_type' => \App\Support\IdentityScope::normalize($company->product_type)]);
+            }
+
+            if ($company->wasChanged(['cnic', 'ntn', 'email', 'phone', 'mobile', 'owner_name'])) {
+                \App\Services\CompanyGroupService::syncCompany($company);
+            }
+        });
+
+        static::forceDeleted(function (self $company) {
+            \App\Services\CompanyGroupService::forget($company->id);
+        });
+    }
+
     protected $fillable = [
         'name',
         'owner_name',

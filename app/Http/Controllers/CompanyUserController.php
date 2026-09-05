@@ -27,9 +27,9 @@ class CompanyUserController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'phone' => 'nullable|string|max:20|unique:users,phone',
-            'username' => 'nullable|string|max:100|alpha_dash|unique:users,username',
+            'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail(\App\Support\IdentityScope::ofCompanyId($companyId))],
+            'phone' => ['nullable', 'string', 'max:20', \App\Support\IdentityScope::uniquePhone(\App\Support\IdentityScope::ofCompanyId($companyId))],
+            'username' => ['nullable', 'string', 'max:100', 'alpha_dash', \App\Support\IdentityScope::uniqueUsername(\App\Support\IdentityScope::ofCompanyId($companyId))],
             'password' => 'required|string|min:6',
             'role' => 'required|in:company_admin,employee,viewer',
         ]);

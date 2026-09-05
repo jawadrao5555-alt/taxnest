@@ -6194,13 +6194,13 @@ class FbrPosController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:100',
-            'email' => 'required|email|max:150|unique:users,email',
+            'email' => ['required', 'email', 'max:150', \App\Support\IdentityScope::uniqueEmail('fbrpos')],
             'password' => 'required|string|min:6|max:100',
             'pos_role' => 'required|in:pos_cashier,pos_manager',
             'default_branch_id' => 'nullable|integer',
             // Task 529 (twin of PRA storeCashier): optional short login name —
             // globally unique, no spaces/@ (must never look like an email).
-            'username' => \App\Services\LoginIdentifierResolver::usernameRules(),
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules(null, 'fbrpos'),
         ], [
             ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
@@ -6244,12 +6244,12 @@ class FbrPosController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:100',
-            'email' => 'required|email|max:150|unique:users,email,' . $member->id,
+            'email' => ['required', 'email', 'max:150', \App\Support\IdentityScope::uniqueEmail('fbrpos', $member->id)],
             'password' => 'nullable|string|min:6|max:100',
             'pos_role' => 'required|in:pos_cashier,pos_manager',
             'default_branch_id' => 'nullable|integer',
             // Task 529: set/change username from the edit row (own row exempt).
-            'username' => \App\Services\LoginIdentifierResolver::usernameRules($member->id),
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules($member->id, 'fbrpos'),
         ], [
             ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
@@ -6810,7 +6810,7 @@ class FbrPosController extends Controller
                 'ntn' => 'nullable|string|max:20',
                 // Task 579: owner-facing CNIC — same rules the login router
                 // understands (13 digits, dash-tolerant, globally unique).
-                'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
+                'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id, 'fbrpos'),
                 'print_paper_size' => 'nullable|in:thermal,thermal58,a4',
                 'receipt_align_center' => 'nullable|in:0,1',
                 'receipt_left_margin_mm' => 'nullable|integer|min:0|max:30',
@@ -6914,11 +6914,11 @@ class FbrPosController extends Controller
         if ($request->isMethod('post')) {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+                'email' => ['required', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail('fbrpos', $user->id)],
                 'phone' => 'nullable|string|max:20',
                 // Task 529: shared rules — no spaces/@, no identifier-shaped
                 // digits (login routers would divert those to phone/NTN/CNIC).
-                'username' => \App\Services\LoginIdentifierResolver::usernameRules($user->id),
+                'username' => \App\Services\LoginIdentifierResolver::usernameRules($user->id, 'fbrpos'),
                 'current_password' => 'nullable|required_with:new_password',
                 'new_password' => 'nullable|min:8|confirmed',
             ], \App\Services\LoginIdentifierResolver::usernameMessages());

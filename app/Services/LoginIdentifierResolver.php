@@ -48,7 +48,7 @@ class LoginIdentifierResolver
      *
      * @param  int|null $exceptUserId own row to exempt from the unique check
      */
-    public static function usernameRules(?int $exceptUserId = null): array
+    public static function usernameRules(?int $exceptUserId = null, ?string $product = null): array
     {
         return [
             'nullable',
@@ -63,7 +63,14 @@ class LoginIdentifierResolver
                     $fail(__('pos.username_digits_reserved'));
                 }
             },
-            'unique:users,username' . ($exceptUserId ? ',' . $exceptUserId : ''),
+            // Unique INSIDE this product line only (owner ruling, 5 Sep 2026)
+            // — the same person may hold a PRA POS and an FBR POS account
+            // under one username. Passing no product keeps the old
+            // system-wide check, which is still right for callers that have
+            // no panel context.
+            $product === null
+                ? 'unique:users,username' . ($exceptUserId ? ',' . $exceptUserId : '')
+                : \App\Support\IdentityScope::uniqueUsername($product, $exceptUserId),
         ];
     }
 
@@ -93,14 +100,14 @@ class LoginIdentifierResolver
      *
      * @param  int|null $exceptCompanyId own company row to exempt
      */
-    public static function cnicRules(?int $exceptCompanyId = null): array
+    public static function cnicRules(?int $exceptCompanyId = null, ?string $product = null): array
     {
         return [
             'nullable',
             'string',
             'max:20',
             'regex:/^[0-9\-\s]+$/',
-            function ($attribute, $value, $fail) use ($exceptCompanyId) {
+            function ($attribute, $value, $fail) use ($exceptCompanyId, $product) {
                 $digits = preg_replace('/\D/', '', (string) $value);
                 if (strlen($digits) !== 13) {
                     $fail(__('pos.cnic_format_invalid'));
@@ -112,6 +119,15 @@ class LoginIdentifierResolver
                       ->orWhere('cnic', $digits)
                       ->orWhereRaw("REPLACE(REPLACE(cnic, '-', ''), ' ', '') = ?", [$digits]);
                 });
+                // One person's CNIC on a PRA POS hotel AND an FBR POS outlet
+                // is normal (owner ruling, 5 Sep 2026) — the clash that must
+                // still be refused is two accounts on the SAME panel, because
+                // that panel's login could not tell them apart.
+                if ($product !== null) {
+                    $dupe->whereIn('product_type', (array) \App\Support\IdentityScope::storedProductTypes(
+                        \App\Support\IdentityScope::normalize($product)
+                    ));
+                }
                 if ($exceptCompanyId) {
                     $dupe->where('id', '!=', $exceptCompanyId);
                 }
@@ -165,9 +181,17 @@ class LoginIdentifierResolver
      */
     public static function resolveUsernameColumn(string $login, array $productTypes): ?User
     {
-        $user = User::where('username', $login)->first();
+        // A username is unique per PRODUCT now (5 Sep 2026), so the same
+        // "cashier1" can exist on PRA POS and on FBR POS. Taking the first row
+        // and testing it would drop this panel's real user whenever the other
+        // product's row happened to come first — scan all of them.
+        foreach (User::where('username', $login)->orderBy('id')->get() as $user) {
+            if (self::inScope($user, $productTypes)) {
+                return $user;
+            }
+        }
 
-        return ($user && self::inScope($user, $productTypes)) ? $user : null;
+        return null;
     }
 
     /**

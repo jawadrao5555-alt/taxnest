@@ -1389,6 +1389,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
 use App\Http\Controllers\SaasAdmin\AdminAuthController;
 use App\Http\Controllers\SaasAdmin\AdminDashboardController;
 use App\Http\Controllers\SaasAdmin\AdminCompanyController;
+use App\Http\Controllers\SaasAdmin\AdminGroupController;
 use App\Http\Controllers\SaasAdmin\AdminPlanController;
 use App\Http\Controllers\SaasAdmin\AdminSaleController;
 use App\Http\Controllers\SaasAdmin\AdminSubscriptionController;
@@ -1528,6 +1529,15 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::delete('/hs-mapping-engine/{id}', [HsCodeMappingController::class, 'destroy'])->name('admin.hs-mapping-engine.destroy');
     Route::post('/hs-mapping-engine/{id}/clone', [HsCodeMappingController::class, 'duplicate'])->name('admin.hs-mapping-engine.clone');
 
+    // Business Groups (5 Sep 2026): admin-only view of one customer's
+    // accounts across the product lines. Nothing here is exposed to shops.
+    Route::get('/groups', [AdminGroupController::class, 'index'])->name('saas.admin.groups');
+    Route::post('/groups/resync', [AdminGroupController::class, 'resync'])->name('saas.admin.groups.resync');
+    Route::get('/groups/{id}', [AdminGroupController::class, 'show'])->name('saas.admin.groups.show');
+    Route::put('/groups/{id}', [AdminGroupController::class, 'update'])->name('saas.admin.groups.update');
+    Route::post('/groups/{id}/link', [AdminGroupController::class, 'link'])->name('saas.admin.groups.link');
+    Route::post('/groups/{id}/detach/{companyId}', [AdminGroupController::class, 'detach'])->name('saas.admin.groups.detach');
+
     Route::get('/companies', [AdminCompanyController::class, 'index'])->name('saas.admin.companies');
     Route::get('/companies/create', [AdminCompanyController::class, 'create'])->name('saas.admin.companies.create');
     Route::post('/companies', [AdminCompanyController::class, 'store'])->name('saas.admin.companies.store');
@@ -1544,6 +1554,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/ai-pages', [AdminCompanyController::class, 'grantAiPages'])->name('saas.admin.companies.aiPages');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
+    Route::post('/companies/{id}/clone-product', [AdminCompanyController::class, 'cloneToProduct'])->name('saas.admin.companies.cloneProduct');
     Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');
     Route::post('/companies/{id}/reset-password', [AdminCompanyController::class, 'resetAdminPassword'])->name('saas.admin.companies.resetPassword');
 

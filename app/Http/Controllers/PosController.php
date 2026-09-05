@@ -9244,7 +9244,7 @@ class PosController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email',
+            'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail('pos')],
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:6',
             'pos_role' => 'nullable|in:pos_cashier,pos_manager,pos_kitchen,pos_waiter,pos_delivery',
@@ -9252,7 +9252,7 @@ class PosController extends Controller
             // instead of the full email (LoginIdentifierResolver already
             // resolves users.username). Globally unique (column has a global
             // unique index); no spaces/@ so it can never look like an email.
-            'username' => \App\Services\LoginIdentifierResolver::usernameRules(),
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules(null, 'pos'),
             // Multi-branch v1 (Task 1347): validated for shape only — ownership
             // is re-checked against the company in posResolveBranchId().
             'default_branch_id' => 'nullable|integer',
@@ -9548,7 +9548,7 @@ class PosController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email,' . $cashier->id,
+            'email' => ['required', 'email', \App\Support\IdentityScope::uniqueEmail('pos', $cashier->id)],
             'phone' => 'nullable|string|max:20',
             // Item #7 (owner, Jul 2026): optional password RESET from the team edit
             // row — stored hashes are irreversible, so "view password" is impossible;
@@ -9556,7 +9556,7 @@ class PosController extends Controller
             'password' => 'nullable|string|min:6|max:100',
             // Task 529: admin can set/change the member's login username from
             // the edit row (own row exempt from the unique check).
-            'username' => \App\Services\LoginIdentifierResolver::usernameRules($cashier->id),
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules($cashier->id, 'pos'),
             // Multi-branch v1 (Task 1347) — ownership re-checked in posResolveBranchId().
             'default_branch_id' => 'nullable|integer',
         ], [
@@ -12602,7 +12602,7 @@ class PosController extends Controller
                 'ntn' => 'nullable|string|max:50',
                 // Task 579: owner-facing CNIC — same rules the login router
                 // understands (13 digits, dash-tolerant, globally unique).
-                'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
+                'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id, 'pos'),
                 'email' => 'nullable|email|max:255',
                 'phone' => 'nullable|string|max:30',
                 'mobile' => 'nullable|string|max:30',
@@ -12694,11 +12694,11 @@ class PosController extends Controller
             if ($action === 'update_profile') {
                 $request->validate([
                     'name' => 'required|string|max:255',
-                    'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+                    'email' => ['required', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail('pos', $user->id)],
                     'phone' => 'nullable|string|max:30',
                     // Task 529: same format rule as the Team page (no spaces/@ —
                     // an email-looking username could never resolve at login).
-                    'username' => \App\Services\LoginIdentifierResolver::usernameRules($user->id),
+                    'username' => \App\Services\LoginIdentifierResolver::usernameRules($user->id, 'pos'),
                 ], [
                     ...\App\Services\LoginIdentifierResolver::usernameMessages(),
                 ]);

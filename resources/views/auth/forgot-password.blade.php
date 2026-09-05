@@ -35,8 +35,30 @@
             </div>
             @endif
 
+            @if (session('panelChoices'))
+            {{-- One email, several products (5 Sep 2026): a person may hold a
+                 PRA POS, an FBR POS and a Digital Invoice account with the same
+                 address. Never guess which password to reset — ask. --}}
+            <div class="mb-4 p-3 rounded-lg" style="background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.25);">
+                <p class="text-sm text-amber-200 mb-2">{{ __('pos.auth_fp_pick_product') }}</p>
+                <div class="space-y-2">
+                    @foreach (session('panelChoices') as $choice)
+                    <form method="POST" action="{{ route('password.email') }}">
+                        @csrf
+                        <input type="hidden" name="email" value="{{ old('email') }}">
+                        <input type="hidden" name="panel" value="{{ $choice ?: 'di' }}">
+                        <button type="submit" class="w-full text-left px-3 py-2 rounded-lg text-sm text-white transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);">
+                            {{ \App\Support\ProductCatalog::label($choice ?: 'di') }}
+                        </button>
+                    </form>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
             <form method="POST" action="{{ route('password.email') }}" class="space-y-4">
                 @csrf
+                <input type="hidden" name="panel" value="{{ $panel ?? '' }}">
                 <div>
                     <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">{{ __('pos.auth_email_address') }}</label>
                     <input type="email" name="email" value="{{ old('email') }}" required autofocus class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-emerald-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" placeholder="you@company.com" onfocus="this.style.borderColor='rgba(52,211,153,0.5)'; this.style.boxShadow='0 0 0 3px rgba(52,211,153,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">

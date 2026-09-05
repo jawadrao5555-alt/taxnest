@@ -518,6 +518,76 @@
     </div>
 
     {{-- ============================================================
+         BUSINESS GROUP + CLONE TO ANOTHER PRODUCT (5 Sep 2026)
+         One NTN can be registered with both FBR and PRA, so the same
+         businessman may run a hotel on PRA POS, a Tier-1 outlet on FBR POS
+         and a distribution house on Digital Invoice. Those accounts stay
+         completely separate for him — this card is ours.
+         ============================================================ --}}
+    @if(!$company->trashed())
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+            <h3 class="text-sm font-semibold text-white">Same Customer, Other Products</h3>
+            @if($groupMember?->group)
+            <a href="{{ route('saas.admin.groups.show', $groupMember->company_group_id) }}" class="font-mono text-[11px] text-indigo-400 hover:text-indigo-300">{{ $groupMember->group->code }}</a>
+            @endif
+            @if($company->account_code ?? null)
+            <span class="ml-auto font-mono text-[11px] text-gray-500">{{ $company->account_code }}</span>
+            @endif
+        </div>
+
+        @if($groupSiblings->isNotEmpty())
+        <div class="space-y-2 mb-4">
+            @foreach($groupSiblings as $sibling)
+            @php $sc2 = $sibling->company; @endphp
+            @continue(!$sc2)
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <a href="{{ route('saas.admin.companies.show', $sc2->id) }}" class="text-gray-200 hover:text-indigo-400 transition">{{ $sc2->name }}</a>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ \App\Support\ProductCatalog::chipClass($sc2->product_type) }}">
+                    {{ \App\Support\ProductCatalog::label($sc2->product_type, \App\Support\NestErps::verticalOf($sc2)) }}
+                </span>
+                <span class="text-xs text-gray-500">{{ $sibling->reason() }}</span>
+            </div>
+            @endforeach
+        </div>
+        @else
+        <p class="text-xs text-gray-500 mb-4">No other product accounts found for this customer.</p>
+        @endif
+
+        @php
+            $ownProduct = \App\Support\ProductCatalog::normalize($company->product_type);
+            $cloneTargets = array_values(array_diff(['pos', 'fbrpos', 'di'], [$ownProduct]));
+            $siblingTypes = $groupSiblings->map(fn($m) => \App\Support\ProductCatalog::normalize(optional($m->company)->product_type))->filter()->all();
+        @endphp
+
+        <form method="POST" action="{{ route('saas.admin.companies.cloneProduct', $company->id) }}"
+              onsubmit="return confirm('Create a separate account for this customer on the selected product(s)? Only the owner login is copied — team accounts are not.');">
+            @csrf
+            <p class="text-xs text-gray-500 mb-2">Clone to another product — a new, fully separate account with its own 14-day trial. Only the owner login is copied; the owner creates that product&rsquo;s team himself.</p>
+            <div class="flex flex-wrap items-center gap-3 mb-3">
+                @foreach($cloneTargets as $target)
+                <label class="flex items-center gap-2 px-3 py-1.5 bg-gray-950 border border-gray-800 rounded-lg text-xs text-gray-300 cursor-pointer">
+                    <input type="checkbox" name="products[]" value="{{ $target }}" class="rounded bg-gray-900 border-gray-700">
+                    {{ \App\Support\ProductCatalog::label($target) }}
+                    @if(in_array($target, $siblingTypes, true))
+                    <span class="text-[10px] text-amber-500">already has</span>
+                    @endif
+                </label>
+                @endforeach
+            </div>
+            <div class="flex flex-wrap items-end gap-3">
+                <div>
+                    <label class="block text-[11px] text-gray-500 mb-1">Password for the new account (blank = same as this one)</label>
+                    <input type="text" name="admin_password" autocomplete="off" placeholder="same password"
+                           class="px-3 py-2 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-600">
+                </div>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition">Create account(s)</button>
+            </div>
+        </form>
+    </div>
+    @endif
+
+    {{-- ============================================================
          SUBSCRIPTION OVERRIDE + USAGE LIMIT — admin-only controls
          ============================================================ --}}
     @php

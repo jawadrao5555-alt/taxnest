@@ -265,6 +265,7 @@ return [
     'auth_fp_send_failed' => 'Failed to send email. Please try again later.',
     'auth_fp_status_sent' => 'If that email has an account, a 6-digit code and reset link have been sent.',
     'auth_fp_sub' => 'Enter your email and we\'ll send you a reset link',
+    'auth_fp_pick_product' => 'This email is registered on more than one product. Which account do you want to reset?',
     'auth_fp_title' => 'Forgot Password',
     'auth_have_account' => 'Already have an account?',
     'auth_install_fbr' => 'Install Nest FBR Pos',

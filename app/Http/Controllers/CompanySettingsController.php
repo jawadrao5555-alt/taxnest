@@ -28,7 +28,7 @@ class CompanySettingsController extends Controller
             'ntn' => 'nullable|string|max:50',
             // Shared CNIC truth (Task 580): 13 digits, dash-tolerant, GLOBAL
             // uniqueness (own row exempt) — same rules as POS/FBR profiles.
-            'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
+            'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id, $company->product_type),
             'registration_no' => 'nullable|string|max:100',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',

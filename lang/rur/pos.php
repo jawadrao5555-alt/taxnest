@@ -265,6 +265,7 @@ return [
     'auth_fp_send_failed' => 'Email bhejne mein masla hua. Baraye meherbani thodi dair baad dobara koshish karein.',
     'auth_fp_status_sent' => 'Agar is email par account hai to 6-hindson ka code aur reset link bhej diya gaya hai.',
     'auth_fp_sub' => 'Apna email likhein, hum aap ko reset link bhej denge',
+    'auth_fp_pick_product' => 'Yeh email aik se zyada product par registered hai. Kis account ka password reset karna hai?',
     'auth_fp_title' => 'Password Bhool Gaye',
     'auth_have_account' => 'Pehle se account hai?',
     'auth_install_fbr' => 'Nest FBR Pos install karein',

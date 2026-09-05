@@ -41,7 +41,7 @@ class CredentialLedgerService
      *
      * @param array<string,?string> $creds e.g. ['email'=>.., 'phone'=>.., 'ntn'=>.., 'username'=>..]
      */
-    public static function firstUsed(array $creds): ?string
+    public static function firstUsed(array $creds, ?string $productType = null): ?string
     {
         $pairs = [];
         foreach ($creds as $type => $raw) {
@@ -55,6 +55,16 @@ class CredentialLedgerService
         }
 
         $hit = RegisteredCredential::query()
+            // The ledger stops a SECOND free trial of the SAME product, not a
+            // first trial of a different one (owner ruling, 5 Sep 2026). One
+            // taxpayer legitimately runs a hotel on PRA POS, an outlet on FBR
+            // POS and a distribution house on Digital Invoice — with the same
+            // email, phone and NTN on all three.
+            ->when($productType !== null, function ($q) use ($productType) {
+                $q->where('product_type', \App\Support\IdentityScope::storedProductTypes(
+                    \App\Support\IdentityScope::normalize($productType)
+                ));
+            })
             ->where(function ($q) use ($pairs) {
                 foreach ($pairs as $type => $value) {
                     $q->orWhere(function ($qq) use ($type, $value) {

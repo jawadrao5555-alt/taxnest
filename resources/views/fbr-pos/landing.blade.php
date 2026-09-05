@@ -165,7 +165,7 @@
                         <input type="checkbox" name="remember" class="rounded border-gray-300 text-[#0A4D5C] focus:ring-[#0A4D5C] w-4 h-4">
                         <span class="ml-2 text-sm text-gray-600 font-medium">Remember me</span>
                     </label>
-                    <a href="{{ route('password.request') }}" class="text-sm font-semibold text-[#0A4D5C] hover:text-[#052730] transition">Forgot Password?</a>
+                    <a href="{{ route('password.request', ['panel' => 'fbrpos']) }}" class="text-sm font-semibold text-[#0A4D5C] hover:text-[#052730] transition">Forgot Password?</a>
                 </div>
                 
                 @if($errors->any())

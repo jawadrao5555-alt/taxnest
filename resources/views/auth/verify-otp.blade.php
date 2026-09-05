@@ -41,6 +41,7 @@
             <form method="POST" action="{{ route('password.verify.otp.submit') }}" class="space-y-4">
                 @csrf
                 <input type="hidden" name="email" value="{{ $email }}">
+                <input type="hidden" name="panel" value="{{ $panel ?? '' }}">
 
                 <div>
                     <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">{{ __('pos.auth_otp_enter_code') }}</label>
@@ -56,12 +57,13 @@
             </form>
 
             <div class="mt-6 flex items-center justify-between">
-                <a href="{{ route('password.request') }}" class="text-sm text-emerald-300/70 hover:text-emerald-200 transition">
+                <a href="{{ route('password.request', ['panel' => $panel ?? '']) }}" class="text-sm text-emerald-300/70 hover:text-emerald-200 transition">
                     &larr; {{ __('pos.auth_try_different_email') }}
                 </a>
                 <form method="POST" action="{{ route('password.email') }}" class="inline">
                     @csrf
                     <input type="hidden" name="email" value="{{ $email }}">
+                    <input type="hidden" name="panel" value="{{ $panel ?? '' }}">
                     <button type="submit" class="text-sm text-emerald-300/70 hover:text-emerald-200 transition">
                         {{ __('pos.auth_resend_code') }}
                     </button>

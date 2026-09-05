@@ -45,12 +45,15 @@ class RegisteredUserController extends Controller
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone'],
-            'username' => ['nullable', 'string', 'max:100', 'alpha_dash', 'unique:users,username'],
+            // Unique INSIDE the Digital Invoice line only (owner ruling,
+            // 5 Sep 2026): the same taxpayer may already run a hotel on PRA
+            // POS and an outlet on FBR POS with these very credentials.
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail('di')],
+            'phone' => ['nullable', 'string', 'max:20', \App\Support\IdentityScope::uniquePhone('di')],
+            'username' => ['nullable', 'string', 'max:100', 'alpha_dash', \App\Support\IdentityScope::uniqueUsername('di')],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'company_name' => ['required', 'string', 'max:255'],
-            'company_ntn' => ['required', 'string', 'max:50', 'unique:companies,ntn'],
+            'company_ntn' => ['required', 'string', 'max:50', \App\Support\IdentityScope::uniqueNtn('di')],
             'referral_code' => ['nullable', 'string', 'max:30'],
             'distributor_reference_code' => ['nullable', 'string', 'max:30'],
         ]);
@@ -75,7 +78,7 @@ class RegisteredUserController extends Controller
             'phone' => $request->phone,
             'ntn' => $request->company_ntn,
             'username' => $request->username ?? null,
-        ])) {
+        ], 'di')) {
             [$field, $message] = CredentialLedgerService::rejectionFor($usedType);
             throw ValidationException::withMessages([$field => $message]);
         }

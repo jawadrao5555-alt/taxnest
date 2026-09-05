@@ -36,7 +36,7 @@
                 <span class="ms-2 text-sm text-gray-600 group-hover:text-gray-800 dark:text-gray-100 transition">{{ __('Remember me') }}</span>
             </label>
             @if (Route::has('password.request'))
-                <a class="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition" href="{{ route('password.request') }}">
+                <a class="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition" href="{{ route('password.request', ['panel' => 'di']) }}">
                     {{ __('Forgot password?') }}
                 </a>
             @endif

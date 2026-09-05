@@ -64,13 +64,17 @@ class PosAuthController extends Controller
         // ═══ STEP 2 — POS user lookup (strict isolation) ═══
         $user = null;
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $user = User::where('email', $login)->first();
+            // Identity is per product (5 Sep 2026): the same email may also
+            // hold an FBR POS or DI account, so the lookup must stay inside
+            // this panel or a shop owner would be handed the wrong account's
+            // "invalid credentials".
+            $user = \App\Support\IdentityScope::findUserByEmail($login, 'pos');
         } elseif (preg_match('/^\d{7,13}$/', preg_replace('/\D/', '', $login))) {
             // 7–8 digits = a real Pakistani NTN (task 433) — company lookup only.
             // 10–13 digits keep phone-first precedence, then NTN/CNIC fallback.
             $phone = preg_replace('/\D/', '', $login);
             if (strlen($phone) >= 10) {
-                $user = User::where('phone', $phone)->first();
+                $user = \App\Support\IdentityScope::findUserByPhone($phone, 'pos');
             }
             if (!$user) {
                 // Frost & Brew (Aug 2026): NTN/CNIC typed WITH dashes must still
@@ -86,7 +90,11 @@ class PosAuthController extends Controller
                       ->orWhere('ntn', $phone)->orWhere('cnic', $phone)
                       ->orWhereRaw("REPLACE(REPLACE(cnic, '-', ''), ' ', '') = ?", [$phone]);
                 })->get();
-                $company = $matches->firstWhere('product_type', 'pos') ?? $matches->first();
+                // The SAME NTN/CNIC may now legitimately sit on this person's
+                // FBR POS or DI company too (identity is per product, 5 Sep
+                // 2026). This panel only ever accepts a 'pos' company, so
+                // never fall back to another product's row.
+                $company = $matches->firstWhere('product_type', 'pos');
                 if ($company) {
                     $user = User::where('company_id', $company->id)->where('role', 'company_admin')->orderBy('id')->first();
                 }
@@ -190,11 +198,14 @@ class PosAuthController extends Controller
     {
         $request->validate([
             'company_name' => 'required|string|max:255',
-            'company_ntn' => 'nullable|string|max:50|unique:companies,ntn',
+            // Unique INSIDE the PRA POS line only (owner ruling, 5 Sep 2026):
+            // one taxpayer may run a hotel here and an outlet on FBR POS under
+            // the same NTN, email and phone.
+            'company_ntn' => ['nullable', 'string', 'max:50', \App\Support\IdentityScope::uniqueNtn('pos')],
             // Task 579: optional owner CNIC — becomes a login identifier.
-            'company_cnic' => \App\Services\LoginIdentifierResolver::cnicRules(),
+            'company_cnic' => \App\Services\LoginIdentifierResolver::cnicRules(null, 'pos'),
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => ['required', 'string', 'email', 'max:255', \App\Support\IdentityScope::uniqueEmail('pos')],
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             // PRA taxes SERVICES only (Punjab Sales Tax on Services Act 2012,
@@ -234,7 +245,7 @@ class PosAuthController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'ntn' => $request->company_ntn,
-        ])) {
+        ], 'pos')) {
             [$field, $message] = CredentialLedgerService::rejectionFor($usedType);
             throw ValidationException::withMessages([$field => $message]);
         }

@@ -95,14 +95,19 @@ class LoginRequest extends FormRequest
         $normalizedPhone = preg_replace('/[^0-9]/', '', $login);
         $user = null;
 
+        // Identity is per product (5 Sep 2026): this very email/phone may also
+        // hold a PRA POS or FBR POS account, so every lookup stays inside the
+        // Digital Invoice line (plus legacy company-less rows).
+        $diScope = ['di', null];
+
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
-            $user = User::where('email', $login)->first();
+            $user = \App\Support\IdentityScope::findUserByEmail($login, $diScope);
         }
 
         if (!$user && strlen($normalizedPhone) >= 10 && strlen($normalizedPhone) <= 15) {
-            $user = User::where('phone', $normalizedPhone)->first();
+            $user = \App\Support\IdentityScope::findUserByPhone($normalizedPhone, $diScope);
             if (!$user) {
-                $user = User::where('phone', $login)->first();
+                $user = \App\Support\IdentityScope::findUserByPhone($login, $diScope);
             }
         }
 

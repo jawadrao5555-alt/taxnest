@@ -11,6 +11,24 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /**
+     * Identity is unique per PRODUCT, not per system (owner ruling, 5 Sep
+     * 2026) — the same person may hold a PRA POS, an FBR POS and a Digital
+     * Invoice account with the same email. The database enforces that with a
+     * (email, product_type) index, so this mirror column must be right on
+     * EVERY write path — including the ones that pass an array to create().
+     * Setting it here, rather than at 20 call sites, is what makes that true.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $user) {
+            if (!\App\Support\IdentityScope::usersScoped()) {
+                return;   // column not migrated yet (PROD drift safety)
+            }
+            $user->setAttribute('product_type', \App\Support\IdentityScope::ofCompanyId($user->company_id));
+        });
+    }
+
+    /**
      * Waiter personal-style catalogue — SINGLE SOURCE OF TRUTH (owner, 8 Aug 2026).
      * key = users.pos_personal_style value, value = lang key for the label.
      * Add a new waiter theme HERE and it automatically appears in the waiter

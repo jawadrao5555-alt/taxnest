@@ -83,6 +83,7 @@ use App\Http\Controllers\Health\HealthClinicalController;
 use App\Http\Controllers\Health\HealthDoctorController;
 use App\Http\Controllers\Health\HealthIpdReportController;
 use App\Http\Controllers\Health\HealthOpdReportController;
+use App\Http\Controllers\Health\HealthBillingController;
 use App\Http\Controllers\Health\HealthOperationController;
 use App\Http\Controllers\Health\HealthWardController;
 use App\Http\Controllers\Health\HealthPatientController;
@@ -2071,6 +2072,73 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         // needs hr.view, which ordinary staff do not hold.
         Route::post('/my/leave/{id}/cancel', [HealthSelfServiceController::class, 'cancelLeave'])->name('health.my.leave.cancel');
         Route::post('/my/correction', [HealthSelfServiceController::class, 'storeCorrection'])->name('health.my.correction');
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Billing counter (Task 1551)
+    |----------------------------------------------------------------------
+    | Every path here starts /health/billing, so HealthAuth's PATH_MAP derives
+    | `billing.view` on its own and a forgotten middleware argument below still
+    | cannot open a screen. The explicit `health.can:` guards then narrow it
+    | further — reading a bill is not the same right as taking money for it,
+    | and taking money is not the same right as telling FBR about it.
+    |
+    | The whole family also sits behind the `accounts` module, so a hospital
+    | that has not switched billing on has no billing routes at all, which is
+    | what keeps the nav link hidden without a layout edit.
+    */
+    Route::prefix('billing')->middleware('health.module:accounts')->group(function () {
+        Route::middleware('health.can:billing.view')->group(function () {
+            Route::get('/', [HealthBillingController::class, 'index'])->name('health.billing');
+            Route::get('/patient/{id}', [HealthBillingController::class, 'patient'])->whereNumber('id')->name('health.billing.patient');
+            Route::get('/patient/{id}/statement', [HealthBillingController::class, 'statement'])->whereNumber('id')->name('health.billing.statement');
+            Route::get('/bills/{id}', [HealthBillingController::class, 'bill'])->whereNumber('id')->name('health.billing.bill');
+            Route::get('/bills/{id}/receipt', [HealthBillingController::class, 'receipt'])->whereNumber('id')->name('health.billing.receipt');
+            Route::get('/bills/{id}/fbr', [HealthBillingController::class, 'fbr'])->whereNumber('id')->name('health.billing.fbr');
+            Route::post('/bills/{id}/fbr/reconcile', [HealthBillingController::class, 'reconcileFbr'])->whereNumber('id')->name('health.billing.fbr.reconcile');
+            Route::get('/shifts', [HealthBillingController::class, 'shifts'])->name('health.billing.shifts');
+        });
+
+        /* Money movement — the counter's own rights. */
+        Route::middleware('health.can:billing.charge')->group(function () {
+            Route::post('/patient/{id}/sync', [HealthBillingController::class, 'syncCharges'])->whereNumber('id')->name('health.billing.sync');
+            Route::post('/patient/{id}/charges', [HealthBillingController::class, 'storeCharge'])->whereNumber('id')->name('health.billing.charges.store');
+            Route::post('/charges/{id}/reverse', [HealthBillingController::class, 'reverseCharge'])->whereNumber('id')->name('health.billing.charges.reverse');
+            Route::post('/charges/{id}/concession', [HealthBillingController::class, 'concession'])->whereNumber('id')->name('health.billing.charges.concession');
+            Route::post('/patient/{id}/bills', [HealthBillingController::class, 'storeBill'])->whereNumber('id')->name('health.billing.bills.store');
+            Route::post('/patient/{id}/settle/{admissionId}', [HealthBillingController::class, 'settleAdmission'])
+                ->whereNumber('id')->whereNumber('admissionId')->name('health.billing.settle');
+            Route::post('/patient/{id}/deposit', [HealthBillingController::class, 'deposit'])->whereNumber('id')->name('health.billing.deposit');
+            Route::post('/bills/{id}/finalize', [HealthBillingController::class, 'finalize'])->whereNumber('id')->name('health.billing.bills.finalize');
+            Route::post('/bills/{id}/pay', [HealthBillingController::class, 'pay'])->whereNumber('id')->name('health.billing.bills.pay');
+            Route::post('/bills/{id}/apply-credit', [HealthBillingController::class, 'applyCredit'])->whereNumber('id')->name('health.billing.bills.credit');
+            Route::post('/shifts/open', [HealthBillingController::class, 'openShift'])->name('health.billing.shifts.open');
+            Route::post('/shifts/{id}/close', [HealthBillingController::class, 'closeShift'])->whereNumber('id')->name('health.billing.shifts.close');
+        });
+
+        /* Reconciliation reading needs the accounts eye, not the cash drawer. */
+        Route::middleware('health.can:accounts.view')->group(function () {
+            Route::get('/day-close', [HealthBillingController::class, 'dayClose'])->name('health.billing.day-close');
+        });
+
+        /*
+         * Decisions the counter must NOT make on its own: what the regulator is
+         * told, money going back out, cancelling a raised bill, and the tax
+         * rulebook itself.
+         */
+        Route::middleware('health.can:accounts.manage')->group(function () {
+            Route::post('/charges/{id}/reclassify', [HealthBillingController::class, 'reclassify'])->whereNumber('id')->name('health.billing.charges.reclassify');
+            Route::post('/bills/{id}/cancel', [HealthBillingController::class, 'cancelBill'])->whereNumber('id')->name('health.billing.bills.cancel');
+            Route::post('/bills/{id}/refund', [HealthBillingController::class, 'refund'])->whereNumber('id')->name('health.billing.bills.refund');
+            Route::post('/bills/{id}/fbr/submit', [HealthBillingController::class, 'submitFbr'])->whereNumber('id')->name('health.billing.fbr.submit');
+            Route::post('/payments/{id}/reverse', [HealthBillingController::class, 'reversePayment'])->whereNumber('id')->name('health.billing.payments.reverse');
+            Route::get('/tax-categories', [HealthBillingController::class, 'taxCategories'])->name('health.billing.tax-categories');
+            Route::post('/tax-categories', [HealthBillingController::class, 'storeTaxCategory'])->name('health.billing.tax-categories.store');
+            Route::put('/tax-categories/{id}', [HealthBillingController::class, 'updateTaxCategory'])->whereNumber('id')->name('health.billing.tax-categories.update');
+            Route::post('/tax-categories/{id}/toggle', [HealthBillingController::class, 'toggleTaxCategory'])->whereNumber('id')->name('health.billing.tax-categories.toggle');
+            Route::post('/tax-categories/seed', [HealthBillingController::class, 'seedTaxCategories'])->name('health.billing.tax-categories.seed');
+        });
     });
 });
 

@@ -30,6 +30,13 @@ class HealthNumberService
     public const KEY_TOKEN = 'token';
     public const KEY_ADMISSION = 'admission';
     public const KEY_OPERATION = 'operation';
+    // Unified billing (Task 1551). Charges, bills, estimates and receipts each
+    // get their own never-reused series, for the same reason the MRN does: a
+    // reused receipt number turns "show me receipt R000412" into two answers.
+    public const KEY_CHARGE = 'charge';
+    public const KEY_BILL = 'bill';
+    public const KEY_ESTIMATE = 'estimate';
+    public const KEY_RECEIPT = 'receipt';
 
     /**
      * Consume the next value of a counter and return it.
@@ -122,6 +129,36 @@ class HealthNumberService
     public static function operationNumber(int $companyId): string
     {
         return 'OT' . str_pad((string) self::next($companyId, self::KEY_OPERATION), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** C000123 — one line on the unified charge ledger. */
+    public static function chargeNumber(int $companyId): string
+    {
+        return 'C' . str_pad((string) self::next($companyId, self::KEY_CHARGE), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** B000123 — one patient bill (invoice / combined statement / final bill). */
+    public static function billNumber(int $companyId): string
+    {
+        return 'B' . str_pad((string) self::next($companyId, self::KEY_BILL), 6, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * E000123 — one estimate.
+     *
+     * A separate series from the invoice on purpose: an estimate is a quote, not
+     * money owed, and a patient holding "B000412" must never be able to mistake
+     * it for a bill that was actually raised.
+     */
+    public static function estimateNumber(int $companyId): string
+    {
+        return 'E' . str_pad((string) self::next($companyId, self::KEY_ESTIMATE), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** R000123 — one money receipt (deposit, payment or refund). */
+    public static function receiptNumber(int $companyId): string
+    {
+        return 'R' . str_pad((string) self::next($companyId, self::KEY_RECEIPT), 6, '0', STR_PAD_LEFT);
     }
 
     /**

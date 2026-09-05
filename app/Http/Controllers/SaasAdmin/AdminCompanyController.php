@@ -1189,6 +1189,14 @@ class AdminCompanyController extends Controller
             'health_operation_theatres', 'health_procedures',
             'health_admission_payments', 'health_admission_charges', 'health_admission_events',
             'health_admissions', 'health_beds', 'health_rooms', 'health_wards',
+            // Unified healthcare billing: same company_id / no-FK-cascade rule.
+            // Deepest children first — FBR submission evidence and receipts
+            // before the bill, bill lines before the bill, adjustments before
+            // the charge, and the tax rulebook last (nothing points at it once
+            // the charges are gone).
+            'health_fbr_submissions', 'health_payments', 'health_bill_lines', 'health_bills',
+            'health_charge_adjustments', 'health_charges', 'health_cashier_shifts',
+            'health_tax_categories',
         ];
         DB::transaction(function () use ($orphanTables, $id, $company) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge

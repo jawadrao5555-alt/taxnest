@@ -64,6 +64,19 @@ final class HealthPanel
         return 'health.org_type_' . self::normalizeOrgType($type);
     }
 
+    /**
+     * May a signed-out visitor create a healthcare organisation themselves?
+     *
+     * The panel is deployed to production while the product is still
+     * pre-pilot, so the answer is normally NO: the code is live and provable,
+     * but the front door is shut. One predicate, so the route guard, the
+     * controller and every call-to-action can never disagree about it.
+     */
+    public static function registrationOpen(): bool
+    {
+        return (bool) config('health.registration_open', false);
+    }
+
     /** True when the request path belongs to this panel. */
     public static function ownsPath(string $path): bool
     {

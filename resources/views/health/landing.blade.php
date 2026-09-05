@@ -158,7 +158,12 @@
             </p>
             <div class="mt-7 flex flex-wrap gap-3">
                 <a href="{{ url('/contact') }}" class="px-6 py-3 rounded-xl bg-[#E7BF3B] hover:bg-[#d8b230] text-[#052730] text-sm font-bold transition">Request a quote</a>
-                <a href="{{ url(NestErps::registerPath(NestErps::HEALTH)) }}" class="px-6 py-3 rounded-xl border border-white/25 hover:bg-white/10 text-white text-sm font-bold transition">Try {{ NestErps::verticalLabel(NestErps::HEALTH) }} free</a>
+                {{-- The vertical is deployed but still pre-pilot: the code is live and
+                     provable, the front door is shut. One predicate decides it, so this
+                     call-to-action can never disagree with the route guard. --}}
+                @if(HealthPanel::registrationOpen())
+                    <a href="{{ url(NestErps::registerPath(NestErps::HEALTH)) }}" class="px-6 py-3 rounded-xl border border-white/25 hover:bg-white/10 text-white text-sm font-bold transition">Try {{ NestErps::verticalLabel(NestErps::HEALTH) }} free</a>
+                @endif
             </div>
         </div>
     </div>

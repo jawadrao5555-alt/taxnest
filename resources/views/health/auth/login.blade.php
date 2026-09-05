@@ -70,10 +70,12 @@
                 </button>
             </form>
 
-            <p class="mt-5 text-center text-sm text-gray-500">
-                {{ __('health.need_account') }}
-                <a href="{{ url('/health/register') }}" class="font-bold text-teal-700 hover:text-teal-900">{{ __('health.register') }}</a>
-            </p>
+            @if(\App\Support\HealthPanel::registrationOpen())
+                <p class="mt-5 text-center text-sm text-gray-500">
+                    {{ __('health.need_account') }}
+                    <a href="{{ url('/health/register') }}" class="font-bold text-teal-700 hover:text-teal-900">{{ __('health.register') }}</a>
+                </p>
+            @endif
         </div>
 
         {{-- Guest language picker: session-only, same three locales as the panel. --}}

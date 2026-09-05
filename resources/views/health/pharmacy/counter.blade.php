@@ -263,6 +263,15 @@
     </div>
 
     <script>
+        // Labels come through Js::from, never a bare translation echo: an
+        // apostrophe inside a translation would close the JS string and
+        // white-screen the whole counter, which sits behind x-cloak and would
+        // simply render blank with nothing in the server log.
+        const PH_TXT = {
+            expired: {{ \Illuminate\Support\Js::from(__('health.ph_badge_expired')) }},
+            shortDated: {{ \Illuminate\Support\Js::from(__('health.ph_badge_short_dated')) }},
+        };
+
         function pharmacyCounter(catalogue, defaultTaxRate, batchUrl) {
             let counter = 0;
 
@@ -306,8 +315,8 @@
                         batch_id: '',
                         batches: [],
                         warning: medicine.expired
-                            ? '{{ __('health.ph_badge_expired') }}'
-                            : (medicine.short ? '{{ __('health.ph_badge_short_dated') }}' : ''),
+                            ? PH_TXT.expired
+                            : (medicine.short ? PH_TXT.shortDated : ''),
                     };
 
                     this.lines.push(line);

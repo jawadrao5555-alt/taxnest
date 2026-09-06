@@ -6591,7 +6591,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'vocab_added_for_you' => 'Aap ke liye add kiye gaye',
     'vocab_added_for_you_hint' => 'Woh modules jo TaxNest admin ne aap ki dukaan ke liye business type se hat kar on kiye hain.',
     'feature_not_for_business' => 'Yeh feature aap ke karobar ki qisam ka hissa nahi.',
+    'uom_strip' => 'STRIP (Patte)',
     'uom_tab' => 'TAB (Goliyan)',
+    'uom_btl' => 'BTL (Botlein)',
     'auth_bt_general' => 'General Karobar',
     'auth_bt_hybrid_cafe_retail' => 'Cafe + Retail',
     // ---- Task 1582 category profiles: pra-surfaces (append new keys below this line only) ----

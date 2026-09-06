@@ -234,6 +234,14 @@
                     </select>
                 </div>
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
+                    <select name="audience_family" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        @foreach(\App\Support\PosVocabulary::audienceOptions() as $value => $label)
+                            <option value="{{ $value }}" {{ old('audience_family', 'all') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                     <select name="type" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         <option value="improvement">Behtari / Masla Hal (improvement or fix)</option>
@@ -283,6 +291,14 @@
                     </select>
                 </div>
                 @include('admin.partials.elaan-categories', ['prefix' => 'edit'])
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
+                    <select name="audience_family" id="editAudienceFamily" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        @foreach(\App\Support\PosVocabulary::audienceOptions() as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
                     <select name="audience_family" id="editAudienceFamily" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">

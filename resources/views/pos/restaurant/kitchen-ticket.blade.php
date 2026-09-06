@@ -325,6 +325,10 @@
             // drift convention — any lookup failure = old ORD- behavior.
             $kotBillToken = null;
             $kotBillNum = null;
+            // Daily style (ZFC): large L00x only — no TOKEN label / Bill Serial ref.
+            // local_number_style=daily is local-stream only; shim KOTs are local bills.
+            $kotIsDailyStyle = false;
+            $shimIsDailyStyle = (($company->local_number_style ?? 'serial') === 'daily');
             try {
                 if ($omToken === null && $shimBillToken === null && $omStyle !== 'code'
                     && $order->exists && !empty($order->pos_transaction_id)) {
@@ -334,21 +338,27 @@
                     if ($kotBillTxn && $kotBillTxn->invoice_number) {
                         $kotBillNum = $kotBillTxn->invoice_number;
                         $kotBillToken = \App\Support\PosBillNumberStyle::bigNumber($company, $kotBillTxn);
+                        $kotIsDailyStyle = \App\Support\PosBillNumberStyle::styleFor($company, $kotBillTxn) === 'daily';
                     }
                 }
-            } catch (\Throwable $e) { $kotBillToken = null; $kotBillNum = null; }
+            } catch (\Throwable $e) { $kotBillToken = null; $kotBillNum = null; $kotIsDailyStyle = false; }
         @endphp
         @if($omToken)
             <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
         @elseif($shimBillToken !== null)
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $shimBillToken }}</span></p>
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">@if($shimIsDailyStyle){{ $shimBillToken }}@else{{ __('pos.order_match_token_label') }} {{ $shimBillToken }}@endif</span></p>
+            @unless($shimIsDailyStyle)
             <p class="text-sm bold">{{ __('pos.bill_ref_label') }}: {{ $order->order_number }}</p>
+            @endunless
         @elseif($kotBillToken !== null)
             {{-- Task 993: paid order, token-style stream — bill token big with the
                  serial as small Ref, mirroring the receipt + shim-KOT design.
+                 Daily style omits the TOKEN label and Bill Serial ref line.
                  KOT #N rides the token line (delta/reprint sequencing intact). --}}
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $kotBillToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">@if($kotIsDailyStyle){{ $kotBillToken }}@else{{ __('pos.order_match_token_label') }} {{ $kotBillToken }}@endif</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
+            @unless($kotIsDailyStyle)
             <p class="text-sm bold">{{ __('pos.bill_ref_label') }}: {{ $kotBillNum }}</p>
+            @endunless
         @elseif($kotBillNum)
             {{-- Task 993: paid order, serial-style stream — the bill's invoice
                  number replaces the ORD- line (single identifier, owner rule). --}}

@@ -52,6 +52,7 @@ class HealthPostIpdDailyCharges extends Command
         $companies = 0;
         $stays = 0;
         $charges = 0;
+        $failures = 0;
 
         foreach ($companyIds as $companyId) {
             $company = Company::withoutGlobalScopes()->find($companyId);
@@ -79,7 +80,10 @@ class HealthPostIpdDailyCharges extends Command
                     $stays++;
                     $charges += $posted;
                 } catch (\Throwable $e) {
-                    // Never let one stay abort the night's run for everybody.
+                    // Never let one stay abort the night's run for everybody —
+                    // but the run is not a success either. Carry on, remember,
+                    // and say so on the way out.
+                    $failures++;
                     $this->error("Admission {$admission->id}: {$e->getMessage()}");
                     report($e);
                 }
@@ -87,6 +91,20 @@ class HealthPostIpdDailyCharges extends Command
         }
 
         $this->info("Posted {$charges} charge line(s) across {$stays} stay(s) in {$companies} organisation(s).");
+
+        /*
+         * A night where some wards did not accrue is a FAILED night, and the
+         * exit status has to say so. The scheduler stamps its "bed-days are
+         * posting" evidence only on a zero exit, and readiness reads that
+         * stamp — so returning success here after swallowing a stay's exception
+         * would keep the check green for exactly the hospital whose patient is
+         * being under-billed.
+         */
+        if ($failures > 0) {
+            $this->error("{$failures} stay(s) failed to post — the ward is under-billed for the day.");
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }

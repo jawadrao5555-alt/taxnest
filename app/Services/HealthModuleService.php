@@ -51,6 +51,11 @@ class HealthModuleService
         'departments.manage',
         'staff.manage',
         'settings.manage',
+        // Bulk hospital setup by spreadsheet. Core rather than per-module
+        // because one upload can create departments, staff, catalogue AND
+        // opening accounts — it crosses every module boundary there is, which
+        // is exactly why it is also OWNER_ONLY.
+        'setup.import',
         // The owner's audit workspace. `view` reads and runs it, `export`
         // produces the signed evidence pack, `manage` acknowledges a finding
         // and records what was done about it. Three, because the auditor must

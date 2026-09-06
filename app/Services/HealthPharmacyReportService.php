@@ -10,6 +10,7 @@ use App\Models\HealthPrescription;
 use App\Models\PurchaseOrder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Every pharmacy number a screen shows, computed in ONE place (Task 1549).
@@ -287,7 +288,28 @@ class HealthPharmacyReportService
             ->selectRaw('supplier_id, COALESCE(SUM(amount), 0) as paid')
             ->pluck('paid', 'supplier_id');
 
-        $supplierIds = collect($billed->keys())->merge($paid->keys())->unique()->filter()->values();
+        /*
+         * Day-one payables carried in at onboarding (Task 1555). Without them a
+         * hospital that moved onto the panel owing its distributor 400,000 sees
+         * a zero balance on the payables screen, and the first payment it
+         * records against that distributor drives the balance negative.
+         *
+         * Schema-guarded: the column arrives in its own migration, and the
+         * report must not 500 on a box that has deployed the code but not yet
+         * run it.
+         */
+        $opening = collect();
+        if (Schema::hasColumn('suppliers', 'opening_balance')) {
+            $opening = DB::table('suppliers')
+                ->where('company_id', $companyId)
+                ->where('opening_balance', '!=', 0)
+                ->pluck('opening_balance', 'id');
+        }
+
+        $supplierIds = collect($billed->keys())
+            ->merge($paid->keys())
+            ->merge($opening->keys())
+            ->unique()->filter()->values();
         if ($supplierIds->isEmpty()) {
             return collect();
         }
@@ -298,7 +320,8 @@ class HealthPharmacyReportService
             ->get()
             ->keyBy('id');
 
-        return $supplierIds->map(function ($id) use ($billed, $paid, $suppliers) {
+        return $supplierIds->map(function ($id) use ($billed, $paid, $opening, $suppliers) {
+            $openingAmount = round((float) ($opening[$id] ?? 0), 2);
             $billedAmount = round((float) ($billed[$id] ?? 0), 2);
             $paidAmount = round((float) ($paid[$id] ?? 0), 2);
 
@@ -306,9 +329,10 @@ class HealthPharmacyReportService
                 'supplier_id' => (int) $id,
                 'name' => $suppliers[$id]->name ?? '—',
                 'phone' => $suppliers[$id]->phone ?? null,
+                'opening' => $openingAmount,
                 'billed' => $billedAmount,
                 'paid' => $paidAmount,
-                'balance' => round($billedAmount - $paidAmount, 2),
+                'balance' => round($openingAmount + $billedAmount - $paidAmount, 2),
             ];
         })->sortByDesc('balance')->values();
     }

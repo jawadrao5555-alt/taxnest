@@ -18,10 +18,18 @@ class Supplier extends Model
         'contact_person',
         'notes',
         'is_active',
+        // Day-one payable carried over from whatever the hospital used before
+        // the panel. Fillable on purpose — Eloquent drops a non-fillable write
+        // without a word, and a silently dropped opening balance reads as
+        // "we owe this distributor nothing".
+        'opening_balance',
+        'opening_balance_date',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'opening_balance' => 'float',
+        'opening_balance_date' => 'date',
     ];
 
     public function company()

@@ -91,6 +91,7 @@ use App\Http\Controllers\Health\HealthBillingController;
 use App\Http\Controllers\Health\HealthOperationController;
 use App\Http\Controllers\Health\HealthWardController;
 use App\Http\Controllers\Health\HealthPatientController;
+use App\Http\Controllers\Health\HealthSetupImportController;
 use App\Http\Controllers\HealthPharmacyController;
 use App\Http\Controllers\HealthPharmacyPurchaseController;
 use App\Http\Controllers\HealthPharmacyStockController;
@@ -1750,6 +1751,27 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         ->middleware('health.can:settings.manage.modules')->name('health.settings.modules');
     Route::post('/settings/modules', [HealthController::class, 'updateModules'])
         ->middleware('health.can:settings.manage.modules')->name('health.settings.modules.update');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hospital setup by spreadsheet (Task 1555)
+    |--------------------------------------------------------------------------
+    | Owner only — `setup.import` is in OWNER_ONLY, so the capability check
+    | refuses everybody else no matter what the owner delegated, and HealthAuth's
+    | path map (#^health/setup#) refuses them a second time.
+    |
+    | Upload and commit are separate presses against a STORED file, never one
+    | round trip: the hospital must be able to read what an import would do to
+    | 4,000 rows before any of it lands.
+    */
+    Route::middleware('health.can:setup.import')->group(function () {
+        Route::get('/setup/import', [HealthSetupImportController::class, 'index'])->name('health.setup.import');
+        Route::get('/setup/import/{dataset}/template', [HealthSetupImportController::class, 'template'])->name('health.setup.import.template');
+        Route::post('/setup/import/{dataset}/upload', [HealthSetupImportController::class, 'upload'])->name('health.setup.import.upload');
+        Route::get('/setup/import/{dataset}/preview/{token}', [HealthSetupImportController::class, 'preview'])->name('health.setup.import.preview');
+        Route::post('/setup/import/{dataset}/commit/{token}', [HealthSetupImportController::class, 'commit'])->name('health.setup.import.commit');
+        Route::post('/setup/import/discard/{token}', [HealthSetupImportController::class, 'discard'])->name('health.setup.import.discard');
+    });
 
     Route::middleware('health.can:departments.manage')->group(function () {
         Route::get('/departments', [HealthDepartmentController::class, 'index'])->name('health.departments');

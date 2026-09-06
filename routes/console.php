@@ -174,6 +174,32 @@ Schedule::command('pdf:prune-temp')->hourly()->withoutOverlapping();
 Schedule::command('invoices:cache-pdfs --seconds=45')->everyFiveMinutes()->withoutOverlapping();
 // Auto-close prior POS trading days for companies that opted into auto day-close.
 // Each company picks its own auto-close time (never before its business-day cutoff).
+// Inpatient bed-day and nursing charges. A ward that stops accruing is silent
+// — the patient is still in the bed, the discharge bill is just short — so the
+// run stamps its own timestamp and the pilot-readiness command reads THAT.
+// Wrapped in a closure on purpose: the stamp can then only be written by the
+// scheduler itself, so a hand-run of the command cannot fake a working cron.
+Schedule::call(function () {
+    // Only a SUCCESSFUL run may stamp. Artisan::call returns a status, it does
+    // not throw, so stamping unconditionally would let a poster that failed
+    // every night keep the readiness check green — the readiness check would
+    // then be reporting healthy accrual precisely while charges are not
+    // posting, which is the one thing it exists to catch.
+    $exit = Artisan::call('health:ipd-daily-charges');
+
+    if ($exit !== 0) {
+        \Illuminate\Support\Facades\Log::error('health:ipd-daily-charges failed', ['exit' => $exit]);
+
+        return;
+    }
+
+    \App\Models\SystemSetting::set(
+        'health_ipd_daily_charges_last_run',
+        now()->toDateTimeString(),
+        'Last time the scheduler successfully posted inpatient bed-day and nursing charges.'
+    );
+})->dailyAt('00:20')->name('health-ipd-daily-charges')->withoutOverlapping(120);
+
 Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();
 // Task 676 — FBR twin: auto-close FBR POS trading days (same checkbox flag,
 // product_type='fbrpos'), with the ZFC undispatched-deliveries skip.
@@ -225,9 +251,3 @@ Schedule::command('site:uptime-watch')->everyTwoMinutes()->withoutOverlapping();
 // an account runs past the fair-use figure printed on its package, so a custom
 // arrangement can be discussed instead of it surfacing months later.
 Schedule::command('di:fair-use-alerts')->dailyAt('06:40')->withoutOverlapping();
-// Healthcare inpatient: post each open stay's bed-day and nursing charge for
-// the day just gone. Runs just after midnight so the ward bill is right before
-// the morning round, and is idempotent (dedupe key per admission+date+bed), so
-// a retry or a manual press of the same button on the stay screen never bills
-// twice.
-Schedule::command('health:ipd-daily-charges')->dailyAt('00:20')->withoutOverlapping();

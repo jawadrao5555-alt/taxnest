@@ -55,6 +55,17 @@
                     'meta' => null,
                 ];
             }
+            // Owner only, and only where the route exists — the same rule the
+            // navigation follows, so a card can never offer a screen the next
+            // click refuses.
+            if ($isOwner && \Illuminate\Support\Facades\Route::has('health.setup.import')) {
+                $cards[] = [
+                    'url' => route('health.setup.import'),
+                    'title' => __('health.settings_import_card'),
+                    'desc' => __('health.settings_import_card_desc'),
+                    'meta' => null,
+                ];
+            }
         @endphp
 
         <div class="grid sm:grid-cols-2 gap-3">

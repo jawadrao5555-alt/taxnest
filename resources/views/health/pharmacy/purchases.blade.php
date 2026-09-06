@@ -210,6 +210,7 @@
                         <thead class="bg-gray-50 dark:bg-gray-900/40 text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
                             <tr>
                                 <th class="px-4 py-2 text-start font-black">{{ __('health.ph_sup_name') }}</th>
+                                <th class="px-4 py-2 text-end font-black">{{ __('health.ph_opening') }}</th>
                                 <th class="px-4 py-2 text-end font-black">{{ __('health.ph_billed') }}</th>
                                 <th class="px-4 py-2 text-end font-black">{{ __('health.ph_paid') }}</th>
                                 <th class="px-4 py-2 text-end font-black">{{ __('health.ph_balance') }}</th>
@@ -220,6 +221,7 @@
                             @foreach($balances as $row)
                                 <tr>
                                     <td class="px-4 py-2.5 font-bold">{{ $row->name }}</td>
+                                    <td class="px-4 py-2.5 text-end">{{ number_format((float) ($row->opening ?? 0), 2) }}</td>
                                     <td class="px-4 py-2.5 text-end">{{ number_format($row->billed, 2) }}</td>
                                     <td class="px-4 py-2.5 text-end">{{ number_format($row->paid, 2) }}</td>
                                     <td class="px-4 py-2.5 text-end font-black {{ $row->balance > 0 ? 'text-red-700 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300' }}">

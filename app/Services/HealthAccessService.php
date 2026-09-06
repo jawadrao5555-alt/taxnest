@@ -231,7 +231,16 @@ class HealthAccessService
      * owner may still delegate audit.view and audit.export freely — reading and
      * exporting the evidence changes nothing.
      */
-    public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate', 'audit.manage'];
+    /**
+     * Capabilities no delegation can ever hand out.
+     *
+     * `setup.import` is here because a bulk import writes staff logins, the
+     * medicine catalogue, opening stock and the opening trial balance in one
+     * press. There is no role below the owner for whom "all of that at once" is
+     * least privilege, and a delegated set that could tick it would be a way to
+     * mint a login without going near the team screen.
+     */
+    public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate', 'audit.manage', 'setup.import'];
 
     public static function roleLabelKey(?string $role): string
     {
@@ -454,6 +463,10 @@ class HealthAccessService
     private const PATH_MAP = [
         '#^health/settings/modules#'  => 'settings.manage.modules',
         '#^health/settings#'          => 'settings.manage',
+        // Bulk setup import. Owner-only by capability, so the path gate is the
+        // second lock on a screen that can create logins and post opening
+        // balances in one press.
+        '#^health/setup#'             => 'setup.import',
         '#^health/departments#'       => 'departments.manage',
         '#^health/team#'              => 'staff.manage',
         '#^health/patients#'          => 'patients.view',

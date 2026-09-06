@@ -141,6 +141,9 @@ Schedule::command('pos:clean-zombie-tables')->everyFifteenMinutes();
 // self-requeue, cursor in medicine_catalogue_syncs) — live needs both the
 // schedule:run cron and the taxnest-queue worker; idempotent to re-run.
 Schedule::command('catalogue:sync-drap')->weeklyOn(0, '01:30');
+// Watchdog: a deploy restarts taxnest-queue and drops the in-flight slice;
+// --resume re-dispatches a stalled active run from its cursor (no-op otherwise).
+Schedule::command('catalogue:sync-drap --resume')->everyFifteenMinutes();
 Schedule::job(new CheckTrialExpiryJob)->dailyAt('03:00');
 Schedule::command('trial:reminders')->dailyAt('08:00');
 // Admin nudge: pending payment proofs whose auto-granted 10-day access ends

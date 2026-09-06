@@ -2633,6 +2633,17 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
     Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
     Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
+    // 🧾 Distributor ledger (Task 1580) — supplier payments, statements and
+    // purchase returns. Same owner/manager gate + branch scoping as /stock;
+    // every money mutation sits behind plan.limit:inventory like the rest.
+    Route::post('/stock/payments', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storePayment'])->name('fbrpos.stock.payment.store')->middleware('plan.limit:inventory');
+    Route::post('/stock/payments/{id}/void', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'voidPayment'])->name('fbrpos.stock.payment.void')->middleware('plan.limit:inventory');
+    Route::get('/stock/suppliers/{id}/statement', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statement'])->name('fbrpos.stock.supplier.statement');
+    Route::get('/stock/suppliers/{id}/statement/pdf', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statementPdf'])->name('fbrpos.stock.supplier.statement.pdf');
+    Route::get('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returns'])->name('fbrpos.stock.returns');
+    Route::post('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storeReturn'])->name('fbrpos.stock.return.store')->middleware('plan.limit:inventory');
+    Route::get('/stock/returns/{id}/print', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returnPrint'])->name('fbrpos.stock.return.print');
+    Route::get('/stock/purchases/{id}/lines', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'purchaseLines'])->name('fbrpos.stock.purchase.lines');
 
     // 💊 Pharmacy Mode (Task 1558) — batch/expiry stock, distributor expiry
     // claims and pharmacy reports. Every action re-checks pharmacyLive() in

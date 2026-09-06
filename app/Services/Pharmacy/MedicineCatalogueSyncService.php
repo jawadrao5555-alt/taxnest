@@ -98,7 +98,7 @@ class MedicineCatalogueSyncService
         ];
         // A failed run from the last day hands over its cursor — the pages it
         // already walked are upserted and need no second visit this week.
-        if ($latest && $latest->state === 'failed' && $latest->completed_at === null
+        if ($latest && $latest->state === 'failed'
             && $latest->updated_at && $latest->updated_at->gt(now()->subDay())) {
             $attrs['phase_index'] = (int) $latest->phase_index;
             $attrs['next_page'] = max(1, (int) $latest->next_page);
@@ -156,8 +156,14 @@ class MedicineCatalogueSyncService
             $phase = $phases[$run->phase_index];
             $page = max(1, (int) $run->next_page);
 
+            // Never begin a page the slice cannot finish: a slow DRAP response
+            // would outlive the job's own timeout and fail the whole run.
+            if (microtime(true) + 8 >= $deadline) {
+                return false;
+            }
+
             try {
-                $result = $this->client->fetchPage($page, $phase['filters']);
+                $result = $this->client->fetchPage($page, $phase['filters'], $deadline);
             } catch (\Throwable $e) {
                 // One page failing repeatedly must not spin forever: count it,
                 // remember the message, and fail the run after a handful so a

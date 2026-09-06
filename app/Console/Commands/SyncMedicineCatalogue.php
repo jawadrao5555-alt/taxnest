@@ -13,15 +13,19 @@ use Illuminate\Console\Command;
  *   php artisan catalogue:sync-drap --sync     run inline until done (first live seed under nohup)
  *   php artisan catalogue:sync-drap --status   print the latest run
  *   php artisan catalogue:sync-drap --cancel   ask the active run to stop after its current page
+ *   php artisan catalogue:sync-drap --resume   watchdog: re-dispatch a stalled active run (15-min schedule)
  *
  * Source: DRAP Pharmaceutical Product Price Index (Government of Pakistan
  * public data) — https://e.dra.gov.pk/public/price
  */
 class SyncMedicineCatalogue extends Command
 {
-    protected $signature = 'catalogue:sync-drap {--sync : Run inline in this process until finished} {--status : Show the latest run} {--cancel : Request cancellation of the active run} {--delay= : Seconds between pages (default 1)}';
+    protected $signature = 'catalogue:sync-drap {--sync : Run inline in this process until finished} {--status : Show the latest run} {--cancel : Request cancellation of the active run} {--resume : Re-dispatch ONLY a stalled active run (watchdog; no-op otherwise)} {--delay= : Seconds between pages (default 1)}';
 
     protected $description = 'Sync the global medicine catalogue from the DRAP price index (resumable, idempotent)';
+
+    /** Failed runs auto-continued by the watchdog per day; beyond this a human presses Sync. */
+    public const MAX_AUTO_RESUMES_PER_DAY = 6;
 
     public function handle(MedicineCatalogueSyncService $service): int
     {
@@ -47,6 +51,41 @@ class SyncMedicineCatalogue extends Command
             }
             $service->requestCancel($run);
             $this->info('cancel requested for run #' . $run->id);
+
+            return self::SUCCESS;
+        }
+
+        if ($this->option('resume')) {
+            // Watchdog (every 15 min on live): a deploy restarting the queue
+            // service drops the in-flight slice and the run would otherwise
+            // sit at "running" until Sunday. Never starts a fresh crawl.
+            $run = MedicineCatalogueSync::latest('id')->first();
+            if ($run && $run->isActive()) {
+                if (!$run->isStale()) {
+                    $this->line('run #' . $run->id . ' is progressing');
+
+                    return self::SUCCESS;
+                }
+                $service->start('resume');
+                $this->info('stalled run #' . $run->id . ' re-dispatched from page ' . $run->next_page);
+
+                return self::SUCCESS;
+            }
+            // A run that FAILED recently (job timeout, DRAP hiccup) is picked up
+            // from its cursor too — bounded, so a DRAP outage cannot loop all week.
+            if ($run && $run->state === 'failed' && $run->updated_at && $run->updated_at->gt(now()->subDay())) {
+                $retries = MedicineCatalogueSync::where('trigger', 'resume')->where('created_at', '>', now()->subDay())->count();
+                if ($retries >= self::MAX_AUTO_RESUMES_PER_DAY) {
+                    $this->line('run #' . $run->id . ' failed; auto-resume limit reached — press Sync in the admin panel');
+
+                    return self::SUCCESS;
+                }
+                $new = $service->start('resume');
+                $this->info('failed run #' . $run->id . ' continued as run #' . $new->id . ' from page ' . $new->next_page);
+
+                return self::SUCCESS;
+            }
+            $this->line($run ? 'run #' . $run->id . ' is ' . $run->state . '; nothing to resume' : 'no runs yet');
 
             return self::SUCCESS;
         }

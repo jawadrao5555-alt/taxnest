@@ -101,6 +101,11 @@ class PosAccessService
         '#^pos/tax-reports#' => 'tax_reports',
         '#^pos/day-close#' => 'day_close',
         '#^pos/inventory#' => 'inventory',
+        // FBR POS stock module incl. the distributor ledger (payments,
+        // statements, purchase returns — Task 1580) and Munafa: one feature
+        // key, so a future FBR Custom Access rollout gates them together.
+        '#^fbr-pos/stock#' => 'inventory',
+        '#^fbr-pos/munafa#' => 'inventory',
         '#^pos/customize#' => 'customize',
         '#^pos/features#' => 'customize',
         // Multi-branch v1 (Task 1347): branch CRUD rides the Customize grant —

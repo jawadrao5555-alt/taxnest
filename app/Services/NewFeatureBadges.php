@@ -122,6 +122,19 @@ class NewFeatureBadges
             'panel' => 'fbrpos',
             'pages' => ['fbrpos.customize'],
         ],
+        // Task 1580 — distributor ledger on the FBR stock page: scheme/bonus +
+        // discount fields on purchase entry, supplier balances + payments,
+        // statements and purchase returns.
+        'fbr_supplier_ledger' => [
+            'since' => '2026-09-06',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.stock'],
+        ],
+        'fbr_purchase_returns' => [
+            'since' => '2026-09-06',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.stock.returns'],
+        ],
         // Task 1579 — DRAP medicine catalogue: "add from catalogue" picker on
         // the pharmacy-mode products page (+ MRP update notices).
         'fbr_pharmacy_catalogue' => [

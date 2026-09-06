@@ -657,6 +657,25 @@ else
   fi
 fi
 
+# FBR Pharmacy Mode counter check — a REAL browser with every stock-check answer
+# delayed, because the out-of-stock alternatives gate lives in the FBR
+# universal.blade.php Enter/scan path: a scanner's Enter lands before the typing
+# probe, and a gate that only READS the probe cache bills a zero-stock strip while
+# every PHP test stays green (completion review, Sep 2026). Also proves offline
+# never blocks and a carried product is never logged as a missed sale.
+step "Preflight: FBR pharmacy counter check (scanner/fast Enter on zero stock -> alternatives, offline never blocked)"
+if [ "${SKIP_PHARMACY_COUNTER_CHECK:-0}" = "1" ]; then
+  echo "SKIPPED (SKIP_PHARMACY_COUNTER_CHECK=1) — only skip for emergency hotfixes." >&2
+else
+  node scripts/fbr-pharmacy-counter-check.mjs
+  PC_RC=$?
+  if [ $PC_RC -eq 2 ]; then
+    fail "pharmacy counter check could not run (dev server/MySQL/chromium/pharmacy demo shop missing?) — start the Laravel Server + MySQL Staging workflows, seed FbrPharmacyVideoDemoSeeder, or SKIP_PHARMACY_COUNTER_CHECK=1 to bypass"
+  elif [ $PC_RC -ne 0 ]; then
+    fail "pharmacy counter check FAILED — the FBR sale screen's out-of-stock alternatives / missed-sale path regressed; fix before deploying"
+  fi
+fi
+
 step "Preflight: SSH connectivity + live HEAD"
 LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
   || fail "cannot reach live server over SSH (or live git repo broken)"

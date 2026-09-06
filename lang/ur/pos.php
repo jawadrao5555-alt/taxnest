@@ -6362,6 +6362,8 @@ return [
     'sl_return_bill_void' => 'وہ بل منسوخ ہے — اس کے عوض کچھ واپس نہیں ہو سکتا۔',
     'sl_return_needs_supplier' => 'وہ ڈسٹری بیوٹر چنیں جسے مال واپس جا رہا ہے۔',
     'sl_return_qty_exceeds' => ':name کی واپسی مقدار اس بل میں آئے مال سے زیادہ ہے۔',
+    'sl_return_branch_mismatch' => 'یہ بل :branch برانچ کا ہے — اس کا مال واپس کرنے کے لیے وہی برانچ چنیں۔',
+    'sl_return_line_not_on_bill' => 'بل سے جڑی واپسی کی ہر لائن اسی بل کی لائن ہونی چاہیے (وہی پروڈکٹ)۔ بل دوبارہ لوڈ کر کے کوشش کریں۔',
     'sl_return_batch_short' => 'بیچ :batch میں صرف :qty باقی ہے۔',
     'sl_return_saved' => 'واپسی :number درج — :name کے کھاتے میں Rs :amount کریڈٹ۔',
     'sl_return_print_title' => 'مال واپسی / کریڈٹ نوٹ',

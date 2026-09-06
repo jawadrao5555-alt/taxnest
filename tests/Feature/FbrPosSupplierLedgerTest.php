@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseReturn;
 use App\Services\SupplierLedgerService;
 
 /**
@@ -39,6 +40,8 @@ class FbrPosSupplierLedgerTest extends TestCase
         parent::setUp();
         \App\Services\PosFeatureService::flushGateCaches();
         SupplierLedgerService::flushSchemaCache();
+        \App\Services\BranchStockService::flushMemo();
+        app()->forgetInstance(\App\Services\BranchContextService::class);
 
         Schema::dropAllTables();
 
@@ -66,7 +69,14 @@ class FbrPosSupplierLedgerTest extends TestCase
             $table->string('pos_role')->nullable();
             $table->boolean('is_active')->default(true);
             $table->string('language')->nullable();
+            $table->unsignedBigInteger('default_branch_id')->nullable();
             $table->rememberToken();
+            $table->timestamps();
+        });
+        Schema::create('branch_user', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('branch_id');
+            $table->unsignedBigInteger('user_id');
             $table->timestamps();
         });
 
@@ -244,6 +254,8 @@ class FbrPosSupplierLedgerTest extends TestCase
     {
         \App\Services\PosFeatureService::flushGateCaches();
         SupplierLedgerService::flushSchemaCache();
+        \App\Services\BranchStockService::flushMemo();
+        app()->forgetInstance(\App\Services\BranchContextService::class);
         parent::tearDown();
     }
 
@@ -772,5 +784,191 @@ class FbrPosSupplierLedgerTest extends TestCase
         $this->assertTrue($gone['void']);
         $this->assertEqualsWithDelta(0, $gone['debit'], 0.001);
         $this->assertEqualsWithDelta(200.00, $st['period']['billed'], 0.001);
+    }
+    // ── 7. Adversarial: bill-linked returns are authoritative, per-bill serialised ─
+
+    public function test_bill_linked_return_ignores_posted_cost_and_needs_a_real_line(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makeUser($companyId);
+        $supplierId = $this->makeSupplier($companyId);
+        $productId = $this->makeProduct($companyId);
+        $otherProduct = $this->makeProduct($companyId, 'Brufen');
+
+        $this->postScenarioPurchase($user, $supplierId, $productId)->assertRedirect();
+        $poId = (int) DB::table('purchase_orders')->value('id');
+        $itemId = (int) DB::table('purchase_order_items')->value('id');
+
+        // (a) No line id → refused (the old path silently skipped the cap).
+        $this->actingAs($user, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus',
+            'items' => [['product_id' => $productId, 'quantity' => 2, 'unit_cost' => 5000]],
+        ])->assertSessionHas('error');
+        // (b) A line id of the bill but another product → refused.
+        $this->actingAs($user, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus',
+            'items' => [['product_id' => $otherProduct, 'purchase_order_item_id' => $itemId, 'quantity' => 1, 'unit_cost' => 10]],
+        ])->assertSessionHas('error');
+        // (c) A line id that is not on this bill at all → refused.
+        $this->actingAs($user, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus',
+            'items' => [['product_id' => $productId, 'purchase_order_item_id' => $itemId + 99, 'quantity' => 1, 'unit_cost' => 10]],
+        ])->assertSessionHas('error');
+        $this->assertSame(0, DB::table('purchase_returns')->count());
+        $this->assertEqualsWithDelta(11, $this->stockQty($companyId, $productId), 0.0001);
+
+        // (d) A valid line but an inflated posted cost → credited at the BILL's
+        // net unit cost (81.82), never the posted 5000.
+        $this->actingAs($user, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus',
+            'items' => [['product_id' => $productId, 'purchase_order_item_id' => $itemId, 'quantity' => 2, 'unit_cost' => 5000]],
+        ])->assertRedirect('/fbr-pos/stock/returns')->assertSessionHas('success');
+        $ret = PurchaseReturn::first();
+        $this->assertEqualsWithDelta(163.64, (float) $ret->credit_amount, 0.001);
+        $line = DB::table('purchase_return_items')->where('purchase_return_id', $ret->id)->first();
+        $this->assertEqualsWithDelta(81.8182, (float) $line->unit_cost, 0.001);
+        $mv = DB::table('inventory_movements')->where('reference_type', 'purchase_return')->first();
+        $this->assertEqualsWithDelta(81.8182, (float) $mv->unit_price, 0.001, 'stock leaves at the bill cost too');
+        $this->assertEqualsWithDelta(600 - 163.64, SupplierLedgerService::balanceFor($companyId, $supplierId)->balance, 0.001);
+    }
+
+    public function test_return_cap_holds_across_documents_and_duplicate_lines_in_one_form(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makeUser($companyId);
+        $supplierId = $this->makeSupplier($companyId);
+        $productId = $this->makeProduct($companyId);
+
+        $this->postScenarioPurchase($user, $supplierId, $productId)->assertRedirect();
+        $poId = (int) DB::table('purchase_orders')->value('id');
+        $itemId = (int) DB::table('purchase_order_items')->value('id');
+
+        // Two rows for the same line in ONE form: 6 + 6 = 12 > 11 delivered →
+        // the whole document is refused (nothing partial).
+        $this->actingAs($user, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus',
+            'items' => [
+                ['product_id' => $productId, 'purchase_order_item_id' => $itemId, 'quantity' => 6, 'unit_cost' => 81.82],
+                ['product_id' => $productId, 'purchase_order_item_id' => $itemId, 'quantity' => 6, 'unit_cost' => 81.82],
+            ],
+        ])->assertSessionHas('error');
+        $this->assertSame(0, DB::table('purchase_returns')->count());
+        $this->assertSame(0, DB::table('purchase_return_items')->count());
+        $this->assertEqualsWithDelta(11, $this->stockQty($companyId, $productId), 0.0001);
+
+        // Two documents: 6 then 6 — the second (stale form) is refused, 6 then 5 passes.
+        $post = fn (float $qty) => $this->actingAs($user, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus',
+            'items' => [['product_id' => $productId, 'purchase_order_item_id' => $itemId, 'quantity' => $qty, 'unit_cost' => 81.82]],
+        ]);
+        $post(6)->assertSessionHas('success');
+        $post(6)->assertSessionHas('error');
+        $post(5)->assertSessionHas('success');
+        $post(0.5)->assertSessionHas('error');
+        $this->assertSame(2, DB::table('purchase_returns')->count());
+        $this->assertEqualsWithDelta(0, $this->stockQty($companyId, $productId), 0.0001);
+        $this->assertEqualsWithDelta(11, (float) DB::table('purchase_return_items')->sum('quantity'), 0.0001);
+        // 900 − 300 − 11×81.8182 = −300 → the shop is Rs300 in advance, to the rupee.
+        $this->assertEqualsWithDelta(-300.00, SupplierLedgerService::balanceFor($companyId, $supplierId)->balance, 0.01);
+    }
+
+    // ── 8. Adversarial: branch isolation on bill-linked reads/payments/returns ─
+
+    /** Two-branch company; owner books the scenario bill into Main, a manager is confined to Cantt. */
+    private function twoBranchScenario(): array
+    {
+        $companyId = $this->makeCompany();
+        $b1 = (int) DB::table('branches')->insertGetId(['company_id' => $companyId, 'name' => 'Main', 'is_head_office' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $b2 = (int) DB::table('branches')->insertGetId(['company_id' => $companyId, 'name' => 'Cantt', 'created_at' => now(), 'updated_at' => now()]);
+        $owner = $this->makeUser($companyId);
+        $supplierId = $this->makeSupplier($companyId);
+        $productId = $this->makeProduct($companyId);
+
+        $this->withSession([\App\Services\BranchContextService::SESSION_KEY => $b1]);
+        $this->postScenarioPurchase($owner, $supplierId, $productId, ['branch_id' => $b1])->assertRedirect()->assertSessionHas('success');
+        $poId = (int) DB::table('purchase_orders')->value('id');
+        $itemId = (int) DB::table('purchase_order_items')->value('id');
+        $this->assertSame($b1, (int) DB::table('purchase_orders')->value('branch_id'));
+        $this->assertSame($b1, (int) DB::table('inventory_movements')->where('type', 'purchase')->value('branch_id'));
+
+        $manager = $this->makeUser($companyId, 'pos_manager');
+        DB::table('users')->where('id', $manager->id)->update(['default_branch_id' => $b2]);
+        DB::table('branch_user')->insert(['branch_id' => $b2, 'user_id' => $manager->id, 'created_at' => now(), 'updated_at' => now()]);
+        $manager = \App\Models\User::find($manager->id);
+
+        // Fresh actor context for the confined manager.
+        \App\Services\BranchStockService::flushMemo();
+        app()->forgetInstance(\App\Services\BranchContextService::class);
+        $this->flushSession();
+        $this->withSession([\App\Services\BranchContextService::SESSION_KEY => $b2]);
+
+        return compact('companyId', 'b1', 'b2', 'owner', 'manager', 'supplierId', 'productId', 'poId', 'itemId');
+    }
+
+    public function test_confined_manager_cannot_read_pay_or_return_another_branch_bill(): void
+    {
+        extract($this->twoBranchScenario());
+
+        // Lines of Main's bill are not visible from Cantt (404, no existence leak).
+        $this->actingAs($manager, 'fbrpos')->getJson("/fbr-pos/stock/purchases/{$poId}/lines")->assertNotFound();
+        // …while the owner (all branches) still can.
+        $this->actingAs($owner, 'fbrpos')->getJson("/fbr-pos/stock/purchases/{$poId}/lines")->assertOk()->assertJsonPath('lines.0.remaining', 11);
+
+        // A payment "against" Main's bill posted from Cantt is refused …
+        $this->actingAs($manager, 'fbrpos')->post('/fbr-pos/stock/payments', [
+            'supplier_id' => $supplierId, 'purchase_order_id' => $poId, 'amount' => 100, 'method' => 'cash',
+        ])->assertSessionHas('error');
+        $this->assertSame(1, DB::table('supplier_payments')->count(), 'only the paid-now row exists');
+
+        // … and so is a return of Main's goods from Cantt: no document, no stock
+        // movement, Main's balance untouched.
+        $this->actingAs($manager, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus', 'branch_id' => $b2,
+            'items' => [['product_id' => $productId, 'purchase_order_item_id' => $itemId, 'quantity' => 2, 'unit_cost' => 81.82]],
+        ])->assertSessionHas('error');
+        $this->assertSame(0, DB::table('purchase_returns')->count());
+        $this->assertSame(0, DB::table('inventory_movements')->where('type', 'return_out')->count());
+        $this->assertEqualsWithDelta(11, $this->stockQty($companyId, $productId), 0.0001);
+        $this->assertEqualsWithDelta(600.00, SupplierLedgerService::balanceFor($companyId, $supplierId, $b1)->balance, 0.001);
+        $this->assertEqualsWithDelta(0.00, SupplierLedgerService::balanceFor($companyId, $supplierId, $b2)->balance, 0.001);
+
+        // The manager CAN still pay the distributor on account from Cantt.
+        $this->actingAs($manager, 'fbrpos')->post('/fbr-pos/stock/payments', [
+            'supplier_id' => $supplierId, 'amount' => 100, 'method' => 'cash',
+        ])->assertSessionHas('success');
+        $this->assertSame($b2, (int) DB::table('supplier_payments')->orderByDesc('id')->value('branch_id'));
+    }
+
+    public function test_bill_linked_money_and_goods_stay_in_the_bill_branch_even_when_another_is_picked(): void
+    {
+        extract($this->twoBranchScenario());
+
+        // Owner, viewing Cantt, pays against Main's bill: the payment is booked
+        // in MAIN (the bill's branch), not the branch on screen.
+        $this->actingAs($owner, 'fbrpos')->post('/fbr-pos/stock/payments', [
+            'supplier_id' => $supplierId, 'purchase_order_id' => $poId, 'amount' => 100, 'method' => 'cash', 'branch_id' => $b2,
+        ])->assertSessionHas('success');
+        $pay = DB::table('supplier_payments')->orderByDesc('id')->first();
+        $this->assertSame($b1, (int) $pay->branch_id);
+        $this->assertSame($poId, (int) $pay->purchase_order_id);
+
+        // Owner, with Cantt picked, tries to return Main's goods: refused with
+        // the branch named — goods must leave the shop that received them.
+        $this->actingAs($owner, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus', 'branch_id' => $b2,
+            'items' => [['product_id' => $productId, 'purchase_order_item_id' => $itemId, 'quantity' => 2, 'unit_cost' => 81.82]],
+        ])->assertSessionHas('error');
+        $this->assertSame(0, DB::table('purchase_returns')->count());
+
+        // Same request with Main picked posts, and the stock leaves MAIN.
+        $this->actingAs($owner, 'fbrpos')->post('/fbr-pos/stock/returns', [
+            'purchase_order_id' => $poId, 'reason' => 'surplus', 'branch_id' => $b1,
+            'items' => [['product_id' => $productId, 'purchase_order_item_id' => $itemId, 'quantity' => 2, 'unit_cost' => 81.82]],
+        ])->assertSessionHas('success');
+        $ret = PurchaseReturn::first();
+        $this->assertSame($b1, (int) $ret->branch_id);
+        $this->assertSame($b1, (int) DB::table('inventory_movements')->where('type', 'return_out')->value('branch_id'));
+        $this->assertEqualsWithDelta(9, (float) DB::table('inventory_stocks')->where('product_id', $productId)->where('branch_id', $b1)->value('quantity'), 0.0001);
+        $this->assertEqualsWithDelta(600 - 100 - 163.64, SupplierLedgerService::balanceFor($companyId, $supplierId, $b1)->balance, 0.001);
     }
 }

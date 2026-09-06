@@ -4695,6 +4695,7 @@ return [
     'uom_sqft' => 'مربع فٹ',
     'uom_sqm' => 'مربع میٹر',
     'uom_strip' => 'پتی',
+    'uom_tab' => 'گولی',
     'uom_suit' => 'سوٹ',
     'uom_tin' => 'ٹن',
     'uom_trip' => 'ٹرپ',
@@ -6587,9 +6588,6 @@ return [
     'vocab_added_for_you' => 'آپ کے لیے شامل کیے گئے',
     'vocab_added_for_you_hint' => 'وہ ماڈیول جو ٹیکس نیسٹ ایڈمن نے آپ کی دکان کے لیے کاروبار کی قسم سے ہٹ کر آن کیے ہیں۔',
     'feature_not_for_business' => 'یہ فیچر آپ کے کاروبار کی قسم کا حصہ نہیں۔',
-    'uom_strip' => 'پتہ',
-    'uom_tab' => 'گولی',
-    'uom_btl' => 'بوتل',
     'auth_bt_general' => 'عام کاروبار',
     'auth_bt_hybrid_cafe_retail' => 'کیفے + ریٹیل',
     // ---- Task 1582 category profiles: pra-surfaces (append new keys below this line only) ----

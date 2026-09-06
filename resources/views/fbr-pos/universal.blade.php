@@ -3869,6 +3869,7 @@ function restaurantPos() {
         phStockAt: {},           // product id → ms of last probe
         _phStockTimer: null,
         _phStockBusy: false,
+        _phResolvingId: null,    // product id whose stock an add is awaiting (double-Enter guard)
         _phForceId: null,
         phMissedQueueCount: 0,
         _phMissedKey: 'tn_fbrpos_missed_' + {{ (int) (app('currentCompanyId') ?? 0) }},
@@ -5195,6 +5196,34 @@ function restaurantPos() {
             return all.find(it => it.name && parseFloat(it.price) > 0 && this.isExactCodeMatch(it, q)) || null;
         },
         _searchDebounceTimer: null,
+        /**
+         * Ranked dropdown suggestions for a lowercased query — the ONE ranking used by
+         * the typing debounce and by an Enter that lands before that debounce fired.
+         * CATEGORY DROPDOWN: a chosen category narrows the pool; "all" = whole catalog.
+         */
+        rankSuggestions(q) {
+            let all;
+            if (this.activeCategory === 'services') all = [...this.allServices];
+            else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
+            else all = [...this.allProducts, ...this.allServices];
+            // Task 1271: rank-based matching via nameMatchRank (shared with
+            // filterProducts — the two surfaces must never diverge). anyWord
+            // honors the admin search-mode pref; prefix hits still sort first.
+            const ranked = [];
+            for (let i = 0; i < all.length; i++) {
+                const it = all[i];
+                if (!it.name) continue;
+                // Unpriced PRODUCTS stay visible on inventory-OFF companies: picking
+                // one opens the full details popup (central routing in quickAddItem,
+                // owner Aug 2026) instead of dropping a Rs.0 row. Unpriced services
+                // and inventory-ON rows stay hidden (old behavior).
+                if (!(parseFloat(it.price) > 0) && ((it.type || 'product') !== 'product' || this.isInventoryEnabled())) continue;
+                const r = this.itemMatchRank(it, q);
+                if (r > 0) ranked.push({ it, r });
+            }
+            ranked.sort((a, b) => b.r - a.r);
+            return ranked.slice(0, 12).map(x => x.it);
+        },
         onSearchInput() {
             // Toggle dropdown synchronously so empty-state hides instantly (no flicker).
             const q = this.searchQuery.trim().toLowerCase();
@@ -5205,6 +5234,7 @@ function restaurantPos() {
             // Debounce the actual filter work (60ms) — fast enough to feel instant, prevents thrash on long pastes.
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
             this._searchDebounceTimer = setTimeout(() => {
+                this._searchDebounceTimer = null;
                 this.filterProducts();
                 // Search works in BOTH modes: even when the product grid is hidden
                 // (showProducts OFF), typing still surfaces matching catalog items so the
@@ -5229,29 +5259,7 @@ function restaurantPos() {
                             return;
                         }
                     }
-                    // CATEGORY DROPDOWN: a chosen category narrows the suggestion pool to it.
-                    // "all" = whole catalog (old behavior, byte-identical).
-                    let all;
-                    if (this.activeCategory === 'services') all = [...this.allServices];
-                    else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
-                    else all = [...this.allProducts, ...this.allServices];
-                    // Task 1271: rank-based matching via nameMatchRank (shared with
-                    // filterProducts — the two surfaces must never diverge). anyWord
-                    // honors the admin search-mode pref; prefix hits still sort first.
-                    const ranked = [];
-                    for (let i = 0; i < all.length; i++) {
-                        const it = all[i];
-                        if (!it.name) continue;
-                        // Unpriced PRODUCTS stay visible on inventory-OFF companies: picking
-                        // one opens the full details popup (central routing in quickAddItem,
-                        // owner Aug 2026) instead of dropping a Rs.0 row. Unpriced services
-                        // and inventory-ON rows stay hidden (old behavior).
-                        if (!(parseFloat(it.price) > 0) && ((it.type || 'product') !== 'product' || this.isInventoryEnabled())) continue;
-                        const r = this.itemMatchRank(it, q);
-                        if (r > 0) ranked.push({ it, r });
-                    }
-                    ranked.sort((a, b) => b.r - a.r);
-                    const out = ranked.slice(0, 12).map(x => x.it);
+                    const out = this.rankSuggestions(q);
                     this.searchSuggestions = out;
                     this.highlightIndex = 0;
                     this.showSearchDropdown = true;
@@ -5422,6 +5430,32 @@ function restaurantPos() {
                 if (this.phAltOpen) this.phAltRecompute();
             } catch (e) { /* a dead probe must never slow the counter */ }
             finally { this._phStockBusy = false; }
+        },
+        /**
+         * Resolve ONE product's live stock before an add commits. Returns the qty,
+         * or null when it cannot be known right now (offline, timeout, error,
+         * inventory switched off) — null means "add as usual", never "block".
+         */
+        async phResolveStock(id, timeoutMs = 900) {
+            const key = String(id);
+            if (!this.pharmacyMode || !this.pharmacyInventoryOn || !navigator.onLine) return null;
+            if (this.phStockKnown(key)) return this.phStockQty(key);
+            const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const timer = setTimeout(() => { try { ctrl?.abort(); } catch (e) {} }, timeoutMs);
+            try {
+                const res = await fetch('{{ route('fbrpos.pharmacy.stock-check', [], false) }}?ids=' + encodeURIComponent(key), {
+                    headers: { 'Accept': 'application/json' }, signal: ctrl ? ctrl.signal : undefined,
+                });
+                if (!res.ok) return null;
+                const d = await res.json();
+                if (!d || d.success !== true) return null;
+                if (d.inventory === false) { this.pharmacyInventoryOn = false; return null; }
+                const q = Number((d.stock || {})[key] ?? 0);
+                this.phStock = Object.assign({}, this.phStock, { [key]: q });
+                this.phStockAt[key] = Date.now();
+                return q;
+            } catch (e) { return null; }
+            finally { clearTimeout(timer); }
         },
         /** Candidates sharing the asked salt; same strength first, relaxed when none. */
         phAlternativesFor(asked) {
@@ -5765,6 +5799,20 @@ function restaurantPos() {
                 }
             }
             if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
+            // 💊 Pharmacy: a fast typist's Enter can land BEFORE the 60ms debounce has
+            // filled the dropdown. Rank now, so a product the shop does carry is added
+            // (through the same stock gate) and only a true no-match becomes a missed
+            // sale — never a false "customer asked, shop lacked" row for a brand on
+            // the shelf.
+            if (this.pharmacyMode && this._searchDebounceTimer && this.searchQuery.trim().length > 0) {
+                clearTimeout(this._searchDebounceTimer); this._searchDebounceTimer = null;
+                const now = this.rankSuggestions(this.searchQuery.trim().toLowerCase());
+                if (now.length > 0) {
+                    this.searchSuggestions = now; this.highlightIndex = 0; this.showSearchDropdown = true;
+                    this.quickAddItem(now[0]);
+                    return;
+                }
+            }
             // 💊 Pharmacy: a no-match Enter on a typed NAME is a customer asking for
             // something the shop does not carry — write it to the missed-sale log
             // instead of quick-creating a medicine out of thin air (the "+ Create"
@@ -5810,7 +5858,7 @@ function restaurantPos() {
                 this.enterCartMode('last');
             }
         },
-        quickAddItem(item) {
+        async quickAddItem(item) {
             // Kill any in-flight debounced search so it can't repopulate the dropdown
             // under the now-cleared search box after we add the item.
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
@@ -5823,13 +5871,29 @@ function restaurantPos() {
                 this.qcOpenForExisting(item);
                 return;
             }
-            // 💊 Pharmacy + inventory: a brand the probe KNOWS is at zero opens the
-            // alternatives panel instead of silently billing a strip that is not on
-            // the shelf. "Phir bhi add karein" inside the panel is the override.
+            // 💊 Pharmacy + inventory: a brand at zero opens the alternatives panel
+            // instead of silently billing a strip that is not on the shelf. The
+            // stock answer is RESOLVED here, not merely read from the typing probe:
+            // a scanner's Enter or a fast keyboard Enter lands before the 150 ms
+            // debounced probe has returned, so an unknown product is asked for
+            // directly (single id, short timeout). Offline / timeout / error =
+            // add as before — a dead server must never block a pharmacy bill.
+            // "Phir bhi add karein" inside the panel is the override.
             if (this.pharmacyMode && this.pharmacyInventoryOn && (item.type || 'product') === 'product'
-                && this._phForceId !== item.id && this.phStockKnown(item.id) && this.phStockQty(item.id) <= 0) {
-                this.phOpenAlt(item, 'out_of_stock');
-                return;
+                && this._phForceId !== item.id) {
+                let qty = this.phStockKnown(item.id) ? this.phStockQty(item.id) : null;
+                if (qty === null && navigator.onLine) {
+                    // A second Enter/scan while the first is still resolving must not
+                    // become a second add of the same strip.
+                    if (this._phResolvingId === item.id) return;
+                    this._phResolvingId = item.id;
+                    try { qty = await this.phResolveStock(item.id); }
+                    finally { this._phResolvingId = null; }
+                }
+                if (qty !== null && qty <= 0) {
+                    this.phOpenAlt(item, 'out_of_stock');
+                    return;
+                }
             }
             this.handleProductClick(item);
             // GUIDED FLOW (opt-in): first added item moves the indicator off "customer".

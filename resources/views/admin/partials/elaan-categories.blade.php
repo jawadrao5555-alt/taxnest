@@ -15,7 +15,7 @@
             <input type="radio" name="{{ $prefix }}_scope" value="all" checked class="text-emerald-600" data-elaan-scope="all"> All shops
         </label>
         <label class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-            <input type="radio" name="{{ $prefix }}_scope" value="cats" class="text-emerald-600" data-elaan-scope="cats"> Sirf chuni hui business categories
+            <input type="radio" name="{{ $prefix }}_scope" value="cats" class="text-emerald-600" data-elaan-scope="cats"> Only the selected business categories
         </label>
     </div>
     <div data-elaan-catbox class="hidden space-y-3 max-h-64 overflow-y-auto pr-1">
@@ -41,5 +41,5 @@
             </div>
         @endforeach
     </div>
-    <p class="mt-1 text-[11px] text-gray-400">Kuch bhi tick na karein = us panel ke sab shops ko elaan jayega. Category chunne par sirf wohi business type wale shops dekhenge.</p>
+    <p class="mt-1 text-[11px] text-gray-400">Tick nothing = every shop on that panel gets the elaan. Pick categories and only those business types will see it.</p>
 </div>

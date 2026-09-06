@@ -1799,6 +1799,8 @@ return [
     'healthy_stock' => 'مناسب اسٹاک',
     'held' => 'ہولڈ',
     'held_lc' => 'ہولڈ',
+    'held_local_kot_queued' => 'شاپ کے کمپیوٹر پر ہولڈ ہو گیا — کچن ٹکٹ وہیں سے پرنٹ ہوگا۔',
+    'held_local_shop_pc' => 'شاپ کمپیوٹر',
     'held_by_label' => 'بنانے والا',
     'held_no_match' => 'اس تلاش پر کوئی ہولڈ آرڈر نہیں ملا۔',
     'held_orders' => 'ہولڈ آرڈرز',

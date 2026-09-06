@@ -1799,6 +1799,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'healthy_stock' => 'Healthy Stock',
     'held' => 'Held',
     'held_lc' => 'held',
+    'held_local_kot_queued' => 'Shop PC par hold ho gaya — kitchen ticket wahin se print hoga.',
+    'held_local_shop_pc' => 'Shop PC',
     'held_by_label' => 'Banaya',
     'held_no_match' => 'Is talash par koi held order nahi mila.',
     'held_orders' => 'Held Orders',

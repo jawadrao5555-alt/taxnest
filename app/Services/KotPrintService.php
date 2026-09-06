@@ -22,6 +22,220 @@ use Illuminate\Support\Facades\DB;
 class KotPrintService
 {
     /**
+     * Offline KOT local handoff (Sep 2026).
+     *
+     * A hold that reached the cloud from the shop PC's Local Core with a
+     * kot_document means "the shop PC is printing this kitchen slip itself".
+     * The cloud records that as a pos_print_jobs row with status LOCAL_STATUS
+     * (never claimable by the agent poll) instead of stamping the lines
+     * printed — a stamp is written ONLY when the shop PC's durable
+     * print.complete acknowledgement arrives (the paper really came out).
+     *
+     * While the handoff is FRESH (younger than LOCAL_HANDOFF_TIMEOUT_SECONDS)
+     * every cloud KOT enqueue path excludes the handed-off lines, so the
+     * counter's auto/full/safety-net KOT cannot print them a second time.
+     * Once it is older than that with no acknowledgement (agent died, local
+     * state lost, printer never answered) the cloud takes the slip back:
+     * expireLocalHandoffs() marks it expired and enqueues the normal cloud KOT
+     * for whatever is still unprinted. The shop PC gives up strictly EARLIER
+     * (pra-agent LOCAL_KOT_HANDOFF_MS = 3 min, measured from the same
+     * accept instant) and says so with print.fail{terminal} — so there is
+     * never a moment where both sides believe they own the slip.
+     */
+    public const LOCAL_STATUS = 'local';
+    public const LOCAL_EXPIRED_STATUS = 'expired';
+    public const LOCAL_HANDOFF_TIMEOUT_SECONDS = 300;
+
+    /** claim_token the Local Core ack (print.* on aggregate kot:<order>) resolves to. */
+    public static function localHandoffToken(string $orderAggregate): string
+    {
+        return 'ac:kot:' . $orderAggregate;
+    }
+
+    /**
+     * Record that the shop PC owns this order's kitchen slip. Idempotent per
+     * order aggregate (hold replays hit the same token). Returns the row or
+     * null when the print-job table is not migrated (then nothing suppresses
+     * the cloud path — one extra slip beats a kitchen that never got one).
+     */
+    public static function openLocalHandoff(Company $company, RestaurantOrder $order, string $orderAggregate, array $lineIds, ?string $deviceUid, ?int $userId, $at = null): ?PosPrintJob
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) return null;
+            $token = self::localHandoffToken($orderAggregate);
+            $existing = PosPrintJob::where('company_id', $company->id)->where('claim_token', $token)->orderByDesc('id')->first();
+            if ($existing) return $existing;
+            $attrs = [
+                'company_id' => $company->id,
+                'type' => 'kot',
+                'target_printer' => 'local-core',
+                'restaurant_order_id' => $order->id,
+                'render_query' => 'local=1',
+                'printed_item_ids' => array_values(array_unique(array_map('intval', $lineIds))),
+                'status' => self::LOCAL_STATUS,
+                'claim_token' => $token,
+                'created_by' => $userId,
+            ];
+            if ($deviceUid && \App\Http\Controllers\AgentController::deviceRoutingReady()) $attrs['device_uid'] = $deviceUid;
+            $job = new PosPrintJob($attrs);
+            // Handoff clock = cloud RECEIPT time (never the device's clock).
+            $job->created_at = $at ?: now();
+            $job->updated_at = $job->created_at;
+            $job->save();
+            return $job;
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService local handoff failed: ' . $e->getMessage(), ['order_id' => $order->id ?? null]);
+            return null;
+        }
+    }
+
+    /**
+     * Kitchen line ids the shop PC currently owns for this order (fresh,
+     * unacknowledged local handoffs). Empty = the cloud may print anything.
+     */
+    public static function freshLocalHandoffLineIds(Company $company, RestaurantOrder $order): array
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) return [];
+            return PosPrintJob::where('company_id', $company->id)->where('type', 'kot')
+                ->where('restaurant_order_id', $order->id)->where('status', self::LOCAL_STATUS)
+                ->where('created_at', '>=', now()->subSeconds(self::LOCAL_HANDOFF_TIMEOUT_SECONDS))
+                ->get()->flatMap(fn ($job) => (array) ($job->printed_item_ids ?? []))
+                ->map(fn ($id) => (int) $id)->unique()->values()->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Kitchen line ids the shop PC has CONFIRMED printing (acknowledged
+     * handoffs). Durable ownership state read at RENDER time: a cloud KOT job
+     * — even one whose baked printed_item_ids were computed before the ack
+     * arrived (recovery job after an expired handoff, a counter safety-net
+     * fired in the gap) — must drop these lines, so a late shop-PC ack can
+     * never be followed by a second physical slip for the same lines.
+     */
+    public static function shopPcPrintedLineIds(Company $company, RestaurantOrder $order): array
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) return [];
+            return PosPrintJob::where('company_id', $company->id)->where('type', 'kot')
+                ->where('restaurant_order_id', $order->id)->where('status', 'done')
+                ->where('claim_token', 'like', 'ac:kot:%')
+                ->get()->flatMap(fn ($job) => (array) ($job->printed_item_ids ?? []))
+                ->map(fn ($id) => (int) $id)->unique()->values()->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * The shop PC's durable print.complete for its handed-off slip. Stamps
+     * ONLY still-unstamped lines (batch 1), closes the handoff (a handoff the
+     * cloud had already expired is closed too — the paper is in the kitchen),
+     * and takes the lines back from any cloud KOT job that is still PENDING
+     * (unclaimed): fully covered jobs are voided (status done, never rendered),
+     * partially covered ones keep only the lines the shop PC did not print.
+     * The status='pending' predicate in every update is the claim fence — a job
+     * the agent already flipped to printing is left alone, and its render
+     * re-checks shopPcPrintedLineIds() anyway. Call inside a transaction.
+     *
+     * @return array{printed_line_ids: int[], local_handoff: ?string, voided_job_ids: int[], trimmed_job_ids: int[]}
+     */
+    public static function acknowledgeLocalHandoff(Company $company, RestaurantOrder $order, string $orderAggregate, $printedAt = null): array
+    {
+        $printedAt = $printedAt ?: now();
+        $handoff = null;
+        if (\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) {
+            $handoff = PosPrintJob::where('company_id', $company->id)
+                ->where('claim_token', self::localHandoffToken($orderAggregate))
+                ->orderByDesc('id')->lockForUpdate()->first();
+        }
+        $candidates = $handoff && !empty($handoff->printed_item_ids)
+            ? array_map('intval', (array) $handoff->printed_item_ids)
+            : \App\Support\PosKitchenLines::scope($order->items())->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $stampIds = \App\Models\RestaurantOrderItem::where('order_id', $order->id)->whereIn('id', $candidates)
+            ->whereNull('kot_printed_at')->lockForUpdate()->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        if ($stampIds) {
+            \App\Models\RestaurantOrderItem::where('order_id', $order->id)->whereIn('id', $stampIds)
+                ->update(['kot_printed_at' => $printedAt, 'kot_batch_no' => 1]);
+        }
+        $updates = [];
+        if (!$order->kot_sent_at) $updates['kot_sent_at'] = $printedAt;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'kot_print_count') && (int) $order->kot_print_count < 1) $updates['kot_print_count'] = 1;
+        if ($updates) $order->update($updates);
+
+        $handoffStatus = null;
+        if ($handoff) {
+            if (in_array($handoff->status, [self::LOCAL_STATUS, self::LOCAL_EXPIRED_STATUS, 'failed'], true)) {
+                $handoff->update(['status' => 'done', 'error' => $handoff->status === self::LOCAL_STATUS ? null
+                    : 'Shop PC confirmed the slip after the cloud took it back.']);
+            }
+            $handoffStatus = $handoff->status;
+        }
+
+        $voided = [];
+        $trimmed = [];
+        if ($handoff && $candidates) {
+            $pending = PosPrintJob::where('company_id', $company->id)->where('type', 'kot')
+                ->where('restaurant_order_id', $order->id)->where('status', 'pending')
+                ->where(fn ($q) => $q->whereNull('claim_token')->orWhere('claim_token', 'not like', 'ac:kot:%'))
+                ->lockForUpdate()->get();
+            foreach ($pending as $job) {
+                $baked = array_map('intval', (array) ($job->printed_item_ids ?? []));
+                if (!$baked) continue; // full (non-delta) reprint request: not a recovery of these lines
+                $rest = array_values(array_diff($baked, $candidates));
+                if (count($rest) === count($baked)) continue;
+                if ($rest) {
+                    if (PosPrintJob::whereKey($job->id)->where('status', 'pending')->update(['printed_item_ids' => $rest])) $trimmed[] = (int) $job->id;
+                } elseif (PosPrintJob::whereKey($job->id)->where('status', 'pending')->update([
+                    'status' => 'done', 'error' => 'Superseded: shop PC confirmed this kitchen slip.',
+                ])) {
+                    $voided[] = (int) $job->id;
+                }
+            }
+        }
+        return ['printed_line_ids' => $stampIds, 'local_handoff' => $handoffStatus, 'voided_job_ids' => $voided, 'trimmed_job_ids' => $trimmed];
+    }
+
+    /**
+     * Cloud recovery for a shop PC that never acknowledged its slip. Runs
+     * opportunistically from the agent's print-job poll (that agent is, by
+     * definition, online again). Each expired handoff becomes ONE normal
+     * cloud KOT (delta = still-unprinted lines only); a late print.complete
+     * that arrives afterwards voids that job while it is still pending, and
+     * the render path drops shop-PC-printed lines from any job that was
+     * already claimed (204 = no paper), so there is still exactly one slip.
+     *
+     * @return array{expired:int, queued:int}
+     */
+    public static function expireLocalHandoffs(Company $company): array
+    {
+        $out = ['expired' => 0, 'queued' => 0];
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_print_jobs')) return $out;
+            $stale = PosPrintJob::where('company_id', $company->id)->where('type', 'kot')
+                ->where('status', self::LOCAL_STATUS)
+                ->where('created_at', '<', now()->subSeconds(self::LOCAL_HANDOFF_TIMEOUT_SECONDS))
+                ->orderBy('id')->limit(50)->get();
+            foreach ($stale as $job) {
+                // Conditional flip: whoever flips it owns the cloud enqueue.
+                $flipped = PosPrintJob::whereKey($job->id)->where('status', self::LOCAL_STATUS)
+                    ->update(['status' => self::LOCAL_EXPIRED_STATUS, 'error' => 'Shop PC never confirmed the kitchen slip; cloud printed it.']);
+                if (!$flipped) continue;
+                $out['expired']++;
+                $order = RestaurantOrder::where('company_id', $company->id)->find($job->restaurant_order_id);
+                if (!$order || !in_array($order->status, ['held', 'preparing', 'ready'], true)) continue;
+                $queued = self::enqueueForOrder($company, $order, null, true);
+                if ($queued['printed'] ?? false) $out['queued'] += count($queued['job_ids'] ?? []);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('KotPrintService expireLocalHandoffs failed: ' . $e->getMessage());
+        }
+        return $out;
+    }
+
+    /**
      * Task 1194 — enqueue-time owning-device stamp for KOT-family jobs
      * (kot / counter copy / station / kot_void). A pick made on the union
      * printer picker remembers which counter PC owns the printer; stamping
@@ -276,16 +490,21 @@ class KotPrintService
             if ($order->items->isEmpty()) {
                 return ['printed' => false, 'reason' => 'no_kitchen_items'];
             }
+            // Offline KOT local handoff: lines the shop PC is printing itself
+            // right now are NOT ours to print. Whatever is left becomes a delta.
+            $handoffIds = self::freshLocalHandoffLineIds($company, $order);
+            if ($handoffIds) $delta = true;
             $deltaQ = $delta ? '&delta=1' : '';
             // Delta snapshot (Pizza Master edit-path bug, Aug 2026): bake the
             // unprinted row ids into EVERY job of this send — result-time
             // stamping from the first printed job must not empty the later
             // overlapping delta jobs (counter copy). Mirrors apiCreatePrintJob.
             $deltaIds = $delta
-                ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)->values()->all()
+                ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)
+                    ->reject(fn ($i) => in_array($i, $handoffIds, true))->values()->all()
                 : null;
             if ($delta && empty($deltaIds)) {
-                return ['printed' => true, 'job_ids' => []];
+                return ['printed' => true, 'job_ids' => [], 'reason' => $handoffIds ? 'local_handoff' : 'nothing_unprinted'];
             }
             $makeJob = function (?string $printer, ?string $renderQuery, ?string $ownerDeviceUid = null) use ($company, $order, $userId, $delta, $deltaIds) {
                 // Task 753: in-flight dedupe + merge — mirrors apiCreatePrintJob's
@@ -354,7 +573,7 @@ class KotPrintService
             }
 
             // Stations configured: SPLIT — one job per station that has items.
-            $baseItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
+            $baseItems = $delta ? $order->items->whereIn('id', $deltaIds)->values() : $order->items;
             $itemMap = PosStation::mapItems($company->id, $stations, $baseItems);
             $sids = collect($itemMap)->values()->unique()->sort()->values();
             if ($sids->isEmpty()) {

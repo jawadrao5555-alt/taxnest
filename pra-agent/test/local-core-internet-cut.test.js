@@ -18,6 +18,16 @@ const { laravelJson } = require('../src/local-core/lease-chain');
 const holdFixture = require('../../tests/Fixtures/local-core-held-order.json');
 
 const token = 'electron-harness-token';
+// Kitchen slip that rides INSIDE order.hold — never a separate print.enqueue
+// event, so the cloud can stamp the lines printed and never print them again.
+const kotDocument = {
+  kind: 'kot', order_id: holdFixture.aggregate_id, order_type: 'dine_in', table_label: 'T-70',
+  token_label: null, order_label: 'L-FX01', waiter_name: 'Harness Waiter', customer_name: null,
+  kitchen_notes: 'no onions', priority: false,
+  lines: holdFixture.snapshot.lines.map(line => ({
+    line_id: line.line_id, name: line.name, quantity: line.quantity, special_notes: null,
+  })),
+};
 const scope = { company_id: '41', branch_id: '7', device_id: 'harness-device-01', user_id: '19' };
 const lease = {
   lease_id: 7001,
@@ -155,11 +165,22 @@ function cloud() {
         res.setHeader('content-type', 'text/html');
         // The real production web client calls through the shipped preload and
         // main IPC handler into the encrypted LocalCoreDomain.
+        // Offline KOT (Sep 2026): the hold carries its kitchen slip as the 4th
+        // argument exactly like the sale screen / waiter page do offline.
         res.end('<!doctype html><script src="/nestpos-local-core.js"></script><script>let submitted=false;async function go(){let c=await fetch("/control").then(x=>x.json());if(c.action==="hold"&&!submitted&&window.NestPosLocal){submitted=true;let result=await window.NestPosLocal.heldOrder.hold(' +
           JSON.stringify(holdFixture.aggregate_id) + ',' + JSON.stringify(holdFixture.snapshot) + ',' +
-          JSON.stringify(holdFixture.revision) + ');let replay=await window.NestPosLocal.heldOrder.hold(' +
+          JSON.stringify(holdFixture.revision) + ',' + JSON.stringify(kotDocument) + ');let replay=await window.NestPosLocal.heldOrder.hold(' +
           JSON.stringify(holdFixture.aggregate_id) + ',' + JSON.stringify(holdFixture.snapshot) + ',' +
-          JSON.stringify(holdFixture.revision) + ');let orders=await window.NestPosLocal.query("orders");let tables=await window.NestPosLocal.query("tables");await fetch("/renderer-report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({result,replay,orders,tables})});}}setInterval(go,100);</script>');
+          JSON.stringify(holdFixture.revision) + ',' + JSON.stringify(kotDocument) + ');let orders=await window.NestPosLocal.query("orders");let tables=await window.NestPosLocal.query("tables");let printQueue=await window.NestPosLocal.query("print_queue");' +
+          // Counter side (same production client): the held-orders poll failed, so
+          // the sale screen maps the Local Core `orders` projection into its
+          // held list, recalls the row and settles CASH from the frozen lines.
+          'let row=window.NestPosLocal.offlineHeld.rowFromProjection(orders.data[' + JSON.stringify(holdFixture.aggregate_id) + '],{revision:1,table_number:function(id){return "T"+id;},staff_fallback:"Shop PC"});' +
+          'let facts=window.NestPosLocal.offlineHeld.settlementFromRow(row,{discount_cents:0});' +
+          'let sale=facts&&{offline_uuid:"harness-pay-1",business_date:' + JSON.stringify(holdFixture.snapshot.business_date) + ',payment_method:"cash",incoming_order_id:null,recalled_order_id:null,table_id:row.table_id,online_payment_confirmed:false,order_ref:{id:row.id,order_number:row.order_number,order_type:row.order_type,table_id:row.table_id},customer_ref:{id:row.customer_id,name:row.customer_name,phone:row.customer_phone},customer_id:row.customer_id,delivery_address:null,discount_type:"amount",discount_value:0,cash_received:facts.totals.total_amount,terminal_id:null,items:facts.items,totals:facts.totals,tax_pricing:facts.tax_pricing};' +
+          'let settled=sale?await window.NestPosLocal.heldOrder.settleWithSale(row.id,sale,{payment_method:"cash"}):{ok:false,error:"no_settlement_facts"};' +
+          'let ordersAfter=await window.NestPosLocal.query("orders");' +
+          'await fetch("/renderer-report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({result,replay,orders,tables,printQueue,row,facts,settled,ordersAfter})});}}setInterval(go,100);</script>');
         return;
       }
       if (req.url === '/nestpos-local-core.js') {
@@ -205,16 +226,47 @@ function cloud() {
         if (state.cut) { req.socket.destroy(); return; }
         assert.strictEqual(payload.device_uid, scope.device_id);
         assert.strictEqual(payload.version, 1);
-        const event = payload.events[0]; state.attempts++; verifyEvent(event);
-        assert.strictEqual(event.event_type, 'order.held', 'durable outbox event must be canonical order.held');
-        if (!state.projected.has(event.event_id)) state.projected.set(event.event_id, {
-            event_id: event.event_id, status: 'projected', transaction_id: 8801,
-            invoice_number: 'PRA-8801', pra_status: 'reported',
-            scope_lease_id: event.scope_lease_id || null,
-            lease_sequence: event.lease_chain ? event.lease_chain.sequence : null,
-          });
+        state.attempts++;
+        assert.deepStrictEqual(payload.events.map((e) => e.event_type), ['order.held', 'order.settled'],
+          'the outbox carries the hold and its settlement in order; the offline KOT job itself never becomes an outbox event ' +
+          '(only its print.complete/print.fail ACK does, after a real print — no printer is configured here, so none appears)');
+        payload.events.forEach((event) => {
+          verifyEvent(event);
+          assert.strictEqual(event.payload.aggregate_id, holdFixture.aggregate_id);
+          if (event.event_type === 'order.held') {
+            assert.deepStrictEqual(event.payload.data.kot_document && event.payload.data.kot_document.lines.map(l => l.line_id),
+              kotDocument.lines.map(l => l.line_id), 'cloud order.held must carry the KOT the shop PC is printing (cloud opens a local handoff, stamps only on the ack)');
+          } else {
+            // The cloud's held-snapshot match: settlement lines are the frozen
+            // held lines verbatim (ids, prices, tax/recipe/deal snapshots).
+            const items = event.payload.data.sale_snapshot.items;
+            assert.strictEqual(items.length, holdFixture.snapshot.lines.length);
+            holdFixture.snapshot.lines.forEach((line, i) => {
+              ['line_id', 'product_id', 'quantity', 'unit_price_cents'].forEach((key) => {
+                assert.strictEqual(String(items[i][key]), String(line[key]), 'settled ' + key + ' must match the hold');
+              });
+              ['tax_snapshot', 'recipe_snapshot', 'direct_consumption_snapshot'].forEach((key) => {
+                assert.deepStrictEqual(items[i][key], line[key], 'settled ' + key + ' must match the hold');
+              });
+              assert.deepStrictEqual(items[i].deal_snapshot || [], line.deal_snapshot || []);
+              assert.strictEqual(items[i].has_recipe, line.recipe_snapshot.length > 0);
+            });
+            assert.strictEqual(event.payload.data.sale_snapshot.totals.total_cents, holdFixture.snapshot.totals.total_cents,
+              'a shop-PC settlement keeps the hold-time totals');
+            assert.strictEqual(event.payload.data.sale_snapshot.payment.method, 'cash');
+          }
+          if (!state.projected.has(event.event_id)) state.projected.set(event.event_id, {
+              event_id: event.event_id, status: 'projected', transaction_id: 8801,
+              invoice_number: 'PRA-8801', pra_status: 'reported',
+              scope_lease_id: event.scope_lease_id || null,
+              lease_sequence: event.lease_chain ? event.lease_chain.sequence : null,
+            });
+        });
         if (state.loseResponse) { state.loseResponse = false; req.socket.destroy(); return; }
-        json(); res.end(JSON.stringify({ acknowledged_ids: [event.event_id], results: [state.projected.get(event.event_id)] })); return;
+        json(); res.end(JSON.stringify({
+          acknowledged_ids: payload.events.map((e) => e.event_id),
+          results: payload.events.map((e) => state.projected.get(e.event_id)),
+        })); return;
       }
       res.writeHead(404).end();
     });
@@ -284,8 +336,29 @@ function launch(origin) {
     assert.strictEqual(held.replay.success, true, JSON.stringify(held.replay));
     assert.ok(held.orders.data[holdFixture.aggregate_id], 'durable held order missing from projection');
     assert.strictEqual(held.tables.data['70'].order_id, holdFixture.aggregate_id, 'table reservation missing');
-    await eventually(() => mock.state.syncRequests === 1, 'cut cloud submit');
+    // Offline KOT: one LOCAL-ONLY print job per held order (the replay must not
+    // queue a second slip), visible to the agent's drain loop via print_queue.
+    const kotJobs = Object.entries(held.printQueue.data || {}).filter(([, job]) => job && job.kind === 'kot');
+    assert.strictEqual(kotJobs.length, 1, 'exactly one local KOT job expected: ' + JSON.stringify(held.printQueue));
+    assert.strictEqual(kotJobs[0][0], 'kot:' + holdFixture.aggregate_id);
+    assert.strictEqual(kotJobs[0][1].local_only, true, 'KOT job must stay local-only');
+    assert.strictEqual(kotJobs[0][1].document.order_label, 'L-FX01');
+    assert.strictEqual(held.orders.data[holdFixture.aggregate_id].kot_job_id, 'kot:' + holdFixture.aggregate_id);
+    // Counter merge → recall → local cash settlement (recipe-backed deal line).
+    assert.strictEqual(held.row.local, true);
+    assert.strictEqual(held.row.items.length, 2);
+    assert.strictEqual(held.row.items[1].item_type, 'deal');
+    assert.strictEqual(held.row.items[1].deal_snapshot[0].recipe_snapshot[0].stock_id, 'ingredient-4',
+      'recipe-backed deal component survives the counter mapping');
+    assert.ok(held.facts, 'settlement facts derive from the frozen lines');
+    assert.strictEqual(held.facts.totals.total_amount, holdFixture.snapshot.totals.total_cents / 100);
+    assert.strictEqual(held.settled.ok, true, 'local cash settlement must be accepted: ' + JSON.stringify(held.settled));
+    assert.strictEqual(held.ordersAfter.data[holdFixture.aggregate_id].status, 'settled');
+    // Each committed command wakes the outbox sync (hold, then settlement), so
+    // the cut lane may see more than one attempt before the shutdown.
+    await eventually(() => mock.state.syncRequests >= 1, 'cut cloud submit');
     await stopElectron(app); app = null;
+    const cutAttempts = mock.state.syncRequests;
     for (const file of filesUnder(path.join(root, 'local-core'))) {
       const bytes = fs.readFileSync(file, 'utf8');
       assert.strictEqual(bytes.includes('Burger Combo'), false, 'plaintext held order on disk');
@@ -296,11 +369,11 @@ function launch(origin) {
     await eventually(() => mock.state.attempts >= 1, 'first post-restart cloud attempt');
     await eventually(() => mock.state.attempts >= 2, 'idempotent retry after lost response', 45000);
     await eventually(() => mock.state.snapshotRequests >= 1, 'canonical scoped snapshot sync');
-    assert.strictEqual(mock.state.projected.size, 1, 'exactly one cloud projection after relaunch');
+    assert.strictEqual(mock.state.projected.size, 2, 'exactly one cloud hold + one cloud settlement after relaunch');
     const projected = Array.from(mock.state.projected.values());
-    assert.strictEqual(projected.length, 1);
-    assert.strictEqual(mock.state.syncRequests, 3, 'one cut attempt, one lost response, one retry');
-    console.log('PASS Electron Local Core release-gate harness');
+    assert.strictEqual(projected.length, 2);
+    assert.strictEqual(mock.state.syncRequests, cutAttempts + 2, 'cut attempts, then one lost response and one retry');
+    console.log('PASS Electron Local Core release-gate harness (incl. offline KOT: local print job + single cloud order.held + single order.settled)');
   } catch (error) {
     const detail = app ? app.output().trim() : '';
     console.error('Electron release-gate harness failed:', error.message);

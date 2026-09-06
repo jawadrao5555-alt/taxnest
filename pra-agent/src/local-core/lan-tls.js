@@ -255,8 +255,12 @@ function createLocalCoreLanTls(options) {
                     Object.keys(Object.assign({}, result.orders, result.tables)).forEach((id) => {
                         if (Object.prototype.hasOwnProperty.call(result.revisions || {}, id)) revisions[id] = result.revisions[id];
                     });
+                    // recipes ride along (Sep 2026): the waiter freezes recipe
+                    // parts from this projection because cloud-baked catalog
+                    // rows carry none — without it every recipe product would
+                    // hold offline with [] parts and hit recipe_conflict.
                     result = { sequence: result.sequence, catalog: result.catalog, orders: result.orders,
-                        tables: result.tables, revisions };
+                        tables: result.tables, recipes: result.recipes || {}, revisions };
                 }
                 return send(res, 200, { ok: true, result, next_device_token: rotateCredential(auth) });
             }

@@ -117,6 +117,10 @@ class RestaurantWaiterController extends Controller
         // ZFC issue #13 (28 Jul 2026): tax-INCLUSIVE company => menu price IS the
         // final price — waiter sees ONE "Total", no before-tax / incl-tax split.
         $taxInclusive = (bool) ($company->pos_tax_inclusive ?? false);
+        // Offline hold lines freeze the same menu-rate fact the counter freezes
+        // (inclusive_card_save mode) so a shop-PC held line settles verbatim.
+        $taxMenuRate = $company->posTaxPricingMode() === 'inclusive_card_save'
+            ? (float) \App\Models\PosTaxRule::getRateForMethod('cash', $company) : null;
 
         // ZFC (29 Jul 2026): waiter tablets stay open for days and never see new
         // deploys. Page embeds this code-version; the app polls /waiter/api/version
@@ -141,7 +145,7 @@ class RestaurantWaiterController extends Controller
         $waiterCanCancel = !$isWaiter || (bool) ($company->pos_waiter_cancel_enabled ?? false);
         $waiterCanTakeaway = !$isWaiter || (bool) ($company->pos_waiter_takeaway_enabled ?? true);
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion', 'searchAnyWord', 'tablesOn', 'waiterCanCancel', 'waiterCanTakeaway'));
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'taxMenuRate', 'appVersion', 'searchAnyWord', 'tablesOn', 'waiterCanCancel', 'waiterCanTakeaway'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */
@@ -305,7 +309,9 @@ class RestaurantWaiterController extends Controller
         $user = auth('pos')->user();
 
         $orders = RestaurantOrder::where('company_id', $companyId)
-            ->where('source', 'waiter')
+            // 'agent_core' = the waiter's own offline order replayed by the shop
+            // PC once the net returned (Sep 2026) — still theirs, still open.
+            ->whereIn('source', ['waiter', 'agent_core'])
             ->where('status', 'held')
             ->where('created_by', $user->id)
             // 'creator' MUST be eager-loaded: orderJson() reads $o->creator?->name

@@ -28,6 +28,7 @@ const { createEventIngress } = require('./src/local-core/ingress');
 const { createSaleAcceptance } = require('./src/local-core/sale-acceptance');
 const { createBackup, recoverInterruptedRestore } = require('./src/local-core/backup');
 const { printHtml: printHtmlSilent, getLocalPrinters } = require('./src/printer');
+const { drainLocalKotQueue } = require('./src/local-kot');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 const {
   DEFAULT_SERVER_URL,
@@ -36,7 +37,7 @@ const {
 } = require('./src/server-url');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
-const BUILD_TIMESTAMP = '20260905-1';
+const BUILD_TIMESTAMP = '20260906-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -388,8 +389,50 @@ async function refreshTrustedPosScope(ses, origin) {
   } catch (e) { return null; }
 }
 
+// ── Offline KOT drain ───────────────────────────────────────────────────
+// Local Core holds (waiter tablet / counter during an internet cut) queue a
+// LOCAL-ONLY kitchen slip in the domain's print_queue. This loop prints them
+// on the shop PC's silent printer. It never touches the cloud print-job poll:
+// the cloud learns of the slip from the order.held event (local handoff), and
+// stamps the lines printed ONLY from the durable print.complete ack this
+// drain issues after the paper really came out. If the shop PC gives up
+// (handoff window over) it hands the slip back and the cloud prints it.
+const LOCAL_KOT_DRAIN_MS = 3000;
+let localKotTimer = null;
+let localKotBusy = false;
+function scheduleLocalKotDrain(delayMs) {
+  if (localKotTimer) clearTimeout(localKotTimer);
+  localKotTimer = setTimeout(async () => {
+    localKotTimer = null;
+    if (localKotBusy) { scheduleLocalKotDrain(LOCAL_KOT_DRAIN_MS); return; }
+    localKotBusy = true;
+    try {
+      const domain = coreRuntime && coreRuntime.domain;
+      if (domain) {
+        const drained = await drainLocalKotQueue(domain, {
+          printHtml: printHtmlSilent,
+          deviceId: coreRuntime.deviceUid,
+          scope: currentCoreLanScope(),
+          log: (line) => console.log(line),
+        });
+        // The ack/hand-back is an outbox event: let it travel now, not on the
+        // next 5 s tick, so the cloud's handoff clock sees it as early as possible.
+        if (drained && (drained.acked || drained.handed_back)) {
+          try { scheduleCoreSync(250); } catch (e) {}
+        }
+      }
+    } catch (e) {
+      console.log('[local-kot] drain error: ' + (e && e.message ? e.message : e));
+    } finally {
+      localKotBusy = false;
+      if (coreRuntime) scheduleLocalKotDrain(LOCAL_KOT_DRAIN_MS);
+    }
+  }, Number.isFinite(delayMs) ? delayMs : LOCAL_KOT_DRAIN_MS);
+}
+
 function stopCoreRuntime(clearScope) {
   if (coreTimer) { clearTimeout(coreTimer); coreTimer = null; }
+  if (localKotTimer) { clearTimeout(localKotTimer); localKotTimer = null; }
   try { if (coreLanTls) coreLanTls.stop(); } catch (e) {}
   try { if (coreRuntime && coreRuntime.domain) coreRuntime.domain.close(); } catch (e) {}
   try { if (coreRuntime && coreRuntime.store) coreRuntime.store.close(); } catch (e) {}
@@ -494,6 +537,7 @@ function openLocalCoreRuntime(config) {
     };
     coreRuntime = runtime;
     coreStartupError = null;
+    scheduleLocalKotDrain(LOCAL_KOT_DRAIN_MS);
     // Scope and heartbeat may arrive in either order. Refresh from the owning
     // authenticated Electron session after a successful open; stale responses
     // are rejected by refreshTrustedPosScope's generation/config/window checks.

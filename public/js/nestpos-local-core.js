@@ -260,7 +260,12 @@
                 (result && result.message) || 'Local Core rejected the order settlement.');
         });
     }
-    function holdOrder(orderId, snapshot, revision) {
+    // kotDocument (optional, Sep 2026): offline KOT rides INSIDE the hold so the
+    // shop PC prints the kitchen slip itself; the cloud, receiving the same
+    // document in the order.held event, holds its KOT back until the shop PC
+    // acks the print (or hands it back / times out). Plain object:
+    // { kind:'kot', order_id, order_type, table_label, lines:[{line_id,name,quantity,special_notes}] }.
+    function holdOrder(orderId, snapshot, revision, kotDocument) {
         if (!snapshot || String(snapshot.order_id || '') !== String(orderId) ||
             !snapshot.idempotency_key || !snapshot.business_date ||
             !Array.isArray(snapshot.lines) || !snapshot.lines.length ||
@@ -293,7 +298,11 @@
         })) {
             return Promise.resolve(reject('invalid_hold_snapshot', 'A held-order line or total snapshot is incomplete.'));
         }
-        return command('order.hold', orderId, { order_snapshot: snapshot },
+        var holdPayload = { order_snapshot: snapshot };
+        if (kotDocument && typeof kotDocument === 'object' && Array.isArray(kotDocument.lines) && kotDocument.lines.length) {
+            holdPayload.kot_document = kotDocument;
+        }
+        return command('order.hold', orderId, holdPayload,
             revision == null ? 0 : revision, 'order-hold:' + String(snapshot.idempotency_key))
             .then(function (result) {
                 if (result && result.ok) return result;
@@ -301,8 +310,153 @@
                     (result && result.message) || 'Local Core rejected the held order.');
             });
     }
+    // ---- Offline held orders on the counter (Sep 2026) -------------------
+    // Pure mappers shared by the sale screen and the node tests. The Local
+    // Core `orders` projection row becomes a held-orders API row whose items
+    // keep the COMPLETE immutable domain line under `local_line`; settlement is
+    // then built from those lines VERBATIM (line ids, prices, tax/recipe/deal/
+    // direct-consumption snapshots) because the cloud rejects any sale whose
+    // lines differ from the frozen hold (sale_snapshot_conflict) and the
+    // settlement normalizer needs explicit recipe applicability on every line.
+    function plainClone(value) { return JSON.parse(JSON.stringify(value == null ? null : value)); }
+    function heldRowFromProjection(order, opts) {
+        opts = opts || {};
+        var id = String(order.order_id || order.id);
+        var heldAt = new Date(order.held_at_ms || opts.now_ms || Date.now()).toISOString();
+        var items = (order.lines || []).map(function (line) {
+            var qty = Number(line.quantity || 0);
+            var price = Number(line.unit_price_cents || 0) / 100;
+            var recipe = Array.isArray(line.recipe_snapshot) ? plainClone(line.recipe_snapshot) : [];
+            var type = line.item_type || line.type || 'product';
+            return {
+                id: String(line.line_id),
+                item_id: line.item_id == null ? (line.product_id == null ? null : Number(line.product_id)) : line.item_id,
+                item_type: type, item_name: line.name || '',
+                quantity: qty, unit_price: price, subtotal: Math.round(qty * price * 100) / 100,
+                special_notes: line.special_notes || null,
+                is_tax_exempt: !!(line.tax_snapshot && (line.tax_snapshot.exempt || line.tax_snapshot.is_tax_exempt)),
+                item_discount_type: (line.item_discount && line.item_discount.type) || 'percentage',
+                item_discount_value: Number((line.item_discount && line.item_discount.value) || 0),
+                has_recipe: line.has_recipe == null ? recipe.length > 0 : !!line.has_recipe,
+                recipe_snapshot: recipe,
+                deal_snapshot: type === 'deal' && Array.isArray(line.deal_snapshot) ? plainClone(line.deal_snapshot) : null,
+                skip_kitchen: !!line.skip_kitchen,
+                kot_printed_at: order.kot_job_id ? heldAt : null,
+                local_line: plainClone(line),
+            };
+        });
+        var meta = order.immutable_metadata || {};
+        var tableId = order.table_id == null ? null : order.table_id;
+        return {
+            id: id, local: true, local_order_id: id, local_revision: Number(opts.revision || 0),
+            order_number: 'L-' + id.replace(/-/g, '').slice(-4).toUpperCase(),
+            status: 'held', order_type: order.order_type || 'takeaway',
+            table_id: tableId,
+            table: tableId == null ? null : {
+                id: tableId,
+                table_number: typeof opts.table_number === 'function' ? opts.table_number(tableId) : String(tableId),
+                occupied_since: heldAt
+            },
+            items: items,
+            total_amount: Number((order.totals && order.totals.total_cents) || 0) / 100,
+            discount_type: null, discount_value: 0,
+            kitchen_notes: order.kitchen_notes || meta.kitchen_notes || null,
+            priority: !!(order.priority || meta.priority),
+            customer_id: order.customer_ref ? (order.customer_ref.id || null) : null,
+            customer_name: order.customer_ref ? (order.customer_ref.name || null) : (order.customer_name || null),
+            customer_phone: order.customer_ref ? (order.customer_ref.phone || null) : (order.customer_phone || null),
+            delivery_address: order.delivery_address || meta.delivery_address || null,
+            kot_sent_at: order.kot_job_id ? heldAt : null, kot_print_count: order.kot_job_id ? 1 : 0,
+            source: 'shop_pc', held_by_user_id: order.held_by_user_id || null,
+            staff_name: order.waiter_name || meta.waiter_name || opts.staff_fallback || 'Shop PC',
+            created_at: heldAt, online_payment_awaited_at: null,
+        };
+    }
+    // Settlement lines + totals for a shop-PC held row. Tax follows the rates
+    // frozen at hold time (the cloud compares each line's tax_snapshot with the
+    // held one), so a card settlement of an offline order keeps the hold rate.
+    function settlementFromHeldRow(heldRow, opts) {
+        opts = opts || {};
+        var lines = (heldRow && heldRow.items || []).map(function (item) { return item && item.local_line; });
+        if (!lines.length || lines.some(function (line) { return !line; })) return null;
+        var items = lines.map(function (line) {
+            var type = line.type || line.item_type || 'product';
+            var recipe = Array.isArray(line.recipe_snapshot) ? plainClone(line.recipe_snapshot) : [];
+            var unitCents = Number(line.unit_price_cents);
+            var quantity = Number(line.quantity);
+            return {
+                line_id: String(line.line_id),
+                product_id: line.product_id == null ? null : String(line.product_id),
+                item_id: line.item_id == null ? (line.product_id == null ? null : line.product_id) : line.item_id,
+                name: String(line.name || '').trim(),
+                quantity: quantity,
+                unit_price_cents: unitCents,
+                unit_price: unitCents / 100,
+                line_total: unitCents * quantity / 100,
+                type: type, item_type: type,
+                is_tax_exempt: !!(line.tax_snapshot && line.tax_snapshot.exempt),
+                _manual: line.product_id == null,
+                special_notes: line.special_notes || null,
+                item_discount_type: (line.item_discount && line.item_discount.type) || 'percentage',
+                item_discount_value: Number((line.item_discount && line.item_discount.value) || 0),
+                has_recipe: recipe.length > 0,
+                recipe_snapshot: recipe,
+                deal_snapshot: type === 'deal' && Array.isArray(line.deal_snapshot) ? plainClone(line.deal_snapshot) : null,
+                direct_consumption_snapshot: Array.isArray(line.direct_consumption_snapshot) ? plainClone(line.direct_consumption_snapshot) : [],
+                tax_snapshot: plainClone(line.tax_snapshot),
+            };
+        });
+        if (items.some(function (item) {
+            return !item.name || !Number.isInteger(item.quantity) || item.quantity < 1 ||
+                !Number.isInteger(item.unit_price_cents) || item.unit_price_cents < 0 ||
+                !item.tax_snapshot || !Number.isInteger(item.tax_snapshot.rate_basis_points) ||
+                typeof item.tax_snapshot.exempt !== 'boolean' || typeof item.tax_snapshot.inclusive !== 'boolean' ||
+                !Object.prototype.hasOwnProperty.call(item.tax_snapshot, 'menu_rate_basis_points') ||
+                (item.type === 'deal' && (!Array.isArray(item.deal_snapshot) || !item.deal_snapshot.length));
+        })) return null;
+        var first = items[0].tax_snapshot;
+        var inclusive = !!first.inclusive;
+        var rateBasis = first.rate_basis_points;
+        var menuBasis = Number.isInteger(first.menu_rate_basis_points) ? first.menu_rate_basis_points : rateBasis;
+        var subtotal = items.reduce(function (sum, item) { return sum + item.unit_price_cents * item.quantity; }, 0);
+        // Item-level discounts frozen on the counter's own hold fold into the
+        // bill discount (the settlement normalizer knows only subtotal/discount).
+        var frozenItemDiscount = lines.reduce(function (sum, line) {
+            return sum + Math.round(Number((line.item_discount && line.item_discount.amount_cents) || 0));
+        }, 0);
+        var discount = Math.max(0, Math.min(subtotal, Math.round(Number(opts.discount_cents || 0)) + frozenItemDiscount));
+        var taxableGross = items.reduce(function (sum, item) {
+            return sum + (item.tax_snapshot.exempt ? 0 : item.unit_price_cents * item.quantity);
+        }, 0);
+        var taxableAfter = subtotal ? taxableGross * (subtotal - discount) / subtotal : 0;
+        var tax, total;
+        if (inclusive) {
+            var exemptAfter = subtotal - discount - taxableAfter;
+            tax = Math.round(taxableAfter * rateBasis / (10000 + menuBasis));
+            total = Math.round((exemptAfter + taxableAfter * (10000 + rateBasis) / (10000 + menuBasis)) / 100) * 100;
+        } else {
+            tax = Math.round(items.reduce(function (sum, item) {
+                if (item.tax_snapshot.exempt) return sum;
+                var share = subtotal ? (subtotal - discount) / subtotal : 1;
+                return sum + item.unit_price_cents * item.quantity * share * item.tax_snapshot.rate_basis_points / 10000;
+            }, 0));
+            total = subtotal - discount + tax;
+        }
+        return {
+            items: items,
+            totals: {
+                subtotal: subtotal / 100, discount_amount: discount / 100, tax_amount: tax / 100,
+                total_amount: total / 100, tax_inclusive: inclusive,
+            },
+            tax_pricing: {
+                inclusive: inclusive, rate_basis_points: rateBasis,
+                menu_rate_basis_points: Number.isInteger(first.menu_rate_basis_points) ? first.menu_rate_basis_points : null,
+            },
+        };
+    }
     var api = {
         version: 1, available: true, request: cloudFirst, command: command, query: query,
+        offlineHeld: { rowFromProjection: heldRowFromProjection, settlementFromRow: settlementFromHeldRow },
         normalizeHeldSaleSnapshot: normalizeHeldSaleSnapshot,
         normalizeSettlementSnapshot: normalizeHeldSaleSnapshot,
         heldOrder: {

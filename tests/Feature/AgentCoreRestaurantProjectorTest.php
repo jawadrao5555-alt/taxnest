@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Services\AgentCoreProjectorRegistry;
 use App\Services\AgentCoreProjectionService;
 use App\Services\AgentCoreRestaurantProjector;
+use App\Services\KotPrintService;
 use App\Services\AgentCoreSaleProjector;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -326,6 +327,227 @@ class AgentCoreRestaurantProjectorTest extends TestCase
         ]);
     }
 
+    /**
+     * Offline KOT (Sep 2026): a hold that carried a kot_document was already
+     * printed by the shop PC. The cloud must stamp the kitchen lines as
+     * printed so no second slip comes out when the net returns — while a
+     * plain hold (no document) stays unprinted exactly as before.
+     */
+    /** Offline-hold fixture shared by the local KOT handoff tests. */
+    private function offlineKotHold(string $aggregate, ?string $eventId = null): array
+    {
+        $fixture = json_decode(file_get_contents(base_path('tests/Fixtures/local-core-held-settlement.json')), true, 512, JSON_THROW_ON_ERROR);
+        $sale = $this->normalizedFixtureSale($fixture);
+        $heldLines = array_map(function (array $line): array {
+            $line['direct_consumption_snapshot'] ??= [];
+            $line['deal_snapshot'] ??= [];
+            return $line;
+        }, $sale['items']);
+        $snapshot = [
+            'order_id' => $aggregate, 'business_date' => $sale['business_date'],
+            'order_type' => 'takeaway', 'table_id' => null, 'lines' => $heldLines,
+            'totals' => [
+                'subtotal_cents' => $sale['totals']['subtotal_cents'],
+                'discount_cents' => $sale['totals']['discount_cents'],
+                'tax_cents' => $sale['totals']['tax_cents'],
+                'total_cents' => $sale['totals']['total_cents'],
+            ],
+        ];
+        $kot = ['kind' => 'kot', 'order_id' => $aggregate, 'order_type' => 'takeaway',
+            'lines' => array_map(fn (array $l) => ['line_id' => $l['line_id'], 'name' => $l['name'], 'quantity' => $l['quantity']], $heldLines)];
+        $outcome = $this->projectThroughRegistry($eventId ?? ('hold-' . $aggregate), 'order.hold', 1, [
+            'order_snapshot' => $snapshot, 'kot_document' => $kot,
+        ], $aggregate);
+        return ['outcome' => $outcome, 'snapshot' => $snapshot, 'kot' => $kot, 'lines' => $heldLines];
+    }
+
+    private function enableCloudKot(): void
+    {
+        DB::table('companies')->where('id', 1)->update([
+            'pos_printer_settings' => json_encode(['silent_print_enabled' => true, 'kot_printer' => 'Kitchen-80']),
+            'agent_enabled' => true, 'agent_last_seen' => now(),
+        ]);
+        $this->company = Company::findOrFail(1);
+    }
+
+    private function cloudKotJobs(int $orderId)
+    {
+        return DB::table('pos_print_jobs')->where('restaurant_order_id', $orderId)
+            ->where('type', 'kot')->whereIn('status', ['pending', 'printing', 'done'])
+            ->whereNull('claim_token')->orderBy('id')->get();
+    }
+
+    public function test_hold_with_kot_document_opens_a_local_handoff_and_stamps_nothing_until_the_shop_pc_acks(): void
+    {
+        $this->enableCloudKot();
+        $hold = $this->offlineKotHold('offline-kot-1');
+        $this->assertSame('projected', $hold['outcome']->status);
+        $orderId = $hold['outcome']->result['order_id'];
+        $lineCount = count($hold['lines']);
+
+        // Cloud does NOT pretend the kitchen has the slip: no stamps yet.
+        $this->assertNull(DB::table('restaurant_orders')->where('id', $orderId)->value('kot_sent_at'));
+        $this->assertSame($lineCount, DB::table('restaurant_order_items')->where('order_id', $orderId)->whereNull('kot_printed_at')->count());
+        $handoff = DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:offline-kot-1')->first();
+        $this->assertNotNull($handoff, 'a local handoff row records that the shop PC owns this slip');
+        $this->assertSame(KotPrintService::LOCAL_STATUS, $handoff->status);
+        $this->assertSame((int) $orderId, (int) $handoff->restaurant_order_id);
+        $this->assertCount($lineCount, json_decode($handoff->printed_item_ids, true));
+
+        // While the handoff is fresh, EVERY cloud KOT enqueue path (counter
+        // auto/full KOT, safety net, requestKot) prints nothing for these lines.
+        $order = \App\Models\RestaurantOrder::findOrFail($orderId);
+        $full = KotPrintService::enqueueForOrder($this->company, $order, 10, false);
+        $delta = KotPrintService::enqueueForOrder($this->company, $order, 10, true);
+        $this->assertSame([], $full['job_ids']);
+        $this->assertSame('local_handoff', $full['reason']);
+        $this->assertSame([], $delta['job_ids']);
+        $this->assertCount(0, $this->cloudKotJobs($orderId));
+
+        // Lost-ACK redelivery of the same hold: one order, one handoff row.
+        $replay = $this->projectThroughRegistry('hold-replay', 'order.hold', 1, [
+            'order_snapshot' => $hold['snapshot'], 'kot_document' => $hold['kot'],
+        ], 'offline-kot-1');
+        $this->assertNotSame('projected', $replay->status);
+        $this->assertSame(1, DB::table('restaurant_orders')->count());
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:offline-kot-1')->count());
+
+        // Durable ack from the shop PC (print.complete on the local kot job
+        // aggregate): NOW the lines are stamped, exactly once, handoff done.
+        $ack = $this->projectPrintAck('ack-1', 'print.complete', 1, 'offline-kot-1', ['printed_at_ms' => 1_790_000_000_000]);
+        $this->assertSame('projected', $ack->status, json_encode([$ack->message ?? null, $ack->dependency ?? null, $ack->result]));
+        $this->assertSame(0, DB::table('restaurant_order_items')->where('order_id', $orderId)->whereNull('kot_printed_at')->count());
+        $this->assertSame(1, (int) DB::table('restaurant_order_items')->where('order_id', $orderId)->max('kot_batch_no'));
+        $this->assertNotNull(DB::table('restaurant_orders')->where('id', $orderId)->value('kot_sent_at'));
+        $this->assertSame('done', DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:offline-kot-1')->value('status'));
+        $this->assertCount($lineCount, $ack->result['printed_line_ids']);
+
+        // Ack replay (lost response) stamps nothing new and creates no cloud job.
+        $again = $this->projectPrintAck('ack-1-again', 'print.complete', 1, 'offline-kot-1', ['printed_at_ms' => 1_790_000_000_000]);
+        $this->assertNotSame('projected', $again->status);
+        $this->assertCount(0, $this->cloudKotJobs($orderId));
+        // Cloud paths after the ack: nothing unprinted → still no cloud slip.
+        $after = KotPrintService::enqueueForOrder($this->company, $order->fresh(), 10, true);
+        $this->assertSame([], $after['job_ids']);
+
+        // A hold WITHOUT a kot_document behaves exactly as before.
+        $plain = $this->projectThroughRegistry('plain-hold', 'order.hold', 1, [
+            'order_snapshot' => array_merge($hold['snapshot'], ['order_id' => 'plain-hold-1']),
+        ], 'plain-hold-1');
+        $this->assertSame('projected', $plain->status);
+        $this->assertNull(DB::table('restaurant_orders')->where('id', $plain->result['order_id'])->value('kot_sent_at'));
+        $this->assertSame(0, DB::table('pos_print_jobs')->where('restaurant_order_id', $plain->result['order_id'])->count());
+    }
+
+    public function test_shop_pc_hand_back_prints_the_slip_through_the_cloud_exactly_once(): void
+    {
+        $this->enableCloudKot();
+        $hold = $this->offlineKotHold('offline-kot-2');
+        $this->assertSame('projected', $hold['outcome']->status, json_encode([$hold['outcome']->message ?? null, $hold['outcome']->result]));
+        $orderId = $hold['outcome']->result['order_id'];
+
+        $back = $this->projectPrintAck('fail-2', 'print.fail', 1, 'offline-kot-2', ['terminal' => true, 'error' => 'local_kot_handoff_timeout']);
+        $this->assertSame('projected', $back->status, $back->message ?? '');
+        $this->assertSame('failed', DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:offline-kot-2')->value('status'));
+        $jobs = $this->cloudKotJobs($orderId);
+        $this->assertCount(1, $jobs, 'the cloud enqueues exactly one KOT for the handed-back slip');
+        $this->assertSame('Kitchen-80', $jobs[0]->target_printer);
+        $this->assertSame('delta=1', $jobs[0]->render_query);
+        $this->assertCount(count($hold['lines']), json_decode($jobs[0]->printed_item_ids, true));
+        $this->assertSame(count($hold['lines']), DB::table('restaurant_order_items')->where('order_id', $orderId)->whereNull('kot_printed_at')->count(),
+            'lines are stamped by the agent at print-result time, never by the hand-back itself');
+
+        // Counter safety net firing right after: dedupes into the same job.
+        $order = \App\Models\RestaurantOrder::findOrFail($orderId);
+        $again = KotPrintService::enqueueForOrder($this->company, $order, 10, true);
+        $this->assertSame([$jobs[0]->id], $again['job_ids']);
+        $this->assertCount(1, $this->cloudKotJobs($orderId));
+
+        // A hand-back replay after the cloud already printed changes nothing.
+        DB::table('pos_print_jobs')->where('id', $jobs[0]->id)->update(['status' => 'done']);
+        DB::table('restaurant_order_items')->where('order_id', $orderId)->update(['kot_printed_at' => now(), 'kot_batch_no' => 1]);
+        $replay = $this->projectPrintAck('fail-2-again', 'print.fail', 1, 'offline-kot-2', ['terminal' => true, 'error' => 'local_kot_handoff_timeout']);
+        $this->assertNotSame('projected', $replay->status);
+        $this->assertCount(1, $this->cloudKotJobs($orderId));
+    }
+
+    public function test_unacknowledged_handoff_expires_into_one_cloud_kot_and_a_late_ack_cannot_double_it(): void
+    {
+        $this->enableCloudKot();
+        $hold = $this->offlineKotHold('offline-kot-3');
+        $orderId = $hold['outcome']->result['order_id'];
+        $order = \App\Models\RestaurantOrder::findOrFail($orderId);
+
+        // Fresh handoff: expiry sweep leaves it alone, cloud stays silent.
+        $this->assertSame(['expired' => 0, 'queued' => 0], KotPrintService::expireLocalHandoffs($this->company));
+        $this->assertCount(0, $this->cloudKotJobs($orderId));
+
+        // Agent died before printing (no ack ever): after the timeout the cloud
+        // takes the slip back — exactly one normal cloud KOT.
+        DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:offline-kot-3')
+            ->update(['created_at' => now()->subSeconds(KotPrintService::LOCAL_HANDOFF_TIMEOUT_SECONDS + 5)]);
+        $swept = KotPrintService::expireLocalHandoffs($this->company);
+        $this->assertSame(1, $swept['expired']);
+        $this->assertSame(1, $swept['queued']);
+        $this->assertSame(KotPrintService::LOCAL_EXPIRED_STATUS, DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:offline-kot-3')->value('status'));
+        $jobs = $this->cloudKotJobs($orderId);
+        $this->assertCount(1, $jobs);
+        // Second sweep: nothing left to expire, nothing new queued.
+        $this->assertSame(['expired' => 0, 'queued' => 0], KotPrintService::expireLocalHandoffs($this->company));
+        $this->assertCount(1, $this->cloudKotJobs($orderId));
+
+        // Late ack from a resurrected agent: stamps the still-NULL lines, closes
+        // the handoff AND voids the still-pending recovery job (the agent never
+        // even claims it); it never creates another job. The render-level fence
+        // for an already-claimed job lives in PosLocalKotHandoffRenderTest.
+        $recoveryJobId = (int) $jobs->first()->id;
+        $late = $this->projectPrintAck('late-ack-3', 'print.complete', 1, 'offline-kot-3', ['printed_at_ms' => 1_790_000_000_000]);
+        $this->assertSame('projected', $late->status, $late->message ?? '');
+        $this->assertSame([$recoveryJobId], $late->result['voided_job_ids'] ?? null, 'the pending recovery job is voided by the late ack');
+        $this->assertSame(0, DB::table('restaurant_order_items')->where('order_id', $orderId)->whereNull('kot_printed_at')->count());
+        $this->assertSame('done', DB::table('pos_print_jobs')->where('claim_token', 'ac:kot:offline-kot-3')->value('status'));
+        $this->assertSame('done', DB::table('pos_print_jobs')->where('id', $recoveryJobId)->value('status'), 'voided = done without ever rendering');
+        $this->assertCount(1, $this->cloudKotJobs($orderId), 'no new cloud KOT job is created by the late ack');
+        $this->assertSame(0, $this->cloudKotJobs($orderId)->where('status', 'pending')->count(), 'no pending cloud KOT survives the late ack');
+        $this->assertSame([], KotPrintService::enqueueForOrder($this->company, $order->fresh(), 10, true)['job_ids']);
+        // A second ack (restarted agent re-drained): nothing more to stamp or void.
+        $again = $this->projectPrintAck('late-ack-3b', 'print.complete', 2, 'offline-kot-3', ['printed_at_ms' => 1_790_000_000_000]);
+        $this->assertSame('projected', $again->status);
+        $this->assertSame([], $again->result['voided_job_ids']);
+        $this->assertSame([], $again->result['printed_line_ids']);
+    }
+
+    /** print.complete / print.fail on the local kot job aggregate, as the agent's drain emits them. */
+    private function projectPrintAck(string $id, string $command, int $revision, string $orderAggregate, array $extra = [])
+    {
+        $scope = ['company_id' => '1', 'branch_id' => '3', 'device_id' => 'counter', 'user_id' => '10'];
+        $aggregate = 'kot:' . $orderAggregate;
+        $data = array_merge(['kind' => 'kot', 'order_id' => $orderAggregate, 'claim_token' => 'local-claim'], $extra);
+        $wire = [
+            'event_id' => $id,
+            'event_type' => $command === 'print.complete' ? 'print.completed' : 'print.requested',
+            'occurred_at' => '2026-10-06T12:05:00Z',
+            'idempotency_key' => "idem-{$id}",
+            'payload' => [
+                'schema' => 'local-core.print.v1', 'command_type' => $command,
+                'aggregate_id' => $aggregate, 'aggregate_revision' => $revision, 'data' => $data,
+            ],
+            'scope' => $scope,
+        ];
+        $event = new AgentCoreEvent();
+        $event->forceFill([
+            'company_id' => 1, 'device_uid' => 'counter', 'event_id' => $id,
+            'idempotency_key' => "idem-{$id}", 'event_type' => $wire['event_type'],
+            'occurred_at' => $wire['occurred_at'], 'content_hash' => hash('sha256', $id),
+            'event_scope' => $scope, 'payload' => $wire['payload'], 'projection_status' => 'received',
+        ])->save();
+        $outcome = app(AgentCoreProjectorRegistry::class)->project($this->company, 'counter', $event, $wire);
+        if ($outcome->status === 'projected') {
+            $event->update(['projection_status' => 'projected', 'projection_result' => $outcome->result]);
+        }
+        return $outcome;
+    }
+
     public function test_table_shift_target_and_source_races_leave_both_tables_and_order_unchanged(): void
     {
         $aggregate = 'race-order';
@@ -378,6 +600,74 @@ class AgentCoreRestaurantProjectorTest extends TestCase
             $event->update(['projection_status' => 'projected', 'projection_result' => $outcome->result]);
         }
         return $outcome;
+    }
+
+    /**
+     * Offline counter settlement (Sep 2026): a waiter/counter hold made on the
+     * shop PC (shared held-order fixture: direct-consumption line + deal with a
+     * recipe-backed component) is later recalled on the counter and settled
+     * CASH from the frozen lines. tests/Fixtures/local-core-counter-settlement.json
+     * is the exact sale the production client emits (generated by
+     * pra-agent/test/local-core-counter-settle.test.js). The cloud must accept
+     * it: held-snapshot match + the authoritative sale's immutable validation.
+     */
+    public function test_counter_settlement_of_a_shop_pc_hold_matches_the_frozen_lines_and_validates(): void
+    {
+        $hold = json_decode(file_get_contents(base_path('tests/Fixtures/local-core-held-order.json')), true, 512, JSON_THROW_ON_ERROR);
+        $settle = json_decode(file_get_contents(base_path('tests/Fixtures/local-core-counter-settlement.json')), true, 512, JSON_THROW_ON_ERROR);
+        $aggregate = $hold['aggregate_id'];
+        $this->assertSame($aggregate, $settle['aggregate_id']);
+        $sale = $settle['sale_snapshot'];
+        DB::table('pos_products')->insert(['id' => 51, 'company_id' => 1, 'name' => 'Bottle', 'category' => 'Drinks', 'price' => 1, 'created_at' => now(), 'updated_at' => now()]);
+
+        $held = $this->projectThroughRegistry('counter-hold', 'order.hold', 1, [
+            'order_snapshot' => $hold['snapshot'],
+        ], $aggregate);
+        $this->assertSame('projected', $held->status);
+
+        // The authoritative sale projector's own immutable-line validation
+        // (has_recipe/recipe_snapshot consistency, canonical tax_snapshot,
+        // totals) must pass for the client-built settlement.
+        $validate = new \ReflectionMethod(AgentCoreSaleProjector::class, 'validateInventorySaleSnapshot');
+        $validate->invoke(app(AgentCoreSaleProjector::class), $this->company, $sale);
+
+        $sales = Mockery::mock(AgentCoreSaleProjector::class);
+        $sales->shouldReceive('project')->once()->withArgs(function ($company, $device, $wire) use ($sale, $hold): bool {
+            $this->assertSame($sale, $wire['payload']['sale']);
+            $this->assertSame('pra.manual-immediate.v1', $wire['payload']['schema']);
+            $items = $wire['payload']['sale']['items'];
+            $this->assertSame('ingredient-4', $items[1]['deal_snapshot'][0]['recipe_snapshot'][0]['stock_id']);
+            $this->assertSame($hold['snapshot']['totals']['total_cents'], $items[0]['unit_price_cents'] * $items[0]['quantity']
+                + $items[1]['unit_price_cents'] * $items[1]['quantity'] + $wire['payload']['sale']['totals']['tax_cents']);
+            DB::table('pos_transactions')->insert([
+                'id' => 904, 'company_id' => 1, 'branch_id' => 3, 'business_date' => $sale['business_date'],
+                'invoice_number' => 'INV-904', 'payment_method' => 'cash', 'subtotal' => 16,
+                'tax_amount' => 2.56, 'total_amount' => 18.56, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            return true;
+        })->andReturn([
+            'status' => 'projected', 'transaction_id' => 904, 'invoice_number' => 'INV-904',
+            'pra_status' => null, 'replayed' => false,
+        ]);
+        $this->app->instance(AgentCoreSaleProjector::class, $sales);
+        $this->projector = app(AgentCoreRestaurantProjector::class);
+
+        $settled = $this->projectThroughRegistry('counter-settle', 'order.settle', 2, [
+            'sale_snapshot' => $sale, 'offline_uuid' => $sale['offline_uuid'], 'payment_method' => 'cash',
+        ], $aggregate);
+        $this->assertSame('projected', $settled->status, json_encode($settled->result));
+        $this->assertDatabaseHas('restaurant_orders', [
+            'id' => $held->result['order_id'], 'status' => 'completed', 'pos_transaction_id' => 904,
+        ]);
+        $this->assertSame(1, DB::table('pos_transactions')->count());
+
+        // Cloud-side dedupe: the same settlement delivered twice (lost ACK) is
+        // never a second sale.
+        $again = $this->projectThroughRegistry('counter-settle-replay', 'order.settle', 2, [
+            'sale_snapshot' => $sale, 'offline_uuid' => $sale['offline_uuid'], 'payment_method' => 'cash',
+        ], $aggregate);
+        $this->assertNotSame('projected', $again->status);
+        $this->assertSame(1, DB::table('pos_transactions')->count());
     }
 
     private function projectThroughRegistry(string $id, string $command, int $revision, array $data, string $aggregate)
@@ -463,7 +753,15 @@ class AgentCoreRestaurantProjectorTest extends TestCase
 
     private function schema(): void
     {
-        Schema::create('companies', fn (Blueprint $t) => [$t->id(), $t->string('name'), $t->softDeletes(), $t->timestamps()]);
+        Schema::create('companies', fn (Blueprint $t) => [$t->id(), $t->string('name'), $t->json('pos_printer_settings')->nullable(),
+            $t->boolean('agent_enabled')->default(false), $t->timestamp('agent_last_seen')->nullable(), $t->softDeletes(), $t->timestamps()]);
+        Schema::create('pos_print_jobs', function (Blueprint $t): void {
+            $t->id(); $t->unsignedBigInteger('company_id'); $t->string('type', 10); $t->string('target_printer');
+            $t->unsignedBigInteger('transaction_id')->nullable(); $t->unsignedBigInteger('restaurant_order_id')->nullable();
+            $t->string('render_query')->nullable(); $t->string('status', 12)->default('pending'); $t->string('claim_token', 64)->nullable();
+            $t->json('printed_item_ids')->nullable(); $t->text('error')->nullable(); $t->unsignedTinyInteger('attempts')->default(0);
+            $t->unsignedBigInteger('created_by')->nullable(); $t->timestamps();
+        });
         Schema::create('users', fn (Blueprint $t) => [$t->id(), $t->unsignedBigInteger('company_id'), $t->string('name'), $t->timestamps()]);
         Schema::create('agent_core_events', function (Blueprint $t): void {
             $t->id(); $t->unsignedBigInteger('company_id'); $t->string('device_uid'); $t->string('event_id'); $t->string('idempotency_key');

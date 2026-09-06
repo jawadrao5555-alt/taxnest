@@ -73,8 +73,52 @@ function heldSnapshot(orderId, businessDate, lines, extras) {
         assert.strictEqual(wireEvent.payload.schema, 'local-core.order.v1');
         assert.ok(wireEvent.scope_lease_id && wireEvent.scope_lease);
         assert.strictEqual(engine.snapshot().stock.milk, 6);
+        assert.strictEqual(engine.snapshot().orders['order-1'].held_by_user_id, 'user-1');
+        assert.strictEqual(engine.snapshot().orders['order-1'].kot_job_id, null, 'no kot document = no kitchen slip');
         engine.execute(command('order.cancel', 'order-1', 1));
         assert.strictEqual(engine.snapshot().stock.milk, 10, 'only consumed inventory is restored');
+
+        // Offline KOT rides inside order.hold as a LOCAL-ONLY print job.
+        const kotLine = { line_id: 'kot-line-1', product_id: 'tea', product_revision: 4, name: 'Tea', quantity: 1,
+            unit_price_cents: 100, tax_snapshot: { rate_basis_points: 1600 },
+            recipe_snapshot: [{ stock_id: 'milk', ingredient_revision: 2, quantity: 1 }],
+            deal_snapshot: [], direct_consumption_snapshot: [] };
+        expect('invalid_kot_document', () => engine.execute(command('order.hold', 'kot-bad', 0, {
+            order_snapshot: heldSnapshot('kot-bad', '2026-09-02', [kotLine], { catalog_revision: 1 }),
+            kot_document: { kind: 'kot', lines: [{ line_id: 'missing', name: 'Tea', quantity: 1 }] },
+        })));
+        assert.ok(!engine.snapshot().orders['kot-bad'], 'a bad kot document rejects the whole hold');
+        const kotHold = command('order.hold', 'kot-order', 0, {
+            order_snapshot: heldSnapshot('kot-order', '2026-09-02', [kotLine], { catalog_revision: 1 }),
+            kot_document: { kind: 'kot', order_id: 'kot-order', order_type: 'dine_in', table_label: 'T4',
+                lines: [{ line_id: 'kot-line-1', name: 'Tea', quantity: 1, special_notes: 'less sugar' }] },
+        });
+        engine.execute(kotHold);
+        const kotWire = engine.eventStore.pending(50).find((e) => e.payload.aggregate_id === 'kot-order');
+        assert.strictEqual(kotWire.payload.data.kot_document.lines[0].name, 'Tea', 'cloud receives the same kot document');
+        assert.strictEqual(engine.snapshot().orders['kot-order'].kot_job_id, 'kot:kot-order');
+        let jobs = engine.localPrintJobs();
+        assert.strictEqual(jobs.length, 1);
+        assert.strictEqual(jobs[0].id, 'kot:kot-order');
+        assert.strictEqual(jobs[0].kind, 'kot');
+        expect('claim_conflict', () => engine.execute(command('print.claim', 'kot:kot-order', 0, { claim_token: 'x' })),
+            'local-only slips are never claimable through the outbox vocabulary');
+        assert.strictEqual(engine.eventStore.pending(50).some((e) => e.payload.aggregate_id === 'kot:kot-order'), false,
+            'a local kitchen slip never becomes an outbox event');
+        const claimed = engine.claimLocalPrint('kot:kot-order', 'dev-1');
+        assert.strictEqual(claimed.status, 'claimed');
+        assert.strictEqual(engine.localPrintJobs().length, 0, 'claimed jobs leave the drain list');
+        expect('claim_conflict', () => engine.finishLocalPrint('kot:kot-order', 'wrong-token', true));
+        const requeued = engine.finishLocalPrint('kot:kot-order', claimed.claim_token, false, 'printer offline');
+        assert.strictEqual(requeued.status, 'queued');
+        assert.strictEqual(requeued.last_error, 'printer offline');
+        assert.strictEqual(engine.localPrintJobs(Date.now()).length, 0, 'a failed slip waits out its backoff');
+        assert.strictEqual(engine.localPrintJobs(Date.now() + 10 * 60 * 1000).length, 1, 'then retries');
+        const again = engine.claimLocalPrint('kot:kot-order', 'dev-1');
+        assert.strictEqual(engine.finishLocalPrint('kot:kot-order', again.claim_token, true).status, 'completed');
+        assert.strictEqual(engine.eventStore.pending(50).some((e) => e.payload.aggregate_id === 'kot:kot-order'), false);
+        assert.strictEqual(engine.snapshot().print_queue['kot:kot-order'].status, 'completed');
+        engine.execute(command('order.cancel', 'kot-order', 1));
         assert.strictEqual(engine.snapshot().orders['order-1'].lines[0].tax_snapshot.rate_basis_points, 1600);
 
         engine.execute(command('customer.upsert', 'customer-1', 0, { name: 'A' }));

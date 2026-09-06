@@ -246,8 +246,51 @@ const primed = getStore(saleName);
 assert(await primed.match('/pos/invoice/create'), 'prime message did not cache PRA document');
 assert(await primed.match('/fbr-pos/create'), 'prime message did not cache FBR document');
 
+// 7. Waiter tablet page (Sep 2026): NETWORK-FIRST with an offline fallback to
+// the last validated copy; login redirects pass through and evict; query
+// variants and the waiter API stay network-only (never runtime-cached).
+const waiterHtml = (tag) => '<!doctype html><html><body><div x-data="waiterApp()" data-tn-waiter-document="1">' + tag + '</div>'
+  + '<script>function waiterApp() { return {}; }</script>' + 'x'.repeat(2100) + '</body></html>';
+networkHandler = async (input) => htmlResponse(waiterHtml('waiter-network'), { url: ORIGIN + '/pos/waiter' });
+served = await dispatchFetch(request('/pos/waiter'));
+assert((await served.text()).includes('waiter-network'), 'online waiter page was not served from the network');
+const waiterName = [...cacheStores.keys()].find((name) => name.endsWith('-waiter'));
+assert(waiterName, 'WAITER_CACHE was not opened');
+const waiterCache = getStore(waiterName);
+assert(await waiterCache.match('/pos/waiter'), 'valid waiter document was not cached');
+
+networkHandler = async () => { throw new Error('shop internet down'); };
+served = await dispatchFetch(request('/pos/waiter'));
+assert((await served.text()).includes('waiter-network'), 'waiter page did not cold-start from WAITER_CACHE offline');
+
+networkHandler = async () => htmlResponse(waiterHtml('waiter-fresher'), { url: ORIGIN + '/pos/waiter' });
+served = await dispatchFetch(request('/pos/waiter'));
+assert((await served.text()).includes('waiter-fresher'), 'cloud did not stay first once the network answered again');
+assert((await (await waiterCache.match('/pos/waiter')).text()).includes('waiter-fresher'), 'network document did not refresh WAITER_CACHE');
+
+networkHandler = async () => htmlResponse('<html>login</html>', { redirected: true, url: ORIGIN + '/pos/login' });
+served = await dispatchFetch(request('/pos/waiter'));
+assert(served.redirected, 'waiter login redirect was hidden behind the cache');
+assert(!(await waiterCache.match('/pos/waiter')), 'personal waiter copy survived an auth redirect');
+
+await waiterCache.put('/pos/waiter', htmlResponse('<html>partial</html>'));
+networkHandler = async () => { throw new Error('offline again'); };
+served = await dispatchFetch(request('/pos/waiter'));
+assert(served.status === 503 || (await served.text()).includes('offline'), 'invalid waiter copy + outage did not surface a recovery/offline page');
+assert(!(await waiterCache.match('/pos/waiter')), 'invalid waiter copy was not evicted');
+
+networkHandler = async (input) => htmlResponse(waiterHtml('api-or-query'), { url: typeof input === 'string' ? input : input.url });
+assert((await dispatchFetch(request('/pos/waiter/api/tables', { mode: 'cors' }))) === undefined, 'waiter API must stay network-only');
+assert((await dispatchFetch(request('/pos/waiter?table_id=3'))) === undefined, 'waiter query variant must stay network-only');
+assert(!(await waiterCache.match('/pos/waiter')), 'API/query traffic must never populate WAITER_CACHE');
+
+await dispatchMessage({ type: 'TN_PRIME_WAITER_CACHE' });
+assert(await getStore(waiterName).match('/pos/waiter'), 'prime message did not cache the waiter document');
+await dispatchFetch(request('/pos/logout'));
+assert(!cacheStores.has(waiterName) || !(await getStore(waiterName).match('/pos/waiter')), 'logout did not purge WAITER_CACHE');
+
 // Defensive message paths must remain harmless.
 await dispatchMessage({ type: 'SKIP_WAITING' });
 await dispatchMessage(undefined);
 
-console.log('SW SMOKE OK: validated PRA/FBR sale documents, hard-refresh network preference, offline fallback, invalid-cache eviction, auth cleanup, recovery UI, prime-cache and ordinary events.');
+console.log('SW SMOKE OK: validated PRA/FBR sale documents, waiter offline cold-start, hard-refresh network preference, offline fallback, invalid-cache eviction, auth cleanup, recovery UI, prime-cache and ordinary events.');

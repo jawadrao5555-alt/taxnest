@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260906-021202-3efb471d'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260906-waiter-offline-1'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -25,6 +25,14 @@ const SALE_DOCUMENT_HEADER = 'x-taxnest-sale-document';
 // cache lets the board open even with no internet (last-known snapshot).
 // Purged on logout so the next staff member never sees stale table statuses.
 const TABLES_CACHE = `${CACHE_VERSION}-tables`;
+// OFFLINE COLD-START FOR THE WAITER TABLET (Sep 2026): dedicated cache for
+// /pos/waiter — NETWORK-FIRST (cloud stays first while the net is up), offline
+// fallback to the last validated copy so the WebView can reopen the page during
+// an outage and keep punching orders through the shop PC's Local Core bridge.
+// Same hygiene as SALE_CACHE: purged on ANY logout and any /login POST (the page
+// bakes the waiter's own user id, name, grid prefs and permissions).
+const WAITER_CACHE = `${CACHE_VERSION}-waiter`;
+const WAITER_PAGE = '/pos/waiter';
 const OFFLINE_PAGE = '/offline-splash';
 
 // Task 865: durable cache name for per-client Tables serve-mode flags.
@@ -94,6 +102,21 @@ async function fetchSaleDocument(request, cache, variant) {
     return { response, valid };
 }
 
+// A cached waiter page is an authenticated document too: only a fully rendered
+// waiter view (structural markers, never product data) may become the offline copy.
+async function isValidWaiterDocument(response) {
+    const contentType = response && response.headers && response.headers.get('content-type') || '';
+    if (!response || !response.ok || response.redirected || !contentType.includes('text/html')) return false;
+    try {
+        const html = await response.clone().text();
+        return html.length > 2048
+            && html.includes('data-tn-waiter-document')
+            && html.includes('function waiterApp()');
+    } catch (_) {
+        return false;
+    }
+}
+
 function saleRecoveryResponse() {
     return new Response(SALE_RECOVERY_HTML, {
         status: 503,
@@ -131,7 +154,7 @@ self.addEventListener('fetch', e => {
     // GET or POST) purges all cached authenticated pages so the next user on a shared
     // terminal can never see the previous session's pages, even offline.
     if (url.pathname.includes('/logout')) {
-        e.waitUntil(Promise.all([caches.delete(RUNTIME_CACHE), caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE), caches.delete(TN_TABLES_META)]));
+        e.waitUntil(Promise.all([caches.delete(RUNTIME_CACHE), caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE), caches.delete(WAITER_CACHE), caches.delete(TN_TABLES_META)]));
         return;
     }
 
@@ -142,7 +165,7 @@ self.addEventListener('fetch', e => {
         // Tables board is cache-first + bakes per-session data — must be purged
         // alongside the sale screen on user-switch so a new login never sees the
         // previous session's table snapshot (cross-user exposure on shared terminals).
-        e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE), caches.delete(TN_TABLES_META)]));
+        e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE), caches.delete(WAITER_CACHE), caches.delete(TN_TABLES_META)]));
         return;
     }
 
@@ -256,6 +279,32 @@ self.addEventListener('fetch', e => {
         return;
     }
 
+    // WAITER TABLET (Sep 2026): exact match on /pos/waiter (no query string).
+    // Network-FIRST — the cloud is the authority whenever it answers, and the
+    // cache is refreshed from every valid network document. Only when the
+    // network itself fails (shop internet down) does the last validated copy
+    // load; the page then reads tables/orders and punches holds through the
+    // shop PC's Local Core bridge. A login redirect (session gone) is returned
+    // as-is and the stale personal copy is dropped, never replayed. With no
+    // valid copy the recovery page appears — the same honest state as before.
+    if (req.mode === 'navigate' && url.pathname === WAITER_PAGE && url.search === '') {
+        e.respondWith((async () => {
+            const c = await caches.open(WAITER_CACHE);
+            try {
+                const res = await fetch(req);
+                if (await isValidWaiterDocument(res)) c.put(req, res.clone());
+                else if (saleDocumentLooksLikeLogin(res)) await c.delete(req);
+                return res;
+            } catch (err) {
+                const cached = await c.match(req);
+                if (cached && await isValidWaiterDocument(cached)) return cached;
+                if (cached) await c.delete(req);
+                return (await caches.match(OFFLINE_PAGE)) || saleRecoveryResponse();
+            }
+        })());
+        return;
+    }
+
     // Never cache: auth, API, admin, agent, FBR submit, payment posting, livewire, debugbar
     // '/pos/receipt-settings' (Task 1377): a runtime-cached copy of this page is
     // served whenever the network blips, and its form then POSTs an OLD field set —
@@ -285,8 +334,10 @@ self.addEventListener('fetch', e => {
     // a runtime-cached copy would survive logout and could show the NEXT user a
     // previous shop's stock. Network-only, like every other authenticated
     // stock/settings screen.
-    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/return', '/pos/restaurant/tables', '/track/', '/fbr-pos/pharmacy/', ...SETTINGS_PAGES];
-    if (skipPatterns.some(p => url.pathname.includes(p))) return;
+    const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter/', '/proof-bill', '/pos/customers', '/pos/riders/tracking', '/fbr-pos/held/', '/fbr-pos/transaction/', '/return', '/pos/restaurant/tables', '/track/', '/fbr-pos/pharmacy/', ...SETTINGS_PAGES];
+    // '/pos/waiter/' above covers the waiter API + sub-pages; the bare page with a
+    // query string (not handled by the WAITER_CACHE block) stays network-only too.
+    if (url.pathname === WAITER_PAGE || skipPatterns.some(p => url.pathname.includes(p))) return;
 
     // HTML pages: network-first → cache → offline page
     if (req.mode === 'navigate') {
@@ -421,6 +472,22 @@ self.addEventListener('message', e => {
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(url, res.clone());
             } catch (err) { /* best-effort — next online visit still primes via navigate path */ }
+        })());
+    }
+    // Waiter page (Sep 2026): WAITER_CACHE re-prime after a browser-data clear
+    // or a fresh install — the first visit is not SW-controlled, so the page
+    // posts this once it boots without a controller. Fixed URL, validated
+    // document only (never a login redirect or partial HTML).
+    if (e.data && e.data.type === 'TN_PRIME_WAITER_CACHE') {
+        e.waitUntil((async () => {
+            try {
+                const c = await caches.open(WAITER_CACHE);
+                const cached = await c.match(WAITER_PAGE);
+                if (cached && await isValidWaiterDocument(cached)) return;
+                if (cached) await c.delete(WAITER_PAGE);
+                const res = await fetch(WAITER_PAGE, { credentials: 'same-origin' });
+                if (await isValidWaiterDocument(res)) await c.put(WAITER_PAGE, res.clone());
+            } catch (err) { /* best-effort — next online visit primes via the navigate path */ }
         })());
     }
     // Task 865: lightweight echo — page asks "what is my client ID?" so it can

@@ -6,6 +6,7 @@ use App\Models\AgentCoreEvent;
 use App\Models\Company;
 use App\Models\PosProduct;
 use App\Models\PosDeal;
+use App\Models\PosPrintJob;
 use App\Models\PosService;
 use App\Models\PosStation;
 use App\Models\PosTransaction;
@@ -95,6 +96,8 @@ final class AgentCoreRestaurantProjector
                 'table.release', 'table.released' => $this->releaseTable($company, $event, $data, $scope, $domainAggregate),
                 'kot.request', 'kot.requested' => $this->requestKot($company, $event, $data, $scope, $aggregate),
                 'kot.print', 'kot.printed' => $this->markKotPrinted($company, $event, $data, $scope, $aggregate),
+                'print.complete' => $this->localKotPrinted($company, $event, $data, $scope, $aggregate),
+                'print.fail' => $this->localKotHandedBack($company, $event, $data, $scope, $aggregate),
                 default => $this->reject($event, 'unsupported_command', 'Unsupported restaurant command.'),
             };
         } catch (RestaurantProjectionConflict $conflict) {
@@ -162,9 +165,10 @@ final class AgentCoreRestaurantProjector
         }
         $snapshotHash = hash('sha256', json_encode($snapshot, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION));
 
+        $kotDocument = $data['kot_document'] ?? null;
         return DB::transaction(function () use (
             $company, $event, $aggregate, $snapshot, $snapshotHash, $userId, $type,
-            $lines, $lineInput, $discount, $tax, $totals, $tableId, $tableAggregate
+            $lines, $lineInput, $discount, $tax, $totals, $tableId, $tableAggregate, $kotDocument
         ): AgentCoreProjectionOutcome {
             Company::whereKey($company->id)->lockForUpdate()->first();
             $existingMap = $this->aggregates->resolve(
@@ -206,6 +210,22 @@ final class AgentCoreRestaurantProjector
                 'discount_amount' => $discount,
                 'tax_amount' => $tax,
             ]));
+            // Offline KOT (Sep 2026): when the hold carried a kot_document the
+            // shop PC is printing the kitchen slip itself from its local
+            // print_queue. Record a LOCAL HANDOFF for the kitchen lines (the
+            // cloud KOT paths skip them while it is fresh) — but do NOT stamp
+            // them printed: that happens only on the shop PC's durable
+            // print.complete ack (localKotPrinted), or the cloud prints them
+            // itself when the handoff is given back / times out.
+            if (is_array($kotDocument) && !empty($kotDocument['lines'])) {
+                $handoffIds = PosKitchenLines::scope($order->items())->pluck('id')->map(fn ($id) => (int) $id)->all();
+                if ($handoffIds) {
+                    KotPrintService::openLocalHandoff(
+                        $company, $order, $aggregate, $handoffIds, (string) $event->device_uid,
+                        $userId, now(),
+                    );
+                }
+            }
             if ($tableId) {
                 $error = $this->lockedAssign($company, $order, $tableId, false);
                 if ($error !== null) throw new RestaurantProjectionConflict($error);
@@ -605,6 +625,81 @@ final class AgentCoreRestaurantProjector
             $order->update(['kot_sent_at' => $event->occurred_at ?: now(), 'kot_print_count' => max((int) $order->kot_print_count, $batch)]);
             return $this->done($event, ['order_id' => $order->id, 'printed_line_ids' => $stampIds->map(fn ($id) => (int) $id)->values()->all()]);
         });
+    }
+
+    /**
+     * Offline KOT ack (Sep 2026): the shop PC printed the kitchen slip it
+     * took over in an offline hold. Event aggregate = the local print job
+     * `kot:<order aggregate>`; the cloud handoff row shares that token.
+     * KotPrintService::acknowledgeLocalHandoff does the durable work: stamp
+     * only still-unstamped lines (idempotent on replay), close the handoff,
+     * void/trim any still-pending cloud KOT that was about to reprint these
+     * lines (expired-handoff recovery, safety net). A handoff row that never
+     * existed (pre-migration cloud) still stamps the order's lines — the
+     * paper is in the kitchen either way.
+     */
+    private function localKotPrinted(Company $company, AgentCoreEvent $event, array $data, array $scope, string $aggregate): AgentCoreProjectionOutcome
+    {
+        $orderAggregate = $this->localKotOrderAggregate($aggregate, $data);
+        if ($orderAggregate === '') return $this->reject($event, 'invalid_envelope', 'Local KOT ack must name its order.');
+        if (!$this->mappedOrderId($company, $event, $orderAggregate)) return $this->missingOrder($event, $orderAggregate);
+        return DB::transaction(function () use ($company, $event, $orderAggregate): AgentCoreProjectionOutcome {
+            $order = $this->lockedOrder($company, $event, [], $orderAggregate);
+            if (!$order) return $this->reject($event, 'not_found', 'Order does not exist in this scope.');
+            $ack = KotPrintService::acknowledgeLocalHandoff($company, $order, $orderAggregate, $event->occurred_at ?: now());
+            return $this->done($event, array_merge(['order_id' => $order->id, 'order_aggregate_id' => $orderAggregate], $ack));
+        });
+    }
+
+    /**
+     * Offline KOT hand-back (Sep 2026): the shop PC gave up printing the slip
+     * it took over (handoff window over, printer never answered). Close the
+     * handoff and print the still-unprinted lines through the normal cloud
+     * KOT path right away — the retry semantics mirror requestKot.
+     */
+    private function localKotHandedBack(Company $company, AgentCoreEvent $event, array $data, array $scope, string $aggregate): AgentCoreProjectionOutcome
+    {
+        $orderAggregate = $this->localKotOrderAggregate($aggregate, $data);
+        if ($orderAggregate === '') return $this->reject($event, 'invalid_envelope', 'Local KOT hand-back must name its order.');
+        if (($data['terminal'] ?? false) !== true) {
+            return $this->done($event, ['order_aggregate_id' => $orderAggregate, 'ignored' => 'non_terminal']);
+        }
+        $order = $this->order($company, $event, [], $orderAggregate);
+        if (!$order) return $this->missingOrder($event, $orderAggregate);
+        $handoff = $this->localHandoffRow($company, $orderAggregate);
+        if ($handoff && $handoff->status === KotPrintService::LOCAL_STATUS) {
+            $handoff->update(['status' => 'failed', 'error' => 'Shop PC gave the slip back: ' . (string) ($data['error'] ?? 'print_failed')]);
+        }
+        if ($handoff && $handoff->status === 'done') {
+            return $this->done($event, ['order_id' => $order->id, 'ignored' => 'already_printed']);
+        }
+        if (!in_array($order->status, self::OPEN, true)) {
+            return $this->done($event, ['order_id' => $order->id, 'ignored' => 'order_closed']);
+        }
+        $queued = KotPrintService::enqueueForOrder($company, $order, $this->scopeUser($company, $scope), true);
+        if (!($queued['printed'] ?? false)) {
+            $reason = (string) ($queued['reason'] ?? 'error');
+            return in_array($reason, ['agent_offline', 'error'], true)
+                ? $this->retry($event, 'kot-printer', "KOT enqueue failed: {$reason}.")
+                : $this->done($event, ['order_id' => $order->id, 'print_job_ids' => [], 'kot_unavailable' => $reason]);
+        }
+        return $this->done($event, ['order_id' => $order->id, 'print_job_ids' => array_values($queued['job_ids'] ?? [])]);
+    }
+
+    private function localKotOrderAggregate(string $aggregate, array $data): string
+    {
+        $fromData = (string) ($data['order_id'] ?? '');
+        $fromJob = str_starts_with($aggregate, 'kot:') ? substr($aggregate, 4) : '';
+        if ($fromData !== '' && $fromJob !== '' && $fromData !== $fromJob) return '';
+        return $fromData !== '' ? $fromData : $fromJob;
+    }
+
+    private function localHandoffRow(Company $company, string $orderAggregate): ?PosPrintJob
+    {
+        if (!Schema::hasTable('pos_print_jobs')) return null;
+        return PosPrintJob::where('company_id', $company->id)
+            ->where('claim_token', KotPrintService::localHandoffToken($orderAggregate))
+            ->orderByDesc('id')->lockForUpdate()->first();
     }
 
     private function lockedAssign(Company $company, RestaurantOrder $order, int $tableId, bool $shift): ?string

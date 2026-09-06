@@ -338,6 +338,8 @@ const APP_BODY =
     '<h1>Is device ko shop ke PC se jorein</h1>' +
     '<p>Shop ke PC par NestPOS agent window kholein — wahan 6 hindson ka pairing code likha hota hai. ' +
     'Wohi code yahan daalein.</p>' +
+    '<p style="font-size:12px;color:#8b83c9">Net ho to cloud, net jaye to shop PC — pair hone ke baad bhi yeh device ' +
+    'internet par taxnest.pk se hi chalta hai; shop PC sirf net band hone par kaam sambhalta hai.</p>' +
     '<form id="pairForm" autocomplete="off">' +
     '<label for="code">Pairing code</label>' +
     '<input id="code" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" ' +
@@ -362,7 +364,9 @@ const APP_BODY =
     '<div id="viewStatus" class="hide">' +
     '<div class="card">' +
     '<h1>Yeh device juda hua hai</h1>' +
-    '<p style="margin-bottom:6px">Shop ke PC se seedha rabta chal raha hai — internet band ho tab bhi.</p>' +
+    '<p style="margin-bottom:6px"><b>Net ho to cloud, net jaye to shop PC</b> — internet chalta ho to yeh device ' +
+    'pehle ki tarah taxnest.pk se hi kaam karta hai; sirf net band hone par shop ka PC sahara banta hai ' +
+    '(waiter page, tables, orders, kitchen slip). Rider app par koi asar nahi — wo apne mobile data par pehle jaisi.</p>' +
     '<ul class="rows">' +
     '<li><span class="k">Device ka naam</span><span class="v" id="devName">—</span></li>' +
     '<li><span class="k">Kaam</span><span class="v" id="devKind">—</span></li>' +

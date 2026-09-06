@@ -570,6 +570,12 @@ class EventStore {
         return state && state.sync_result ? clone(state.sync_result) : null;
     }
 
+    /** Outbox delivery state of one event: { state, attempts, updated_at_ms } or null when unknown/compacted. */
+    outboxState(id) {
+        const state = this.outbox.get(String(id));
+        return state ? { state: state.state, attempts: state.attempts, updated_at_ms: state.updated_at_ms } : null;
+    }
+
     acknowledge(ids, scope) {
         const allowed = new Set();
         for (const id of (ids || []).map(String)) {

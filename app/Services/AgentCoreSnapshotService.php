@@ -26,7 +26,7 @@ class AgentCoreSnapshotService
                 'products', 'pos_products', 'pos_tax_rules', 'inventory_stocks',
                 'ingredients', 'ingredient_stocks', 'product_recipes',
                 'customer_profiles', 'customer_ledgers', 'pos_customers',
-                'restaurant_tables', 'restaurant_orders', 'restaurant_order_items',
+                'restaurant_floors', 'restaurant_tables', 'restaurant_orders', 'restaurant_order_items',
                 'pos_held_sales', 'pos_day_openings', 'pos_day_close_reports',
                 'pos_expenses', 'expenses', 'pos_user_sessions',
             ];
@@ -39,6 +39,17 @@ class AgentCoreSnapshotService
                     if ($stamp !== false) $revision = max($revision, $stamp * 1000);
                 }
             }
+            // The local `orders` projection means OPEN orders (held / preparing /
+            // ready) — the ones a counter or waiter can still recall offline.
+            // Closed history stays in the cloud (a busy shop has tens of
+            // thousands of settled orders; shipping them made every snapshot
+            // import grow without bound). The revision already covered every
+            // row above, so it stays monotonic when an order leaves the set.
+            $rows['restaurant_orders'] = array_values(array_filter($rows['restaurant_orders'],
+                fn (array $row) => in_array((string) ($row['status'] ?? ''), ['held', 'preparing', 'ready'], true)));
+            $openOrderIds = array_fill_keys(array_map(fn (array $row) => (string) $row['id'], $rows['restaurant_orders']), true);
+            $rows['restaurant_order_items'] = array_values(array_filter($rows['restaurant_order_items'],
+                fn (array $row) => isset($openOrderIds[(string) ($row['order_id'] ?? '')])));
 
             $user = User::query()->whereKey($lease->user_id)->where('company_id', $company->id)->firstOrFail();
             $cashDays = $this->cashDays($rows['pos_day_openings'], $rows['pos_day_close_reports'],
@@ -46,15 +57,29 @@ class AgentCoreSnapshotService
             $today = now()->toDateString();
             $cashDays[$today] ??= ['business_date' => $today, 'opening_cash_cents' => 0,
                 'expenses' => [], 'closed' => false];
+            // Shape contract (Sep 2026): every key below must match what the
+            // clients actually send in their frozen snapshots, or the domain
+            // rejects offline holds with ingredient_not_found / table_not_found /
+            // already_claimed while the internet-cut test (self-consistent mock)
+            // stays green:
+            //   • recipe parts + ingredient stock  → 'ingredient-<id>' (PosController / universal)
+            //   • direct product consumption       → plain '<product_id>' (inventory_stocks)
+            //   • catalog.tables = restaurant_tables rows (findEntity target);
+            //     top-level tables = CLAIMS only (table_id → open order), never rows.
             $payload = [
                 'catalog' => [
-                    'products' => array_values(array_merge($rows['products'], $rows['pos_products'])),
+                    // POS products first: Local Core holds come from POS clients,
+                    // and findEntity() returns the FIRST id match.
+                    'products' => array_values(array_merge($rows['pos_products'], $rows['products'])),
                     'taxes' => $rows['pos_tax_rules'],
+                    'ingredients' => $this->ingredientCatalog($rows['ingredients'], $rows['inventory_stocks'], $rows['pos_products']),
+                    'tables' => array_values($rows['restaurant_tables']),
+                    'floors' => array_values($rows['restaurant_floors']),
                 ],
-                'stock' => $this->quantities($rows['inventory_stocks'], $rows['ingredient_stocks']),
+                'stock' => $this->quantities($rows['inventory_stocks'], $rows['ingredients'], $rows['ingredient_stocks']),
                 'recipes' => $this->recipes($rows['product_recipes']),
                 'customers' => $this->customers($rows['customer_profiles'], $rows['pos_customers'], $rows['customer_ledgers']),
-                'tables' => $this->keyById($rows['restaurant_tables']),
+                'tables' => $this->tableClaims($rows['restaurant_tables'], $rows['restaurant_orders']),
                 'orders' => $this->orders($rows['restaurant_orders'], $rows['restaurant_order_items'], $rows['pos_held_sales']),
                 'cash_days' => $cashDays,
                 'staff_sessions' => $this->keyById($rows['pos_user_sessions']),
@@ -66,6 +91,9 @@ class AgentCoreSnapshotService
                         'name' => (string) $user->name,
                         'role' => (string) ($user->pos_role ?: $user->role),
                     ],
+                    // Offline KOT routing for the agent's local print drain
+                    // (src/local-kot.js). Same source as the cloud's KotPrintService.
+                    'print' => $this->printSettings($company),
                 ],
             ];
             $scope = ['company_id' => (string) $company->id, 'branch_id' => (string) $branchId,
@@ -113,24 +141,105 @@ class AgentCoreSnapshotService
         return $out;
     }
 
-    private function quantities(array ...$sets): array
+    /**
+     * Stock keyed exactly as the clients reference it in frozen consumption
+     * parts: 'ingredient-<id>' for ingredients (their live balance lives on
+     * ingredients.current_stock; an optional ingredient_stocks row wins when
+     * present) and the bare product id for direct product consumption.
+     */
+    private function quantities(array $inventoryStocks, array $ingredients, array $ingredientStocks): array
     {
         $out = [];
-        foreach ($sets as $rows) foreach ($rows as $row) {
-            $id = isset($row['ingredient_id']) ? 'ingredient:'.$row['ingredient_id'] : 'product:'.$row['product_id'];
-            $out[$id] = (float) ($row['quantity'] ?? 0);
+        foreach ($inventoryStocks as $row) {
+            if (!isset($row['product_id'])) continue;
+            $out[(string) $row['product_id']] = ($out[(string) $row['product_id']] ?? 0) + (float) ($row['quantity'] ?? 0);
+        }
+        foreach ($ingredients as $row) {
+            $out['ingredient-'.$row['id']] = (float) ($row['current_stock'] ?? $row['quantity'] ?? 0);
+        }
+        foreach ($ingredientStocks as $row) {
+            if (!isset($row['ingredient_id'])) continue;
+            $out['ingredient-'.$row['ingredient_id']] = (float) ($row['quantity'] ?? 0);
         }
         return $out;
     }
 
+    /** Only ACTIVE recipe parts — the same filter the sale screens bake. */
     private function recipes(array $rows): array
     {
         $out = [];
-        foreach ($rows as $row) $out[(string) $row['product_id']][] = [
-            'stock_id' => 'ingredient:'.$row['ingredient_id'], 'quantity' => (float) $row['quantity_needed'],
-            'version' => (int) ($row['recipe_version'] ?? 1),
-        ];
+        foreach ($rows as $row) {
+            if (array_key_exists('is_active', $row) && !$row['is_active']) continue;
+            $out[(string) $row['product_id']][] = [
+                'stock_id' => 'ingredient-'.$row['ingredient_id'], 'quantity' => (float) $row['quantity_needed'],
+                'version' => (int) ($row['recipe_version'] ?? 1),
+            ];
+        }
         return $out;
+    }
+
+    /**
+     * catalog.ingredients — every consumable the domain may be asked to
+     * reserve: ingredient rows under 'ingredient-<id>' plus a product-stock
+     * entry under the bare product id for direct consumption.
+     */
+    private function ingredientCatalog(array $ingredients, array $inventoryStocks, array $products): array
+    {
+        $out = [];
+        foreach ($ingredients as $row) {
+            $out[] = array_merge($row, ['id' => 'ingredient-'.$row['id'], 'ingredient_id' => (int) $row['id'], 'kind' => 'ingredient']);
+        }
+        $names = [];
+        foreach ($products as $product) $names[(string) $product['id']] = (string) ($product['name'] ?? '');
+        $seen = [];
+        foreach ($inventoryStocks as $row) {
+            if (!isset($row['product_id']) || isset($seen[(string) $row['product_id']])) continue;
+            $seen[(string) $row['product_id']] = true;
+            $out[] = ['id' => (string) $row['product_id'], 'product_id' => (int) $row['product_id'], 'kind' => 'product',
+                'name' => $names[(string) $row['product_id']] ?? '', 'updated_at' => $row['updated_at'] ?? null];
+        }
+        return $out;
+    }
+
+    /**
+     * Top-level tables = CLAIMS (the domain's one-open-order-per-table rule),
+     * derived from open restaurant orders and non-available table status —
+     * never the raw table rows, which the domain would read as "every table
+     * already claimed".
+     */
+    private function tableClaims(array $tables, array $orders): array
+    {
+        $out = [];
+        foreach ($orders as $order) {
+            if (empty($order['table_id']) || !in_array((string) ($order['status'] ?? ''), ['held', 'preparing', 'ready'], true)) continue;
+            $tableId = (string) $order['table_id'];
+            if (isset($out[$tableId])) continue;
+            $stamp = isset($order['created_at']) ? strtotime((string) $order['created_at']) : false;
+            $out[$tableId] = ['order_id' => (string) $order['id'], 'claimed_by' => null,
+                'claimed_at_ms' => $stamp === false ? 0 : $stamp * 1000, 'table_revision' => null, 'source' => 'cloud'];
+        }
+        foreach ($tables as $table) {
+            $status = (string) ($table['status'] ?? 'available');
+            if ($status === 'available' || isset($out[(string) $table['id']])) continue;
+            $out[(string) $table['id']] = ['order_id' => null, 'claimed_by' => null, 'claimed_at_ms' => 0,
+                'table_revision' => null, 'source' => 'cloud', 'table_status' => $status];
+        }
+        return $out;
+    }
+
+    private function printSettings(Company $company): array
+    {
+        $settings = method_exists($company, 'printerSettings') ? (array) $company->printerSettings() : [];
+        return [
+            'silent_print_enabled' => (bool) ($settings['silent_print_enabled'] ?? false),
+            'kot_printer' => ($settings['kot_printer'] ?? null) ?: null,
+            'kot_printer_device' => ($settings['kot_printer_device'] ?? null) ?: null,
+            'counter_kot_enabled' => (bool) ($settings['counter_kot_enabled'] ?? false),
+            'counter_kot_printer' => ($settings['counter_kot_printer'] ?? null) ?: null,
+            'kot_compact' => (bool) ($company->kot_compact ?? false),
+            'kot_align_center' => (bool) ($company->kot_align_center ?? false),
+            'kot_left_margin_mm' => max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0))),
+        ];
     }
 
     private function customers(array $profiles, array $pos, array $ledger): array

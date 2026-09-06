@@ -13,6 +13,9 @@ const { validateAuthority, signWireEvent } = require('./lease-chain');
 
 const MAGIC = Buffer.from('PRADOM1');
 const FILE = 'domain-state.bin';
+// Local-only kitchen slips queued by order.hold (see KOT block in _project).
+const KOT_JOB_PREFIX = 'kot:';
+const KOT_RETRY_BACKOFF_MS = [5000, 15000, 30000, 60000, 120000];
 const TXN_FILE = 'domain-transaction.bin';
 const MAX_BYTES = 128 * 1024 * 1024;
 
@@ -719,6 +722,29 @@ class LocalCoreDomain {
                 validateRevision(snapshot.table_revision, table, 'table');
                 if (s.tables[tableId]) fail('already_claimed', 'table already has an order');
             }
+            // Offline KOT rides INSIDE the hold (optional payload.kot_document):
+            // paired waiters may only send order.*/table.* commands, so a
+            // separate print.enqueue is impossible for them. The kitchen slip is
+            // a LOCAL-ONLY print_queue job (kind 'kot', never an outbox event);
+            // the same document travels to the cloud in this event's data so the
+            // cloud records a local HANDOFF (no cloud slip while the shop PC owns
+            // it); the lines are stamped printed only by the durable
+            // print.complete ack after the paper really came out.
+            const kot = p.kot_document;
+            if (kot != null) {
+                if (!plainObject(kot) || kot.kind !== 'kot' || !Array.isArray(kot.lines) || !kot.lines.length ||
+                    (kot.order_id != null && String(kot.order_id) !== c.aggregate_id)) {
+                    fail('invalid_kot_document', 'kot document must reference this order and carry kitchen lines');
+                }
+                kot.lines.forEach((line) => {
+                    if (!plainObject(line) || typeof line.line_id !== 'string' || !lineIds.has(line.line_id) ||
+                        typeof line.name !== 'string' || !line.name) {
+                        fail('invalid_kot_document', 'kot lines must reference held order lines');
+                    }
+                    quantity(line.quantity, 'kot line quantity');
+                });
+                if (s.print_queue[KOT_JOB_PREFIX + c.aggregate_id]) fail('already_exists', 'kot job already exists');
+            }
             Object.entries(reserved).forEach(([id, used]) => setStockQuantity(id, stockQuantity(id) - used));
             const immutable = clone(snapshot);
             immutable.lines.forEach((line) => { line.consumed = true; });
@@ -727,10 +753,21 @@ class LocalCoreDomain {
                 table_id: tableId, reserved_consumptions: Object.entries(reserved)
                     .map(([stock_id, reserved_quantity]) => ({ stock_id, quantity: reserved_quantity })),
                 reservation_restored: false, held_at_ms: c.at_ms, claimed_by: null,
+                // Who punched it (waiter "meray orders" offline filter + counter label).
+                held_by_user_id: c.scope.user_id == null ? null : String(c.scope.user_id),
+                held_by_device_id: c.scope.device_id == null ? null : String(c.scope.device_id),
+                kot_job_id: kot == null ? null : KOT_JOB_PREFIX + c.aggregate_id,
             });
             if (tableId) {
                 s.tables[tableId] = { order_id: c.aggregate_id, claimed_by: c.scope.device_id,
                     claimed_at_ms: c.at_ms, table_revision: snapshot.table_revision == null ? null : snapshot.table_revision };
+            }
+            if (kot != null) {
+                s.print_queue[KOT_JOB_PREFIX + c.aggregate_id] = {
+                    status: 'queued', kind: 'kot', local_only: true, order_id: c.aggregate_id,
+                    document: Object.assign(clone(kot), { order_id: c.aggregate_id }),
+                    attempts: 0, queued_at_ms: c.at_ms, last_error: null, next_attempt_at_ms: 0,
+                };
             }
             return s.orders[c.aggregate_id];
         }
@@ -888,7 +925,8 @@ class LocalCoreDomain {
             if (s.print_queue[c.aggregate_id]) fail('already_exists', 'print job already exists');
             s.print_queue[c.aggregate_id] = { status: 'queued', document: clone(p.document), attempts: 0 }; return s.print_queue[c.aggregate_id];
         case 'print.claim': {
-            const job = s.print_queue[c.aggregate_id]; if (!job || job.status !== 'queued') fail('claim_conflict', 'print job is not claimable');
+            const job = s.print_queue[c.aggregate_id];
+            if (!job || job.status !== 'queued' || job.local_only === true) fail('claim_conflict', 'print job is not claimable');
             job.status = 'claimed'; job.claimed_by = c.scope.device_id; job.claim_token = p.claim_token; job.attempts++; return job;
         }
         case 'print.complete': case 'print.fail': {
@@ -896,8 +934,21 @@ class LocalCoreDomain {
             if (!job || job.status !== 'claimed' || job.claim_token !== p.claim_token || job.claimed_by !== c.scope.device_id) {
                 fail('claim_conflict', 'print job claim does not match');
             }
-            job.status = c.type === 'print.complete' ? 'completed' : 'queued';
+            // Local-only KOT jobs reach this ONLY as the durable acknowledgement
+            // to the cloud: print.complete = the kitchen really has the slip
+            // (cloud stamps the lines); print.fail{terminal:true} = the shop PC
+            // gives the slip back (cloud prints it through its own KOT path).
+            // Retryable local failures never come here (finishLocalPrint).
+            if (job.local_only === true) {
+                if (p.kind !== 'kot' || String(p.order_id || '') !== String(job.order_id || '')) {
+                    fail('invalid_command', 'local kot acknowledgement must name its order');
+                }
+                if (c.type === 'print.fail' && p.terminal !== true) fail('invalid_command', 'local kot jobs only fail terminally');
+            }
+            const terminal = c.type === 'print.fail' && p.terminal === true;
+            job.status = c.type === 'print.complete' ? 'completed' : (terminal ? 'failed' : 'queued');
             job.completed_at_ms = c.type === 'print.complete' ? c.at_ms : null;
+            if (terminal) { job.failed_at_ms = c.at_ms; job.last_error = p.error == null ? 'print_failed' : String(p.error).slice(0, 240); }
             delete job.claim_token; delete job.claimed_by; return job;
         }
         default: fail('invalid_command_type', 'unsupported command');
@@ -917,7 +968,81 @@ class LocalCoreDomain {
             this._persist(next); this.state = next; return next.identities[namespace];
         });
     }
+
+    // ── Local-only print queue (offline KOT) ─────────────────────────────
+    // These jobs are created by order.hold (payload.kot_document) and drained
+    // by the agent's own printer on the shop PC. Claim and retryable failure
+    // are NOT domain commands (an outbox event per paper-out retry would be
+    // noise). Only the OUTCOME is durable: print.complete (kitchen has the
+    // slip → cloud stamps the lines) or print.fail{terminal} (handed back →
+    // cloud prints). The cloud opened the handoff from the order.held event.
+    localPrintJobs(nowMs) {
+        const now = Number.isFinite(nowMs) ? nowMs : this.now();
+        return Object.entries(this.state.print_queue || {})
+            .filter(([, job]) => job && job.local_only === true && job.status === 'queued' &&
+                Number(job.next_attempt_at_ms || 0) <= now)
+            .map(([id, job]) => Object.assign({ id }, clone(job), { hold_synced_at_ms: this._holdSyncedAtMs(job) }));
+    }
+    // When did the cloud accept the order.held event that created this local
+    // KOT job? null = still pending on the outbox (internet down: the shop PC is
+    // the only printer there is, keep retrying). A number = the cloud knows the
+    // order since then, and after the handoff window it prints the slip itself
+    // — so the drain must stop and hand the job back (print.fail terminal).
+    _holdSyncedAtMs(job) {
+        if (!job || !job.order_id) return null;
+        const held = (this.state.events || []).find((event) =>
+            event && event.type === 'order.held' && String(event.aggregate_id) === String(job.order_id));
+        if (!held) return Number(job.queued_at_ms || 0) || null; // compacted away = old = treat as long synced
+        const outbox = this.eventStore && typeof this.eventStore.outboxState === 'function'
+            ? this.eventStore.outboxState(held.id) : null;
+        if (!outbox) return Number(job.queued_at_ms || 0) || null;
+        return outbox.state === 'sent' ? Number(outbox.updated_at_ms) || null : null;
+    }
+    // Claim token + revision needed to issue the print.complete / print.fail
+    // acknowledgement command for a claimed local job.
+    localPrintAckInput(jobId) {
+        const job = (this.state.print_queue || {})[jobId];
+        if (!job || job.local_only !== true || job.status !== 'claimed') return null;
+        return { claim_token: job.claim_token, order_id: job.order_id,
+            expected_revision: this.state.revisions[jobId] || 0 };
+    }
+    claimLocalPrint(jobId, deviceId) {
+        if (typeof jobId !== 'string' || !jobId) fail('invalid_print_job', 'print job id is required');
+        return this._locked(() => {
+            const next = clone(this.state);
+            const job = next.print_queue[jobId];
+            if (!job || job.local_only !== true) fail('not_found', 'local print job does not exist');
+            if (job.status !== 'queued') fail('claim_conflict', 'local print job is not claimable');
+            job.status = 'claimed'; job.claimed_by = deviceId == null ? null : String(deviceId);
+            job.claim_token = crypto.randomBytes(16).toString('hex');
+            job.claimed_at_ms = this.now(); job.attempts = (job.attempts || 0) + 1;
+            this._persist(next); this.state = next;
+            return Object.assign({ id: jobId }, clone(job));
+        });
+    }
+    finishLocalPrint(jobId, claimToken, ok, error) {
+        if (typeof jobId !== 'string' || !jobId) fail('invalid_print_job', 'print job id is required');
+        return this._locked(() => {
+            const next = clone(this.state);
+            const job = next.print_queue[jobId];
+            if (!job || job.local_only !== true || job.status !== 'claimed' || job.claim_token !== claimToken) {
+                fail('claim_conflict', 'local print job claim does not match');
+            }
+            delete job.claim_token; delete job.claimed_by;
+            if (ok) {
+                job.status = 'completed'; job.completed_at_ms = this.now(); job.last_error = null;
+            } else {
+                // Printer off / paper out: keep the slip, retry with backoff — the
+                // kitchen must still get it once the printer answers again.
+                const step = Math.min(Math.max(job.attempts, 1) - 1, KOT_RETRY_BACKOFF_MS.length - 1);
+                job.status = 'queued'; job.last_error = error == null ? 'print_failed' : String(error).slice(0, 240);
+                job.next_attempt_at_ms = this.now() + KOT_RETRY_BACKOFF_MS[step];
+            }
+            this._persist(next); this.state = next;
+            return Object.assign({ id: jobId }, clone(job));
+        });
+    }
     close() { this.key.fill(0); }
 }
 
-module.exports = { LocalCoreDomain, DomainEngine: LocalCoreDomain, DOMAIN_STATE_FILE: FILE };
+module.exports = { LocalCoreDomain, DomainEngine: LocalCoreDomain, DOMAIN_STATE_FILE: FILE, KOT_JOB_PREFIX };

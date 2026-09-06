@@ -1266,6 +1266,13 @@ class AgentController extends Controller
      */
     private function printJobsHousekeeping($company): void
     {
+        // Offline KOT local handoff recovery (Sep 2026): a shop PC that took a
+        // kitchen slip during an internet cut but never acknowledged printing
+        // it (agent died / local state lost / printer never answered) hands
+        // the slip back to the cloud after the handoff window — this agent is
+        // online again, so the normal cloud KOT path can print it now.
+        \App\Services\KotPrintService::expireLocalHandoffs($company);
+
         // Task 1166 — stranded stamped-job rescue: a job stamped for a counter
         // whose agent stopped claiming (PC shut down right after enqueue, agent
         // downgraded mid-flight) must NEVER sit pending forever. Rescue ONLY
@@ -1386,7 +1393,7 @@ class AgentController extends Controller
             do {
                 $deleted = DB::table('pos_print_jobs')
                     ->where('company_id', $company->id)
-                    ->whereIn('status', ['done', 'failed'])
+                    ->whereIn('status', ['done', 'failed', \App\Services\KotPrintService::LOCAL_EXPIRED_STATUS])
                     ->where('updated_at', '<', now()->subDays(7))
                     ->limit(100)
                     ->delete();
@@ -1519,6 +1526,17 @@ class AgentController extends Controller
             $baked = ($delta && is_array($job->printed_item_ids) && count($job->printed_item_ids))
                 ? array_map('intval', $job->printed_item_ids)
                 : null;
+            // Offline KOT local handoff (Sep 2026): lines the shop PC has
+            // CONFIRMED printing are never ours, even when they were baked
+            // into this job before the ack arrived (recovery job of an expired
+            // handoff, safety-net fired in the gap). Durable ownership read at
+            // render time = the claim fence the ack's pending-only void cannot
+            // provide. An emptied baked set stays [] (→ 204), it must NOT fall
+            // back to the whereNull resolution.
+            if ($baked !== null) {
+                $shopPcPrinted = \App\Services\KotPrintService::shopPcPrintedLineIds($company, $order);
+                if ($shopPcPrinted) $baked = array_values(array_diff($baked, $shopPcPrinted));
+            }
             $unprinted = $baked !== null
                 ? $order->items->whereIn('id', $baked)->values()
                 : $order->items->whereNull('kot_printed_at');

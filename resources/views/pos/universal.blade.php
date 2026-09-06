@@ -8684,28 +8684,78 @@ function restaurantPos() {
                 if (etag) this._heldEtag = etag;
                 const fresh = await res.json();
                 if (!Array.isArray(fresh)) return;
+                // Offline Mode (Sep 2026): cloud is back → the cloud copy WINS.
+                // A shop-PC order that already replayed carries local_order_id on
+                // its cloud row, so its local twin (uuid id) is dropped here; local
+                // orders the cloud has not received yet stay visible until then.
+                const cloudSeen = new Set(fresh.map(o => o.local_order_id ? String(o.local_order_id) : null).filter(Boolean));
+                const pendingLocal = this.heldOrders.filter(o => o && o.local === true && !cloudSeen.has(String(o.id)));
                 // Preserve any recalled order that is actively being edited in the cart
                 // so a concurrent server-side update doesn't stomp the cashier's work.
-                const recalled = this.recalledOrderId ? Number(this.recalledOrderId) : null;
+                const recalled = this.recalledOrderId ? String(this.recalledOrderId) : null;
                 if (recalled) {
                     // Keep the local copy of the recalled order; replace everything else.
-                    const localRecalled = this.heldOrders.find(o => Number(o.id) === recalled);
-                    const merged = fresh.filter(o => Number(o.id) !== recalled);
+                    const localRecalled = this.heldOrders.find(o => String(o.id) === recalled);
+                    const merged = fresh.filter(o => String(o.id) !== recalled);
                     if (localRecalled) merged.push(localRecalled);
-                    this.heldOrders = merged;
+                    this.heldOrders = merged.concat(pendingLocal.filter(o => String(o.id) !== recalled && !merged.includes(o)));
                 } else {
-                    this.heldOrders = fresh;
+                    this.heldOrders = fresh.concat(pendingLocal);
                 }
-                // Clamp the held-orders modal cursor so it never points past the list end.
-                const _hwLen = this.heldWindowList().length;
-                if (this.activeHeldIndex >= _hwLen) {
-                    this.activeHeldIndex = Math.max(0, _hwLen - 1);
-                }
-                if (_hwLen === 0 && this.showHeldOrders) {
-                    this.showHeldOrders = false;
-                    this.activeHeldIndex = 0;
-                }
-            } catch (e) { /* silent — stale list is better than a toast flood */ }
+                this._clampHeldCursor();
+            } catch (e) {
+                // Cloud unreachable → NestPOS Desktop merges the shop PC's own open
+                // orders (waiter tablets + this counter, held via Local Core) so the
+                // counter can recall/settle them and nothing "disappears" offline.
+                await this._mergeLocalCoreHeldOrders();
+            }
+        },
+        _clampHeldCursor() {
+            // Clamp the held-orders modal cursor so it never points past the list end.
+            const _hwLen = this.heldWindowList().length;
+            if (this.activeHeldIndex >= _hwLen) {
+                this.activeHeldIndex = Math.max(0, _hwLen - 1);
+            }
+            if (_hwLen === 0 && this.showHeldOrders) {
+                this.showHeldOrders = false;
+                this.activeHeldIndex = 0;
+            }
+        },
+        // Local Core `orders` projection → held-orders API shape. Only OPEN local
+        // orders; ids are the order uuids (strings) so recall/pay/delete flow
+        // through the same handlers, whose network failure already routes to
+        // NestPosLocal.heldOrder.settleWithSale / cancel. Never called online.
+        async _mergeLocalCoreHeldOrders() {
+            if (!window.NestPosLocal || typeof window.NestPosLocal.query !== 'function') return;
+            let orders = null, revisions = null;
+            try {
+                const answer = await window.NestPosLocal.query('orders');
+                if (!answer || !answer.success || !answer.data || typeof answer.data !== 'object') return;
+                orders = answer.data;
+                const rev = await window.NestPosLocal.query('revisions').catch(() => null);
+                revisions = rev && rev.success && rev.data && typeof rev.data === 'object' ? rev.data : {};
+            } catch (e) { return; }
+            const tableNumber = (id) => {
+                if (id == null) return null;
+                const t = this.tablePickerFlat().find(x => String(x.id) === String(id));
+                return t ? t.table_number : String(id);
+            };
+            const rows = Object.values(orders).filter(o => o && o.status === 'open').map(o =>
+                // Pure mapper (nestpos-local-core.js): keeps the COMPLETE immutable
+                // domain line on each item (local_line) so settlement can carry
+                // it verbatim — the cloud rejects a sale whose lines differ from
+                // the frozen hold.
+                window.NestPosLocal.offlineHeld.rowFromProjection(o, {
+                    revision: revisions[String(o.order_id || o.id)],
+                    table_number: tableNumber,
+                    staff_fallback: window.TXT.held_local_shop_pc,
+                }));
+            const recalled = this.recalledOrderId ? String(this.recalledOrderId) : null;
+            // Cloud rows we already know stay (stale > empty); local rows refresh.
+            const kept = this.heldOrders.filter(o => !(o && o.local === true));
+            const keptIds = new Set(kept.map(o => String(o.id)));
+            this.heldOrders = kept.concat(rows.filter(r => !keptIds.has(r.id) && r.id !== recalled));
+            this._clampHeldCursor();
         },
         async selectTable(table, opts) {
             // Table-se-Bill (Jul 2026) + ZFC (5 Aug 2026): occupied table WITH a
@@ -9370,7 +9420,10 @@ function restaurantPos() {
         // payHeldOrder / resendKitchen / deleteHeldOrder) — menu sirf hub hai.
         // Waiter-source orders EXCLUDED — woh purple "C" counter chips hain
         // (atomic-claim path); yahan bhi dikhte to double-count + claim bypass hota.
-        heldNoTable() { return this.heldOrders.filter(o => !o.table && o.source !== 'waiter'); },
+        // Offline Mode (Sep 2026): shop-PC (local:true) orders always list here —
+        // the table board is cloud-driven and cannot show them during an outage,
+        // and the HELD window is the counter's only recall/settle surface then.
+        heldNoTable() { return this.heldOrders.filter(o => o.local === true || (!o.table && o.source !== 'waiter')); },
         // 25 Aug 2026: HELD window ki list. Table companies par sirf bina-table
         // (takeaway/delivery) held orders — table wale orders board/tiles par
         // hain, unhein yahan dikhana double-count aur do jagah se delete/pay ka
@@ -10367,8 +10420,14 @@ function restaurantPos() {
                     has_recipe: !!item.has_recipe,
                     recipe_snapshot: recipe,
                     deal_snapshot: deal,
-                    direct_consumption_snapshot: item.item_type === 'product' && !item.has_recipe && item.item_id != null
+                    // Direct product stock exists locally ONLY when the shop runs the
+                    // inventory module (product rows keyed by bare product id in the
+                    // Local Core snapshot). A product without a stock row is retried
+                    // below without consumption instead of killing the offline hold.
+                    direct_consumption_snapshot: this._localCoreInventoryEnabled && item.item_type === 'product' &&
+                        !item.has_recipe && item.item_id != null && !item.skip_kitchen
                         ? [{ stock_id: String(item.item_id), quantity: 1 }] : [],
+                    skip_kitchen: !!item.skip_kitchen,
                     tax_snapshot: {
                         rate_basis_points: Math.round(rate * 100),
                         exempt: !!item.is_tax_exempt,
@@ -10420,13 +10479,48 @@ function restaurantPos() {
                 },
             };
             const revision = Number(this.recalledOrderMeta?.local_revision || 0);
-            const answer = await window.NestPosLocal.heldOrder.hold(orderId, snapshot, revision);
+            // Offline KOT (Sep 2026): a FRESH offline hold carries its kitchen slip
+            // inside the same command; the agent prints it from the shop PC's own
+            // print_queue; the cloud replay records a local handoff and stamps the
+            // lines only from the shop PC's printed ack, so the kitchen gets
+            // exactly one ticket. Re-holds (recalled orders) keep the
+            // cloud delta-KOT path — offline append is not designed yet.
+            const kotDocument = (!this.recalledOrderId && this.silentKotPrint) ? this._localKotDocument(orderId, lines) : null;
+            let answer = await window.NestPosLocal.heldOrder.hold(orderId, snapshot, revision, kotDocument);
+            if (answer && !answer.success && answer.error === 'ingredient_not_found' &&
+                lines.some(line => line.direct_consumption_snapshot.length)) {
+                lines.forEach(line => { line.direct_consumption_snapshot = []; });
+                answer = await window.NestPosLocal.heldOrder.hold(orderId, snapshot, revision, kotDocument);
+            }
             if (!answer || !answer.success) return answer;
             return { success: true, local: true, pending: true, state: 'pending',
                 message: 'Order saved locally — sync pending',
-                order: { id: orderId, order_number: orderId, order_type: this.orderType,
+                kot_queued: !!kotDocument,
+                order: { id: orderId, local: true, local_order_id: orderId, local_revision: revision + 1,
+                    order_number: 'L-' + orderId.replace(/-/g, '').slice(-4).toUpperCase(), order_type: this.orderType,
+                    status: 'held', source: 'shop_pc', created_at: new Date().toISOString(),
+                    kot_sent_at: kotDocument ? new Date().toISOString() : null,
+                    kitchen_notes: this.kitchenNotes || null, priority: !!this.priorityOrder,
+                    customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null,
+                    customer_phone: this.selectedCustomer?.phone || null,
                     table: this.selectedTable || null, table_id: this.selectedTable?.id || null,
-                    items: this.cart.slice(), total_amount: this.grandTotal } };
+                    items: this.cart.map((item, index) => ({ ...item, id: lines[index] ? lines[index].line_id : String(index),
+                        subtotal: Number(item.quantity || 0) * Number(item.unit_price || 0) })),
+                    total_amount: this.grandTotal } };
+        },
+        _localKotDocument(orderId, lines) {
+            const kitchen = lines.filter(line => !line.skip_kitchen && line.type !== 'manual');
+            if (!kitchen.length) return null;
+            const table = this.selectedTable ? ('T-' + (this.selectedTable.table_number || this.selectedTable.id)) : null;
+            return {
+                kind: 'kot', order_id: orderId, order_type: this.orderType || 'takeaway',
+                table_label: table, token_label: null,
+                order_label: 'L-' + orderId.replace(/-/g, '').slice(-4).toUpperCase(),
+                waiter_name: null, customer_name: this.selectedCustomer ? (this.selectedCustomer.name || null) : null,
+                kitchen_notes: this.kitchenNotes || null, priority: !!this.priorityOrder,
+                lines: kitchen.map(line => ({ line_id: line.line_id, name: line.name, quantity: line.quantity,
+                    special_notes: line.special_notes || null })),
+            };
         },
 
         async holdOrder(opts) {
@@ -10550,8 +10644,10 @@ function restaurantPos() {
                 const local = await this._localCoreHold();
                 if (local && local.success) {
                     result = local; this.heldOrders.unshift(local.order); this.clearCart();
-                    this.showToast(local.message, 'success');
-                    if (opts.forcePrintKot) this.trySilentPrint({ type: 'kot', restaurant_order_id: local.order.id });
+                    // Offline KOT already rides inside the local hold — the agent
+                    // prints it from the shop PC; never ask the (unreachable) cloud.
+                    this.showToast(local.kot_queued ? window.TXT.held_local_kot_queued : local.message, 'success');
+                    if (opts.forcePrintKot && !local.kot_queued) this.trySilentPrint({ type: 'kot', restaurant_order_id: local.order.id });
                 } else this.showToast((local && (local.message || local.error)) || window.TXT.network_error, 'error');
             }
             this.submitting = false;
@@ -12820,15 +12916,37 @@ function restaurantPos() {
             }
             this.waHighlight = false;
         },
+        // Recipe applicability for a held item the cloud poll delivered without
+        // its recipe facts: the baked product catalogue is the same frozen truth
+        // the cart uses (stock ids 'ingredient-N'). Explicit facts on the item win.
+        _heldItemRecipeFacts(item) {
+            if (Array.isArray(item.recipe_snapshot)) {
+                return { has_recipe: item.has_recipe == null ? item.recipe_snapshot.length > 0 : !!item.has_recipe,
+                    recipe_snapshot: item.recipe_snapshot.map(part => ({ stock_id: String(part.stock_id), quantity: Number(part.quantity) })) };
+            }
+            const product = (item.item_type || 'product') === 'product' && item.item_id != null
+                ? (this.allProducts || []).find(p => String(p.id) === String(item.item_id)) : null;
+            const recipe = product && Array.isArray(product.recipe_snapshot)
+                ? product.recipe_snapshot.map(part => ({ stock_id: String(part.stock_id), quantity: Number(part.quantity) })) : [];
+            return { has_recipe: recipe.length > 0, recipe_snapshot: recipe };
+        },
         localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, payUuid, payOrderType) {
             if (!['cash', 'card'].includes(method)) return null;
             if (!heldOrd || !Array.isArray(heldOrd.items) || !heldOrd.items.length) return null;
-            const rate = method === 'card'
+            // Shop-PC held order (Offline Mode): lines + totals come VERBATIM from
+            // the frozen hold (hold-time tax rates) via the shared pure helper.
+            const localFrozen = heldOrd.local === true && window.NestPosLocal && window.NestPosLocal.offlineHeld
+                ? window.NestPosLocal.offlineHeld.settlementFromRow(heldOrd, {
+                    discount_cents: Math.round(Number(heldOrd.discount_amount || 0) * 100) })
+                : null;
+            if (heldOrd.local === true && !localFrozen) return null;
+            const rate = localFrozen ? localFrozen.tax_pricing.rate_basis_points / 100 : (method === 'card'
                 ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
-                : (this.taxRules['cash'] || 16);
-            const items = heldOrd.items.map(item => {
+                : (this.taxRules['cash'] || 16));
+            const items = localFrozen ? localFrozen.items : heldOrd.items.map(item => {
                 const quantity = Number(item.quantity);
                 const unitPrice = Number(item.unit_price);
+                const recipeFacts = this._heldItemRecipeFacts(item);
                 return {
                     line_id: String(item.id),
                     product_id: item.item_id == null ? null : String(item.item_id),
@@ -12852,35 +12970,31 @@ function restaurantPos() {
                             tax_facts: component.tax_facts ? { ...component.tax_facts } : null,
                         }))
                         : null,
-                    has_recipe: !!item.has_recipe,
+                    has_recipe: recipeFacts.has_recipe,
                     tax_snapshot: {
                         rate_basis_points: Math.round(rate * 100),
                         exempt: !!item.is_tax_exempt,
                         inclusive: !!this.taxInclusive,
                         menu_rate_basis_points: this.taxMenuRate == null ? null : Math.round(this.taxMenuRate * 100),
                     },
-                    recipe_snapshot: Array.isArray(item.recipe_snapshot)
-                        ? item.recipe_snapshot.map(part => ({
-                            stock_id: String(part.stock_id),
-                            quantity: Number(part.quantity),
-                        }))
-                        : null,
+                    recipe_snapshot: recipeFacts.recipe_snapshot,
                 };
             });
             if (items.some(item => !item.name || !Number.isInteger(item.quantity) || item.quantity < 1 ||
                 !Number.isFinite(item.unit_price) || item.unit_price < 0)) return null;
             if (items.some(item => item.type === 'deal' &&
                 (!Array.isArray(item.deal_snapshot) || !item.deal_snapshot.length))) return null;
-            const subtotal = this.r2(items.reduce((sum, item) => sum + item.line_total, 0));
-            const discount = this.r2(Number(heldOrd.discount_amount || 0));
-            const total = this.r2(Number(savedTotal || heldOrd.total_amount || 0));
+            const subtotal = localFrozen ? localFrozen.totals.subtotal : this.r2(items.reduce((sum, item) => sum + item.line_total, 0));
+            const discount = localFrozen ? localFrozen.totals.discount_amount : this.r2(Number(heldOrd.discount_amount || 0));
+            const total = localFrozen ? localFrozen.totals.total_amount : this.r2(Number(savedTotal || heldOrd.total_amount || 0));
             const ratio = subtotal > 0 ? Math.max(0, (subtotal - discount) / subtotal) : 1;
             const taxable = heldOrd.items.filter(item => !item.is_tax_exempt)
                 .reduce((sum, item) => sum + Number(item.subtotal || 0), 0) * ratio;
             const includedBaseRate = this.taxMenuRate !== null && this.taxMenuRate > 0 ? this.taxMenuRate : rate;
-            const tax = this.taxInclusive
+            const taxInclusive = localFrozen ? localFrozen.totals.tax_inclusive : !!this.taxInclusive;
+            const tax = localFrozen ? localFrozen.totals.tax_amount : (this.taxInclusive
                 ? this.r2(taxable * rate / (100 + includedBaseRate))
-                : Math.max(0, this.r2(total - subtotal + discount));
+                : Math.max(0, this.r2(total - subtotal + discount)));
             return {
                 scope: {
                     company_id: String(this._offlineCompanyId),
@@ -12897,7 +13011,7 @@ function restaurantPos() {
                 order_type: payOrderType || heldOrd.order_type || null,
                 customer_credit: false,
                 incoming_order_id: null,
-                recalled_order_id: Number(orderId),
+                recalled_order_id: Number.isFinite(Number(orderId)) ? Number(orderId) : null,
                 table_id: heldOrd.table ? heldOrd.table.id : null,
                 online_payment_confirmed: !!this._onlineOkByOrder[orderId],
                 order_ref: {
@@ -12922,9 +13036,9 @@ function restaurantPos() {
                 items,
                 totals: {
                     subtotal, discount_amount: discount, tax_amount: tax,
-                    total_amount: total, tax_inclusive: !!this.taxInclusive,
+                    total_amount: total, tax_inclusive: taxInclusive,
                 },
-                tax_pricing: {
+                tax_pricing: localFrozen ? localFrozen.tax_pricing : {
                     inclusive: !!this.taxInclusive,
                     rate_basis_points: Math.round(rate * 100),
                     menu_rate_basis_points: this.taxMenuRate == null ? null : Math.round(this.taxMenuRate * 100),
@@ -12971,6 +13085,9 @@ function restaurantPos() {
             // the original bill (with receipt data) instead of dead-ending on 409.
             const effPayUuid = payUuid || (this._payUuidByOrder[orderId] = this._payUuidByOrder[orderId] || this._newOfflineUuid());
             try {
+                // A shop-PC (Local Core) order has no cloud id yet → settle it where it
+                // lives; once the cloud copy arrives the poll swaps it for the cloud row.
+                if (heldOrd && heldOrd.local === true) throw new Error('local_core_order');
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
@@ -13024,7 +13141,7 @@ function restaurantPos() {
             } catch (e) {
                 console.error('[payHeldOrderDirect] FAIL', e);
                 const snapshot = this.localHeldSaleSnapshot(orderId, heldOrd, method, savedTotal, effPayUuid, payOrderType);
-                const totalCents = Math.round(Number(savedTotal || (heldOrd && heldOrd.total_amount) || 0) * 100);
+                const totalCents = Math.round(Number(snapshot ? snapshot.totals.total_amount : (savedTotal || (heldOrd && heldOrd.total_amount) || 0)) * 100);
                 const local = window.NestPosLocal && snapshot && await window.NestPosLocal.heldOrder.settleWithSale(
                     String(orderId), snapshot, {
                         business_date: snapshot.business_date,
@@ -13213,7 +13330,7 @@ function restaurantPos() {
             // Task 781: meta snapshot for the in-panel table actions — the order
             // leaves heldOrders on the next line, so KOT gating + the cancel
             // modal would otherwise lose kot_sent_at / order_number.
-            this.recalledOrderMeta = { order_number: order.order_number || null, kot_sent_at: order.kot_sent_at || null, source: order.source || null, online_payment_awaited_at: order.online_payment_awaited_at || null };
+            this.recalledOrderMeta = { order_number: order.order_number || null, kot_sent_at: order.kot_sent_at || null, source: order.source || null, online_payment_awaited_at: order.online_payment_awaited_at || null, local: order.local === true, local_revision: order.local_revision || 0 };
             // Task 1028: recall ke foran baad ka fingerprint — table-switch par
             // isi se compare ho kar dirty (edited) carts ko explicit choice milti hai.
             this._recallCartBaseline = this.cartEditFingerprint();

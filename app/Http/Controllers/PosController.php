@@ -1198,7 +1198,6 @@ class PosController extends Controller
         if ($order->items->isEmpty()) {
             return response()->json(['success' => false, 'reason' => 'no_kitchen_items'], 200);
         }
-        $deltaQ = $delta ? '&delta=1' : '';
         // Delta snapshot (Pizza Master edit-path bug, Aug 2026): compute the
         // unprinted rows ONCE and bake their ids into EVERY job of this send
         // (printed_item_ids). The agent prints jobs sequentially and stamps
@@ -1206,8 +1205,16 @@ class PosController extends Controller
         // ticket's success emptied the counter-copy delta (rendered later,
         // whereNull found nothing → 204 → no slip at the counter). Baked ids
         // keep all copies of one kitchen-send identical.
+        // Offline KOT local handoff (Sep 2026): lines the shop PC is printing
+        // itself right now (fresh, unacknowledged Local Core hold) are NOT ours
+        // to print — same rule as KotPrintService::enqueueForOrder. Whatever is
+        // left becomes a delta; nothing left = success with no jobs.
+        $handoffIds = \App\Services\KotPrintService::freshLocalHandoffLineIds($company, $order);
+        if ($handoffIds) $delta = true;
+        $deltaQ = $delta ? '&delta=1' : '';
         $deltaIds = $delta
-            ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)->values()->all()
+            ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)
+                ->reject(fn ($i) => in_array($i, $handoffIds, true))->values()->all()
             : null;
         $stations = \App\Models\PosStation::activeFor($companyId);
         // Counter KOT Copy (owner request 30 Jul 2026): DINE-IN orders only —
@@ -1339,7 +1346,7 @@ class PosController extends Controller
         // KOT printer). Agent renders each with render_query station=ID; empty
         // buckets never become jobs. If ANY bucket lacks a printer, 409 so the
         // caller falls back to the classic full-ticket popup (nothing lost).
-        $baseItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
+        $baseItems = $delta ? $order->items->whereIn('id', $deltaIds)->values() : $order->items;
         $itemMap = \App\Models\PosStation::mapItems($companyId, $stations, $baseItems);
         $sids = collect($itemMap)->values()->unique()->sort()->values();
 

@@ -1,14 +1,37 @@
 <x-pos-layout>
-<script src="{{ asset('js/waiter-local-core.js') }}?v=1" defer></script>
+<script src="{{ asset('js/waiter-local-core.js') }}?v=3" defer></script>
+<script>
+// Offline cold-start (Sep 2026): the service worker keeps a validated copy of
+// this page in WAITER_CACHE (network-first; served only when the cloud fetch
+// itself fails). The very first visit after an install/data clear has no
+// controlling SW, so ask the fresh worker to prime the copy in the background —
+// same pattern as TN_PRIME_SALE_CACHE / TN_PRIME_TABLES_CACHE.
+(function () {
+    try {
+        if (!('serviceWorker' in navigator) || navigator.serviceWorker.controller) return;
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.ready.then(function (reg) {
+                if (reg.active) reg.active.postMessage({ type: 'TN_PRIME_WAITER_CACHE' });
+            }).catch(function () {});
+        });
+    } catch (e) { /* best-effort */ }
+})();
+</script>
 @php
     // Per-waiter style pref (owner, 5 Aug 2026): waiter apni marzi se Full/Saaf.
     // Effective = user's own pick (BOTH-direction override), else company style.
     // WAITER-ONLY: admins/managers previewing this tablet keep the company style.
     $waiterIsWaiterRole = (auth('pos')->user()->pos_role ?? null) === 'pos_waiter';
     $waiterOwnStyle = $waiterIsWaiterRole ? (auth('pos')->user()->pos_personal_style ?? null) : null;
+    $waiterCompanyModel = \App\Models\Company::find(app('currentCompanyId'));
     $waiterEffStyle = in_array($waiterOwnStyle, array_keys(\App\Models\User::WAITER_STYLES), true)
         ? $waiterOwnStyle
-        : (optional(\App\Models\Company::find(app('currentCompanyId')))->pos_dashboard_style ?? 'default');
+        : (optional($waiterCompanyModel)->pos_dashboard_style ?? 'default');
+    // Offline KOT (Sep 2026): only a shop with silent printing + a kitchen
+    // printer configured gets a kitchen slip from the shop PC during an outage.
+    // Everyone else keeps printing from the counter exactly as before.
+    $waiterPrintCfg = $waiterCompanyModel ? $waiterCompanyModel->printerSettings() : [];
+    $waiterOfflineKot = !empty($waiterPrintCfg['silent_print_enabled']) && !empty($waiterPrintCfg['kot_printer']);
     // Fast Food mode (Pizza Master, 10 Aug 2026): speed-first LAYOUT — customer
     // name, Urgent aur "Mazeed" fold GAYAB; sirf table + items + ek note box +
     // send. Koi feature DELETE nahi hua — Full/Saaf theme par sab wapis aa
@@ -24,7 +47,15 @@
         return $s === false ? '[]' : $s;
     };
 @endphp
-<div x-data="waiterApp()" x-init="init()" class="max-w-7xl mx-auto px-3 sm:px-6 py-4">
+<div x-data="waiterApp()" x-init="init()" data-tn-waiter-document="1" class="max-w-7xl mx-auto px-3 sm:px-6 py-4">
+
+    {{-- Offline banner (Sep 2026): cloud first, shop PC only when the net is
+         gone. Shown only while a list on this screen is actually being served
+         from the Local Core — never a standing "LAN mode" claim. --}}
+    <div x-show="tablesLocal || myOrdersLocal" x-cloak
+         class="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">
+        {{ __('pos.waiter_offline_banner') }}
+    </div>
 
     {{-- ── Header ─────────────────────────────────────────────────────────── --}}
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -140,6 +171,7 @@
                     {{ __('pos.waiter_buttons_free_note') }}
                 </p>
 
+                <p x-show="!tablesLoading && tablesLocal" x-cloak class="text-center text-[11px] font-bold text-amber-700 dark:text-amber-300 py-1">{{ __('pos.waiter_shop_pc_marker') }}</p>
                 {{-- Net/server down — parcel ka rasta khula rehta hai, magar message sach bole. --}}
                 <div x-show="!tablesLoading && tablesError" class="text-center py-4 px-3">
                     <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
@@ -450,6 +482,7 @@
                     </template>
                 </div>
                 <div x-show="!tablesLoading && tables.length === 0 && !tablesError" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_tables_configured_dot') }}</div>
+                <p x-show="!tablesLoading && tablesLocal" x-cloak class="text-center text-[11px] font-bold text-amber-700 dark:text-amber-300 py-2">{{ __('pos.waiter_shop_pc_marker') }}</p>
                 {{-- Rabta na ho to sach batao (tables "gayab" nahi hain, sirf load nahi hui). --}}
                 <div x-show="!tablesLoading && tablesError" class="text-center py-6 px-4">
                     <p class="text-sm font-bold text-amber-600 dark:text-amber-400">{{ __('pos.tables_offline') }}</p>
@@ -526,6 +559,7 @@
                         <div class="flex items-center justify-between gap-2 flex-wrap">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="font-mono text-sm font-bold text-gray-800 dark:text-gray-100" x-text="o.order_number"></span>
+                                <span x-show="o.local_source === 'shop_pc'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-800/60 dark:text-amber-100">{{ __('pos.waiter_shop_pc_marker') }}</span>
                                 <span x-show="o.table" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" x-text="'T-' + o.table"></span>
                                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300" x-text="'→ ' + (o.assigned_cashier || {{ Js::from(__('pos.any_cashier')) }})"></span>
                             </div>
@@ -538,17 +572,19 @@
                             {{-- Task 626: takeaway OFF = parcel (non-dine-in) orders par
                                  waiter ka Add Items rasta bhi band — order dikh jata hai
                                  (status/settle cashier side), append nahi hota. --}}
-                            <button @click="startAppend(o)" x-show="canTakeaway || o.order_type === 'dine_in'" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
+                            <button @click="startAppend(o)" x-show="(canTakeaway || o.order_type === 'dine_in') && !o.local" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
+                            {{-- Offline (local) order: no sequential offline append vocabulary, so append/shift/cancel wait for the net. --}}
+                            <span x-show="o.local" class="text-[11px] font-bold text-amber-700 dark:text-amber-300">{{ __('pos.waiter_local_order_hint') }}</span>
                             {{-- Table Shift (owner batch, 26 Jul 2026): sirf dine-in
                                  orders (table wale); khali table par hi jayega. --}}
-                            <button x-show="o.table_id" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">⇄ {{ __('pos.change_table') }}</button>
+                            <button x-show="o.table_id && !o.local" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">⇄ {{ __('pos.change_table') }}</button>
                             {{-- Waiter self-cancel (Task 412): sirf UN-CLAIMED order
                                  (assigned_cashier_id null) — cashier ke claim/settle
                                  ke baad cancel counter se hi hota hai.
                                  Task 527: admin-controlled permission (default OFF) —
                                  band ho to button hi nahi (server bhi 403 deta hai). --}}
                             @if($waiterCanCancel ?? false)
-                            <button x-show="!o.assigned_cashier_id" @click="cancelAsk = o" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 text-xs font-bold transition">✕ {{ __('pos.cancel') }}</button>
+                            <button x-show="!o.assigned_cashier_id && !o.local" @click="cancelAsk = o" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 text-xs font-bold transition">✕ {{ __('pos.cancel') }}</button>
                             @endif
                         </div>
                     </div>
@@ -775,6 +811,13 @@ function waiterApp() {
         myOrdersLoading: false,
          myOrdersError: false,
          _myOrdersRequest: null,
+        // Offline readers (Sep 2026): true while the list on screen came from
+        // the shop PC's Local Core instead of the cloud ("shop PC se" marker).
+        tablesLocal: false,
+        myOrdersLocal: false,
+        _offlineKot: {{ $waiterOfflineKot ? 'true' : 'false' }},
+        _waiterUserId: {{ (int) auth('pos')->id() }},
+        _waiterName: {{ Js::from((string) (auth('pos')->user()->name ?? '')) }},
         appendOrderId: null,
         appendOrderNumber: '',
         appendTableLabel: '',    // Task 526: append banner mein table number dikhao (parcel = khali)
@@ -1089,19 +1132,21 @@ function waiterApp() {
                         // Net/server down: purani list ZINDA rakho aur saaf batao ke
                         // rabta nahi ho raha. List khali karna jhoot tha — waiter ko
                         // "koi table configure nahi hai" nazar aata tha.
-                        this.tablesError = true;
+                        if (!this._tablesFromLocalCore()) this.tablesError = true;
                     }
                     else {
                         const etag = res.headers.get('ETag');
                         if (etag) this._tableEtag = etag;
                         this.tables = await res.json();
                         this.tablesError = false;
+                        this.tablesLocal = false;
                     }
                 } else {
                     this.tablesError = false;
+                    this.tablesLocal = false;
                 }
             } catch (e) {
-                if (requestSerial === this._tableRequestSerial) this.tablesError = true;
+                if (requestSerial === this._tableRequestSerial && !this._tablesFromLocalCore()) this.tablesError = true;
             } finally {
                 // Release the spinner UNCONDITIONALLY. The serial decides whose DATA
                 // wins, never who owns the loading flag: a background refresh that
@@ -1115,6 +1160,29 @@ function waiterApp() {
             this.selectedTable = t;
             this.showTables = false;
         },
+        // Cloud failed → shop PC (Local Core) projections, same list shape.
+        // Returns true only when a real list arrived; the caller keeps its
+        // honest "no connection" state otherwise.
+        _tablesFromLocalCore() {
+            try {
+                const local = window.TaxNestWaiterLocalCore && window.TaxNestWaiterLocalCore.listTables();
+                if (!Array.isArray(local)) return false;
+                this.tables = local;
+                this.tablesError = false;
+                this.tablesLocal = true;
+                return true;
+            } catch (e) { return false; }
+        },
+        _myOrdersFromLocalCore() {
+            try {
+                const local = window.TaxNestWaiterLocalCore && window.TaxNestWaiterLocalCore.myOrders(this._waiterUserId);
+                if (!Array.isArray(local)) return false;
+                this.myOrders = local;
+                this.myOrdersError = false;
+                this.myOrdersLocal = true;
+                return true;
+            } catch (e) { return false; }
+        },
 
         async loadMyOrders() {
             if (this._myOrdersRequest) return this._myOrdersRequest;
@@ -1126,11 +1194,14 @@ function waiterApp() {
                     if (!Array.isArray(orders)) throw new Error('Invalid orders response');
                     this.myOrders = orders;
                     this.myOrdersError = false;
+                    this.myOrdersLocal = false;
                     return true;
                 } catch (e) {
                     // Do not replace the last good list with an empty one. A
                     // timed-out poll is a connection problem, not proof that
-                    // the waiter has no open orders.
+                    // the waiter has no open orders. Shop PC first, then the
+                    // honest error state.
+                    if (this._myOrdersFromLocalCore()) return true;
                     this.myOrdersError = true;
                     return false;
                 }
@@ -1371,6 +1442,7 @@ function waiterApp() {
                 priority: this.priority,
                 tax_rate_basis_points: Math.round(Number(this.cashTaxRate || 0) * 100),
                 tax_inclusive: {{ ($taxInclusive ?? false) ? 'true' : 'false' }},
+                tax_menu_rate_basis_points: {{ isset($taxMenuRate) && $taxMenuRate !== null ? (int) round((float) $taxMenuRate * 100) : 'null' }},
                 hold_uuid: this.holdAttemptUuid,
             };
             try {
@@ -1384,45 +1456,56 @@ function waiterApp() {
                     this.showToast((data && data.message) || (@js(__('pos.failed_http_prefix')) + res.status + ')'), 'error');
                 } else {
                     this.showToast(data.message || @js(__('pos.sent_excl')), 'success');
-                    this.cart = [];
-                    this.customerName = ''; this.customerPhone = ''; this.kitchenNotes = '';
-                    this.selectedTable = null;
-                    this.priority = false;
-                    this.holdAttemptUuid = null;
-                    // SADA MODE: agla order phir dine-in se, fold band — screen
-                    // khud "naya order" halat par wapas (cashier ka intikhab
-                    // din bhar qaim rehta hai, jaan boojh kar reset NahiN).
-                    this.orderType = 'dine_in'; this.moreOpen = false;
-                    this.appendOrderId = null; this.appendOrderNumber = ''; this.appendTableLabel = ''; this.appendCustomerLabel = '';
-                    this.loadMyOrders();
-                    // Buttons style (Task #340, Aug 2026): after send, return to the
-                    // home button list and silently refresh table counts/timers.
-                    // _buttonsMode is PHP-baked — plain JS branch, no Blade directive needed.
-                    if (this._buttonsMode) {
-                        this.buttonsView = true;
-                        this.reloadTablesQuiet();
-                    }
+                    this._afterOrderSent();
                 }
             } catch (e) {
                 try {
                     // Cloud remains first. Only a real network failure reaches
                     // this native, pinned-TLS Local Core fallback.
                     const local = window.TaxNestWaiterLocalCore &&
-                        window.TaxNestWaiterLocalCore.fallbackOrder(body, this.appendOrderId);
+                        window.TaxNestWaiterLocalCore.fallbackOrder(body, this.appendOrderId, {
+                            // Offline KOT rides inside the hold (shop PC prints it and
+                            // acks; cloud holds its slip back). Baked flag = silent KOT configured.
+                            kot: this._offlineKot,
+                            waiterName: this._waiterName,
+                            tableLabel: this.selectedTable ? this.selectedTable.table_number : null,
+                        });
                     if (!local || !local.ok) throw e;
-                    this.showToast(@js(__('pos.waiter_local_order_saved')), 'success');
-                    this.cart = [];
-                    this.selectedTable = null;
-                    this.holdAttemptUuid = null;
-                    this.appendAttemptUuid = null;
-                    this.appendOrderId = null;
-                    this.loadMyOrders();
+                    this.showToast(local.kot_queued ? @js(__('pos.waiter_local_order_kot')) : @js(__('pos.waiter_local_order_saved')), 'success');
+                    // Same reset as the cloud path: a shop-PC order must not leak
+                    // its customer/note/priority into the next order.
+                    this._afterOrderSent();
                     this.reloadTablesQuiet();
                 } catch (localError) {
                     this.showToast(@js(__('pos.network_error_try_again')), 'error');
                 }
             }
             this.sending = false;
+        },
+
+        // ONE post-send reset for BOTH acceptance paths (cloud and shop-PC
+        // Local Core fallback). Every order-scoped field the send body reads
+        // is cleared here; the cashier choice stays for the whole day on purpose.
+        _afterOrderSent() {
+            this.cart = [];
+            this.customerName = ''; this.customerPhone = ''; this.kitchenNotes = '';
+            this.selectedTable = null;
+            this.priority = false;
+            this.holdAttemptUuid = null;
+            this.appendAttemptUuid = null;
+            // SADA MODE: agla order phir dine-in se, fold band — screen
+            // khud "naya order" halat par wapas (cashier ka intikhab
+            // din bhar qaim rehta hai, jaan boojh kar reset NahiN).
+            this.orderType = 'dine_in'; this.moreOpen = false;
+            this.appendOrderId = null; this.appendOrderNumber = ''; this.appendTableLabel = ''; this.appendCustomerLabel = '';
+            this.loadMyOrders();
+            // Buttons style (Task #340, Aug 2026): after send, return to the
+            // home button list and silently refresh table counts/timers.
+            // _buttonsMode is PHP-baked — plain JS branch, no Blade directive needed.
+            if (this._buttonsMode) {
+                this.buttonsView = true;
+                this.reloadTablesQuiet();
+            }
         },
 
         // Task 1010: crypto UUIDs are preferred; the fallback supports older
@@ -1508,14 +1591,15 @@ function waiterApp() {
                 if (this._tableEtag) headers['If-None-Match'] = this._tableEtag;
                 const res = await this._fetchWithTimeout('/pos/waiter/api/tables', { headers });
                 if (requestSerial !== this._tableRequestSerial) return;
-                if (res.status === 304) { this.tablesError = false; return; }
-                if (!res.ok) { this.tablesError = true; return; }
+                if (res.status === 304) { this.tablesError = false; this.tablesLocal = false; return; }
+                if (!res.ok) { if (!this._tablesFromLocalCore()) this.tablesError = true; return; }
                 const etag = res.headers.get('ETag');
                 if (etag) this._tableEtag = etag;
                 this.tables = await res.json();
                 this.tablesError = false;
+                this.tablesLocal = false;
             } catch (e) {
-                if (requestSerial === this._tableRequestSerial) this.tablesError = true;
+                if (requestSerial === this._tableRequestSerial && !this._tablesFromLocalCore()) this.tablesError = true;
                 /* stale data stays until next poll */
             }
         },

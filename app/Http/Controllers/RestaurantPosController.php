@@ -2037,10 +2037,27 @@ class RestaurantPosController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $json = $orders->map(function ($o) {
+        // Offline orders (Sep 2026): an order that was punched on the shop PC
+        // during an outage is shown on the counter from the Local Core
+        // projection under its local uuid until the cloud copy exists. The
+        // cloud copy carries that uuid back as local_order_id so the counter
+        // can replace the local row instead of showing the order twice.
+        $localIds = [];
+        $agentIds = $orders->where('source', 'agent_core')->pluck('id');
+        if ($agentIds->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('agent_core_aggregate_mappings')) {
+            $localIds = \Illuminate\Support\Facades\DB::table('agent_core_aggregate_mappings')
+                ->where('company_id', $companyId)
+                ->where('local_type', 'restaurant_order')
+                ->whereIn('cloud_id', $agentIds)
+                ->pluck('local_aggregate_id', 'cloud_id')
+                ->all();
+        }
+
+        $json = $orders->map(function ($o) use ($localIds) {
             return [
                 'id'              => $o->id,
                 'order_number'    => $o->order_number,
+                'local_order_id'  => isset($localIds[$o->id]) ? (string) $localIds[$o->id] : null,
                 'token_no'        => $o->token_no ?? null,
                 'status'          => $o->status,
                 'source'          => $o->source,

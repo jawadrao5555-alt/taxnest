@@ -16,7 +16,7 @@ class PosLocalCoreDesktopBridgeTest extends TestCase
         $layout = file_get_contents(resource_path('views/layouts/pos-app.blade.php'));
 
         $this->assertStringContainsString("asset('js/nestpos-local-core.js')", $layout);
-        $this->assertStringContainsString('?v=8', $layout);
+        $this->assertStringContainsString('?v=10', $layout);
     }
 
     public function test_desktop_scope_issues_lease_only_from_registered_device_header(): void

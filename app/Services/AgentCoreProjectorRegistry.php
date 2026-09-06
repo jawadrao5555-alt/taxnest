@@ -90,6 +90,14 @@ class AgentCoreProjectorRegistry
             ], true)) {
                 return $this->restaurant->project($company, $stored, $event, (array) $event['scope']);
             }
+            // Offline KOT ack / hand-back: print.complete|print.fail on the
+            // shop PC's local kitchen-slip job (`kot:<order aggregate>`, data
+            // kind 'kot'). These close the cloud's local handoff for the order
+            // instead of touching a generic print job.
+            if (in_array($command, ['print.complete', 'print.fail'], true)
+                && (($event['payload']['data']['kind'] ?? null) === 'kot')) {
+                return $this->restaurant->project($company, $stored, $event, (array) $event['scope']);
+            }
             if (in_array($command, ['cash.open', 'cash.expense', 'cash.close', 'staff.start', 'staff.end'], true)) {
                 return $this->cashDay->project($company, $stored, $event);
             }

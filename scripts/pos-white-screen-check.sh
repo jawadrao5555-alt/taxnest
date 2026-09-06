@@ -429,6 +429,9 @@ PRA_PAGES=(
   "/pos/billing|tnpc-plan|/pos/payment-proof"
   # Multi-branch v1 (Task 1347): owner/admin-only branch management page.
   "/pos/branches|pos/branches\"|name=\"city\""
+  # Waiter tablet page (Sep 2026): the SW serves it offline from WAITER_CACHE,
+  # so its language-independent marker + inline JS must stay parseable.
+  "/pos/waiter|data-tn-waiter-document|waiterApp\("
 )
 FBR_PAGES=(
   "/fbr-pos/dashboard|fbr-pos/day-close|fbr-pos/create"

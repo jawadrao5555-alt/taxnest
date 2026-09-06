@@ -63,6 +63,10 @@ args = "test"
 task = "workflow.run"
 args = "Video Batch"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Video Pharmacy"
+
 [[workflows.workflow]]
 name = "Laravel Server"
 author = "agent"

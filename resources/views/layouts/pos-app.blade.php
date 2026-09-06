@@ -288,7 +288,7 @@
         <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
         <noscript><link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" /></noscript>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        <script src="{{ asset('js/nestpos-local-core.js') }}?v=8" defer></script>
+        <script src="{{ asset('js/nestpos-local-core.js') }}?v=10" defer></script>
         <script>
             // Alpine CDN fallback (only if the Vite bundle failed). MUST arm AFTER
             // DOMContentLoaded: module scripts always run before DCL, so post-DCL

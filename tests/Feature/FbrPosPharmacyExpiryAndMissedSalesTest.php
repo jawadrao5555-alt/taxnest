@@ -118,6 +118,34 @@ class FbrPosPharmacyExpiryAndMissedSalesTest extends TestCase
         $this->assertSame(1, PharmacyExpirySummaryService::summary($this->company, null)['near_count']);
     }
 
+    /**
+     * Live runs the DATABASE cache store, whose increment() returns false on a
+     * key that does not exist yet (the array store silently creates it). The
+     * forget path must bump the version under that store too, or a near-days
+     * change keeps serving the stale window for ten minutes.
+     */
+    public function test_summary_forget_works_on_the_database_cache_store(): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('cache')) {
+            \Illuminate\Support\Facades\Schema::create('cache', function ($t) {
+                $t->string('key')->primary();
+                $t->mediumText('value');
+                $t->integer('expiration');
+            });
+        }
+        config(['cache.default' => 'database']);
+        \Illuminate\Support\Facades\Cache::forgetDriver('database');
+
+        $p = $this->product('Brufen 400');
+        $this->assertSame(0, PharmacyExpirySummaryService::summary($this->company, null)['near_count']);
+        $this->batch($p, 'B1', now()->addDays(3)->toDateString(), 5, 20, 30);
+        $this->assertSame(0, PharmacyExpirySummaryService::summary($this->company, null)['near_count']);
+        PharmacyExpirySummaryService::forget($this->company->id);
+        $this->assertSame(1, PharmacyExpirySummaryService::summary($this->company, null)['near_count']);
+
+        config(['cache.default' => 'array']);
+    }
+
     // ── 2. Dashboard tile + banner gating ───────────────────────────────────
 
     public function test_dashboard_shows_tile_and_banner_for_admin(): void

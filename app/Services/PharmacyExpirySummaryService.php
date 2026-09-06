@@ -81,11 +81,13 @@ class PharmacyExpirySummaryService
     public static function forget(int $companyId): void
     {
         // Branch views are few; a version bump is cheaper than tracking keys.
-        try {
-            Cache::increment(self::versionKey($companyId));
-        } catch (\Throwable $e) {
-            Cache::put(self::versionKey($companyId), (int) now()->timestamp, 86400 * 7);
-        }
+        // Deliberately get+put, NOT Cache::increment(): the database/file
+        // stores return false on a key that does not exist yet (array store
+        // creates it), so an increment-only bump was a silent no-op on live
+        // and the tile kept showing a stale window after a settings change.
+        $key = self::versionKey($companyId);
+        $next = (int) Cache::get($key, 0) + 1;
+        Cache::put($key, $next, 86400 * 7);
     }
 
     public static function compute(Company $company, ?int $branchId): array

@@ -122,6 +122,24 @@ class NewFeatureBadges
             'panel' => 'fbrpos',
             'pages' => ['fbrpos.customize'],
         ],
+        // 💊 6 Sep 2026 — counter-side pharmacy: dashboard par "Expire ho rahi
+        // hain" tile, near-expiry window setting, aur "Missed sales" report
+        // (customer ne poocha, dukan par nahi thi).
+        'fbr_pharmacy_expiry_tile' => [
+            'since' => '2026-09-06',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.dashboard'],
+        ],
+        'fbr_pharmacy_near_days' => [
+            'since' => '2026-09-06',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.customize'],
+        ],
+        'fbr_pharmacy_missed_sales' => [
+            'since' => '2026-09-06',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.pharmacy.missed-sales', 'fbrpos.pharmacy.reports'],
+        ],
     ];
 
     /** Sirf tests ke liye — asli register ki jagah naqli entries. */

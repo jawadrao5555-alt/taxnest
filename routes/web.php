@@ -2637,6 +2637,13 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/pharmacy/claims/{id}/print', [\App\Http\Controllers\FbrPosPharmacyController::class, 'printClaim'])->name('fbrpos.pharmacy.claim.print');
     Route::post('/pharmacy/claims/{id}/status', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateClaimStatus'])->name('fbrpos.pharmacy.claim.status')->middleware('plan.limit:inventory');
     Route::get('/pharmacy/reports', [\App\Http\Controllers\FbrPosPharmacyController::class, 'reports'])->name('fbrpos.pharmacy.reports');
+    // Counter-side pharmacy (Sep 2026): near-expiry window, salt-alternative
+    // stock check, and the "customer asked, shop lacked" missed-sale log.
+    Route::post('/pharmacy/near-days', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateNearDays'])->name('fbrpos.pharmacy.near-days');
+    Route::get('/pharmacy/stock-check', [\App\Http\Controllers\FbrPosPharmacyController::class, 'stockCheck'])->name('fbrpos.pharmacy.stock-check');
+    Route::post('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeMissedSale'])->name('fbrpos.pharmacy.missed-sales.store');
+    Route::get('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSales'])->name('fbrpos.pharmacy.missed-sales');
+    Route::post('/pharmacy/missed-sales/handled', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSaleHandled'])->name('fbrpos.pharmacy.missed-sales.handled');
 
     // 🚚 Delivery Riders (Aug 2026 — FBR port of PRA PosRiderController)
     // Board + mutations: admin + cashier. Rider CRUD: admin-only (checked in controller).

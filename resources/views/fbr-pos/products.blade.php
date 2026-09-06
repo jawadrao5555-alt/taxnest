@@ -19,11 +19,13 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
             {{-- 🏷 Label print page (Task 1272) — selection-aware: picked rows preselect on the labels page --}}
+            @if(\App\Services\PosFeatureService::moduleRelevant($company ?? null, 'barcode'))
             <a x-show="!allMatching" :href="labelsUrl()" href="{{ route('fbrpos.products.labels') }}"
                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 <span x-text="selected.length > 0 ? @js(__('pos.print')) + ' ' + selected.length : @js(__('pos.print_labels'))">{{ __('pos.print_labels') }}</span>
             </a>
+            @endif
             <a href="{{ route('fbrpos.products.create') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
                 {{ __('pos.plus_new_product') }}
             </a>

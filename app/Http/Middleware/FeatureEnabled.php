@@ -16,15 +16,25 @@ use Illuminate\Http\Request;
  * gate reads planAllows() (relevance-aware). A module that does not belong to
  * the shop's business category is therefore unreachable by URL with the same
  * friendly outcome a switched-off module gets — never a locked upsell.
+ *
+ * Second parameter 'relevant' (->middleware('feature:inventory,relevant'))
+ * checks ONLY the category half: the module must belong to the shop (profile,
+ * admin extra or grandfathered) but may still be switched off — the page keeps
+ * its own "turn it on from Modules" flow. Use it on modules whose landing page
+ * is the place a shop enables them (inventory/stock, services).
  */
 class FeatureEnabled
 {
-    public function handle(Request $request, Closure $next, string $flag)
+    public function handle(Request $request, Closure $next, string $flag, ?string $mode = null)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        if (!PosFeatureService::moduleAvailable($company, $flag)) {
+        $blocked = $mode === 'relevant'
+            ? ($company && !PosFeatureService::moduleRelevant($company, $flag))
+            : !PosFeatureService::moduleAvailable($company, $flag);
+
+        if ($blocked) {
             $notForCategory = $company && !PosFeatureService::moduleRelevant($company, $flag);
             $message = $notForCategory
                 ? __('pos.feature_not_for_business')

@@ -91,6 +91,8 @@ $run = function (Company $co, string $guard, array $cats) use (&$problems, $kern
                 return preg_replace('#(^|[^:\'"\\\\])//[^\n]*#m', '$1', $b);
             }, $html);
             $html = preg_replace('/"(barcode|inventory|kitchen|kot|tables|recipes)":/', '"x":', $html); // JSON keys are data, not copy
+            $html = preg_replace('/\b(barcode|inventory|kitchen|kot|tables|recipes)\s*:\s*/', 'x: ', $html); // unquoted JS object keys
+            $html = preg_replace('/[.?](barcode|inventory|kitchen|kot|tables|recipes)\b/', '.x', $html);       // JS property reads (r.barcode)
             $low = mb_strtolower($html);
             foreach ($forbid as $w) {
                 if (preg_match('/(?<![\\p{L}.])' . preg_quote(mb_strtolower($w), '/') . '(?![\\p{L}])/u', $low, $mm, PREG_OFFSET_CAPTURE)) {

@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Schema;
  *   - QR menu       the public profile is switched on
  *   - caller id     caller_id_enabled switch on
  *   - pharmacy      pharmacy_mode on
+ *   - inventory     companies.inventory_enabled on (column, not only the flag)
+ *   - services      a services row exists
  *   - any gate      a verified, active paid add-on for it
  * Every lookup is table/column guarded so the backfill runs on any schema.
  */
@@ -74,6 +76,15 @@ class PosCategoryRolloutService
         }
         if (self::col($company, 'pharmacy_mode')) {
             $evidence['pharmacy_enabled'] = 'pharmacy mode on';
+        }
+        // Inventory has TWO switches (flag + companies.inventory_enabled) and the
+        // stock pages read the COLUMN — a shop tracking stock on the column
+        // alone must be grandfathered before the URL gate lands.
+        if (self::col($company, 'inventory_enabled')) {
+            $evidence['inventory'] = 'stock tracking switched on';
+        }
+        if (self::rows('pos_services', $cid)) {
+            $evidence['service_jobs'] = 'has services';
         }
         foreach (self::addonGates($company) as $gate) {
             $evidence[$gate] = 'paid add-on active';

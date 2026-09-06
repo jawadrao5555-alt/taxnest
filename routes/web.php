@@ -1096,7 +1096,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/api/products/{id}/quick-price', [PosController::class, 'apiQuickUpdatePrice'])->name('pos.api.products.quick-price');
     Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
-    Route::get('/products/labels', [PosController::class, 'productLabels'])->name('pos.products.labels');
+    Route::get('/products/labels', [PosController::class, 'productLabels'])->name('pos.products.labels')->middleware('feature:barcode,relevant');
     // Bulk sale-screen visibility: OUTSIDE PosAdminOnly on purpose — that middleware
     // redirects instead of 403ing; controller enforces a strict admin/manager allowlist
     // (isPosAdmin) and returns a true 403 to everyone else, cashiers included.
@@ -1113,10 +1113,14 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/customers/alert-dismiss', [PosController::class, 'dismissInactiveRegular'])->name('pos.customers.alert-dismiss');
 
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
-        Route::get('/services', [PosController::class, 'services'])->name('pos.services');
-        Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
-        Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
-        Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
+        // Category profile (Task 1582): Services belong to the services family
+        // (or an admin extra / grandfathered shop) — hidden = unreachable by URL.
+        Route::middleware(['feature:service_jobs,relevant'])->group(function () {
+            Route::get('/services', [PosController::class, 'services'])->name('pos.services');
+            Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
+            Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
+            Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
+        });
         Route::get('/deals', [PosController::class, 'deals'])->name('pos.deals');
         Route::post('/deals', [PosController::class, 'storeDeal'])->name('pos.deals.store');
         Route::put('/deals/{id}', [PosController::class, 'updateDeal'])->name('pos.deals.update');
@@ -1166,34 +1170,39 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/customers/history/bill/{id}', [PosController::class, 'customerHistoryBill'])->name('pos.customers.history.bill');
         Route::get('/customers/{id}/history/export', [PosController::class, 'exportCustomerHistory'])->name('pos.customers.history.export');
         Route::get('/customers/{id}/history/pdf', [PosController::class, 'customerHistoryPdf'])->name('pos.customers.history.pdf');
-        Route::get('/inventory', [PosInventoryController::class, 'dashboard'])->name('pos.inventory.dashboard');
-        Route::get('/inventory/stock', [PosInventoryController::class, 'stock'])->name('pos.inventory.stock');
-        Route::get('/inventory/movements', [PosInventoryController::class, 'movements'])->name('pos.inventory.movements');
-        Route::get('/inventory/low-stock', [PosInventoryController::class, 'lowStockAlerts'])->name('pos.inventory.low-stock');
-        Route::match(['get', 'post'], '/inventory/adjust', [PosInventoryController::class, 'adjustStock'])->name('pos.inventory.adjust');
-        // Branch-to-branch stock transfer (Task 1354) — owner/manager only.
-        Route::get('/inventory/transfer', [PosInventoryController::class, 'transfers'])->name('pos.inventory.transfers');
-        Route::post('/inventory/transfer', [PosInventoryController::class, 'storeTransfer'])->name('pos.inventory.transfer.store');
-        // In-transit transfers (Task 1434): the receiving branch confirms
-        // arrival, or either end cancels while the maal is still on the road.
-        Route::post('/inventory/transfer/{movement}/receive', [PosInventoryController::class, 'receiveTransfer'])->name('pos.inventory.transfer.receive');
-        Route::post('/inventory/transfer/{movement}/cancel', [PosInventoryController::class, 'cancelTransfer'])->name('pos.inventory.transfer.cancel');
-        Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
-        Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
-        // Physical Stock Check — expected vs physically counted, and the gap.
-        // Reads are open to anyone who can see inventory; every WRITE is
-        // owner/manager only (enforced inside the controller, not here, so a
-        // cashier hitting the URL directly gets the same 403).
-        Route::get('/inventory/stock-check', [PosStockCheckController::class, 'index'])->name('pos.inventory.stock-check.index');
-        Route::get('/inventory/stock-check/create', [PosStockCheckController::class, 'create'])->name('pos.inventory.stock-check.create');
-        Route::post('/inventory/stock-check', [PosStockCheckController::class, 'store'])->name('pos.inventory.stock-check.store');
-        Route::get('/inventory/stock-check/{id}', [PosStockCheckController::class, 'show'])->whereNumber('id')->name('pos.inventory.stock-check.show');
-        Route::post('/inventory/stock-check/{id}/counts', [PosStockCheckController::class, 'saveCounts'])->whereNumber('id')->name('pos.inventory.stock-check.counts');
-        Route::get('/inventory/stock-check/{id}/sheet', [PosStockCheckController::class, 'downloadSheet'])->whereNumber('id')->name('pos.inventory.stock-check.sheet');
-        Route::post('/inventory/stock-check/{id}/import', [PosStockCheckController::class, 'importSheet'])->whereNumber('id')->name('pos.inventory.stock-check.import');
-        Route::post('/inventory/stock-check/{id}/post', [PosStockCheckController::class, 'post'])->whereNumber('id')->name('pos.inventory.stock-check.post');
-        Route::post('/inventory/stock-check/{id}/cancel', [PosStockCheckController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-check.cancel');
-        Route::get('/inventory/stock-check/{id}/pdf', [PosStockCheckController::class, 'pdf'])->whereNumber('id')->name('pos.inventory.stock-check.pdf');
+        // Category profile (Task 1582): the whole inventory family is for shops
+        // that stock goods (or an admin extra / grandfathered shop). The
+        // relevance-only mode keeps the dashboard's own "turn it on" flow.
+        Route::middleware(['feature:inventory,relevant'])->group(function () {
+            Route::get('/inventory', [PosInventoryController::class, 'dashboard'])->name('pos.inventory.dashboard');
+            Route::get('/inventory/stock', [PosInventoryController::class, 'stock'])->name('pos.inventory.stock');
+            Route::get('/inventory/movements', [PosInventoryController::class, 'movements'])->name('pos.inventory.movements');
+            Route::get('/inventory/low-stock', [PosInventoryController::class, 'lowStockAlerts'])->name('pos.inventory.low-stock');
+            Route::match(['get', 'post'], '/inventory/adjust', [PosInventoryController::class, 'adjustStock'])->name('pos.inventory.adjust');
+            // Branch-to-branch stock transfer (Task 1354) — owner/manager only.
+            Route::get('/inventory/transfer', [PosInventoryController::class, 'transfers'])->name('pos.inventory.transfers');
+            Route::post('/inventory/transfer', [PosInventoryController::class, 'storeTransfer'])->name('pos.inventory.transfer.store');
+            // In-transit transfers (Task 1434): the receiving branch confirms
+            // arrival, or either end cancels while the maal is still on the road.
+            Route::post('/inventory/transfer/{movement}/receive', [PosInventoryController::class, 'receiveTransfer'])->name('pos.inventory.transfer.receive');
+            Route::post('/inventory/transfer/{movement}/cancel', [PosInventoryController::class, 'cancelTransfer'])->name('pos.inventory.transfer.cancel');
+            Route::post('/inventory/min-stock', [PosInventoryController::class, 'updateMinStock'])->name('pos.inventory.min-stock');
+            Route::post('/inventory/toggle', [PosInventoryController::class, 'toggleInventory'])->name('pos.inventory.toggle');
+            // Physical Stock Check — expected vs physically counted, and the gap.
+            // Reads are open to anyone who can see inventory; every WRITE is
+            // owner/manager only (enforced inside the controller, not here, so a
+            // cashier hitting the URL directly gets the same 403).
+            Route::get('/inventory/stock-check', [PosStockCheckController::class, 'index'])->name('pos.inventory.stock-check.index');
+            Route::get('/inventory/stock-check/create', [PosStockCheckController::class, 'create'])->name('pos.inventory.stock-check.create');
+            Route::post('/inventory/stock-check', [PosStockCheckController::class, 'store'])->name('pos.inventory.stock-check.store');
+            Route::get('/inventory/stock-check/{id}', [PosStockCheckController::class, 'show'])->whereNumber('id')->name('pos.inventory.stock-check.show');
+            Route::post('/inventory/stock-check/{id}/counts', [PosStockCheckController::class, 'saveCounts'])->whereNumber('id')->name('pos.inventory.stock-check.counts');
+            Route::get('/inventory/stock-check/{id}/sheet', [PosStockCheckController::class, 'downloadSheet'])->whereNumber('id')->name('pos.inventory.stock-check.sheet');
+            Route::post('/inventory/stock-check/{id}/import', [PosStockCheckController::class, 'importSheet'])->whereNumber('id')->name('pos.inventory.stock-check.import');
+            Route::post('/inventory/stock-check/{id}/post', [PosStockCheckController::class, 'post'])->whereNumber('id')->name('pos.inventory.stock-check.post');
+            Route::post('/inventory/stock-check/{id}/cancel', [PosStockCheckController::class, 'cancel'])->whereNumber('id')->name('pos.inventory.stock-check.cancel');
+            Route::get('/inventory/stock-check/{id}/pdf', [PosStockCheckController::class, 'pdf'])->whereNumber('id')->name('pos.inventory.stock-check.pdf');
+        });
         Route::get('/team', [PosController::class, 'posTeam'])->name('pos.team');
         Route::post('/team/cashier', [PosController::class, 'storeCashier'])->name('pos.team.store-cashier');
         Route::put('/team/cashier/{id}', [PosController::class, 'updateCashier'])->name('pos.team.update-cashier');
@@ -2481,7 +2490,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
     Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');
     // 🏷 Barcode label print page (Task 1272 — PRA port + picker upgrade)
-    Route::get('/products/labels', [FbrPosController::class, 'productLabels'])->name('fbrpos.products.labels');
+    Route::get('/products/labels', [FbrPosController::class, 'productLabels'])->name('fbrpos.products.labels')->middleware('feature:barcode,relevant');
     // Bulk ops on SELECTED products — admin-gated in-controller (FBR convention)
     Route::post('/products/bulk', [FbrPosController::class, 'bulkProductAction'])->name('fbrpos.products.bulk');
     // 📦 Excel export/template + bulk import (FBR mirror of pos.products.template/import).
@@ -2499,10 +2508,13 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/products/bulk-sale', [FbrPosController::class, 'bulkToggleSale'])->name('fbrpos.products.bulk-sale');
     Route::delete('/products/{id}', [FbrPosController::class, 'destroyProduct'])->name('fbrpos.products.destroy');
     // 🛠 Services (Task 1272 — PRA port): non-stock service items; admin-gated in-controller
-    Route::get('/services', [FbrPosController::class, 'services'])->name('fbrpos.services');
-    Route::post('/services', [FbrPosController::class, 'storeService'])->name('fbrpos.services.store');
-    Route::put('/services/{id}', [FbrPosController::class, 'updateService'])->name('fbrpos.services.update');
-    Route::delete('/services/{id}', [FbrPosController::class, 'deleteService'])->name('fbrpos.services.delete');
+    // Category profile (Task 1582): hidden for goods shops = unreachable by URL.
+    Route::middleware(['feature:service_jobs,relevant'])->group(function () {
+        Route::get('/services', [FbrPosController::class, 'services'])->name('fbrpos.services');
+        Route::post('/services', [FbrPosController::class, 'storeService'])->name('fbrpos.services.store');
+        Route::put('/services/{id}', [FbrPosController::class, 'updateService'])->name('fbrpos.services.update');
+        Route::delete('/services/{id}', [FbrPosController::class, 'deleteService'])->name('fbrpos.services.delete');
+    });
     Route::get('/api/products/search', [FbrPosController::class, 'searchProducts'])->name('fbrpos.api.products.search');
     Route::get('/api/products/barcode', [FbrPosController::class, 'lookupByBarcode'])->name('fbrpos.api.products.barcode');
     // 🔄 Auto-Sync engine — silent 30-sec frontend poller + manual Failed modal
@@ -2619,35 +2631,40 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/customers/{id}/history/export', [\App\Http\Controllers\FbrPosCustomerController::class, 'historyExport'])->name('fbrpos.customers.history.export');
     Route::get('/customers/{id}/history/pdf', [\App\Http\Controllers\FbrPosCustomerController::class, 'historyPdf'])->name('fbrpos.customers.history.pdf');
 
-    // Stock / Purchase / Suppliers (Aug 2026 — Retail Core)
-    Route::get('/stock', [\App\Http\Controllers\FbrPosStockController::class, 'index'])->name('fbrpos.stock');
-    Route::get('/stock/purchases', [\App\Http\Controllers\FbrPosStockController::class, 'purchases'])->name('fbrpos.stock.purchases');
-    Route::get('/stock/movements', [\App\Http\Controllers\FbrPosStockController::class, 'movements'])->name('fbrpos.stock.movements');
-    Route::get('/stock/corrections', [\App\Http\Controllers\FbrPosStockController::class, 'corrections'])->name('fbrpos.stock.corrections');
-    Route::post('/stock/toggle', [\App\Http\Controllers\FbrPosStockController::class, 'toggle'])->name('fbrpos.stock.toggle')->middleware('plan.limit:inventory');
-    Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier')->middleware('plan.limit:inventory');
-    Route::post('/stock/supplier/{id}/update', [\App\Http\Controllers\FbrPosStockController::class, 'updateSupplier'])->name('fbrpos.stock.supplier.update')->middleware('plan.limit:inventory');
-    Route::post('/stock/supplier/{id}/delete', [\App\Http\Controllers\FbrPosStockController::class, 'deleteSupplier'])->name('fbrpos.stock.supplier.delete')->middleware('plan.limit:inventory');
-    Route::post('/stock/supplier/{id}/reactivate', [\App\Http\Controllers\FbrPosStockController::class, 'reactivateSupplier'])->name('fbrpos.stock.supplier.reactivate')->middleware('plan.limit:inventory');
-    Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase')->middleware('plan.limit:inventory');
-    Route::post('/stock/purchase/{id}/void', [\App\Http\Controllers\FbrPosStockController::class, 'voidPurchase'])->name('fbrpos.stock.purchase.void')->middleware('plan.limit:inventory');
-    // Branch-to-branch stock transfer (Task 1365) — owner/manager only.
-    Route::get('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'transfers'])->name('fbrpos.stock.transfers');
-    Route::post('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'storeTransfer'])->name('fbrpos.stock.transfer.store')->middleware('plan.limit:inventory');
-    Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
-    Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
-    Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
-    // 🧾 Distributor ledger (Task 1580) — supplier payments, statements and
-    // purchase returns. Same owner/manager gate + branch scoping as /stock;
-    // every money mutation sits behind plan.limit:inventory like the rest.
-    Route::post('/stock/payments', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storePayment'])->name('fbrpos.stock.payment.store')->middleware('plan.limit:inventory');
-    Route::post('/stock/payments/{id}/void', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'voidPayment'])->name('fbrpos.stock.payment.void')->middleware('plan.limit:inventory');
-    Route::get('/stock/suppliers/{id}/statement', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statement'])->name('fbrpos.stock.supplier.statement');
-    Route::get('/stock/suppliers/{id}/statement/pdf', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statementPdf'])->name('fbrpos.stock.supplier.statement.pdf');
-    Route::get('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returns'])->name('fbrpos.stock.returns');
-    Route::post('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storeReturn'])->name('fbrpos.stock.return.store')->middleware('plan.limit:inventory');
-    Route::get('/stock/returns/{id}/print', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returnPrint'])->name('fbrpos.stock.return.print');
-    Route::get('/stock/purchases/{id}/lines', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'purchaseLines'])->name('fbrpos.stock.purchase.lines');
+    // Category profile (Task 1582): stock, purchases, suppliers, munafa and the
+    // distributor ledger belong to goods/pharmacy shops (or an admin extra /
+    // grandfathered shop) — relevance-only so /stock keeps its own ON switch.
+    Route::middleware(['feature:inventory,relevant'])->group(function () {
+        // Stock / Purchase / Suppliers (Aug 2026 — Retail Core)
+        Route::get('/stock', [\App\Http\Controllers\FbrPosStockController::class, 'index'])->name('fbrpos.stock');
+        Route::get('/stock/purchases', [\App\Http\Controllers\FbrPosStockController::class, 'purchases'])->name('fbrpos.stock.purchases');
+        Route::get('/stock/movements', [\App\Http\Controllers\FbrPosStockController::class, 'movements'])->name('fbrpos.stock.movements');
+        Route::get('/stock/corrections', [\App\Http\Controllers\FbrPosStockController::class, 'corrections'])->name('fbrpos.stock.corrections');
+        Route::post('/stock/toggle', [\App\Http\Controllers\FbrPosStockController::class, 'toggle'])->name('fbrpos.stock.toggle')->middleware('plan.limit:inventory');
+        Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier')->middleware('plan.limit:inventory');
+        Route::post('/stock/supplier/{id}/update', [\App\Http\Controllers\FbrPosStockController::class, 'updateSupplier'])->name('fbrpos.stock.supplier.update')->middleware('plan.limit:inventory');
+        Route::post('/stock/supplier/{id}/delete', [\App\Http\Controllers\FbrPosStockController::class, 'deleteSupplier'])->name('fbrpos.stock.supplier.delete')->middleware('plan.limit:inventory');
+        Route::post('/stock/supplier/{id}/reactivate', [\App\Http\Controllers\FbrPosStockController::class, 'reactivateSupplier'])->name('fbrpos.stock.supplier.reactivate')->middleware('plan.limit:inventory');
+        Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase')->middleware('plan.limit:inventory');
+        Route::post('/stock/purchase/{id}/void', [\App\Http\Controllers\FbrPosStockController::class, 'voidPurchase'])->name('fbrpos.stock.purchase.void')->middleware('plan.limit:inventory');
+        // Branch-to-branch stock transfer (Task 1365) — owner/manager only.
+        Route::get('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'transfers'])->name('fbrpos.stock.transfers');
+        Route::post('/stock/transfer', [\App\Http\Controllers\FbrPosStockController::class, 'storeTransfer'])->name('fbrpos.stock.transfer.store')->middleware('plan.limit:inventory');
+        Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
+        Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
+        Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
+        // 🧾 Distributor ledger (Task 1580) — supplier payments, statements and
+        // purchase returns. Same owner/manager gate + branch scoping as /stock;
+        // every money mutation sits behind plan.limit:inventory like the rest.
+        Route::post('/stock/payments', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storePayment'])->name('fbrpos.stock.payment.store')->middleware('plan.limit:inventory');
+        Route::post('/stock/payments/{id}/void', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'voidPayment'])->name('fbrpos.stock.payment.void')->middleware('plan.limit:inventory');
+        Route::get('/stock/suppliers/{id}/statement', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statement'])->name('fbrpos.stock.supplier.statement');
+        Route::get('/stock/suppliers/{id}/statement/pdf', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statementPdf'])->name('fbrpos.stock.supplier.statement.pdf');
+        Route::get('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returns'])->name('fbrpos.stock.returns');
+        Route::post('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storeReturn'])->name('fbrpos.stock.return.store')->middleware('plan.limit:inventory');
+        Route::get('/stock/returns/{id}/print', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returnPrint'])->name('fbrpos.stock.return.print');
+        Route::get('/stock/purchases/{id}/lines', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'purchaseLines'])->name('fbrpos.stock.purchase.lines');
+    });
 
     // 💊 Pharmacy Mode (Task 1558) — batch/expiry stock, distributor expiry
     // claims and pharmacy reports. Every action re-checks pharmacyLive() in

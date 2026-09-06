@@ -101,6 +101,24 @@ class CompanyGroupingTest extends TestCase
         }
     }
 
+    public function test_demo_phone_numbers_are_not_evidence(): void
+    {
+        // 0300-1234567 keeps a real network code and fakes the rest.
+        $a = $this->makeCompany(['phone' => '03001234567', 'mobile' => '03001234567']);
+        $b = $this->makeCompany(['phone' => '0300-1234567', 'mobile' => '', 'product_type' => 'di']);
+        $c = $this->makeCompany(['phone' => '03211111111', 'product_type' => 'fbrpos']);
+        $d = $this->makeCompany(['phone' => '+92 321 1111111', 'product_type' => 'health']);
+
+        CompanyGroupService::rebuild();
+
+        foreach ([$a, $b, $c, $d] as $company) {
+            $this->assertNull(
+                CompanyGroupMember::where('company_id', $company->id)->first(),
+                "{$company->name} must not be grouped on a demo phone number"
+            );
+        }
+    }
+
     public function test_a_widely_shared_phone_stops_counting_as_evidence(): void
     {
         // An accountant's number on many unrelated shops is not a group.

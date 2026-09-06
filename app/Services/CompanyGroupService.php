@@ -126,8 +126,17 @@ class CompanyGroupService
                 return true;
             }
             // A straight run in either direction: 1234567890, 9876543210.
-            if (str_contains('01234567890123456789', $digits) || str_contains('98765432109876543210', $digits)) {
+            if (self::isRun($digits)) {
                 return true;
+            }
+
+            // Demo mobile numbers keep a real network code and fake the rest:
+            // 0300-1234567, 0321-1111111. Judge the subscriber part alone.
+            if ($type === 'phone' && strlen($digits) >= 9) {
+                $subscriber = substr($digits, -7);
+                if (count(array_unique(str_split($subscriber))) <= 2 || self::isRun($subscriber)) {
+                    return true;
+                }
             }
 
             return false;
@@ -142,6 +151,13 @@ class CompanyGroupService
         }
 
         return false;
+    }
+
+    /** 1234567 / 7654321 — counted digits, in either direction. */
+    private static function isRun(string $digits): bool
+    {
+        return strlen($digits) >= 4
+            && (str_contains('01234567890123456789', $digits) || str_contains('98765432109876543210', $digits));
     }
 
     /**

@@ -9954,9 +9954,15 @@ class PosController extends Controller
             }
         }
 
+        // Units follow the shop's business category (PosUnitCatalog): the add
+        // and edit modals show the recommended group first, "Baqi units" after.
+        // Legacy NOS/KGS rows stay valid and selected (catalogue lists them).
+        $uomGroups = \App\Services\PosUnitCatalog::groupsFor($company);
+
         return view('pos.products', compact(
             'products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes',
-            'company', 'productLimitStatus', 'stockBranchId', 'stockBranchName', 'stockAllBranches'
+            'company', 'productLimitStatus', 'stockBranchId', 'stockBranchName', 'stockAllBranches',
+            'uomGroups'
         ));
     }
 
@@ -10011,7 +10017,7 @@ class PosController extends Controller
         // simultaneous quick-creates at the last free slot serialize — the
         // second recounts AFTER the first commits and can never exceed the cap.
         try {
-            $product = DB::transaction(function () use ($companyId, $name, $data) {
+            $product = DB::transaction(function () use ($companyId, $name, $data, $company) {
                 Company::where('id', $companyId)->lockForUpdate()->get();
                 $remaining = \App\Services\PlanLimitService::remainingProductAllowance($companyId, 'pos');
                 if ($remaining !== null && $remaining <= 0) {
@@ -10028,7 +10034,9 @@ class PosController extends Controller
                     'show_on_sale'  => true, // explicit — never trust the DB default (prod drift)
                     'category'      => 'Quick',
                     'sku'           => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
-                    'uom'           => 'NOS',
+                    // Business-category default unit (PosUnitCatalog); NOS for
+                    // generic services, NGT for a hotel, SES for a clinic…
+                    'uom'           => \App\Services\PosUnitCatalog::defaultFor($company),
                 ]);
             });
         } catch (\App\Exceptions\PlanLimitReachedException $e) {
@@ -10085,7 +10093,8 @@ class PosController extends Controller
             'category' => 'nullable|string|max:100',
             'sku' => 'nullable|string|max:100',
             'barcode' => 'nullable|string|max:100',
-            'uom' => 'nullable|string|max:20',
+            // One unit catalogue (PosUnitCatalog): every code a shop can pick.
+            'uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule()],
             'description' => 'nullable|string|max:500',
             'stock_quantity' => 'nullable|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
@@ -10133,7 +10142,7 @@ class PosController extends Controller
             'category' => $request->category,
             'sku' => $request->sku,
             'barcode' => $request->barcode,
-            'uom' => $request->uom ?? 'NOS',
+            'uom' => \App\Services\PosUnitCatalog::normalize($request->uom) ?: \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId)),
             'is_tax_exempt' => $isExempt,
             'is_third_schedule' => $isThirdSchedule,
             'show_on_sale' => $request->has('show_on_sale'),
@@ -10451,6 +10460,7 @@ class PosController extends Controller
         $barcodeIdx = $this->findColumn($header, ['barcode', 'bar code', 'ean']);
         $taxIdx = $this->findColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax', 'tax %']);
         $uomIdx = $this->findColumn($header, ['unit (uom)', 'unit', 'uom']);
+        $importUomDefault = \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId));
         // Tax Exempt column (owner request Jul 2026): Yes/No round-trip so bulk
         // exempting via Excel works. Older files without the column keep the
         // existing flag untouched.
@@ -10511,7 +10521,10 @@ class PosController extends Controller
             $desc = $descIdx !== false ? trim((string) ($data[$descIdx] ?? '')) : '';
             $cat = $catIdx !== false ? trim((string) ($data[$catIdx] ?? '')) : '';
             $tax = $taxIdx !== false ? $this->cleanImportNumber($data[$taxIdx] ?? '') : null;
-            $uom = $uomIdx !== false ? strtoupper(trim((string) ($data[$uomIdx] ?? ''))) : '';
+            // Unit cell: tolerant resolve against the ONE catalogue (code, alias
+            // or label). Unknown text = blank cell — existing rows keep their
+            // unit, new rows take the shop's category default.
+            $uom = $uomIdx !== false ? (\App\Services\PosUnitCatalog::resolve((string) ($data[$uomIdx] ?? '')) ?? '') : '';
 
             // Third Schedule cell: Yes/No (tolerant); blank = leave flag as-is.
             $thirdSchedule = null;
@@ -10604,7 +10617,7 @@ class PosController extends Controller
                     'sku' => $sku,
                     'barcode' => $barcode,
                     'tax_rate' => ($exempt === true) ? 0 : ($tax !== null ? $tax : 0),
-                    'uom' => $uom !== '' ? $uom : 'NOS',
+                    'uom' => $uom !== '' ? $uom : $importUomDefault,
                     'is_tax_exempt' => $exempt === true,
                     'is_active' => true,
                 ];
@@ -10735,7 +10748,9 @@ class PosController extends Controller
             'category' => 'nullable|string|max:100',
             'sku' => 'nullable|string|max:100',
             'barcode' => 'nullable|string|max:100',
-            'uom' => 'nullable|string|max:20',
+            // Catalogue codes + this product's own stored unit (a legacy /
+            // unknown code must keep re-saving as-is, never block the edit).
+            'uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule([$product->uom])],
             'description' => 'nullable|string|max:500',
             'stock_quantity' => 'nullable|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
@@ -10765,8 +10780,10 @@ class PosController extends Controller
         // Third Schedule → always tax-free (also marks exempt)
         if ($isThirdSchedule) { $isExempt = true; }
         $data = array_merge(
-            $request->only(['name', 'description', 'price', 'category', 'sku', 'barcode', 'uom']),
+            $request->only(['name', 'description', 'price', 'category', 'sku', 'barcode']),
             [
+                // Blank keeps the stored unit (legacy NOS/KGS rows never lose it).
+                'uom' => \App\Services\PosUnitCatalog::normalize($request->uom) ?: ($product->uom ?: \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId))),
                 'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
                 'stock_quantity' => $request->filled('stock_quantity') ? (int) $request->stock_quantity : null,
                 'low_stock_threshold' => $request->filled('low_stock_threshold') ? (int) $request->low_stock_threshold : ($product->low_stock_threshold ?? 10),
@@ -12386,7 +12403,7 @@ class PosController extends Controller
                         'name' => $itemName,
                         'price' => $itemPrice,
                         'tax_rate' => 0,
-                        'uom' => 'NOS',
+                        'uom' => \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId)),
                         'is_active' => true,
                         'is_tax_exempt' => $userExempt,
                         'show_on_sale' => true, // explicit — never trust the DB default (prod drift)

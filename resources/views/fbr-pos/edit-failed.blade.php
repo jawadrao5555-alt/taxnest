@@ -86,9 +86,15 @@
                             <td class="px-3 py-2">
                                 <select :name="'items[' + idx + '][uom]'" x-model="item.uom"
                                         class="w-20 px-2 py-1.5 text-sm rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500">
-                                    @foreach(['U','KG','GM','LTR','ML','MTR','SQM','PCS','PKT','DOZ','BOX','SET','BAG','BTL','CTN','ROL','FT','IN','YDS','TIN','CAN','BUN'] as $u)
-                                    <option value="{{ $u }}">{{ $u }}</option>
-                                    @endforeach
+                                    {{-- One unit catalogue (PosUnitCatalog): the shop's business-
+                                         category units first, "Baqi units" second. A stored code the
+                                         catalogue never listed stays selectable verbatim. --}}
+                                    @php
+                                        $uomGroups = $uomGroups ?? \App\Services\PosUnitCatalog::groupsFor(\App\Models\Company::find($transaction->company_id));
+                                        $uomKnown = array_merge(array_column($uomGroups['recommended'], 'code'), array_column($uomGroups['rest'], 'code'));
+                                    @endphp
+                                    <template x-if="item.uom && !{{ \Illuminate\Support\Js::from($uomKnown) }}.includes(String(item.uom).toUpperCase())"><option :value="item.uom" x-text="item.uom"></option></template>
+                                    @include('partials.pos-uom-options', ['uomGroups' => $uomGroups, 'uomSelected' => null])
                                 </select>
                             </td>
                             <td class="px-3 py-2">

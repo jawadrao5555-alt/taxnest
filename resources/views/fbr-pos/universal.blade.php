@@ -21,6 +21,10 @@
     // autoKotEnabled, sendToKitchen, fbr_kot job type, kitchen-ticket view)
     // stay identical to the PRA source so diffs remain reviewable. PRA keeps
     // its KOT wording — never point the fbr_* keys at PRA views.
+    // Units (UoM) follow the shop's business category — one grouped list from
+    // PosUnitCatalog, normally passed by create(); guard keeps any other render
+    // path alive (undefined var = 500).
+    $uomGroups = $uomGroups ?? \App\Services\PosUnitCatalog::groupsFor($company);
     $features = (object) [
         'tables' => false, 'delivery' => false,
         // Order Matching (Aug 2026): unpin kot — gate on kitchen_printer_enabled so
@@ -1492,7 +1496,15 @@ window.addEventListener('popstate', function() {
                                 @keydown.enter.prevent.stop="$event.target.blur()" @keydown.escape.prevent.stop="$event.target.blur()"
                                 class="dense-input w-20 text-[10px] font-mono bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500">
                             <select x-model="item.uom" @click.stop title="{{ __('pos.ti_uom') }}" class="dense-input text-[10px] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded px-1 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500">
-                                <template x-for="u in uomOptions" :key="u"><option :value="u" x-text="u"></option></template>
+                                {{-- Business-category units first, the rest second (PosUnitCatalog).
+                                     A stored code the catalogue never listed stays pickable verbatim. --}}
+                                <template x-if="item.uom && !uomOptions.includes(String(item.uom).toUpperCase())"><option :value="item.uom" x-text="item.uom"></option></template>
+                                <optgroup label="{{ __('pos.uom_group_recommended') }}">
+                                    <template x-for="u in uomGroups.recommended" :key="'r' + u.code"><option :value="u.code" x-text="u.code"></option></template>
+                                </optgroup>
+                                <optgroup label="{{ __('pos.uom_group_rest') }}">
+                                    <template x-for="u in uomGroups.rest" :key="'o' + u.code"><option :value="u.code" x-text="u.code"></option></template>
+                                </optgroup>
                             </select>
                             <div class="flex items-center gap-0.5" title="{{ __('pos.ti_tax_rate_pct') }}">
                                 <input type="number" x-model.number="item.tax_rate" min="0" max="100" step="any" placeholder="18"
@@ -1801,13 +1813,9 @@ window.addEventListener('popstate', function() {
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.uom_label') }}</label>
                         <select x-model="qcUom" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            @php
-                                // KEEP IN SYNC with product-form.blade.php $uomList
-                                $qcUomList = ['U'=>'Units','PCS'=>'Pieces','KG'=>'Kilogram','GM'=>'Gram','LTR'=>'Liter','ML'=>'Milliliter','MTR'=>'Meter','SQM'=>'Square Meter','FT'=>'Feet','IN'=>'Inch','YDS'=>'Yards','PKT'=>'Packet','DOZ'=>'Dozen','BOX'=>'Box','CTN'=>'Carton','BAG'=>'Bag','BTL'=>'Bottle','TIN'=>'Tin','CAN'=>'Can','BUN'=>'Bundle','ROL'=>'Roll','SET'=>'Set'];
-                            @endphp
-                            @foreach($qcUomList as $code => $label)
-                                <option value="{{ $code }}">{{ $code }} — {{ $label }}</option>
-                            @endforeach
+                            {{-- One unit catalogue (PosUnitCatalog): the shop's business-category
+                                 units first, "Baqi units" second — same list as the product form. --}}
+                            @include('partials.pos-uom-options', ['uomGroups' => $uomGroups, 'uomSelected' => $uomGroups['default']])
                         </select>
                     </div>
                 </div>
@@ -4034,7 +4042,15 @@ function restaurantPos() {
         deliveryPrintReceipt: {{ ($company->delivery_receipt_print_on_assign ?? false) ? 'true' : 'false' }},
         // 🧾 FBR compliance — buyer NTN (optional, B2B) + UoM list (mirrors store() validation)
         customerNtn: '',
-        uomOptions: ['U','KG','GM','LTR','ML','MTR','SQM','PCS','PKT','DOZ','BOX','SET','BAG','BTL','CTN','ROL','FT','IN','YDS','TIN','CAN','BUN'],
+        // One unit catalogue (PosUnitCatalog), grouped for THIS shop's business
+        // category. uomOptions = flat code list (recommended first), uomMeasure =
+        // the codes that sell in fractions / by Rs value, uomDefault = what a new
+        // quick-created item starts on. Baked server-side; business_category is
+        // in the boot fingerprint so a re-filed shop refreshes its cached screen.
+        uomGroups: {!! $jsEnc($uomGroups, "{recommended:[],rest:[],default:'U'}") !!},
+        get uomOptions() { return [...this.uomGroups.recommended, ...this.uomGroups.rest].map(u => u.code); },
+        uomMeasure: {!! $jsEnc(array_values(\App\Services\PosUnitCatalog::measureCodes())) !!},
+        uomDefault: @js((string) ($uomGroups['default'] ?? 'U')),
         // ── FAILED BILLS (header shortcut, F11) ───────────────────────────────
         // Lazy-loaded list of all bills with fbr_status IN (failed,offline,pending)
         // that have NOT received a fbr_invoice_number yet. Auto-refresh on mount.
@@ -4223,7 +4239,7 @@ function restaurantPos() {
         get cartQtyCount() { return this.cart.reduce((s, i) => s + this._safeQty(i.quantity), 0); },
         // Retail Core (Aug 2026): weight/measure units sell in fractions (0.5 KG,
         // 1.25 LTR, 2.5 MTR) — min qty 0.001 for these; count units stay min 1.
-        _isFractionalUom(item) { return ['KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS'].includes(String(item?.uom || '').toUpperCase()); },
+        _isFractionalUom(item) { return this.uomMeasure.includes(String(item?.uom || '').toUpperCase()); },
         _qtyMin(item) { return this._isFractionalUom(item) ? 0.001 : 1; },
         getItemDiscount(item) {
             const lineTotal = this.r2(this._safeQty(item.quantity) * item.unit_price);
@@ -6094,7 +6110,7 @@ function restaurantPos() {
         qcSaving: false,
         qcFromScan: false,
         qcExistingId: null,   // set = popup is EDITING an existing unpriced product (update, not create)
-        qcName: '', qcBarcode: '', qcPrice: '', qcUom: 'U', qcTaxMode: 'exempt', qcTaxRate: '', qcHsCode: '',
+        qcName: '', qcBarcode: '', qcPrice: '', qcUom: @js((string) ($uomGroups['default'] ?? 'U')), qcTaxMode: 'exempt', qcTaxRate: '', qcHsCode: '',
         quickPriceCartUid: null,    // cart_uid of row currently in price-edit mode
         quickPriceValue: '',        // bound to the inline price input
         quickCreateProduct() {
@@ -6129,7 +6145,7 @@ function restaurantPos() {
             this.qcFromScan = /^[0-9]{6,}$/.test(typed);
             this.qcName = this.qcFromScan ? '' : typed;
             this.qcBarcode = this.qcFromScan ? typed : '';
-            this.qcPrice = ''; this.qcUom = 'U'; this.qcTaxMode = 'exempt'; this.qcTaxRate = ''; this.qcHsCode = '';
+            this.qcPrice = ''; this.qcUom = this.uomDefault; this.qcTaxMode = 'exempt'; this.qcTaxRate = ''; this.qcHsCode = '';
             this.showSearchDropdown = false;
             this.qcModal = true;
             // Focus the missing piece: scanned code needs a NAME first, typed name needs a PRICE.
@@ -6150,7 +6166,7 @@ function restaurantPos() {
             this.qcName = prod.name || '';
             this.qcBarcode = prod.barcode || '';
             this.qcPrice = parseFloat(prod.price) > 0 ? prod.price : '';
-            this.qcUom = prod.uom || 'U';
+            this.qcUom = prod.uom || this.uomDefault;
             const tr = parseFloat(prod.tax_rate);
             this.qcTaxMode = prod.is_tax_exempt ? 'exempt' : ((isNaN(tr) || tr === 18) ? 'standard' : 'custom');
             this.qcTaxRate = this.qcTaxMode === 'custom' ? tr : '';
@@ -6194,7 +6210,7 @@ function restaurantPos() {
                         name,
                         price: priceNum,
                         barcode: (this.qcBarcode || '').trim() || null,
-                        uom: this.qcUom || 'U',
+                        uom: this.qcUom || this.uomDefault,
                         tax_mode: this.qcTaxMode,
                         tax_rate: this.qcTaxMode === 'custom' ? (parseFloat(this.qcTaxRate) || 0) : null,
                         hs_code: (this.qcHsCode || '').trim() || null,

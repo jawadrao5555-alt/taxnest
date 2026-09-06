@@ -18,7 +18,13 @@
     $initTaxRate = $initTaxRate === null || $initTaxRate === '' ? 18 : $initTaxRate;
     $initThird = old('is_third_schedule', $isEdit ? ($product->is_third_schedule ?? false) : ($sticky['is_third_schedule'] ?? false));
     $initPriceEditable = old('is_price_editable', $isEdit ? $product->is_price_editable : ($sticky['is_price_editable'] ?? true));
-    $currentUom = old('uom', $product->uom ?? ($sticky['uom'] ?? 'U'));
+    // Unit: stored value → sticky (save-and-continue) → the business
+    // category's own default (PosUnitCatalog via the controller).
+    $uomGroups = $uomGroups ?? \App\Services\PosUnitCatalog::groupsFor(
+        app()->bound('currentCompanyId') ? \App\Models\Company::find(app('currentCompanyId')) : null,
+        $product->uom ?? null
+    );
+    $currentUom = old('uom', $product->uom ?? ($sticky['uom'] ?? $uomGroups['default']));
     $stickySupplierId = (string) old('supplier_id', $sticky['supplier_id'] ?? '');
 
     // Multi-mode rows: re-fill every row from old input after a validation
@@ -199,35 +205,10 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.uom_label') }}</label>
                     <select name="uom" x-model="uomCode" @change="onUomChange()" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        @php
-                            $uomList = [
-                                'U' => 'Units',
-                                'PCS' => 'Pieces',
-                                'KG' => 'Kilogram',
-                                'GM' => 'Gram',
-                                'LTR' => 'Liter',
-                                'ML' => 'Milliliter',
-                                'MTR' => 'Meter',
-                                'SQM' => 'Square Meter',
-                                'FT' => 'Feet',
-                                'IN' => 'Inch',
-                                'YDS' => 'Yards',
-                                'PKT' => 'Packet',
-                                'DOZ' => 'Dozen',
-                                'BOX' => 'Box',
-                                'CTN' => 'Carton',
-                                'BAG' => 'Bag',
-                                'BTL' => 'Bottle',
-                                'TIN' => 'Tin',
-                                'CAN' => 'Can',
-                                'BUN' => 'Bundle',
-                                'ROL' => 'Roll',
-                                'SET' => 'Set',
-                            ];
-                        @endphp
-                        @foreach($uomList as $code => $label)
-                            <option value="{{ $code }}" {{ $currentUom == $code ? 'selected' : '' }}>{{ $code }} — {{ $label }}</option>
-                        @endforeach
+                        {{-- Units follow the shop's business category (one catalogue,
+                             PosUnitCatalog) — recommended group first, everything
+                             else under "Baqi units"; the stored value is always present. --}}
+                        @include('partials.pos-uom-options', ['uomGroups' => $uomGroups, 'uomSelected' => $currentUom])
                     </select>
                 </div>
                 @if($pharmacyMode ?? false)

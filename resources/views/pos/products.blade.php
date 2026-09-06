@@ -1,6 +1,14 @@
 <x-pos-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     @include('pos.partials.back-link')
+    @php
+        // One unit catalogue (PosUnitCatalog): this shop's business-category
+        // units first, "Baqi units" second. Passed by products(); guard keeps
+        // any other render path alive (undefined var = 500).
+        $uomGroups = $uomGroups ?? \App\Services\PosUnitCatalog::groupsFor($company ?? null);
+        $uomKnown = array_merge(array_column($uomGroups['recommended'], 'code'), array_column($uomGroups['rest'], 'code'));
+        $uomDefault = $uomGroups['default'];
+    @endphp
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('pos.pos_products') }}</h1>
         <div class="flex items-center gap-2">
@@ -256,13 +264,7 @@
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.unit_uom') }}</label>
                         <select name="uom" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-                            <option value="NOS">{{ __('pos.uom_nos') }}</option>
-                            <option value="KGS">{{ __('pos.uom_kgs') }}</option>
-                            <option value="LTR">{{ __('pos.uom_ltr') }}</option>
-                            <option value="MTR">{{ __('pos.uom_mtr') }}</option>
-                            <option value="PCS">{{ __('pos.uom_pcs') }}</option>
-                            <option value="PKT">{{ __('pos.uom_pkt') }}</option>
-                            <option value="BOX">{{ __('pos.uom_box') }}</option>
+                            @include('partials.pos-uom-options', ['uomGroups' => $uomGroups, 'uomSelected' => old('uom', $uomGroups['default'])])
                         </select>
                     </div>
                     <div>
@@ -492,7 +494,7 @@
     @php
         $catFieldNames = array_values($categoryFields ?? []);
         $boolCatFields = ['prescription_required', 'weight_based', 'custom_order'];
-        $productsJson = $products->map(function ($p) use ($catFieldNames, $boolCatFields) {
+        $productsJson = $products->map(function ($p) use ($catFieldNames, $boolCatFields, $uomDefault) {
             $row = [
                 'id' => $p->id,
                 'name' => $p->name,
@@ -505,7 +507,7 @@
                 'category' => $p->category,
                 'sku' => $p->sku,
                 'barcode' => $p->barcode,
-                'uom' => $p->uom ?? 'NOS',
+                'uom' => $p->uom ?? $uomDefault,
                 'is_active' => (bool) $p->is_active,
                 'show_on_sale' => (bool) ($p->show_on_sale ?? true),
                 'stock_quantity' => $p->stock_quantity,
@@ -818,9 +820,9 @@
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.unit_uom') }}</label>
                                 <select name="uom" x-model="editing.uom" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-                                    @foreach(['NOS','KGS','LTR','MTR','PCS','PKT','BOX'] as $u)
-                                    <option value="{{ $u }}">{{ $u }}</option>
-                                    @endforeach
+                                    {{-- A stored unit the catalogue never listed stays selectable verbatim. --}}
+                                    <template x-if="editing.uom && !{{ \Illuminate\Support\Js::from($uomKnown) }}.includes(String(editing.uom).toUpperCase())"><option :value="editing.uom" x-text="editing.uom"></option></template>
+                                    @include('partials.pos-uom-options', ['uomGroups' => $uomGroups, 'uomSelected' => $uomGroups['default']])
                                 </select>
                             </div>
                             <div class="sm:col-span-2 lg:col-span-3">

@@ -23,7 +23,12 @@ class FbrPosController extends Controller
 
     // 🎯 VALUE MODE — UoM gating: only measure-based UoMs allow value(Rs) → qty derivation
     // Per FBR PRAL spec: weight/volume/length UoMs accept decimal qty; piece-based UoMs do not.
-    const VALUE_MODE_UOMS = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
+    /**
+     * Measure units (decimal qty + Rs value-mode). Read from the ONE unit
+     * catalogue so a unit added there (LB, SQFT, KM, HR…) is a measure unit
+     * here too — never a second hand-written list.
+     */
+    const VALUE_MODE_UOMS = \App\Services\PosUnitCatalog::MEASURE_CODES;
 
     // 💊 Pharmacy Mode (Task 1558) — how many catalogue rows the sale screen is
     // allowed to bake into its x-data. Beyond this the screen serves lookups
@@ -1569,6 +1574,11 @@ class FbrPosController extends Controller
             Auth::guard('fbrpos')->user(), $company
         );
 
+        // Units follow the shop's business category (PosUnitCatalog): the
+        // quick-create select, the per-line unit select, the new-item default
+        // and the decimal/value-mode rule all read this ONE grouped list.
+        $uomGroups = \App\Services\PosUnitCatalog::groupsFor($company);
+
         return response(view($viewName, compact(
             'company', 'products', 'services', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
@@ -1577,7 +1587,7 @@ class FbrPosController extends Controller
             'petiRates', 'petiRateEnabled',
             // 💊 Pharmacy Mode (Task 1558)
             'pharmacyMode', 'pharmacyBatchTracking', 'pharmacyLooseSale', 'pharmacyNearDays',
-            'productsTruncated'
+            'productsTruncated', 'uomGroups'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('X-TaxNest-Sale-Document', 'fbr')
@@ -1843,7 +1853,7 @@ class FbrPosController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.unit_price' => 'required|numeric|min:0.01',
             'items.*.hs_code' => 'nullable|string|max:20',
-            'items.*.uom' => 'nullable|string|in:U,KG,GM,LTR,ML,MTR,SQM,PCS,PKT,DOZ,BOX,SET,BAG,BTL,CTN,ROL,FT,IN,YDS,TIN,CAN,BUN',
+            'items.*.uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule()],
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
             'items.*.is_tax_exempt' => 'nullable|boolean',
             // Peti (Wholesale) Rate (Task 1414): receipt/report marker only —
@@ -2347,7 +2357,7 @@ class FbrPosController extends Controller
                     if ($valueInput > 0) {
                         if (!in_array($uom, self::VALUE_MODE_UOMS, true)) {
                             throw \Illuminate\Validation\ValidationException::withMessages([
-                                'items' => "Value (Rs) entry only allowed for KG/GM/LTR/ML/MTR/SQM. Got '{$uom}' for item '{$item['item_name']}'.",
+                                'items' => "Value (Rs) entry only allowed for measure units (" . implode('/', self::VALUE_MODE_UOMS) . "). Got '{$uom}' for item '{$item['item_name']}'.",
                             ]);
                         }
                         if ($price <= 0) {
@@ -3573,8 +3583,10 @@ class FbrPosController extends Controller
         }
 
         $lastError = optional($transaction->fbrLogs->first())->error_message;
+        // Units follow the shop's business category (PosUnitCatalog).
+        $uomGroups = \App\Services\PosUnitCatalog::groupsFor(Company::find($companyId));
 
-        return view('fbr-pos.edit-failed', compact('transaction', 'lastError'));
+        return view('fbr-pos.edit-failed', compact('transaction', 'lastError', 'uomGroups'));
     }
 
     /**
@@ -3609,7 +3621,7 @@ class FbrPosController extends Controller
             'items.*.id' => 'required|integer',
             'items.*.item_name' => 'required|string|max:255',
             'items.*.hs_code' => 'nullable|string|max:20',
-            'items.*.uom' => 'nullable|string|in:U,KG,GM,LTR,ML,MTR,SQM,PCS,PKT,DOZ,BOX,SET,BAG,BTL,CTN,ROL,FT,IN,YDS,TIN,CAN,BUN',
+            'items.*.uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule()],
             'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.unit_price' => 'required|numeric|min:0.01',
             'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
@@ -3704,7 +3716,7 @@ class FbrPosController extends Controller
                 if ($valueInput > 0) {
                     if (!in_array($uom, self::VALUE_MODE_UOMS, true)) {
                         throw \Illuminate\Validation\ValidationException::withMessages([
-                            'items' => "Value (Rs) entry only allowed for KG/GM/LTR/ML/MTR/SQM. Got '{$uom}' for item ID #{$item->id}.",
+                            'items' => "Value (Rs) entry only allowed for measure units (" . implode('/', self::VALUE_MODE_UOMS) . "). Got '{$uom}' for item ID #{$item->id}.",
                         ]);
                     }
                     if ($price <= 0) {
@@ -8220,11 +8232,14 @@ class FbrPosController extends Controller
         $suppliers = $inventoryAllowed
             ? \App\Models\Supplier::forCompany($companyId)->active()->orderBy('name')->get(['id', 'name', 'city'])
             : collect();
+        $formCompany = Company::find($companyId);
         return view('fbr-pos.product-form', [
             'suppliers' => $suppliers,
             'inventoryAllowed' => $inventoryAllowed,
             // Pharmacy Mode (Task 1558): medicine fields appear ONLY here.
-            'pharmacyMode' => \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId)),
+            'pharmacyMode' => \App\Services\PosFeatureService::pharmacyLive($formCompany),
+            // Units follow the shop's business category (PosUnitCatalog).
+            'uomGroups' => \App\Services\PosUnitCatalog::groupsFor($formCompany),
             // Save-and-continue sticky defaults (one-request flash from store).
             'sticky' => session('fbr_product_sticky', []),
         ]);
@@ -8311,7 +8326,8 @@ class FbrPosController extends Controller
             'name' => 'required|string|max:255',
             'default_price' => 'required|numeric|min:0',
             'hs_code' => 'nullable|string|max:50',
-            'uom' => 'nullable|string|max:20',
+            // One unit catalogue (PosUnitCatalog): every code a shop can pick.
+            'uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule()],
             'barcode' => 'nullable|string|max:64',
             'sku' => 'nullable|string|max:64',
             'tax_type' => 'required|in:taxable,exempt,custom',
@@ -8352,7 +8368,7 @@ class FbrPosController extends Controller
             'default_price' => $request->default_price,
             'is_price_editable' => $request->boolean('is_price_editable'),
             'hs_code' => $request->hs_code,
-            'uom' => $request->uom ?? 'U',
+            'uom' => \App\Services\PosUnitCatalog::normalize($request->uom) ?: \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId)),
             'tax_type' => $taxType,
             'default_tax_rate' => $taxRate,
             'mrp' => $request->filled('mrp') ? (float) $request->mrp : null,
@@ -8409,7 +8425,7 @@ class FbrPosController extends Controller
         $request->validate([
             'tax_type' => 'required|in:taxable,exempt,custom',
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
-            'uom' => 'nullable|string|max:20',
+            'uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule()],
             'supplier_id' => 'nullable|integer',
             'new_supplier_name' => 'nullable|string|max:150',
             'new_supplier_phone' => 'nullable|string|max:30',
@@ -8491,7 +8507,7 @@ class FbrPosController extends Controller
                     'barcode' => trim((string) ($row['barcode'] ?? '')) !== '' ? $row['barcode'] : null,
                     'default_price' => (float) $row['default_price'],
                     'is_price_editable' => true,
-                    'uom' => $request->uom ?? 'U',
+                    'uom' => \App\Services\PosUnitCatalog::normalize($request->uom) ?: \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId)),
                     'tax_type' => $taxType,
                     'default_tax_rate' => $taxRate,
                     'mrp' => trim((string) ($row['mrp'] ?? '')) !== '' ? (float) $row['mrp'] : null,
@@ -8544,8 +8560,12 @@ class FbrPosController extends Controller
         $suppliers = $inventoryAllowed
             ? \App\Models\Supplier::forCompany($companyId)->active()->orderBy('name')->get(['id', 'name', 'city'])
             : collect();
-        $pharmacyMode = \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId));
-        return view('fbr-pos.product-form', compact('product', 'suppliers', 'inventoryAllowed', 'pharmacyMode'));
+        $formCompany = Company::find($companyId);
+        $pharmacyMode = \App\Services\PosFeatureService::pharmacyLive($formCompany);
+        // Units follow the shop's business category; the stored unit is always
+        // present (even a legacy / off-category code) so the edit re-saves it.
+        $uomGroups = \App\Services\PosUnitCatalog::groupsFor($formCompany, $product->uom);
+        return view('fbr-pos.product-form', compact('product', 'suppliers', 'inventoryAllowed', 'pharmacyMode', 'uomGroups'));
     }
 
     public function updateProduct(Request $request, $id)
@@ -8563,7 +8583,9 @@ class FbrPosController extends Controller
             'name' => 'required|string|max:255',
             'default_price' => 'required|numeric|min:0',
             'hs_code' => 'nullable|string|max:50',
-            'uom' => 'nullable|string|max:20',
+            // Catalogue codes + this product's own stored unit (a legacy /
+            // unknown code must keep re-saving as-is, never block the edit).
+            'uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule([$product->uom])],
             'barcode' => 'nullable|string|max:64',
             'sku' => 'nullable|string|max:64',
             'tax_type' => 'required|in:taxable,exempt,custom',
@@ -8618,7 +8640,7 @@ class FbrPosController extends Controller
             'default_price' => $request->default_price,
             'is_price_editable' => $request->boolean('is_price_editable'),
             'hs_code' => $request->hs_code,
-            'uom' => $request->uom ?? 'U',
+            'uom' => \App\Services\PosUnitCatalog::normalize($request->uom) ?: ($product->uom ?: \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId))),
             'tax_type' => $taxType,
             'default_tax_rate' => $taxRate,
             // Full product edit (Task 1276): FBR reference fields + toggles.
@@ -8989,7 +9011,7 @@ class FbrPosController extends Controller
             'tax_type' => $request->tax_type,
             'default_tax_rate' => $request->default_tax_rate,
             'is_third_schedule' => $request->boolean('is_third_schedule'),
-            'uom' => $request->uom ?? 'U',
+            'uom' => \App\Services\PosUnitCatalog::normalize($request->uom) ?: \App\Services\PosUnitCatalog::defaultFor(Company::find((int) app('currentCompanyId'))),
             'is_price_editable' => $request->has('is_price_editable') ? $request->boolean('is_price_editable') : true,
             'supplier_id' => $supplierId,
             'entry_mode' => $mode,
@@ -9481,6 +9503,7 @@ class FbrPosController extends Controller
         $barcodeIdx = $this->findFbrColumn($header, ['barcode', 'bar code', 'ean']);
         $taxIdx = $this->findFbrColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax', 'tax %']);
         $uomIdx = $this->findFbrColumn($header, ['unit (uom)', 'unit', 'uom']);
+        $importUomDefault = \App\Services\PosUnitCatalog::defaultFor(Company::find($companyId));
         $exemptIdx = $this->findFbrColumn($header, ['tax exempt (yes/no)', 'tax exempt', 'exempt (yes/no)', 'exempt', 'tax_exempt', 'is_tax_exempt']);
         // Third Schedule column: round-trip Yes/No; blank = leave flag as-is.
         $thirdIdx = $this->findFbrColumn($header, ['third schedule (yes/no)', 'third schedule', 'third_schedule', 'is_third_schedule', 'third']);
@@ -9613,7 +9636,11 @@ class FbrPosController extends Controller
             $sku = $skuIdx !== false ? $this->cleanFbrImportCode($data[$skuIdx] ?? null) : null;
             $barcode = $barcodeIdx !== false ? $this->cleanFbrImportCode($data[$barcodeIdx] ?? null) : null;
             $tax = $taxIdx !== false ? $this->cleanFbrImportNumber($data[$taxIdx] ?? '') : null;
-            $uom = $uomIdx !== false ? strtoupper(trim((string) ($data[$uomIdx] ?? ''))) : '';
+            // Unit cell: tolerant resolve against the ONE catalogue (code, alias
+            // or label). Unknown text is treated like a blank cell — existing
+            // rows keep their unit, new rows take the shop's category default —
+            // so an import can never plant a code the sale screen rejects.
+            $uom = $uomIdx !== false ? (\App\Services\PosUnitCatalog::resolve((string) ($data[$uomIdx] ?? '')) ?? '') : '';
 
             // Third Schedule cell: Yes/No (tolerant); blank = leave flag as-is.
             $thirdSchedule = null;
@@ -9765,7 +9792,7 @@ class FbrPosController extends Controller
                     'hs_code' => $hsCode,
                     'sku' => $sku,
                     'barcode' => $barcode,
-                    'uom' => $uom !== '' ? $uom : 'U',
+                    'uom' => $uom !== '' ? $uom : $importUomDefault,
                     'tax_type' => $newType ?? 'taxable',
                     'default_tax_rate' => $newRate ?? 18,
                     'is_active' => true,
@@ -10404,8 +10431,8 @@ class FbrPosController extends Controller
             'name'     => 'required|string|max:255',
             'price'    => 'required|numeric|min:0',
             'barcode'  => 'nullable|string|max:64',
-            // KEEP IN SYNC with product-form.blade.php $uomList (same codes).
-            'uom'      => 'nullable|string|in:U,PCS,KG,GM,LTR,ML,MTR,SQM,FT,IN,YDS,PKT,DOZ,BOX,CTN,BAG,BTL,TIN,CAN,BUN,ROL,SET',
+            // One unit catalogue (PosUnitCatalog) — same codes every surface uses.
+            'uom'      => ['nullable', 'string', \App\Services\PosUnitCatalog::rule()],
             'tax_mode' => 'nullable|in:standard,exempt,custom',
             'tax_rate' => 'nullable|required_if:tax_mode,custom|numeric|min:0|max:100',
             'hs_code'  => 'nullable|string|max:50',

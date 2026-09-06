@@ -335,13 +335,17 @@
                         <div>
                             <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.uom_label') }}</label>
                             @php
-                                $quickUomList = ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'];
+                                // One unit catalogue (PosUnitCatalog): business-category
+                                // units first, "Baqi units" second. Passed by the controller;
+                                // guard keeps any other render path alive.
+                                $uomGroups = $uomGroups ?? \App\Services\PosUnitCatalog::groupsFor($company ?? null);
+                                $uomKnown = array_merge(array_column($uomGroups['recommended'], 'code'), array_column($uomGroups['rest'], 'code'));
                             @endphp
                             <select name="uom" x-model="edit.uom"
                                     class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                                @foreach($quickUomList as $code)
-                                    <option value="{{ $code }}">{{ $code }}</option>
-                                @endforeach
+                                {{-- A stored unit the catalogue never listed stays selectable verbatim. --}}
+                                <template x-if="edit.uom && !{{ \Illuminate\Support\Js::from($uomKnown) }}.includes(String(edit.uom).toUpperCase())"><option :value="edit.uom" x-text="edit.uom"></option></template>
+                                @include('partials.pos-uom-options', ['uomGroups' => $uomGroups, 'uomSelected' => $uomGroups['default']])
                             </select>
                         </div>
                     </div>
@@ -615,7 +619,10 @@ function stockPage() {
         prodResults: [],
         purchaseRows: [],
         editOpen: false,
-        edit: { id: 0, name: '', sku: '', uom: 'U', price: '', kharid: '', kharid_orig: '', qty: '', qty_orig: '' },
+        // Category default unit (PosUnitCatalog) — what the modal shows for a
+        // product whose unit is blank.
+        uomDefault: @js((string) ($uomGroups['default'] ?? 'U')),
+        edit: { id: 0, name: '', sku: '', uom: @js((string) ($uomGroups['default'] ?? 'U')), price: '', kharid: '', kharid_orig: '', qty: '', qty_orig: '' },
         // Baked product list for instant client-side search (name/sku/barcode)
         // AND the quick-edit modal prefill (price/qty/kharid per row).
         // NOTE: complex expressions inside the json Blade directive break its
@@ -712,7 +719,7 @@ function stockPage() {
             const p = this.allProducts.find(x => x.id === id);
             if (!p) return;
             this.edit = {
-                id: p.id, name: p.name, sku: p.sku || '', uom: p.uom || 'U',
+                id: p.id, name: p.name, sku: p.sku || '', uom: p.uom || this.uomDefault,
                 price: p.price, kharid: p.kharid, kharid_orig: p.kharid,
                 qty: p.qty, qty_orig: p.qty,
             };

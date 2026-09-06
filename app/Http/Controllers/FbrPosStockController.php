@@ -277,6 +277,9 @@ class FbrPosStockController extends Controller
 
         return view('fbr-pos.stock', array_merge($branchView, [
             'company' => $company,
+            // Units follow the shop's business category (PosUnitCatalog) — the
+            // quick-edit select shows the recommended group first.
+            'uomGroups' => \App\Services\PosUnitCatalog::groupsFor($company),
             'recentCorrectionsData' => $this->serializeCorrections($recentCorrections),
             'correctionsHasMore' => $correctionsHasMore,
             'rows' => $rows,
@@ -979,6 +982,12 @@ class FbrPosStockController extends Controller
 
         $companyId = $this->companyId();
         $product = Product::where('company_id', $companyId)->findOrFail($request->product_id);
+        // Unit must be a catalogue code (PosUnitCatalog) — or the product's own
+        // stored code, so a legacy/unknown unit re-saves as-is instead of
+        // blocking a price edit.
+        $request->validate([
+            'uom' => ['nullable', 'string', \App\Services\PosUnitCatalog::rule([$product->uom])],
+        ]);
         $this->healBranchStock($companyId);
 
         // Task 1365: sale price / unit stay company-wide (same item everywhere),
@@ -996,7 +1005,7 @@ class FbrPosStockController extends Controller
         // sale-screen boot fingerprint).
         $product->fill([
             'default_price' => round((float) $request->default_price, 2),
-            'uom' => strtoupper(trim((string) ($request->uom ?: $product->uom ?: 'U'))),
+            'uom' => strtoupper(trim((string) ($request->uom ?: $product->uom ?: \App\Services\PosUnitCatalog::defaultFor(\App\Models\Company::find($companyId))))),
         ]);
         if ($product->isDirty()) {
             $product->save();

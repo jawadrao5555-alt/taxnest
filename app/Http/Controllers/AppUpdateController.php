@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class AppUpdateController extends Controller
 {
-    // ============ ADMIN SIDE ============
+    // ---- ADMIN SIDE ----
 
     public function index(Request $request)
     {
@@ -59,6 +59,7 @@ class AppUpdateController extends Controller
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             // Audience (Aug 2026): 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
             'audience' => 'nullable|in:pos,fbr_pos,all',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
             // Type (Task 1286): 'feature' = Naya Feature, 'improvement' = Behtari / Masla Hal.
             'type' => 'nullable|in:feature,improvement',
             // Task 1585: optional business-category targeting (empty = all shops).
@@ -85,7 +86,9 @@ class AppUpdateController extends Controller
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')
             ? ['type' => $request->input('type') ?: 'improvement'] : [])
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')
-            ? ['target_categories' => AppUpdate::normalizeCategories($request->input('target_categories'))] : []));
+            ? ['target_categories' => AppUpdate::normalizeCategories($request->input('target_categories'))] : [])
+          + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')
+            ? ['audience_family' => $request->input('audience_family', 'all')] : []));
 
         return redirect('/admin/app-updates')->with('success', 'Update published. POS users will see it on their next page load.');
     }
@@ -99,6 +102,7 @@ class AppUpdateController extends Controller
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'audience' => 'nullable|in:pos,fbr_pos,all',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
             'type' => 'nullable|in:feature,improvement',
             'target_categories' => 'nullable|array',
             'target_categories.*' => 'string|max:50',
@@ -115,6 +119,9 @@ class AppUpdateController extends Controller
         ];
         if ($request->filled('audience')) {
             $data['audience'] = $request->input('audience');
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')) {
+            $data['audience_family'] = $request->input('audience_family', 'all');
         }
         // Unchecked checkbox = false (edit form always sends the field's state).
         if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')) {
@@ -236,7 +243,7 @@ class AppUpdateController extends Controller
         return array_slice($points, 0, 15);
     }
 
-    // ============ POS SIDE ============
+    // ---- POS SIDE ----
 
     /**
      * Mark published POS updates as seen for the logged-in POS user.
@@ -266,7 +273,7 @@ class AppUpdateController extends Controller
         // POS layouts use — mark-seen must never tick an elaan the shop can't
         // actually see (that would hide it from a shop it IS meant for).
         $company = \App\Models\Company::find($user->company_id);
-        $query = AppUpdate::forCompany($company, $panel)->published()->liveWindow();
+        $query = AppUpdate::forCompany($company, $panel)->forCompanyFamily($company)->published()->liveWindow();
         if ($request->filled('update_id')) {
             $query->whereKey((int) $request->input('update_id'));
         }

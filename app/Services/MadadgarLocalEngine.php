@@ -20,8 +20,8 @@ use Illuminate\Support\Facades\Cache;
  *    escalate_to_admin tool isn't in the loop. Card only — the
  *    FeatureSuggestion row is still created EXCLUSIVELY on the Haan endpoint.
  *
- * Company-agnostic by design: the KB is global, no user/company data ever
- * enters an answer, so cached answers are safe to share across companies.
+ * Answers are vocabulary/profile aware. Cache keys include that context so a
+ * restaurant answer can never be replayed to a pharmacy or services shop.
  */
 class MadadgarLocalEngine
 {
@@ -47,25 +47,39 @@ class MadadgarLocalEngine
      * Try to answer locally. Returns plain-text Roman Urdu or NULL when not
      * confident (caller decides: OpenAI / polite fallback).
      */
-    public static function answer(string $question, string $product = 'pos'): ?string
+    public static function answer(
+        string $question,
+        string $product = 'pos',
+        array $vocabulary = [],
+        ?array $availableModules = null
+    ): ?string
     {
         $tokens = self::questionTokens($question);
         if (empty($tokens)) {
             return null;
         }
 
-        $faq = self::faqAnswer($tokens, $product);
+        if (self::asksForUnavailableModule($tokens, $availableModules)) {
+            return (string) __('pos.feature_not_for_business', [], 'rur');
+        }
+
+        $faq = self::faqAnswer($tokens, $product, $vocabulary);
         if ($faq !== null) {
             return $faq;
         }
 
-        return self::retrieve($tokens, $product);
+        return self::retrieve($tokens, $product, $vocabulary);
     }
 
     /** Cached answer for this question under the CURRENT KB hash, or null. */
-    public static function cachedAnswer(string $question, string $product = 'pos'): ?string
+    public static function cachedAnswer(
+        string $question,
+        string $product = 'pos',
+        array $vocabulary = [],
+        ?array $availableModules = null
+    ): ?string
     {
-        $key = self::cacheKey($question, $product);
+        $key = self::cacheKey($question, $product, $vocabulary, $availableModules);
         if ($key === null) {
             return null;
         }
@@ -83,7 +97,14 @@ class MadadgarLocalEngine
      * Store a successful plain-text answer. Escalation cards and error replies
      * must NEVER reach this method (caller guarantees).
      */
-    public static function cacheAnswer(string $question, string $text, string $source = 'local', string $product = 'pos'): void
+    public static function cacheAnswer(
+        string $question,
+        string $text,
+        string $source = 'local',
+        string $product = 'pos',
+        array $vocabulary = [],
+        ?array $availableModules = null
+    ): void
     {
         // Hard guard: ONLY deterministic KB-derived local answers may enter the
         // shared cache. OpenAI output can embed per-session/user context and
@@ -91,7 +112,7 @@ class MadadgarLocalEngine
         if ($source !== 'local') {
             return;
         }
-        $key = self::cacheKey($question, $product);
+        $key = self::cacheKey($question, $product, $vocabulary, $availableModules);
         if ($key === null || trim($text) === '') {
             return;
         }
@@ -154,7 +175,12 @@ class MadadgarLocalEngine
     // ==================== CACHE KEY ====================
 
     /** Null when the question is unsafe to cache (follow-up / too thin). */
-    private static function cacheKey(string $question, string $product = 'pos'): ?string
+    private static function cacheKey(
+        string $question,
+        string $product = 'pos',
+        array $vocabulary = [],
+        ?array $availableModules = null
+    ): ?string
     {
         $q = mb_strtolower(trim($question), 'UTF-8');
         if (mb_strlen($q) < 6) {
@@ -173,7 +199,8 @@ class MadadgarLocalEngine
 
         // Per-product isolation is automatic: kbHash($product) differs per KB
         // file, so 'pos' and 'fbrpos' answers can never cross-contaminate.
-        return 'madadgar_ans:'.md5(self::kbHash($product).'|'.implode(' ', $tokens));
+        $context = self::contextKey($vocabulary, $availableModules);
+        return 'madadgar_ans:'.md5(self::kbHash($product).'|'.$context.'|'.implode(' ', $tokens));
     }
 
     // ==================== FAQ LAYER ====================
@@ -183,7 +210,7 @@ class MadadgarLocalEngine
      * First pattern fully contained in the question tokens wins, so more
      * specific patterns must come first.
      */
-    private static function faqAnswer(array $tokens, string $product = 'pos'): ?string
+    private static function faqAnswer(array $tokens, string $product = 'pos', array $vocabulary = []): ?string
     {
         $set = array_flip($tokens);
         foreach (self::faqs($product) as $faq) {
@@ -196,7 +223,7 @@ class MadadgarLocalEngine
                     }
                 }
                 if ($ok) {
-                    return $faq['a'];
+                    return self::fillPlaceholders($faq['a'], $vocabulary);
                 }
             }
         }
@@ -216,7 +243,7 @@ class MadadgarLocalEngine
              'a' => "Rider ka cash settle karne ke liye sale screen ka GREEN \"Deliveries\" button (Delivery Board) ya /pos/deliveries kholein — rider ke card par \"Settle Cash\" dabayen, jo bills settle ho rahe hain tick karein, note (optional) likh kar \"Confirm Settlement\". Partial settlement bhi ho sakta hai. Day-close par rider ka poora khata (owed vs settled) nazar aata hai."],
 
             ['p' => [['barcode', 'sticker'], ['barcode', 'label'], ['product', 'label']],
-             'a' => "Product barcode stickers /pos/products/labels se print hote hain — sticker par naam, price, barcode aur SKU aata hai. \"Columns\" box se sheet ke columns (1-5) set karein aur Print dabayen."],
+             'a' => "{item} barcode stickers /pos/products/labels se print hote hain — sticker par naam, price, barcode aur SKU aata hai. \"Columns\" box se sheet ke columns (1-5) set karein aur Print dabayen."],
 
             ['p' => [['kot', 'nahi']],
              'a' => "KOT kitchen par na aaye to yeh check karein:\n1. /pos/restaurant/kitchen-settings par \"KDS Auto-Print\" — agar ON hai to KOT sirf KDS wali device se print hota hai; KDS use nahi karte to isay OFF karein.\n2. \"Kitchen Printer\" ON ho aur Desktop Agent PC par chalta ho.\n3. Setting badalne ke baad sale screen refresh (F5) karein."],
@@ -258,7 +285,7 @@ class MadadgarLocalEngine
              'a' => "Barcode scanner ke liye alag setup nahi chahiye — koi bhi USB/Bluetooth scanner jo keyboard ki tarah type karta hai seedha chal jata hai. Sale screen ke search box mein scan karein — exact match foran cart mein chala jata hai. Product barcode stickers /pos/products/labels se print hote hain."],
 
             ['p' => [['product', 'add'], ['product', 'naya'], ['product', 'banana']],
-             'a' => "Naya product /pos/products par banta hai — \"+ Add Product\" dabayen: Product Name aur Price zaroori hain; Category, SKU, Barcode, Cost Price, Tax Rate/Tax Exempt, Unit, Opening Stock, Low-Stock Alert aur Image bhi de sakte hain. Bohat se products ek sath dalne hon to isi page se Excel template download kar ke \"Upload & Import\" karein (CSV use NA karein — barcode kharab ho jate hain)."],
+             'a' => "Naya {item} /pos/products par banta hai — \"+ Add {item}\" dabayen: naam aur Price zaroori hain; Category, SKU, Barcode, Cost Price, Tax Rate/Tax Exempt, Unit, Opening Stock, Low-Stock Alert aur Image bhi de sakte hain. Bohat se {items} ek sath dalne hon to isi page se Excel template download kar ke \"Upload & Import\" karein (CSV use NA karein — barcode kharab ho jate hain)."],
 
             ['p' => [['stock'], ['inventory']],
              'a' => "Stock /pos/inventory/adjust se update hota hai — product chunein → Add (+) / Remove (−) / Set Exact (=) → quantity → Reason (New Purchase, Physical Count, Damaged/Expired waghera) → save. Sale par stock khud katta hai. Poora stock /pos/inventory/stock par dikhta hai (search + Low/Out filter), har tabdeeli ka log /pos/inventory/movements par. Inventory Tracking /pos/features se ON/OFF hota hai."],
@@ -288,7 +315,7 @@ class MadadgarLocalEngine
              'a' => "Sirf FINAL bills monthly quota mein ginte hain — provisional (F9) bills FREE hain jab tak promote na hon. Bills ki limit khatam ho jaye to filhal provisional bills banayen (baad mein promote karein) ya /pos/billing se package upgrade karein. Quota har mahine reset hota hai. Team accounts ki limit poori ho to bhi upgrade hi rasta hai."],
 
             ['p' => [['product', 'mil', 'nahi'], ['search', 'nahi'], ['product', 'nahi', 'search']],
-             'a' => "Search naam ke SHURU se chalti hai — pehla lafz naam ke shuru se likhein (maslan \"Chicken Roll\" ke liye \"chi\" ya \"chicken\", sirf \"roll\" se nahi milega); baqi lafz naam ke kisi bhi lafz se mil jate hain (\"cheese half\" se \"Cheese Loaded Fries (Half)\"). Item phir bhi na mile to /pos/products par dekhein — product inactive ya sale-screen toggle OFF to nahi. Grid ghayab ho to \"Show All Products\" toggle ON karein — search har category mein dhoondti hai."],
+             'a' => "Search naam ke SHURU se chalti hai — {example} ke naam ka pehla lafz shuru se likhein; baqi lafz naam ke kisi bhi lafz se mil jate hain. {item} phir bhi na mile to /pos/products par dekhein — inactive ya sale-screen toggle OFF to nahi. Grid ghayab ho to \"Show All {items}\" toggle ON karein — search har category mein dhoondti hai."],
 
             ['p' => [['shortcut']],
              'a' => "Aham keyboard shortcuts (sale screen): F1 = madad, F2 = search, F4 = cart khali, F5 = Hold, F8 = PAY (phir 1 = Cash, 2 = Card), F9 = Save Provisional, F10 = local bills, F11 = failed bills, Alt+R = reprint, Alt+1/Alt+2 = one-tap Cash/Card, Alt+B = Table board, D = bill discount, T = selected item ka tax ON/OFF, Esc = modal band. F1 dabane par poori list screen par aa jati hai."],
@@ -330,7 +357,7 @@ class MadadgarLocalEngine
              'a' => "Urgent button (pehle 'Rush') order ko priority mark karta hai — KOT par bara *** URGENT *** aur kitchen/KDS screen par laal URGENT ka nishan aata hai. Saaf style mein yeh button \"Mazeed\" ke peechay hota hai."],
 
             ['p' => [['quick', 'type'], ['f7']],
-             'a' => "Quick Type Mode (F7): \"chai 2, samosa 1\" jaisi line likhein — pura order khud cart mein aa jata hai. Default BAND hota hai — admin /pos/customize se ON kare, phir sale screen par F7 se modal khulta hai."],
+             'a' => "Quick Type Mode (F7): \"{quick_type}\" jaisi line likhein — pura order khud cart mein aa jata hai. Default BAND hota hai — admin /pos/customize se ON kare, phir sale screen par F7 se modal khulta hai."],
 
             ['p' => [['qr', 'menu'], ['public', 'menu']],
              'a' => "QR Menu ke liye /pos/business-profile kholein → \"Public Page Enabled\" ON + \"Menu\" visible ON → menu builder mein products tick karein → QR code customer ko dikhayen. Kya kya public dikhe (Phone, Email, Address waghera) har cheez ka apna toggle hai. \"Regenerate Link\" se naya link banta hai. Yeh feature Business, Pro aur Unlimited packages mein hai."],
@@ -398,7 +425,7 @@ class MadadgarLocalEngine
              'a' => "Barcode scanner ke liye alag setup nahi chahiye — koi bhi USB/Bluetooth scanner jo keyboard ki tarah type karta hai seedha chal jata hai. Sale screen ke search box mein scan karein — exact match foran cart mein chala jata hai."],
 
             ['p' => [['product', 'add'], ['product', 'naya'], ['product', 'banana']],
-             'a' => "Naya product /fbr-pos/products par banta hai — \"Add Product\" se naam, price, barcode/SKU aur tax set karein. Bohat saare products ek saath dalne hon to Excel import istemal karein (/fbr-pos/products/import — pehle template download karein)."],
+             'a' => "Naya {item} /fbr-pos/products par banta hai — \"Add {item}\" se naam, price, barcode/SKU aur tax set karein. Bohat saare {items} ek saath dalne hon to Excel import istemal karein (/fbr-pos/products/import — pehle template download karein)."],
 
             ['p' => [['limit'], ['package'], ['expiry']],
              'a' => "Apna package, mahana bill limit aur expiry /fbr-pos/billing par nazar aati hai. FBR POS mein mahana quota mein provisional bills bhi ginte hain. Upgrade ya renewal ke liye billing page se payment proof upload karein ya TaxNest team se WhatsApp par rabta karein."],
@@ -411,9 +438,9 @@ class MadadgarLocalEngine
     // ==================== RETRIEVAL ENGINE ====================
 
     /** Confidence-gated retrieval over KB sections/lines. Null = decline. */
-    private static function retrieve(array $qTokens, string $product = 'pos'): ?string
+    private static function retrieve(array $qTokens, string $product = 'pos', array $vocabulary = []): ?string
     {
-        $index = self::index($product);
+        $index = self::index($product, $vocabulary);
         if (empty($index['sections'])) {
             return null;
         }
@@ -562,15 +589,17 @@ class MadadgarLocalEngine
     }
 
     /** Parse + tokenize the KB once per request (memoized per product). */
-    private static function index(string $product = 'pos'): array
+    private static function index(string $product = 'pos', array $vocabulary = []): array
     {
-        if (isset(self::$index[$product])) {
-            return self::$index[$product];
+        $indexKey = $product.'|'.self::contextKey($vocabulary, null);
+        if (isset(self::$index[$indexKey])) {
+            return self::$index[$indexKey];
         }
 
         $sections = [];
         $current = null;
-        foreach (preg_split('/\r?\n/', self::kbRaw($product)) as $raw) {
+        $knowledge = self::fillPlaceholders(self::kbRaw($product), $vocabulary);
+        foreach (preg_split('/\r?\n/', $knowledge) as $raw) {
             if (preg_match('/^#{2,3}\s+(.*)$/', $raw, $m)) {
                 if ($current !== null && !empty($current['lines'])) {
                     $sections[] = $current;
@@ -620,7 +649,65 @@ class MadadgarLocalEngine
             $idf[$tok] = log(1 + $n / $d);
         }
 
-        return self::$index[$product] = ['sections' => $sections, 'idf' => $idf];
+        return self::$index[$indexKey] = ['sections' => $sections, 'idf' => $idf];
+    }
+
+    private static function asksForUnavailableModule(array $tokens, ?array $availableModules): bool
+    {
+        if ($availableModules === null) {
+            return false;
+        }
+        $set = array_flip($tokens);
+        $topics = [
+            'kot' => ['kot'],
+            'kitchen' => ['kds', 'kitchen', 'restaurant'],
+            'tables' => ['table', 'waiter', 'dine'],
+            'recipes' => ['recipe', 'ingredient'],
+            'riders_enabled' => ['rider'],
+            'deals_enabled' => ['deal', 'combo'],
+            'inventory' => ['stock', 'inventory'],
+            'barcode' => ['barcode', 'scanner'],
+            'pharmacy' => ['pharmacy', 'prescription', 'batch', 'expiry', 'medicine'],
+        ];
+        foreach ($topics as $module => $keywords) {
+            if (array_intersect_key($set, array_flip($keywords))
+                && !in_array($module, $availableModules, true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function fillPlaceholders(string $text, array $vocabulary): string
+    {
+        $defaults = [
+            'item' => 'Product',
+            'items' => 'Products',
+            'example' => 'Item A',
+            'example2' => 'Item B',
+            'quick_type' => 'item 2, item 1',
+        ];
+        $v = array_merge($defaults, $vocabulary);
+        return strtr($text, [
+            '{item}' => (string) $v['item'],
+            '{items}' => (string) $v['items'],
+            '{example}' => (string) $v['example'],
+            '{example2}' => (string) $v['example2'],
+            '{quick_type}' => (string) $v['quick_type'],
+        ]);
+    }
+
+    private static function contextKey(array $vocabulary, ?array $availableModules): string
+    {
+        $modules = $availableModules ?? [];
+        sort($modules);
+        return md5(json_encode([
+            $vocabulary['category'] ?? 'generic',
+            $vocabulary['item'] ?? 'Product',
+            $vocabulary['examples'] ?? [],
+            $modules,
+            $availableModules === null ? 'unfiltered' : 'filtered',
+        ]));
     }
 
     // ==================== NORMALIZATION ====================

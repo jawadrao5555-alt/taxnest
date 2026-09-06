@@ -370,6 +370,7 @@
                     ['rp_kot_show_footer',          'pos.show_business_name_bottom',     'pos.show_business_name_bottom_hint',    $company->kot_show_footer ?? true],
                     ['rp_kot_show_kitchen_notes',   'pos.show_kitchen_notes_box',        'pos.show_kitchen_notes_box_hint',       $company->kot_show_kitchen_notes ?? false],
                 ] as [$fieldName, $labelKey, $hintKey, $checked])
+                @continue($fieldName === 'rp_kot_show_barcode' && !\App\Services\PosFeatureService::moduleRelevant($company, 'barcode'))
                 <div class="p-5 flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __($labelKey) }}</h3>

@@ -345,7 +345,7 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.public_menu_hint') }}</p>
 
             @if(($ppProducts ?? collect())->isEmpty())
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.no_active_products') }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ \App\Support\PosVocabulary::t('no_active_products') }}</p>
             @else
             <div class="max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
                 @foreach(($ppProducts ?? collect())->groupBy(fn ($p) => trim((string) $p->category) !== '' ? $p->category : __('pos.uncategorized')) as $cat => $prods)

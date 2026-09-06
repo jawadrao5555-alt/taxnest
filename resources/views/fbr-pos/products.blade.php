@@ -14,16 +14,18 @@
     @include('fbr-pos.partials.back-link')
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.products_word') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.manage_products_tax_config') }}</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ \App\Support\PosVocabulary::for($company ?? null)['items'] }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ \App\Support\PosVocabulary::t('fbr_vocab_manage_tax', [], $company ?? null) }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             {{-- 🏷 Label print page (Task 1272) — selection-aware: picked rows preselect on the labels page --}}
+            @if(\App\Services\PosFeatureService::moduleRelevant($company ?? null, 'barcode'))
             <a x-show="!allMatching" :href="labelsUrl()" href="{{ route('fbrpos.products.labels') }}"
                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 <span x-text="selected.length > 0 ? @js(__('pos.print')) + ' ' + selected.length : @js(__('pos.print_labels'))">{{ __('pos.print_labels') }}</span>
             </a>
+            @endif
             <a href="{{ route('fbrpos.products.create') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
                 {{ __('pos.plus_new_product') }}
             </a>
@@ -59,11 +61,11 @@
                 @csrf
                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="radio" name="mode" value="prefix" onchange="this.form.submit()" {{ $searchMode !== 'any_word' ? 'checked' : '' }} class="text-blue-600 focus:ring-blue-500">
-                    <span>{{ __('pos.search_mode_prefix') }}</span>
+                    <span>{{ \App\Support\PosVocabulary::t('search_mode_prefix') }}</span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="radio" name="mode" value="any_word" onchange="this.form.submit()" {{ $searchMode === 'any_word' ? 'checked' : '' }} class="text-blue-600 focus:ring-blue-500">
-                    <span>{{ __('pos.search_mode_any_word') }}</span>
+                    <span>{{ \App\Support\PosVocabulary::t('search_mode_any_word') }}</span>
                 </label>
             </form>
         </div>
@@ -119,7 +121,7 @@
                     </a>
                     <div class="mt-3 text-[11px] text-gray-400">
                         <p class="font-semibold text-gray-500 mb-1">{{ __('pos.only_two_required') }}</p>
-                        <p>{!! __('pos.import_required_columns_note') !!}</p>
+                        <p>{{ __('pos.fbr_import_optional_columns', ['barcode_part' => \App\Services\PosFeatureService::moduleRelevant($company ?? null, 'barcode') ? ', ' . __('pos.barcode_label') : '']) }}</p>
                     </div>
                 </div>
                 <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
@@ -290,7 +292,7 @@
                 @empty
                 <tr>
                     <td colspan="{{ $fbrIsAdmin ? 8 : 7 }}" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                        {{ __('pos.no_products_yet_short') }} <a href="{{ route('fbrpos.products.create') }}" class="text-blue-600 hover:text-blue-800 font-medium">{{ __('pos.add_your_first_product') }}</a>.
+                        {{ \App\Support\PosVocabulary::t('fbr_vocab_empty_catalog', [], $company ?? null) }} <a href="{{ route('fbrpos.products.create') }}" class="text-blue-600 hover:text-blue-800 font-medium">{{ \App\Support\PosVocabulary::t('fbr_vocab_add_first', [], $company ?? null) }}</a>.
                     </td>
                 </tr>
                 @endforelse

@@ -28,7 +28,7 @@
             // bell + popup 7 days after publish (read-time filter, no cron).
             // Task 1585: forCompany() adds the business-category targeting on
             // top of the panel audience (one shared predicate).
-            $whatsNewList = \App\Models\AppUpdate::forCompany($fbrCompany ?? null, 'fbr')->where('is_published', true)
+            $whatsNewList = \App\Models\AppUpdate::forCompany($fbrCompany ?? null, 'fbr')->forCompanyFamily($fbrCompany ?? null)->where('is_published', true)
                 ->where('created_at', '>=', now()->subDays(\App\Models\AppUpdate::LIVE_DAYS))
                 ->orderByDesc('created_at')->limit(10)->get();
             if ($whatsNewList->isNotEmpty()) {
@@ -85,6 +85,7 @@
     $fbrPlanDeals   = \App\Services\PosFeatureService::planAllows($fbrCompany, 'deals_enabled');
     $fbrPlanLoyalty = \App\Services\PosFeatureService::planAllows($fbrCompany, 'loyalty_enabled');
     $fbrDealsNavVisible = $fbrPlanDeals && $fbrUser && $fbrUser->isPosAdmin();
+    $fbrInventoryRelevant = \App\Services\PosFeatureService::moduleRelevant($fbrCompany, 'inventory');
     // 💊 Pharmacy mode (Task 1558): pharmacyLive() is shop-switch AND package,
     // so nav never advertises a screen the controller would 403. Batch/claim
     // work is owner+manager territory, exactly like stock.
@@ -633,7 +634,7 @@
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         {{ __('pos.nav_customers') }}
                                     </a>
-                                    @if (!in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
+                                    @if ($fbrInventoryRelevant && !in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
                                     <a href="{{ route('fbrpos.stock') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
                                         {{ __('pos.nav_stock_purchase') }}
@@ -897,7 +898,7 @@
                         @endif
                     </div>
 
-                    {{-- Inventory Section --}}
+                    {{-- Inventory and catalogue section. The catalogue is core; stock tools are category-aware. --}}
                     <div>
                         <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{{ __('pos.nav_inventory') }}</p>
                         <a href="{{ route('fbrpos.products') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.products') && !request()->routeIs('fbrpos.products.create') && !request()->routeIs('fbrpos.products.edit') ? $sidebarActive : $sidebarInactive }}">
@@ -919,7 +920,7 @@
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                             {{ __('pos.nav_customers') }}
                         </a>
-                        @if (!in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
+                        @if ($fbrInventoryRelevant && !in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
                         <a href="{{ route('fbrpos.stock') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.stock') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
                             {{ __('pos.nav_stock_purchase') }}

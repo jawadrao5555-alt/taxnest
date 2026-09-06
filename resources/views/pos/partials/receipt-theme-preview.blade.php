@@ -99,24 +99,14 @@
                     <td style="width:20%;font-size:10px;font-weight:bold;text-transform:uppercase;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:3px 1px;text-align:right;">Price</td>
                     <td style="width:24%;font-size:10px;font-weight:bold;text-transform:uppercase;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:3px 1px;text-align:right;">Total</td>
                 </tr>
+                @foreach(\App\Support\PosVocabulary::for()['receipt_lines'] as $tnPreviewLine)
                 <tr>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;font-weight:600;">Chicken Burger</td>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:center;font-weight:600;">2</td>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:right;font-weight:600;">450.00</td>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:right;font-weight:bold;">900.00</td>
+                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;font-weight:600;">{{ $tnPreviewLine['name'] }}</td>
+                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:center;font-weight:600;">{{ $tnPreviewLine['qty'] }}</td>
+                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:right;font-weight:600;">{{ number_format($tnPreviewLine['price'], 2) }}</td>
+                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:right;font-weight:bold;">{{ number_format($tnPreviewLine['qty'] * $tnPreviewLine['price'], 2) }}</td>
                 </tr>
-                <tr>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;font-weight:600;">Fries (Large)</td>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:center;font-weight:600;">1</td>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:right;font-weight:600;">250.00</td>
-                    <td style="font-size:11px;padding:3px 1px;border-bottom:1px dashed #000;text-align:right;font-weight:bold;">250.00</td>
-                </tr>
-                <tr>
-                    <td style="font-size:11px;padding:3px 1px;font-weight:600;">Soft Drink 1.5L</td>
-                    <td style="font-size:11px;padding:3px 1px;text-align:center;font-weight:600;">1</td>
-                    <td style="font-size:11px;padding:3px 1px;text-align:right;font-weight:600;">180.00</td>
-                    <td style="font-size:11px;padding:3px 1px;text-align:right;font-weight:bold;">180.00</td>
-                </tr>
+                @endforeach
             </table>
 
             {{-- ── Totals (tax rows follow the show-tax toggle) ── --}}

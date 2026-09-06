@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\TutorialVideo;
 use App\Services\PosFeatureService;
+use App\Support\PosVocabulary;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Super-admin management of tutorial videos (/admin/tutorial-videos):
@@ -25,6 +27,7 @@ class TutorialVideoAdminController extends Controller
             'videos' => $videos,
             'gateOptions' => self::gateOptions(),
             'roleOptions' => self::roleOptions(),
+            'audienceOptions' => PosVocabulary::audienceOptions(),
         ]);
     }
 
@@ -53,13 +56,21 @@ class TutorialVideoAdminController extends Controller
     public function setGate(Request $request, $id)
     {
         $video = TutorialVideo::findOrFail($id);
-        $gate = (string) $request->input('required_feature', '');
+        $data = $request->validate([
+            'required_feature' => 'nullable|string',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
+        ]);
+        $gate = (string) ($data['required_feature'] ?? '');
 
         if ($gate !== '' && !array_key_exists($gate, self::gateOptions())) {
             return redirect('/admin/tutorial-videos')->with('error', 'Unknown feature gate.');
         }
 
-        $video->update(['required_feature' => $gate === '' ? null : $gate]);
+        $video->update([
+            'required_feature' => $gate === '' ? null : $gate,
+        ] + (Schema::hasColumn('tutorial_videos', 'audience_family')
+            ? ['audience_family' => $data['audience_family'] ?? $video->audience_family]
+            : []));
 
         return redirect('/admin/tutorial-videos')->with(
             'success',
@@ -71,13 +82,21 @@ class TutorialVideoAdminController extends Controller
     public function setRole(Request $request, $id)
     {
         $video = TutorialVideo::findOrFail($id);
-        $role = (string) $request->input('min_role', 'any');
+        $data = $request->validate([
+            'min_role' => 'required|string',
+            'audience_family' => 'nullable|in:all,food_service,goods_retail,pharmacy,services',
+        ]);
+        $role = (string) $data['min_role'];
 
         if (!array_key_exists($role, self::roleOptions())) {
             return redirect('/admin/tutorial-videos')->with('error', 'Unknown role tier.');
         }
 
-        $video->update(['min_role' => $role]);
+        $video->update([
+            'min_role' => $role,
+        ] + (Schema::hasColumn('tutorial_videos', 'audience_family')
+            ? ['audience_family' => $data['audience_family'] ?? $video->audience_family]
+            : []));
 
         return redirect('/admin/tutorial-videos')->with(
             'success',
@@ -101,6 +120,12 @@ class TutorialVideoAdminController extends Controller
         $opts = ['restaurant' => 'Restaurant module'];
         foreach (PosFeatureService::PLAN_GATES as $col) { // plain list of column names
             $opts[$col] = ucwords(str_replace(['_enabled', '_'], ['', ' '], $col));
+        }
+        // Task 1582: module FLAGS gate too (barcode / inventory / recipes …) —
+        // a barcode video should not reach a salon just because barcode is
+        // not a paid gate. Resolved through PosFeatureService::moduleAvailable.
+        foreach (PosFeatureService::ALL_FLAGS as $flag) {
+            $opts[$flag] = 'Module: ' . (PosFeatureService::moduleMeta($flag)['label'] ?? ucwords(str_replace('_', ' ', $flag)));
         }
 
         return $opts;

@@ -8,22 +8,42 @@ use Closure;
 use Illuminate\Http\Request;
 
 /**
- * Parameterized per-feature gate: ->middleware('feature:tables').
- * Checks the company's resolved POS feature flags.
+ * Parameterized per-feature gate: ->middleware('feature:tables') or
+ * ->middleware('feature:khata_enabled').
+ *
+ * Routed through THE availability predicate (Task 1582): a module flag reads
+ * the resolved feature map (masked for plan AND category relevance), a plan
+ * gate reads planAllows() (relevance-aware). A module that does not belong to
+ * the shop's business category is therefore unreachable by URL with the same
+ * friendly outcome a switched-off module gets — never a locked upsell.
+ *
+ * Second parameter 'relevant' (->middleware('feature:inventory,relevant'))
+ * checks ONLY the category half: the module must belong to the shop (profile,
+ * admin extra or grandfathered) but may still be switched off — the page keeps
+ * its own "turn it on from Modules" flow. Use it on modules whose landing page
+ * is the place a shop enables them (inventory/stock, services).
  */
 class FeatureEnabled
 {
-    public function handle(Request $request, Closure $next, string $flag)
+    public function handle(Request $request, Closure $next, string $flag, ?string $mode = null)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $features = PosFeatureService::forCompany($company);
 
-        if (empty($features->{$flag})) {
+        $blocked = $mode === 'relevant'
+            ? ($company && !PosFeatureService::moduleRelevant($company, $flag))
+            : !PosFeatureService::moduleAvailable($company, $flag);
+
+        if ($blocked) {
+            $notForCategory = $company && !PosFeatureService::moduleRelevant($company, $flag);
+            $message = $notForCategory
+                ? __('pos.feature_not_for_business')
+                : 'This feature is not enabled. Turn it on from Customize POS → Modules.';
             if ($request->expectsJson()) {
-                return response()->json(['error' => 'This feature is not enabled for your business.'], 403);
+                return response()->json(['error' => $notForCategory ? $message : 'This feature is not enabled for your business.'], 403);
             }
-            return redirect('/pos/dashboard')->with('error', 'This feature is not enabled. Turn it on from Customize POS → Modules.');
+            $home = $request->is('fbr-pos/*') ? '/fbr-pos/dashboard' : '/pos/dashboard';
+            return redirect($home)->with('error', $message);
         }
 
         return $next($request);

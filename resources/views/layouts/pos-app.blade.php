@@ -69,7 +69,7 @@
     // per-company opt-out were retired — restaurant behavior is driven by feature flags.
     // Per-cashier toggle (owner rule Jul 2026): layout badge shows THIS user's effective state.
     $praEnabledLayout = $companyLayout && $posUserLayout && $posUserLayout->praReportingEnabled($companyLayout);
-    $inventoryEnabledLayout = $companyLayout && $companyLayout->inventory_enabled;
+    $inventoryEnabledLayout = \App\Services\PosFeatureService::moduleAvailable($companyLayout, 'inventory');
     $companyName = $companyLayout->name ?? 'My Business';
     $userName = $posUserLayout->name ?? 'User';
     $userInitial = strtoupper(substr($userName, 0, 1));
@@ -115,7 +115,7 @@
             // bell + popup 7 days after publish (read-time filter, no cron).
             // Task 1585: forCompany() adds the business-category targeting on
             // top of the panel audience (one shared predicate).
-            $whatsNewList = \App\Models\AppUpdate::forCompany($companyLayout ?? null, 'pra')->where('is_published', true)
+            $whatsNewList = \App\Models\AppUpdate::forCompany($companyLayout ?? null, 'pra')->forCompanyFamily($companyLayout ?? null)->where('is_published', true)
                 ->where('created_at', '>=', now()->subDays(\App\Models\AppUpdate::LIVE_DAYS))
                 ->orderByDesc('created_at')->limit(10)->get();
             if ($whatsNewList->isNotEmpty()) {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FeatureSuggestion;
 use App\Models\MadadgarMessage;
+use App\Models\Company;
 use App\Services\MadadgarService;
 use Illuminate\Http\Request;
 
@@ -99,9 +100,10 @@ class MadadgarController extends Controller
             ->all();
 
         $question = trim($request->content);
+        $company = Company::find($user->company_id);
 
         try {
-            $result = MadadgarService::respond($history, $question, $product);
+            $result = MadadgarService::respond($history, $question, $product, $company);
         } catch (\Throwable $e) {
             // Sirf-OpenAI mode only (hybrid/local degrade internally): failed
             // turn must not eat the daily cap or leave a reply-less row.

@@ -42,10 +42,10 @@
                     <input type="radio" name="scope" value="products" @checked(!$hasIngredients) class="mt-1 text-purple-600 focus:ring-purple-500">
                     <span>
                         <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.stock_check_scope_products') }}</span>
-                        <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.stock_check_scope_products_hint') }}</span>
+                        <span class="block text-xs text-gray-500 dark:text-gray-400">{{ \App\Support\PosVocabulary::t('stock_check_scope_products_hint') }}</span>
                     </span>
                 </label>
-                @if($hasIngredients)
+                @if($hasIngredients && \App\Services\PosFeatureService::moduleAvailable(\App\Support\PosVocabulary::currentCompany(), 'recipes'))
                 <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                     <input type="radio" name="scope" value="ingredients" class="mt-1 text-purple-600 focus:ring-purple-500">
                     <span>

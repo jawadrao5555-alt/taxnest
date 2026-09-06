@@ -58,7 +58,7 @@
                 </div>
                 <div class="sm:col-span-2">
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.description_label') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
-                    <input type="text" name="description" maxlength="255" value="{{ $restoringCreateDeal ? old('description') : '' }}" placeholder="{{ __('pos.ph_deal_desc_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" name="description" maxlength="255" value="{{ $restoringCreateDeal ? old('description') : '' }}" placeholder="{{ \App\Support\PosVocabulary::t('ph_deal_desc_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">

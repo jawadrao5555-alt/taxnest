@@ -149,50 +149,52 @@ class FbrPosCatalogueController extends Controller
         $ids = array_values(array_unique(array_map('intval', $data['ids'])));
 
         $entries = MedicineCatalogueEntry::whereIn('id', $ids)->where('is_active', true)->get()->keyBy('id');
-        $already = Product::where('company_id', $companyId)->whereIn('medicine_catalogue_id', $ids)
-            ->get(['id', 'name', 'medicine_catalogue_id'])->keyBy('medicine_catalogue_id');
-
-        $toCreate = [];
-        $skipped = [];
-        foreach ($ids as $id) {
-            $e = $entries->get($id);
-            if (!$e) {
-                $skipped[] = ['id' => $id, 'reason' => 'missing'];
-                continue;
-            }
-            if ($already->has($id)) {
-                $skipped[] = ['id' => $id, 'reason' => 'already', 'product_id' => $already->get($id)->id, 'name' => $already->get($id)->name];
-                continue;
-            }
-            $toCreate[] = $e;
-        }
-
-        if (empty($toCreate)) {
-            return response()->json(['success' => true, 'created' => [], 'skipped' => $skipped, 'message' => __('pos.ph_cat_nothing_new')]);
-        }
-
-        // Plan quota for EVERY row — the same check the product form runs.
-        $remaining = PlanLimitService::remainingProductAllowance($companyId, 'fbr');
-        if ($remaining !== null && count($toCreate) > $remaining) {
-            return response()->json([
-                'success' => false,
-                'message' => __('pos.fbr_pf_quota_rows', ['n' => max(0, (int) $remaining)]),
-                'remaining' => (int) $remaining,
-            ], 422);
-        }
 
         $hasThirdCol = Schema::hasColumn('products', 'is_third_schedule');
         $hasDrapCol = Schema::hasColumn('products', 'drap_reg_no');
         $userId = (int) $this->user()->id;
 
-        $created = DB::transaction(function () use ($toCreate, $companyId, $hasThirdCol, $hasDrapCol, $userId) {
-            $out = [];
-            foreach ($toCreate as $e) {
-                // Re-check under the transaction: two tabs adding the same row.
-                $dup = Product::where('company_id', $companyId)->where('medicine_catalogue_id', $e->id)->first();
-                if ($dup) {
+        // Everything that decides WHAT gets created — which rows are already
+        // linked and how much of the product plan is left — is evaluated under
+        // a lock on the company row. Two tabs (or two cashier PCs) pressing
+        // "add" at once therefore serialise: the second sees the first's
+        // products as "already" and the first's spend against the plan cap.
+        // products(company_id, medicine_catalogue_id) is additionally UNIQUE,
+        // so even a lock-less write path cannot leave a second linked copy.
+        $result = DB::transaction(function () use ($ids, $entries, $companyId, $hasThirdCol, $hasDrapCol, $userId) {
+            Company::whereKey($companyId)->lockForUpdate()->first();
+
+            $already = Product::where('company_id', $companyId)->whereIn('medicine_catalogue_id', $ids)
+                ->get(['id', 'name', 'medicine_catalogue_id'])->keyBy('medicine_catalogue_id');
+
+            $toCreate = [];
+            $skipped = [];
+            foreach ($ids as $id) {
+                $e = $entries->get($id);
+                if (!$e) {
+                    $skipped[] = ['id' => $id, 'reason' => 'missing'];
                     continue;
                 }
+                if ($already->has($id)) {
+                    $skipped[] = ['id' => $id, 'reason' => 'already', 'product_id' => $already->get($id)->id, 'name' => $already->get($id)->name];
+                    continue;
+                }
+                $toCreate[] = $e;
+            }
+
+            if (empty($toCreate)) {
+                return ['created' => [], 'skipped' => $skipped];
+            }
+
+            // Plan quota for EVERY row — the same check the product form runs,
+            // re-read here so a concurrent add cannot overspend the cap.
+            $remaining = PlanLimitService::remainingProductAllowance($companyId, 'fbr');
+            if ($remaining !== null && count($toCreate) > $remaining) {
+                return ['quota' => max(0, (int) $remaining)];
+            }
+
+            $out = [];
+            foreach ($toCreate as $e) {
                 $mrp = $e->mrp !== null ? round((float) $e->mrp, 2) : null;
                 $attrs = [
                     'company_id' => $companyId,
@@ -213,7 +215,16 @@ class FbrPosCatalogueController extends Controller
                 ];
                 if ($hasThirdCol) $attrs['is_third_schedule'] = false;
                 if ($hasDrapCol) $attrs['drap_reg_no'] = $e->drap_reg_no;
-                $p = Product::create($attrs);
+                try {
+                    $p = Product::create($attrs);
+                } catch (\Illuminate\Database\UniqueConstraintViolationException $ex) {
+                    // The unique fence caught a writer that bypassed the lock
+                    // (e.g. an import that linked this row meanwhile): report
+                    // it as "already" instead of failing the whole batch.
+                    $dup = Product::where('company_id', $companyId)->where('medicine_catalogue_id', $e->id)->first(['id', 'name']);
+                    $skipped[] = ['id' => $e->id, 'reason' => 'already', 'product_id' => $dup?->id, 'name' => $dup?->name];
+                    continue;
+                }
 
                 AuditLogService::log('medicine_catalogue_product_added', 'Product', $p->id, null, [
                     'catalogue_id' => $e->id, 'drap_reg_no' => $e->drap_reg_no, 'mrp' => $mrp, 'brand' => $e->brand_name,
@@ -222,8 +233,22 @@ class FbrPosCatalogueController extends Controller
                 $out[] = ['id' => $e->id, 'product_id' => $p->id, 'name' => $p->name, 'mrp' => $mrp];
             }
 
-            return $out;
+            return ['created' => $out, 'skipped' => $skipped];
         });
+
+        if (isset($result['quota'])) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.fbr_pf_quota_rows', ['n' => $result['quota']]),
+                'remaining' => $result['quota'],
+            ], 422);
+        }
+
+        $created = $result['created'];
+        $skipped = $result['skipped'];
+        if (empty($created)) {
+            return response()->json(['success' => true, 'created' => [], 'skipped' => $skipped, 'message' => __('pos.ph_cat_nothing_new')]);
+        }
 
         return response()->json([
             'success' => true,

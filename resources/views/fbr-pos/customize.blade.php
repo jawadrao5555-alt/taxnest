@@ -39,6 +39,9 @@
         $fbrNearDays      = \App\Services\PharmacyExpirySummaryService::windowDays($company);
         $fbrPharmacyPlan  = \App\Services\PosFeatureService::planAllows($company, 'pharmacy_enabled');
         $fbrPharmLockedOn = !$fbrPharmacyPlan && $fbrPharmacyOn;
+        $moduleRelevant = fn (string $key) => \App\Services\PosFeatureService::moduleRelevant($company, $key);
+        $vocab = \App\Support\PosVocabulary::for($company);
+        $extraModules = \App\Services\PosFeatureService::extraModules($company);
 
         // Card sections — every FBR POS setting reachable from this one hub.
         $sections = [
@@ -55,8 +58,8 @@
                     // of the FBR connection mode.
                     ['label' => __('pos.desktop_agent'), 'desc' => __('pos.fbr_card_agent_desc'), 'url' => route('fbrpos.agent'), 'tone' => $agentOnline ? 'emerald' : 'blue', 'badge' => $agentOnline ? __('pos.online') : __('pos.offline'), 'icon' => 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
                     ['label' => __('pos.fbr_settings'), 'desc' => __('pos.fbr_settings_card_desc'), 'url' => route('fbrpos.settings'), 'tone' => $fbrOn ? 'emerald' : 'amber', 'badge' => $fbrOn ? __('pos.fbr_on_badge') : __('pos.fbr_off_badge'), 'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
-                    ['label' => __('pos.products_word'), 'desc' => __('pos.products_card_desc'), 'url' => route('fbrpos.products'), 'tone' => 'blue', 'badge' => __('pos.badge_catalog'), 'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
-                    ['label' => __('pos.card_services'), 'desc' => __('pos.card_services_desc'), 'url' => route('fbrpos.services'), 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'icon' => 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'],
+                    ['label' => $vocab['items'], 'desc' => \App\Support\PosVocabulary::t('fbr_vocab_catalog_desc', [], $company), 'url' => route('fbrpos.products'), 'tone' => 'blue', 'badge' => __('pos.badge_catalog'), 'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4'],
+                    ['label' => __('pos.card_services'), 'desc' => __('pos.card_services_desc'), 'url' => route('fbrpos.services'), 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'gate' => 'service_jobs', 'icon' => 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'],
                 ],
             ],
             [
@@ -65,15 +68,15 @@
                 'items' => [
                     ['label' => __('pos.terminals_word'), 'desc' => __('pos.terminals_card_desc'), 'url' => route('fbrpos.phase2.terminals'), 'tone' => 'blue', 'badge' => 'Manage', 'icon' => 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
                     ['label' => __('pos.shifts_cash_drawer'), 'desc' => __('pos.shifts_card_desc'), 'url' => route('fbrpos.phase2.shifts'), 'tone' => 'blue', 'badge' => 'Manage', 'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
-                    ['label' => __('pos.promotions_word'), 'desc' => __('pos.promotions_card_desc'), 'url' => route('fbrpos.phase2.promotions'), 'tone' => 'blue', 'badge' => 'Manage', 'icon' => 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z'],
+                    ['label' => __('pos.promotions_word'), 'desc' => __('pos.promotions_card_desc'), 'url' => route('fbrpos.phase2.promotions'), 'tone' => 'blue', 'badge' => 'Manage', 'gate' => 'deals_enabled', 'icon' => 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z'],
                     // 🍔 Deals (Task 1273): fixed-price combos. Plan-locked companies see the
                     // amber 🔒 badge; the page itself redirects to billing (fbrPlanGate).
-                    ['label' => __('pos.deals_title'), 'desc' => __('pos.card_deals_desc'), 'url' => route('fbrpos.deals'), 'tone' => \App\Services\PosFeatureService::planAllows($company, 'deals_enabled') ? 'blue' : 'amber', 'badge' => \App\Services\PosFeatureService::planAllows($company, 'deals_enabled') ? 'Manage' : ('🔒 ' . __('pos.upgrade_plan_btn')), 'icon' => 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7'],
+                    ['label' => __('pos.deals_title'), 'desc' => __('pos.card_deals_desc'), 'url' => route('fbrpos.deals'), 'tone' => \App\Services\PosFeatureService::planAllows($company, 'deals_enabled') ? 'blue' : 'amber', 'badge' => \App\Services\PosFeatureService::planAllows($company, 'deals_enabled') ? 'Manage' : ('🔒 ' . __('pos.upgrade_plan_btn')), 'gate' => 'deals_enabled', 'icon' => 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7'],
                     // Team + Branches (Task 1403): both pages already existed but were
                     // reachable only from the top nav — the hub never listed them.
                     ['label' => __('pos.team_management'), 'desc' => __('pos.fbr_card_team_desc'), 'url' => route('fbrpos.team'), 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'icon' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'],
                     ['label' => __('pos.branches_title'), 'desc' => __('pos.fbr_card_branches_desc'), 'url' => route('fbrpos.branches'), 'tone' => 'blue', 'badge' => __('pos.badge_manage'), 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
-                    ['label' => __('pos.loyalty_program'), 'desc' => __('pos.loyalty_card_desc'), 'url' => route('fbrpos.phase2.loyalty'), 'tone' => 'blue', 'badge' => 'Manage', 'icon' => 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z'],
+                    ['label' => __('pos.loyalty_program'), 'desc' => __('pos.loyalty_card_desc'), 'url' => route('fbrpos.phase2.loyalty'), 'tone' => 'blue', 'badge' => 'Manage', 'gate' => 'loyalty_enabled', 'icon' => 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z'],
                 ],
             ],
             [
@@ -92,6 +95,13 @@
                 ],
             ],
         ];
+        foreach ($sections as &$section) {
+            $section['items'] = array_values(array_filter(
+                $section['items'],
+                fn (array $item) => empty($item['gate']) || $moduleRelevant($item['gate'])
+            ));
+        }
+        unset($section);
 
         $tones = [
             'blue'    => ['ic' => 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400', 'bd' => 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'],
@@ -118,21 +128,21 @@
         $kw = [
             'theme'      => __('pos.pos_theme') . ' ' . __('pos.active_prefix') . ' theme rang color colour appearance look sale screen',
             'guided'     => __('pos.guided_keyboard_billing') . ' ' . __('pos.guided_billing_desc') . ' keyboard guided billing flow madad arrow keys',
-            'whatsapp'   => __('pos.wa_bill_toggle') . ' ' . __('pos.wa_bill_toggle_sub') . ' whatsapp bill receipt rasid parchi send bhejo auto open',
+            'whatsapp'   => $moduleRelevant('whatsapp_enabled') ? __('pos.wa_bill_toggle') . ' ' . __('pos.wa_bill_toggle_sub') . ' whatsapp bill receipt rasid parchi send bhejo auto open' : '',
             'dashboard'  => __('pos.dashboard_design') . ' ' . __('pos.dashboard_design_desc') . ' dashboard style design layout screen',
             'language'   => __('pos.fbr_default_language_title') . ' ' . __('pos.fbr_default_language_sub') . ' language zaban urdu roman english default',
-            'storeslip'  => __('pos.fbr_feat_store_slip_title') . ' ' . __('pos.fbr_feat_store_slip_sub') . ' store slip kitchen parchi chapai print rasoi',
-            'delivery'   => __('pos.fbr_feat_delivery_title') . ' ' . __('pos.fbr_feat_delivery_sub') . ' delivery rider riders home ghar bhejo',
-            'storenote'  => __('pos.fbr_feat_store_notes_title') . ' ' . __('pos.fbr_feat_store_notes_sub') . ' note notes hidayat item special store slip',
-            'pharmacy'   => __('pos.fbr_feat_pharmacy_title') . ' ' . __('pos.fbr_feat_pharmacy_sub') . ' pharmacy medical store medicine dawa batch expiry salt generic loose tablet strip',
-            'quicktype'  => __('pos.quick_type_mode') . ' ' . __('pos.quick_type_mode_sub') . ' quick type fast tez keyboard input',
+            'storeslip'  => $moduleRelevant('kot_enabled') ? __('pos.fbr_feat_store_slip_title') . ' ' . __('pos.fbr_feat_store_slip_sub') . ' store slip kitchen parchi chapai print rasoi' : '',
+            'delivery'   => $moduleRelevant('delivery') ? __('pos.fbr_feat_delivery_title') . ' ' . __('pos.fbr_feat_delivery_sub') . ' delivery rider riders home ghar bhejo' : '',
+            'storenote'  => $moduleRelevant('kitchen_notes') ? __('pos.fbr_feat_store_notes_title') . ' ' . __('pos.fbr_feat_store_notes_sub') . ' note notes hidayat item special store slip' : '',
+            'pharmacy'   => $moduleRelevant('pharmacy') ? __('pos.fbr_feat_pharmacy_title') . ' ' . __('pos.fbr_feat_pharmacy_sub') . ' pharmacy medical store medicine dawa batch expiry salt generic loose tablet strip' : '',
+            'quicktype'  => __('pos.quick_type_mode') . ' ' . \App\Support\PosVocabulary::t('quick_type_mode_sub') . ' quick type fast tez keyboard input',
             'cashrecv'   => __('pos.cash_received_toggle') . ' ' . __('pos.cash_received_toggle_sub') . ' cash received change wapsi paise pay',
             'autoclose'  => __('pos.receipt_popup_autoclose') . ' ' . __('pos.receipt_popup_autoclose_sub') . ' receipt popup autoclose rasid band second timer',
-            'autoslip'   => __('pos.fbr_auto_store_slip') . ' ' . __('pos.fbr_ti_auto_store_slip_hint') . ' auto store slip print chapai payment',
-            'slipreprint'=> __('pos.fbr_store_slip_reprint_toggle_title') . ' ' . __('pos.fbr_store_slip_reprint_toggle_sub') . ' reprint store slip dubara chapai',
-            'inventory'  => __('pos.inventory_tracking') . ' ' . __('pos.inventory_tracking_sub') . ' inventory stock maal tracking',
-            'callerid'   => __('pos.caller_id_title') . ' ' . __('pos.caller_id_sub') . ' caller id call phone number customer',
-            'restock'    => __('pos.restock_on_void') . ' ' . __('pos.restock_on_void_sub') . ' restock void delete wapas stock maal',
+            'autoslip'   => $moduleRelevant('kot_enabled') ? __('pos.fbr_auto_store_slip') . ' ' . __('pos.fbr_ti_auto_store_slip_hint') . ' auto store slip print chapai payment' : '',
+            'slipreprint'=> $moduleRelevant('kot_enabled') ? __('pos.fbr_store_slip_reprint_toggle_title') . ' ' . __('pos.fbr_store_slip_reprint_toggle_sub') . ' reprint store slip dubara chapai' : '',
+            'inventory'  => $moduleRelevant('inventory') ? __('pos.inventory_tracking') . ' ' . __('pos.inventory_tracking_sub') . ' inventory stock maal tracking' : '',
+            'callerid'   => $moduleRelevant('caller_id_enabled') ? __('pos.caller_id_title') . ' ' . __('pos.caller_id_sub') . ' caller id call phone number customer' : '',
+            'restock'    => $moduleRelevant('inventory') ? __('pos.restock_on_void') . ' ' . __('pos.restock_on_void_sub') . ' restock void delete wapas stock maal' : '',
             'pending'    => __('pos.fbr_dayclose_pending_title') . ' ' . __('pos.fbr_dayclose_pending_desc') . ' pending bills day close din band final carry',
             'cashierdc'  => __('pos.cashier_dayclose_title') . ' ' . __('pos.cashier_dayclose_sub') . ' cashier day close din band z report',
             'daycutoff'  => __('pos.day_cutoff_title') . ' ' . __('pos.fbr_card_dayclose_settings_desc') . ' day close cutoff auto din band time',
@@ -373,7 +383,14 @@
                     </span>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold mb-1.5">{{ __('pos.customize_fbr_pos') }}</h1>
+                <p class="text-xs font-bold text-white/90 mb-1">{{ __('pos.vocab_for_your_business', ['category' => $vocab['category_label']]) }}</p>
                 <p class="text-sm sm:text-base text-white/85 max-w-2xl">{!! __('pos.customize_hero_blurb') !!}</p>
+                @if($extraModules)
+                <div class="mt-3 text-xs text-white/90">
+                    <span class="font-bold">{{ __('pos.vocab_added_for_you') }}:</span>
+                    {{ collect(array_keys($extraModules))->map(fn ($key) => \App\Services\PosFeatureService::moduleMeta($key)['label'] ?? $key)->join(', ') }}
+                </div>
+                @endif
             </div>
         </div>
 
@@ -505,6 +522,7 @@
                      WhatsApp button (default ON) + optional auto-open mode (default OFF).
                      Pro+ plan gate: locked below Pro. Shared company columns with PRA. --}}
                 @php $tnWaPlanAllowed = \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled'); @endphp
+                @if($moduleRelevant('whatsapp_enabled'))
                 <div x-data="{ waOn: {{ ($tnWaPlanAllowed && ($company->pos_whatsapp_bill_enabled ?? true)) ? 'true' : 'false' }}, waAutoOn: {{ ($company->pos_whatsapp_bill_auto_open ?? false) ? 'true' : 'false' }}, savingWa: false,
                         saveWa(payload, revert) { this.savingWa = true; fetch('{{ route('fbrpos.settings.whatsapp-bill-toggle', [], false) }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify(payload)}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { revert(); alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ revert(); alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ this.savingWa = false; }); } }"
                      x-show="hit(kw.whatsapp)"
@@ -569,6 +587,7 @@
                     </div>
                     @endif
                 </div>
+                @endif
 
                 {{-- Dashboard style picker (6 designs) --}}
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm sm:col-span-2" x-show="hit(kw.dashboard)">
@@ -645,6 +664,7 @@
             <div class="grid sm:grid-cols-2 gap-4">
 
                 {{-- Store Slip — companies.kitchen_printer_enabled --}}
+                @if($moduleRelevant('kot_enabled'))
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm" x-show="hit(kw.storeslip)">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center shrink-0">
@@ -695,8 +715,10 @@
                     </div>
                     @endunless
                 </div>
+                @endif
 
                 {{-- Delivery & Riders — feature_flags.delivery (forces customer_profile on) --}}
+                @if($moduleRelevant('delivery'))
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm" x-show="hit(kw.delivery)">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -726,8 +748,10 @@
                     </div>
                     @endunless
                 </div>
+                @endif
 
                 {{-- Per-item Store note — feature_flags.kitchen_notes (needs the slip) --}}
+                @if($moduleRelevant('kitchen_notes'))
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm" x-show="hit(kw.storenote)">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 flex items-center justify-center shrink-0">
@@ -761,6 +785,7 @@
                     </div>
                     @endunless
                 </div>
+                @endif
 
                 {{-- 💊 Pharmacy Mode (Task 1558) — feature_flags.pharmacy plus its
                      two children. The master carries the whole module: switch it
@@ -769,6 +794,7 @@
                      while the master is on, because that is the only state in
                      which they mean anything. Spans both columns — this is a
                      whole business mode, not one more toggle. --}}
+                @if($moduleRelevant('pharmacy'))
                 <div class="sm:col-span-2 rounded-2xl border-2 border-emerald-200 dark:border-emerald-900/50 bg-white dark:bg-gray-900 p-5 shadow-sm" x-show="hit(kw.pharmacy)">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center shrink-0 text-lg">💊</div>
@@ -851,6 +877,7 @@
                         <p class="text-[11px] text-gray-400">{{ __('pos.ph_nav_after_save_hint') }}</p>
                     </div>
                 </div>
+                @endif
             </div>
         </section>
 
@@ -869,7 +896,7 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.quick_type_mode') }}</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.quick_type_mode_sub') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ \App\Support\PosVocabulary::t('quick_type_mode_sub') }}</p>
                     </div>
                     <button type="button"
                         @click="quickOn=!quickOn; savingQuick=true; fetch('/fbr-pos/settings/quick-type', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:quickOn})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { quickOn=!quickOn; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ quickOn=!quickOn; alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ savingQuick=false; })"
@@ -972,6 +999,7 @@
                 @endif
 
                 {{-- Inventory tracking on/off (dual-switch synced server-side) --}}
+                @if($moduleRelevant('inventory'))
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3" x-show="hit(kw.inventory)">
                     <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -986,6 +1014,7 @@
                         <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="invOn && 'translate-x-6'"></span>
                     </button>
                 </div>
+                @endif
 
                 {{-- Caller ID (Task 1353 — FBR twin of the PRA customize card):
                      Android companion app + sale-screen popup. Card-local Alpine
@@ -995,6 +1024,7 @@
                      once the SystemSetting version AND the hosted APK both exist
                      (APKs are scp'd to live public/downloads, never committed —
                      repo is public) so a button can never 404. --}}
+                @if($moduleRelevant('caller_id_enabled'))
                 @php
                     $tnCallerReady = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'caller_id_enabled');
                     $tnCallerOn = $tnCallerReady && ($company->caller_id_enabled ?? false);
@@ -1144,8 +1174,10 @@
                     </div>
                 </div>
                 @endif
+                @endif
 
                 {{-- Restock on bill delete / edit (only meaningful with inventory ON) --}}
+                @if($moduleRelevant('inventory'))
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3" x-show="invOn && hit(kw.restock)" x-cloak>
                     <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -1160,6 +1192,7 @@
                         <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="restockOn && 'translate-x-6'"></span>
                     </button>
                 </div>
+                @endif
             </div>
         </section>
 

@@ -1,4 +1,9 @@
 <x-pos-layout>
+@php
+    $dashboardRidersRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'riders_enabled');
+    $dashboardKhataRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'khata_enabled');
+    $dashboardKitchenRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'kitchen');
+@endphp
 
 <style>
 @keyframes countUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -24,13 +29,13 @@
              baitha hota hai, day-close ki report mein har waqt to nahi jayega."
              Alert pehle sirf retail dashboard par tha; delivery to restaurant
              hi karte hain, is liye dono jagah. --}}
-        @include('pos.partials.rider-settlement-pending')
+        @if($dashboardRidersRelevant) @include('pos.partials.rider-settlement-pending') @endif
         @include('pos.partials.inactive-customers')
-        @include('pos.partials.today-khata')
+        @if($dashboardKhataRelevant) @include('pos.partials.today-khata') @endif
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
 
         {{-- ─── Kitchen Efficiency (owner, Jul 2026) — KDS timing report ─── --}}
-        @if(isset($kitchenStats))
+        @if($dashboardKitchenRelevant && isset($kitchenStats))
         @php
             // Minutes → "12 min" / "1h 5m"; null → em-dash.
             $fmtMins = function ($m) {

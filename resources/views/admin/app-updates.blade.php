@@ -114,6 +114,9 @@
                                         <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center {{ $upd->audience === 'fbr_pos' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : ($upd->audience === 'all' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300') }}">
                                             {{ $upd->audience === 'fbr_pos' ? 'FBR POS' : ($upd->audience === 'all' ? 'PRA + FBR' : 'PRA POS') }}
                                         </span>
+                                        <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
+                                            {{ \App\Support\PosVocabulary::audienceOptions()[$upd->audience_family] ?? \App\Support\PosVocabulary::audienceOptions()['all'] }}
+                                        </span>
                                         {{-- Type (Task 1286): accessor normalizes legacy/blank rows to 'improvement' --}}
                                         <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center {{ $upd->type === 'feature' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' }}">
                                             {{ $upd->type === 'feature' ? 'Naya Feature' : 'Behtari / Masla Hal' }}
@@ -145,7 +148,7 @@
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <button type="button"
-                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience), @json((bool) ($upd->is_featured ?? false)), @json($upd->type), @json(array_values((array) ($upd->target_categories ?? []))))'
+                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience), @json((bool) ($upd->is_featured ?? false)), @json($upd->type), @json(array_values((array) ($upd->target_categories ?? []))), @json($upd->audience_family))'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
                                             @php $updExpired = $upd->created_at->lt(now()->subDays(\App\Models\AppUpdate::LIVE_DAYS)); @endphp
                                             <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline"
@@ -223,6 +226,14 @@
                 </div>
                 @include('admin.partials.elaan-categories', ['prefix' => 'add'])
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
+                    <select name="audience_family" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        @foreach(\App\Support\PosVocabulary::audienceOptions() as $value => $label)
+                            <option value="{{ $value }}" {{ old('audience_family', 'all') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                     <select name="type" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         <option value="improvement">Behtari / Masla Hal (improvement or fix)</option>
@@ -272,6 +283,14 @@
                     </select>
                 </div>
                 @include('admin.partials.elaan-categories', ['prefix' => 'edit'])
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience family</label>
+                    <select name="audience_family" id="editAudienceFamily" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        @foreach(\App\Support\PosVocabulary::audienceOptions() as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                     <select name="type" id="editType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
@@ -361,11 +380,12 @@
             }
         });
 
-        function openEditModal(id, title, pointsText, imageUrl, audience, isFeatured, type, categories) {
+        function openEditModal(id, title, pointsText, imageUrl, audience, isFeatured, type, categories, audienceFamily) {
             document.getElementById('editUpdateForm').action = '/admin/app-updates/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
             document.getElementById('editAudience').value = ['pos','fbr_pos','all'].includes(audience) ? audience : 'pos';
+            document.getElementById('editAudienceFamily').value = ['all','food_service','goods_retail','pharmacy','services'].includes(audienceFamily) ? audienceFamily : 'all';
             document.getElementById('editType').value = type === 'feature' ? 'feature' : 'improvement';
             elaanSyncPanels('edit', document.getElementById('editAudience').value);
             elaanSetCategories('edit', categories || []);

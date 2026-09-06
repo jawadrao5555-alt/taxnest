@@ -15,6 +15,9 @@ class AppUpdate extends Model
 
     protected $fillable = [
         'title', 'points', 'image_path', 'audience', 'target_categories', 'type', 'is_published', 'is_featured', 'created_by',
+        // Task 1582: category family this update is for (all / food_service /
+        // goods_retail / pharmacy / services). Legacy rows read as 'all'.
+        'audience_family',
     ];
 
     protected $casts = [
@@ -61,6 +64,43 @@ class AppUpdate extends Model
     public function getTypeAttribute($value)
     {
         return $value === 'feature' ? 'feature' : 'improvement';
+    }
+
+    /**
+     * Category-family audience (Task 1582). Blank / missing column = 'all'.
+     */
+    public function getAudienceFamilyAttribute($value): string
+    {
+        $v = is_string($value) ? trim($value) : '';
+        return in_array($v, \App\Services\PosCategoryProfiles::AUDIENCE_FAMILIES, true) ? $v : 'all';
+    }
+
+    /** Does this update reach the given company's category family? */
+    public function reachesCompany(?\App\Models\Company $company): bool
+    {
+        try {
+            return \App\Services\PosFeatureService::audienceMatches($company, $this->audience_family);
+        } catch (\Throwable $e) {
+            return true; // never hide an announcement over a profile fault
+        }
+    }
+
+    /**
+     * Rows for one company: panel audience + category family. Family is
+     * filtered in SQL when the column exists (mid-deploy safe) — an unknown
+     * family value is treated as 'all'.
+     */
+    public function scopeForCompanyFamily($query, ?\App\Models\Company $company)
+    {
+        if (!$company || !\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'audience_family')) {
+            return $query;
+        }
+        $families = array_merge(['all'], \App\Services\PosFeatureService::audiencesFor($company));
+        return $query->where(function ($q) use ($families) {
+            $q->whereNull('audience_family')->orWhere('audience_family', '')
+              ->orWhereIn('audience_family', $families)
+              ->orWhereNotIn('audience_family', \App\Services\PosCategoryProfiles::AUDIENCE_FAMILIES);
+        });
     }
 
     public function scopePublished($query)

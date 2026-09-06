@@ -40,20 +40,39 @@ class CompanyGroupService
 
     private const STRENGTH = ['cnic' => 'strong', 'ntn' => 'strong', 'email' => 'weak', 'phone' => 'weak', 'manual' => 'manual', 'seed' => 'seed'];
 
+    /**
+     * How many different companies may share ONE weak value (email/phone)
+     * before it stops being evidence of anything. An accountant's address or a
+     * shop chain's landline sits on many unrelated businesses; past this many,
+     * the value identifies a helper, not an owner.
+     */
+    private const WEAK_SHARE_CAP = 3;
+
     /** Re-entrancy guard: model events call sync, sync writes models. */
     private static bool $syncing = false;
 
+    /** Per-request memo for the shared-value count (one query per value). */
+    private static array $shareCounts = [];
+
+    /**
+     * Only the YES is remembered. A "no" is a statement about the schema at one
+     * moment — before a migration finished, on a connection that was still
+     * being built — and memoising it would switch grouping off for the rest of
+     * the process even after the tables appeared.
+     */
     public static function enabled(): bool
     {
-        static $ok = null;
-        if ($ok === null) {
-            try {
-                $ok = Schema::hasTable('company_groups')
-                    && Schema::hasTable('company_group_members')
-                    && Schema::hasTable('company_identity_keys');
-            } catch (\Throwable $e) {
-                $ok = false;
-            }
+        static $ok = false;
+        if ($ok) {
+            return true;
+        }
+
+        try {
+            $ok = Schema::hasTable('company_groups')
+                && Schema::hasTable('company_group_members')
+                && Schema::hasTable('company_identity_keys');
+        } catch (\Throwable $e) {
+            $ok = false;
         }
 
         return $ok;
@@ -78,13 +97,73 @@ class CompanyGroupService
             return null;
         }
 
-        return match ($type) {
+        $value = match ($type) {
             'cnic'  => strlen($norm) === 13 ? $norm : null,
             'ntn'   => strlen($norm) >= 6 ? $norm : null,
             'email' => str_contains($norm, '@') ? mb_substr($norm, 0, 191) : null,
             'phone' => self::normalizePhone($norm),
             default => $norm,
         };
+
+        return $value !== null && self::isPlaceholder($type, $value) ? null : $value;
+    }
+
+    /**
+     * Filler that identifies nobody: 0000000000, 9999999999998, 1234567890,
+     * demo@example.com. Seed rows and rushed sign-ups are full of these, and
+     * treating one as evidence would glue a dozen unrelated shops into one
+     * "customer" — the loudest possible way for this feature to be wrong.
+     */
+    private static function isPlaceholder(string $type, string $value): bool
+    {
+        if (in_array($type, ['cnic', 'ntn', 'phone'], true)) {
+            $digits = preg_replace('/\\D+/', '', $value);
+            if ($digits === '' || strlen($digits) < 6) {
+                return true;
+            }
+            // One or two distinct digits: 000000, 9999999999998, 121212121212.
+            if (count(array_unique(str_split($digits))) <= 2) {
+                return true;
+            }
+            // A straight run in either direction: 1234567890, 9876543210.
+            if (str_contains('01234567890123456789', $digits) || str_contains('98765432109876543210', $digits)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        if ($type === 'email') {
+            foreach (['@example.com', '@example.org', '@example.net', '@test.com', '@test.pk', '@sample.com', '@domain.com', '@email.com'] as $filler) {
+                if (str_ends_with($value, $filler)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Is this value still worth grouping on? Strong evidence always is. A weak
+     * one stops counting once it is spread across more companies than one
+     * owner plausibly has — that is a shared accountant, not a group.
+     */
+    public static function keyIsUsable(string $type, string $value): bool
+    {
+        if (self::strengthOf($type) !== 'weak') {
+            return true;
+        }
+
+        $signature = $type . '|' . $value;
+        if (!array_key_exists($signature, self::$shareCounts)) {
+            self::$shareCounts[$signature] = (int) CompanyIdentityKey::where('key_type', $type)
+                ->where('key_value', $value)
+                ->distinct()
+                ->count('company_id');
+        }
+
+        return self::$shareCounts[$signature] <= self::WEAK_SHARE_CAP;
     }
 
     /** 0300-1234567 / +92 300 1234567 / 00923001234567 all become 3001234567. */
@@ -139,6 +218,9 @@ class CompanyGroupService
     /** Rewrite this company's identity keys to exactly the current values. */
     public static function storeKeys(int $companyId, array $keys): void
     {
+        // The share counts are read from these very rows.
+        self::$shareCounts = [];
+
         $wanted = [];
         foreach ($keys as $key) {
             $wanted[$key['key_type'] . '|' . $key['key_value']] = $key;
@@ -187,8 +269,29 @@ class CompanyGroupService
 
             $excluded = DB::table('company_group_exclusions')
                 ->where('company_id', $company->id)
+                ->whereNotNull('company_group_id')
                 ->pluck('company_group_id')
                 ->all();
+
+            // "Not the same customer" is a statement about two BUSINESSES, so
+            // it survives the group it was made in dissolving.
+            $excludedCompanies = self::pairExclusionsEnabled()
+                ? DB::table('company_group_exclusions')
+                    ->where('company_id', $company->id)
+                    ->whereNotNull('excluded_company_id')
+                    ->pluck('excluded_company_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all()
+                : [];
+
+            // A weak value that half the customer base shares is not evidence.
+            $keys = array_values(array_filter(
+                $keys,
+                fn ($key) => self::keyIsUsable($key['key_type'], $key['key_value'])
+            ));
+            if (!$keys) {
+                return $current?->group;
+            }
 
             $matches = CompanyIdentityKey::query()
                 ->where('company_id', '!=', $company->id)
@@ -210,6 +313,10 @@ class CompanyGroupService
                     // Hard-deleted company left its keys behind — clean up.
                     CompanyIdentityKey::where('company_id', $match->company_id)->delete();
                     continue;
+                }
+
+                if (in_array((int) $other->id, $excludedCompanies, true)) {
+                    continue;   // admin has already split these two apart
                 }
 
                 $otherMember = CompanyGroupMember::where('company_id', $other->id)->first();
@@ -297,6 +404,20 @@ class CompanyGroupService
             ->where('company_group_id', $group->id)
             ->delete();
 
+        if (self::pairExclusionsEnabled()) {
+            $memberIds = $group->members()->pluck('company_id')->map(fn ($id) => (int) $id)->all();
+            if ($memberIds) {
+                DB::table('company_group_exclusions')
+                    ->where(function ($q) use ($company, $memberIds) {
+                        $q->where('company_id', $company->id)->whereIn('excluded_company_id', $memberIds);
+                    })
+                    ->orWhere(function ($q) use ($company, $memberIds) {
+                        $q->whereIn('company_id', $memberIds)->where('excluded_company_id', $company->id);
+                    })
+                    ->delete();
+            }
+        }
+
         return CompanyGroupMember::updateOrCreate(
             ['company_id' => $company->id],
             [
@@ -321,12 +442,32 @@ class CompanyGroupService
         }
 
         $groupId = $member->company_group_id;
+        $siblings = CompanyGroupMember::where('company_group_id', $groupId)
+            ->where('company_id', '!=', $company->id)
+            ->pluck('company_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
         $member->delete();
 
         DB::table('company_group_exclusions')->updateOrInsert(
-            ['company_group_id' => $groupId, 'company_id' => $company->id],
+            ['company_group_id' => $groupId, 'company_id' => $company->id, 'excluded_company_id' => null],
             ['updated_at' => now(), 'created_at' => now()]
         );
+
+        if (self::pairExclusionsEnabled()) {
+            foreach ($siblings as $siblingId) {
+                foreach ([[$company->id, $siblingId], [$siblingId, $company->id]] as [$left, $right]) {
+                    // No group id on a pair row: the decision outlives the
+                    // group, and the (group, company) unique index would
+                    // otherwise allow only one pair per company.
+                    DB::table('company_group_exclusions')->updateOrInsert(
+                        ['company_id' => $left, 'excluded_company_id' => $right],
+                        ['company_group_id' => null, 'updated_at' => now(), 'created_at' => now()]
+                    );
+                }
+            }
+        }
 
         self::dissolveIfAlone($groupId);
     }
@@ -344,6 +485,24 @@ class CompanyGroupService
         }
     }
 
+    /** Older deployments may not have the pair column yet. */
+    public static function pairExclusionsEnabled(): bool
+    {
+        static $ok = false;
+        if ($ok) {
+            return true;
+        }
+
+        try {
+            $ok = Schema::hasTable('company_group_exclusions')
+                && Schema::hasColumn('company_group_exclusions', 'excluded_company_id');
+        } catch (\Throwable $e) {
+            $ok = false;
+        }
+
+        return $ok;
+    }
+
     /** Forget everything about a company that no longer exists. */
     public static function forget(int $companyId): void
     {
@@ -355,6 +514,9 @@ class CompanyGroupService
         CompanyGroupMember::where('company_id', $companyId)->delete();
         CompanyIdentityKey::where('company_id', $companyId)->delete();
         DB::table('company_group_exclusions')->where('company_id', $companyId)->delete();
+        if (self::pairExclusionsEnabled()) {
+            DB::table('company_group_exclusions')->where('excluded_company_id', $companyId)->delete();
+        }
         if ($groupId) {
             self::dissolveIfAlone($groupId);
         }
@@ -378,6 +540,72 @@ class CompanyGroupService
             }
         });
 
+        self::revalidate();
+
         return $count;
+    }
+
+    /**
+     * Drop members whose evidence no longer holds — the value was corrected,
+     * or it turned out to be filler / a shared address. Without this a wrong
+     * grouping would be permanent: sync only ever ADDS, and a customer wrongly
+     * merged into someone else's group could see nothing of it while support
+     * quietly worked from a false picture.
+     *
+     * A manual link is never pruned (an admin outranks the rule), and no
+     * exclusion is written — this is not an admin decision, so a later real
+     * match must still be allowed to re-form the group.
+     *
+     * @return int members removed
+     */
+    public static function revalidate(): int
+    {
+        if (!self::enabled()) {
+            return 0;
+        }
+
+        self::$shareCounts = [];
+        $removed = 0;
+
+        foreach (CompanyGroup::with('members')->get() as $group) {
+            $memberIds = $group->members->pluck('company_id')->all();
+            if (count($memberIds) < 2) {
+                self::dissolveIfAlone($group->id);
+                continue;
+            }
+
+            $usable = CompanyIdentityKey::whereIn('company_id', $memberIds)
+                ->get()
+                ->filter(fn ($row) => self::keyIsUsable($row->key_type, $row->key_value))
+                ->groupBy('company_id')
+                ->map(fn ($rows) => $rows->map(fn ($row) => $row->key_type . '|' . $row->key_value)->all());
+
+            foreach ($group->members as $member) {
+                if ($member->is_manual) {
+                    continue;
+                }
+
+                $mine = $usable[$member->company_id] ?? [];
+                $shares = false;
+                foreach ($group->members as $other) {
+                    if ($other->company_id === $member->company_id) {
+                        continue;
+                    }
+                    if (array_intersect($mine, $usable[$other->company_id] ?? [])) {
+                        $shares = true;
+                        break;
+                    }
+                }
+
+                if (!$shares) {
+                    $member->delete();
+                    $removed++;
+                }
+            }
+
+            self::dissolveIfAlone($group->id);
+        }
+
+        return $removed;
     }
 }

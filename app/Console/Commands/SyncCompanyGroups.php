@@ -52,6 +52,7 @@ class SyncCompanyGroups extends Command
         $groups = \App\Models\CompanyGroup::count();
         $members = \App\Models\CompanyGroupMember::count();
         $this->info("Scanned {$count} companies → {$groups} groups covering {$members} accounts.");
+        $this->line('  (memberships whose evidence no longer holds — filler values, shared accountant addresses — are dropped in the same pass)');
 
         return self::SUCCESS;
     }

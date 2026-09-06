@@ -290,6 +290,10 @@
         // follow the LOCAL number style; mirrors receipt_80mm.
         $rcptIsLocalStream = $transaction->isLocalBill() || $transaction->isExemptStream();
         $rcptBillToken = \App\Support\PosBillNumberStyle::bigNumber($company, $transaction);
+        // Daily style (ZFC): print ONLY the large L00x calling number — never the
+        // "Daily Token" label or the Bill Serial / local-invoice line. Internal
+        // invoice_number stays on the bill for search/returns/reports.
+        $rcptIsDailyStyle = \App\Support\PosBillNumberStyle::styleFor($company, $transaction) === 'daily';
     @endphp
 
     {{-- Order-number early lookup: for fiscal top box (code-style restaurant bills
@@ -334,7 +338,9 @@
     <div class="separator"></div>
     <div class="invoice-numbers" style="text-align:center; padding:3px 4px;">
         <strong style="font-size:10px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
-        @if($rcptBillToken !== null)
+        @if($rcptIsDailyStyle && $rcptBillToken !== null)
+        <span style="font-size:18px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span>
+        @elseif($rcptBillToken !== null)
         <span style="font-size:8px; font-weight:700; color:#000;">{{ __('pos.daily_token_label') }}</span><br>
         <span style="font-size:18px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span><br>
         <span style="font-size:8px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}: {{ $transaction->invoice_number }}</span>
@@ -345,6 +351,20 @@
         {{-- Task 655: agent-mode bill printed while still 'pending' — chhoti wazahat
              ke yeh bill PRA ko report ho raha hai (taake "local bill" na samjha jaye). --}}
         @if(($transaction->pra_status ?? null) === 'pending')<br><span style="font-size:8px; color:#000;">{{ __('pos.receipt_pending_pra_note') }}</span>@endif
+    </div>
+    @elseif($rcptIsDailyStyle && $rcptBillToken !== null)
+    <div class="invoice-numbers">
+        <div style="text-align:center; padding:2px 0 3px;">
+            <span style="font-size:18px; font-weight:bold; color:#000;">{{ $rcptBillToken }}</span>
+        </div>
+        <table class="inv-table">
+            @if($omRcptFullNum)
+            <tr>
+                <td class="inv-label">Order #:</td>
+                <td class="inv-value" style="font-weight:900;">{{ $omRcptFullNum }}</td>
+            </tr>
+            @endif
+        </table>
     </div>
     @else
     <div class="invoice-numbers">

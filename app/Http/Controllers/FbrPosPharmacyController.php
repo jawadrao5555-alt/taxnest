@@ -9,6 +9,7 @@ use App\Models\InventoryMovement;
 use App\Models\InventoryStock;
 use App\Models\PharmacyClaim;
 use App\Models\PharmacyClaimItem;
+use App\Models\PharmacyMissedSale;
 use App\Models\PharmacyStockAction;
 use App\Models\Product;
 use App\Models\ProductBatch;
@@ -16,10 +17,13 @@ use App\Models\Supplier;
 use App\Services\BranchStockService;
 use App\Services\InventoryService;
 use App\Services\PharmacyBatchService;
+use App\Services\PharmacyExpirySummaryService;
+use App\Services\PosAccessService;
 use App\Services\PosFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * FBR POS Pharmacy Mode (Task 1558).
@@ -572,13 +576,32 @@ class FbrPosPharmacyController extends Controller
                 return;
             }
 
-            $claim->update([
+            $update = [
                 'status' => $data['status'],
                 'settled_amount' => $data['settled_amount'] ?? null,
                 'settlement_reference' => $data['settlement_reference'] ?? null,
                 'settled_at' => now()->toDateString(),
                 'notes' => $data['notes'] ?? $claim->notes,
-            ]);
+            ];
+            // Task 1580: a claim the distributor settles as a CREDIT NOTE is
+            // money off the shop's distributor account — post it to the
+            // supplier ledger (SupplierLedgerService reads ledger_credited_at;
+            // cash settlements and rejections never touch the ledger).
+            $postsCredit = $data['status'] === PharmacyClaim::STATUS_CREDITED
+                && $claim->supplier_id
+                && Schema::hasColumn('pharmacy_claims', 'ledger_credited_at');
+            if ($postsCredit) {
+                $update['ledger_credited_at'] = now();
+            }
+            $claim->update($update);
+
+            if ($postsCredit) {
+                \App\Services\SupplierLedgerService::audit('claim_credit_posted', 'pharmacy_claim', $claim->id, null, [
+                    'supplier_id' => $claim->supplier_id,
+                    'amount' => \App\Services\SupplierLedgerService::claimCreditAmount($claim->fresh()),
+                    'reference' => $data['settlement_reference'] ?? null,
+                ], $companyId, (int) $this->user()->id);
+            }
         });
 
         return back()->with('success', __('pos.ph_claim_updated'));
@@ -605,7 +628,11 @@ class FbrPosPharmacyController extends Controller
         $companyId = $this->companyId();
         $report = $request->get('report', 'near_expiry');
         $today = now()->toDateString();
-        $soon = now()->addDays(PharmacyBatchService::NEAR_EXPIRY_DAYS)->toDateString();
+        // The shop's own near-expiry window — the SAME number the dashboard
+        // tile and the daily alert use, so the report never disagrees with
+        // the surface that sent the owner here.
+        $nearDays = PharmacyExpirySummaryService::windowDays($this->company());
+        $soon = now()->addDays($nearDays)->toDateString();
 
         $rows = collect();
         $totals = ['quantity' => 0.0, 'cost' => 0.0, 'retail' => 0.0];
@@ -656,10 +683,262 @@ class FbrPosPharmacyController extends Controller
             'report' => $report,
             'rows' => $rows,
             'totals' => $totals,
-            'nearDays' => PharmacyBatchService::NEAR_EXPIRY_DAYS,
+            'nearDays' => $nearDays,
             'from' => $request->get('from', now()->startOfMonth()->toDateString()),
             'to' => $request->get('to', $today),
         ]));
+    }
+
+    /**
+     * Owner sets how many days ahead counts as "expiring soon". Stored on the
+     * pharmacy feature map (no new column) and read through ONE resolver, so
+     * the tile, the alert, the report and the sale-screen chip all move
+     * together. Out-of-range values are refused, never silently clamped.
+     */
+    public function updateNearDays(Request $request)
+    {
+        if ($resp = $this->pharmacyGate(true)) return $resp;
+        $this->assertNotCashier();
+
+        $days = (int) $request->input('days', 0);
+        if ($days < PharmacyExpirySummaryService::MIN_WINDOW_DAYS || $days > PharmacyExpirySummaryService::MAX_WINDOW_DAYS) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.ph_near_days_range', [
+                    'min' => PharmacyExpirySummaryService::MIN_WINDOW_DAYS,
+                    'max' => PharmacyExpirySummaryService::MAX_WINDOW_DAYS,
+                ]),
+            ], 422);
+        }
+
+        $company = $this->company();
+        $flags = is_array($company->feature_flags) ? $company->feature_flags : [];
+        $flags['near_expiry_days'] = $days;
+        $company->feature_flags = $flags;
+        $company->save();
+        PharmacyExpirySummaryService::forget($company->id);
+
+        return response()->json(['success' => true, 'days' => PharmacyExpirySummaryService::windowDays($company->fresh())]);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    //  Counter helpers: stock check for the alternatives panel
+    // ═════════════════════════════════════════════════════════════════════
+
+    /**
+     * Branch stock for a handful of product ids — the sale screen asks this
+     * when it offers "other medicines with the same salt", because the FBR
+     * counter is inventory-blind by design (cache-first boot, nothing about
+     * stock is baked). Offline the screen simply shows the salt matches
+     * without stock claims; this endpoint only ever ADDS certainty.
+     */
+    public function stockCheck(Request $request)
+    {
+        if ($resp = $this->pharmacyGate(true)) return $resp;
+
+        $companyId = $this->companyId();
+        $company = $this->company();
+        $ids = collect(explode(',', (string) $request->get('ids', '')))
+            ->map(fn ($v) => (int) trim($v))
+            ->filter(fn ($v) => $v > 0)
+            ->unique()
+            ->take(60)
+            ->values();
+
+        // The COLUMN is what every stock gate reads (dual-switch rule).
+        $inventoryOn = (bool) ($company->inventory_enabled ?? false);
+        if (!$inventoryOn || $ids->isEmpty() || !Schema::hasTable('inventory_stocks')) {
+            return response()->json(['success' => true, 'inventory' => $inventoryOn, 'stock' => (object) []]);
+        }
+
+        $known = Product::where('company_id', $companyId)->whereIn('id', $ids->all())->pluck('id')->all();
+        $branchId = BranchStockService::writeBranchId($companyId, BranchStockService::viewBranchId($companyId));
+        $qty = BranchStockService::quantities($companyId, $branchId, $known);
+        $stock = [];
+        foreach ($known as $pid) {
+            $stock[(string) $pid] = round((float) ($qty[$pid] ?? 0), 3);
+        }
+
+        return response()->json(['success' => true, 'inventory' => true, 'stock' => (object) $stock]);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    //  Missed sales — "customer asked, shop did not have it"
+    // ═════════════════════════════════════════════════════════════════════
+
+    /**
+     * Record one missed ask. Idempotent on client_uuid per company: the sale
+     * screen replays these from a local queue after being offline, and a lost
+     * response must never count the same customer twice. Any pharmacy user
+     * may write (it is the cashier who hears the ask); reading is manager-only.
+     */
+    public function storeMissedSale(Request $request)
+    {
+        if ($resp = $this->pharmacyGate(true)) return $resp;
+        if (!Schema::hasTable('pharmacy_missed_sales')) {
+            return response()->json(['success' => false, 'message' => 'missed_sales_unavailable'], 503);
+        }
+
+        $term = trim((string) $request->input('term', ''));
+        $term = preg_replace('/\s+/u', ' ', $term) ?? $term;
+        if (mb_strlen($term) < 2 || mb_strlen($term) > 150) {
+            return response()->json(['success' => false, 'message' => 'term_invalid'], 422);
+        }
+        // A pure barcode scan that found nothing is a catalogue gap, not a
+        // customer ask — keep the log about medicines people name.
+        if (preg_match('/^\d{6,}$/', $term)) {
+            return response()->json(['success' => false, 'message' => 'term_numeric'], 422);
+        }
+
+        $companyId = $this->companyId();
+        $reason = (string) $request->input('reason', PharmacyMissedSale::REASON_NO_MATCH);
+        if (!in_array($reason, PharmacyMissedSale::REASONS, true)) {
+            $reason = PharmacyMissedSale::REASON_NO_MATCH;
+        }
+        $qty = $request->input('qty');
+        $qty = ($qty === null || $qty === '') ? null : round((float) $qty, 2);
+        if ($qty !== null && ($qty <= 0 || $qty > 100000)) {
+            $qty = null;
+        }
+        $productId = (int) $request->input('product_id', 0) ?: null;
+        if ($productId && !Product::where('company_id', $companyId)->where('id', $productId)->exists()) {
+            $productId = null;
+        }
+        $uuid = trim((string) $request->input('uuid', ''));
+        $uuid = ($uuid !== '' && mb_strlen($uuid) <= 64 && preg_match('/^[A-Za-z0-9._:-]+$/', $uuid)) ? $uuid : null;
+
+        if ($uuid) {
+            $dupe = PharmacyMissedSale::where('company_id', $companyId)->where('client_uuid', $uuid)->first();
+            if ($dupe) {
+                return response()->json(['success' => true, 'id' => $dupe->id, 'duplicate' => true]);
+            }
+        }
+
+        $branchId = BranchStockService::writeBranchId($companyId, BranchStockService::viewBranchId($companyId));
+
+        try {
+            $row = PharmacyMissedSale::create([
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'user_id' => $this->user()->id,
+                'term' => mb_substr($term, 0, 150),
+                'term_key' => PharmacyMissedSale::keyFor($term),
+                'quantity' => $qty,
+                'reason' => $reason,
+                'product_id' => $productId,
+                'client_uuid' => $uuid,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Two replays raced past the SELECT above — the unique key wins.
+            $dupe = $uuid ? PharmacyMissedSale::where('company_id', $companyId)->where('client_uuid', $uuid)->first() : null;
+            if ($dupe) {
+                return response()->json(['success' => true, 'id' => $dupe->id, 'duplicate' => true]);
+            }
+            throw $e;
+        }
+
+        return response()->json(['success' => true, 'id' => $row->id]);
+    }
+
+    /**
+     * Manager-only (owner / manager / admin; a cashier only through Custom
+     * Access "reports"). Grouped by term over a date range: how many times,
+     * last asked, quantity wanted, who heard it, and a "create product" jump.
+     */
+    public function missedSales(Request $request)
+    {
+        if ($resp = $this->pharmacyGate()) return $resp;
+        $this->assertMissedSalesReader();
+
+        $companyId = $this->companyId();
+        $from = $request->get('from', now()->subDays(29)->toDateString());
+        $to = $request->get('to', now()->toDateString());
+        $show = $request->get('show', 'open'); // open | handled | all
+        if (!in_array($show, ['open', 'handled', 'all'], true)) {
+            $show = 'open';
+        }
+
+        $groups = collect();
+        $askers = [];
+        $totalAsks = 0;
+        if (Schema::hasTable('pharmacy_missed_sales')) {
+            $base = PharmacyMissedSale::where('company_id', $companyId)
+                ->whereBetween('created_at', [$from . ' 00:00:00', $to . ' 23:59:59']);
+            $this->scopeBranch($base, $companyId);
+
+            $groups = (clone $base)
+                ->selectRaw('term_key, MIN(term) AS term, COUNT(*) AS asks, '
+                    . 'COALESCE(SUM(quantity), 0) AS qty, MAX(created_at) AS last_asked, MAX(id) AS last_id, '
+                    . 'SUM(CASE WHEN handled_at IS NULL THEN 1 ELSE 0 END) AS open_asks, '
+                    . 'SUM(CASE WHEN reason = ? THEN 1 ELSE 0 END) AS out_of_stock_asks, '
+                    . 'MAX(product_id) AS product_id', [PharmacyMissedSale::REASON_OUT_OF_STOCK])
+                ->groupBy('term_key')
+                ->when($show === 'open', fn ($q) => $q->havingRaw('SUM(CASE WHEN handled_at IS NULL THEN 1 ELSE 0 END) > 0'))
+                ->when($show === 'handled', fn ($q) => $q->havingRaw('SUM(CASE WHEN handled_at IS NULL THEN 1 ELSE 0 END) = 0'))
+                ->orderByDesc('asks')->orderByDesc('last_asked')
+                ->limit(500)
+                ->get();
+            $totalAsks = (int) $groups->sum('asks');
+
+            // Who heard the last ask — one small lookup, never a join per row.
+            $lastIds = $groups->pluck('last_id')->filter()->all();
+            if ($lastIds) {
+                $askers = PharmacyMissedSale::with('user:id,name')->whereIn('id', $lastIds)->get()
+                    ->mapWithKeys(fn ($r) => [$r->id => $r->user?->name])->all();
+            }
+        }
+
+        return view('fbr-pos.pharmacy.missed-sales', array_merge($this->branchView($companyId), [
+            'company' => $this->company(),
+            'groups' => $groups,
+            'askers' => $askers,
+            'totalAsks' => $totalAsks,
+            'from' => $from,
+            'to' => $to,
+            'show' => $show,
+        ]));
+    }
+
+    /** Mark every open ask of a term handled (or reopen it). Grouped, like the report. */
+    public function missedSaleHandled(Request $request)
+    {
+        if ($resp = $this->pharmacyGate(true)) return $resp;
+        $this->assertMissedSalesReader();
+        if (!Schema::hasTable('pharmacy_missed_sales')) {
+            return response()->json(['success' => false], 503);
+        }
+
+        $key = PharmacyMissedSale::keyFor((string) $request->input('term', ''));
+        if ($key === '') {
+            return response()->json(['success' => false, 'message' => 'term_invalid'], 422);
+        }
+        $handled = filter_var($request->input('handled', true), FILTER_VALIDATE_BOOLEAN);
+
+        $companyId = $this->companyId();
+        $q = PharmacyMissedSale::where('company_id', $companyId)->where('term_key', $key);
+        $this->scopeBranch($q, $companyId);
+        $n = $handled
+            ? $q->whereNull('handled_at')->update(['handled_at' => now(), 'handled_by' => $this->user()->id])
+            : $q->whereNotNull('handled_at')->update(['handled_at' => null, 'handled_by' => null]);
+
+        return response()->json(['success' => true, 'handled' => $handled, 'updated' => (int) $n]);
+    }
+
+    /**
+     * Reading the missed-sale log is manager territory. Custom Access lets an
+     * owner hand "reports" to one cashier without opening every manager page —
+     * the same key the other FBR report surfaces honour.
+     */
+    private function assertMissedSalesReader(): void
+    {
+        $u = $this->user();
+        if (!in_array($u->pos_role ?? '', ['pos_cashier', 'local_viewer'], true)) {
+            return;
+        }
+        if (($u->pos_role ?? '') === 'pos_cashier' && PosAccessService::customAllows($u, 'reports') === true) {
+            return;
+        }
+        abort(403, __('pos.access_denied'));
     }
 
     /** Bills that captured a prescription, or that sold a schedule medicine. */

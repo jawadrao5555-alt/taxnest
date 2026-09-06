@@ -2637,6 +2637,17 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
     Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
     Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
+    // 🧾 Distributor ledger (Task 1580) — supplier payments, statements and
+    // purchase returns. Same owner/manager gate + branch scoping as /stock;
+    // every money mutation sits behind plan.limit:inventory like the rest.
+    Route::post('/stock/payments', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storePayment'])->name('fbrpos.stock.payment.store')->middleware('plan.limit:inventory');
+    Route::post('/stock/payments/{id}/void', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'voidPayment'])->name('fbrpos.stock.payment.void')->middleware('plan.limit:inventory');
+    Route::get('/stock/suppliers/{id}/statement', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statement'])->name('fbrpos.stock.supplier.statement');
+    Route::get('/stock/suppliers/{id}/statement/pdf', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'statementPdf'])->name('fbrpos.stock.supplier.statement.pdf');
+    Route::get('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returns'])->name('fbrpos.stock.returns');
+    Route::post('/stock/returns', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'storeReturn'])->name('fbrpos.stock.return.store')->middleware('plan.limit:inventory');
+    Route::get('/stock/returns/{id}/print', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'returnPrint'])->name('fbrpos.stock.return.print');
+    Route::get('/stock/purchases/{id}/lines', [\App\Http\Controllers\FbrPosSupplierLedgerController::class, 'purchaseLines'])->name('fbrpos.stock.purchase.lines');
 
     // 💊 Pharmacy Mode (Task 1558) — batch/expiry stock, distributor expiry
     // claims and pharmacy reports. Every action re-checks pharmacyLive() in
@@ -2659,6 +2670,13 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/pharmacy/claims/{id}/print', [\App\Http\Controllers\FbrPosPharmacyController::class, 'printClaim'])->name('fbrpos.pharmacy.claim.print');
     Route::post('/pharmacy/claims/{id}/status', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateClaimStatus'])->name('fbrpos.pharmacy.claim.status')->middleware('plan.limit:inventory');
     Route::get('/pharmacy/reports', [\App\Http\Controllers\FbrPosPharmacyController::class, 'reports'])->name('fbrpos.pharmacy.reports');
+    // Counter-side pharmacy (Sep 2026): near-expiry window, salt-alternative
+    // stock check, and the "customer asked, shop lacked" missed-sale log.
+    Route::post('/pharmacy/near-days', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateNearDays'])->name('fbrpos.pharmacy.near-days');
+    Route::get('/pharmacy/stock-check', [\App\Http\Controllers\FbrPosPharmacyController::class, 'stockCheck'])->name('fbrpos.pharmacy.stock-check');
+    Route::post('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeMissedSale'])->name('fbrpos.pharmacy.missed-sales.store');
+    Route::get('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSales'])->name('fbrpos.pharmacy.missed-sales');
+    Route::post('/pharmacy/missed-sales/handled', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSaleHandled'])->name('fbrpos.pharmacy.missed-sales.handled');
 
     // 🚚 Delivery Riders (Aug 2026 — FBR port of PRA PosRiderController)
     // Board + mutations: admin + cashier. Rider CRUD: admin-only (checked in controller).

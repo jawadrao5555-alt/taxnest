@@ -106,6 +106,10 @@ class PharmacyBatchService
 
         $expiry = self::normalizeExpiry($expiryDate);
 
+        // A fresh receive changes what is "expiring soon" — drop the cached
+        // dashboard/alert summary so the owner sees the new batch at once.
+        PharmacyExpirySummaryService::forget($companyId);
+
         return DB::transaction(function () use ($companyId, $productId, $branchId, $quantity, $batchNumber, $expiry, $costPrice, $extra) {
             $batch = ProductBatch::where('company_id', $companyId)
                 ->where('product_id', $productId)
@@ -447,6 +451,8 @@ class PharmacyBatchService
         string $action,
         array $opts = []
     ): PharmacyStockAction {
+        PharmacyExpirySummaryService::forget((int) $batch->company_id);
+
         return DB::transaction(function () use ($batch, $action, $opts) {
             $batch = ProductBatch::lockForUpdate()->findOrFail($batch->id);
             $quantity = round((float) ($opts['quantity'] ?? $batch->quantity), self::Q);

@@ -65,6 +65,14 @@
             <span x-text="offlineCustomerCount"></span> {{ __('pos.offq_customers_pending') }}
         </div>
 
+        {{-- 💊 Pharmacy missed-sale notes queued offline (FBR screen only; the
+             PRA screen has no such queue so the guard keeps it inert there).
+             Non-money, counted apart from bills, never blocks a sync. --}}
+        <div x-show="typeof phMissedQueueCount !== 'undefined' && phMissedQueueCount > 0" x-cloak
+             class="mx-5 mt-3 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
+            <span x-text="typeof phMissedQueueCount !== 'undefined' ? phMissedQueueCount : 0"></span> {{ __('pos.offq_missed_pending') }}
+        </div>
+
         {{-- Grow warning: fires before the queue is scary, not after. --}}
         <div x-show="offlineQueueList.length >= 25" x-cloak
              class="mx-5 mt-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-[11px] font-semibold text-amber-800 dark:text-amber-300">

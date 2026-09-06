@@ -242,12 +242,16 @@ class FbrPosStockPurchasesSearchTest extends TestCase
         $this->assertSame('PO-020', $data['purchases'][0]['po_number']);
         $this->assertSame('PO-006', $data['purchases'][14]['po_number']);
 
-        // Serializer shape: id int, item detail with trimmed quantities.
+        // Serializer shape: id int, item detail with trimmed quantities;
+        // scheme fields (Task 1580) are null when the line carried none.
         $row = $data['purchases'][0];
         $this->assertIsInt($row['id']);
         $this->assertSame('200.00', $row['total']);
         $this->assertSame(
-            [['name' => 'Candi Biscuit', 'qty' => '5'], ['name' => 'Fresh Touch', 'qty' => '2.5']],
+            [
+                ['name' => 'Candi Biscuit', 'qty' => '5', 'bonus' => null, 'disc' => null],
+                ['name' => 'Fresh Touch', 'qty' => '2.5', 'bonus' => null, 'disc' => null],
+            ],
             $row['items']
         );
 

@@ -31,18 +31,35 @@ class DrapPriceIndexClient
      * @param  array<string,string>  $filters  e.g. ['category' => 'Low Price Drugs']
      * @return array{page:int,total_pages:?int,rows:array<int,array<string,mixed>>}
      */
-    public function fetchPage(int $page, array $filters = []): array
+    /** Longest single HTTP attempt (seconds). Three of these must fit inside one queue slice. */
+    public const ATTEMPT_TIMEOUT = 20;
+
+    /**
+     * @param  float|null  $deadline  microtime() by which the caller must have an answer;
+     *                                attempts are shortened / skipped so the queue job
+     *                                never outlives its own timeout waiting on DRAP.
+     */
+    public function fetchPage(int $page, array $filters = [], ?float $deadline = null): array
     {
         $query = array_merge($filters, ['page' => $page]);
         $attempt = 0;
         $lastError = null;
         while ($attempt < 3) {
             $attempt++;
+            $timeout = self::ATTEMPT_TIMEOUT;
+            if ($deadline !== null) {
+                $remaining = $deadline - microtime(true);
+                if ($remaining < 4) {
+                    $lastError = ($lastError ?? 'no time left in this slice') . ' (deadline)';
+                    break;
+                }
+                $timeout = (int) max(3, min(self::ATTEMPT_TIMEOUT, floor($remaining)));
+            }
             try {
                 $response = Http::withHeaders([
                     'User-Agent' => 'Mozilla/5.0 (compatible; TaxNestCatalogue/1.0; +https://taxnest.pk)',
                     'Accept' => 'text/html',
-                ])->timeout(40)->connectTimeout(15)->get(self::BASE_URL, $query);
+                ])->timeout($timeout)->connectTimeout(min(10, $timeout))->get(self::BASE_URL, $query);
 
                 if ($response->successful()) {
                     $parsed = self::parseHtml($response->body());
@@ -60,6 +77,9 @@ class DrapPriceIndexClient
                 }
             } catch (\Throwable $e) {
                 $lastError = $e->getMessage();
+            }
+            if ($deadline !== null && $deadline - microtime(true) < 4 + 1.5 * $attempt) {
+                break; // the slice is about to end; the next slice retries this page
             }
             usleep((int) (1_500_000 * $attempt));
         }

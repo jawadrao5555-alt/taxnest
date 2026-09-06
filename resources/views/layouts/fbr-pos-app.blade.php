@@ -89,6 +89,18 @@
     // work is owner+manager territory, exactly like stock.
     $fbrPharmacyLive = \App\Services\PosFeatureService::pharmacyLive($fbrCompany)
         && !in_array($fbrUser->pos_role ?? '', ['pos_cashier', 'local_viewer'], true);
+    // 💊 MRP price-update notices (Task 1579): pharmacy mode only, owner/manager
+    // only, and the same skips as What's New (pending company, read-only
+    // impersonation) — a notice must never be shown to someone who cannot act.
+    $fbrPriceNoticeCount = 0;
+    try {
+        if ($fbrPharmacyLive && $fbrUser && $fbrUser->isPosAdmin()
+            && ($fbrCompany->status ?? null) !== 'pending'
+            && !(is_array(session('impersonation')) && !empty(session('impersonation')['readonly']))
+            && \Illuminate\Support\Facades\Schema::hasTable('medicine_price_notices')) {
+            $fbrPriceNoticeCount = \App\Models\MedicinePriceNotice::pendingCountFor((int) $fbrCompany->id);
+        }
+    } catch (\Throwable $e) { $fbrPriceNoticeCount = 0; }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -629,6 +641,11 @@
                                         <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                                         {{ __('pos.ph_nav_reports') }}
                                     </a>
+                                    <a href="{{ route('fbrpos.pharmacy.price-updates') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                                        {{ __('pos.ph_cat_pu_nav') }}
+                                        @if($fbrPriceNoticeCount > 0)<span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-bold">{{ $fbrPriceNoticeCount }}</span>@endif
+                                    </a>
                                     @endif
                                     @if($fbrPlanKhata)
                                     <a href="{{ route('fbrpos.khata') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
@@ -901,6 +918,11 @@
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             {{ __('pos.ph_nav_claims') }}
                         </a>
+                        <a href="{{ route('fbrpos.pharmacy.price-updates') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.pharmacy.price-updates*') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                            {{ __('pos.ph_cat_pu_nav') }}
+                            @if($fbrPriceNoticeCount > 0)<span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-bold">{{ $fbrPriceNoticeCount }}</span>@endif
+                        </a>
                         @endif
                         @if($fbrPlanKhata)
                         <a href="{{ route('fbrpos.khata') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.khata') ? $sidebarActive : $sidebarInactive }}">
@@ -1041,6 +1063,15 @@
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts"
                     :dismiss-route="route('fbrpos.bio-sync.dismiss-pin-alert')"
                     :setup-route="route('fbrpos.bio-sync.setup')" />
+                @if($fbrPriceNoticeCount > 0 && !request()->routeIs('fbrpos.pharmacy.price-updates*'))
+                {{-- 💊 Catalogue MRP changed for linked medicines (Task 1579) — link only, never auto-repriced. --}}
+                <div class="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+                        <span class="font-semibold text-amber-900 dark:text-amber-100">💊 {{ __('pos.ph_cat_pu_banner', ['n' => $fbrPriceNoticeCount]) }}</span>
+                        <a href="{{ route('fbrpos.pharmacy.price-updates') }}" class="font-bold text-amber-800 dark:text-amber-200 underline">{{ __('pos.ph_cat_pu_banner_link') }}</a>
+                    </div>
+                </div>
+                @endif
                 @if(session('success'))
                     <div class="max-w-7xl mx-auto mb-4 px-4 sm:px-6 pt-4">
                         <div class="bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-4 py-3 rounded-lg font-semibold shadow-sm">

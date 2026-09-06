@@ -122,6 +122,13 @@ class NewFeatureBadges
             'panel' => 'fbrpos',
             'pages' => ['fbrpos.customize'],
         ],
+        // Task 1579 — DRAP medicine catalogue: "add from catalogue" picker on
+        // the pharmacy-mode products page (+ MRP update notices).
+        'fbr_pharmacy_catalogue' => [
+            'since' => '2026-09-06',
+            'panel' => 'fbrpos',
+            'pages' => ['fbrpos.products'],
+        ],
     ];
 
     /** Sirf tests ke liye — asli register ki jagah naqli entries. */

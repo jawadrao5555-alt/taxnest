@@ -82,6 +82,13 @@ Yeh Nest FBR POS (FBR-integrated Point of Sale) ka guide hai. Sirf is guide ki m
 - Mahana bill quota mein provisional bills bhi ginte hain (FBR POS mein).
 - Package upgrade ya renewal ke liye billing page se payment proof upload hota hai — ya TaxNest team se WhatsApp par rabta karein.
 
+
+## Pharmacy Mode — Medicine Catalogue (sirf pharmacy/medical store shops, admin login)
+- Products page (/fbr-pos/products) par "Add from Medicine Catalogue" box: brand ya salt likhein (misal "panadol", "amoxicillin"), list mein se dawaiyan tick karein, "Add selected" dabayen — products ban jate hain jin mein naam, generic/salt, strength, form, manufacturer, pack aur MRP pehle se bhare hote hain (sale price = MRP). Baad mein product edit kar ke strip/tablet ki tadaad ya barcode khud lagayen.
+- Catalogue DRAP (Government of Pakistan) ki public price list se banta hai — takreeban 21 hazar registered dawaiyan. Jo dawai pehle se add ho chuki ho us par "Already added" likha aata hai.
+- Product Excel import mein "DRAP Reg No" column bhi match hota hai (barcode/SKU ke baad).
+- Jab DRAP kisi linked dawai ki MRP badal de to layout mein amber banner + menu mein "Price Updates" (/fbr-pos/pharmacy/price-updates) aata hai: purani/nayi MRP aur effective date dikhti hai; Apply karne par product ki MRP update hoti hai (sale price sirf tab badalti hai jab wo purani MRP ke barabar thi); Dismiss se notice hat jata hai. System khud-ba-khud koi price nahi badalta.
+
 ## Mobile App aur Notifications
 - Nest FBR POS ki mobile app (Android) se bhi panel chalta hai — wohi login.
 - App notifications bhej sakti hai — misal: fail queue mein bills jama hone ka alert aur day close ki yaad-dihani (admin/manager ko).

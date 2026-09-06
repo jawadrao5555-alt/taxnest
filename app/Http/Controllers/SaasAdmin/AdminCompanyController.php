@@ -1209,6 +1209,16 @@ class AdminCompanyController extends Controller
             'health_fbr_submissions', 'health_payments', 'health_bill_lines', 'health_bills',
             'health_charge_adjustments', 'health_charges', 'health_cashier_shifts',
             'health_tax_categories',
+            // Healthcare accounts & settlements: same company_id / no-FK-cascade
+            // rule. Deepest children first — journal lines before journals,
+            // doctor shares before the settlement they hang on, and the chart
+            // of accounts last, because everything else points at it.
+            'health_journal_lines', 'health_journals',
+            'health_doctor_shares', 'health_doctor_settlements', 'health_doctor_share_rules',
+            'health_expenses', 'health_expense_categories',
+            'health_fund_transfers', 'health_account_reconciliations',
+            'health_bank_accounts', 'health_accounting_settings',
+            'health_fiscal_periods', 'health_accounts',
         ];
         DB::transaction(function () use ($orphanTables, $id, $company) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge

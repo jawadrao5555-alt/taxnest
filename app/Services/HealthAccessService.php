@@ -74,7 +74,10 @@ class HealthAccessService
             'operations.view', 'operations.manage',
             'lab.view',
             'billing.view', 'billing.charge',
-            'accounts.view',
+            // Reads the books and signs off what the accountant prepared —
+            // period close and doctor payouts — without being able to post the
+            // ledger itself.
+            'accounts.view', 'accounts.approve',
             'hr.view', 'hr.manage',
             'hr.attendance.view', 'hr.attendance.correct', 'hr.attendance.approve',
             'hr.leave.approve',

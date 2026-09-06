@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\LedgerReversalRefused;
 use App\Models\HealthBill;
 use App\Models\HealthBillLine;
 use App\Models\HealthCharge;
@@ -203,6 +204,33 @@ class HealthBillingService
     }
 
     /**
+     * Remove the lines of a draft whose charge has since been reversed.
+     *
+     * @return int how many lines were dropped
+     */
+    public static function dropDeadLines(HealthBill $bill): int
+    {
+        if (!Schema::hasTable('health_bill_lines') || !Schema::hasTable('health_charges')) {
+            return 0;
+        }
+
+        $dead = HealthCharge::withoutGlobalScopes()
+            ->where('company_id', $bill->company_id)
+            ->where('status', HealthCharge::STATUS_REVERSED)
+            ->pluck('id');
+
+        if ($dead->isEmpty()) {
+            return 0;
+        }
+
+        return HealthBillLine::withoutGlobalScopes()
+            ->where('company_id', $bill->company_id)
+            ->where('health_bill_id', $bill->id)
+            ->whereIn('health_charge_id', $dead->all())
+            ->delete();
+    }
+
+    /**
      * Finalize a bill: freeze the lines, freeze the tax, make it money owed.
      *
      * After this the charges behind it cannot be reclassified, discounted or
@@ -220,6 +248,15 @@ class HealthBillingService
         if ($bill->isEstimate()) {
             return ['ok' => false, 'reason' => 'estimate_cannot_finalize'];
         }
+        /*
+         * A charge that died after the draft was built must not survive as a
+         * line. Reversing a charge releases it from its draft bill, but the
+         * frozen line stays behind — and finalizing that line would bill the
+         * patient for a returned medicine or a cancelled procedure, with the
+         * charge ledger and the printed bill each telling a different story.
+         */
+        self::dropDeadLines($bill);
+
         if ($bill->lines()->count() === 0) {
             return ['ok' => false, 'reason' => 'no_lines'];
         }
@@ -267,6 +304,12 @@ class HealthBillingService
             self::recomputeBill($bill->fresh());
         });
 
+        // The books follow the document, never lead it. Posting happens AFTER
+        // the bill is safely finalized and outside its transaction, so a ledger
+        // problem can never roll back a bill the counter has already printed —
+        // anything missed here is picked up by the accounts sweep.
+        HealthPostingService::auto('postBill', $bill->fresh(), $actor);
+
         return ['ok' => true, 'bill' => $bill->fresh()];
     }
 
@@ -291,30 +334,47 @@ class HealthBillingService
             return ['ok' => false, 'reason' => 'already_paid'];
         }
 
-        DB::transaction(function () use ($bill, $actor, $reason) {
-            HealthCharge::withoutGlobalScopes()
-                ->where('company_id', $bill->company_id)
-                ->where('health_bill_id', $bill->id)
-                ->update([
-                    'health_bill_id' => null,
-                    'billed_at' => null,
-                    'status' => HealthCharge::STATUS_POSTED,
-                    // The freeze is released with the bill: the charges are back
-                    // on the ledger and may legitimately be reclassified again
-                    // before somebody bills them properly.
-                    'tax_locked_at' => null,
-                    'tax_locked_by' => null,
-                    'updated_at' => now(),
-                ]);
+        try {
+            DB::transaction(function () use ($bill, $actor, $reason) {
+                HealthCharge::withoutGlobalScopes()
+                    ->where('company_id', $bill->company_id)
+                    ->where('health_bill_id', $bill->id)
+                    ->update([
+                        'health_bill_id' => null,
+                        'billed_at' => null,
+                        'status' => HealthCharge::STATUS_POSTED,
+                        // The freeze is released with the bill: the charges are
+                        // back on the ledger and may legitimately be
+                        // reclassified again before somebody bills them
+                        // properly.
+                        'tax_locked_at' => null,
+                        'tax_locked_by' => null,
+                        'updated_at' => now(),
+                    ]);
 
-            $bill->forceFill([
-                'status' => HealthBill::STATUS_CANCELLED,
-                'cancelled_at' => now(),
-                'cancelled_by' => $actor->id ?? null,
-                'cancel_reason' => $reason ? mb_substr($reason, 0, 300) : null,
-                'outstanding_amount' => 0,
-            ])->save();
-        });
+                $bill->forceFill([
+                    'status' => HealthBill::STATUS_CANCELLED,
+                    'cancelled_at' => now(),
+                    'cancelled_by' => $actor->id ?? null,
+                    'cancel_reason' => $reason ? mb_substr($reason, 0, 300) : null,
+                    'outstanding_amount' => 0,
+                ])->save();
+
+                // A cancelled bill's income and receivable must leave the books,
+                // and the only honest way to remove a posted entry is to reverse
+                // it. If the books refuse, the cancellation refuses with them —
+                // a cancelled bill still carrying its income is a lie the trial
+                // balance cannot show anybody.
+                $undone = HealthPostingService::reverseBillPosting($bill, $actor, $reason ?: __('health.bill_cancelled'));
+                if (!($undone['ok'] ?? false)) {
+                    throw new LedgerReversalRefused((string) ($undone['reason'] ?? 'reverse_failed'));
+                }
+            });
+        } catch (LedgerReversalRefused $e) {
+            report($e);
+
+            return ['ok' => false, 'reason' => 'ledger_refused'];
+        }
 
         return ['ok' => true];
     }
@@ -370,6 +430,14 @@ class HealthBillingService
 
         $payment = null;
         $credited = 0.0;
+        /*
+         * EVERY row this call creates, so every one of them gets posted. An
+         * overpayment writes two receipts — the part the bill owed and the
+         * surplus that became credit — and posting only the first understates
+         * both the cash in the drawer and the advance the hospital now owes the
+         * patient until somebody happens to run a sweep.
+         */
+        $created = [];
 
         /*
          * A receipt attached to a bill can never exceed what that bill still
@@ -391,7 +459,7 @@ class HealthBillingService
             }
         }
 
-        DB::transaction(function () use ($companyId, $patientId, $data, $actor, $amount, $kind, $method, $bill, $credited, &$payment) {
+        DB::transaction(function () use ($companyId, $patientId, $data, $actor, $amount, $kind, $method, $bill, $credited, &$payment, &$created) {
             $shiftId = $data['health_cashier_shift_id']
                 ?? (self::openShiftFor($companyId, $actor)->id ?? null);
 
@@ -418,6 +486,7 @@ class HealthBillingService
                     'amount' => $amount,
                     'note' => $note,
                 ]));
+                $created[] = $payment;
             }
 
             if ($credited > 0) {
@@ -434,6 +503,7 @@ class HealthBillingService
                     ])),
                 ]));
 
+                $created[] = $surplus;
                 $payment = $payment ?: $surplus;
             }
 
@@ -441,6 +511,10 @@ class HealthBillingService
                 self::recomputeBill($bill->fresh());
             }
         });
+
+        foreach ($created as $row) {
+            HealthPostingService::auto('postPayment', $row->fresh(), $actor);
+        }
 
         return ['ok' => true, 'payment' => $payment, 'credited' => $credited];
     }
@@ -493,6 +567,10 @@ class HealthBillingService
             self::recomputeBill($bill->fresh());
         });
 
+        if ($payment) {
+            HealthPostingService::auto('postPayment', $payment->fresh(), $actor);
+        }
+
         return ['ok' => true, 'payment' => $payment];
     }
 
@@ -511,20 +589,36 @@ class HealthBillingService
             return ['ok' => true, 'reason' => 'already_reversed'];
         }
 
-        DB::transaction(function () use ($payment, $actor, $reason) {
-            $payment->forceFill([
-                'reversed_at' => now(),
-                'reversed_by' => $actor->id ?? null,
-                'reversal_reason' => $reason ? mb_substr($reason, 0, 300) : null,
-            ])->save();
-
-            if ($payment->health_bill_id) {
-                $bill = HealthBill::withoutGlobalScopes()->find($payment->health_bill_id);
-                if ($bill) {
-                    self::recomputeBill($bill);
+        try {
+            DB::transaction(function () use ($payment, $actor, $reason) {
+                // The receipt is evidence now, not money. Its ledger footprint —
+                // both the cash side and any advance application — has to come
+                // back out, and if it will not, the receipt stays live: a
+                // reversed receipt whose cash is still in the books hides a hole
+                // in the drawer.
+                $undone = HealthPostingService::reversePaymentPosting($payment, $actor, $reason ?: __('health.pay_reversed'));
+                if (!($undone['ok'] ?? false)) {
+                    throw new LedgerReversalRefused((string) ($undone['reason'] ?? 'reverse_failed'));
                 }
-            }
-        });
+
+                $payment->forceFill([
+                    'reversed_at' => now(),
+                    'reversed_by' => $actor->id ?? null,
+                    'reversal_reason' => $reason ? mb_substr($reason, 0, 300) : null,
+                ])->save();
+
+                if ($payment->health_bill_id) {
+                    $bill = HealthBill::withoutGlobalScopes()->find($payment->health_bill_id);
+                    if ($bill) {
+                        self::recomputeBill($bill);
+                    }
+                }
+            });
+        } catch (LedgerReversalRefused $e) {
+            report($e);
+
+            return ['ok' => false, 'reason' => 'ledger_refused'];
+        }
 
         return ['ok' => true];
     }
@@ -551,7 +645,9 @@ class HealthBillingService
 
         $applied = 0.0;
 
-        DB::transaction(function () use ($bill, $outstanding, $limit, $actor, &$applied) {
+        $touched = [];
+
+        DB::transaction(function () use ($bill, $outstanding, $limit, $actor, &$applied, &$touched) {
             $budget = $limit !== null ? min($outstanding, round($limit, 2)) : $outstanding;
 
             $credits = HealthPayment::withoutGlobalScopes()
@@ -592,6 +688,10 @@ class HealthBillingService
                     'branch_id' => $credit->branch_id,
                     'health_patient_id' => $bill->health_patient_id,
                     'health_bill_id' => $bill->id,
+                    // The money already arrived once, on the parent receipt.
+                    // Without this the books would credit the same cash twice —
+                    // once on the parent and once on the piece carved out of it.
+                    'split_from_payment_id' => $credit->id,
                     'health_admission_id' => $bill->health_admission_id,
                     'health_cashier_shift_id' => $credit->health_cashier_shift_id,
                     'receipt_no' => HealthNumberService::receiptNumber((int) $bill->company_id),
@@ -610,7 +710,24 @@ class HealthBillingService
             }
 
             self::recomputeBill($bill->fresh());
+            $touched = HealthPayment::withoutGlobalScopes()
+                ->where('company_id', $bill->company_id)
+                ->where('health_bill_id', $bill->id)
+                ->where('kind', HealthPayment::KIND_DEPOSIT)
+                ->whereNull('reversed_at')
+                ->pluck('id')
+                ->all();
         });
+
+        // Applying credit turns advances into settled receivables. Each touched
+        // deposit re-runs its own posting: the cash half is already keyed and
+        // becomes a no-op, and the application half lands for the first time.
+        foreach ($touched as $paymentId) {
+            $row = HealthPayment::withoutGlobalScopes()->find($paymentId);
+            if ($row) {
+                HealthPostingService::auto('postPayment', $row, $actor);
+            }
+        }
 
         return ['ok' => true, 'applied' => $applied];
     }
@@ -633,11 +750,23 @@ class HealthBillingService
         $paid = 0.0;
         $refunded = 0.0;
         $deposits = 0.0;
+        $writtenOff = 0.0;
 
         foreach ($payments as $p) {
             $amount = round((float) $p->amount, 2);
-            if ($p->kind === HealthPayment::KIND_REFUND || $p->kind === HealthPayment::KIND_WRITE_OFF) {
+            if ($p->kind === HealthPayment::KIND_REFUND) {
                 $refunded = round($refunded + $amount, 2);
+                continue;
+            }
+            /*
+             * A WRITE-OFF settles the debt without any money arriving. It
+             * belongs in neither bucket: counted as paid it would inflate the
+             * day's collection, and counted as refunded it would RAISE the
+             * outstanding on a bill the hospital has just decided to stop
+             * chasing. It clears the balance and stays out of every cash total.
+             */
+            if ($p->kind === HealthPayment::KIND_WRITE_OFF) {
+                $writtenOff = round($writtenOff + $amount, 2);
                 continue;
             }
             $paid = round($paid + $amount, 2);
@@ -647,7 +776,7 @@ class HealthBillingService
         }
 
         $payable = round((float) $bill->patient_payable, 2);
-        $outstanding = round($payable - $paid + $refunded, 2);
+        $outstanding = round($payable - $paid - $writtenOff + $refunded, 2);
         if ($outstanding < 0) {
             $outstanding = 0.0;
         }

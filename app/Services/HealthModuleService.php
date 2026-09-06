@@ -87,7 +87,12 @@ class HealthModuleService
             'lab.view', 'lab.collect', 'lab.result',
         ],
         'accounts' => [
-            'billing.view', 'billing.charge', 'accounts.view', 'accounts.manage',
+            // `accounts.approve` is the accountant's ceiling, not their right.
+            // Closing a financial period and signing off a doctor's payout are
+            // the two acts an accountant must not be able to perform on their
+            // own work — the whole point of a preparer/approver split is that
+            // one person cannot both write the number and bless it.
+            'billing.view', 'billing.charge', 'accounts.view', 'accounts.manage', 'accounts.approve',
         ],
         'hr' => [
             // Staff records, work patterns, rosters, holidays, leave types.

@@ -77,6 +77,9 @@ use App\Http\Controllers\HealthLeaveController;
 use App\Http\Controllers\HealthRosterController;
 use App\Http\Controllers\HealthSelfServiceController;
 use App\Http\Controllers\HealthTeamController;
+use App\Http\Controllers\Health\HealthAccountsController;
+use App\Http\Controllers\Health\HealthAccountsReportController;
+use App\Http\Controllers\Health\HealthDoctorShareController;
 use App\Http\Controllers\Health\HealthAdmissionController;
 use App\Http\Controllers\Health\HealthAppointmentController;
 use App\Http\Controllers\Health\HealthClinicalController;
@@ -2151,6 +2154,113 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
             Route::post('/tax-categories/seed', [HealthBillingController::class, 'seedTaxCategories'])->name('health.billing.tax-categories.seed');
         });
     });
+
+    /*
+    |----------------------------------------------------------------------
+    | ACCOUNTS — the accountant's workspace and the books (Task 1552).
+    |----------------------------------------------------------------------
+    | Rides the same `accounts` module as billing, because a hospital that has
+    | not switched money on has no books to keep. Three rights, kept apart:
+    |
+    |   accounts.view     read the books and every report
+    |   accounts.manage   post to them — journals, expenses, transfers, payouts
+    |   accounts.approve  sign off what the accountant prepared: closing a
+    |                     financial period, and approving or reversing a
+    |                     doctor's payout
+    |
+    | The accountant holds view+manage and NOT approve. That is the whole
+    | control: the person who prepares a figure must not also be the person who
+    | blesses it. The route file is where that separation is enforced, not the
+    | blade — a hidden button is a suggestion, a middleware is a boundary.
+    |
+    | None of the three grants clinical.view, so a finance account reaches the
+    | money on a stay and never the diagnosis behind it.
+    */
+    Route::prefix('accounts')->middleware('health.module:accounts')->group(function () {
+        Route::middleware('health.can:accounts.view')->group(function () {
+            Route::get('/', [HealthAccountsController::class, 'index'])->name('health.accounts');
+            Route::get('/chart', [HealthAccountsController::class, 'chart'])->name('health.accounts.chart');
+            Route::get('/journals', [HealthAccountsController::class, 'journals'])->name('health.accounts.journals');
+            Route::get('/journals/{id}', [HealthAccountsController::class, 'journal'])->whereNumber('id')->name('health.accounts.journal');
+            Route::get('/expenses', [HealthAccountsController::class, 'expenses'])->name('health.accounts.expenses');
+            Route::get('/transfers', [HealthAccountsController::class, 'transfers'])->name('health.accounts.transfers');
+            Route::get('/reconciliations', [HealthAccountsController::class, 'reconciliations'])->name('health.accounts.reconciliations');
+            Route::get('/periods', [HealthAccountsController::class, 'periods'])->name('health.accounts.periods');
+            Route::get('/settings', [HealthAccountsController::class, 'settings'])->name('health.accounts.settings');
+
+            /* Doctor compensation — reading it. */
+            Route::get('/doctor-shares/rules', [HealthDoctorShareController::class, 'rules'])->name('health.accounts.share-rules');
+            Route::get('/doctor-shares', [HealthDoctorShareController::class, 'accruals'])->name('health.accounts.shares');
+            Route::get('/settlements', [HealthDoctorShareController::class, 'settlements'])->name('health.accounts.settlements');
+            Route::get('/settlements/{id}', [HealthDoctorShareController::class, 'settlement'])->whereNumber('id')->name('health.accounts.settlement');
+            Route::get('/doctors/{id}/statement', [HealthDoctorShareController::class, 'statement'])->whereNumber('id')->name('health.accounts.doctor-statement');
+
+            /* Reports. Every one of them also serves its own CSV via ?export=csv. */
+            Route::get('/reports', [HealthAccountsReportController::class, 'index'])->name('health.accounts.reports');
+            Route::get('/reports/trial-balance', [HealthAccountsReportController::class, 'trialBalance'])->name('health.accounts.reports.trial-balance');
+            Route::get('/reports/ledger', [HealthAccountsReportController::class, 'ledger'])->name('health.accounts.reports.ledger');
+            Route::get('/reports/profit-loss', [HealthAccountsReportController::class, 'profitAndLoss'])->name('health.accounts.reports.profit-loss');
+            Route::get('/reports/balance-sheet', [HealthAccountsReportController::class, 'balanceSheet'])->name('health.accounts.reports.balance-sheet');
+            Route::get('/reports/cash-flow', [HealthAccountsReportController::class, 'cashFlow'])->name('health.accounts.reports.cash-flow');
+            Route::get('/reports/receivables', [HealthAccountsReportController::class, 'receivables'])->name('health.accounts.reports.receivables');
+            Route::get('/reports/payables', [HealthAccountsReportController::class, 'payables'])->name('health.accounts.reports.payables');
+            Route::get('/reports/suppliers/{id}', [HealthAccountsReportController::class, 'supplier'])->whereNumber('id')->name('health.accounts.reports.supplier');
+            Route::get('/reports/profitability', [HealthAccountsReportController::class, 'profitability'])->name('health.accounts.reports.profitability');
+        });
+
+        /* Posting to the books. */
+        Route::middleware('health.can:accounts.manage')->group(function () {
+            Route::post('/sweep', [HealthAccountsController::class, 'sweep'])->name('health.accounts.sweep');
+            Route::post('/chart', [HealthAccountsController::class, 'storeAccount'])->name('health.accounts.chart.store');
+            Route::put('/chart/{id}', [HealthAccountsController::class, 'updateAccount'])->whereNumber('id')->name('health.accounts.chart.update');
+            Route::post('/chart/{id}/toggle', [HealthAccountsController::class, 'toggleAccount'])->whereNumber('id')->name('health.accounts.chart.toggle');
+            Route::post('/journals', [HealthAccountsController::class, 'storeJournal'])->name('health.accounts.journals.store');
+            Route::post('/journals/{id}/reverse', [HealthAccountsController::class, 'reverseJournal'])->whereNumber('id')->name('health.accounts.journals.reverse');
+            Route::post('/expense-categories', [HealthAccountsController::class, 'storeExpenseCategory'])->name('health.accounts.expense-categories.store');
+            Route::post('/expense-categories/{id}/toggle', [HealthAccountsController::class, 'toggleExpenseCategory'])->whereNumber('id')->name('health.accounts.expense-categories.toggle');
+            Route::post('/expenses', [HealthAccountsController::class, 'storeExpense'])->name('health.accounts.expenses.store');
+            Route::post('/expenses/{id}/reverse', [HealthAccountsController::class, 'reverseExpense'])->whereNumber('id')->name('health.accounts.expenses.reverse');
+            Route::post('/transfers', [HealthAccountsController::class, 'storeTransfer'])->name('health.accounts.transfers.store');
+            Route::post('/transfers/{id}/reverse', [HealthAccountsController::class, 'reverseTransfer'])->whereNumber('id')->name('health.accounts.transfers.reverse');
+            Route::post('/bank-accounts', [HealthAccountsController::class, 'storeBankAccount'])->name('health.accounts.bank-accounts.store');
+            Route::post('/reconciliations', [HealthAccountsController::class, 'storeReconciliation'])->name('health.accounts.reconciliations.store');
+            Route::post('/reconciliations/{id}/close', [HealthAccountsController::class, 'closeReconciliation'])->whereNumber('id')->name('health.accounts.reconciliations.close');
+            Route::post('/periods/ensure', [HealthAccountsController::class, 'ensurePeriod'])->name('health.accounts.periods.ensure');
+            Route::post('/settings', [HealthAccountsController::class, 'updateSettings'])->name('health.accounts.settings.update');
+            Route::post('/doctor-shares/accrue', [HealthAccountsController::class, 'accrueShares'])->name('health.accounts.shares.accrue');
+            Route::post('/doctor-shares/rules', [HealthDoctorShareController::class, 'storeRule'])->name('health.accounts.share-rules.store');
+            Route::put('/doctor-shares/rules/{id}', [HealthDoctorShareController::class, 'updateRule'])->whereNumber('id')->name('health.accounts.share-rules.update');
+            Route::post('/doctor-shares/rules/{id}/toggle', [HealthDoctorShareController::class, 'toggleRule'])->whereNumber('id')->name('health.accounts.share-rules.toggle');
+            Route::post('/doctor-shares/{id}/exclude', [HealthDoctorShareController::class, 'excludeShare'])->whereNumber('id')->name('health.accounts.shares.exclude');
+            Route::post('/doctor-shares/{id}/restore', [HealthDoctorShareController::class, 'restoreShare'])->whereNumber('id')->name('health.accounts.shares.restore');
+            Route::post('/settlements', [HealthDoctorShareController::class, 'buildSettlement'])->name('health.accounts.settlements.build');
+            Route::put('/settlements/{id}', [HealthDoctorShareController::class, 'updateSettlement'])->whereNumber('id')->name('health.accounts.settlements.update');
+            Route::post('/settlements/{id}/shares/{shareId}/detach', [HealthDoctorShareController::class, 'detachShare'])
+                ->whereNumber('id')->whereNumber('shareId')->name('health.accounts.settlements.detach');
+            Route::post('/settlements/{id}/pay', [HealthDoctorShareController::class, 'paySettlement'])->whereNumber('id')->name('health.accounts.settlements.pay');
+        });
+
+        /*
+         * The approver's two acts. Separated from `manage` so the accountant
+         * who built the payout is not the person who signs it, and the month
+         * they posted into is not closed by their own hand.
+         */
+        Route::middleware('health.can:accounts.approve')->group(function () {
+            Route::post('/periods/{id}/close', [HealthAccountsController::class, 'closePeriod'])->whereNumber('id')->name('health.accounts.periods.close');
+            Route::post('/settlements/{id}/approve', [HealthDoctorShareController::class, 'approveSettlement'])->whereNumber('id')->name('health.accounts.settlements.approve');
+            Route::post('/settlements/{id}/reverse', [HealthDoctorShareController::class, 'reverseSettlement'])->whereNumber('id')->name('health.accounts.settlements.reverse');
+        });
+    });
+
+    /*
+     * A doctor's OWN earnings. Deliberately OUTSIDE the accounts group: it
+     * rides dashboard.view and resolves the doctor from the signed-in account's
+     * linked profile, so a consultant sees their own money without being given
+     * any right over anybody else's.
+     */
+    Route::get('/my/earnings', [HealthDoctorShareController::class, 'myEarnings'])
+        ->middleware('health.module:accounts')
+        ->name('health.my.earnings');
 });
 
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {

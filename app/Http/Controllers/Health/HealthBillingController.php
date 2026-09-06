@@ -480,7 +480,10 @@ class HealthBillingController extends HealthPanelController
 
         $payment = $this->findPayment($id);
 
-        HealthBillingService::reversePayment($payment, $this->user(), (string) $request->input('reason', ''));
+        $result = HealthBillingService::reversePayment($payment, $this->user(), (string) $request->input('reason', ''));
+        if (!($result['ok'] ?? false)) {
+            return back()->with('error', __('health.pay_err_ledger_refused'));
+        }
 
         return back()->with('success', __('health.pay_reversed'));
     }

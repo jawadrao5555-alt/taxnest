@@ -140,6 +140,21 @@ class HealthChargeIngestService
 
         $posted = 0;
         foreach ($sales as $sale) {
+            /*
+             * Bill what the patient KEPT. A sale that was partly returned
+             * before anybody built the bill would otherwise arrive at full
+             * price, and the patient would be charged for medicine that is
+             * back on the shelf. A sale returned in full raises nothing at all.
+             */
+            $saleTotal = round((float) $sale->total_amount, 2);
+            $kept = $saleTotal > 0
+                ? max(0.0, round($saleTotal - (float) $sale->refunded_amount, 2)) / $saleTotal
+                : 0.0;
+
+            if ($kept <= 0) {
+                continue;
+            }
+
             // The sale's own tax split is honoured only where the hospital's
             // rulebook says pharmacy reports. Otherwise the ledger records the
             // full amount as local money — which is what the resolver decides,
@@ -158,11 +173,11 @@ class HealthChargeIngestService
                 'source_type' => HealthCharge::SOURCE_PHARMACY_SALE,
                 'source_id' => $sale->id,
                 'source_reference' => $sale->sale_number,
-                'unit_price' => (float) $sale->subtotal,
+                'unit_price' => round((float) $sale->subtotal * $kept, 2),
                 'quantity' => 1,
-                'gross_amount' => (float) $sale->subtotal,
-                'concession_amount' => (float) $sale->discount_amount,
-                'tax_amount' => (float) $sale->tax_amount,
+                'gross_amount' => round((float) $sale->subtotal * $kept, 2),
+                'concession_amount' => round((float) $sale->discount_amount * $kept, 2),
+                'tax_amount' => round((float) $sale->tax_amount * $kept, 2),
                 'tax_rate' => (float) $sale->tax_rate,
                 'dedupe_key' => 'pharmacy_sale:' . $sale->id,
                 'created_by' => $actor->id ?? $sale->created_by,

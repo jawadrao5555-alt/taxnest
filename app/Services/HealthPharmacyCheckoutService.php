@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\HealthBatchMovement;
+use App\Models\HealthBill;
+use App\Models\HealthCharge;
+use App\Models\HealthChargeAdjustment;
 use App\Models\HealthMedicine;
 use App\Models\HealthMedicineBatch;
 use App\Models\HealthPharmacyReturn;
@@ -12,7 +15,9 @@ use App\Models\HealthPharmacySale;
 use App\Models\HealthPharmacySaleItem;
 use App\Models\HealthPrescription;
 use App\Models\HealthPrescriptionItem;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -86,7 +91,7 @@ class HealthPharmacyCheckoutService
             }
         }
 
-        return DB::transaction(function () use ($companyId, $payload, $lines, $branchId, $userId, $company, $settings, $allowExpired, $prescription) {
+        $sale = DB::transaction(function () use ($companyId, $payload, $lines, $branchId, $userId, $company, $settings, $allowExpired, $prescription) {
             $taxRate = isset($payload['tax_rate']) && $payload['tax_rate'] !== ''
                 ? round((float) $payload['tax_rate'], 2)
                 : (float) $settings->default_tax_rate;
@@ -247,6 +252,17 @@ class HealthPharmacyCheckoutService
 
             return $sale;
         });
+
+        /*
+         * The books follow the counter, outside its transaction. Cost of sales
+         * is posted for EVERY sale; the revenue half only for a walk-in that
+         * never becomes a patient charge, because a patient-linked sale already
+         * reaches the ledger through its bill.
+         */
+        HealthPostingService::auto('postPharmacyCogs', $sale);
+        HealthPostingService::auto('postPharmacySaleRevenue', $sale);
+
+        return $sale;
     }
 
     /**
@@ -282,7 +298,7 @@ class HealthPharmacyCheckoutService
             throw ValidationException::withMessages(['lines' => [__('health.ph_return_empty')]]);
         }
 
-        return DB::transaction(function () use ($companyId, $sale, $wanted, $restock, $reason, $userId) {
+        $document = DB::transaction(function () use ($companyId, $sale, $wanted, $restock, $reason, $userId) {
             $document = HealthPharmacyReturn::withoutGlobalScopes()->create([
                 'company_id' => $companyId,
                 'branch_id' => $sale->branch_id,
@@ -392,6 +408,121 @@ class HealthPharmacyCheckoutService
 
             return $document;
         });
+
+        // A sale billed to a patient never took money at the counter, so its
+        // correction belongs on the patient's own ledger, not the drawer.
+        self::correctPatientLedger($companyId, $sale->fresh(), $document, $userId);
+
+        HealthPostingService::auto('postPharmacyReturn', $document);
+
+        return $document;
+    }
+
+    /**
+     * A returned medicine that was billed to a patient must stop being billed.
+     *
+     * ONE correction, and which one depends on how far the paperwork got:
+     *
+     *   charge still open  → it is reversed and re-raised for what the patient
+     *       actually kept. Nothing reached the books yet (income posts when the
+     *       bill is finalized), so the charge ledger is the whole correction.
+     *   charge frozen by a finalized bill → the bill stands as printed and
+     *       possibly filed. The correction is recorded against the charge for
+     *       the audit trail, and the money side is a credit to the patient's
+     *       receivable, posted from the return itself.
+     *
+     * Never both: the two paths are exclusive, or the patient is credited twice
+     * for one strip of medicine.
+     */
+    private static function correctPatientLedger(
+        int $companyId,
+        HealthPharmacySale $sale,
+        HealthPharmacyReturn $document,
+        ?int $userId
+    ): void {
+        if (!$sale->patient_id || !Schema::hasTable('health_charges')) {
+            return;
+        }
+
+        $charge = HealthCharge::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('source_type', HealthCharge::SOURCE_PHARMACY_SALE)
+            ->where('source_id', $sale->id)
+            ->where('status', '!=', HealthCharge::STATUS_REVERSED)
+            ->orderByDesc('id')
+            ->first();
+
+        // Not billed yet: the charge ingest raises it for what was kept.
+        if (!$charge) {
+            return;
+        }
+
+        $actor = $userId ? User::find($userId) : null;
+        $reason = __('health.ph_return_charge_reason', ['no' => $document->return_number]);
+
+        $bill = $charge->health_bill_id
+            ? HealthBill::withoutGlobalScopes()->find($charge->health_bill_id)
+            : null;
+
+        if ($charge->isLocked() || ($bill && $bill->isFinal())) {
+            HealthChargeService::adjust(
+                $charge,
+                HealthChargeAdjustment::KIND_CORRECTION,
+                round((float) $document->refund_amount, 2),
+                $reason,
+                $actor
+            );
+
+            return;
+        }
+
+        $reversal = HealthChargeService::reverse($charge, $actor, $reason);
+        if (!($reversal['ok'] ?? false)) {
+            // It froze underneath us — the books carry the credit instead.
+            return;
+        }
+
+        $saleTotal = round((float) $sale->total_amount, 2);
+        $kept = $saleTotal > 0
+            ? max(0.0, round($saleTotal - (float) $sale->refunded_amount, 2)) / $saleTotal
+            : 0.0;
+
+        // The whole sale came back: there is nothing left to bill anybody for.
+        if ($kept <= 0) {
+            return;
+        }
+
+        $gross = round((float) $charge->gross_amount * $kept, 2);
+        if ($gross <= 0) {
+            return;
+        }
+
+        HealthChargeService::post([
+            'company_id' => $companyId,
+            'branch_id' => $charge->branch_id,
+            'health_department_id' => $charge->health_department_id,
+            'health_patient_id' => $charge->health_patient_id,
+            'health_visit_id' => $charge->health_visit_id,
+            'health_admission_id' => $charge->health_admission_id,
+            'charge_date' => $charge->charge_date
+                ? $charge->charge_date->toDateString()
+                : now()->toDateString(),
+            'category' => $charge->category,
+            'description' => $charge->description,
+            'reference' => $charge->reference,
+            'source_type' => HealthCharge::SOURCE_PHARMACY_SALE,
+            'source_id' => $sale->id,
+            'source_reference' => $sale->sale_number,
+            'unit_price' => $gross,
+            'quantity' => 1,
+            'gross_amount' => $gross,
+            'concession_amount' => round((float) $charge->concession_amount * $kept, 2),
+            'tax_amount' => round((float) $charge->tax_amount * $kept, 2),
+            'tax_rate' => (float) $charge->tax_rate,
+            'health_tax_category_id' => $charge->health_tax_category_id,
+            'dedupe_key' => 'pharmacy_sale:' . $sale->id . ':kept:' . $document->id,
+            'created_by' => $userId ?: $charge->created_by,
+        ], $actor);
     }
 
     // ═══════════════════════ Internals ═══════════════════════

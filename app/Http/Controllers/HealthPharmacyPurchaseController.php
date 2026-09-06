@@ -213,6 +213,18 @@ class HealthPharmacyPurchaseController extends Controller
             return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
         }
 
+        // Stock arriving is an asset bought on the supplier's account, and any
+        // cash handed over at the same time is a separate settlement. Posted
+        // after the transaction so the ledger can never block a delivery that
+        // is already on the shelf.
+        \App\Services\HealthPostingService::auto('postPurchase', $order->fresh());
+        foreach (HealthSupplierPayment::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->where('purchase_order_id', $order->id)
+            ->get() as $supplierPayment) {
+            \App\Services\HealthPostingService::auto('postSupplierPayment', $supplierPayment);
+        }
+
         return redirect()->route('health.pharmacy.purchases')
             ->with('success', __('health.ph_purchase_saved', [
                 'number' => $order->po_number,
@@ -250,7 +262,7 @@ class HealthPharmacyPurchaseController extends Controller
             }
         }
 
-        HealthSupplierPayment::withoutGlobalScopes()->create([
+        $supplierPayment = HealthSupplierPayment::withoutGlobalScopes()->create([
             'company_id' => $companyId,
             'branch_id' => $this->viewBranchId(),
             'supplier_id' => $supplier->id,
@@ -262,6 +274,8 @@ class HealthPharmacyPurchaseController extends Controller
             'notes' => $data['notes'] ?? null,
             'created_by' => $this->user()?->id,
         ]);
+
+        \App\Services\HealthPostingService::auto('postSupplierPayment', $supplierPayment);
 
         return back()->with('success', __('health.ph_payment_saved', ['name' => $supplier->name]));
     }

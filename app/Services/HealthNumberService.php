@@ -37,6 +37,12 @@ class HealthNumberService
     public const KEY_BILL = 'bill';
     public const KEY_ESTIMATE = 'estimate';
     public const KEY_RECEIPT = 'receipt';
+    // Accounting (Task 1552). A journal number is what an auditor asks for by
+    // name, so it obeys exactly the same never-reused rule as a receipt.
+    public const KEY_JOURNAL = 'journal';
+    public const KEY_EXPENSE = 'expense';
+    public const KEY_TRANSFER = 'transfer';
+    public const KEY_SETTLEMENT = 'settlement';
 
     /**
      * Consume the next value of a counter and return it.
@@ -159,6 +165,30 @@ class HealthNumberService
     public static function receiptNumber(int $companyId): string
     {
         return 'R' . str_pad((string) self::next($companyId, self::KEY_RECEIPT), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** J000123 — one balanced entry in the books. */
+    public static function journalNumber(int $companyId): string
+    {
+        return 'J' . str_pad((string) self::next($companyId, self::KEY_JOURNAL), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** EX000123 — one recorded expense. */
+    public static function expenseNumber(int $companyId): string
+    {
+        return 'EX' . str_pad((string) self::next($companyId, self::KEY_EXPENSE), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** TR000123 — one cash/bank movement between our own accounts. */
+    public static function transferNumber(int $companyId): string
+    {
+        return 'TR' . str_pad((string) self::next($companyId, self::KEY_TRANSFER), 6, '0', STR_PAD_LEFT);
+    }
+
+    /** DS000123 — one doctor's payout for one period. */
+    public static function settlementNumber(int $companyId): string
+    {
+        return 'DS' . str_pad((string) self::next($companyId, self::KEY_SETTLEMENT), 6, '0', STR_PAD_LEFT);
     }
 
     /**

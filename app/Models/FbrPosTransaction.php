@@ -202,4 +202,42 @@ class FbrPosTransaction extends Model
         }
         return $out;
     }
+
+    /**
+     * Optional FBR integration (Sep 2026): a bill that never goes to FBR —
+     * reporting-OFF final (fbr_status NULL, invoice_mode fbr/NULL), a legacy
+     * fbr/'local' final, or a config-only failure converted back to a plain
+     * bill. These print as "Sale Receipt" with the simple details QR and carry
+     * NO FBR wording. Deliberate provisionals (local/local) are NOT this.
+     */
+    public function isNonIntegratedBill(): bool
+    {
+        $status = $this->fbr_status ?? null;
+        if ($status === null) {
+            return true;
+        }
+        return $status === 'local' && ($this->invoice_mode ?? 'fbr') !== 'local';
+    }
+
+    /**
+     * The ONE payload behind every simple details QR (thermal 80/58, receipt
+     * popup, invoice PDF, transaction page, reprints). Rendered locally via
+     * App\Support\QrImage so it prints offline. Fiscalised bills never use
+     * this — their QR is the bare FBR number (Tax Asaan scans it as-is).
+     */
+    public function simpleQrPayload(?Company $company): string
+    {
+        $payload = [
+            'type' => $this->isDeliberateProvisional() ? 'Provisional Bill' : 'Sale Receipt',
+            'inv' => (string) $this->invoice_number,
+            'date' => optional($this->created_at)->format('d/m/Y H:i'),
+            'total' => number_format((float) $this->total_amount, 2, '.', ''),
+            'business' => (string) ($company->name ?? ''),
+        ];
+        $ntn = trim((string) ($company->ntn ?? ''));
+        if ($ntn !== '') {
+            $payload['ntn'] = $ntn;
+        }
+        return json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: (string) $this->invoice_number;
+    }
 }

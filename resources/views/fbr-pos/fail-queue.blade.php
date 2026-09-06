@@ -21,6 +21,17 @@
         <div class="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">{{ session('error') }}</div>
     @endif
 
+    @if($fbrReportingOff ?? false)
+    {{-- Optional FBR integration (Sep 2026): reporting OFF = no FBR queue. --}}
+    <div class="mb-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 dark:bg-slate-800/40 dark:border-slate-700 dark:text-slate-200 text-sm flex items-start justify-between gap-3 flex-wrap">
+        <div>
+            <p class="font-bold">{{ __('pos.fbr_queue_reporting_off_title') }}</p>
+            <p class="text-xs mt-1">{{ __('pos.fbr_queue_reporting_off_body') }}</p>
+        </div>
+        <a href="{{ route('fbrpos.settings') }}" class="text-xs font-bold text-blue-600 hover:underline whitespace-nowrap">{{ __('pos.fbr_integration_settings') }} →</a>
+    </div>
+    @endif
+
     {{-- Stats Cards --}}
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900/40 p-4 shadow-sm">

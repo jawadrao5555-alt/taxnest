@@ -55,6 +55,12 @@ class FbrPosReceiptSerialWithFiscalTest extends TestCase
     private const SERIAL     = 'FPOS-2026-00777';
     private const FISCAL     = '7000000009999127';
 
+    protected function tearDown(): void
+    {
+        \App\Support\QrImage::resetFake();
+        parent::tearDown();
+    }
+
     /** Both paper widths — every assertion runs against each. */
     private const PAPERS = ['thermal', 'thermal58'];
 
@@ -62,6 +68,9 @@ class FbrPosReceiptSerialWithFiscalTest extends TestCase
     {
         parent::setUp();
         Schema::dropAllTables();
+        // QR is rendered LOCALLY now (optional FBR integration, Sep 2026 — no
+        // external image host on receipts); record payloads instead of PNGs.
+        \App\Support\QrImage::fake();
 
         // Minimal fbr_pos_transactions — the blade om block gates on
         // hasColumn('fbr_pos_transactions','token_no'/'order_code').
@@ -158,7 +167,8 @@ class FbrPosReceiptSerialWithFiscalTest extends TestCase
             $this->assertSame(1, substr_count($body, self::SERIAL), "serial prints exactly once ({$paper})");
             $this->assertSame(1, substr_count($body, 'FBR: ' . self::FISCAL), "fiscal line prints exactly once ({$paper})");
             // Fiscalized QR carries ONLY the bare fiscal number (X-WAY, 6 Aug 2026).
-            $this->assertStringContainsString('data=' . self::FISCAL, $body, "QR encodes the bare fiscal number ({$paper})");
+            $this->assertContains(self::FISCAL, \App\Support\QrImage::recorded(), "QR encodes the bare fiscal number ({$paper})");
+            $this->assertStringNotContainsString('qrserver', $body, "no external QR host — receipt must print offline ({$paper})");
         }
     }
 

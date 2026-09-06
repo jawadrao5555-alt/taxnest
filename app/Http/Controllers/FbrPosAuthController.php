@@ -218,7 +218,11 @@ class FbrPosAuthController extends Controller
             'pos_type' => $posType,
             'fbr_pos_enabled' => true,
             'fbr_pos_environment' => 'sandbox',
-            'fbr_reporting_enabled' => true,
+            // Optional FBR integration (Sep 2026): a new shop starts WITHOUT
+            // FBR reporting — nothing is configured yet, so ON would only make
+            // every first bill fail as config_error. The owner is asked once
+            // (decision card) and can turn it ON from FBR Settings any time.
+            'fbr_reporting_enabled' => false,
         ]
             // Same rule as the PRA panel: the business type chosen here is the
             // shop's category, and it arrives with its own modules already

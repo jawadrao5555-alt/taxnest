@@ -104,6 +104,9 @@
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">{{ __('pos.submitted_word') }}</span>
                             @elseif($txn->fbr_status === 'failed')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">{{ __('pos.failed_word') }}</span>
+                            @elseif($txn->fbr_status === null)
+                                {{-- Plain bill (reporting OFF / converted) — never "pending" (Sep 2026). --}}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('pos.bill_no_fbr_word') }}</span>
                             @else
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">{{ __('pos.pending_word') }}</span>
                             @endif

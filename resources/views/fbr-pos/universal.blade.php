@@ -444,8 +444,9 @@ window.addEventListener('popstate', function() {
             </button>
             @endif
 
-            {{-- Failed FBR bills — F11 (page modal: Retry / Edit / Delete inline) --}}
-            <button @click="openFailedBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition flex-shrink-0" title="{{ __('pos.ti_failed_fbr_f11') }}">
+            {{-- Failed FBR bills — F11 (page modal: Retry / Edit / Delete inline).
+                 Hidden while the shop runs WITHOUT FBR (optional integration, Sep 2026). --}}
+            <button x-show="fbrEnabled" x-cloak @click="openFailedBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition flex-shrink-0" title="{{ __('pos.ti_failed_fbr_f11') }}">
                 <span class="text-[9px] bg-red-400/40 px-1 rounded">F11</span>
                 <span class="hidden lg:inline">{{ __('pos.failed_word_html') }}</span>
                 <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-700 text-white text-[9px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
@@ -547,7 +548,7 @@ window.addEventListener('popstate', function() {
                         <span class="text-[10px] uppercase tracking-wider font-extrabold text-blue-700 dark:text-blue-300">{{ __('pos.fbr_reporting') }}</span>
                         <div class="flex items-center gap-1.5">
                             <button type="button"
-                                @click="fbrLoading = true; fetch('{{ route('fbrpos.api.toggle-fbr-reporting') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { fbrEnabled = !!d.enabled; fbrLoading = false; window.tnNotify && window.tnNotify(window.TXT.fbr_reporting, fbrEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); }).catch(() => { fbrLoading = false; alert(window.TXT.toggle_failed); })"
+                                @click="toggleFbrReporting()"
                                 :disabled="fbrLoading"
                                 :class="fbrEnabled ? 'bg-blue-600' : 'bg-gray-400 dark:bg-gray-600'"
                                 class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
@@ -555,15 +556,6 @@ window.addEventListener('popstate', function() {
                             </button>
                             <span x-text="fbrEnabled ? 'ON' : 'OFF'" :class="fbrEnabled ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
                             <span x-show="fbrLoading" class="text-[10px] text-blue-500 animate-pulse">…</span>
-                            @if($isFbrCompanyAdmin ?? false)
-                            <span x-cloak x-show="fbrEnabled && !fbrConfigured"
-                                  class="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400"
-                                  title="{{ __('pos.fbr_reporting_setup_incomplete_body') }}"
-                                  aria-label="{{ __('pos.fbr_reporting_setup_incomplete_title') }}">
-                                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
-                                <span>{{ __('pos.fbr_reporting_setup_incomplete_short') }}</span>
-                            </span>
-                            @endif
                         </div>
                     </div>
 
@@ -640,7 +632,7 @@ window.addEventListener('popstate', function() {
         <div class="flex items-center gap-2">
             <span class="text-[10px] uppercase tracking-wider font-extrabold text-blue-700 dark:text-blue-300">{{ __('pos.fbr_reporting') }}</span>
             <button type="button"
-                @click="fbrLoading = true; fetch('{{ route('fbrpos.api.toggle-fbr-reporting') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { fbrEnabled = !!d.enabled; fbrLoading = false; window.tnNotify && window.tnNotify(window.TXT.fbr_reporting, fbrEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); }).catch(() => { fbrLoading = false; alert(window.TXT.toggle_failed); })"
+                @click="toggleFbrReporting()"
                 :disabled="fbrLoading"
                 :class="fbrEnabled ? 'bg-blue-600' : 'bg-gray-400 dark:bg-gray-600'"
                 class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
@@ -648,15 +640,6 @@ window.addEventListener('popstate', function() {
             </button>
             <span x-text="fbrEnabled ? 'ON' : 'OFF'" :class="fbrEnabled ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
             <span x-show="fbrLoading" class="text-[10px] text-blue-500 animate-pulse">…</span>
-             @if($isFbrCompanyAdmin ?? false)
-             <span x-cloak x-show="fbrEnabled && !fbrConfigured"
-                   class="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-600 dark:text-amber-400"
-                   title="{{ __('pos.fbr_reporting_setup_incomplete_body') }}"
-                   aria-label="{{ __('pos.fbr_reporting_setup_incomplete_title') }}">
-                 <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
-                 <span>{{ __('pos.fbr_reporting_setup_incomplete_short') }}</span>
-             </span>
-             @endif
         </div>
 
         <div class="w-px h-4 bg-blue-200 dark:bg-blue-800/40"></div>
@@ -1012,7 +995,7 @@ window.addEventListener('popstate', function() {
 
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
-        <button @click="openFailedBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="{{ __('pos.ti_failed_fbr_f11') }}">
+        <button x-show="fbrEnabled" x-cloak @click="openFailedBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="{{ __('pos.ti_failed_fbr_f11') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             <span class="text-[10px] bg-red-400/30 px-1 rounded">F11</span>
             <span class="hidden sm:inline">{{ __('pos.failed_word_html') }}</span>
@@ -3969,6 +3952,29 @@ function restaurantPos() {
         // to posConfigRev — a settings save refreshes cached offline-first screens.
         fbrConfigured: {{ $company->fbrPosIntegrationConfigured() ? 'true' : 'false' }},
         fbrLoading: false,
+        // Optional FBR integration (Sep 2026): ON needs a configured setup — the
+        // server refuses otherwise (422 + plain reason). Never optimistic: the
+        // switch shows server truth ('enabled') and the refusal is spoken out
+        // loud with a link to FBR Settings (toggle-honesty rule).
+        toggleFbrReporting() {
+            if (this.fbrLoading) return;
+            this.fbrLoading = true;
+            fetch('{{ route('fbrpos.api.toggle-fbr-reporting', [], false) }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } })
+                .then(r => r.json().then(d => ({ ok: r.ok, d })))
+                .then(({ ok, d }) => {
+                    this.fbrLoading = false;
+                    if (typeof d.enabled !== 'undefined') this.fbrEnabled = !!d.enabled;
+                    if (!ok || !d.success) {
+                        const msg = d.message || window.TXT.toggle_failed;
+                        if (d.settings_url && confirm(msg + '\n\n' + window.TXT.fbr_open_settings_q)) { window.location.href = d.settings_url; return; }
+                        if (!d.settings_url) alert(msg);
+                        return;
+                    }
+                    if (this.fbrEnabled) this.fbrConfigured = true;
+                    window.tnNotify && window.tnNotify(window.TXT.fbr_reporting, this.fbrEnabled ? window.TXT.enabled_word : window.TXT.disabled_word);
+                })
+                .catch(() => { this.fbrLoading = false; alert(window.TXT.toggle_failed); });
+        },
         // ── GUIDED KEYBOARD BILLING FLOW (opt-in, default OFF) ───────────────
         // Mirrors $company->pos_guided_flow_enabled. When false EVERY keyboard
         // behaviour below stays byte-identical to the original (no interception).

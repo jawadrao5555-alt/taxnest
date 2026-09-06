@@ -139,7 +139,14 @@ class FbrAgentController extends Controller
                 'agent_enabled' => true,
             ]);
 
-        return back()->with('success', __('pos.fbr_agent_key_generated'));
+        // Optional FBR integration (Sep 2026): pairing the agent can be the
+        // last missing piece for a shop that chose "connect" — turn reporting
+        // ON without a second click (no-op unless decision=connect + configured).
+        $autoOn = $this->autoEnableReporting($company);
+
+        return back()->with('success', $autoOn
+            ? __('pos.fbr_agent_key_generated') . ' ' . __('pos.fbr_integration_auto_on')
+            : __('pos.fbr_agent_key_generated'));
     }
 
     /**
@@ -162,7 +169,23 @@ class FbrAgentController extends Controller
             'agent_enabled' => true,
         ]);
 
-        return back()->with('success', __('pos.fbr_agent_key_regenerated'));
+        $autoOn = $this->autoEnableReporting($company);
+
+        return back()->with('success', $autoOn
+            ? __('pos.fbr_agent_key_regenerated') . ' ' . __('pos.fbr_integration_auto_on')
+            : __('pos.fbr_agent_key_regenerated'));
+    }
+
+    /** Auto-ON hook shared by both key paths; never throws (a key must still land). */
+    private function autoEnableReporting(Company $company): bool
+    {
+        try {
+            return app(\App\Services\FbrIntegrationDecisionService::class)
+                ->maybeAutoEnableReporting($company, auth('fbrpos')->id());
+        } catch (\Throwable $e) {
+            report($e);
+            return false;
+        }
     }
 
     /**

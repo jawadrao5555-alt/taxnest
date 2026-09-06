@@ -239,6 +239,10 @@ class Company extends Model
         'force_watermark',
         'fbr_pos_enabled',
         'fbr_reporting_enabled',
+        // Optional FBR integration (Sep 2026): the shop's recorded choice.
+        'fbr_integration_decision',
+        'fbr_integration_decided_at',
+        'fbr_integration_decided_by',
         // Peti (Wholesale) Rate (Task 1414) — single source of truth switch + margin.
         'fbr_peti_rate_enabled',
         'fbr_peti_margin_pct',
@@ -289,6 +293,7 @@ class Company extends Model
         'pos_tax_inclusive' => 'boolean',
         'fbr_pos_enabled' => 'boolean',
         'fbr_reporting_enabled' => 'boolean',
+        'fbr_integration_decided_at' => 'datetime',
         // Peti (Wholesale) Rate (Task 1414) — the ONE per-company switch.
         'fbr_peti_rate_enabled' => 'boolean',
         'fbr_peti_margin_pct' => 'decimal:2',
@@ -546,6 +551,100 @@ class Company extends Model
         return app(\App\Services\FbrService::class)->hasUsableFbrPosToken($this);
     }
 
+    // ── Optional FBR integration (Sep 2026) ─────────────────────────────────
+    // FBR reporting is a CHOICE, not a requirement. The reporting flag
+    // (fbr_reporting_enabled) stays the single runtime switch; the decision
+    // columns only remember what the shop chose so the one-time card never
+    // nags a shop that already answered.
+
+    public const FBR_DECISION_CONNECT = 'connect';
+    public const FBR_DECISION_WITHOUT = 'without_fbr';
+
+    /** Recorded choice (NULL = never asked). hasColumn-guarded for prod drift. */
+    public function fbrIntegrationDecision(): ?string
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_integration_decision')) {
+            return null;
+        }
+        $v = $this->getAttribute('fbr_integration_decision');
+        return in_array($v, [self::FBR_DECISION_CONNECT, self::FBR_DECISION_WITHOUT], true) ? $v : null;
+    }
+
+    /** True once FBR ever accepted a bill from this shop (fiscal number or 'submitted'). */
+    public function hasAnyFbrSubmittedBill(): bool
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('fbr_pos_transactions')) {
+            return false;
+        }
+        return \App\Models\FbrPosTransaction::where('company_id', $this->id)
+            ->where(function ($q) {
+                $q->where('fbr_status', 'submitted')->orWhereNotNull('fbr_invoice_number');
+            })
+            ->exists();
+    }
+
+    /**
+     * "Not yet decided" — the decision card audience. A shop that is ON and
+     * either configured or already had a bill accepted by FBR has decided by
+     * doing; everyone else without a recorded choice is undecided: brand-new
+     * shops (reporting OFF by default) and legacy shops that were switched ON
+     * at registration but never set up a POS ID / token.
+     */
+    public function fbrIntegrationUndecided(): bool
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'fbr_integration_decision')) {
+            return false;
+        }
+        if ($this->fbrIntegrationDecision() !== null) {
+            return false;
+        }
+        if ($this->fbr_reporting_enabled) {
+            return !$this->fbrPosIntegrationConfigured() && !$this->hasAnyFbrSubmittedBill();
+        }
+        return true;
+    }
+
+    /**
+     * Settings-page verdict — one of 'on' | 'off' | 'setup_pending'.
+     *  on            reporting ON and the integration is configured
+     *  setup_pending details still missing while the shop wants FBR (chose
+     *                'connect', or a legacy shop left ON without a setup)
+     *  off           bills run without FBR (simple details QR)
+     */
+    public function fbrIntegrationState(): string
+    {
+        $configured = $this->fbrPosIntegrationConfigured();
+        if ($this->fbr_reporting_enabled) {
+            return $configured ? 'on' : 'setup_pending';
+        }
+        if (!$configured && $this->fbrIntegrationDecision() === self::FBR_DECISION_CONNECT) {
+            return 'setup_pending';
+        }
+        return 'off';
+    }
+
+    /**
+     * What is still missing before reporting may turn ON. Keys map 1:1 to
+     * lang lines (pos.fbr_missing_pos_id / pos.fbr_missing_token /
+     * pos.fbr_missing_agent). Empty array == fbrPosIntegrationConfigured().
+     */
+    public function fbrIntegrationMissing(): array
+    {
+        $missing = [];
+        $posId = preg_replace('/[^0-9]/', '', (string) ($this->fbr_pos_id ?? ''));
+        if ($posId === '' || (int) $posId === 0) {
+            $missing[] = 'pos_id';
+        }
+        if ($this->agentServesFbr()) {
+            if (!$this->agent_enabled) {
+                $missing[] = 'agent';
+            }
+        } elseif (!app(\App\Services\FbrService::class)->hasUsableFbrPosToken($this)) {
+            $missing[] = 'token';
+        }
+        return $missing;
+    }
+
     /**
      * POS-CONFIG REVISION (Task 52, Jul 2026): explicit whitelist hash of the
      * company fields that actually shape the sale screen / receipts / POS
@@ -584,6 +683,9 @@ class Company extends Model
             'pra_pos_id', 'pra_connection_mode', 'agent_enabled', 'agent_submits_pra',
             'fbr_pos_enabled', 'fbr_universal_enabled', 'fbr_reporting_enabled',
             'fbr_pos_id', 'fbr_pos_environment', 'fbr_connection_mode',
+            // Optional FBR integration (Sep 2026): the decision card is baked
+            // into the cached sale screen — recording a choice must refresh it.
+            'fbr_integration_decision',
             // Peti (Wholesale) Rate (Task 1414): switch + margin are BAKED into
             // the sale screen (they drive the auto peti-rate decision). A toggle
             // or margin change must bust the SW-cached screen's fingerprint, or

@@ -9,17 +9,80 @@
     @if(session('error'))
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>
     @endif
-    @if($fbrReportingSetupIncomplete ?? false)
-    <div class="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm dark:border-amber-700 dark:bg-amber-900/25 dark:text-amber-100" role="alert">
-        <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-        </svg>
-        <div class="min-w-0">
-            <p class="text-sm font-bold">{{ __('pos.fbr_reporting_setup_incomplete_title') }}</p>
-            <p class="mt-1 text-xs text-amber-800 dark:text-amber-200">{{ __('pos.fbr_reporting_setup_incomplete_body') }}</p>
+    {{-- ═══ FBR Integration — optional (Sep 2026) ═══
+         Three honest states: off (bills without FBR, simple details QR) / on
+         (bills go to FBR) / setup_pending (shop wants FBR, details missing).
+         ON refuses while the setup is incomplete; a "connect" shop turns ON by
+         itself the moment its POS ID + token (or fiscal-device agent) land. --}}
+    @php
+        $fiState = $fbrIntegrationState ?? 'off';
+        $fiMissing = $fbrIntegrationMissing ?? [];
+        $fiConfigured = $fbrIntegrationConfigured ?? empty($fiMissing);
+        $fiDecision = $fbrIntegrationDecision ?? null;
+        $fiPill = [
+            'on'            => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+            'off'           => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700',
+            'setup_pending' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 border-amber-200 dark:border-amber-800',
+        ][$fiState];
+        $fiBorder = ['on' => 'border-emerald-300 dark:border-emerald-700', 'off' => 'border-gray-200 dark:border-gray-700', 'setup_pending' => 'border-amber-300 dark:border-amber-700'][$fiState];
+    @endphp
+    <div class="mb-6 bg-white dark:bg-gray-900 rounded-xl border-2 {{ $fiBorder }} shadow-md p-5" data-fbr-integration-state="{{ $fiState }}">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div class="min-w-0">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                    {{ __('pos.fbr_integration_section_title') }}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black border {{ $fiPill }}">{{ __('pos.fbr_integration_state_' . $fiState) }}</span>
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.fbr_integration_state_' . $fiState . '_desc') }}</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                @if($fiState === 'on')
+                <form method="POST" action="{{ route('fbrpos.settings') }}" onsubmit="return confirm(@js(__('pos.fbr_integration_off_confirm')))">
+                    @csrf
+                    <input type="hidden" name="integration_toggle" value="off">
+                    <button type="submit" class="px-4 py-2 rounded-lg text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-100 transition">{{ __('pos.fbr_integration_turn_off') }}</button>
+                </form>
+                @elseif($fiConfigured)
+                <form method="POST" action="{{ route('fbrpos.settings') }}">
+                    @csrf
+                    <input type="hidden" name="integration_toggle" value="on">
+                    <button type="submit" class="px-4 py-2 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-sm">{{ __('pos.fbr_integration_turn_on') }}</button>
+                </form>
+                @elseif($fiDecision !== \App\Models\Company::FBR_DECISION_CONNECT)
+                <form method="POST" action="{{ route('fbrpos.settings') }}">
+                    @csrf
+                    <input type="hidden" name="integration_toggle" value="start">
+                    <button type="submit" class="px-4 py-2 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-sm">{{ __('pos.fbr_integration_start') }}</button>
+                </form>
+                @endif
+            </div>
+        </div>
+
+        @if(!$fiConfigured)
+        <div class="mt-4 rounded-lg {{ $fiState === 'setup_pending' ? 'bg-amber-50 dark:bg-amber-900/15 border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700' }} border p-3">
+            <p class="text-xs font-bold text-gray-800 dark:text-gray-100">{{ __('pos.fbr_integration_missing_title') }}</p>
+            <ul class="mt-1.5 space-y-1">
+                @foreach($fiMissing as $miss)
+                <li class="text-xs text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>{{ __('pos.fbr_missing_' . $miss) }}
+                </li>
+                @endforeach
+            </ul>
+            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2">{{ $fiDecision === \App\Models\Company::FBR_DECISION_CONNECT ? __('pos.fbr_integration_auto_on_hint') : __('pos.fbr_integration_start_hint') }}</p>
+        </div>
+        @endif
+
+        <div class="mt-3 flex items-center justify-between gap-3 flex-wrap text-[11px] text-gray-400 dark:text-gray-500">
+            <span>{{ __('pos.fbr_integration_any_time_note') }}</span>
+            @if($fiDecision !== null)
+            <form method="POST" action="{{ route('fbrpos.integration.decision') }}">
+                @csrf
+                <input type="hidden" name="choice" value="reset">
+                <button type="submit" class="underline hover:text-gray-600 dark:hover:text-gray-300">{{ __('pos.fbr_decision_show_again') }}</button>
+            </form>
+            @endif
         </div>
     </div>
-    @endif
 
     @php
         $fbrMode = $company->fbr_connection_mode ?? 'cloud';

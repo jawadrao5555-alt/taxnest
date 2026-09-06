@@ -3804,6 +3804,18 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // Optional FBR integration (Sep 2026): a reporting-OFF shop has no FBR
+        // queue. The page renders empty with a plain note instead of a red list.
+        $fbrCompany = Company::find($companyId);
+        $fbrReportingOff = $fbrCompany && !$fbrCompany->fbr_reporting_enabled;
+        if ($fbrReportingOff) {
+            $transactions = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20, 1, [
+                'path' => $request->url(), 'query' => $request->query(),
+            ]);
+            $stats = (object) ['failed_count' => 0, 'pending_count' => 0, 'submitted_count' => 0, 'failed_amount' => 0, 'config_error_count' => 0];
+            return view('fbr-pos.fail-queue', compact('transactions', 'stats', 'fbrReportingOff'));
+        }
+
         // config_error bills are included in the Fail Queue page (but NOT in the
         // auto-retry pool on the sale screen). They get a distinct visual treatment
         // and a "Fix Settings" note so the admin knows what to do.
@@ -3839,7 +3851,7 @@ class FbrPosController extends Controller
             ")
             ->first();
 
-        return view('fbr-pos.fail-queue', compact('transactions', 'stats'));
+        return view('fbr-pos.fail-queue', compact('transactions', 'stats', 'fbrReportingOff'));
     }
 
     /**
@@ -3848,6 +3860,12 @@ class FbrPosController extends Controller
     public function failQueueRetryAll()
     {
         $companyId = app('currentCompanyId');
+
+        // Reporting OFF = nothing goes to FBR (optional integration, Sep 2026).
+        $fbrCompany = Company::find($companyId);
+        if ($fbrCompany && !$fbrCompany->fbr_reporting_enabled) {
+            return redirect()->route('fbrpos.failQueue')->with('error', __('pos.fbr_reporting_disabled_enable'));
+        }
 
         $failed = FbrPosTransaction::where('company_id', $companyId)
             ->whereIn('fbr_status', ['failed', 'pending'])
@@ -3878,6 +3896,11 @@ class FbrPosController extends Controller
 
         if ($tx->fbr_status === 'submitted') {
             return back()->with('error', __('pos.already_submitted_fbr_short'));
+        }
+
+        $fbrCompany = Company::find($companyId);
+        if ($fbrCompany && !$fbrCompany->fbr_reporting_enabled) {
+            return back()->with('error', __('pos.fbr_reporting_disabled_enable'));
         }
 
         // config_error bills may be manually retried from the Fail Queue page after
@@ -3986,6 +4009,28 @@ class FbrPosController extends Controller
                 return back()->with('success', __('pos.agent_key_regenerated'));
             }
 
+            // Optional FBR integration (Sep 2026): the settings section is the
+            // permanent home of the ON/OFF choice. ON refuses while the setup
+            // is incomplete (same predicate as the sale-screen toggle).
+            if ($request->has('integration_toggle')) {
+                $request->validate(['integration_toggle' => 'required|in:on,off,start']);
+                $svc = app(\App\Services\FbrIntegrationDecisionService::class);
+                $action = $request->input('integration_toggle');
+                if ($action === 'start') {
+                    // "FBR integration shuru karein" — remembers the intent so the
+                    // save that completes the setup turns reporting ON by itself.
+                    $r = $svc->chooseConnect($company, $user->id);
+                    return back()->with('success', $r['enabled']
+                        ? __('pos.fbr_reporting_enabled_msg')
+                        : __('pos.fbr_decision_connect_next'));
+                }
+                $r = $svc->setReporting($company, $action === 'on', $user->id);
+                if (!$r['ok']) {
+                    return back()->with('error', __('pos.fbr_on_requires_setup', ['missing' => $this->fbrMissingLabels($r['missing'])]));
+                }
+                return back()->with('success', $r['enabled'] ? __('pos.fbr_reporting_enabled_msg') : __('pos.fbr_reporting_disabled_msg'));
+            }
+
             $request->validate([
                 'fbr_pos_environment' => 'required|in:sandbox,production',
                 'fbr_connection_mode' => 'nullable|in:cloud,fiscal_device',
@@ -4028,7 +4073,14 @@ class FbrPosController extends Controller
 
             $company->update($updateData);
 
-            return back()->with('success', __('pos.fbr_settings_updated'));
+            // A shop that chose "connect" and has just completed its setup gets
+            // reporting ON without a second click (optional integration, Sep 2026).
+            $autoOn = app(\App\Services\FbrIntegrationDecisionService::class)
+                ->maybeAutoEnableReporting($company, $user->id);
+
+            return back()->with('success', $autoOn
+                ? __('pos.fbr_settings_updated') . ' ' . __('pos.fbr_integration_auto_on')
+                : __('pos.fbr_settings_updated'));
         }
 
         $fbrLogs = FbrPosLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
@@ -4047,8 +4099,12 @@ class FbrPosController extends Controller
 
         $hasSandboxFallback = !empty($company->fbr_sandbox_token);
         $hasProductionFallback = !empty($company->fbr_production_token);
-        $fbrReportingSetupIncomplete = (bool) $company->fbr_reporting_enabled
-            && !$company->fbrPosIntegrationConfigured();
+        // Optional FBR integration (Sep 2026): one honest verdict for the
+        // settings section — on / off / setup_pending + what is still missing.
+        $fbrIntegrationState = $company->fbrIntegrationState();
+        $fbrIntegrationMissing = $company->fbrIntegrationMissing();
+        $fbrIntegrationDecision = $company->fbrIntegrationDecision();
+        $fbrIntegrationConfigured = empty($fbrIntegrationMissing);
 
         // Peti (Wholesale) Rate (Task 1414): the "reh gaye" list — products that
         // ALREADY sell in bulk (a past sale line hit a big quantity) but can't
@@ -4069,7 +4125,10 @@ class FbrPosController extends Controller
             'maskedAccessCode',
             'hasSandboxFallback',
             'hasProductionFallback',
-            'fbrReportingSetupIncomplete',
+            'fbrIntegrationState',
+            'fbrIntegrationMissing',
+            'fbrIntegrationDecision',
+            'fbrIntegrationConfigured',
             'petiGaps'
         ));
     }
@@ -4704,13 +4763,92 @@ class FbrPosController extends Controller
 
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $company->fbr_reporting_enabled = !$company->fbr_reporting_enabled;
-        $company->save();
+        $wantOn = !$company->fbr_reporting_enabled;
+
+        // Optional FBR integration (Sep 2026): ON requires a configured
+        // integration — mirrors the PRA toggle refusing without an NTN. The
+        // UI must show server truth ('enabled') and the plain reason.
+        $res = app(\App\Services\FbrIntegrationDecisionService::class)
+            ->setReporting($company, $wantOn, Auth::guard('fbrpos')->id());
+
+        if (!$res['ok']) {
+            return response()->json([
+                'success' => false,
+                'enabled' => (bool) $res['enabled'],
+                'missing' => $res['missing'],
+                'message' => __('pos.fbr_on_requires_setup', ['missing' => $this->fbrMissingLabels($res['missing'])]),
+                'settings_url' => route('fbrpos.settings', [], false),
+            ], 422);
+        }
 
         return response()->json([
             'success' => true,
-            'enabled' => $company->fbr_reporting_enabled,
-            'message' => $company->fbr_reporting_enabled ? __('pos.fbr_reporting_enabled_msg') : __('pos.fbr_reporting_disabled_msg'),
+            'enabled' => (bool) $res['enabled'],
+            'message' => $res['enabled'] ? __('pos.fbr_reporting_enabled_msg') : __('pos.fbr_reporting_disabled_msg'),
+        ]);
+    }
+
+    /** Human list of what the FBR setup still lacks (pos_id / token / agent keys). */
+    private function fbrMissingLabels(array $missing): string
+    {
+        $labels = array_map(fn ($k) => __('pos.fbr_missing_' . $k), $missing);
+        return implode(', ', $labels);
+    }
+
+    /**
+     * Optional FBR integration (Sep 2026) — the one-time decision card POST.
+     * choice: connect | without_fbr | later | reset. company_admin only;
+     * 'later' only snoozes the card for this session (no dismiss loop, no
+     * schema); the settings section is the permanent home of the choice.
+     */
+    public function fbrIntegrationDecision(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || $user->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_toggle_fbr')], 403);
+        }
+        if (session('impersonation')['readonly'] ?? false) {
+            return response()->json(['success' => false, 'message' => __('pos.view_only_no_changes')], 403);
+        }
+
+        $request->validate(['choice' => 'required|in:connect,without_fbr,later,reset']);
+        $choice = $request->input('choice');
+
+        if ($choice === 'later') {
+            session([\App\Services\FbrIntegrationDecisionService::SESSION_LATER => true]);
+            return response()->json(['success' => true, 'choice' => 'later']);
+        }
+
+        $company = Company::find(app('currentCompanyId'));
+        $svc = app(\App\Services\FbrIntegrationDecisionService::class);
+
+        if ($choice === 'reset') {
+            $svc->resetDecision($company, $user->id);
+            session()->forget(\App\Services\FbrIntegrationDecisionService::SESSION_LATER);
+            return $request->expectsJson()
+                ? response()->json(['success' => true, 'choice' => 'reset'])
+                : back()->with('success', __('pos.fbr_decision_card_will_show'));
+        }
+
+        if ($choice === 'connect') {
+            $r = $svc->chooseConnect($company, $user->id);
+            return response()->json([
+                'success' => true,
+                'choice' => 'connect',
+                'enabled' => (bool) $r['enabled'],
+                'redirect' => route('fbrpos.settings', [], false),
+                'message' => $r['enabled'] ? __('pos.fbr_reporting_enabled_msg') : __('pos.fbr_decision_connect_next'),
+            ]);
+        }
+
+        $r = $svc->chooseWithoutFbr($company, $user->id);
+        session()->forget(\App\Services\FbrIntegrationDecisionService::SESSION_LATER);
+        return response()->json([
+            'success' => true,
+            'choice' => 'without_fbr',
+            'enabled' => false,
+            'converted' => (int) $r['converted'],
+            'message' => __('pos.fbr_decision_without_done'),
         ]);
     }
 
@@ -9831,6 +9969,21 @@ class FbrPosController extends Controller
     public function apiFailedBills(Request $request)
     {
         $companyId = app('currentCompanyId');
+
+        // Optional FBR integration (Sep 2026): a shop running WITHOUT FBR has
+        // no FBR queue — pill and counters stay at zero. Bills created while
+        // OFF are plain (fbr_status NULL) and can never enter this pool.
+        $fbrCompany = Company::find($companyId);
+        if ($fbrCompany && !$fbrCompany->fbr_reporting_enabled) {
+            return response()->json([
+                'success' => true,
+                'reporting_off' => true,
+                'count' => 0,
+                'bills' => [],
+                'config_error_count' => 0,
+                'config_error_bills' => [],
+            ]);
+        }
 
         $baseQuery = FbrPosTransaction::where('company_id', $companyId)
             ->whereNull('fbr_invoice_number')

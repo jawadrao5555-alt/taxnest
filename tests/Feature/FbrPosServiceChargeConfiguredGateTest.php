@@ -392,11 +392,16 @@ class FbrPosServiceChargeConfiguredGateTest extends TestCase
             'agent_enabled' => false,
         ]);
 
+        // Optional FBR integration (Sep 2026): the amber alert became the
+        // "FBR Integration" section state — 'setup_pending' is the honest verdict
+        // for ON-without-setup, and the missing items are listed.
         $incomplete = $controller->fbrSettings(Request::create('/fbr-pos/settings', 'GET'));
-        $this->assertTrue(
-            $incomplete->getData()['fbrReportingSetupIncomplete'],
-            'settings must warn while Reporting is on but no working FBR route exists'
+        $this->assertSame(
+            'setup_pending',
+            $incomplete->getData()['fbrIntegrationState'],
+            'settings must show setup pending while Reporting is on but no working FBR route exists'
         );
+        $this->assertSame(['pos_id', 'token'], $incomplete->getData()['fbrIntegrationMissing']);
 
         // Completing Fiscal Device setup makes the same canonical predicate true,
         // so the settings warning must disappear without changing the reporting toggle.
@@ -408,10 +413,12 @@ class FbrPosServiceChargeConfiguredGateTest extends TestCase
         ]);
 
         $configured = $controller->fbrSettings(Request::create('/fbr-pos/settings', 'GET'));
-        $this->assertFalse(
-            $configured->getData()['fbrReportingSetupIncomplete'],
-            'settings must clear the warning as soon as the fiscal-device setup is complete'
+        $this->assertSame(
+            'on',
+            $configured->getData()['fbrIntegrationState'],
+            'settings must report ON as soon as the fiscal-device setup is complete'
         );
+        $this->assertSame([], $configured->getData()['fbrIntegrationMissing']);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

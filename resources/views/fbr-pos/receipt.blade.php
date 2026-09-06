@@ -512,16 +512,15 @@
         // garbage into the app's field and verify failed). Fiscalized bill =
         // bare FBR number; non-fiscalized bills (pending/provisional) keep the
         // details-JSON QR — wahan verify karne ko FBR number hai hi nahi.
+        // Optional FBR integration (Sep 2026): non-fiscalised bills share ONE
+        // details payload (FbrPosTransaction::simpleQrPayload) across thermal,
+        // popup, PDF and the transaction page; rendered LOCALLY (QrImage) so
+        // the receipt prints offline — the old api.qrserver.com <img> needed
+        // internet at print time. Empty string when PNG rendering is impossible.
         $qrData = $transaction->fbr_invoice_number
             ? $transaction->fbr_invoice_number
-            : json_encode([
-                'pos' => $transaction->invoice_number,
-                'ntn' => $company->ntn ?? '',
-                'date' => $transaction->created_at->format('d/m/Y'),
-                'total' => number_format($transaction->total_amount, 2, '.', ''),
-                'reg' => $company->fbr_pos_id ?? '',
-            ]);
-        $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' . urlencode($qrData);
+            : $transaction->simpleQrPayload($company);
+        $qrUrl = \App\Support\QrImage::dataUri($qrData, 4, 4);
     @endphp
 
     {{-- Owner (6 Aug 2026): QR box saaf — sirf QR + FBR invoice number + Tax Asaan
@@ -540,7 +539,9 @@
     {{-- SUBMITTED: FBR accepted the bill and returned a fiscal invoice number. --}}
     <div class="fbr-badge">
         <div style="margin: 3px 0;">
+            @if($qrUrl)
             <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
+            @endif
         </div>
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
         {{-- Task 769: verify-line toggle (Receipt Settings) — default ON when absent. --}}
@@ -565,7 +566,9 @@
     <div class="fbr-badge" style="border-style: dashed;">
         <div class="fbr-title">⏳ {{ __('pos.rcpt_fbr_pending') }}</div>
         <div style="margin: 3px 0;">
+            @if($qrUrl)
             <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
+            @endif
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div style="font-size:10px; margin-top:3px;">{{ __('pos.rcpt_will_retry') }}</div>
@@ -578,7 +581,9 @@
     <div class="fbr-badge" style="border-style: dashed;">
         <div class="fbr-title">⚠ {{ __('pos.config_error_autoretry_off') }}</div>
         <div style="margin: 3px 0;">
+            @if($qrUrl)
             <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
+            @endif
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div style="font-size:10px; margin-top:3px;">{{ __('pos.fq_config_error_body_1') }}</div>
@@ -588,7 +593,9 @@
     <div class="fbr-badge" style="border-style: dashed;">
         <div class="fbr-title">⏳ {{ __('pos.rcpt_fbr_pending') }}</div>
         <div style="margin: 3px 0;">
+            @if($qrUrl)
             <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
+            @endif
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div style="font-size:10px; margin-top:3px;">{{ __('pos.rcpt_will_retry') }}</div>
@@ -607,7 +614,9 @@
     {{-- Owner (22 Jul 2026): SALE RECEIPT / PROVISIONAL bills also carry a QR at the
          bottom — same as PRA finals — so every bill is scannable. --}}
     <div style="text-align: center; margin: 4px 0;">
+        @if($qrUrl)
         <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
+        @endif
         <div style="font-size:9px; margin-top:2px;">{{ __('pos.receipt_scan_details') }}</div>
     </div>
     @endif
@@ -621,7 +630,7 @@
         <p style="font-style: italic; margin-top:2px;">{{ $company->receipt_footer_note }}</p>
         @endif
         @endif
-        @if($company->fbr_pos_id)
+        @if($company->fbr_pos_id && !$transaction->isNonIntegratedBill())
         <p style="font-weight:bold;">{{ __('pos.rcpt_fbr_integrated') }}</p>
         @endif
         @if($rd['show_developed_by'])

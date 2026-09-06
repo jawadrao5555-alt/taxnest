@@ -325,13 +325,8 @@
             // provisionals (invoice_mode 'local'); reporting-OFF finals (fbr/NULL)
             // and legacy fbr/'local' finals are REAL sales => SALE RECEIPT.
             $pdfIsProvisional = ($transaction->invoice_mode ?? 'fbr') === 'local';
-            $qrData = json_encode([
-                'type' => $pdfIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
-                'inv' => $transaction->invoice_number,
-                'date' => $transaction->created_at->format('d/m/Y H:i'),
-                'total' => number_format($transaction->total_amount, 2),
-                'business' => $company->name ?? 'TaxNest FBR POS',
-            ]);
+            // Same payload as the thermal receipt (optional FBR integration, Sep 2026).
+            $qrData = $transaction->simpleQrPayload($company);
             $qrUrl = \App\Support\QrImage::dataUri($qrData);
         @endphp
         @if($pdfIsProvisional)
@@ -368,7 +363,7 @@
             <p style="font-style: italic;">{{ $company->receipt_footer_note }}</p>
             @endif
             @endif
-            @if($company->fbr_pos_id)
+            @if($company->fbr_pos_id && !$transaction->isNonIntegratedBill())
             <p style="font-weight:bold; color:#1e3a5f;">{{ __('pos.rcpt_fbr_integrated') }}</p>
             @endif
             @if($rd['show_developed_by'])

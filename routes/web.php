@@ -2338,6 +2338,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/agent/download', [\App\Http\Controllers\FbrAgentController::class, 'download'])->name('fbrpos.agent.download');
     Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
+    // Optional FBR integration (Sep 2026): one-time decision card (connect / without_fbr / later / reset).
+    Route::post('/integration/decision', [FbrPosController::class, 'fbrIntegrationDecision'])->name('fbrpos.integration.decision');
     // OFFLINE-FIRST BOOT (Aug 2026 — PRA port): freshness probe for the SW-cached sale screen.
     Route::get('/api/boot-check', [FbrPosController::class, 'bootCheck'])->name('fbrpos.api.boot-check');
     Route::post('/api/boot-diagnostics', [FbrPosController::class, 'bootDiagnostics'])

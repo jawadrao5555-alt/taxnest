@@ -10,6 +10,10 @@
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">{{ __('pos.fbr_submitted') }}</span>
             @elseif($transaction->invoice_mode === 'local')
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ __('pos.local_invoice') }}</span>
+            @elseif($transaction->isNonIntegratedBill())
+                {{-- Optional FBR integration (Sep 2026): a plain bill (reporting OFF /
+                     converted). No FBR chip, no Submit/Retry — nothing to send. --}}
+                <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" data-bill-kind="sale">{{ __('pos.bill_no_fbr_word') }}</span>
             @elseif($transaction->fbr_status === 'failed')
                 <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">{{ __('pos.fbr_failed') }}</span>
                 {{-- ✏️ Edit & Retry only available for terminal-failed bills (not pending/in-flight) --}}
@@ -126,6 +130,16 @@
         </div>
 
         <div class="space-y-4">
+            @if($transaction->isNonIntegratedBill())
+            @php $showSimpleQr = \App\Support\QrImage::dataUri($transaction->simpleQrPayload($transaction->company ?? null)); @endphp
+            @if($showSimpleQr)
+            {{-- Simple details QR — same payload as the printed receipt (Sep 2026). --}}
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 text-center" data-simple-qr="1">
+                <img src="{{ $showSimpleQr }}" alt="QR" class="w-28 h-28 mx-auto rounded bg-white p-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ __('pos.receipt_scan_details') }}</p>
+            </div>
+            @endif
+            @endif
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.summary_word') }}</h3>
                 <div class="space-y-2 text-sm">

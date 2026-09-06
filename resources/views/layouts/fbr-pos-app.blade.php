@@ -43,6 +43,22 @@
             }
         }
     } catch (\Throwable $e) { /* keep FBR POS pages alive */ }
+    // Optional FBR integration (Sep 2026): the one-time "FBR se connect karna
+    // hai?" decision card. Same audience rules as What's New (no confined
+    // roles, no pending companies, no read-only impersonation) but owner-only
+    // (company_admin) because it flips a company-wide switch. Shown on the
+    // dashboard + the sale screen only; the settings section is its permanent
+    // home. 'later' (X) snoozes it for the session so it never loops.
+    $fbrReportingOn = (bool) ($fbrCompany->fbr_reporting_enabled ?? false);
+    $fbrDecisionCard = app(\App\Services\FbrIntegrationDecisionService::class)->shouldShowDecisionCard(
+        $fbrUser,
+        $fbrCompany,
+        request()->routeIs('fbrpos.dashboard') || request()->routeIs('fbrpos.create')
+    );
+    if ($fbrDecisionCard) {
+        // One interruption at a time — the decision comes first, updates wait.
+        $whatsNewPopup = null; $whatsNewPopupList = collect(); $whatsNewFeatured = null;
+    }
     // Unmapped biometric PIN alerts — admin/manager only (FBR port, Aug 2026).
     // Same gating as the PRA pos-app layout: Schema::hasTable guard + try/catch
     // so prod schema drift never breaks the layout; pending companies and
@@ -419,13 +435,16 @@
                         </button>
 
                         {{-- 🟥 Failed Bills (Shift+F11) — F11 plain stays for browser fullscreen.
-                             Hidden on the universal sale screen (its own teleported F11 pill lives there). --}}
+                             Hidden on the universal sale screen (its own teleported F11 pill lives there).
+                             Hidden entirely while the shop runs WITHOUT FBR (optional integration, Sep 2026). --}}
+                        @if($fbrReportingOn)
                         <button @click="openFailed()" type="button" class="relative {{ ($tnOnUniversalSale ?? false) ? 'hidden' : 'hidden sm:inline-flex' }} items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="{{ __('pos.ti_failed_bills_f11') }}">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
                             <span>{{ __('pos.failed_word') }}</span>
                             <span x-show="failedCount > 0" x-cloak x-text="failedCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-red-700 text-[10px] font-black animate-pulse"></span>
                             <span class="hidden md:inline text-[9px] opacity-70 ml-1">⇧F11</span>
                         </button>
+                        @endif
 
                         @if($whatsNewList->isNotEmpty())
                         {{-- What's New bell — opening history does NOT mark anything seen. --}}
@@ -822,6 +841,7 @@
                             <span x-show="localCount > 0" x-text="localCount" class="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-black"></span>
                             <span class="text-[9px] font-bold opacity-50 ml-1">F10</span>
                         </button>
+                        @if($fbrReportingOn)
                         <button @click="sidebarOpen=false; openFailed()" type="button" class="{{ $sidebarBase }} {{ $sidebarInactive }} w-full text-left">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
                             <span class="flex-1">{{ __('pos.nav_failed_bills') }}</span>
@@ -832,6 +852,7 @@
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span class="flex-1">{{ __('pos.nav_fail_queue_sync') }}</span>
                         </a>
+                        @endif
                     </div>
 
                     {{-- Inventory Section --}}
@@ -1366,6 +1387,10 @@
             'seenIds' => $whatsNewSeenIds,
             'seenEndpoint' => '/fbr-pos/whats-new/seen',
         ])
+
+        @if($fbrDecisionCard)
+        @include('fbr-pos.partials.integration-decision-card')
+        @endif
 
         @if($whatsNewPopup)
         @if($whatsNewFeatured)

@@ -6072,6 +6072,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'ph_mode_off' => 'Is shop ke liye pharmacy mode band hai.',
     'ph_medicine_details' => 'Medicine Details',
     'ph_generic_name' => 'Generic / Salt Name',
+    'ph_medicine_name_ph' => 'maslan Panadol 500mg',
     'ph_generic_name_ph' => 'e.g. Paracetamol',
     'ph_generic_name_hint' => 'Counter salt name se bhi search kar sakta hai, sirf box par likhe brand se nahi.',
     'ph_strength' => 'Strength',

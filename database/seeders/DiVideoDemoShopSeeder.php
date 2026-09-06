@@ -35,11 +35,10 @@ class DiVideoDemoShopSeeder extends Seeder
     public function run(): void
     {
         // ── FAIL-CLOSED DEV GUARD ───────────────────────────────────────────────
-        $dbName = DB::connection()->getDatabaseName();
-        if (!str_contains($dbName, 'staging')) {
-            throw new \RuntimeException(
-                "DiVideoDemoShopSeeder refused: database '{$dbName}' is not a staging DB. This seeder is DEV ONLY."
-            );
+        // Exact local-staging identity (driver + db name + host), shared with
+        // every other destructive dev tool — a substring match is not a boundary.
+        if ($problems = \App\Support\DevStagingGuard::problems()) {
+            throw new \RuntimeException("DiVideoDemoShopSeeder refused: not the local staging DB (" . implode('; ', $problems) . "). This seeder is DEV ONLY.");
         }
 
         DB::beginTransaction();

@@ -172,7 +172,7 @@
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.product_name_label') }} <span class="text-red-500">*</span></label>
                     <input type="text" name="name" value="{{ old('name', $product->name ?? '') }}" required :disabled="mode === 'multi'"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="{{ __('pos.ph_chicken_burger') }}">
+                        placeholder="{{ ($pharmacyMode ?? false) ? __('pos.ph_medicine_name_ph') : __('pos.ph_chicken_burger') }}">
                 </div>
                 <div x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.price_pkr') }} <span class="text-red-500">*</span></label>

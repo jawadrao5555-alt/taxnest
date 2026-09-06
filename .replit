@@ -119,6 +119,17 @@ outputType = "console"
 task = "shell.exec"
 args = "bash tools/video-pipeline/batch-waiter-order-sale.sh"
 
+[[workflows.workflow]]
+name = "Video Pharmacy"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash tools/video-pipeline/batch-fbr-pharmacy.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 5000
 externalPort = 80

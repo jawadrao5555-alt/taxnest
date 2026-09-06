@@ -6068,6 +6068,7 @@ return [
     'ph_mode_off' => 'اس دکان کے لیے فارمیسی موڈ بند ہے۔',
     'ph_medicine_details' => 'دوا کی تفصیل',
     'ph_generic_name' => 'جنرک / سالٹ نام',
+    'ph_medicine_name_ph' => 'مثلاً پیناڈول 500 ملی گرام',
     'ph_generic_name_ph' => 'مثلاً پیراسیٹامول',
     'ph_generic_name_hint' => 'کاؤنٹر سالٹ نام سے بھی تلاش کر سکتا ہے، صرف ڈبے پر لکھے برانڈ سے نہیں۔',
     'ph_strength' => 'طاقت',

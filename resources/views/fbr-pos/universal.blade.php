@@ -5135,7 +5135,7 @@ function restaurantPos() {
                         // owner Aug 2026) instead of dropping a Rs.0 row. Unpriced services
                         // and inventory-ON rows stay hidden (old behavior).
                         if (!(parseFloat(it.price) > 0) && ((it.type || 'product') !== 'product' || this.isInventoryEnabled())) continue;
-                        const r = this.nameMatchRank(it.name, q, this.searchAnyWord);
+                        const r = this.itemMatchRank(it, q);
                         if (r > 0) ranked.push({ it, r });
                     }
                     ranked.sort((a, b) => b.r - a.r);
@@ -5219,7 +5219,7 @@ function restaurantPos() {
                 const it = all[i];
                 if (!it.name) continue;
                 if (!(parseFloat(it.price) > 0) && ((it.type || 'product') !== 'product' || this.isInventoryEnabled())) continue;
-                const r = this.nameMatchRank(it.name, lower, this.searchAnyWord);
+                const r = this.itemMatchRank(it, lower);
                 if (r > 0) ranked.push({ it, r });
             }
             ranked.sort((a, b) => b.r - a.r);
@@ -5513,6 +5513,23 @@ function restaurantPos() {
         // loosen): the FIRST token must still match the very START of the name;
         // only the LATER tokens are free to prefix-match any later word. Single-
         // word queries therefore behave exactly as before in both modes.
+        // One matcher for every search surface (dropdown, immediate re-rank,
+        // grid filter). Name hits keep their full rank; in pharmacy mode the
+        // salt / strength / manufacturer also match (server search already
+        // finds rows by salt — dropping them on re-rank made "paracetamol"
+        // return nothing), but capped below a name hit so a brand typed by
+        // name always sorts first.
+        itemMatchRank(it, q) {
+            const byName = this.nameMatchRank(it.name, q, this.searchAnyWord);
+            if (byName > 0 || !this.pharmacyMode || (it.type || 'product') !== 'product') return byName;
+            let best = 0;
+            for (const f of [it.generic_name, it.manufacturer, it.strength]) {
+                if (!f) continue;
+                const r = this.nameMatchRank(f, q, true);
+                if (r > best) best = r;
+            }
+            return Math.min(best, 2);
+        },
         nameMatchRank(name, q, anyWord) {
             const lname = String(name).toLowerCase();
             if (lname.startsWith(q)) return 4;
@@ -5576,7 +5593,7 @@ function restaurantPos() {
                 // Task 1271: shared matcher with the dropdown (nameMatchRank) — the two
                 // surfaces must never diverge. anyWord honors the admin search-mode pref.
                 items = items
-                    .map(i => ({ i, r: this.nameMatchRank(i.name, q, this.searchAnyWord) }))
+                    .map(i => ({ i, r: this.itemMatchRank(i, q) }))
                     .filter(x => x.r > 0)
                     .sort((a, b) => b.r - a.r)
                     .map(x => x.i);

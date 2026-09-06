@@ -1,0 +1,81 @@
+[Script Info]
+; Compact Roman Urdu overlay for the Pharmacy tutorial.
+ScriptType: v4.00+
+PlayResX: 384
+PlayResY: 288
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Caption,DejaVu Sans,5,&H00FFFFFF,&H00FFFFFF,&H00152A30,&H00000000,0,0,0,0,100,100,0,0,1,0.4,0.5,9,110,10,12,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.50,0:00:04.94,Caption,,0,0,0,,Assalam o Alaikum! Medical store ki billing aam dukan jaisi nahi hoti.
+Dialogue: 0,0:00:04.94,0:00:09.43,Caption,,0,0,0,,Har dawa ka batch, har batch ki expiry, customer salt ka naam leta hai.
+Dialogue: 0,0:00:09.43,0:00:12.54,Caption,,0,0,0,,Kuch dawaein nuskhe ke baghair nahi di ja saktin.
+Dialogue: 0,0:00:12.54,0:00:18.24,Caption,,0,0,0,,FBR POS ka Pharmacy Mode yehi sab sambhalta hai — aur har bill FBR ko bhi report hota hai.
+Dialogue: 0,0:00:18.24,0:00:20.14,Caption,,0,0,0,,Aaj poora chakkar dekhte hain.
+Dialogue: 0,0:00:22.05,0:00:28.08,Caption,,0,0,0,,Pehle nai dawa add karenge, phir distributor ka maal batch + expiry ke saath stock mein.
+Dialogue: 0,0:00:28.08,0:00:33.71,Caption,,0,0,0,,Phir counter par bill: salt se search, batch chunna, khuli goliyan, nuskha record.
+Dialogue: 0,0:00:33.71,0:00:38.17,Caption,,0,0,0,,Aakhir mein expired maal, distributor claim aur pharmacy reports.
+Dialogue: 0,0:00:40.08,0:00:44.32,Caption,,0,0,0,,Demo dukan: Shifa Medical Store. Login karte hi dashboard samne hai.
+Dialogue: 0,0:00:44.32,0:00:47.94,Caption,,0,0,0,,Aaj ki sale, kitne bill bane, kitne FBR par jama ho chuke.
+Dialogue: 0,0:00:47.94,0:00:51.80,Caption,,0,0,0,,Upar FBR ka switch ON hai — dukan live reporting kar rahi hai.
+Dialogue: 0,0:00:55.19,0:00:58.82,Caption,,0,0,0,,Pehla kaam: nai dawa. Products → New Product.
+Dialogue: 0,0:00:58.82,0:01:01.33,Caption,,0,0,0,,Naam Augmentin 625, qeemat 520.
+Dialogue: 0,0:01:01.33,0:01:06.26,Caption,,0,0,0,,Pharmacy mode mein neeche Medicine Details ka hissa aata hai.
+Dialogue: 0,0:01:06.26,0:01:10.79,Caption,,0,0,0,,Salt ka naam, strength, form, company aur shelf likhein.
+Dialogue: 0,0:01:10.79,0:01:15.88,Caption,,0,0,0,,Salt ka naam hi woh cheez hai jisse counter par search chalegi.
+Dialogue: 0,0:01:17.78,0:01:20.17,Caption,,0,0,0,,Neeche do zaroori tick hain.
+Dialogue: 0,0:01:20.17,0:01:25.04,Caption,,0,0,0,,Prescription Required — nuskhe ke baghair bill nahi hoga.
+Dialogue: 0,0:01:25.04,0:01:32.65,Caption,,0,0,0,,Allow Loose Sale — khuli goliyan bhi bik sakengi; ek patti mein kitni goliyan, likh dein.
+Dialogue: 0,0:01:32.65,0:01:36.93,Caption,,0,0,0,,Dawa tax se exempt hai — pehle se chuna hua. Save.
+Dialogue: 0,0:01:44.60,0:01:48.10,Caption,,0,0,0,,Distributor se maal aaya hai — Stock & Purchase par jayen.
+Dialogue: 0,0:01:48.10,0:01:52.51,Caption,,0,0,0,,Distributor chunein, dawa search karein, tadaad aur khareed rate likhein.
+Dialogue: 0,0:01:52.51,0:01:55.35,Caption,,0,0,0,,Do khaane sab se aham: Batch Number aur Expiry.
+Dialogue: 0,0:01:55.35,0:01:59.93,Caption,,0,0,0,,Yehi counter par, expiry alert mein aur distributor claim mein kaam aayenge.
+Dialogue: 0,0:01:59.93,0:02:03.43,Caption,,0,0,0,,Receive Stock — maal usi batch ke naam stock mein aa gaya.
+Dialogue: 0,0:02:06.58,0:02:13.27,Caption,,0,0,0,,Asal imtihan: counter. Customer kehta hai 'Paracetamol de do' — salt ka naam.
+Dialogue: 0,0:02:13.27,0:02:19.53,Caption,,0,0,0,,Bas 'paracet' likhein — Panadol, Panadol Extra, Calpol Syrup, sab samne.
+Dialogue: 0,0:02:19.53,0:02:24.58,Caption,,0,0,0,,Har ek ke neeche salt, strength, company aur shelf number.
+Dialogue: 0,0:02:24.58,0:02:30.14,Caption,,0,0,0,,Naya larka bhi counter par dawa dhoondne mein der nahi lagayega.
+Dialogue: 0,0:02:32.04,0:02:39.88,Caption,,0,0,0,,Panadol chunte hain. Line par 'Auto batch' — pehle expire hone wala batch khud niklega.
+Dialogue: 0,0:02:39.88,0:02:43.93,Caption,,0,0,0,,Khud batch chunna ho to isi par click karein.
+Dialogue: 0,0:02:43.93,0:02:50.87,Caption,,0,0,0,,Dono batch, har ek ki expiry aur bacha hua maal. Purana batch chun lete hain.
+Dialogue: 0,0:02:52.77,0:02:58.52,Caption,,0,0,0,,Ab Brufen. Ek batch EXPIRED hai — halka ho kar lock; click hi nahi hoga.
+Dialogue: 0,0:02:58.52,0:03:03.23,Caption,,0,0,0,,Expired dawa ghalti se bhi bill mein nahi ja sakti. Cancel.
+Dialogue: 0,0:03:03.23,0:03:08.97,Caption,,0,0,0,,Customer ko sirf 4 goliyan chahiyein — Loose dabayein, 4 likhein, Apply.
+Dialogue: 0,0:03:08.97,0:03:13.12,Caption,,0,0,0,,Line par 4 units aur qeemat khud hisaab se ban gayi.
+Dialogue: 0,0:03:15.38,0:03:21.25,Caption,,0,0,0,,Aakhir mein nai dawa Augmentin — cart par laal 'Rx needed' aa gaya.
+Dialogue: 0,0:03:21.25,0:03:26.95,Caption,,0,0,0,,Cash dabayen to bill nahi banta; system pehle nuskha poochta hai.
+Dialogue: 0,0:03:26.95,0:03:32.81,Caption,,0,0,0,,Doctor ka naam, mareez ka naam, chahein to nuskhe ki tasveer. Save.
+Dialogue: 0,0:03:32.81,0:03:38.95,Caption,,0,0,0,,Ab yeh bill ke saath record hai aur Prescription Register mein milega.
+Dialogue: 0,0:03:40.84,0:03:44.07,Caption,,0,0,0,,Cash — Alt+1. Payment complete.
+Dialogue: 0,0:03:44.07,0:03:50.01,Caption,,0,0,0,,Upar 'Reporting to FBR', kuch second mein 'FBR Verified'.
+Dialogue: 0,0:03:50.01,0:03:55.21,Caption,,0,0,0,,Customer ko FBR invoice number aur QR code milega.
+Dialogue: 0,0:03:55.21,0:04:01.77,Caption,,0,0,0,,Receipt par har dawa ke neeche batch aur expiry bhi chhapi hai.
+Dialogue: 0,0:04:03.67,0:04:08.73,Caption,,0,0,0,,Dukan ke peeche ka kaam: Settings → Batch & Expiry Stock.
+Dialogue: 0,0:04:08.73,0:04:13.07,Caption,,0,0,0,,Har batch ek line — kitna bacha, kab tak chalega.
+Dialogue: 0,0:04:13.07,0:04:17.33,Caption,,0,0,0,,Tabs: 90 din mein expire hone wale, aur Expired.
+Dialogue: 0,0:04:17.33,0:04:25.05,Caption,,0,0,0,,Quarantine = shelf se hata kar alag rakho; Write Off = nuqsan maan kar stock se nikalo.
+Dialogue: 0,0:04:25.05,0:04:30.10,Caption,,0,0,0,,Calpol ko quarantine karte hain — wajah likhein, Confirm.
+Dialogue: 0,0:04:32.01,0:04:37.54,Caption,,0,0,0,,Expired maal ka paisa distributor se wapas lena hota hai — aksar kaghazon mein gum.
+Dialogue: 0,0:04:37.54,0:04:42.47,Caption,,0,0,0,,Expiry Claims kholen — expired / near-expiry batch upar tayyar milte hain.
+Dialogue: 0,0:04:42.47,0:04:46.01,Caption,,0,0,0,,Batch tick karein, distributor chunein, Create Claim.
+Dialogue: 0,0:04:46.01,0:04:50.81,Caption,,0,0,0,,Claim number ban gaya — print kar ke distributor ke bande ko thama dein.
+Dialogue: 0,0:04:50.81,0:04:54.21,Caption,,0,0,0,,Paisa ya maal wapas mile to yahin Settled kar dein.
+Dialogue: 0,0:04:56.11,0:04:58.31,Caption,,0,0,0,,Pharmacy Reports — sab ek jagah.
+Dialogue: 0,0:04:58.31,0:05:04.31,Caption,,0,0,0,,Near Expiry: agle 90 din mein kaunsa maal nikalna zaroori hai, kitni qeemat phansi hai.
+Dialogue: 0,0:05:04.31,0:05:08.44,Caption,,0,0,0,,Batch Valuation: shelf par kul kitne rupay ka maal para hai.
+Dialogue: 0,0:05:08.44,0:05:14.50,Caption,,0,0,0,,Prescription Register: kis doctor ke nuskhe par kis mareez ko kaunsi dawa, kis batch se.
+Dialogue: 0,0:05:14.50,0:05:19.60,Caption,,0,0,0,,Fast & Slow Movers: kaunsi dawa roz bikti hai, kaunsi mahinon se pari hai.
+Dialogue: 0,0:05:21.50,0:05:24.81,Caption,,0,0,0,,Medical store ki ek aur haqeeqat: udhaar.
+Dialogue: 0,0:05:24.81,0:05:31.35,Caption,,0,0,0,,Clinic aur purane customers ki khata list — kis par kitna baqi, kitne din purana.
+Dialogue: 0,0:05:31.35,0:05:36.93,Caption,,0,0,0,,Ek button se WhatsApp yaad-dehani; wasooli aaye to yahin darj karein.
+Dialogue: 0,0:05:36.93,0:05:43.55,Caption,,0,0,0,,Din ke aakhir mein Day Close — cash, udhaar aur FBR ka poora hisaab ek kaghaz par.
+Dialogue: 0,0:05:45.45,0:05:48.13,Caption,,0,0,0,,Yeh tha FBR POS ka Pharmacy Mode.
+Dialogue: 0,0:05:48.13,0:05:55.44,Caption,,0,0,0,,Salt se search, batch aur expiry ka pakka hisaab, khuli goliyon ki sale, nuskhe ka record,
+Dialogue: 0,0:05:55.44,0:05:58.76,Caption,,0,0,0,,distributor claim — aur har bill FBR par.
+Dialogue: 0,0:05:58.76,0:06:04.29,Caption,,0,0,0,,taxnest.pk par apni pharmacy ka trial aaj hi shuru karein. Shukriya!

@@ -1,0 +1,754 @@
+{
+  "slug": "fbr-pharmacy",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "FBR POS · Pharmacy Mode",
+  "cardTheme": "fbr",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Pharmacy Mode",
+        "sub": "Medical store ka poora hisaab — Batch · Expiry · Salt search · Nuskha · FBR reporting"
+      },
+      "narration": "अस्सलामु अलैकुम! मेडिकल स्टोर की बिलिंग आम दुकान जैसी नहीं होती। हर दवा का बैच होता है, हर बैच की एक्सपायरी होती है, कस्टमर साल्ट का नाम ले कर आता है, और कुछ दवाएँ नुस्खे के बिना नहीं दी जा सकतीं। FBR POS का फ़ार्मेसी मोड यही सब सँभालता है — और साथ में हर बिल FBR को भी रिपोर्ट होता रहता है। आज पूरा चक्कर देखते हैं।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_agenda",
+      "card": {
+        "heading": "Aaj kya dekhenge",
+        "sub": "Dawa add karna → Maal receive (batch + expiry) → Counter sale → Expiry stock & claim → Reports"
+      },
+      "narration": "पहले एक नई दवा ऐड करेंगे, फिर डिस्ट्रीब्यूटर से आया माल बैच और एक्सपायरी के साथ स्टॉक में डालेंगे। फिर काउंटर पर बिल बनाएँगे — साल्ट से सर्च, बैच चुनना, खुली गोलियाँ बेचना, और नुस्खा रिकॉर्ड करना। आख़िर में एक्सपायर माल, डिस्ट्रीब्यूटर क्लेम और फ़ार्मेसी रिपोर्ट्स।",
+      "minMs": 5000
+    },
+    {
+      "id": "s03_login",
+      "narration": "हमारी डेमो दुकान है शिफ़ा मेडिकल स्टोर। लॉग इन करते ही डैशबोर्ड सामने है — आज की सेल, कितने बिल बने, और कितने FBR पर जमा हो चुके हैं। ऊपर दाएँ FBR का स्विच ऑन है — यानी यह दुकान लाइव रिपोर्टिंग कर रही है।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/fbr-pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "pharmacydemo@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "{{VIDEO_DEMO_PASS}}",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "form[action*='login'] button[type=submit]",
+          "after": 2500
+        },
+        {
+          "do": "eval",
+          "js": "try{localStorage.setItem('tnPushAsked_fbrpos','1');document.getElementById('tn-domain-move-dismiss')?.click();}catch(e){}",
+          "after": 200
+        },
+        {
+          "do": "goto",
+          "url": "/fbr-pos/dashboard"
+        },
+        {
+          "do": "eval",
+          "js": "try{document.getElementById('tn-domain-move-dismiss')?.click();}catch(e){}",
+          "after": 200
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "highlight",
+          "selector": "text=FBR SUBMITTED",
+          "after": 1500
+        }
+      ]
+    },
+    {
+      "id": "s04_product_form",
+      "narration": "पहला काम — नई दवा ऐड करना। प्रोडक्ट्स में जा कर न्यू प्रोडक्ट खोलें। नाम लिखें ऑगमेंटिन छह सौ पच्चीस, क़ीमत पाँच सौ बीस। फ़ार्मेसी मोड में नीचे मेडिसिन डिटेल्स का हिस्सा आता है — यहाँ साल्ट का नाम, स्ट्रेंथ, फ़ॉर्म, कंपनी, और शेल्फ़ लिखें। साल्ट का नाम ही वो चीज़ है जिससे काउंटर पर सर्च चलेगी।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/fbr-pos/products"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "click",
+          "selector": "main a[href$='/fbr-pos/products/create'], a.bg-blue-600[href$='/fbr-pos/products/create']",
+          "after": 1600
+        },
+        {
+          "do": "type",
+          "selector": "input[name=name]",
+          "text": "Augmentin 625mg",
+          "delay": 55
+        },
+        {
+          "do": "type",
+          "selector": "input[name=default_price]",
+          "text": "520",
+          "delay": 90
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "highlight",
+          "selector": "text=Medicine Details",
+          "after": 900
+        },
+        {
+          "do": "type",
+          "selector": "input[name=generic_name]",
+          "text": "Amoxicillin + Clavulanic Acid",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "input[name=strength]",
+          "text": "625mg",
+          "delay": 80
+        },
+        {
+          "do": "select",
+          "selector": "select[name=dosage_form]",
+          "value": "tablet"
+        },
+        {
+          "do": "type",
+          "selector": "input[name=manufacturer]",
+          "text": "GSK",
+          "delay": 90
+        },
+        {
+          "do": "select",
+          "selector": "select[name=drug_schedule]",
+          "value": "H"
+        },
+        {
+          "do": "type",
+          "selector": "input[name=shelf_location]",
+          "text": "B-2",
+          "delay": 90
+        }
+      ]
+    },
+    {
+      "id": "s05_product_rx_save",
+      "narration": "नीचे दो ज़रूरी टिक हैं। प्रिस्क्रिप्शन रिक्वायर्ड — यानी यह दवा नुस्खे के बिना बिल नहीं होगी। और अलाओ लूज़ सेल — यानी पूरी पत्ती के बजाय खुली गोलियाँ भी बेची जा सकेंगी; इसके लिए बताएँ कि एक पत्ती में कितनी गोलियाँ हैं। दवा टैक्स से एग्ज़ेम्प्ट है, वह पहले से चुना हुआ है। सेव करें।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "type",
+          "selector": "input[name=strips_per_pack]",
+          "text": "1",
+          "delay": 120
+        },
+        {
+          "do": "type",
+          "selector": "input[name=units_per_strip]",
+          "text": "6",
+          "delay": 120
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "eval",
+          "js": "document.querySelector('input[name=prescription_required][type=checkbox]').scrollIntoView({block:'center',behavior:'smooth'})",
+          "after": 900
+        },
+        {
+          "do": "click",
+          "selector": "input[name=prescription_required][type=checkbox]",
+          "after": 1400
+        },
+        {
+          "do": "click",
+          "selector": "input[name=allow_loose_sale][type=checkbox]",
+          "after": 1400
+        },
+        {
+          "do": "wait",
+          "ms": 3000
+        },
+        {
+          "do": "eval",
+          "js": "document.querySelector('input[name=tax_type][value=exempt]').scrollIntoView({block:'center',behavior:'smooth'})",
+          "after": 1000
+        },
+        {
+          "do": "highlight",
+          "selector": "input[name=tax_type][value=exempt]",
+          "after": 1600
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "click",
+          "selector": "form[action$='/fbr-pos/products'] button[type=submit]",
+          "after": 2500
+        }
+      ]
+    },
+    {
+      "id": "s06_stock_receive",
+      "narration": "अब डिस्ट्रीब्यूटर से माल आया है। स्टॉक एंड परचेज़ पर जाएँ। डिस्ट्रीब्यूटर चुनें, दवा सर्च करें, तादाद और ख़रीद रेट लिखें। और यहाँ दो ख़ाने सब से अहम हैं — बैच नंबर और एक्सपायरी। यही दो चीज़ें आगे चल कर काउंटर पर, एक्सपायरी अलर्ट में, और डिस्ट्रीब्यूटर क्लेम में काम आएँगी। रिसीव स्टॉक दबाएँ — माल उसी बैच के नाम स्टॉक में आ गया।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/fbr-pos/stock"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "select",
+          "selector": "select[name=supplier_id]",
+          "label": "Muller & Phipps (Islamabad)"
+        },
+        {
+          "do": "type",
+          "selector": "input[name=stock_prod_search_nofill]",
+          "text": "augm",
+          "delay": 110
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='prodResults.length > 0'] button",
+          "after": 900
+        },
+        {
+          "do": "type",
+          "selector": "input[name='items[0][quantity]']",
+          "text": "30",
+          "delay": 120
+        },
+        {
+          "do": "type",
+          "selector": "input[name='items[0][unit_price]']",
+          "text": "445",
+          "delay": 120
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "type",
+          "selector": "input[name='items[0][batch_number]']",
+          "text": "AG2508",
+          "delay": 110
+        },
+        {
+          "do": "type",
+          "selector": "input[name='items[0][expiry_date]']",
+          "text": "03/2028",
+          "delay": 110
+        },
+        {
+          "do": "highlight",
+          "selector": "input[name='items[0][expiry_date]']",
+          "after": 1200
+        },
+        {
+          "do": "type",
+          "selector": "input[name=notes]",
+          "text": "Invoice # MP-4471",
+          "delay": 50
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "click",
+          "selector": "form[action$='/fbr-pos/stock/purchase'] button[type=submit]",
+          "after": 2500
+        }
+      ]
+    },
+    {
+      "id": "s07_salt_search",
+      "narration": "अब असल इम्तिहान — काउंटर। सेल स्क्रीन खोलें। कस्टमर कहता है, पैरासिटामोल दे दो। ब्रांड का नाम नहीं, साल्ट का नाम। बस पैरासेट लिखें — और देखें, पैनाडोल, पैनाडोल एक्स्ट्रा, कैलपोल सिरप — जितनी दवाओं में यह साल्ट है, सब सामने, हर एक के नीचे साल्ट, स्ट्रेंथ, कंपनी और शेल्फ़ का नंबर। कोई भी नया लड़का काउंटर पर खड़ा हो, दवा ढूँढने में देर नहीं लगेगी।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/fbr-pos/create",
+          "waitUntil": "load"
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "eval",
+          "js": "try{document.getElementById('tn-domain-move-dismiss')?.click();}catch(e){}",
+          "after": 300
+        },
+        {
+          "do": "wait",
+          "ms": 3500
+        },
+        {
+          "do": "type",
+          "selector": "input[x-ref='searchInput']",
+          "text": "paracet",
+          "delay": 140
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "highlight",
+          "selector": "[x-ref='searchDropdown'] button:has-text('Panadol 500mg')",
+          "after": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "[x-ref='searchDropdown'] button:has-text('Calpol Syrup 60ml')",
+          "after": 1500
+        }
+      ]
+    },
+    {
+      "id": "s08_batch_picker",
+      "narration": "पैनाडॉल चुनते हैं। कार्ट की लाइन पर ऑटो बैच लिखा है — यानी सिस्टम ख़ुद वह बैच निकालेगा जिसकी एक्सपायरी सब से पहले है, ताकि पुराना माल पहले निकले। लेकिन अगर आप ख़ुद बैच चुनना चाहें, तो इसी पर क्लिक करें। यहाँ दोनों बैच दिख रहे हैं, हर एक की एक्सपायरी और बचा हुआ माल। पुराना बैच चुन लेते हैं।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "click",
+          "selector": "[x-ref='searchDropdown'] button:has-text('Panadol 500mg')",
+          "after": 1200
+        },
+        {
+          "do": "wait",
+          "ms": 1800
+        },
+        {
+          "do": "highlight",
+          "selector": ".cart-item:has-text('Panadol') button:has-text('Auto batch')",
+          "after": 2000
+        },
+        {
+          "do": "click",
+          "selector": ".cart-item:has-text('Panadol') button:has-text('Auto batch')",
+          "after": 1400
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "highlight",
+          "selector": "div[x-show='batchPickerUid'] button:has-text('PN2409A')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='batchPickerUid'] button:has-text('PN2409A')",
+          "after": 1200
+        }
+      ]
+    },
+    {
+      "id": "s09_expired_loose",
+      "narration": "अब ब्रूफ़ेन। इसके बैच देखें — एक बैच एक्सपायर्ड है, वह हल्का हो कर लॉक हो गया है; उस पर क्लिक ही नहीं होगा। एक्सपायर दवा ग़लती से भी बिल में नहीं जा सकती। कैंसल करें। और कस्टमर को पूरी पत्ती नहीं, सिर्फ़ चार गोलियाँ चाहिएँ — लूज़ दबाएँ, चार लिखें, अप्लाई। लाइन पर चार यूनिट लिखा आ गया और क़ीमत ख़ुद हिसाब से बन गई।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "type",
+          "selector": "input[x-ref='searchInput']",
+          "text": "brufen",
+          "delay": 120
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "press",
+          "key": "Enter",
+          "selector": "input[x-ref='searchInput']",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": ".cart-item:has-text('Brufen') button:has-text('Auto batch')",
+          "after": 1200
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "highlight",
+          "selector": "div[x-show='batchPickerUid'] button:has-text('BF2308')",
+          "after": 2500
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='batchPickerUid'] button:has-text('Cancel')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": ".cart-item:has-text('Brufen') button:has-text('Loose')",
+          "after": 1200
+        },
+        {
+          "do": "type",
+          "selector": "input[x-ref='looseInput']",
+          "text": "4",
+          "delay": 150
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='looseModalUid'] button:has-text('Apply')",
+          "after": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": ".cart-item:has-text('Brufen') button:has-text('4 units')",
+          "after": 1500
+        }
+      ]
+    },
+    {
+      "id": "s10_rx",
+      "narration": "आख़िर में वही नई दवा — ऑगमेंटिन। कार्ट में आते ही लाल रंग में आर एक्स नीडेड लिखा आ गया। अब कैश दबा कर देखें — बिल नहीं बनता; सिस्टम पहले नुस्खा पूछता है। डॉक्टर का नाम और मरीज़ का नाम लिखें, चाहें तो नुस्खे की तस्वीर भी साथ लगा दें। सेव। अब यह बिल के साथ रिकॉर्ड हो गया और आगे प्रिस्क्रिप्शन रजिस्टर में मिलेगा।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "type",
+          "selector": "input[x-ref='searchInput']",
+          "text": "augmentin",
+          "delay": 110
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "press",
+          "key": "Enter",
+          "selector": "input[x-ref='searchInput']",
+          "after": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "button:has-text('Rx needed')",
+          "after": 1800
+        },
+        {
+          "do": "press",
+          "key": "Alt+1",
+          "after": 2000
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "type",
+          "selector": "div[x-show='showPrescription'] input[placeholder='Doctor name']",
+          "text": "Dr. Saeed Anwar",
+          "delay": 60
+        },
+        {
+          "do": "type",
+          "selector": "div[x-show='showPrescription'] input[placeholder='Patient name']",
+          "text": "Muhammad Asif",
+          "delay": 60
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='showPrescription'] button:has-text('Save')",
+          "after": 1500
+        }
+      ]
+    },
+    {
+      "id": "s11_pay",
+      "narration": "अब कैश — ऑल्ट वन। पेमेंट कम्प्लीट। ऊपर लिखा है रिपोर्टिंग टु FBR, और कुछ ही सेकंड में FBR वेरिफ़ाइड — बिल FBR पर जमा हो गया, कस्टमर को FBR का इनवॉइस नंबर और QR कोड मिलेगा। रसीद पर हर दवा के नीचे उसका बैच और एक्सपायरी भी छपी है — कल कोई दवा वापस आए तो पता होगा किस बैच की है।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "press",
+          "key": "Alt+1",
+          "after": 2500
+        },
+        {
+          "do": "wait",
+          "ms": 6000
+        },
+        {
+          "do": "highlight",
+          "selector": "iframe[x-ref='receiptIframe']",
+          "after": 2000
+        },
+        {
+          "do": "wait",
+          "ms": 3000
+        }
+      ]
+    },
+    {
+      "id": "s12_batches",
+      "narration": "अब दुकान के पीछे का काम। सेटिंग्स में बैच एंड एक्सपायरी स्टॉक — हर बैच एक लाइन, कितना बचा है, कब तक चलेगा। ऊपर टैब देखें — नब्बे दिन में एक्सपायर होने वाले, और एक्सपायर हो चुके। एक्सपायर्ड खोलें। हर लाइन पर दो काम हैं — क्वारंटीन यानी माल शेल्फ़ से हटा कर अलग रख दो, या राइट ऑफ़ यानी नुक़सान मान कर स्टॉक से निकाल दो। कैलपोल को क्वारंटीन करते हैं — वजह लिखें, कन्फ़र्म।",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "div[x-show='showReceipt'] button:has-text('Close')",
+          "after": 1500
+        },
+        {
+          "do": "goto",
+          "url": "/fbr-pos/pharmacy/batches"
+        },
+        {
+          "do": "wait",
+          "ms": 4000
+        },
+        {
+          "do": "highlight",
+          "selector": "a:has-text('Expiring in 90 days')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": "a:has-text('Expired')",
+          "after": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "tr:has-text('Calpol') button:has-text('Quarantine')",
+          "after": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "tr:has-text('Calpol') button:has-text('Write off')",
+          "after": 2000
+        },
+        {
+          "do": "click",
+          "selector": "tr:has-text('Calpol') button:has-text('Quarantine')",
+          "after": 1500
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "type",
+          "selector": "form[action*='/action'] input[name=notes]",
+          "text": "Expired — shelf se hata diya",
+          "delay": 45
+        },
+        {
+          "do": "click",
+          "selector": "form[action*='/action'] button:has-text('Confirm')",
+          "after": 2500
+        }
+      ]
+    },
+    {
+      "id": "s13_claim",
+      "narration": "एक्सपायर माल का पैसा डिस्ट्रीब्यूटर से वापस लेना होता है — यह काम अक्सर काग़ज़ों में गुम हो जाता है। एक्सपायरी क्लेम्स खोलें। जो एक्सपायर या क़रीब-एक्सपायर बैच पड़े हैं, वो यहाँ ऊपर तैयार मिलेंगे। बैच टिक करें, डिस्ट्रीब्यूटर चुनें, क्रिएट क्लेम। क्लेम नंबर बन गया, और प्रिंट करके डिस्ट्रीब्यूटर के बंदे को थमा दें। बाद में जब पैसा या माल वापस मिले, तो यहीं सेटल्ड कर दें।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "goto",
+          "url": "/fbr-pos/pharmacy/claims"
+        },
+        {
+          "do": "wait",
+          "ms": 4500
+        },
+        {
+          "do": "click",
+          "selector": "input.ph-claim-box >> nth=0",
+          "after": 900
+        },
+        {
+          "do": "click",
+          "selector": "input.ph-claim-box >> nth=1",
+          "after": 900
+        },
+        {
+          "do": "select",
+          "selector": "select[name=supplier_id]",
+          "label": "Muller & Phipps"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Create Claim')",
+          "after": 2500
+        },
+        {
+          "do": "highlight",
+          "selector": "a:has-text('Print')",
+          "after": 1200
+        },
+        {
+          "do": "eval",
+          "js": "const a=document.querySelector('a[href*=\"/print\"]'); if(a){a.removeAttribute('target');}",
+          "after": 100
+        },
+        {
+          "do": "click",
+          "selector": "a:has-text('Print')",
+          "after": 1500
+        },
+        {
+          "do": "eval",
+          "js": "document.body.style.zoom='1.55'",
+          "after": 2500
+        }
+      ]
+    },
+    {
+      "id": "s14_reports",
+      "narration": "फ़ार्मेसी रिपोर्ट्स में सब एक जगह है। नियर एक्सपायरी — अगले नब्बे दिन में कौन सा माल निकालना ज़रूरी है, उसकी क़ीमत कितनी फँसी है। बैच वैल्यूएशन — शेल्फ़ पर कुल कितने रुपये का माल पड़ा है। प्रिस्क्रिप्शन रजिस्टर — किस डॉक्टर के नुस्खे पर किस मरीज़ को कौन सी दवा, किस बैच से दी गई। और फ़ास्ट एंड स्लो मूवर्स — कौन सी दवा रोज़ बिकती है और कौन सी महीनों से पड़ी है।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/fbr-pos/pharmacy/reports?report=near_expiry"
+        },
+        {
+          "do": "wait",
+          "ms": 5000
+        },
+        {
+          "do": "click",
+          "selector": "a:has-text('Batch Valuation')",
+          "after": 3500
+        },
+        {
+          "do": "click",
+          "selector": "a:has-text('Prescription Register')",
+          "after": 4000
+        },
+        {
+          "do": "click",
+          "selector": "a:has-text('Fast & Slow Movers')",
+          "after": 3000
+        }
+      ]
+    },
+    {
+      "id": "s15_khata",
+      "narration": "और मेडिकल स्टोर की एक और हक़ीक़त — उधार। क्लिनिक, मोहल्ले के पुराने कस्टमर, सब की खाता लिस्ट यहाँ है — किस पर कितना बाक़ी है, कितने दिन पुराना है, और एक बटन से वॉट्सऐप पर याद-दहानी। वसूली आए तो यहीं दर्ज करें। दिन के आख़िर में डे क्लोज़ — कैश, उधार, और FBR का पूरा हिसाब एक काग़ज़ पर।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/fbr-pos/khata"
+        },
+        {
+          "do": "wait",
+          "ms": 4000
+        },
+        {
+          "do": "highlight",
+          "selector": "text=0-15 DAYS",
+          "after": 1500
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "highlight",
+          "selector": "button:text-is('WA') >> nth=0",
+          "after": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "button:has-text('Wasooli') >> nth=0",
+          "after": 1500
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "goto",
+          "url": "/fbr-pos/day-close"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
+      ]
+    },
+    {
+      "id": "s16_cta",
+      "card": {
+        "heading": "FBR POS · Pharmacy Mode",
+        "sub": "taxnest.pk — apni pharmacy ka trial aaj shuru karein · Support: support@taxnest.pk"
+      },
+      "narration": "तो यह था FBR पी ओ एस का फ़ार्मेसी मोड — साल्ट से सर्च, बैच और एक्सपायरी का पक्का हिसाब, खुली गोलियों की सेल, नुस्खे का रिकॉर्ड, डिस्ट्रीब्यूटर क्लेम, और हर बिल FBR पर। टैक्सनेस्ट डॉट पी के पर जा कर अपनी फ़ार्मेसी का ट्रायल आज ही शुरू करें। शुक्रिया!",
+      "minMs": 7000
+    }
+  ]
+}

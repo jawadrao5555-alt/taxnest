@@ -33,9 +33,10 @@ class FbrVideoDemoShopSeeder extends Seeder
         // flips company FBR flags. APP_ENV is 'production' even in dev on this
         // project, so gate on the DATABASE NAME instead: only the local staging
         // MySQL is allowed. Never run on cPanel LIVE.
-        $dbName = DB::connection()->getDatabaseName();
-        if (!str_contains($dbName, 'staging')) {
-            throw new \RuntimeException("FbrVideoDemoShopSeeder refused: database '{$dbName}' is not a staging DB. This seeder is DEV ONLY.");
+        // Exact local-staging identity (driver + db name + host), shared with
+        // every other destructive dev tool — a substring match is not a boundary.
+        if ($problems = \App\Support\DevStagingGuard::problems()) {
+            throw new \RuntimeException("FbrVideoDemoShopSeeder refused: not the local staging DB (" . implode('; ', $problems) . "). This seeder is DEV ONLY.");
         }
 
         DB::beginTransaction();

@@ -19,6 +19,13 @@ const TIMEOUT = 6000;
 
 const problems = [];
 
+// Same targeting rule as record.cjs center(): the VISIBLE match. POS layouts
+// keep hidden duplicates (mobile drawer links, desktop/mobile variants), and
+// a hidden first match hangs the click here while the recorder would pass.
+function vis(page, selector) {
+  return page.locator(selector).locator('visible=true').first();
+}
+
 async function run(page, scene, a) {
   const where = `${scene.id} · ${a.do} ${a.selector || a.url || ''}`;
   try {
@@ -41,10 +48,10 @@ async function run(page, scene, a) {
       case 'wait': await page.waitForTimeout(Math.min(a.ms || 500, 800)); break;
       case 'waitFor':
       case 'highlight':
-        await page.locator(a.selector).first().waitFor({ state: 'visible', timeout: TIMEOUT });
+        await vis(page, a.selector).waitFor({ state: 'visible', timeout: TIMEOUT });
         break;
       case 'click':
-        await page.locator(a.selector).first().click({ timeout: TIMEOUT });
+        await vis(page, a.selector).click({ timeout: TIMEOUT });
         await page.waitForTimeout(700);
         break;
       case 'type': {
@@ -55,7 +62,7 @@ async function run(page, scene, a) {
           const body = await (await fetch(a.textFrom.url)).json();
           text = String(body[a.textFrom.key] || '');
         }
-        await page.locator(a.selector).first().fill(text != null ? text : '', { timeout: TIMEOUT });
+        await vis(page, a.selector).fill(text != null ? text : '', { timeout: TIMEOUT });
         break;
       }
       case 'offline':
@@ -70,8 +77,17 @@ async function run(page, scene, a) {
         await page.waitForTimeout(400);
         break;
       case 'select':
-        await page.locator(a.selector).first().selectOption(a.value, { timeout: TIMEOUT });
+        // Mirror record.cjs: a scenario may pick by visible label instead of value.
+        await vis(page, a.selector).selectOption(
+          a.value !== undefined ? { value: a.value } : { label: a.label }, { timeout: TIMEOUT });
         await page.waitForTimeout(600);
+        break;
+      case 'press':
+        // Enter-to-add and Alt+shortcuts drive real state (cart lines, modals);
+        // skipping them here would make every later selector a false failure.
+        if (a.selector) await vis(page, a.selector).press(a.key, { timeout: TIMEOUT });
+        else await page.keyboard.press(a.key);
+        await page.waitForTimeout(700);
         break;
       case 'scroll':
         await page.evaluate((by) => window.scrollBy(0, by), a.by || 0);

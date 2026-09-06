@@ -38,12 +38,29 @@ const CARD_CSS = `
   .sub{font-size:26px;color:#cfe7ec;margin-top:14px;font-weight:500;}
 `;
 
+// FBR POS marketing videos use the FBR landing look (navy + blue accents),
+// not the teal/gold PRA formula. Scenario opts in with "cardTheme": "fbr".
+const CARD_CSS_FBR = `
+  html,body{margin:0;height:100%;font-family:Inter,system-ui,sans-serif;}
+  .card{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 700px at 50% 35%, #0b3a55 0%, #052730 55%, #031a21 100%);color:#fff;text-align:center;}
+  .logo{font-size:76px;font-weight:900;letter-spacing:-1px;}
+  .logo span{color:#60a5fa;}
+  .logo small{display:block;font-size:22px;font-weight:600;color:#93c5fd;letter-spacing:4px;margin-top:6px;}
+  .rule{width:120px;height:4px;background:#3b82f6;border-radius:2px;margin:28px 0;}
+  .heading{font-size:44px;font-weight:800;}
+  .sub{font-size:26px;color:#bfdbfe;margin-top:14px;font-weight:500;}
+`;
+
 function cardHtml(card, title) {
-  const heading = card.heading || 'NestPOS';
+  const fbr = scenario.cardTheme === 'fbr';
+  const heading = card.heading || (fbr ? 'FBR POS' : 'NestPOS');
   const sub = card.sub || title || '';
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${CARD_CSS}</style></head>
+  const css = fbr ? CARD_CSS_FBR : CARD_CSS;
+  const logo = fbr ? '<div class="logo">FBR <span>POS</span><small>BY TAXNEST</small></div>' : '<div class="logo">Nest<span>POS</span></div>';
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head>
   <body><div class="card">
-    <div class="logo">Nest<span>POS</span></div>
+    ${logo}
     <div class="rule"></div>
     <div class="heading">${heading}</div>
     <div class="sub">${sub}</div>
@@ -119,7 +136,9 @@ async function runOne(page, a) {
       // An absolute URL escapes the scenario's baseUrl — the LAN tutorial has
       // to visit the agent window and the tablet pairing page, which are
       // served by their own local harness, not by the POS app.
-      await page.goto(/^https?:\/\//i.test(a.url) ? a.url : scenario.baseUrl + a.url, { waitUntil: 'networkidle' });
+      // Screens with a long-polling caller-id / agent channel never reach
+      // networkidle; such a scene sets waitUntil:"load" and waits explicitly.
+      await page.goto(/^https?:\/\//i.test(a.url) ? a.url : scenario.baseUrl + a.url, { waitUntil: a.waitUntil || 'networkidle' });
       await page.evaluate(CURSOR_JS);
       break;
     case 'wait': await sleep(a.ms || 500); break;
@@ -274,6 +293,9 @@ async function startTlsProxy() {
     viewport: { width: 1920, height: 1080 },
     recordVideo: { dir: OUT, size: { width: 1920, height: 1080 } },
     ignoreHTTPSErrors: true,
+    // Browser-side clocks (payment popup time, "today" pickers) must read as a
+    // Pakistani shop's PC, not the workspace's UTC.
+    timezoneId: 'Asia/Karachi',
   });
   ctx.setDefaultTimeout(20000);
   await ctx.addInitScript(CURSOR_JS);

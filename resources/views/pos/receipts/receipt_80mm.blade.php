@@ -400,10 +400,12 @@
     <div class="separator"></div>
     <div class="invoice-numbers" style="text-align:center; padding:4px 5px;">
         <strong style="font-size:12px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
-        @if($rcptBillToken !== null)
-        @unless($rcptIsDailyStyle)<span style="font-size:9px; font-weight:700; color:#000;">{{ __('pos.daily_token_label') }}</span><br>@endunless
+        @if($rcptIsDailyStyle && $rcptBillToken !== null)
         <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span>
-        @unless($rcptIsDailyStyle)<br><span style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}: {{ $transaction->invoice_number }}</span>@endunless
+        @elseif($rcptBillToken !== null)
+        <span style="font-size:9px; font-weight:700; color:#000;">{{ __('pos.daily_token_label') }}</span><br>
+        <span style="font-size:22px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span><br>
+        <span style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}: {{ $transaction->invoice_number }}</span>
         @else
         <span style="font-size:13px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
         @endif
@@ -412,11 +414,25 @@
              ke yeh bill PRA ko report ho raha hai (taake "local bill" na samjha jaye). --}}
         @if(($transaction->pra_status ?? null) === 'pending')<br><span style="font-size:9px; color:#000;">{{ __('pos.receipt_pending_pra_note') }}</span>@endif
     </div>
+    @elseif($rcptIsDailyStyle && $rcptBillToken !== null)
+    <div class="invoice-numbers">
+        <div style="text-align:center; padding:2px 0 3px;">
+            <span style="font-size:22px; font-weight:bold; color:#000;">{{ $rcptBillToken }}</span>
+        </div>
+        <table class="inv-table">
+            @if($omRcptFullNum)
+            <tr>
+                <td class="inv-label">Order #:</td>
+                <td class="inv-value" style="font-weight:900;">{{ $omRcptFullNum }}</td>
+            </tr>
+            @endif
+        </table>
+    </div>
     @else
     <div class="invoice-numbers">
         @if($rcptBillToken !== null)
         <div style="text-align:center; padding:2px 0 3px;">
-            @unless($rcptIsDailyStyle)<span style="font-size:9px; font-weight:700; color:#000;">{{ __('pos.daily_token_label') }}</span><br>@endunless
+            <span style="font-size:9px; font-weight:700; color:#000;">{{ __('pos.daily_token_label') }}</span><br>
             <span style="font-size:22px; font-weight:bold; color:#000;">{{ $rcptBillToken }}</span>
         </div>
         @endif
@@ -439,20 +455,18 @@
                 <td class="inv-label">{{ __('pos.receipt_pra_fiscal') }}:</td>
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
-            @if($rcptBillToken !== null && !$rcptIsDailyStyle)
+            @if($rcptBillToken !== null)
             <tr>
                 <td class="inv-label" style="font-size:9px; font-weight:600; color:#000;">{{ __('pos.bill_serial_label') }}:</td>
                 <td class="inv-value" style="font-size:9px; font-weight:600; color:#000;">{{ $transaction->invoice_number }}</td>
             </tr>
-            @elseif($rcptBillToken !== null && $rcptIsDailyStyle)
-            {{-- Daily style: large L00x already printed above; keep invoice_number off the slip. --}}
             @else
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
             @endif
-            @elseif($rcptIsLocalStream && !($rcptIsDailyStyle && $rcptBillToken !== null))
+            @elseif($rcptIsLocalStream)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_local_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>

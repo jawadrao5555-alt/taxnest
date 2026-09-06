@@ -2063,6 +2063,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'station_key_not_linked' => 'Khufia key: PRA counterpart link nahi — is ID par key kuch nahi karti',
     'pra_counterpart_hint' => 'Woh PRA cashier ID jis par yeh station khufia key se switch hota hai (aur wapas).',
     'pra_counterpart_none_available' => 'Abhi koi PRA wali cashier ID nahi — pehle kisi doosri cashier ID ka scope PRA rakhein.',
+    'pra_counterpart_unavailable' => '(abhi dastiyab nahi)',
     'billing_scope_pra_only' => 'Yeh account sirf PRA billing ke liye muqarrar hai — local/provisional bill ki ijazat nahi.',
     'billing_scope_local_only' => 'Yeh account sirf local billing ke liye muqarrar hai — PRA bill ki ijazat nahi.',
     'billing_scope_no_toggle' => 'Aap ka billing scope admin ne muqarrar kiya hai — PRA switch band hai.',

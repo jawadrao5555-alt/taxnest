@@ -383,19 +383,20 @@
                                         @if($counterpartColReady && $scopeManageAllowed && $mScopeIsCashier)
                                         @php
                                             // The CURRENT link is always kept in the list (even if that ID is
-                                            // derived-local today) so an unrelated save (name/password) never
-                                            // clears it silently — the server's own rule is explicit≠local.
+                                            // inactive or derived-local today) so an unrelated save (name/
+                                            // password) never clears it silently — the server's own rule is
+                                            // explicit≠local. NEW picks stay restricted to active PRA-capable IDs.
                                             $mCpCurrentId = (int) ($member->pos_counterpart_user_id ?? 0);
                                             $mCpOptions = $team->filter(fn ($t) => $t->pos_role === 'pos_cashier' && $t->id !== $member->id
-                                                && $t->is_active && $t->posBillingScopeExplicit() !== 'local'
-                                                && ($t->id === $mCpCurrentId || $t->posBillingScope($company) !== 'local'));
+                                                && $t->posBillingScopeExplicit() !== 'local'
+                                                && ($t->id === $mCpCurrentId || ($t->is_active && $t->posBillingScope($company) !== 'local')));
                                         @endphp
                                         <span x-show="scopeSel === 'local'" class="inline-flex flex-col gap-0.5">
                                             @if($mCpOptions->isNotEmpty())
                                             <select form="edit-{{ $member->id }}" name="pos_counterpart_user_id" :disabled="scopeSel !== 'local'" title="{{ __('pos.pra_counterpart_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                                 <option value="">{{ __('pos.pra_counterpart_none') }}</option>
                                                 @foreach($mCpOptions as $cpOption)
-                                                <option value="{{ $cpOption->id }}" {{ (int) ($member->pos_counterpart_user_id ?? 0) === $cpOption->id ? 'selected' : '' }}>{{ __('pos.pra_counterpart_label') }}: {{ $cpOption->name }}</option>
+                                                <option value="{{ $cpOption->id }}" {{ $mCpCurrentId === $cpOption->id ? 'selected' : '' }}>{{ __('pos.pra_counterpart_label') }}: {{ $cpOption->name }}{{ (!$cpOption->is_active || $cpOption->posBillingScope($company) === 'local') ? ' ' . __('pos.pra_counterpart_unavailable') : '' }}</option>
                                                 @endforeach
                                             </select>
                                             <span class="text-[10px] text-gray-400 dark:text-gray-500">{{ __('pos.pra_counterpart_hint') }}</span>

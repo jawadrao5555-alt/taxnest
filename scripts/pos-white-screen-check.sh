@@ -439,6 +439,11 @@ FBR_PAGES=(
   "/fbr-pos/reports|name=\"from\"|raDailyTrend|analyticsLockedCard"
   "/fbr-pos/settings|name=\"fbr_pos_token\"|name=\"fbr_pos_id\""
   "/fbr-pos/create|manualItemNameInput|restaurantPos\("
+  # Task 1580 distributor ledger: the stock page's purchase form and the
+  # returns page are Alpine components whose inline JS bakes PHP values —
+  # a Blade-escaped literal there kills the whole page (Sep 2026 near-miss).
+  "/fbr-pos/stock|stockPage\(|purchaseRows"
+  "/fbr-pos/stock/returns|returnsPage\("
 )
 
 check_page() {

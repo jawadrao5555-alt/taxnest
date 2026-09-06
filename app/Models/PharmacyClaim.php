@@ -42,6 +42,8 @@ class PharmacyClaim extends Model
         'raised_at',
         'settled_at',
         'settlement_reference',
+        // Task 1580: stamped when the credit note was posted to the distributor ledger.
+        'ledger_credited_at',
         'notes',
         'created_by',
     ];
@@ -51,6 +53,7 @@ class PharmacyClaim extends Model
         'settled_amount' => 'float',
         'raised_at' => 'date',
         'settled_at' => 'date',
+        'ledger_credited_at' => 'datetime',
     ];
 
     public function items()

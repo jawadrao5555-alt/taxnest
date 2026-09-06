@@ -20,6 +20,7 @@ use App\Services\PosFeatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * FBR POS Pharmacy Mode (Task 1558).
@@ -572,13 +573,32 @@ class FbrPosPharmacyController extends Controller
                 return;
             }
 
-            $claim->update([
+            $update = [
                 'status' => $data['status'],
                 'settled_amount' => $data['settled_amount'] ?? null,
                 'settlement_reference' => $data['settlement_reference'] ?? null,
                 'settled_at' => now()->toDateString(),
                 'notes' => $data['notes'] ?? $claim->notes,
-            ]);
+            ];
+            // Task 1580: a claim the distributor settles as a CREDIT NOTE is
+            // money off the shop's distributor account — post it to the
+            // supplier ledger (SupplierLedgerService reads ledger_credited_at;
+            // cash settlements and rejections never touch the ledger).
+            $postsCredit = $data['status'] === PharmacyClaim::STATUS_CREDITED
+                && $claim->supplier_id
+                && Schema::hasColumn('pharmacy_claims', 'ledger_credited_at');
+            if ($postsCredit) {
+                $update['ledger_credited_at'] = now();
+            }
+            $claim->update($update);
+
+            if ($postsCredit) {
+                \App\Services\SupplierLedgerService::audit('claim_credit_posted', 'pharmacy_claim', $claim->id, null, [
+                    'supplier_id' => $claim->supplier_id,
+                    'amount' => \App\Services\SupplierLedgerService::claimCreditAmount($claim->fresh()),
+                    'reference' => $data['settlement_reference'] ?? null,
+                ], $companyId, (int) $this->user()->id);
+            }
         });
 
         return back()->with('success', __('pos.ph_claim_updated'));

@@ -381,6 +381,9 @@ class HealthOpdCoreTest extends TestCase
         Storage::disk('local')->assertExists($stored->path);
 
         $this->company->delete();
+        // Task 1585: the bin holds a company for 7 days before a permanent
+        // delete is possible, so age the bin entry past the hold.
+        $this->company->forceFill(['deleted_at' => now()->subDays(\App\Models\Company::BIN_HOLD_DAYS + 1)])->saveQuietly();
         $admin = $this->makeAdmin();
         $this->actingAs($admin, 'admin')->delete(route('saas.admin.companies.destroy', $this->company->id));
 

@@ -46,6 +46,9 @@ class WhatsNewAudienceTargetingTest extends TestCase
     private const T_FBR = 'WNMARK-FBR-ONLY-73kd2';
     private const T_ALL = 'WNMARK-EVERYONE-73kd3';
     private const T_HIDDEN = 'WNMARK-UNPUBLISHED-73kd4';
+    // Task 1585: category-targeted elaans.
+    private const T_RESTAURANT = 'WNMARK-RESTAURANT-ONLY-73kd5';
+    private const T_PHARMACY = 'WNMARK-PHARMACY-ONLY-73kd6';
 
     private int $posCompanyId;
     private int $fbrCompanyId;
@@ -76,6 +79,9 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->string('pos_theme')->nullable();
             $table->string('pos_dashboard_style')->nullable();
             $table->string('confidential_pin')->nullable();
+            $table->string('business_category')->nullable(); // Task 1585
+            $table->string('pos_type')->nullable();
+            $table->text('feature_flags')->nullable();
             $table->string('default_language')->nullable();
             $table->softDeletes();
             $table->timestamps();
@@ -164,6 +170,7 @@ class WhatsNewAudienceTargetingTest extends TestCase
             $table->string('image_path')->nullable();
             $table->string('audience')->default('pos');
             $table->string('type', 20)->nullable(); // Task 1286: feature|improvement (null = legacy)
+            $table->text('target_categories')->nullable(); // Task 1585: null/[] = all shops
             $table->boolean('is_published')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
@@ -184,12 +191,15 @@ class WhatsNewAudienceTargetingTest extends TestCase
         $now = now();
 
         $this->posCompanyId = DB::table('companies')->insertGetId([
-            'name' => 'PRA Shop', 'product_type' => 'pos',
+            // Task 1585: an explicit category that matches NO targeted fixture
+            // row, so the audience tests keep measuring audience alone.
+            'name' => 'PRA Shop', 'product_type' => 'pos', 'business_category' => 'salon',
             'status' => 'approved', 'company_status' => 'approved',
             'created_at' => $now, 'updated_at' => $now,
         ]);
         $this->fbrCompanyId = DB::table('companies')->insertGetId([
             'name' => 'FBR Shop', 'product_type' => 'fbrpos', 'fbr_pos_enabled' => true,
+            'business_category' => 'grocery',
             'status' => 'approved', 'company_status' => 'approved',
             'created_at' => $now, 'updated_at' => $now,
         ]);
@@ -226,6 +236,19 @@ class WhatsNewAudienceTargetingTest extends TestCase
                 'is_published' => $published,
             ]);
         }
+
+        // Task 1585: category-targeted rows. 'all' audience on purpose — the
+        // category is what narrows them, not the panel.
+        AppUpdate::create([
+            'title' => self::T_RESTAURANT, 'points' => ['Point one'],
+            'audience' => 'all', 'is_published' => true,
+            'target_categories' => ['restaurant'],
+        ]);
+        AppUpdate::create([
+            'title' => self::T_PHARMACY, 'points' => ['Point one'],
+            'audience' => 'all', 'is_published' => true,
+            'target_categories' => ['pharmacy'],
+        ]);
     }
 
     private function updateId(string $title): int
@@ -522,6 +545,112 @@ class WhatsNewAudienceTargetingTest extends TestCase
         $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
         $resp->assertStatus(200);
         $resp->assertSee($legacyTitle); // badge rendering must not 500 on legacy rows
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Task 1585: business-category targeting (popup, bell and mark-seen must
+    // all agree, and a shop with no stored category resolves the same way the
+    // POS itself resolves it).
+    // ════════════════════════════════════════════════════════════════════
+
+    private function setCategory(int $companyId, ?string $category): void
+    {
+        DB::table('companies')->where('id', $companyId)->update(['business_category' => $category]);
+    }
+
+    public function test_pra_restaurant_sees_restaurant_and_universal_elaans(): void
+    {
+        $this->setCategory($this->posCompanyId, 'restaurant');
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertSee(self::T_RESTAURANT);
+        $resp->assertSee(self::T_ALL);
+        $resp->assertDontSee(self::T_PHARMACY);
+    }
+
+    public function test_pra_salon_sees_only_universal_elaans(): void
+    {
+        $this->setCategory($this->posCompanyId, 'salon');
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertSee(self::T_ALL);
+        $resp->assertDontSee(self::T_RESTAURANT);
+        $resp->assertDontSee(self::T_PHARMACY);
+    }
+
+    public function test_fbr_pharmacy_sees_pharmacy_but_not_restaurant_elaan(): void
+    {
+        $this->setCategory($this->fbrCompanyId, 'pharmacy');
+
+        $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertSee(self::T_PHARMACY);
+        $resp->assertSee(self::T_ALL);
+        $resp->assertDontSee(self::T_RESTAURANT);
+    }
+
+    public function test_fbr_grocery_never_sees_a_pra_only_targeted_elaan(): void
+    {
+        $this->setCategory($this->fbrCompanyId, 'grocery');
+        AppUpdate::create([
+            'title' => 'WNMARK-PRA-RESTAURANT-73kd7', 'points' => ['Point one'],
+            'audience' => 'pos', 'is_published' => true, 'target_categories' => ['restaurant'],
+        ]);
+
+        $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee('WNMARK-PRA-RESTAURANT-73kd7');
+        $resp->assertDontSee(self::T_PHARMACY);
+    }
+
+    public function test_mark_seen_respects_category_targeting(): void
+    {
+        $this->setCategory($this->posCompanyId, 'salon');
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->post('/pos/whats-new/seen')->assertStatus(200);
+
+        $seen = AppUpdateSeen::where('user_id', $this->posAdminId)->pluck('app_update_id')->all();
+        $this->assertContains($this->updateId(self::T_ALL), $seen);
+        $this->assertNotContains($this->updateId(self::T_RESTAURANT), $seen,
+            'a salon must not have a restaurant-targeted elaan marked seen — it never saw it');
+        $this->assertNotContains($this->updateId(self::T_PHARMACY), $seen);
+    }
+
+    public function test_company_without_stored_category_resolves_like_the_pos_does(): void
+    {
+        // No business_category, no pos_type: PosFeatureService::resolveCategory
+        // falls back to 'restaurant', so this shop must see the restaurant row.
+        $this->setCategory($this->posCompanyId, null);
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertSee(self::T_RESTAURANT);
+        $resp->assertSee(self::T_ALL);
+    }
+
+    public function test_unknown_category_keys_are_dropped_and_empty_list_means_all_shops(): void
+    {
+        $upd = AppUpdate::create([
+            'title' => 'WNMARK-NORMALIZE-73kd8', 'points' => ['Point one'],
+            'audience' => 'pos', 'is_published' => true,
+            'target_categories' => ['restaurant', 'not_a_real_category', ''],
+        ]);
+        $this->assertSame(['restaurant'], $upd->fresh()->target_categories);
+
+        $upd->update(['target_categories' => []]);
+        $this->assertNull($upd->fresh()->target_categories, 'an empty list must store as NULL = all shops');
+
+        $this->setCategory($this->posCompanyId, 'salon');
+        $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile')
+            ->assertSee('WNMARK-NORMALIZE-73kd8');
     }
 
     public function test_feature_type_round_trips_and_unknown_normalizes(): void

@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ deleteId: null, deleteName: '' }">
+<div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ deleteId: null, deleteName: '', deleteHold: false, deleteEligible: '', deleteSiblings: [], typedName: '' }">
     <div class="flex items-center gap-3 mb-6">
         <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back to Companies</a>
         <h1 class="text-2xl font-bold text-white">Bin</h1>
@@ -22,6 +22,7 @@
                         <th class="px-4 py-3 text-center">Type</th>
                         <th class="px-4 py-3 hidden sm:table-cell">Reason</th>
                         <th class="px-4 py-3 hidden sm:table-cell">Deleted On</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">Permanent Delete</th>
                         <th class="px-4 py-3 text-center">Actions</th>
                     </tr>
                 </thead>
@@ -37,19 +38,28 @@
                         </td>
                         <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $company->deleted_reason ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden sm:table-cell">{{ $company->deleted_at->format('d M Y, h:i A') }}</td>
+                        {{-- Task 1585: 7-day holding period before a purge is possible --}}
+                        @php $binHold = $company->purgeHoldActive(); $binEligible = $company->purgeEligibleAt()?->format('d M Y, h:i A'); @endphp
+                        <td class="px-4 py-3 text-xs hidden sm:table-cell">
+                            @if($binHold)
+                                <span class="text-amber-400">possible from {{ $binEligible }}</span>
+                            @else
+                                <span class="text-gray-500">possible now (hold since {{ $binEligible }})</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1">
                                 <form method="POST" action="{{ route('saas.admin.companies.restore', $company->id) }}" class="inline">
                                     @csrf
                                     <button class="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-[10px] rounded hover:bg-emerald-600/40 transition">Restore</button>
                                 </form>
-                                <button @click="deleteId = {{ $company->id }}; deleteName = '{{ addslashes($company->name) }}'" class="px-2 py-1 bg-red-600/20 text-red-400 text-[10px] rounded hover:bg-red-600/40 transition">Delete Forever</button>
+                                <button @click="deleteId = {{ $company->id }}; deleteName = @js($company->name); deleteHold = @js($binHold); deleteEligible = @js($binEligible); deleteSiblings = @js($siblingNames[$company->id] ?? []); typedName = ''" class="px-2 py-1 bg-red-600/20 text-red-400 text-[10px] rounded hover:bg-red-600/40 transition">Delete Forever</button>
                             </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-12 text-center">
+                        <td colspan="6" class="px-4 py-12 text-center">
                             <svg class="w-12 h-12 mx-auto text-gray-700 dark:text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             <p class="text-gray-500 dark:text-gray-400">Bin is empty</p>
                         </td>
@@ -73,12 +83,44 @@
                 </div>
             </div>
             <p class="text-sm text-gray-400 mb-4">Are you absolutely sure you want to permanently delete "<span class="text-white font-medium" x-text="deleteName"></span>"? All associated data will be lost forever.</p>
-            <form :action="`{{ url('/admin/bin') }}/${deleteId}/destroy`" method="POST">
+
+            {{-- Task 1585: same customer's OTHER product accounts. Deleting this
+                 one does NOT touch them, but the admin must see they exist. --}}
+            <template x-if="deleteSiblings.length">
+                <div class="mb-4 p-3 rounded-lg bg-amber-900/20 border border-amber-800">
+                    <p class="text-xs text-amber-300 font-semibold mb-1">Is customer ke doosre accounts bhi hain:</p>
+                    <ul class="text-xs text-amber-200/80 list-disc list-inside space-y-0.5">
+                        <template x-for="s in deleteSiblings" :key="s"><li x-text="s"></li></template>
+                    </ul>
+                    <p class="text-[11px] text-amber-200/60 mt-1">Yeh delete sirf isi account ka hai — baqi accounts par asar nahi hoga.</p>
+                </div>
+            </template>
+
+            {{-- Task 1585: holding period. Refused server-side too — this is
+                 only the honest UI in front of that gate. --}}
+            <template x-if="deleteHold">
+                <div class="mb-4 p-3 rounded-lg bg-red-900/20 border border-red-800">
+                    <p class="text-xs text-red-300">Yeh company abhi <span class="font-semibold">bin hold</span> mein hai. Permanent delete <span class="font-semibold" x-text="deleteEligible"></span> se possible hai.</p>
+                    @if($isSuperAdmin)
+                        <label class="block text-[11px] text-red-200/80 mt-2 mb-1">Override karne ke liye company ka poora naam type karein:</label>
+                        <input type="text" x-model="typedName" name="confirm_name" form="binDeleteForm" autocomplete="off"
+                               class="w-full px-3 py-2 bg-gray-950 border border-red-800 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-red-600"
+                               :placeholder="deleteName">
+                    @else
+                        <p class="text-[11px] text-red-200/70 mt-1">Sirf ek super-admin hold override kar sakta hai.</p>
+                    @endif
+                </div>
+            </template>
+
+            <form id="binDeleteForm" :action="`{{ url('/admin/bin') }}/${deleteId}/destroy`" method="POST">
                 @csrf
                 @method('DELETE')
                 <div class="flex gap-2 justify-end">
                     <button type="button" @click="deleteId = null" class="px-4 py-2 bg-gray-800 text-gray-300 text-sm rounded-lg hover:bg-gray-700 transition">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition">Delete Forever</button>
+                    <button type="submit"
+                            :disabled="deleteHold && (!@js($isSuperAdmin) || typedName !== deleteName)"
+                            :class="(deleteHold && (!@js($isSuperAdmin) || typedName !== deleteName)) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-red-700'"
+                            class="px-4 py-2 bg-red-600 text-white text-sm rounded-lg font-medium transition">Delete Forever</button>
                 </div>
             </form>
         </div>

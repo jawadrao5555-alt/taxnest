@@ -496,6 +496,54 @@ class Company extends Model
         ];
     }
 
+    /**
+     * Task 1585: a company sitting in the bin cannot be purged for this many
+     * days. The bin is the one recoverable step between "admin clicked delete"
+     * and "the account is gone forever" — the hold makes a mis-click always
+     * undoable. A super-admin may override by typing the exact company name.
+     */
+    public const BIN_HOLD_DAYS = 7;
+
+    /** When permanent delete becomes possible (null when not in the bin). */
+    public function purgeEligibleAt(): ?\Carbon\Carbon
+    {
+        return $this->deleted_at ? $this->deleted_at->copy()->addDays(self::BIN_HOLD_DAYS) : null;
+    }
+
+    public function purgeHoldActive(): bool
+    {
+        $at = $this->purgeEligibleAt();
+
+        return $at !== null && $at->isFuture();
+    }
+
+    /**
+     * Other LIVE accounts of the same customer (same NTN / CNIC / owner email),
+     * so a permanent delete can name what else that customer runs. Identity
+     * values are the same ones company grouping keys on.
+     */
+    public function siblingAccounts()
+    {
+        $keys = array_filter([
+            'ntn'   => $this->ntn,
+            'cnic'  => $this->cnic,
+            'email' => $this->email,
+        ], fn ($v) => filled($v));
+
+        if (!$keys) {
+            return collect();
+        }
+
+        return self::where('id', '!=', $this->id)
+            ->where(function ($w) use ($keys) {
+                foreach ($keys as $col => $val) {
+                    $w->orWhere($col, $val);
+                }
+            })
+            ->orderBy('id')
+            ->get();
+    }
+
     public function isSuspended()
     {
         return $this->company_status === 'suspended';

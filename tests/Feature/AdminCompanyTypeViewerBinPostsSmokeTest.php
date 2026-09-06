@@ -485,7 +485,8 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
 
     public function test_force_delete_purges_company_and_orphan_tables_but_keeps_ledger(): void
     {
-        $id = $this->makeCompany(['deleted_at' => now()]);
+        // Task 1585: past the 7-day bin hold, so the purge itself is allowed.
+        $id = $this->makeCompany(['deleted_at' => now()->subDays(\App\Models\Company::BIN_HOLD_DAYS + 1)]);
         $otherId = $this->makeCompany(['name' => 'Survivor Co']);
 
         $dealId = DB::table('pos_deals')->insertGetId(['company_id' => $id, 'name' => 'Deal', 'created_at' => now(), 'updated_at' => now()]);
@@ -524,6 +525,65 @@ class AdminCompanyTypeViewerBinPostsSmokeTest extends TestCase
 
         $this->actingAsAdmin()->delete("/admin/bin/{$id}/destroy")
             ->assertRedirect('/admin/dashboard')->assertSessionHas('error');
+
+        $this->assertSame(1, DB::table('companies')->where('id', $id)->count());
+    }
+
+    // ── Task 1585: bin holding period before a permanent delete ──────────
+
+    public function test_force_delete_inside_hold_is_refused_and_audited(): void
+    {
+        $id = $this->makeCompany(['name' => 'Fresh Bin Co', 'deleted_at' => now()->subDay()]);
+
+        $this->actingAsAdmin()->from('/admin/bin')
+            ->delete("/admin/bin/{$id}/destroy")
+            ->assertRedirect('/admin/bin')
+            ->assertSessionHas('error');
+
+        $this->assertSame(1, DB::table('companies')->where('id', $id)->count(),
+            'a company inside the bin hold must survive the purge attempt');
+        $this->assertSame(1, DB::table('admin_audit_logs')
+            ->where('action', 'Permanent delete refused (bin hold)')->where('target_id', $id)->count(),
+            'the refusal must be audited');
+    }
+
+    public function test_wrong_typed_name_does_not_override_the_hold(): void
+    {
+        $id = $this->makeCompany(['name' => 'Fresh Bin Co', 'deleted_at' => now()->subDay()]);
+
+        $this->actingAsAdmin()->from('/admin/bin')
+            ->delete("/admin/bin/{$id}/destroy", ['confirm_name' => 'fresh bin co'])
+            ->assertSessionHas('error');
+
+        $this->assertSame(1, DB::table('companies')->where('id', $id)->count(),
+            'the override name must match EXACTLY');
+    }
+
+    public function test_super_admin_overrides_the_hold_with_the_exact_name(): void
+    {
+        $id = $this->makeCompany(['name' => 'Fresh Bin Co', 'deleted_at' => now()->subDay()]);
+
+        $this->actingAsAdmin()->from('/admin/bin')
+            ->delete("/admin/bin/{$id}/destroy", ['confirm_name' => 'Fresh Bin Co'])
+            ->assertSessionHas('success');
+
+        $this->assertSame(0, DB::table('companies')->where('id', $id)->count());
+        $this->assertSame(1, DB::table('admin_audit_logs')
+            ->where('action', 'Permanent delete override (bin hold bypassed)')->where('target_id', $id)->count(),
+            'the override must be audited');
+    }
+
+    public function test_non_super_admin_cannot_override_the_hold(): void
+    {
+        $id = $this->makeCompany(['name' => 'Fresh Bin Co', 'deleted_at' => now()->subDay()]);
+        $staff = AdminUser::create([
+            'name' => 'Staff', 'email' => 'staff.hold@taxnest.test',
+            'password' => Hash::make('Secret@12345'), 'role' => 'admin',
+        ]);
+
+        $this->actingAs($staff, 'admin')->from('/admin/bin')
+            ->delete("/admin/bin/{$id}/destroy", ['confirm_name' => 'Fresh Bin Co'])
+            ->assertSessionHas('error');
 
         $this->assertSame(1, DB::table('companies')->where('id', $id)->count());
     }

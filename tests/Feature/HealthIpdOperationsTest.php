@@ -1085,6 +1085,9 @@ class HealthIpdOperationsTest extends TestCase
         // Permanent deletion runs out of the recycle bin, so the company is
         // binned first — exactly the two-step an admin performs.
         $this->company->delete();
+        // Task 1585: the bin holds a company for 7 days before a permanent
+        // delete is possible, so age the bin entry past the hold.
+        $this->company->forceFill(['deleted_at' => now()->subDays(\App\Models\Company::BIN_HOLD_DAYS + 1)])->saveQuietly();
 
         $this->actingAs($admin, 'admin')
             ->delete('/admin/bin/' . $this->company->id . '/destroy')

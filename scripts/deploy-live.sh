@@ -421,6 +421,8 @@ if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
   echo "ELAAN_DB_CREDS_MISSING"
   exit 0
 fi
+# Task 1585: target_categories is deliberately NOT filtered here — a
+# category-targeted elaan is a real elaan and satisfies the gate.
 COUNT=$(mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN \
   -e "SELECT COUNT(*) FROM app_updates WHERE audience IN ('pos','all') AND is_published=1 AND created_at > '$SINCE'" 2>&1)
 MYSQL_RC=$?

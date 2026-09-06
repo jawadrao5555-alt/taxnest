@@ -8,7 +8,8 @@
 #     --title "Naya update — August 2026" \
 #     --point "Pehla kaam theek hua" \
 #     --point "Doosra feature add kiya" \
-#     [--audience pos|fbr_pos|all]   (default: pos)
+#     [--audience pos|fbr_pos|all]   (default: pos) \
+#     [--category restaurant] [--category pharmacy] ...   (repeatable; none = all shops)
 #
 # Usage (dev local DB):
 #   bash scripts/elaan-insert.sh --dev \
@@ -19,6 +20,10 @@
 #   - points MUST be a PHP array on the way in (never a pre-encoded JSON string).
 #   - AppUpdate model's setPointsAttribute handles encoding — just pass the array.
 #   - audience 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
+#   - --category narrows the elaan to shops on those business categories
+#     (Task 1585). No --category = every shop of that audience. Unknown keys
+#     are rejected by the model normalizer, so the row would silently widen —
+#     the PHP side below fails loudly instead.
 #   - Editing an existing row does NOT reset seen rows — always create a NEW row.
 #
 # After running, verify the row appeared: check /admin/app-updates on live.
@@ -40,12 +45,14 @@ TITLE=""
 AUDIENCE="pos"
 DEV=0
 declare -a POINTS=()
+declare -a CATEGORIES=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --title)    shift; TITLE="$1" ;;
     --point)    shift; POINTS+=("$1") ;;
     --audience) shift; AUDIENCE="$1" ;;
+    --category) shift; CATEGORIES+=("$1") ;;
     --dev)      DEV=1 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -58,6 +65,7 @@ case "$AUDIENCE" in pos|fbr_pos|all) ;; *) fail "--audience must be pos, fbr_pos
 
 echo ""
 echo "==> Elaan insert: \"$TITLE\" (audience=$AUDIENCE, ${#POINTS[@]} point(s))"
+if [ ${#CATEGORIES[@]} -gt 0 ]; then echo "    categories: ${CATEGORIES[*]}"; else echo "    categories: (all shops)"; fi
 for P in "${POINTS[@]}"; do echo "    • $P"; done
 echo ""
 
@@ -75,6 +83,15 @@ for P in "${POINTS[@]}"; do
   fi
 done
 PHP_POINTS_ARRAY="${PHP_POINTS_ARRAY})"
+
+PHP_CATS_ARRAY="array("
+FIRST=1
+for C in ${CATEGORIES[@]+"${CATEGORIES[@]}"}; do
+  ESCAPED=$(printf '%s' "$C" | sed "s/'/\\\\'/g")
+  if [ $FIRST -eq 1 ]; then PHP_CATS_ARRAY="${PHP_CATS_ARRAY}'${ESCAPED}'"; FIRST=0
+  else PHP_CATS_ARRAY="${PHP_CATS_ARRAY},'${ESCAPED}'"; fi
+done
+PHP_CATS_ARRAY="${PHP_CATS_ARRAY})"
 
 TITLE_ESCAPED=$(printf '%s' "$TITLE" | sed "s/'/\\\\'/g")
 AUDIENCE_ESCAPED=$(printf '%s' "$AUDIENCE" | sed "s/'/\\\\'/g")
@@ -109,13 +126,26 @@ if (empty(\$points)) {
     exit(1);
 }
 
+// Task 1585: category targeting. Every key must resolve to a real preset —
+// a typo would otherwise be dropped and the elaan would go to EVERY shop.
+\$cats = $PHP_CATS_ARRAY;
+\$cats = array_values(array_filter(array_map('trim', \$cats), fn(\$c) => \$c !== ''));
+foreach (\$cats as \$c) {
+    if (! App\Services\PosFeatureService::isKnownCategory(\$c)) {
+        fwrite(STDERR, "ERROR: unknown business category '" . \$c . "' — elaan NOT created.\n");
+        exit(1);
+    }
+}
+\$extra = (\$cats && Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories'))
+    ? ['target_categories' => \$cats] : [];
+
 \$row = App\Models\AppUpdate::create([
     'title'        => '$TITLE_ESCAPED',
     'points'       => \$points,   // PHP array — model setter handles JSON encode
     'audience'     => '$AUDIENCE_ESCAPED',
     'is_published' => true,
     'created_by'   => null,
-]);
+] + \$extra);
 
 echo "ELAAN_INSERTED id=" . \$row->id . " title=" . json_encode(\$row->title) . "\n";
 exit(0);

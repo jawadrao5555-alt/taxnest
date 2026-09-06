@@ -61,6 +61,9 @@ class AppUpdateController extends Controller
             'audience' => 'nullable|in:pos,fbr_pos,all',
             // Type (Task 1286): 'feature' = Naya Feature, 'improvement' = Behtari / Masla Hal.
             'type' => 'nullable|in:feature,improvement',
+            // Task 1585: optional business-category targeting (empty = all shops).
+            'target_categories' => 'nullable|array',
+            'target_categories.*' => 'string|max:50',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -80,7 +83,9 @@ class AppUpdateController extends Controller
         ] + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')
             ? ['is_featured' => $request->boolean('is_featured')] : [])
           + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')
-            ? ['type' => $request->input('type') ?: 'improvement'] : []));
+            ? ['type' => $request->input('type') ?: 'improvement'] : [])
+          + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')
+            ? ['target_categories' => AppUpdate::normalizeCategories($request->input('target_categories'))] : []));
 
         return redirect('/admin/app-updates')->with('success', 'Update published. POS users will see it on their next page load.');
     }
@@ -95,6 +100,8 @@ class AppUpdateController extends Controller
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'audience' => 'nullable|in:pos,fbr_pos,all',
             'type' => 'nullable|in:feature,improvement',
+            'target_categories' => 'nullable|array',
+            'target_categories.*' => 'string|max:50',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -115,6 +122,12 @@ class AppUpdateController extends Controller
         }
         if ($request->filled('type') && \Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'type')) {
             $data['type'] = $request->input('type');
+        }
+        // Task 1585: the edit form always sends the control's state (a hidden
+        // empty marker when nothing is ticked), so an unticked list clears the
+        // targeting back to "all shops".
+        if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')) {
+            $data['target_categories'] = AppUpdate::normalizeCategories($request->input('target_categories'));
         }
 
         if ($request->boolean('remove_image')) {
@@ -234,10 +247,10 @@ class AppUpdateController extends Controller
         // Both panels share the 'users' provider, so AppUpdateSeen.user_id is safe
         // for either guard. Audience 'all' targets both panels.
         $user = auth('pos')->user();
-        $audiences = ['pos', 'all'];
+        $panel = 'pra';
         if (!$user) {
             $user = auth('fbrpos')->user();
-            $audiences = ['fbr_pos', 'all'];
+            $panel = 'fbr';
         }
         if (!$user) {
             return response()->json(['ok' => false], 401);
@@ -249,7 +262,11 @@ class AppUpdateController extends Controller
             'update_id' => 'nullable|integer|min:1',
         ]);
 
-        $query = AppUpdate::whereIn('audience', $audiences)->published()->liveWindow();
+        // Task 1585: the same audience + business-category predicate the two
+        // POS layouts use — mark-seen must never tick an elaan the shop can't
+        // actually see (that would hide it from a shop it IS meant for).
+        $company = \App\Models\Company::find($user->company_id);
+        $query = AppUpdate::forCompany($company, $panel)->published()->liveWindow();
         if ($request->filled('update_id')) {
             $query->whereKey((int) $request->input('update_id'));
         }

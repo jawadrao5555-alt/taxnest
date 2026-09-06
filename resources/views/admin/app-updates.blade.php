@@ -9,6 +9,20 @@
         </div>
     </x-slot>
 
+    @php
+        // Task 1585: category targeting lists come from the SAME source the app
+        // uses for its signup pickers (PosFeatureService), so admin, signup and
+        // the resolver can never disagree about what a category is.
+        $elaanGroups = [
+            'pra' => \App\Services\PosFeatureService::categoryGroups('pra'),
+            'fbr' => \App\Services\PosFeatureService::categoryGroups('fbr'),
+        ];
+        $elaanCatLabel = function ($key) {
+            $label = __('pos.auth_bt_' . $key);
+            return $label === 'pos.auth_bt_' . $key ? ucwords(str_replace('_', ' ', $key)) : $label;
+        };
+    @endphp
+
     <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             @if(session('success'))
@@ -104,6 +118,17 @@
                                         <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center {{ $upd->type === 'feature' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' }}">
                                             {{ $upd->type === 'feature' ? 'Naya Feature' : 'Behtari / Masla Hal' }}
                                         </span>
+                                        {{-- Task 1585: category targeting (empty = every shop of the audience) --}}
+                                        @php $updCats = array_values((array) ($upd->target_categories ?? [])); @endphp
+                                        @if($updCats)
+                                            <span class="mt-1 flex flex-wrap gap-1 justify-center">
+                                                @foreach($updCats as $updCat)
+                                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">{{ $elaanCatLabel($updCat) }}</span>
+                                                @endforeach
+                                            </span>
+                                        @else
+                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-medium text-center bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">Sab shops</span>
+                                        @endif
                                         @if($upd->is_featured ?? false)
                                             <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-bold text-center bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">⭐ Bara Elaan</span>
                                         @endif
@@ -120,7 +145,7 @@
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <button type="button"
-                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience), @json((bool) ($upd->is_featured ?? false)), @json($upd->type))'
+                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience), @json((bool) ($upd->is_featured ?? false)), @json($upd->type), @json(array_values((array) ($upd->target_categories ?? []))))'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
                                             @php $updExpired = $upd->created_at->lt(now()->subDays(\App\Models\AppUpdate::LIVE_DAYS)); @endphp
                                             <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline"
@@ -190,12 +215,13 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience</label>
-                    <select name="audience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    <select name="audience" id="addAudience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
                         <option value="pos">PRA POS users only</option>
                         <option value="fbr_pos">FBR POS users only</option>
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
+                @include('admin.partials.elaan-categories', ['prefix' => 'add'])
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                     <select name="type" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
@@ -245,6 +271,7 @@
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
+                @include('admin.partials.elaan-categories', ['prefix' => 'edit'])
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
                     <select name="type" id="editType" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
@@ -276,12 +303,72 @@
     </div>
 
     <script>
-        function openEditModal(id, title, pointsText, imageUrl, audience, isFeatured, type) {
+        // Task 1585: "Which shops" control — All shops vs a category list, with
+        // the visible panel sections following the chosen audience.
+        function elaanCatBox(prefix) { return document.querySelector('[data-elaan-cats="' + prefix + '"]'); }
+
+        function elaanSyncPanels(prefix, audience) {
+            var box = elaanCatBox(prefix);
+            if (!box) return;
+            box.querySelectorAll('[data-elaan-panel]').forEach(function (sec) {
+                var panel = sec.getAttribute('data-elaan-panel');
+                var show = audience === 'all' || (audience === 'fbr_pos' ? panel === 'fbr' : panel === 'pra');
+                sec.classList.toggle('hidden', !show);
+                if (!show) sec.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+            });
+        }
+
+        function elaanSyncScope(prefix) {
+            var box = elaanCatBox(prefix);
+            if (!box) return;
+            var cats = box.querySelector('[data-elaan-scope="cats"]').checked;
+            box.querySelector('[data-elaan-catbox]').classList.toggle('hidden', !cats);
+            if (!cats) box.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; });
+        }
+
+        function elaanSetCategories(prefix, list) {
+            var box = elaanCatBox(prefix);
+            if (!box) return;
+            var chosen = Array.isArray(list) ? list : [];
+            box.querySelectorAll('input[type=checkbox]').forEach(function (c) {
+                c.checked = chosen.indexOf(c.value) !== -1;
+            });
+            box.querySelector('[data-elaan-scope="' + (chosen.length ? 'cats' : 'all') + '"]').checked = true;
+            box.querySelector('[data-elaan-catbox]').classList.toggle('hidden', chosen.length === 0);
+        }
+
+        ['add', 'edit'].forEach(function (prefix) {
+            var box = elaanCatBox(prefix);
+            if (!box) return;
+            box.querySelectorAll('[data-elaan-scope]').forEach(function (r) {
+                r.addEventListener('change', function () { elaanSyncScope(prefix); });
+            });
+            box.querySelectorAll('[data-elaan-pick]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var keys = (btn.getAttribute('data-elaan-pick') || '').split(',');
+                    box.querySelector('[data-elaan-scope="cats"]').checked = true;
+                    box.querySelector('[data-elaan-catbox]').classList.remove('hidden');
+                    keys.forEach(function (k) {
+                        var el = box.querySelector('input[data-elaan-cat="' + k + '"]');
+                        if (el && !el.closest('[data-elaan-panel]').classList.contains('hidden')) el.checked = true;
+                    });
+                });
+            });
+            var sel = document.getElementById(prefix + 'Audience');
+            if (sel) {
+                sel.addEventListener('change', function () { elaanSyncPanels(prefix, sel.value); });
+                elaanSyncPanels(prefix, sel.value);
+            }
+        });
+
+        function openEditModal(id, title, pointsText, imageUrl, audience, isFeatured, type, categories) {
             document.getElementById('editUpdateForm').action = '/admin/app-updates/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
             document.getElementById('editAudience').value = ['pos','fbr_pos','all'].includes(audience) ? audience : 'pos';
             document.getElementById('editType').value = type === 'feature' ? 'feature' : 'improvement';
+            elaanSyncPanels('edit', document.getElementById('editAudience').value);
+            elaanSetCategories('edit', categories || []);
             document.getElementById('featEdit').checked = !!isFeatured;
             var wrap = document.getElementById('editCurrentImageWrap');
             var img = document.getElementById('editCurrentImage');

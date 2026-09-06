@@ -1140,7 +1140,18 @@ class AdminCompanyController extends Controller
         }
 
         $companies = $query->orderBy('deleted_at', 'desc')->paginate(20)->appends($request->all());
-        return view('saas-admin.companies.bin', compact('companies'));
+
+        // Task 1585: the confirm dialog names the customer's OTHER accounts, so
+        // an admin can never purge a sibling thinking it stands alone.
+        $siblingNames = [];
+        foreach ($companies as $c) {
+            $siblingNames[$c->id] = $c->siblingAccounts()
+                ->map(fn ($s) => $s->name . ' (' . \App\Support\ProductCatalog::shortLabel($s->product_type) . ')')
+                ->values()->all();
+        }
+        $isSuperAdmin = (bool) auth('admin')->user()?->isSuperAdmin();
+
+        return view('saas-admin.companies.bin', compact('companies', 'siblingNames', 'isSuperAdmin'));
     }
 
     public function restore($id)
@@ -1152,10 +1163,37 @@ class AdminCompanyController extends Controller
         return back()->with('success', "Company '{$company->name}' has been restored.");
     }
 
-    public function forceDelete($id)
+    public function forceDelete(Request $request, $id)
     {
         $company = Company::onlyTrashed()->findOrFail($id);
         $companyName = $company->name;
+
+        // Task 1585: 7-day holding period. Permanent delete is the ONLY way a
+        // (cloned or otherwise) account can vanish, so a mis-click must stay
+        // recoverable. A super-admin may override, but only by typing the
+        // company's exact name — both the refusal and the override are audited.
+        if ($company->purgeHoldActive()) {
+            $admin = auth('admin')->user();
+            $typed = trim((string) $request->input('confirm_name', ''));
+            $eligible = $company->purgeEligibleAt()->format('d M Y, h:i A');
+
+            if (!$admin?->isSuperAdmin() || $typed === '' || $typed !== $company->name) {
+                AdminAuditLog::log($admin?->id, 'Permanent delete refused (bin hold)', 'Company', $id, [
+                    'name' => $companyName,
+                    'eligible_at' => $eligible,
+                    'super_admin' => (bool) $admin?->isSuperAdmin(),
+                    'name_typed' => $typed !== '',
+                ]);
+
+                return back()->with('error', "'{$companyName}' abhi bin hold mein hai — permanent delete "
+                    . $eligible . " se possible hai. Us se pehle sirf ek super-admin, company ka poora naam type kar ke, override kar sakta hai.");
+            }
+
+            AdminAuditLog::log($admin->id, 'Permanent delete override (bin hold bypassed)', 'Company', $id, [
+                'name' => $companyName,
+                'eligible_at' => $eligible,
+            ]);
+        }
 
         // Purge company-scoped OPERATIONAL rows in tables that have no DB-level
         // company FK cascade (newer tables were created without the FK, so a

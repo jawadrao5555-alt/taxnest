@@ -557,7 +557,16 @@
         @php
             $ownProduct = \App\Support\ProductCatalog::normalize($company->product_type);
             $cloneTargets = array_values(array_diff(['pos', 'fbrpos', 'di'], [$ownProduct]));
-            $siblingTypes = $groupSiblings->map(fn($m) => \App\Support\ProductCatalog::normalize(optional($m->company)->product_type))->filter()->all();
+            // Task 1585: a product the customer ALREADY has is shown as
+            // "already created" with a link to that account — never as a
+            // tickable option, because ticking it would do nothing (the server
+            // skips existing siblings) and unticking never deletes anything.
+            $siblingByType = [];
+            foreach ($groupSiblings as $m) {
+                $sc = $m->company;
+                $t = $sc ? \App\Support\ProductCatalog::normalize($sc->product_type) : null;
+                if ($t && !isset($siblingByType[$t])) { $siblingByType[$t] = $sc; }
+            }
         @endphp
 
         <form method="POST" action="{{ route('saas.admin.companies.cloneProduct', $company->id) }}"
@@ -566,15 +575,21 @@
             <p class="text-xs text-gray-500 mb-2">Clone to another product — a new, fully separate account with its own 14-day trial. Only the owner login is copied; the owner creates that product&rsquo;s team himself.</p>
             <div class="flex flex-wrap items-center gap-3 mb-3">
                 @foreach($cloneTargets as $target)
+                @if(isset($siblingByType[$target]))
+                <span class="flex items-center gap-2 px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-xs text-gray-500">
+                    {{ \App\Support\ProductCatalog::label($target) }}
+                    <span class="text-[10px] text-emerald-500">already created</span>
+                    <a href="{{ route('saas.admin.companies.show', $siblingByType[$target]->id) }}" class="text-[10px] text-indigo-400 hover:text-indigo-300 underline">{{ $siblingByType[$target]->account_code ?? $siblingByType[$target]->name }}</a>
+                </span>
+                @else
                 <label class="flex items-center gap-2 px-3 py-1.5 bg-gray-950 border border-gray-800 rounded-lg text-xs text-gray-300 cursor-pointer">
                     <input type="checkbox" name="products[]" value="{{ $target }}" class="rounded bg-gray-900 border-gray-700">
                     {{ \App\Support\ProductCatalog::label($target) }}
-                    @if(in_array($target, $siblingTypes, true))
-                    <span class="text-[10px] text-amber-500">already has</span>
-                    @endif
                 </label>
+                @endif
                 @endforeach
             </div>
+            <p class="text-[11px] text-gray-500 mb-3">Tick lagana = us product par naya account BANEGA. Tick na lagana ka matlab sirf "mat banao" hai — is se koi account delete ya band nahi hota. Kisi account ko hatana sirf Delete &rarr; Bin &rarr; Permanent Delete se hota hai.</p>
             <div class="flex flex-wrap items-end gap-3">
                 <div>
                     <label class="block text-[11px] text-gray-500 mb-1">Password for the new account (blank = same as this one)</label>

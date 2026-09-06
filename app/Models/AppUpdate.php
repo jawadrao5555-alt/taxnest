@@ -14,11 +14,14 @@ class AppUpdate extends Model
     public const LIVE_DAYS = 7;
 
     protected $fillable = [
-        'title', 'points', 'image_path', 'audience', 'type', 'is_published', 'is_featured', 'created_by',
+        'title', 'points', 'image_path', 'audience', 'target_categories', 'type', 'is_published', 'is_featured', 'created_by',
     ];
 
     protected $casts = [
         'points' => 'array',
+        // Task 1585: NULL / [] = every shop of the audience panel; a non-empty
+        // list narrows the elaan to those business categories.
+        'target_categories' => 'array',
         'is_published' => 'boolean',
         // Featured "bara elaan" (Task 722): renders as a celebratory hero popup.
         'is_featured' => 'boolean',
@@ -72,6 +75,63 @@ class AppUpdate extends Model
     public function scopeLiveWindow($query)
     {
         return $query->where('created_at', '>=', now()->subDays(self::LIVE_DAYS));
+    }
+
+    /**
+     * Task 1585: only known category keys are ever stored, and an empty list
+     * is stored as NULL ("all shops") so the query side has ONE meaning of
+     * "untargeted". Unknown slugs are dropped rather than silently narrowing
+     * an elaan to a category nothing resolves to.
+     */
+    public static function normalizeCategories($raw): ?array
+    {
+        $list = is_array($raw) ? $raw : (is_string($raw) ? json_decode($raw, true) : null);
+        if (!is_array($list)) {
+            return null;
+        }
+        $clean = array_values(array_unique(array_filter(
+            array_map(fn ($c) => is_string($c) ? trim($c) : null, $list),
+            fn ($c) => $c !== null && $c !== '' && \App\Services\PosFeatureService::isKnownCategory($c)
+        )));
+
+        return $clean ?: null;
+    }
+
+    public function setTargetCategoriesAttribute($value): void
+    {
+        $clean = self::normalizeCategories($value);
+        $this->attributes['target_categories'] = $clean === null ? null : json_encode($clean, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Task 1585: the ONE "does THIS company see this elaan" predicate — panel
+     * audience plus optional business-category targeting, resolved exactly the
+     * way the POS itself resolves a shop's category (PosFeatureService), so a
+     * shop with no stored category is never silently excluded.
+     *
+     * Used by the PRA layout, the FBR layout and the mark-seen endpoint.
+     */
+    public function scopeForCompany($query, ?Company $company, ?string $panel = null)
+    {
+        $panel = $panel ?: \App\Services\PosFeatureService::panelFor($company);
+        $audiences = $panel === 'fbr' ? ['fbr_pos', 'all'] : ['pos', 'all'];
+        $query->whereIn('audience', $audiences);
+
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')) {
+            return $query; // mid-deploy: column not there yet = everything is universal
+        }
+
+        $category = \App\Services\PosFeatureService::resolveCategory($company);
+
+        return $query->where(function ($w) use ($category) {
+            $w->whereNull('target_categories')
+              ->orWhere('target_categories', '')
+              ->orWhere('target_categories', '[]')
+              // Category keys are a fixed slug set (see PosFeatureService), so
+              // a quoted-token LIKE matches the JSON list on both MySQL and
+              // SQLite without needing JSON_CONTAINS.
+              ->orWhere('target_categories', 'like', '%"' . $category . '"%');
+        });
     }
 
     public function seens()

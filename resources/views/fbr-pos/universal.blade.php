@@ -882,7 +882,7 @@ window.addEventListener('popstate', function() {
         <div class="flex-1 relative" style="min-width:170px;">
             {{-- Barcode/scan icon (retail fast-billing Aug 2026) --}}
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h1v12H4zm3 0h1v12H7zm3 0h2v12h-2zm4 0h1v12h-1zm3 0h1v12h-1zM2 4h20v2H2zm0 14h20v2H2z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ __(\App\Services\PosFeatureService::moduleRelevant($company, 'barcode') ? 'pos.ph_scan_or_first_letter' : 'pos.ph_first_letter_no_barcode') }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm font-medium border-2 border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.escape="if (phAltOpen) { $event.preventDefault(); phAltClose(); }" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ __(\App\Services\PosFeatureService::moduleRelevant($company, 'barcode') ? 'pos.ph_scan_or_first_letter' : 'pos.ph_first_letter_no_barcode') }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm font-medium border-2 border-blue-400 dark:border-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -902,7 +902,20 @@ window.addEventListener('popstate', function() {
                             <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.create_q_prefix') }}<span x-text="searchQuery"></span>"</p>
                             <p class="text-[10px] text-gray-400">{{ __('pos.qc_fill_details_hint') }}</p>
                         </div>
-                        <span class="text-[9px] font-mono bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">⏎</span>
+                        <span x-show="!pharmacyMode" class="text-[9px] font-mono bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">⏎</span>
+                    </button>
+                </template>
+                {{-- 💊 Pharmacy: Enter on a no-match writes the missed-sale log
+                     (see addHighlightedItem); creating stays a deliberate click. --}}
+                <template x-if="pharmacyMode">
+                    <button type="button" @click="phLogMissed(searchQuery.trim(), 'no_match', null, null, false); searchQuery = ''; searchSuggestions = []; showSearchDropdown = false; filterProducts(); $refs.searchInput?.focus()"
+                            class="w-full flex items-center gap-3 px-3 py-2 text-left border-t border-gray-100 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition" data-testid="ph-missed-btn">
+                        <span class="w-8 h-8 rounded-lg flex items-center justify-center bg-red-100 text-red-600 flex-shrink-0 text-base">💊</span>
+                        <span class="flex-1 min-w-0">
+                            <span class="text-sm font-bold text-gray-900 dark:text-white block">{{ __('pos.ph_missed_btn') }}</span>
+                            <span class="text-[10px] text-gray-400 block">{{ __('pos.ph_missed_btn_hint') }}</span>
+                        </span>
+                        <span class="text-[9px] font-mono bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800">⏎</span>
                     </button>
                 </template>
                 <template x-if="isInventoryEnabled()">
@@ -957,9 +970,78 @@ window.addEventListener('popstate', function() {
                                 @endif
                             </div>
                         </div>
+                        {{-- 💊 Alternatives (Sep 2026): stock chip when the probe knows,
+                             and a per-row "Alt" action that opens "Isi salt ki aur
+                             dawaiyan". .stop keeps the row's own add-click out of it. --}}
+                        <template x-if="pharmacyMode && phStockChip(s.id)">
+                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                  :style="i === highlightIndex ? 'background:rgba(255,255,255,0.25); color:white;' : (phStockQty(s.id) <= 0 ? 'background:#fee2e2; color:#b91c1c;' : 'background:#f1f5f9; color:#334155;')"
+                                  x-text="phStockChip(s.id)"></span>
+                        </template>
+                        <template x-if="pharmacyMode && s.generic_name">
+                            <span role="button" tabindex="-1" @click.stop="phOpenAlt(s, 'row')" @mousedown.prevent
+                                  class="text-[10px] font-bold px-1.5 py-0.5 rounded-md border flex-shrink-0 cursor-pointer select-none"
+                                  :style="i === highlightIndex ? 'border-color:rgba(255,255,255,0.6); color:white;' : 'border-color:#a7f3d0; color:#047857; background:#ecfdf5;'"
+                                  :title="window.TXT.ph_alt_row_title" data-testid="ph-alt-row">{{ __('pos.ph_alt_row_btn') }}</span>
+                        </template>
                         <span class="text-sm font-extrabold" :style="i === highlightIndex ? 'color:white;' : 'color:#1d4ed8;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
+            </div>
+            {{-- 💊 "Isi salt ki aur dawaiyan" — alternatives panel (Sep 2026).
+                 Opens from a row's Alt action, from a known out-of-stock pick, or
+                 never on its own for a no-match (that goes straight to the missed
+                 log). Arrows/Enter/Esc are routed here by moveHighlight /
+                 addHighlightedItem / handleKey while phAltOpen; no other key is
+                 touched, so T/D/N, Alt chords and the guided Enter chain stay
+                 exactly as they were. Computed from the baked list = works offline. --}}
+            <div x-show="phAltOpen" x-cloak x-transition @click.away="phAltClose(false)"
+                 class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border-2 border-emerald-300 dark:border-emerald-700 rounded-xl shadow-2xl z-[60] overflow-hidden"
+                 data-testid="ph-alt-panel">
+                <div class="px-3 py-2 flex items-start gap-2 border-b border-emerald-100 dark:border-emerald-900/40"
+                     :class="phAltReason === 'out_of_stock' ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'">
+                    <span class="text-base leading-none mt-0.5">💊</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[12px] font-extrabold text-emerald-900 dark:text-emerald-100 truncate">{{ __('pos.ph_alt_title') }}</p>
+                        <p class="text-[10px] text-gray-600 dark:text-gray-300 truncate">
+                            <span class="font-semibold" x-text="phAltAsked ? phAltAsked.name : phAltTerm"></span>
+                            <template x-if="phAltAsked && phAltAsked.generic_name"><span> · <span x-text="[phAltAsked.generic_name, phAltAsked.strength].filter(Boolean).join(' ')"></span></span></template>
+                            <template x-if="phAltReason === 'out_of_stock'"><span class="ml-1 font-bold text-red-700 dark:text-red-300">{{ __('pos.ph_alt_asked_out') }}</span></template>
+                        </p>
+                        <template x-if="phAltLoose"><p class="text-[10px] text-amber-700 dark:text-amber-300">{{ __('pos.ph_alt_strength_relaxed') }}</p></template>
+                    </div>
+                    <button type="button" @click="phAltClose()" class="text-gray-400 hover:text-gray-600 p-0.5" aria-label="Close">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="max-h-56 overflow-y-auto" x-ref="phAltList">
+                    <template x-for="(a, k) in phAltRows" :key="'alt' + a.id">
+                        <button type="button" @click="phAltPick(a)" @mouseenter="phAltIndex = k" :data-alt-hl="k === phAltIndex ? 'true' : 'false'"
+                                class="w-full flex items-center gap-3 px-3 py-2 text-left"
+                                :style="k === phAltIndex ? 'background:#059669; border-radius:10px; margin:2px 4px; width:calc(100% - 8px);' : 'margin:2px 4px; width:calc(100% - 8px);'">
+                            <div class="flex-1 min-w-0">
+                                <span class="text-sm font-semibold truncate block" :style="k === phAltIndex ? 'color:white;' : 'color:#1f2937;'" x-text="a.name"></span>
+                                <span class="text-[10px] truncate block" :style="k === phAltIndex ? 'color:rgba(255,255,255,0.8);' : 'color:#6b7280;'" x-text="phSubtitle(a)"></span>
+                            </div>
+                            <template x-if="phStockChip(a.id)">
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0" :style="k === phAltIndex ? 'background:rgba(255,255,255,0.25); color:white;' : 'background:#f1f5f9; color:#334155;'" x-text="phStockChip(a.id)"></span>
+                            </template>
+                            <span class="text-sm font-extrabold flex-shrink-0" :style="k === phAltIndex ? 'color:white;' : 'color:#047857;'" x-text="'Rs. ' + Number(a.price).toLocaleString()"></span>
+                        </button>
+                    </template>
+                    <template x-if="phAltRows.length === 0">
+                        <p class="px-3 py-4 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('pos.ph_alt_none') }}</p>
+                    </template>
+                </div>
+                <div class="px-3 py-2 border-t border-gray-100 dark:border-gray-700 flex items-center gap-2 bg-gray-50 dark:bg-gray-900/40">
+                    <span class="text-[9px] text-gray-400 hidden sm:inline">↑↓ · ⏎ · Esc</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <template x-if="phAltReason === 'out_of_stock' && phAltAsked">
+                            <button type="button" @click="phAltForceAdd()" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800" data-testid="ph-alt-force">{{ __('pos.ph_alt_force_add') }}</button>
+                        </template>
+                        <button type="button" @click="phAltNahiHai()" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-red-600 hover:bg-red-700 text-white" data-testid="ph-alt-nahi">{{ __('pos.ph_alt_nahi_hai') }}</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -3798,6 +3880,29 @@ function restaurantPos() {
         batchOverrideAllowed: {{ auth('fbrpos')->user()?->isPosCashier() ? 'false' : 'true' }},
         looseSaleOn: {{ ($pharmacyLooseSale ?? false) ? 'true' : 'false' }},
         nearExpiryDays: {{ (int) ($pharmacyNearDays ?? 90) }},
+        {{-- 💊 Salt alternatives + missed-sale log (Sep 2026). All state below is
+             inert unless pharmacyMode is true; the panel is computed from the
+             already-baked product list (no new baked data, works offline). --}}
+        pharmacyInventoryOn: {{ ($pharmacyInventoryOn ?? false) ? 'true' : 'false' }},
+        phAltOpen: false,
+        phAltAsked: null,        // the product/term the customer asked for
+        phAltTerm: '',           // typed text when no product matched
+        phAltReason: 'row',      // row | out_of_stock | no_match
+        phAltRows: [],
+        phAltIndex: 0,
+        phAltLoose: false,       // true when strength had to be relaxed
+        phAltStockNote: '',
+        phStock: {},             // product id → qty (probe cache)
+        phStockAt: {},           // product id → ms of last probe
+        _phStockTimer: null,
+        _phStockBusy: false,
+        _phForceId: null,
+        phMissedQueueCount: 0,
+        _phMissedKey: 'tn_fbrpos_missed_' + {{ (int) (app('currentCompanyId') ?? 0) }},
+        _phMissedFlushing: false,
+        // The shared offline-queue modal reads this on the PRA screen; the
+        // FBR screen has no offline walk-in queue, so it is always zero here.
+        offlineCustomerCount: 0,
         {{-- Step 9 (scale): TRUE when the catalogue is bigger than the bake cap,
              so allProducts is only the fallback subset and lookups must reach
              /fbr-pos/api/products/search. Offline → the baked subset stands. --}}
@@ -4446,6 +4551,7 @@ function restaurantPos() {
             window.addEventListener('offline', () => { this.syncStatus = 'offline'; this._markConnectivity(false); });
             this.refreshOfflineCount();
             this.syncOfflineBills();
+            this.phMissedRefreshCount();
             this._autoSyncTick();
             this._syncTimer = setInterval(() => this._autoSyncTick(), 30000);
 
@@ -4463,6 +4569,9 @@ function restaurantPos() {
             // server before failed-bill FBR retries (they're older by definition).
             if (this.offlineQueueCount > 0) await this.syncOfflineBills();
             this._reportOfflineQueue();
+            // 💊 Missed-sale notes carry no money: they flush AFTER the bills and
+            // never hold the tick up (fire-and-forget, own error handling).
+            this.phFlushMissed();
             this._autoSyncBusy = true;
             try {
                 // Lightweight refresh of pending count (also serves as ping).
@@ -5117,6 +5226,9 @@ function restaurantPos() {
             // Toggle dropdown synchronously so empty-state hides instantly (no flicker).
             const q = this.searchQuery.trim().toLowerCase();
             if (q.length === 0) { this.searchSuggestions = []; this.showSearchDropdown = false; }
+            // 💊 Any keystroke in the box (incl. Chrome's native Esc-clear on a
+            // type=search input) answers the previous question — drop its panel.
+            if (this.phAltOpen) this.phAltClose(false);
             // Debounce the actual filter work (60ms) — fast enough to feel instant, prevents thrash on long pastes.
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
             this._searchDebounceTimer = setTimeout(() => {
@@ -5170,6 +5282,10 @@ function restaurantPos() {
                     this.searchSuggestions = out;
                     this.highlightIndex = 0;
                     this.showSearchDropdown = true;
+                    // 💊 Typing again closes an alternatives panel from the previous
+                    // question and asks the server (online only) which of these
+                    // rows are actually on the shelf.
+                    this.phScheduleStockProbe(out.map(p => p.id));
                     // 💊 Step 9 (scale): on a catalogue bigger than the bake cap
                     // the baked rows are only a fallback — the server holds the
                     // rest. Fire the lookup alongside (never instead of) the
@@ -5272,6 +5388,211 @@ function restaurantPos() {
             if (!this.pharmacyMode || !p) return '';
             return [p.generic_name, p.strength, p.dosage_form, p.manufacturer]
                 .filter(v => v && String(v).trim() !== '').join(' · ');
+        },
+        // ── 💊 Salt alternatives + missed-sale log (Sep 2026) ──────────────
+        // Everything here works from the already-baked product list, so the
+        // panel opens offline exactly as it does online; the only network calls
+        // are the (optional) stock probe and the missed-sale flush, and both
+        // fail silently — the counter never waits on them.
+        /** Normalised salt key: case/space/order-insensitive for multi-salt names. */
+        phGenericKey(p) {
+            const g = String((p && p.generic_name) || '').toLowerCase();
+            if (!g.trim()) return '';
+            return g.split(/[+,\/&;]|\band\b/)
+                .map(x => x.replace(/[^a-z0-9\u0080-\uffff]+/g, ' ').trim())
+                .filter(Boolean).sort().join('+');
+        },
+        phStrengthKey(p) {
+            return String((p && p.strength) || '').toLowerCase().replace(/\s+/g, '');
+        },
+        phStockKnown(id) {
+            return this.pharmacyInventoryOn && Object.prototype.hasOwnProperty.call(this.phStock, String(id));
+        },
+        phStockQty(id) {
+            const v = this.phStock[String(id)];
+            return (v === undefined || v === null) ? null : Number(v);
+        },
+        /** Short stock chip text for a row, or '' when nothing is known. */
+        phStockChip(id) {
+            if (!this.phStockKnown(id)) return '';
+            const q = this.phStockQty(id);
+            if (q <= 0) return window.TXT.ph_alt_out || 'Khatam';
+            return (window.TXT.ph_alt_stock || 'Stock') + ' ' + (Number.isInteger(q) ? q : q.toFixed(1));
+        },
+        phScheduleStockProbe(ids) {
+            if (!this.pharmacyMode || !this.pharmacyInventoryOn || !navigator.onLine) return;
+            const now = Date.now();
+            const want = [...new Set((ids || []).filter(Boolean).map(String))]
+                .filter(id => !this.phStockAt[id] || (now - this.phStockAt[id]) > 60000);
+            if (!want.length) return;
+            if (this._phStockTimer) clearTimeout(this._phStockTimer);
+            this._phStockTimer = setTimeout(() => this.phProbeStock(want), 150);
+        },
+        async phProbeStock(ids) {
+            if (this._phStockBusy || !navigator.onLine) return;
+            const uniq = [...new Set(ids)].slice(0, 60);
+            if (!uniq.length) return;
+            this._phStockBusy = true;
+            try {
+                const res = await fetch('{{ route('fbrpos.pharmacy.stock-check', [], false) }}?ids=' + encodeURIComponent(uniq.join(',')), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) return;
+                const d = await res.json();
+                if (!d || d.success !== true) return;
+                if (d.inventory === false) { this.pharmacyInventoryOn = false; return; }
+                const stock = d.stock || {};
+                const ts = Date.now();
+                const next = Object.assign({}, this.phStock);
+                uniq.forEach(id => { next[id] = Number(stock[id] ?? 0); this.phStockAt[id] = ts; });
+                this.phStock = next;
+                if (this.phAltOpen) this.phAltRecompute();
+            } catch (e) { /* a dead probe must never slow the counter */ }
+            finally { this._phStockBusy = false; }
+        },
+        /** Candidates sharing the asked salt; same strength first, relaxed when none. */
+        phAlternativesFor(asked) {
+            const key = this.phGenericKey(asked);
+            if (!key) return { rows: [], loose: false };
+            const sKey = this.phStrengthKey(asked);
+            const pool = this.allProducts.filter(p =>
+                p && p.id !== asked.id && (p.type || 'product') === 'product'
+                && this.phGenericKey(p) === key
+                && !(this.phStockKnown(p.id) && this.phStockQty(p.id) <= 0));
+            let rows = sKey ? pool.filter(p => this.phStrengthKey(p) === sKey) : pool;
+            let loose = false;
+            if (!rows.length && sKey && pool.length) { rows = pool; loose = true; }
+            rows = rows.slice().sort((a, b) => {
+                const qa = this.phStockKnown(a.id) ? this.phStockQty(a.id) : -1;
+                const qb = this.phStockKnown(b.id) ? this.phStockQty(b.id) : -1;
+                if (qb !== qa) return qb - qa;
+                const pa = parseFloat(a.price) || 0, pb = parseFloat(b.price) || 0;
+                if (pa !== pb) return pa - pb;
+                return String(a.name).localeCompare(String(b.name));
+            });
+            return { rows: rows.slice(0, 12), loose };
+        },
+        phOpenAlt(asked, reason) {
+            if (!this.pharmacyMode || !asked) return;
+            this.phAltAsked = asked;
+            this.phAltTerm = asked.name || '';
+            this.phAltReason = reason || 'row';
+            this.phAltIndex = 0;
+            this.phAltRecompute();
+            this.phAltOpen = true;
+            this.showSearchDropdown = false;
+            this.phScheduleStockProbe([asked.id, ...this.phAltRows.map(r => r.id)]);
+            this.$nextTick(() => { try { this.$refs.searchInput?.focus(); } catch (e) {} });
+        },
+        phAltRecompute() {
+            if (!this.phAltAsked) { this.phAltRows = []; this.phAltLoose = false; return; }
+            const r = this.phAlternativesFor(this.phAltAsked);
+            this.phAltRows = r.rows; this.phAltLoose = r.loose;
+            if (this.phAltIndex > this.phAltRows.length - 1) this.phAltIndex = Math.max(0, this.phAltRows.length - 1);
+        },
+        phAltClose(refocus = true) {
+            this.phAltOpen = false;
+            this.phAltAsked = null; this.phAltRows = []; this.phAltLoose = false; this.phAltReason = 'row';
+            if (refocus) this.$nextTick(() => { try { this.$refs.searchInput?.focus(); } catch (e) {} });
+        },
+        phAltMove(dir) {
+            if (!this.phAltRows.length) return;
+            this.phAltIndex = Math.max(0, Math.min(this.phAltRows.length - 1, this.phAltIndex + dir));
+            this.$nextTick(() => {
+                const dd = this.$refs.phAltList;
+                const active = dd ? dd.querySelector('[data-alt-hl="true"]') : null;
+                if (active) active.scrollIntoView({ block: 'nearest' });
+            });
+        },
+        phAltEnter() {
+            if (this.phAltRows.length) { this.phAltPick(this.phAltRows[this.phAltIndex] || this.phAltRows[0]); return; }
+            this.phAltClose();
+        },
+        /** Add the chosen alternative; the asked brand goes to the log as out-of-stock. */
+        phAltPick(p) {
+            if (!p) return;
+            const asked = this.phAltAsked, reason = this.phAltReason;
+            this.phAltClose(false);
+            if (asked && reason === 'out_of_stock') this.phLogMissed(asked.name, 'out_of_stock', asked.id, null, true);
+            this.quickAddItem(p);
+        },
+        /** Owner override: bill the asked brand even though the probe says zero. */
+        phAltForceAdd() {
+            const asked = this.phAltAsked;
+            this.phAltClose(false);
+            if (!asked) return;
+            this._phForceId = asked.id;
+            try { this.quickAddItem(asked); } finally { this._phForceId = null; }
+        },
+        /** "Nahi hai" — nothing on the shelf fits; remember what was asked. */
+        phAltNahiHai() {
+            const asked = this.phAltAsked, term = this.phAltTerm, reason = this.phAltReason;
+            this.phAltClose();
+            const what = (asked && asked.name) || term;
+            if (!what) return;
+            this.phLogMissed(what, reason === 'out_of_stock' ? 'out_of_stock' : 'no_match', asked ? asked.id : null, null, false);
+            this.searchQuery = ''; this.searchSuggestions = []; this.showSearchDropdown = false; this.filterProducts();
+        },
+        /** No-match Enter in pharmacy mode: wait for a pending server lookup on a
+         *  partial catalogue, then log the term instead of quick-creating it. */
+        async phNoMatchEnter(term) {
+            if (this.productsBakedPartial && navigator.onLine && term.length >= 2) {
+                if (this.prodSearchTimer) { clearTimeout(this.prodSearchTimer); this.prodSearchTimer = null; }
+                try { await this.prodServerSearch(term); } catch (e) {}
+                if (this.searchQuery.trim() !== term) return; // cashier kept typing
+                if (this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[0]); return; }
+            }
+            this.phLogMissed(term, 'no_match', null, null, false);
+            this.searchQuery = ''; this.searchSuggestions = []; this.showSearchDropdown = false; this.filterProducts();
+            this.$nextTick(() => { try { this.$refs.searchInput?.focus(); } catch (e) {} });
+        },
+        // ── Missed-sale local queue: non-money, company-scoped, never blocks a bill ──
+        _phMissedRead() {
+            try { const a = JSON.parse(localStorage.getItem(this._phMissedKey) || '[]'); return Array.isArray(a) ? a : []; }
+            catch (e) { return []; }
+        },
+        _phMissedWrite(list) {
+            try { localStorage.setItem(this._phMissedKey, JSON.stringify(list.slice(-500))); } catch (e) {}
+            this.phMissedQueueCount = list.length;
+        },
+        phMissedRefreshCount() { this.phMissedQueueCount = this._phMissedRead().length; },
+        phLogMissed(term, reason, productId, qty, quiet) {
+            if (!this.pharmacyMode) return;
+            term = String(term || '').trim();
+            if (term.length < 2 || /^\d{6,}$/.test(term)) return;
+            const uuid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (String(Date.now()) + Math.random().toString(16).slice(2));
+            const list = this._phMissedRead();
+            list.push({ uuid, term: term.slice(0, 120), reason: reason || 'no_match', product_id: productId || null, qty: qty || null, queued_at: Date.now(), tries: 0 });
+            this._phMissedWrite(list);
+            if (!quiet) this.showToast((window.TXT.ph_missed_logged || 'Missed list mein likh diya: ') + term, 'success');
+            this.phFlushMissed();
+        },
+        async phFlushMissed() {
+            if (this._phMissedFlushing || !navigator.onLine || this.offlineNeedsLogin) return;
+            const list = this._phMissedRead();
+            if (!list.length) { this.phMissedQueueCount = 0; return; }
+            this._phMissedFlushing = true;
+            try {
+                let remaining = list.slice();
+                for (const row of list.slice(0, 20)) {
+                    let done = false;
+                    try {
+                        const res = await fetch('{{ route('fbrpos.pharmacy.missed-sales.store', [], false) }}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: JSON.stringify({ uuid: row.uuid, term: row.term, reason: row.reason, product_id: row.product_id, qty: row.qty, queued_at: row.queued_at }),
+                        });
+                        if (res.status === 401 || res.status === 419) { this.offlineNeedsLogin = true; break; }
+                        // 2xx = stored (or already stored); 4xx = the server will never
+                        // take this row (bad term, mode off) — drop it rather than retry
+                        // forever. 5xx / network = keep for the next tick.
+                        if (res.ok || (res.status >= 400 && res.status < 500 && res.status !== 429)) done = true;
+                    } catch (e) { /* offline again — keep it */ }
+                    if (done) remaining = remaining.filter(r => r.uuid !== row.uuid);
+                    else { row.tries = (row.tries || 0) + 1; if (row.tries >= 50) remaining = remaining.filter(r => r.uuid !== row.uuid); }
+                }
+                this._phMissedWrite(remaining);
+            } finally { this._phMissedFlushing = false; }
         },
         /** The MRP ceiling the server will enforce, or null when there is none. */
         phMrp(item) {
@@ -5427,6 +5748,8 @@ function restaurantPos() {
         },
         phClearRx() { this.rxDoctor = ''; this.rxPatient = ''; this.rxImage = null; this.rxImageName = ''; },
         moveHighlight(dir) {
+            // 💊 Alternatives panel owns the arrows while it is open.
+            if (this.phAltOpen) { this.phAltMove(dir); return; }
             if (!this.showSearchDropdown || this.searchSuggestions.length === 0) return;
             this.highlightIndex = Math.max(0, Math.min(this.searchSuggestions.length - 1, this.highlightIndex + dir));
             this.$nextTick(() => {
@@ -5450,6 +5773,9 @@ function restaurantPos() {
             // forward Enter to the prompt's confirm — never re-run search logic
             // behind the modal (same forwarding pattern as the type step above).
             if (this.tableSwitchPrompt) { if (!e?.repeat) this.confirmTableSwitch(this.tableSwitchIndex === 1 ? 'discard' : 'move'); return; }
+            // 💊 Alternatives panel open: Enter adds the highlighted alternative
+            // (or closes an empty panel). Nothing else in this chain may run.
+            if (this.phAltOpen) { if (!e?.repeat) this.phAltEnter(); return; }
             // BARCODE SCAN fast path (ported from PRA universal — Aug 2026 scanner bug):
             // scanner's Enter can arrive BEFORE the 60ms search debounce fills the dropdown —
             // an exact barcode/SKU match must add instantly here, or (inventory-OFF) the scan
@@ -5466,6 +5792,14 @@ function restaurantPos() {
                 }
             }
             if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
+            // 💊 Pharmacy: a no-match Enter on a typed NAME is a customer asking for
+            // something the shop does not carry — write it to the missed-sale log
+            // instead of quick-creating a medicine out of thin air (the "+ Create"
+            // button stays a deliberate click). Digit-only scans keep the old path.
+            if (this.pharmacyMode && this.searchQuery.trim().length > 0 && !this.quickCreating && !/^\d+$/.test(this.searchQuery.trim())) {
+                this.phNoMatchEnter(this.searchQuery.trim());
+                return;
+            }
             // No catalog match: in SIMPLE (inventory-OFF) mode, Enter creates the typed item on the fly.
             if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) {
                 // DUPLICATE GUARD: before quick-creating, check the WHOLE catalog (any category,
@@ -5514,6 +5848,14 @@ function restaurantPos() {
             // popup's endpoint 403s on inventory-ON); services keep instant-add.
             if (!(parseFloat(item.price) > 0) && (item.type || 'product') === 'product' && !this.isInventoryEnabled()) {
                 this.qcOpenForExisting(item);
+                return;
+            }
+            // 💊 Pharmacy + inventory: a brand the probe KNOWS is at zero opens the
+            // alternatives panel instead of silently billing a strip that is not on
+            // the shelf. "Phir bhi add karein" inside the panel is the override.
+            if (this.pharmacyMode && this.pharmacyInventoryOn && (item.type || 'product') === 'product'
+                && this._phForceId !== item.id && this.phStockKnown(item.id) && this.phStockQty(item.id) <= 0) {
+                this.phOpenAlt(item, 'out_of_stock');
                 return;
             }
             this.handleProductClick(item);
@@ -6940,6 +7282,7 @@ function restaurantPos() {
             }
 
             if (e.key === 'Escape') {
+                if (this.phAltOpen) { this.phAltClose(); return; }
                 if (this.showShortcuts) { this.showShortcuts = false; return; }
                 if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
                 if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }

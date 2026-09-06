@@ -65,6 +65,12 @@
         'pendingBillsUrl' => route('fbrpos.transactions', ['tab' => 'local']),
     ])
 
+    {{-- 💊 Pharmacy "Expire ho rahi hain" tile — included here, BEFORE the
+         style include, so every one of the six dashboard styles carries it
+         without per-style edits. Renders nothing unless the controller passed
+         a summary (pharmacy mode + batch tracking + manager/owner). --}}
+    @include('fbr-pos.partials.pharmacy-expiry-tile')
+
     @include('fbr-pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
 </div>
 </x-fbr-pos-layout>

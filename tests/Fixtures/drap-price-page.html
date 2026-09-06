@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharmaceutical Product Prices</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            500: '#0e4ce9',
+                            600: '#0240c7',
+                            700: '#0328a1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50">
+<!-- Header -->
+<header class="bg-white shadow-sm">
+    <div class="max-w-7xl md:max-w-[80%] mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center py-4">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <img src="https://e.dra.gov.pk/images/eservices/logo.png" alt="DRAP Logo" class="h-16 block">
+                </div>
+                <div class="ml-3">
+                    <h1 class="text-base md:text-3xl font-bold uppercase">Drug Regulatory Authority of Pakistan</h1>
+                    <p class="text-sm md:text-md opacity-90 uppercase text-gray-500">PharmaPrice Index</p>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Main Content -->
+<main class="max-w-7xl md:max-w-[80%] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Page Title and Stats -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold text-gray-900">Pharmaceutical Product Price Index</h2>
+        <p class="text-gray-600 mt-1">Browse and search current pharmaceutical product pricing</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-white rounded-lg shadow mb-6">
+        <div class="p-4 border-b border-gray-200">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <form name="product-search" action="https://e.dra.gov.pk/public/price/find" method="post" class="flex space-x-2 flex-1">
+                <div class="flex items-center space-x-2 flex-1 max-w-md">
+                    <input type="hidden" name="_token" value="zSHy8utNcMTzabuajsNHSRgBFZLI5UR973JWdcgx" autocomplete="off">                    <!-- Search Input -->
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input
+                                type="text"
+                                name="query"
+                                class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                placeholder="Search products using name, registration number"
+                                value=""
+                        >
+                    </div>
+                    <!-- Search Button -->
+                    <button
+                            type="submit"
+                            class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    >
+                        Search
+                    </button>
+                </div>
+                </form>
+
+                <div class="md:flex space-y-3 md:space-x-3 md:space-y-0">
+                    <form method="GET" action="https://e.dra.gov.pk/public/price" id="categoryForm">
+                        <select name="category" class="block w-full md:w-50 pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 rounded-lg" onchange="document.getElementById('categoryForm').submit()">
+                            <option class="text-gray-400 dark:text-gray-500" value="" disabled selected hidden>All Categories</option>
+                                                            <option value="Essential Drugs">Essential Drugs</option>
+                                                            <option value="Low Price Drugs">Low Price Drugs</option>
+                                                    </select>
+                    </form>
+                    <form method="POST" action="https://e.dra.gov.pk/public/price" id="manufacturerForm">
+                        <input type="hidden" name="_token" value="zSHy8utNcMTzabuajsNHSRgBFZLI5UR973JWdcgx" autocomplete="off">                        <select name="manufacturer" class="block w-full md:w-50 pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 rounded-lg" onchange="document.getElementById('manufacturerForm').submit()">
+                            <option class="text-gray-400 dark:text-gray-500" value="" disabled selected hidden>All Manufacturers/Registration Holders</option>
+                                                            <option value="8846662062">Werrick Pharmaceuticals (DML: 000340)</option>
+                                                            <option value="4925057322">Nicholas Pharmaceuticals (DML: 000886)</option>
+                                                            <option value="0008646248">Ali Gohar &amp; Company (Private) Limited (DSL: 027)</option>
+                                                            <option value="4828204482">McOlson Research Laboratories Pvt. Ltd (DML: 000664)</option>
+                                                            <option value="4385300784">Laderly Bio-Tech Pharma (DSL: 01-374-0176-06894D)</option>
+                                                            <option value="4068800680">Raazee Therapeutics (Pvt Ltd. (DML: 000437)</option>
+                                                            <option value="4688076603">A.J. MIRZA PHARMA (PVT.) LTD. (DML: 000234)</option>
+                                                            <option value="6184489054">Univet Pharmaceuticals (DML: 000424)</option>
+                                                            <option value="4265826464">PHARMEVO (PVT) LTD. (DML: 000504)</option>
+                                                            <option value="9830767498">Valor Pharmaceuticals ()</option>
+                                                            <option value="8046682400">Crown Pharmaceuticals (DML: 000456)</option>
+                                                            <option value="9673125689">Oncogen Pharma (Pvt) Limited (DML: 000960)</option>
+                                                            <option value="2644066802">Welmark Pharmaceuticals (DML: 000614)</option>
+                                                            <option value="8642208482">Zafa Pharmaceutical Laboratories (Pvt) Ltd. (DML: 000040)</option>
+                                                            <option value="8255681600">ETHICAL LABORATORIES PRIVATE LIMITED (DML: 000100)</option>
+                                                            <option value="4364149440">Ashrafsons Pharmaceutical (Pvt) Ltd. (DML: 000947)</option>
+                                                            <option value="2284442660">Ottoman Pharma (DML: 000502)</option>
+                                                            <option value="6068426802">Zamko Pharmaceuticals (Pvt) Ltd. (DML: 000890)</option>
+                                                            <option value="0200062206">Novex Pharma (DML: 000898)</option>
+                                                            <option value="4466202484">Pharma Health Pakistan (Pvt) Ltd. (DML: 000761)</option>
+                                                            <option value="0664680280">AJ Mirza Pharma Pvt Ltd (DSL: 235)</option>
+                                                            <option value="6222875700">Semos Pharmaceuticals PVT LTD (DML: 000335)</option>
+                                                            <option value="1760256121">3A Diagnostics (DSL: 05-352-0066-102283D)</option>
+                                                            <option value="2704998205">Pacific Pharmaceutical Ltd (DML: 000295)</option>
+                                                            <option value="0004240824">Moringa Pharmaceuticals (Pvt) Ltd. (DML: 000769)</option>
+                                                            <option value="8640408006">VENUS PHARMA (DML: 000300)</option>
+                                                            <option value="1123677960">Mukhtar Enterprises (DSL: 0535200650524080)</option>
+                                                            <option value="8462446686">Novartis Pharma (Pakistan) Limited (DML: 000193)</option>
+                                                            <option value="2246280064">Remington Pharmaceutical Industries (Pvt) Ltd (DML: 000061)</option>
+                                                            <option value="0826024268">Wilshire Laboratories (Private) Limited (DML: 000232)</option>
+                                                            <option value="8006468226">Lahore Chemical and Pharmaceutical Works Pvt. Ltd. (DML: 000064)</option>
+                                                            <option value="7780316696">Regal Pharmaceuticals (DML: 000839)</option>
+                                                            <option value="5168504394">Advanced Pharmaceuticals (DML: 000686)</option>
+                                                            <option value="2868666466">Neutro Pharma (Pvt.) Ltd., (DML: 000576)</option>
+                                                            <option value="4264268642">Healthtek Pvt. Ltd. (DML: 000618)</option>
+                                                            <option value="5003648646">Pfizer Pakistan Limited (DSL: 687)</option>
+                                                            <option value="6079593818">AJM Pharma Pvt Ltd (DSL: 262)</option>
+                                                            <option value="6802064802">Schazoo Zaka (Pvt) Ltd (DML: 000636)</option>
+                                                            <option value="6664044620">Martin Dow Marker Limited (DML: 000028)</option>
+                                                            <option value="4973865169">GlaxoSmithKline Pakistan Limited (DML: 000233)</option>
+                                                            <option value="6260026040">Dyson Research Laboratories (Pvt.) Ltd (DML: 000559)</option>
+                                                            <option value="0882426842">AGP Limited (DML: 000044)</option>
+                                                            <option value="5815082372">Nexus Pharma (Pvt) Ltd (DML: 000421)</option>
+                                                            <option value="4428662008">Platinum Pharmaceuticals (DML: 000415)</option>
+                                                            <option value="7895208624">Genetics Pharmaceuticals Pvt. Ltd (DML: 000845)</option>
+                                                            <option value="2264842264">Medisure Laboratories Pakistan Pvt Ltd (DML: 000503)</option>
+                                                            <option value="8604666486">Sohail Corporation (DSL: 238)</option>
+                                                            <option value="8009162286">Newton Health Care Pvt Ltd (DML: 000870)</option>
+                                                            <option value="1979124892">HONIG PHARMACEUTICALS LABORATORIES (DML: 000550)</option>
+                                                            <option value="6946622038">M/s. Zafa Pharmaceutical Laboratories (Pvt) Ltd (DML: 000558)</option>
+                                                            <option value="5590031505">Amson Vaccines &amp; Pharma (Pvt.) Ltd (DSL: 017/DSL(D)/PS&amp;DC-ICT/2025)</option>
+                                                            <option value="6362141605">2 World Traders Pakistan (DSL: 634)</option>
+                                                            <option value="2628426648">FESTEL LABORATORIES (DML: 000556)</option>
+                                                            <option value="3079640607">Haleon Pakistan Limited (DML: 000010)</option>
+                                                            <option value="5090900834">Zam Zam Pharma (DML: 000833)</option>
+                                                            <option value="4860022288">UniMark Pharmaceuticals Pvt. Ltd. (DML: 000557)</option>
+                                                            <option value="2020460024">Medical Equipment and Systems (DSL: 05-352-0065-069537D)</option>
+                                                            <option value="7404067266">Atco Pharma International (Pvt) Ltd (DSL: 046)</option>
+                                                            <option value="8304044024">KARACHI PHARMACEUTICAL LABORATORIES (DML: 000074)</option>
+                                                            <option value="6763753271">Inaya traders (DSL: 0470)</option>
+                                                            <option value="2744012058">Lucky Core Industries Limited (DML: 000363)</option>
+                                                            <option value="8822448313">RA Healthcare (SMC-Pvt) Ltd (DSL: 01-374-0176-99719D)</option>
+                                                            <option value="6426828080">Hiranis Pharmaceuticals Pvt. Ltd. (DML: 000785)</option>
+                                                            <option value="5248027487">Searle Pakistan Limited (DSL: 0500)</option>
+                                                            <option value="2086622244">Amarant Pharmaceuticals Private Limited (DML: 000584)</option>
+                                                            <option value="9547861888">Acumen Healthcare (Pvt.) Ltd (DML: 000932)</option>
+                                                            <option value="8480240880">Sigma Pharma International (Pvt.) Ltd. (DML: 000804)</option>
+                                                            <option value="6747846064">Sante (Private) Limited (DML: 000702)</option>
+                                                            <option value="8422660680">AGP Limited (DML: 000348)</option>
+                                                            <option value="4062402842">Venture Pharmaceuticals (Pvt.) Ltd (DSL: 291)</option>
+                                                            <option value="8264060826">Chiesi Pharmaceuticals (Pvt) Ltd (DSL: 05-352-0058-0161D)</option>
+                                                            <option value="6684280028">Hoffmann Human Health Pakistan Ltd. (DSL: 05-352-0065-013785D)</option>
+                                                            <option value="8662848684">Getz Pharma (Pvt.) Ltd.  (DML: 000933)</option>
+                                                            <option value="9422586037">ICU Pharmaceuticals (SMC-Private) Limited  (DML: 000956)</option>
+                                                            <option value="1009244114">ARP (PVT) Limited (DML: 000682)</option>
+                                                            <option value="7367573744">SAFE PHARMACEUTICAL  (PVT) LTD (DML: 000349)</option>
+                                                            <option value="4062060028">GSK Pakistan Limited (DSL: 066)</option>
+                                                            <option value="4531454562">Titlis Pharma (Private) Limited (DSL: 05-352-0066-035681D)</option>
+                                                            <option value="9538244664">Martin Dow Marker Limited (DML: 000043)</option>
+                                                            <option value="0646042422">Radiant Pharma (Pvt.) Ltd., (DML: 000776)</option>
+                                                            <option value="7655197658">RECKITT BENCKISER PAKISTAN LIMITED (DML: 000022)</option>
+                                                            <option value="2682666066">Hizat Pharmaceutical Industry (DML: 000315)</option>
+                                                            <option value="1443072476">OBS Pharma (Pvt) Ltd (DML: 000243)</option>
+                                                            <option value="8430018125">M.A. Kamil Farma (Pvt) Limited (DML: 000972)</option>
+                                                            <option value="8325331864">Valor Pharmaceuticals (DML: 000496)</option>
+                                                            <option value="6868622084">PUNJAB MEDICAL SERVICES (DSL: 05-352-0063-041061D)</option>
+                                                            <option value="6697919608">Arsons Pharmaceutical Industries (Pvt) Ltd (DML: 000514)</option>
+                                                            <option value="4484200002">RG Pharmaceutica Pvt Ltd (DSL: 05-352-0066-059010D-E)</option>
+                                                            <option value="1010349608">Lucky Core Industries Limited (DML: 000006)</option>
+                                                            <option value="0488200402">Kohinoor Industries (DML: 000197)</option>
+                                                            <option value="4354626040">Mass Pharma (Pvt) Ltd. (DML: 000444)</option>
+                                                            <option value="8828226002">XenoBiotech Pharma and Devices (DSL: 01-374-0176-112407D)</option>
+                                                            <option value="4440886002">UNEXOLABS (PVT) LTD. (DML: 000065)</option>
+                                                            <option value="8024242466">Atlantic Pharmaceuticals (DSL: 0660)</option>
+                                                            <option value="2298847121">S&amp;K Pharmaceuticals (DML: 000961)</option>
+                                                            <option value="2886400804">Polyfine Chempharma (DML: 000216)</option>
+                                                            <option value="8057930360">The Schazoo Pharmaceutical Laboratories (Pvt) Ltd. ()</option>
+                                                            <option value="2224000844">OLIVE LABORATORIES (DML: 000524)</option>
+                                                            <option value="3644994296">The Searle Company Limited (DML: 000016)</option>
+                                                            <option value="6468606240">Winthrox Laboratories Pvt. Ltd (DML: 000807)</option>
+                                                            <option value="8646046004">MS SIZA INTERNATIONAL PVT LTD. (DML: 000259)</option>
+                                                            <option value="3416880884">RASCO PHARMA (DML: 000530)</option>
+                                                            <option value="2371455903">Innvotek Pharmaceuticals (DML: 000487)</option>
+                                                            <option value="4960906060">Caliph Pharmaceuticals (Pvt) Ltd.  (DML: 000748)</option>
+                                                            <option value="0462449703">Horizon HealthCare (Pvt) Ltd (DML: 000782)</option>
+                                                            <option value="8048402280">De-Mont Research Laboratories (Pvt.) Ltd. (DML: 000844)</option>
+                                                            <option value="8521183292">Don Valley (DML: 000395)</option>
+                                                            <option value="2204224448">Surge Laboratories (Pvt.) Ltd. (DML: 000484)</option>
+                                                            <option value="3229011984">Helix Pharma (Pvt)., Ltd. (DML: 000030)</option>
+                                                            <option value="0600802266">GlaxoSmithKline Pakistan Limited (DML: 000248)</option>
+                                                            <option value="0372208604">Swiss Pharmaceuticals Pvt. Ltd. (DML: 000438)</option>
+                                                            <option value="2721846437">Panacea Pharmaceuticals (DML: 000600)</option>
+                                                            <option value="9343320980">Trigon Pharmaceuticals (Private) Ltd (DML: 000342)</option>
+                                                            <option value="1318131302">Tovida Pharmaceuticals (Pvt) Ltd (DML: 000996)</option>
+                                                            <option value="7339758508">Lakhani Pharma (Pvt.) Limited (DML: 000928)</option>
+                                                            <option value="6886882442">Hospital supply Corporation (DSL: 0395)</option>
+                                                            <option value="4668642262">Abbott Laboratories (Pakistan) Limited (DML: 000004)</option>
+                                                            <option value="1507223872">Bryon Pharmaceuticals (Pvt.) Ltd (DML: 000388)</option>
+                                                            <option value="4874500653">FRONTIER DEXTROSE LIMITED (DML: 000633)</option>
+                                                            <option value="6673170177">Martin Dow Marker Limited (DSL: 0523)</option>
+                                                            <option value="5440415927">shrooq pharmaceuticals pvt ltd (DML: 000577)</option>
+                                                            <option value="4058224848">Pharmedic Laboratories (Pvt.) Ltd Lahore (DML: 000228)</option>
+                                                            <option value="8538022428">Saffron Pharmaceuticals (DML: 000616)</option>
+                                                            <option value="2351732550">Orbis Pharmaceuticals (DML: 000979)</option>
+                                                            <option value="2800464826">Himmel Pharmaceuticals Private Limited (DSL: 05-352-0065-016174D)</option>
+                                                            <option value="1925245746">Zeta Pharmaceuticals (DML: 000818)</option>
+                                                            <option value="2801431168">Pacific Pharmaceuticals Ltd. (DML: 000902)</option>
+                                                            <option value="6204262644">Hakimsons (Impex) (Pvt.) Ltd. (DSL: 030)</option>
+                                                            <option value="1183170678">CURATECH PHARMA PVT.LTD. (DML: 000619)</option>
+                                                            <option value="0882086068">shaheen pharmaceuticals (DML: 000562)</option>
+                                                            <option value="0684866468">Highnoon Laboratories Ltd (DML: 000155)</option>
+                                                            <option value="1328190680">Ophth Pharma (Pvt.) Ltd (DML: 000488)</option>
+                                                            <option value="0662648682">Geofman Pharmaceuticals (DML: 000090)</option>
+                                                            <option value="1065077984">GT Pharma Pvt. Ltd (DML: 000829)</option>
+                                                            <option value="9862015263">Getz Pharma (Pvt) Limited (DML: 000284)</option>
+                                                            <option value="4282886608">Al Qasim Enterprises (DSL: 01-374-0176-039416D)</option>
+                                                            <option value="6664844666">Cell Health Sciences, (DML: 000711)</option>
+                                                            <option value="3761626822">Dow Institute of Life Sciences (DML: 000915)</option>
+                                                            <option value="9019092715">Allmed (Pvt.) Ltd (DML: 000645)</option>
+                                                            <option value="6040002084">Popular Chemical Works Pvt Ltd., (DML: 000076)</option>
+                                                            <option value="3787933301">FAAS Pharmaceuticals (Pvt)Ltd (DML: 000767)</option>
+                                                            <option value="5557944295">Nahal Pharmaceuticals (Pvt) Ltd. (DML: 000989)</option>
+                                                            <option value="2826622048">Medera Pharmaceuticals (Pvt) Ltd (DML: 000714)</option>
+                                                            <option value="4242068288">Indus Pharma (Pvt.) Ltd. (DML: 000124)</option>
+                                                            <option value="0642226482">P.D.H Pharmaceuticals (Pvt) Ltd (DML: 000459)</option>
+                                                            <option value="3451966518">Searle Pakistan Limited (DML: 000012)</option>
+                                                            <option value="2408242426">Hilton Pharma (Pvt) Limited. (DML: 000136)</option>
+                                                            <option value="4084686488">Medisave Pharmaceuticals (DML: 000681)</option>
+                                                            <option value="4543054635">Ali Industries (DML: 000222)</option>
+                                                            <option value="1954070442">Reign Pharmaceuticals PCSIR - KLC (Pvt.) Ltd. (DML: 000757)</option>
+                                                            <option value="6240800228">Genome Pharmaceuticals (Pvt.) Ltd, (DML: 000454)</option>
+                                                            <option value="4466046482">Searle IV Solutions (Pvt) Ltd. (DML: 000586)</option>
+                                                            <option value="4620082462">Axis Pharmaceuticals (Pvt) Ltd (DML: 000667)</option>
+                                                            <option value="0040804400">SKIMS PHARMACEUTICALS (DML: 000830)</option>
+                                                            <option value="4820966423">SAMI Pharmaceuticals Pvt. Ltd. (DML: 000072)</option>
+                                                            <option value="6004244406">NAVEGAL LABORATORIES (DML: 000591)</option>
+                                                            <option value="1646772419">Medella Pharmaceuticals (Pvt) Ltd (DML: 000749)</option>
+                                                            <option value="0796319440">Barrett Hodgson Pakistan (Pvt.) Ltd (DML: 000457)</option>
+                                                            <option value="1648660808">Filix Pharmaceuticals Pvt Ltd (DML: 000779)</option>
+                                                            <option value="1963880307">Health care pharmaceuticals (DML: 000905)</option>
+                                                            <option value="2990115557">Bio-Labs(Pvt) Ltd (DML: 000296)</option>
+                                                            <option value="0460466222">HOSPITAL SERVICES &amp; SALES (DSL: 0398)</option>
+                                                            <option value="7691549340">SAFE Pharmaceuticals (Pvt)Ltd ()</option>
+                                                            <option value="4620082066">Wilson&#039;s Pharmaceuticals (DML: 000239)</option>
+                                                            <option value="3012143547">CSH Pharmaceuticals (Pvt.) Ltd., (DML: 000737)</option>
+                                                            <option value="6617253848">SAMI Pharmaceuticals (Pvt) Ltd. (DML: 000938)</option>
+                                                            <option value="6042848002">Medifine Laboratories (Pvt) Ltd. (DML: 000672)</option>
+                                                            <option value="4227702600">Rotex Pharma Pvt Ltd (DML: 000651)</option>
+                                                            <option value="6186789394">REVIVE HEALTH CARE (DSL: 05-352-0065-031159D)</option>
+                                                            <option value="3372720580">Himont Pharmaceuticals (Pvt.) Ltd. (DML: 000231)</option>
+                                                            <option value="2882862080">IRZA PHARMA (PVT) LTD (DML: 000108)</option>
+                                                            <option value="2599155943">CRYSTOLITE PHARMACEUTICALS (DML: 000778)</option>
+                                                            <option value="4055342934">Quaper pvt Ltd (DML: 000609)</option>
+                                                            <option value="5319958857">Biocare Pharmaceutica (DSL: 05-353-0063-032069D)</option>
+                                                            <option value="0408688062">M/s. Genix Pharma (Pvt) Ltd. (DML: 000351)</option>
+                                                            <option value="0822262806">Bosch Pharmaceuticals (Pvt)  Ltd. (DML: 000350)</option>
+                                                            <option value="7628268604">Abbott Laboratories (Pakistan) Limited (DML: 000001)</option>
+                                                            <option value="7837575658">The Searle Company Limited (DML: 000647)</option>
+                                                            <option value="8228488680">Medipak Limited (DML: 000257)</option>
+                                                            <option value="0004804840">Welwrd Pharmaceuticals (DML: 000574)</option>
+                                                            <option value="6222060862">Evolution Pharmaceuticals (Pvt.) Ltd. (DML: 000867)</option>
+                                                            <option value="8028846048">Wnsfeild Pharmaceuticals (DML: 000610)</option>
+                                                            <option value="4886648062">Well &amp; Well Pharma Pvt.Ltd (DML: 000687)</option>
+                                                            <option value="4064646062">Sunshine Pharmaceuticals (DML: 000662)</option>
+                                                            <option value="8882846006">Hoechst Pakistan Limited (DML: 000007)</option>
+                                                            <option value="9470850679">Muller &amp; Phipps Pakistan (Pvt) Ltd. (DSL: 264)</option>
+                                                            <option value="9500636608">Welmed Pharmaceutical Industries (Pvt) Ltd. (DML: 000546)</option>
+                                                            <option value="0422804268">Amgomed (DSL: 037/DSL(D)/PS&amp;DC-ICT/2025)</option>
+                                                            <option value="8628624040">LINZ PHARMACEUTICALS (PVT) LTD. (DML: 000540)</option>
+                                                            <option value="0008686002">Macter International Limited (DML: 000641)</option>
+                                                            <option value="0666600204">Hygeia Pharmaceuticals (DML: 000523)</option>
+                                                            <option value="2660824880">HIPRA PAKISTAN PVT LTD. (DSL: 05-352-0058-050528D)</option>
+                                                            <option value="4068268882">GALLOP WATER SCIENCES (DML: 000817)</option>
+                                                            <option value="1866530546">Mega Pharmaceuticals limited (DML: 000537)</option>
+                                                            <option value="0648266266">Pharmatec Pakistan (Pvt.) Limited (DML: 000024)</option>
+                                                            <option value="9359576034">Safe Pharmaceutical Pvt Ltd ()</option>
+                                                            <option value="7707961707">AUSPEC PHARMACEUTICALS PVT LTD (DML: 000964)</option>
+                                                            <option value="8684082666">Aptcure (PVT.) Ltd (DML: 000648)</option>
+                                                            <option value="0882022286">Standpharm Pakistan Pvt Ltd (DML: 000051)</option>
+                                                            <option value="6464246844">Excel Healthcare Laboratories Pvt. Ltd. (DSL: 143)</option>
+                                                            <option value="8446446202">CCL Pharmaceuticals (Pvt.) Ltd (DML: 000891)</option>
+                                                            <option value="2418344586">Adamjee Pharmaceuticals (Pvt) Ltd (DML: 000236)</option>
+                                                            <option value="6820206488">GENOME PHARMA (DSL: DHO-ISB-2257)</option>
+                                                            <option value="8602286202">Hicon Pharmaceuticals (DML: 000583)</option>
+                                                            <option value="6080084444">himark laboratories (pvt.) Ltd (DML: 000909)</option>
+                                                            <option value="8848466064">Akson Pharmaceuticals (Pvt) Ltd (DML: 000486)</option>
+                                                            <option value="8620486446">Pharma Lord (Pvt) Ltd (DML: 000774)</option>
+                                                            <option value="2328858442">Nouveaux Pharma Limited (DSL: 073)</option>
+                                                            <option value="0846979428">Bio-Next Pharmaceuticals (DML: 000910)</option>
+                                                            <option value="2442808886">Umar Pharma Pvt Ltd (DSL: 14-07-2026)</option>
+                                                            <option value="0846226626">M/s. Zafa Pharmaceutical Laboratories (Pvt) Ltd (DML: 000490)</option>
+                                                            <option value="6868224488">CCL Pharmaceuticals (Pvt.) Ltd. (DML: 000052)</option>
+                                                            <option value="2806044024">News Pharma (DML: 000775)</option>
+                                                            <option value="4668284608">Kaizen Pharmaceuticals (Pvt) Ltd (DML: 000755)</option>
+                                                            <option value="3354135984">Palpex Pharmaceuticals pvt ltd (DML: 000858)</option>
+                                                            <option value="0207868987">Nabiqasim Industries (Pvt) Ltd., (DML: 000105)</option>
+                                                            <option value="2688084448">M/s Daneen Pharma (Pvt) Ltd (DML: 000688)</option>
+                                                            <option value="0240824248">poulmed Enterprises (DSL: 0381)</option>
+                                                            <option value="0677783269">Glitz Pharma (DML: 000571)</option>
+                                                            <option value="8004420624">Nouveaux Pharma Limited (DSL: 071)</option>
+                                                            <option value="2957757440">SMS Corporation (DSL: 0458)</option>
+                                                            <option value="4340041198">GENOME PHARMA (DSL: 01-374-0176-035673D)</option>
+                                                            <option value="2013278450">Paradise Pharma (DML: 000742)</option>
+                                                            <option value="5568404087">IBL Health Care Ltd (DSL: 0424)</option>
+                                                            <option value="0608046824">Herbion Pakistan (Pvt.) Ltd. (DML: 000795)</option>
+                                                            <option value="2860686682">Ferozsons Laboratories Limited (DML: 000038)</option>
+                                                            <option value="8472082426">Delux Chemical Industries (DML: 000033)</option>
+                                                            <option value="1386082228">PDH Laboratories (Pvt.) Ltd. (DML: 000039)</option>
+                                                            <option value="0832393060">Pearl Pharmaceuticals (DML: 000479)</option>
+                                                            <option value="1011771205">Hamaz Pharmaceuticals (Pvt) Ltd. (DML: 000427)</option>
+                                                            <option value="8831463064">We Care (DSL: 985-ICT/2013)</option>
+                                                            <option value="2365025967">Eastern Medical Care Pvt Ltd (DSL: ELI-00130)</option>
+                                                            <option value="6864662840">Medipak Limited (DML: 000841)</option>
+                                                            <option value="4204484604">Bristol Mayer Biotech Pakistan (DSL: 05-352-0068-109282D)</option>
+                                                            <option value="8022066828">Maxitech Pharma (Pvt) Ltd. (DML: 000851)</option>
+                                                            <option value="7576479202">ZINTA PHARMACEUTICAL INDUSTRY (DML: 000570)</option>
+                                                            <option value="0420000068">B. Braun Pakistan Pvt. Ltd. (DSL: 615)</option>
+                                                            <option value="6603271459">Batala Pharmaceuticals (DML: 000477)</option>
+                                                            <option value="4070372871">Hudson Pharma (Pvt) Ltd (DML: 000842)</option>
+                                                            <option value="9769386466">RELIZON PHARMACEUTICALS (DML: 000875)</option>
+                                                            <option value="9291033543">Global Pharmaceuticals Pakistan (DML: 000724)</option>
+                                                            <option value="9182604848">Nimrall Laboratories (DML: 000611)</option>
+                                                            <option value="6220842640">Nextar Pharma (pvt) Ltd (DML: 000777)</option>
+                                                            <option value="8428860000">Bio Medics Medical system (DSL: 01-374-0177-107736D)</option>
+                                                            <option value="6827540653">AstraZeneca Pharmaceuticals Pakistan Private Limited (DSL: 290)</option>
+                                                            <option value="6583449066">Hakimsons (Pvt)., Ltd. (DSL: 055)</option>
+                                                            <option value="8020286804">Mediate Pharmaceutical Pvt Ltd (DML: 000167)</option>
+                                                            <option value="8627137942">INVENTOR PHARMA PVT LTD (DML: 000866)</option>
+                                                            <option value="7111724215">Air Pharmaceuticals(Pvt.)Ltd (DML: 000977)</option>
+                                                            <option value="2000062486">ASTER LIFE SCIENCES (DSL: 053520065013801D)</option>
+                                                            <option value="1291390220">Medisearch Pharmacal (Pvt) Ltd (DML: 000549)</option>
+                                                            <option value="5397194586">Mediflow Pharmaceutical (Pvt) Ltd. (DML: 000822)</option>
+                                                            <option value="2433650000">Ray Pharma (DML: 000642)</option>
+                                                            <option value="2880686808">Servier Research and Pharmaceuticals (Pakistan) (Pvt) Limited (DML: 000472)</option>
+                                                            <option value="0426626404">Nawan Laboratories Pvt Ltd (DML: 000442)</option>
+                                                            <option value="0208248288">Wimits Pharmaceuticals Pvt. Ltd (DML: 000789)</option>
+                                                            <option value="0002084464">Maple Pharmaceuticals (Pvt.) Ltd. (DML: 000620)</option>
+                                                            <option value="4242260402">Fedro Pharmaceutical Labs Pvt Ltd (DML: 000238)</option>
+                                                            <option value="6044684666">Seatle Private Limited (DML: 000481)</option>
+                                                            <option value="5420840345">High-Q Pharmaceuticals (DML: 000597)</option>
+                                                            <option value="0874862154">Next Pharmaceutical Products (Pvt.) Ltd (DML: 000847)</option>
+                                                            <option value="7866824040">Fresenius Medical Care Pakistan Pvt Ltd (DSL: 05-352-0065-103893D)</option>
+                                                            <option value="1876480022">Dew-Max Pharmaceuticals (Pvt) Ltd (DML: 000889)</option>
+                                                            <option value="3452026403">M/s. Zafa Pharmaceutical Laboratories (Pvt) Ltd (DML: 000470)</option>
+                                                            <option value="9886664266">Lucky Core Industries Limited (DML: 000025)</option>
+                                                            <option value="4791487141">Pinnacle Biotech (Pvt.) Ltd. (DML: 000939)</option>
+                                                            <option value="2824624000">Danas Pharmaceuticals (Pvt) Ltd. (DML: 000569)</option>
+                                                            <option value="0686642864">OPAL LABORATORIES (PVT) LTD (DML: 000046)</option>
+                                                            <option value="3992054386">JHK PHARMA (PVT) LTD (DML: 000946)</option>
+                                                            <option value="4448826002">Al Habib Pharmaceuticals. (DSL: 0414)</option>
+                                                            <option value="4758018064">M/s. Zafa Pharmaceutical Laboratories (Pvt) Ltd (DML: 000626)</option>
+                                                            <option value="4060480862">Honig Pharmaceuticals Labs ()</option>
+                                                            <option value="8002424466">Friends Pharma (Pvt.) Ltd. (DML: 000531)</option>
+                                                            <option value="4484602824">M/s. Zafa Pharmaceutical Laboratories (Pvt) Ltd (DML: 000516)</option>
+                                                            <option value="2402422822">Zephyr Pharmatec (pvt) limited (DML: 000403)</option>
+                                                            <option value="8822026020">Titlis Pharma (Private) Limited (DML: 000799)</option>
+                                                            <option value="8844820824">Davis Pharmaceutical Laboratories (DML: 000432)</option>
+                                                            <option value="9362160247">Medimarker&#039;s Laboratories (DML: 000615)</option>
+                                                            <option value="2577542633">Xenon Pharmaceuticals (Pvt.) Ltd (DML: 000077)</option>
+                                                            <option value="0208048486">Citi pharma ltd (DML: 000512)</option>
+                                                            <option value="6635103964">Global Pharmaceuticals Pvt Ltd (DML: 000417)</option>
+                                                            <option value="5230200403">Pulse Pharmaceuticals (Pvt.) Ltd. (DML: 000564)</option>
+                                                            <option value="8187447234">CCL Pharmaceuticals (DSL: 05-354-0077-068122D)</option>
+                                                            <option value="4204040600">AMROS PHARMACEUTICALS (DML: 000406)</option>
+                                                            <option value="2637248002">JAENS PHARMACEUTICAL INDUSTRIES PVT  LTD (DML: 000532)</option>
+                                                            <option value="6024428220">The Schazoo Pharmaceutical Laboratories (Pvt.) Ltd. (DML: 000019)</option>
+                                                            <option value="3938980040">Amson Vaccines &amp; Pharma (Pvt.) Ltd. (DML: 000393)</option>
+                                                            <option value="4269058652">Seraph Pharmaceutical (DML: 000860)</option>
+                                                            <option value="6486886006">Abbott Laboratories (Pakistan) Limited (DSL: 056/2023)</option>
+                                                            <option value="6713494011">Aspin Pharma (DML: 000045)</option>
+                                                            <option value="8820002480">Novamed Pharmaceuticals (Pvt.) Ltd (DML: 000590)</option>
+                                                            <option value="3385141459">REVIE PHARMAKON ()</option>
+                                                            <option value="3669847289">Roche Pakistan Ltd (DSL: 0493)</option>
+                                                            <option value="6320173054">Hoover Pharmaceuticals (Pvt.) Ltd (DML: 000676)</option>
+                                                            <option value="7906066536">Biogen Pharma (DML: 000639)</option>
+                                                            <option value="6003681350">Nouveaux Pharma Limited (DML: 000003)</option>
+                                                            <option value="3608575848">BF BIOSCIENCES LIMITED (DSL: 05-352-0066-034461D)</option>
+                                                            <option value="3892966185">JSK Medica (pvt) Ltd. (DML: 000816)</option>
+                                                            <option value="1000053986">Athan Pharmaceuticals (DML: 000900)</option>
+                                                            <option value="8674030974">Medimarker&#039;s Laboratries ()</option>
+                                                            <option value="8626026280">Martin Dow Limited (DML: 000267)</option>
+                                                            <option value="8468880066">Getz Pharma (Pvt) Limited (DSL: DSL 0655)</option>
+                                                            <option value="8806820882">Farm Aid Group (DML: 000298)</option>
+                                                            <option value="3406088440">Arreta Pharmaceuticals (Pvt.) Ltd. (DML: 000846)</option>
+                                                            <option value="8622442224">BF Biosciences Limited (DML: 000655)</option>
+                                                            <option value="1442823228">Allied Distributors (DSL: 0325)</option>
+                                                            <option value="9019406954">MTI MEDICAL (PVT.) LTD (DML: 000801)</option>
+                                                            <option value="8080066426">Cibex (Private) Limited (DML: 000784)</option>
+                                                            <option value="8005819924">Bayer Pakistan Private Limited (DSL: 0611)</option>
+                                                            <option value="6640642848">Harrison Pharmaceuticals (DML: 000634)</option>
+                                                            <option value="0080822482">BOSCH PHARMACEUTICALS (PVT) LTD (DML: 000707)</option>
+                                                            <option value="8424268222">Focus &amp; Rulz Pharmaceuticals (Pvt) Ltd (DML: 000628)</option>
+                                                            <option value="4402680442">Bajwa Pharmaceuticals (Pvt.) Ltd. (DML: 000805)</option>
+                                                            <option value="6622442866">Novo Nordisk Pharma (Pvt.) Ltd. (DSL: 636)</option>
+                                                            <option value="7531365785">Stanley Pharmaceuticals (Pvt) Ltd, (DML: 000434)</option>
+                                                            <option value="0122101330">Lab Diagnostic Systems (SMC) Pvt. Ltd. (DSL: 01-374-0006-118530D)</option>
+                                                            <option value="0224266480">Otsuka Pakistan Limited (DML: 000281)</option>
+                                                            <option value="4804248404">Hoechst Pakistan Limited (DSL: 650)</option>
+                                                            <option value="3810234293">Biogen Life Sciences (DML: 000911)</option>
+                                                            <option value="4602004826">Winlet Pharmaceuticals (Pvt) Ltd. (DML: 000874)</option>
+                                                            <option value="6626040444">Macter International Limited (DML: 000141)</option>
+                                                            <option value="5245440020">CUREXA HEALTH (PVT.) LIMITED (DML: 000864)</option>
+                                                            <option value="6802268226">Himedic Pharmaceuticals Pvt Ltd (DML: 000824)</option>
+                                                            <option value="8190182596">Biological Production Divison, National Institute of Health (DML: 000092)</option>
+                                                            <option value="8835206884">ANEEB PHARMACEUTICAL PVT LIMITED (DML: 000555)</option>
+                                                            <option value="6446840480">Scotmann Pharmaceuticals (DML: 000498)</option>
+                                                            <option value="0640288242">Zafa Pharmaceutical Laboratories (Pvt) Ltd. (DML: 000513)</option>
+                                                            <option value="4240900333">Misaq Pharmaceuticals Pvt Ltd. (DML: 000985)</option>
+                                                            <option value="3086980122">TABROS PHARMA (PVT). LTD. (DML: 000106)</option>
+                                                            <option value="2808226468">Efroze Chemical Industries Pvt. Ltd. (DML: 000151)</option>
+                                                            <option value="2462202404">Lucky Core Industries Limited (DSL: 013)</option>
+                                                            <option value="6686422848">ALLMED LABORATORIES (DSL: 0388)</option>
+                                                            <option value="7195435807">Network Marketing Services (DSL: 05-352-0058-081174D)</option>
+                                                            <option value="2920604286">RAKAPOSHI PHARMACEUTICAL (PVT) LTD (DML: 000386)</option>
+                                                            <option value="8447374282">STALLION PHARMACEUTICALS PVT LTD (DML: 000783)</option>
+                                                            <option value="4006608622">Epharm Laboratories (DML: 000598)</option>
+                                                            <option value="7973768266">Elite Pharma (Pvt) Ltd (DML: 000455)</option>
+                                                            <option value="6022042846">Albert Pharmaceuticals (Pvt) Ltd (DML: 000865)</option>
+                                                            <option value="9840028624">S.J &amp; G. Fazul Ellahie (pvt) limited. (DML: 000083)</option>
+                                                            <option value="3794369886">English Pharmaceutical Indsutries (DML: 000339)</option>
+                                                            <option value="6941103269">AsianContinental (Pvt.) Ltd. (DML: 000643)</option>
+                                                            <option value="8256352408">Wyeth Pakistan Limited (DSL: 371)</option>
+                                                            <option value="9448644484">Vision Pharmaceuticals Pvt Ltd (DML: 000517)</option>
+                                                            <option value="9183128593">MIssion Pharmaceuticals (DML: 000809)</option>
+                                                            <option value="0040226400">Le Mendoza Pharmaceutical (Pvt) Ltd. (DML: 000140)</option>
+                                                            <option value="7836406844">Atco Laboratories Ltd (DSL: 025)</option>
+                                                            <option value="8330969430">Rite Bio Sciences (Pvt) Ltd. (DML: 000871)</option>
+                                                            <option value="7060194434">Max Pharmaceuticals (DML: 000671)</option>
+                                                            <option value="0424402262">Unisa Pharmaceutical Industries Limited (DML: 000740)</option>
+                                                            <option value="0880208884">Horizon Healthcare (pvt.) ltd. (DML: 000856)</option>
+                                                            <option value="8044826468">AGP Limited (DSL: 001)</option>
+                                                            <option value="4233810999">Atco Laboratories Limited (DML: 000188)</option>
+                                                            <option value="9519992742">Pharmasol (Pvt) Ltd. (DML: 000872)</option>
+                                                            <option value="2955679540">Genetech Laboratories (DSL: 0002)</option>
+                                                            <option value="3888242440">Gene-Tech Laboratories (DSL: 0311)</option>
+                                                            <option value="0372006617">Lucky Core Industries Limited (DSL: whole Sale/8c-13OFf13s)</option>
+                                                            <option value="9736319451">Lisko Pakistan (Pvt.) Ltd. (DML: 000110)</option>
+                                                            <option value="1681098060">RSK Pharmaceuticals (DML: 000998)</option>
+                                                            <option value="2706267339">SIND MEDICAL STORES (DSL: 450)</option>
+                                                            <option value="7273197794">TRISON RESEARCH LABORATORIES PRIVATE LIMITED (DML: 000529)</option>
+                                                            <option value="1328608668">High-Q international (DSL: 233)</option>
+                                                            <option value="4824880400">Magns Pharmaceuticals (DML: 000849)</option>
+                                                            <option value="4222242822">AA Pharma (DSL: 323)</option>
+                                                            <option value="6826064482">Scilife Pharma Private Limited (DML: 000837)</option>
+                                                            <option value="8637440622">Merixil Pharma (DSL: DHO-ISB-1745)</option>
+                                                            <option value="6646666288">GlaxoSmithKline Pakistan Limited (DML: 000017)</option>
+                                                            <option value="2264684040">W. Woodward Pakistan (Pvt) Ltd. (DML: 000042)</option>
+                                                            <option value="1554204284">Cunningham Pharmaceuticals (Pvt.) Ltd. (DML: 000840)</option>
+                                                            <option value="8060022624">Medwell Pharmaceuticals (DML: 000699)</option>
+                                                            <option value="4662006806">MEDICAIDS PAKISTAN PVT LTD (DML: 000139)</option>
+                                                            <option value="6688620084">Medizan Laboratories (Pvt) Ltd (DML: 000572)</option>
+                                                            <option value="3152295286">Solaris Life Sciences Private Limited, (DML: 000992)</option>
+                                                            <option value="3957399587">Shaigan Pharmaceuticals (Pvt) Ltd (DML: 000333)</option>
+                                                    </select>
+                    </form>
+                </div>
+            </div>
+        </div>
+            </div>
+
+    <!-- Products Table -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Product Name
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Reg. Number
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Manufacturer
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Category
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pack Size
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Price
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Effective From
+                    </th>
+                </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                <!-- Product 1 -->
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Typbar Injection</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each 0.5ml vial contains:Purified capsular Poly-Saccharide Powder (Strain name Salmonella Typhl Ty2 0.025mg)</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        017467
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Amson Vaccines &amp; Pharma (Pvt.) Ltd.</div>
+                        <div class="text-sm text-gray-500">DML: 000393</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        0.5ml x1&#039;s
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>1,372.71</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        23 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Typbar Injection</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each 0.5ml vial contains:Purified capsular Poly-Saccharide Powder (Strain name Salmonella Typhl Ty2 0.025mg)</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        017467
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Amson Vaccines &amp; Pharma (Pvt.) Ltd.</div>
+                        <div class="text-sm text-gray-500">DML: 000393</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        0.5ml x10&#039;s
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>13,727.15</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        23 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">ENOX INJECTION 60mg(Cont./Toll Mfg. With Scotmann)(As per SRO229)</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Enoxaprin Sodium 60mg</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        056919
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Wilson&#039;s Pharmaceuticals</div>
+                        <div class="text-sm text-gray-500">DML: 000239</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        0.6ml/1&#039;s
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>1,157.74</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        01 Jul, 2024
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Oxaprin Injection 60mg</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Enoxaparin Sodium 60mg/0.6ml</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        056861
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Werrick Pharmaceuticals</div>
+                        <div class="text-sm text-gray-500">DML: 000340</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        0.6mlx1&#039;s
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>1,257.71</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        17 Aug, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Oxaprin Injection 80mg</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Enoxaparin Sodium 80mg/0.8ml</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        056862
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Werrick Pharmaceuticals</div>
+                        <div class="text-sm text-gray-500">DML: 000340</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        0.8mlx1&#039;s
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>928.81</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        17 Aug, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">CONVIDECIA Vaccine (PFS)</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each 0.5ml dose Contains:Recombinant replication-deficient human type-5 adenovirus expressing S protein of novel coronavirus……..&gt;5.0 x 1010VP</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        107885
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">AJM Pharma Pvt Ltd</div>
+                        <div class="text-sm text-gray-500">DSL: 262</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        01 Dose (PFS)
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>5,687.56</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        19 Aug, 2025
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">CONVIDECIA Vaccine (Vial)</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each 0.5ml dose Contains:Recombinant replication-deficient human type-5 adenovirus expressing S protein of novel coronavirus……..&gt;5.0 x 1010VP</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        107886
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">AJM Pharma Pvt Ltd</div>
+                        <div class="text-sm text-gray-500">DSL: 262</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        01 Dose (Vial)
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>5,687.56</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        19 Aug, 2025
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">YELLOW FEVER VACCINE(Yellow Fever Vaccine Live, Freeze-dried)</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each single 0.5ml dose of vaccine contains:Yellow fever virus no less than 1,000 LD50 or 1,600 PFU</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        077551
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">HOSPITAL SERVICES &amp; SALES</div>
+                        <div class="text-sm text-gray-500">DSL: 0398</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        02 Doses Amp. / 1 ml
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>5,274.34</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        07 Aug, 2025
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">YELLOW FEVER VACCINE(Yellow Fever Vaccine Live, Freeze-dried)</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each single 0.5ml dose of vaccine contains:Yellow fever virus no less than 1,000 LD50 or 1,600 PFU</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        077553
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">HOSPITAL SERVICES &amp; SALES</div>
+                        <div class="text-sm text-gray-500">DSL: 0398</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        05 Doses Amp. / 2.5 ml
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>10,546.73</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        07 Aug, 2025
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Azolive Tab 500mg</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each film coated tablet contains ( Azythromycine as dihydrate 500mg) USP spces</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        106161
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">OLIVE LABORATORIES</div>
+                        <div class="text-sm text-gray-500">DML: 000524</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        06&#039;s
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>393.26</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        30 Jun, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Azolive Tab 250 mg</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each tablet contains Azithromycin 250 mg</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        038233
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">OLIVE LABORATORIES</div>
+                        <div class="text-sm text-gray-500">DML: 000524</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        06&#039;s
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>300.99</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        30 Jun, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Budeform 100 HFA inhaler</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Budesonide 100 mcg </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        072588
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Highnoon Laboratories Ltd</div>
+                        <div class="text-sm text-gray-500">DML: 000155</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>1,002.97</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        27 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Asthavent 100 HFA inhaler</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Salbutamol sulphate 100 mcg</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        072583
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Highnoon Laboratories Ltd</div>
+                        <div class="text-sm text-gray-500">DML: 000155</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>413.07</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        27 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Linowin Infusion</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Linezolid 200mg x 100ml</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        067211
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Macter International Limited</div>
+                        <div class="text-sm text-gray-500">DML: 000141</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>748.13</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        23 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Foracort 100 mcg HFA inhaler</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Formoterol Fumarate  6mcg+ Budesonide 100 mcg</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        072586
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Highnoon Laboratories Ltd</div>
+                        <div class="text-sm text-gray-500">DML: 000155</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>1,075.28</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        27 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Titan Inj. IM IV</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Ceftriaxone 500mg</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        021742
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Macter International Limited</div>
+                        <div class="text-sm text-gray-500">DML: 000141</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>330.45</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        23 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Mep-Med infusion 40 mg</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Each vial contains:                                     Omeprazole 40 mg </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        057924
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Mediate Pharmaceutical Pvt Ltd</div>
+                        <div class="text-sm text-gray-500">DML: 000167</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>527.90</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        27 Jan, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Sprahaler 20 HFA inhaler</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Ipratropium bromide 20 mcg</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        072585
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Highnoon Laboratories Ltd</div>
+                        <div class="text-sm text-gray-500">DML: 000155</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>898.43</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        27 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Titan Inj. IM IV</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Ceftriaxone 2gm</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        075825
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Macter International Limited</div>
+                        <div class="text-sm text-gray-500">DML: 000141</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>959.73</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        23 Jul, 2026
+                    </td>
+                </tr>
+                                <tr class="hover:bg-emerald-50">
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="flex items-top">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center
+                            bg-emerald-100">
+                                <i class="fas fa-pills
+                                text-emerald-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">Cytarabine Injection 100 mg</div>
+                                <div class="max-w-[200px] text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap hover:whitespace-normal hover:overflow-visible">Cytarabine 100 mg</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-900">
+                        016169
+                    </td>
+                    <td class="px-6 py-4 min-w-[300px]">
+                        <div class="text-sm text-gray-900">Highnoon Laboratories Ltd</div>
+                        <div class="text-sm text-gray-500">DML: 000155</div>
+                    </td>
+                    <td class="px-6 py-4 mx-auto text-center whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                            bg-emerald-100 text-emerald-800">
+                            Essential Drugs
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center whitespace-nowrap text-sm text-gray-500">
+                        1
+                    </td>
+                    <td class="min-w-[150px] px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-right">
+                        <span class="flex items-center justify-between">
+                            <span>Rs</span>
+                            <span>349.99</span>
+                        </span>
+
+                    </td>
+                    <td class="min-w-[180px] text-center py-4 whitespace-nowrap text-sm text-gray-500">
+                        27 Jul, 2026
+                    </td>
+                </tr>
+                                </tbody>
+            </table>
+        </div>
+
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+
+            <!-- Mobile only -->
+            <div class="flex-1 flex justify-between sm:hidden">
+                <a
+                        href="https://e.dra.gov.pk/public/price?page=1"
+                        class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 "
+                >
+                    Previous
+                </a>
+
+                <a
+                        href="https://e.dra.gov.pk/public/price?page=3"
+                        class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 "
+                >
+                    Next
+                </a>
+            </div>
+
+            <!-- Desktop -->
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+
+                <div>
+                    <p class="text-sm text-gray-700">
+                        Showing page
+                        <span class="font-medium">2</span>
+                        of
+                        <span class="font-medium">1069</span>
+                    </p>
+                </div>
+
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+
+                        
+                        <a
+                                href="https://e.dra.gov.pk/public/price?page=1"
+                                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 "
+                        >
+                            <span class="sr-only">Previous</span>
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+
+                        
+                        
+                        
+                        
+                        
+                                                    <a href="https://e.dra.gov.pk/public/price?page=1"
+                               class="bg-white border-gray-300 text-gray-500 hover:bg-gray-100
+                              relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                1
+                            </a>
+                                                    <a href="https://e.dra.gov.pk/public/price?page=2"
+                               class="z-10 bg-zinc-500 border-zinc-500 text-zinc-50
+                              relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                2
+                            </a>
+                                                    <a href="https://e.dra.gov.pk/public/price?page=3"
+                               class="bg-white border-gray-300 text-gray-500 hover:bg-gray-100
+                              relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                3
+                            </a>
+                                                    <a href="https://e.dra.gov.pk/public/price?page=4"
+                               class="bg-white border-gray-300 text-gray-500 hover:bg-gray-100
+                              relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                4
+                            </a>
+                        
+                        
+                                                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>
+                            <a href="https://e.dra.gov.pk/public/price?page=1069"
+                               class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                1069
+                            </a>
+                        
+                        
+                        <a
+                                href="https://e.dra.gov.pk/public/price?page=3"
+                                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 "
+                        >
+                            <span class="sr-only">Next</span>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+
+                    </nav>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Footer -->
+<footer class="relative bg-emerald-900 dark:bg-gradient-overlay text-white mt-12 w-full overflow-hidden">
+    <div class="absolute inset-0 bg-[url('https://e.dra.gov.pk/images/eservices/pattern.png')] bg-contain bg-center md:bg-left-bottom md:bg-repeat-y dark:bg-cover dark:bg-no-repeat dark:bg-gradient-overlay opacity-40 dark:opacity-100 pointer-events-none z-0"></div>
+    <div class="relative z-10 max-w-7xl md:max-w-[80%] mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 md:grid-cols-10 gap-8">
+            <div class="col-span-1 md:col-span-3">
+                <h4 class="text-lg font-bold mb-4">Contact Us</h4>
+                <p class="mb-2">Drug Regulatory Authority of Pakistan</p>
+                <p class="mb-2">Prime Minister’s National Health Complex Park Road, Chak Shahzad, Islamabad</p>
+                <p>Toll Free: 0800-03727</p>
+                <img src="https://e.dra.gov.pk/images/eservices/logo-dark.png" alt="DRAP Logo" class="hidden md:block h-32 mt-10">
+            </div>
+            <div class="col-span-1 md:col-span-7">
+                <h4 class="text-lg font-bold mb-4">Field Offices</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">Karachi</h4>
+                        <p class="mb-1">2nd Floor, USAID Building, No 1V Block “B” Sindh Muslim Cooperative Housing Society, Karachi</p>
+                        <p>Phone: +92-21-34390712, 13</p>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">Peshawar</h4>
+                        <p class="mb-2">1st Floor, Benevolent Fund Building Saddar Road, Peshawar</p>
+                        <p>Phone: +92-91-9211749, 9212484</p>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">Lahore</h4>
+                        <p class="mb-2">6-BirdWood Road, Lahore</p>
+                        <p>Phone: +92-42-99203335</p>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">Quetta</h4>
+                        <p class="mb-1">Bungalow No.10-E, Afzal Bungalows,</p>
+                        <p class="mb-2">Opposite S.S.P Traffic Office, Spinny Road Quetta</p>
+                        <p>Phone: +92-81-2443926</p>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">Central Drugs Laboratory Karachi</h4>
+                        <p class="mb-2">4-B, Block B, Sindhi Muslim Cooperative Housing Society, Karachi</p>
+                        <p>Phone: +92-21-34392159, 92-21-34382979</p>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-4">NCLB, Islamabad</h4>
+                        <p class="mb-1">Prime Minister’s National Health Complex</p>
+                        <p class="mb-2">Park Road, Chak Shahzad, Islamabad</p>
+                        <p>Phone: +92-51-9255263</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-emerald-200/10 mt-8 pt-6 text-center text-sm">
+            <p>© 2026 Drug Regulatory Authority Pakistan. All rights reserved.</p>
+        </div>
+    </div>
+</footer>
+</body>
+</html>

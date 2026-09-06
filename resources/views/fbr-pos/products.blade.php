@@ -3,6 +3,12 @@
     // Selection checkboxes + bulk bar are admin-only (endpoint 403s non-admins
     // anyway — don't render controls a cashier can't use). Labels stay open.
     $fbrIsAdmin = auth('fbrpos')->user() && auth('fbrpos')->user()->role === 'company_admin';
+    // 💊 Medicine catalogue picker (Task 1579): pharmacy mode (package AND shop
+    // switch) + owner only + tables present — the endpoints re-check all three.
+    $phCatalogueLive = $fbrIsAdmin
+        && \Illuminate\Support\Facades\Schema::hasTable('medicine_catalogue')
+        && \Illuminate\Support\Facades\Schema::hasColumn('products', 'medicine_catalogue_id')
+        && \App\Services\PosFeatureService::pharmacyLive($company ?? \App\Models\Company::find(app('currentCompanyId')));
 @endphp
 <div class="max-w-6xl mx-auto" x-data="fbrProductBulk()">
     @include('fbr-pos.partials.back-link')
@@ -131,6 +137,13 @@
             </div>
         </div>
     </div>
+    @endif
+
+    @if($phCatalogueLive)
+        @include('fbr-pos.partials.catalogue-picker', [
+            'phCatalogueSearchUrl' => route('fbrpos.pharmacy.catalogue.search', [], false),
+            'phCatalogueAddUrl' => route('fbrpos.pharmacy.catalogue.add', [], false),
+        ])
     @endif
 
     <div class="mb-6">

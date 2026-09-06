@@ -182,7 +182,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="md:col-span-2" x-show="mode === 'single'">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.product_name_label') }} <span class="text-red-500">*</span></label>
-                    <input type="text" name="name" value="{{ old('name', $product->name ?? '') }}" required :disabled="mode === 'multi'"
+                    <input type="text" name="name" value="{{ old('name', $product->name ?? request('name', '')) }}" required :disabled="mode === 'multi'"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
                         placeholder="{{ ($pharmacyMode ?? false) ? __('pos.ph_medicine_name_ph') : \App\Support\PosVocabulary::t('ph_chicken_burger') }}">
                 </div>

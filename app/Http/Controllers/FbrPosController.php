@@ -735,11 +735,22 @@ class FbrPosController extends Controller
             ->take(5)
             ->get();
 
+        // 💊 Pharmacy: "Expire ho rahi hain" tile — pharmacy mode + batch
+        // tracking only, manager/owner only, branch-scoped like the report,
+        // and served from the same cached summary the layout alert reads.
+        $pharmacyExpiry = null;
+        if ($isAdmin && \App\Services\PharmacyExpirySummaryService::enabledFor($company)) {
+            $pharmacyExpiry = \App\Services\PharmacyExpirySummaryService::summary(
+                $company,
+                \App\Services\BranchStockService::viewBranchId($companyId)
+            );
+        }
+
         return view('fbr-pos.dashboard', compact(
             'company', 'todayStats', 'monthStats',
             'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus',
             'dashboardStyle', 'notifications', 'pendingProvisional', 'isAdmin',
-            'unclosedPriorDays', 'canDayClose'
+            'unclosedPriorDays', 'canDayClose', 'pharmacyExpiry'
         ));
     }
 
@@ -1347,7 +1358,13 @@ class FbrPosController extends Controller
         $pharmacyBatchTracking = \App\Services\PharmacyBatchService::trackingEnabled($company);
         $pharmacyLooseSale = $pharmacyMode
             && (bool) (\App\Services\PosFeatureService::forCompany($company)->loose_sale ?? false);
-        $pharmacyNearDays = \App\Services\PharmacyBatchService::NEAR_EXPIRY_DAYS;
+        // Near-expiry window = the shop's own setting (feature_flags rides
+        // posConfigRev, so the baked number already joins the boot fingerprint).
+        $pharmacyNearDays = \App\Services\PharmacyExpirySummaryService::windowDays($company);
+        // 💊 Alternatives panel (Sep 2026): the FBR screen bakes no stock, so
+        // the counter asks /pharmacy/stock-check when the company tracks
+        // inventory. Column is in posConfigRev → fingerprint already covers it.
+        $pharmacyInventoryOn = $pharmacyMode && (bool) ($company->inventory_enabled ?? false);
 
         $prodBase = Product::where('company_id', $companyId)->where('is_active', true);
         $productsTruncated = (clone $prodBase)->count() > self::PRODUCT_BAKE_CAP;
@@ -1577,6 +1594,7 @@ class FbrPosController extends Controller
             'petiRates', 'petiRateEnabled',
             // 💊 Pharmacy Mode (Task 1558)
             'pharmacyMode', 'pharmacyBatchTracking', 'pharmacyLooseSale', 'pharmacyNearDays',
+            'pharmacyInventoryOn',
             'productsTruncated'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')

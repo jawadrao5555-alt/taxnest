@@ -72,6 +72,25 @@
     // work is owner+manager territory, exactly like stock.
     $fbrPharmacyLive = \App\Services\PosFeatureService::pharmacyLive($fbrCompany)
         && !in_array($fbrUser->pos_role ?? '', ['pos_cashier', 'local_viewer'], true);
+    // 💊 Daily expiry alert (Sep 2026): owner/manager only, never for pending
+    // companies or read-only impersonation (same gating as What's New), never
+    // on the sale screen itself, and only when there is something to say.
+    // One cached summary per company+branch+day keeps this off the hot path.
+    $fbrExpiryAlert = null;
+    try {
+        if ($fbrPharmacyLive && $fbrUser && $fbrUser->isPosAdmin()
+            && ($fbrCompany->status ?? null) !== 'pending'
+            && !(is_array(session('impersonation')) && !empty(session('impersonation')['readonly']))
+            && !request()->is('*invoice/create')
+            && \App\Services\PharmacyExpirySummaryService::enabledFor($fbrCompany)) {
+            $fbrExpirySummary = \App\Services\PharmacyExpirySummaryService::summary(
+                $fbrCompany, \App\Services\BranchStockService::viewBranchId($fbrCompany->id)
+            );
+            if (($fbrExpirySummary['near_count'] ?? 0) > 0 || ($fbrExpirySummary['expired_count'] ?? 0) > 0) {
+                $fbrExpiryAlert = $fbrExpirySummary;
+            }
+        }
+    } catch (\Throwable $e) { $fbrExpiryAlert = null; }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -609,6 +628,10 @@
                                         <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                                         {{ __('pos.ph_nav_reports') }}
                                     </a>
+                                    <a href="{{ route('fbrpos.pharmacy.missed-sales') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        {{ __('pos.ph_nav_missed_sales') }} <x-new-badge feature="fbr_pharmacy_missed_sales" />
+                                    </a>
                                     @endif
                                     @if($fbrPlanKhata)
                                     <a href="{{ route('fbrpos.khata') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
@@ -879,6 +902,10 @@
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             {{ __('pos.ph_nav_claims') }}
                         </a>
+                        <a href="{{ route('fbrpos.pharmacy.missed-sales') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.pharmacy.missed-sales') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            {{ __('pos.ph_nav_missed_sales') }} <x-new-badge feature="fbr_pharmacy_missed_sales" />
+                        </a>
                         @endif
                         @if($fbrPlanKhata)
                         <a href="{{ route('fbrpos.khata') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.khata') ? $sidebarActive : $sidebarInactive }}">
@@ -1019,6 +1046,9 @@
                 <x-bio-unmapped-pin-banner :alerts="$bioAlerts"
                     :dismiss-route="route('fbrpos.bio-sync.dismiss-pin-alert')"
                     :setup-route="route('fbrpos.bio-sync.setup')" />
+                @if($fbrExpiryAlert)
+                    <x-pharmacy-expiry-banner :summary="$fbrExpiryAlert" :user-id="$fbrUser->id" :company-id="$fbrCompany->id" />
+                @endif
                 @if(session('success'))
                     <div class="max-w-7xl mx-auto mb-4 px-4 sm:px-6 pt-4">
                         <div class="bg-emerald-50 dark:bg-emerald-900/30 border-2 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 px-4 py-3 rounded-lg font-semibold shadow-sm">

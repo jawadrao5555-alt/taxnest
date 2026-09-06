@@ -34,6 +34,9 @@
         $fbrPharmacyOn    = \App\Services\PosFeatureService::rawFlag($company, 'pharmacy');
         $fbrBatchExpOn    = \App\Services\PosFeatureService::rawFlag($company, 'batch_expiry');
         $fbrLooseSaleOn   = \App\Services\PosFeatureService::rawFlag($company, 'loose_sale');
+        // Near-expiry window (Sep 2026): ONE resolver shared with the dashboard
+        // tile, the daily alert, the report and the sale-screen chip.
+        $fbrNearDays      = \App\Services\PharmacyExpirySummaryService::windowDays($company);
         $fbrPharmacyPlan  = \App\Services\PosFeatureService::planAllows($company, 'pharmacy_enabled');
         $fbrPharmLockedOn = !$fbrPharmacyPlan && $fbrPharmacyOn;
 
@@ -187,6 +190,24 @@
             pharmacyOn: {{ $fbrPharmacyOn ? 'true' : 'false' }}, savingPharmacy: false,
             batchExpOn: {{ $fbrBatchExpOn ? 'true' : 'false' }}, savingBatchExp: false,
             looseSaleOn: {{ $fbrLooseSaleOn ? 'true' : 'false' }}, savingLooseSale: false,
+            nearDays: {{ (int) $fbrNearDays }}, nearDaysDraft: {{ (int) $fbrNearDays }}, savingNearDays: false,
+            saveNearDays() {
+                if (this.savingNearDays) return;
+                const want = parseInt(this.nearDaysDraft, 10);
+                if (!(want >= {{ \App\Services\PharmacyExpirySummaryService::MIN_WINDOW_DAYS }} && want <= {{ \App\Services\PharmacyExpirySummaryService::MAX_WINDOW_DAYS }})) {
+                    alert({{ Js::from(__('pos.ph_near_days_range', ['min' => \App\Services\PharmacyExpirySummaryService::MIN_WINDOW_DAYS, 'max' => \App\Services\PharmacyExpirySummaryService::MAX_WINDOW_DAYS])) }});
+                    return;
+                }
+                this.savingNearDays = true;
+                fetch({{ Js::from(route('fbrpos.pharmacy.near-days', [], false)) }}, {method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({days: want})})
+                    .then(r => r.json().catch(() => null).then(d => ({ ok: r.ok, d })))
+                    .then(({ ok, d }) => {
+                        if (!ok || !d || d.success !== true) { this.nearDaysDraft = this.nearDays; alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); return; }
+                        this.nearDays = d.days; this.nearDaysDraft = d.days;
+                    })
+                    .catch(() => { this.nearDaysDraft = this.nearDays; alert({{ Js::from(__('pos.setting_save_failed')) }}); })
+                    .finally(() => { this.savingNearDays = false; });
+            },
             pharmOffOnly: {{ $fbrPharmLockedOn ? 'true' : 'false' }},
             featSave(feature, prop, savingProp) {
                 if (this[savingProp]) return;
@@ -787,6 +808,23 @@
                                 class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-60" :class="batchExpOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'">
                                 <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="batchExpOn && 'translate-x-6'"></span>
                             </button>
+                        </div>
+                        {{-- Near-expiry window (Sep 2026): how many days ahead the
+                             dashboard tile, the daily alert and the report call a
+                             batch "expiring soon". Only meaningful with batches on. --}}
+                        <div class="flex items-center gap-3" x-show="batchExpOn" x-cloak>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[13px] font-bold text-gray-900 dark:text-white flex items-center gap-1.5">{{ __('pos.ph_near_days_title') }} <x-new-badge feature="fbr_pharmacy_near_days" /></p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.ph_near_days_sub') }}</p>
+                            </div>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <input type="number" min="{{ \App\Services\PharmacyExpirySummaryService::MIN_WINDOW_DAYS }}" max="{{ \App\Services\PharmacyExpirySummaryService::MAX_WINDOW_DAYS }}" step="1"
+                                       x-model="nearDaysDraft" @keydown.enter.prevent="saveNearDays()"
+                                       class="w-20 rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white text-sm text-center" data-testid="near-days-input">
+                                <span class="text-[11px] text-gray-500">{{ __('pos.ph_near_days_unit') }}</span>
+                                <button type="button" @click="saveNearDays()" :disabled="savingNearDays || parseInt(nearDaysDraft, 10) === nearDays"
+                                        class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 disabled:opacity-50" data-testid="near-days-save">{{ __('pos.save') }}</button>
+                            </div>
                         </div>
                         {{-- Loose / broken-strip sale --}}
                         <div class="flex items-center gap-3">

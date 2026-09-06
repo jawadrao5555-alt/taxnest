@@ -20,7 +20,6 @@ use App\Services\PharmacyBatchService;
 use App\Services\PharmacyExpirySummaryService;
 use App\Services\PosAccessService;
 use App\Services\PosFeatureService;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;

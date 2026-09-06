@@ -82,6 +82,62 @@ class FbrPosSupplierLedgerController extends Controller
         return Supplier::forCompany($companyId)->findOrFail((int) $id);
     }
 
+    /**
+     * The branch a purchase bill belongs to, resolved SERVER-SIDE: the bill's
+     * own branch_id, else the branch its goods were actually booked into
+     * (purchase movements). NULL = single-shop company, or a legacy bill that
+     * never recorded a branch. Mixed movements (should not exist) count as
+     * "unknown" so the caller falls back to an explicit branch choice.
+     */
+    private function purchaseBranchId(int $companyId, PurchaseOrder $po): ?int
+    {
+        if (!BranchStockService::isMultiBranch($companyId)) {
+            return null;
+        }
+        if (Schema::hasColumn('purchase_orders', 'branch_id') && $po->branch_id !== null) {
+            return (int) $po->branch_id;
+        }
+        $branchIds = InventoryMovement::where('company_id', $companyId)
+            ->where('type', InventoryMovement::TYPE_PURCHASE)
+            ->where('reference_type', 'purchase_order')
+            ->where('reference_id', $po->id)
+            ->whereNotNull('branch_id')
+            ->distinct()
+            ->pluck('branch_id')
+            ->map(fn ($b) => (int) $b)
+            ->unique()
+            ->values();
+
+        return $branchIds->count() === 1 ? (int) $branchIds->first() : null;
+    }
+
+    /**
+     * Load a purchase bill this actor may touch: same company, optionally the
+     * same supplier, and — on a multi-branch company — a branch the actor is
+     * allowed to use. A confined manager must never see, pay against or return
+     * another shop's bill, so a foreign-branch bill answers 404 exactly like a
+     * foreign company's would (no existence leak).
+     *
+     * Returns [$po, $poBranchId]; $po is null when not found / not allowed.
+     */
+    private function purchaseForActor(int $companyId, int $poId, ?int $supplierId = null): array
+    {
+        $q = PurchaseOrder::where('company_id', $companyId)->with('items.product:id,name,uom');
+        if ($supplierId !== null) {
+            $q->where('supplier_id', $supplierId);
+        }
+        $po = $q->find($poId);
+        if (!$po) {
+            return [null, null];
+        }
+        $poBranch = $this->purchaseBranchId($companyId, $po);
+        if ($poBranch !== null && !BranchStockService::actorCanUse($companyId, $poBranch)) {
+            return [null, null];
+        }
+
+        return [$po, $poBranch];
+    }
+
     /** Parse the optional from/to filter (Y-m-d); garbage = no filter. */
     private function period(Request $request): array
     {
@@ -131,13 +187,16 @@ class FbrPosSupplierLedgerController extends Controller
 
         $poId = null;
         if ($request->filled('purchase_order_id')) {
-            $po = PurchaseOrder::where('company_id', $companyId)
-                ->where('supplier_id', $supplier->id)
-                ->find((int) $request->purchase_order_id);
+            [$po, $poBranch] = $this->purchaseForActor($companyId, (int) $request->purchase_order_id, (int) $supplier->id);
             if (!$po) {
                 return back()->withInput()->with('error', __('pos.sl_bill_not_found'));
             }
             $poId = (int) $po->id;
+            // A payment against a bill is booked in the BILL's branch — the
+            // branch selector on screen must not re-home another shop's money.
+            if ($poBranch !== null) {
+                $branchId = $poBranch;
+            }
         }
 
         $paidOn = $request->filled('paid_on')
@@ -426,9 +485,11 @@ class FbrPosSupplierLedgerController extends Controller
         $this->assertNotCashier();
         $this->assertLedgerReady();
         $companyId = $this->companyId();
-        $po = PurchaseOrder::where('company_id', $companyId)
-            ->with('items.product:id,name,uom')
-            ->findOrFail((int) $id);
+        [$po] = $this->purchaseForActor($companyId, (int) $id);
+        if (!$po) {
+            // Foreign company AND foreign branch answer the same way.
+            return response()->json(['success' => false, 'error' => __('pos.sl_bill_not_found')], 404);
+        }
 
         $already = PurchaseReturnItem::whereIn('purchase_return_id', function ($q) use ($companyId, $po) {
                 $q->select('id')->from('purchase_returns')
@@ -505,12 +566,24 @@ class FbrPosSupplierLedgerController extends Controller
 
         $po = null;
         if ($request->filled('purchase_order_id')) {
-            $po = PurchaseOrder::where('company_id', $companyId)->with('items')->find((int) $request->purchase_order_id);
+            [$po, $poBranch] = $this->purchaseForActor($companyId, (int) $request->purchase_order_id);
             if (!$po) {
                 return back()->withInput()->with('error', __('pos.sl_bill_not_found'));
             }
             if ($po->status === PurchaseOrder::STATUS_CANCELLED) {
                 return back()->withInput()->with('error', __('pos.sl_return_bill_void'));
+            }
+            // Goods go back out of the shop that received them. The bill's
+            // branch is authoritative; a different branch on screen is refused
+            // rather than silently re-homed (stock would vanish from the wrong
+            // shop). A legacy bill with no known branch uses the picked branch.
+            if ($poBranch !== null && $branchId !== null && $poBranch !== $branchId) {
+                return back()->withInput()->with('error', __('pos.sl_return_branch_mismatch', [
+                    'branch' => BranchStockService::branchName($companyId, $poBranch) ?? ('#' . $poBranch),
+                ]));
+            }
+            if ($poBranch !== null) {
+                $branchId = $poBranch;
             }
         }
 
@@ -530,6 +603,21 @@ class FbrPosSupplierLedgerController extends Controller
             return back()->withInput()->with('error', 'Ghalat product select hua — dobara koshish karein.');
         }
 
+        // A bill-linked return is AUTHORITATIVE from the bill: every line must
+        // name a line of that bill with the same product. The credit rate is
+        // the bill's own net unit cost (server-side), never the posted value —
+        // a crafted or stale form must not mint an arbitrary credit note.
+        if ($po) {
+            foreach ($request->items as $row) {
+                $poItem = !empty($row['purchase_order_item_id'])
+                    ? $po->items->firstWhere('id', (int) $row['purchase_order_item_id'])
+                    : null;
+                if (!$poItem || (int) $poItem->product_id !== (int) $row['product_id']) {
+                    return back()->withInput()->with('error', __('pos.sl_return_line_not_on_bill'));
+                }
+            }
+        }
+
         $returnedOn = $request->filled('returned_on')
             ? \Illuminate\Support\Carbon::parse($request->returned_on)->toDateString()
             : now()->toDateString();
@@ -542,6 +630,20 @@ class FbrPosSupplierLedgerController extends Controller
 
         try {
             $ret = DB::transaction(function () use ($request, $companyId, $branchId, $po, $supplier, $returnedOn, $batchTracking, $userId) {
+                // Serialise every return against one bill: the bill row is
+                // locked for the whole posting, so two concurrent forms cannot
+                // both pass the "remaining" check and together send back more
+                // than the bill delivered. Lines are re-read under the lock.
+                $lockedItems = collect();
+                if ($po) {
+                    $lockedPo = PurchaseOrder::whereKey($po->id)->lockForUpdate()->first();
+                    if (!$lockedPo || $lockedPo->status === PurchaseOrder::STATUS_CANCELLED) {
+                        throw new \RuntimeException(__('pos.sl_return_bill_void'));
+                    }
+                    $lockedItems = \App\Models\PurchaseOrderItem::where('purchase_order_id', $po->id)
+                        ->lockForUpdate()->get()->keyBy('id');
+                }
+
                 $ret = PurchaseReturn::create([
                     'company_id' => $companyId,
                     'branch_id' => $branchId,
@@ -562,23 +664,28 @@ class FbrPosSupplierLedgerController extends Controller
                     $productId = (int) $row['product_id'];
                     $qty = round((float) $row['quantity'], 3);
                     $unitCost = round((float) $row['unit_cost'], 4);
-                    $lineTotal = round($qty * $unitCost, 2);
 
                     $poItemId = null;
-                    if ($po && !empty($row['purchase_order_item_id'])) {
-                        $poItem = $po->items->firstWhere('id', (int) $row['purchase_order_item_id']);
-                        if ($poItem && (int) $poItem->product_id === $productId) {
-                            $poItemId = (int) $poItem->id;
-                            // Never send back more of a line than that bill delivered.
-                            $prior = (float) PurchaseReturnItem::where('purchase_order_item_id', $poItemId)
-                                ->whereIn('purchase_return_id', fn ($q) => $q->select('id')->from('purchase_returns')
-                                    ->where('company_id', $companyId)->where('status', PurchaseReturn::STATUS_POSTED))
-                                ->sum('quantity');
-                            if ($qty + $prior > (float) $poItem->received_quantity + 0.0005) {
-                                throw new \RuntimeException(__('pos.sl_return_qty_exceeds', ['name' => $poItem->product?->name ?? ('#' . $productId)]));
-                            }
+                    if ($po) {
+                        $poItem = $lockedItems->get((int) ($row['purchase_order_item_id'] ?? 0));
+                        if (!$poItem || (int) $poItem->product_id !== $productId) {
+                            throw new \RuntimeException(__('pos.sl_return_line_not_on_bill'));
+                        }
+                        $poItemId = (int) $poItem->id;
+                        // Credit at what the bill actually cost us for that line.
+                        $unitCost = round($poItem->effectiveUnitCost(), 4);
+                        // Never send back more of a line than that bill delivered
+                        // (prior returns summed under the bill lock, this form's
+                        // own earlier rows included).
+                        $prior = (float) PurchaseReturnItem::where('purchase_order_item_id', $poItemId)
+                            ->whereIn('purchase_return_id', fn ($q) => $q->select('id')->from('purchase_returns')
+                                ->where('company_id', $companyId)->where('status', PurchaseReturn::STATUS_POSTED))
+                            ->sum('quantity');
+                        if ($qty + $prior > (float) $poItem->received_quantity + 0.0005) {
+                            throw new \RuntimeException(__('pos.sl_return_qty_exceeds', ['name' => $po->items->firstWhere('id', $poItemId)?->product?->name ?? ('#' . $productId)]));
                         }
                     }
+                    $lineTotal = round($qty * $unitCost, 2);
 
                     // Batch: explicit id, else the number typed / carried by the line.
                     $batch = null;

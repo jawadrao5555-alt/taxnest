@@ -6366,6 +6366,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'sl_return_bill_void' => 'Wo bill void hai — us ke against kuch wapas nahi ho sakta.',
     'sl_return_needs_supplier' => 'Wo distributor chunein jise maal wapas ja raha hai.',
     'sl_return_qty_exceeds' => ':name ki wapsi miqdar us bill mein aaye maal se zyada hai.',
+    'sl_return_branch_mismatch' => 'Yeh bill :branch branch ka hai — us ka maal wapas karne ke liye wohi branch chunein.',
+    'sl_return_line_not_on_bill' => 'Bill se judi wapsi ki har line usi bill ki line honi chahiye (wohi product). Bill dobara load kar ke koshish karein.',
     'sl_return_batch_short' => 'Batch :batch mein sirf :qty baqi hai.',
     'sl_return_saved' => 'Wapsi :number darj — :name ke khatay mein Rs :amount credit.',
     'sl_return_print_title' => 'MAAL WAPSI / CREDIT NOTE',

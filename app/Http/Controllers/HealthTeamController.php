@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\HealthDepartment;
 use App\Models\User;
 use App\Services\HealthAccessService;
+use App\Services\HealthAudit\HealthAuditRecorder;
 use App\Services\HealthModuleService;
 use App\Services\HealthPlatformService;
 use App\Services\HealthScopeService;
@@ -252,8 +253,24 @@ class HealthTeamController extends Controller
             'capabilities.*' => 'string',
         ]);
 
+        // What the member could do BEFORE the change. Captured here rather than
+        // after, because "who widened whose access" is only answerable if the
+        // old set survives the save.
+        $before = HealthAccessService::customSet($member) ?? [];
+
         if ($request->boolean('use_defaults')) {
             HealthAccessService::setCustomSet($member, null, $company);
+
+            HealthAuditRecorder::record('access.permissions.reset', [
+                'company_id' => $company?->id,
+                'category' => 'access',
+                'action' => 'revoked',
+                'entity_type' => 'users',
+                'entity_id' => $member->id,
+                'entity_label' => $member->name ?: $member->email,
+                'old' => ['capabilities' => implode(', ', $before)],
+                'new' => ['capabilities' => __('health.audit_role_defaults')],
+            ]);
 
             return redirect()->route('health.team')->with('success', __('health.team_permissions_reset'));
         }
@@ -263,6 +280,21 @@ class HealthTeamController extends Controller
         if ($saved === null) {
             return redirect()->route('health.team')->with('error', __('health.team_role_not_customizable'));
         }
+
+        HealthAuditRecorder::record('access.permissions.changed', [
+            'company_id' => $company?->id,
+            'category' => 'access',
+            'action' => array_diff($saved, $before) ? 'granted' : 'revoked',
+            'entity_type' => 'users',
+            'entity_id' => $member->id,
+            'entity_label' => $member->name ?: $member->email,
+            'old' => ['capabilities' => implode(', ', $before)],
+            'new' => ['capabilities' => implode(', ', $saved)],
+            'meta' => [
+                'added' => implode(', ', array_values(array_diff($saved, $before))),
+                'removed' => implode(', ', array_values(array_diff($before, $saved))),
+            ],
+        ]);
 
         return redirect()->route('health.team')
             ->with('success', __('health.team_permissions_saved', ['count' => count($saved)]));

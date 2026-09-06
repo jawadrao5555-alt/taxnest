@@ -22,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
     {
         InvoiceItem::observe(InvoiceItemObserver::class);
 
+        // Healthcare audit trail (Task 1554). One observer covers every audited
+        // healthcare model, so a new module cannot ship without recording who
+        // changed what simply because somebody forgot to write an observer.
+        \App\Observers\HealthAuditObserver::registerAll();
+
         // Rate limit public password-reset endpoints per IP+email to prevent
         // reset-email bombing, account enumeration, and SMTP reputation abuse.
         \Illuminate\Support\Facades\RateLimiter::for('password-reset', function (\Illuminate\Http\Request $request) {

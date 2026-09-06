@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\User;
 use App\Services\CredentialLedgerService;
 use App\Services\HealthAccessService;
+use App\Services\HealthAudit\HealthAuditRecorder;
 use App\Services\HealthModuleService;
 use App\Services\HealthPlatformService;
 use App\Services\LoginIdentifierResolver;
@@ -95,6 +96,16 @@ class HealthAuthController extends Controller
                 $request->session()->regenerate();
                 $request->session()->forget('url.intended');
 
+                HealthAuditRecorder::record('auth.login', [
+                    'actor' => $user,
+                    'company_id' => $user->company_id,
+                    'category' => 'auth',
+                    'action' => 'login',
+                    'entity_type' => 'users',
+                    'entity_id' => $user->id,
+                    'entity_label' => $user->name ?: $user->email,
+                ]);
+
                 return $this->redirectToPortal($user);
             }
             // Wrong panel / no healthcare role → fall through, no info leak.
@@ -102,6 +113,24 @@ class HealthAuthController extends Controller
 
         // ═══ STEP 3 — Generic failure ═══
         RateLimiter::hit($throttleKey);
+
+        // A failed sign-in is only recorded when the identifier resolved to a
+        // real healthcare account — the trail belongs to an organisation, and a
+        // typo that matches nobody belongs to none of them. Recording it under
+        // a guess would also let an outsider write rows into a hospital's audit
+        // trail simply by typing at the login box.
+        if ($user && $user->company_id) {
+            HealthAuditRecorder::record('auth.login.failed', [
+                'actor' => $user,
+                'company_id' => $user->company_id,
+                'category' => 'auth',
+                'action' => 'login',
+                'entity_type' => 'users',
+                'entity_id' => $user->id,
+                'entity_label' => $user->name ?: $user->email,
+                'reason' => __('health.audit_reason_bad_password'),
+            ]);
+        }
 
         return back()->withErrors([
             'login' => __('health.auth_invalid_credentials'),
@@ -284,6 +313,20 @@ class HealthAuthController extends Controller
 
     public function logout(Request $request)
     {
+        // Recorded BEFORE the guard is torn down, so the event still knows who
+        // it belongs to.
+        if ($user = Auth::guard(HealthPanel::GUARD)->user()) {
+            HealthAuditRecorder::record('auth.logout', [
+                'actor' => $user,
+                'company_id' => $user->company_id,
+                'category' => 'auth',
+                'action' => 'logout',
+                'entity_type' => 'users',
+                'entity_id' => $user->id,
+                'entity_label' => $user->name ?: $user->email,
+            ]);
+        }
+
         Auth::guard(HealthPanel::GUARD)->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

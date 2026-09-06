@@ -160,7 +160,11 @@ class HealthAccessService
             'accounts.view',
             'hr.view', 'hr.attendance.view', 'hr.payroll.view',
             'reports.view',
+            // Runs the audit and takes the signed pack away. Deliberately NOT
+            // audit.manage: an auditor who can mark their own finding resolved
+            // is not a control, they are a rubber stamp.
             'audit.view',
+            'audit.export',
         ],
         // Takes the payment at the counter. Nothing else — including on a
         // stay: an advance may be received, but the bill may not be cleared
@@ -217,8 +221,17 @@ class HealthAccessService
      */
     private const WRITE_SUFFIXES = ['manage', 'write', 'charge', 'dispense', 'collect', 'result', 'record', 'correct', 'approve'];
 
-    /** Capabilities only the organisation owner may ever exercise. */
-    public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate'];
+    /**
+     * Capabilities only the organisation owner may ever exercise.
+     *
+     * audit.manage is here because closing a finding is the one audit act that
+     * changes what the record says. An administrator is a SUBJECT of the audit
+     * as much as anybody else, so letting the role that runs the hospital day
+     * to day mark its own findings resolved would empty the control out. The
+     * owner may still delegate audit.view and audit.export freely — reading and
+     * exporting the evidence changes nothing.
+     */
+    public const OWNER_ONLY = ['settings.manage.modules', 'staff.delegate', 'audit.manage'];
 
     public static function roleLabelKey(?string $role): string
     {

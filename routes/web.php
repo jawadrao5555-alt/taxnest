@@ -78,6 +78,7 @@ use App\Http\Controllers\HealthRosterController;
 use App\Http\Controllers\HealthSelfServiceController;
 use App\Http\Controllers\HealthTeamController;
 use App\Http\Controllers\Health\HealthAccountsController;
+use App\Http\Controllers\Health\HealthAuditController;
 use App\Http\Controllers\Health\HealthAccountsReportController;
 use App\Http\Controllers\Health\HealthDoctorShareController;
 use App\Http\Controllers\Health\HealthAdmissionController;
@@ -1831,6 +1832,40 @@ Route::prefix('health')->middleware(['health.auth', 'company.approval'])->group(
         // Owner-only delegation — re-checked inside the controller, because the
         // route gate only proves the actor may manage staff at all.
         Route::post('/team/{id}/permissions', [HealthTeamController::class, 'permissions'])->name('health.team.permissions');
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Owner one-click audit (Task 1554)
+    |----------------------------------------------------------------------
+    | Three capabilities, deliberately separated. audit.view runs an audit and
+    | reads it; audit.export produces the signed evidence pack; audit.manage
+    | records a decision against a finding. The dedicated auditor role holds the
+    | first two and NOT the third, because an auditor who closes their own
+    | findings is not a control.
+    |
+    | Nothing under this prefix can change an operational record. A wrong charge
+    | is corrected on the billing screen by the person accountable for it — and
+    | that correction writes its own audited event.
+    */
+    Route::middleware('health.can:audit.view')->group(function () {
+        Route::get('/audit', [HealthAuditController::class, 'index'])->name('health.audit');
+        Route::post('/audit/run', [HealthAuditController::class, 'run'])->name('health.audit.run');
+        Route::get('/audit/trail', [HealthAuditController::class, 'trail'])->name('health.audit.trail');
+        Route::get('/audit/finding/{id}', [HealthAuditController::class, 'finding'])->name('health.audit.finding');
+        Route::get('/audit/{id}', [HealthAuditController::class, 'show'])->name('health.audit.show');
+
+        // Recording a decision is a different right from reading the audit.
+        Route::middleware('health.can:audit.manage')->group(function () {
+            Route::post('/audit/finding/{id}/status', [HealthAuditController::class, 'updateStatus'])->name('health.audit.finding.status');
+            Route::post('/audit/finding/{id}/note', [HealthAuditController::class, 'addNote'])->name('health.audit.finding.note');
+        });
+
+        // So is taking the evidence out of the building.
+        Route::middleware('health.can:audit.export')->group(function () {
+            Route::post('/audit/{id}/pack', [HealthAuditController::class, 'pack'])->name('health.audit.pack');
+            Route::get('/audit/{id}/pack/download', [HealthAuditController::class, 'packDownload'])->name('health.audit.pack.download');
+        });
     });
 
     /*

@@ -35,6 +35,9 @@ class HealthRecordAccessService
     /** Per-request memo: "userId:patientId" => bool. */
     protected static array $treatingCache = [];
 
+    /** Per-request memo of confidential views already recorded. */
+    protected static array $viewLogged = [];
+
     /**
      * May this person open the clinical record (notes, diagnosis, prescription)
      * of this patient?
@@ -58,10 +61,55 @@ class HealthRecordAccessService
         }
 
         if (HealthAccessService::isAdministrative($user)) {
-            return true;
+            return self::recordSensitiveOpen($user, $patient, 'administrative');
         }
 
-        return self::isTreatingClinician($user, $patient);
+        return self::isTreatingClinician($user, $patient)
+            ? self::recordSensitiveOpen($user, $patient, 'treating_clinician')
+            : false;
+    }
+
+    /**
+     * Record that a confidential file was opened, and say yes.
+     *
+     * Recording lives HERE rather than in each controller on purpose: this
+     * method is the single door every confidential clinical record opens
+     * through, so a new screen cannot reach one without the trail hearing about
+     * it. A gate that is enforced in one place and logged in six is a gate that
+     * will eventually be enforced in seven.
+     *
+     * Only CONFIDENTIAL files are recorded. Logging every ordinary consultation
+     * a doctor opens would bury the handful of views that actually matter under
+     * the hospital's normal day.
+     *
+     * The event carries who, when and which file — never what was in it.
+     */
+    protected static function recordSensitiveOpen(User $user, HealthPatient $patient, string $basis): bool
+    {
+        $key = $user->id . ':' . $patient->id;
+
+        // Once per request. One screen can ask the same question several times
+        // while it renders, and three identical rows are not three views.
+        if (isset(self::$viewLogged[$key])) {
+            return true;
+        }
+        self::$viewLogged[$key] = true;
+
+        \App\Services\HealthAudit\HealthAuditRecorder::record('record_view.confidential', [
+            'actor' => $user,
+            'company_id' => $patient->company_id,
+            'branch_id' => $patient->branch_id,
+            'category' => 'record_view',
+            'action' => 'viewed',
+            'entity_type' => 'health_patients',
+            'entity_id' => $patient->id,
+            'entity_label' => $patient->mrn,
+            'health_patient_id' => $patient->id,
+            'sensitive' => true,
+            'meta' => ['basis' => $basis],
+        ]);
+
+        return true;
     }
 
     /**

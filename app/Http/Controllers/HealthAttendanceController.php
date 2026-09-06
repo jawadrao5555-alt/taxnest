@@ -519,6 +519,20 @@ class HealthAttendanceController extends Controller
         $staff = HealthPlatformService::staff($this->company());
         $totals = HealthPayrollService::monthlyTotals($companyId, $year, $month, $staff);
 
+        // A file that leaves the building is an act, and the trail says who
+        // took it and what was in scope — including whether it carried money.
+        \App\Services\HealthAudit\HealthAuditRecorder::record('export.attendance', [
+            'company_id' => $companyId,
+            'category' => 'export',
+            'action' => 'exported',
+            'entity_label' => sprintf('attendance-%04d-%02d.csv', $year, $month),
+            'meta' => [
+                'period' => sprintf('%04d-%02d', $year, $month),
+                'rows' => is_countable($totals) ? count($totals) : null,
+                'includes_pay' => $this->can('hr.payroll.view') ? 'yes' : 'no',
+            ],
+        ]);
+
         // This export lives on the attendance permission, so it carries the
         // money columns ONLY for somebody who also holds the payroll one.
         // Otherwise an attendance-only manager could read every salary in the
@@ -652,6 +666,18 @@ class HealthAttendanceController extends Controller
 
         $staff = HealthPlatformService::staff($this->company());
         $totals = HealthPayrollService::monthlyTotals($companyId, $year, $month, $staff);
+
+        \App\Services\HealthAudit\HealthAuditRecorder::record('export.payroll', [
+            'company_id' => $companyId,
+            'category' => 'export',
+            'action' => 'exported',
+            'entity_label' => sprintf('payroll-input-%04d-%02d.csv', $year, $month),
+            'meta' => [
+                'period' => sprintf('%04d-%02d', $year, $month),
+                'rows' => is_countable($totals) ? count($totals) : null,
+                'includes_pay' => 'yes',
+            ],
+        ]);
 
         return $this->csv(
             HealthPayrollService::exportRows($totals),

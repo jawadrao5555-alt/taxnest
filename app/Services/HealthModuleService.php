@@ -51,7 +51,14 @@ class HealthModuleService
         'departments.manage',
         'staff.manage',
         'settings.manage',
+        // The owner's audit workspace. `view` reads and runs it, `export`
+        // produces the signed evidence pack, `manage` acknowledges a finding
+        // and records what was done about it. Three, because the auditor must
+        // be able to run and export without being able to close a finding —
+        // an auditor who can mark their own findings resolved is not a control.
         'audit.view',
+        'audit.export',
+        'audit.manage',
     ];
 
     public const MODULE_CAPABILITIES = [

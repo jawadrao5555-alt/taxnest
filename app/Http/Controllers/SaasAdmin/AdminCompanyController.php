@@ -1219,6 +1219,14 @@ class AdminCompanyController extends Controller
             'health_fund_transfers', 'health_account_reconciliations',
             'health_bank_accounts', 'health_accounting_settings',
             'health_fiscal_periods', 'health_accounts',
+            // Healthcare audit trail (Task 1554). Immutable to ordinary company
+            // users, but that guarantee protects the company's own record — it
+            // is not a reason to keep a purged company's patient identifiers on
+            // disk. The SaaS-level audit_logs chain above stays, because it
+            // records what WE did to the account, not what the hospital did
+            // inside it. Children before parents.
+            'health_audit_notes', 'health_audit_findings', 'health_audit_runs',
+            'health_audit_events', 'health_audit_chain_anchors',
         ];
         DB::transaction(function () use ($orphanTables, $id, $company) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge
@@ -1262,6 +1270,14 @@ class AdminCompanyController extends Controller
             \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('audit-packs/company_' . $id);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Audit pack directory cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
+        }
+        // The healthcare audit packs are a second archive on the same disk, and
+        // a built pack contains the findings and the trail rows in full. Purging
+        // the tables above without this leaves the evidence packs behind.
+        try {
+            \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('health-audit-packs/' . $id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Healthcare audit pack cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
         }
         // Healthcare uploads live on the private disk, NOT in the database:
         // deleting the attachment rows above leaves the lab reports and clinical

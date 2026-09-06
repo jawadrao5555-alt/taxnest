@@ -435,6 +435,31 @@ class MedicineCatalogueTest extends TestCase
         $this->assertSame(MedicineCatalogueEntry::SOURCE_IMPORT, $r['entry']->source);
     }
 
+    public function test_resume_watchdog_redispatches_only_a_stalled_run(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        // No run at all → nothing dispatched (the watchdog never starts a crawl).
+        $this->artisan('catalogue:sync-drap --resume')->assertSuccessful();
+        \Illuminate\Support\Facades\Queue::assertNothingPushed();
+
+        $run = \App\Models\MedicineCatalogueSync::create([
+            'state' => 'running', 'trigger' => 'schedule', 'phase_index' => 0, 'next_page' => 412,
+            'total_pages' => 1069, 'pages_done' => 411, 'started_at' => now()->subHour(), 'last_progress_at' => now()->subMinutes(2),
+        ]);
+        $this->artisan('catalogue:sync-drap --resume')->assertSuccessful();
+        \Illuminate\Support\Facades\Queue::assertNothingPushed();
+
+        // Progress older than the stall threshold (deploy restarted the worker) → re-dispatched from its cursor.
+        $run->forceFill(['last_progress_at' => now()->subMinutes(\App\Models\MedicineCatalogueSync::STALE_AFTER_MINUTES + 1)])->save();
+        $this->artisan('catalogue:sync-drap --resume')->assertSuccessful();
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SyncMedicineCatalogueJob::class, 1);
+        $run->refresh();
+        $this->assertSame('running', $run->state);
+        $this->assertSame(412, (int) $run->next_page, 'resume keeps the cursor, never page 1');
+        $this->assertSame(1, \App\Models\MedicineCatalogueSync::count(), 'no second run row');
+    }
+
     public function test_product_name_carries_the_pack_once(): void
     {
         $e = new MedicineCatalogueEntry(['brand_name' => 'Panadol Tablets 500mg', 'pack_size' => "200's"]);

@@ -740,11 +740,22 @@ class FbrPosController extends Controller
             ->take(5)
             ->get();
 
+        // 💊 Pharmacy: "Expire ho rahi hain" tile — pharmacy mode + batch
+        // tracking only, manager/owner only, branch-scoped like the report,
+        // and served from the same cached summary the layout alert reads.
+        $pharmacyExpiry = null;
+        if ($isAdmin && \App\Services\PharmacyExpirySummaryService::enabledFor($company)) {
+            $pharmacyExpiry = \App\Services\PharmacyExpirySummaryService::summary(
+                $company,
+                \App\Services\BranchStockService::viewBranchId($companyId)
+            );
+        }
+
         return view('fbr-pos.dashboard', compact(
             'company', 'todayStats', 'monthStats',
             'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus',
             'dashboardStyle', 'notifications', 'pendingProvisional', 'isAdmin',
-            'unclosedPriorDays', 'canDayClose'
+            'unclosedPriorDays', 'canDayClose', 'pharmacyExpiry'
         ));
     }
 
@@ -1352,7 +1363,13 @@ class FbrPosController extends Controller
         $pharmacyBatchTracking = \App\Services\PharmacyBatchService::trackingEnabled($company);
         $pharmacyLooseSale = $pharmacyMode
             && (bool) (\App\Services\PosFeatureService::forCompany($company)->loose_sale ?? false);
-        $pharmacyNearDays = \App\Services\PharmacyBatchService::NEAR_EXPIRY_DAYS;
+        // Near-expiry window = the shop's own setting (feature_flags rides
+        // posConfigRev, so the baked number already joins the boot fingerprint).
+        $pharmacyNearDays = \App\Services\PharmacyExpirySummaryService::windowDays($company);
+        // 💊 Alternatives panel (Sep 2026): the FBR screen bakes no stock, so
+        // the counter asks /pharmacy/stock-check when the company tracks
+        // inventory. Column is in posConfigRev → fingerprint already covers it.
+        $pharmacyInventoryOn = $pharmacyMode && (bool) ($company->inventory_enabled ?? false);
 
         $prodBase = Product::where('company_id', $companyId)->where('is_active', true);
         $productsTruncated = (clone $prodBase)->count() > self::PRODUCT_BAKE_CAP;
@@ -1587,6 +1604,7 @@ class FbrPosController extends Controller
             'petiRates', 'petiRateEnabled',
             // 💊 Pharmacy Mode (Task 1558)
             'pharmacyMode', 'pharmacyBatchTracking', 'pharmacyLooseSale', 'pharmacyNearDays',
+            'pharmacyInventoryOn',
             'productsTruncated', 'uomGroups'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -9337,8 +9355,13 @@ class FbrPosController extends Controller
                 'Generic / Salt', 'Strength', 'Dosage Form', 'Manufacturer', 'Drug Schedule',
                 'Prescription Required (Yes/No)', 'Shelf Location', 'Strips per Pack', 'Units per Strip', 'Loose Sale (Yes/No)',
             ]);
+            // V = DRAP Reg No (Task 1579) — the catalogue alias the importer matches on.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'drap_reg_no')) {
+                $headers[] = 'DRAP Reg No';
+            }
         }
-        $lastCol = $pharmacyExcel ? 'U' : 'K';
+        $drapExcel = $pharmacyExcel && \Illuminate\Support\Facades\Schema::hasColumn('products', 'drap_reg_no');
+        $lastCol = $drapExcel ? 'V' : ($pharmacyExcel ? 'U' : 'K');
         $sheet->fromArray($headers, null, 'A1');
         $sheet->getStyle('A1:' . $lastCol . '1')->getFont()->setBold(true);
         $sheet->getStyle('A1:' . $lastCol . '1')->getFill()
@@ -9346,7 +9369,7 @@ class FbrPosController extends Controller
             ->getStartColor()->setRGB('BFDBFE');
         $widths = ['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20, 'J' => 16, 'K' => 16];
         if ($pharmacyExcel) {
-            $widths += ['L' => 26, 'M' => 12, 'N' => 14, 'O' => 22, 'P' => 14, 'Q' => 26, 'R' => 14, 'S' => 14, 'T' => 14, 'U' => 16];
+            $widths += ['L' => 26, 'M' => 12, 'N' => 14, 'O' => 22, 'P' => 14, 'Q' => 26, 'R' => 14, 'S' => 14, 'T' => 14, 'U' => 16, 'V' => 14];
         }
         foreach ($widths as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
@@ -9392,7 +9415,7 @@ class FbrPosController extends Controller
                     ((int) ($p->strips_per_pack ?? 0) > 0) ? (int) $p->strips_per_pack : '',
                     ((int) ($p->units_per_strip ?? 0) > 0) ? (int) $p->units_per_strip : '',
                     !empty($p->allow_loose_sale) ? 'Yes' : 'No',
-                ] : []));
+                ] : [], $drapExcel ? [(string) ($p->drap_reg_no ?? '')] : []));
             }
         }
 
@@ -9432,6 +9455,10 @@ class FbrPosController extends Controller
                 break;
             }
             $sheet->setCellValue($col . $rowNum, $vals[11 + $offset]);
+        }
+        // V = DRAP Reg No (Task 1579) — explicit string, leading zeros matter ("019809").
+        if (array_key_exists(21, $vals)) {
+            $sheet->setCellValueExplicit('V' . $rowNum, (string) $vals[21], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
         }
     }
 
@@ -9533,6 +9560,8 @@ class FbrPosController extends Controller
                 'strips_per_pack' => ['strips per pack', 'strips_per_pack', 'strips'],
                 'units_per_strip' => ['units per strip', 'units_per_strip', 'tablets per strip', 'units'],
                 'allow_loose_sale' => ['loose sale (yes/no)', 'loose sale', 'allow_loose_sale', 'loose'],
+                // Task 1579: DRAP registration number — also an extra match alias below.
+                'drap_reg_no' => ['drap reg no', 'drap reg no.', 'drap reg', 'drap registration no', 'drap registration number', 'drap_reg_no', 'reg no', 'reg. no', 'registration no', 'registration number', 'drap'],
             ];
             foreach ($phAliases as $column => $aliases) {
                 if (!\Illuminate\Support\Facades\Schema::hasColumn('products', $column)) {
@@ -9574,6 +9603,13 @@ class FbrPosController extends Controller
                     if (in_array($v, Product::DRUG_SCHEDULES, true)) {
                         $out[$column] = $v;
                     }
+                } elseif ($column === 'drap_reg_no') {
+                    // Excel may hand back 19809.0 for "019809" — keep digits, restore the DRAP 6-digit form.
+                    $digits = preg_replace('/\.0+$/', '', $raw);
+                    $digits = preg_replace('/\s+/', '', $digits);
+                    if ($digits !== '') {
+                        $out[$column] = mb_substr(ctype_digit($digits) ? str_pad($digits, 6, '0', STR_PAD_LEFT) : $digits, 0, 30);
+                    }
                 } else {
                     $out[$column] = mb_substr($raw, 0, 190);
                 }
@@ -9594,11 +9630,18 @@ class FbrPosController extends Controller
         // Maps updated after each create so a duplicate row in the same file
         // updates instead of double-creating.
         $catalog = Product::where('company_id', $companyId)->get();
-        $byBarcode = []; $bySku = []; $byName = [];
+        $byBarcode = []; $bySku = []; $byName = []; $byDrap = [];
         foreach ($catalog as $p) {
             if (trim((string) $p->barcode) !== '') $byBarcode[strtolower(trim($p->barcode))] = $p;
             if (trim((string) $p->sku) !== '') $bySku[strtolower(trim($p->sku))] = $p;
             $byName[strtolower(trim($p->name))] = $p;
+            // Task 1579: DRAP reg no alias. One reg no can cover several packs
+            // of the same brand, so the alias only matches when it is UNIQUE in
+            // this shop; otherwise the row falls through to the name match.
+            if (isset($phIdx['drap_reg_no']) && trim((string) ($p->drap_reg_no ?? '')) !== '') {
+                $k = trim((string) $p->drap_reg_no);
+                $byDrap[$k] = array_key_exists($k, $byDrap) ? false : $p;
+            }
         }
 
         $hasThirdCol = \Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule');
@@ -9691,6 +9734,10 @@ class FbrPosController extends Controller
             $existing = null;
             if ($barcode !== null && isset($byBarcode[strtolower($barcode)])) $existing = $byBarcode[strtolower($barcode)];
             if (!$existing && $sku !== null && isset($bySku[strtolower($sku)])) $existing = $bySku[strtolower($sku)];
+            if (!$existing && isset($phIdx['drap_reg_no'])) {
+                $drapKey = $readPharmacyCells($data)['drap_reg_no'] ?? null;
+                if ($drapKey !== null && !empty($byDrap[$drapKey])) $existing = $byDrap[$drapKey];
+            }
             if (!$existing && isset($byName[strtolower($name)])) $existing = $byName[strtolower($name)];
 
             // Third Schedule implies exempt (which implies 0 tax below) —
@@ -9818,6 +9865,11 @@ class FbrPosController extends Controller
             if ($barcode !== null) $byBarcode[strtolower($barcode)] = $product;
             if ($sku !== null) $bySku[strtolower($sku)] = $product;
             $byName[strtolower($name)] = $product;
+            if (!empty($product->drap_reg_no) && isset($phIdx['drap_reg_no'])) {
+                $k = (string) $product->drap_reg_no;
+                if (!array_key_exists($k, $byDrap)) $byDrap[$k] = $product;
+                elseif ($byDrap[$k] !== false && $byDrap[$k]->id !== $product->id) $byDrap[$k] = false;
+            }
         }
 
         DB::commit();

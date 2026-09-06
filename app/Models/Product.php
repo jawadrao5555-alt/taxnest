@@ -44,7 +44,19 @@ class Product extends Model
         'strips_per_pack',
         'units_per_strip',
         'allow_loose_sale',
+        // ── DRAP medicine catalogue link (Task 1579) ─────────────────────
+        // A product added from the global catalogue remembers WHICH catalogue
+        // row it came from (MRP update notices ride on this) and its DRAP
+        // registration number (an extra alias the Excel importer matches on).
+        'medicine_catalogue_id',
+        'drap_reg_no',
     ];
+
+    /** The global DRAP catalogue row this product was added from (pharmacy mode). */
+    public function catalogueEntry()
+    {
+        return $this->belongsTo(MedicineCatalogueEntry::class, 'medicine_catalogue_id');
+    }
 
     protected $casts = [
         'is_price_editable' => 'boolean',

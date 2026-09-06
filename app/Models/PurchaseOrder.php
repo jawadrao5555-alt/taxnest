@@ -11,11 +11,17 @@ class PurchaseOrder extends Model
         'supplier_id',
         'branch_id',
         'po_number',
+        // Task 1580: distributor bill number + discount breakdown. total_amount
+        // stays "what the shop owes for this bill" — now the NET figure.
+        'supplier_invoice_no',
         'status',
         'order_date',
         'expected_date',
         'received_date',
         'total_amount',
+        'gross_amount',
+        'line_discount_amount',
+        'invoice_discount_amount',
         'notes',
         'created_by',
     ];
@@ -25,6 +31,9 @@ class PurchaseOrder extends Model
         'expected_date' => 'date',
         'received_date' => 'date',
         'total_amount' => 'float',
+        'gross_amount' => 'float',
+        'line_discount_amount' => 'float',
+        'invoice_discount_amount' => 'float',
     ];
 
     const STATUS_DRAFT = 'draft';
@@ -56,6 +65,18 @@ class PurchaseOrder extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Money handed to the distributor against this bill (Task 1580). */
+    public function supplierPayments()
+    {
+        return $this->hasMany(SupplierPayment::class);
+    }
+
+    /** Goods sent back from this bill (Task 1580). */
+    public function purchaseReturns()
+    {
+        return $this->hasMany(PurchaseReturn::class);
     }
 
     public function scopeForCompany($query, $companyId)

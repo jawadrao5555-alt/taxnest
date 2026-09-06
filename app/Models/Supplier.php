@@ -34,6 +34,17 @@ class Supplier extends Model
         return $this->hasMany(PurchaseOrder::class);
     }
 
+    /** Task 1580: distributor ledger relations. */
+    public function payments()
+    {
+        return $this->hasMany(SupplierPayment::class);
+    }
+
+    public function purchaseReturns()
+    {
+        return $this->hasMany(PurchaseReturn::class);
+    }
+
     public function scopeForCompany($query, $companyId)
     {
         return $query->where('company_id', $companyId);

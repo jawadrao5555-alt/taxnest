@@ -8,9 +8,13 @@ use App\Models\InventoryStock;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseReturn;
+use App\Models\PurchaseReturnItem;
 use App\Models\Supplier;
+use App\Models\SupplierPayment;
 use App\Services\BranchStockService;
 use App\Services\InventoryService;
+use App\Services\SupplierLedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -251,6 +255,19 @@ class FbrPosStockController extends Controller
         // withCount decides Delete vs Deactivate per row (history must stay intact).
         $suppliers = Supplier::forCompany($companyId)->withCount('purchaseOrders')->orderBy('name')->get();
 
+        // Task 1580: distributor ledger — ONE service computes every balance
+        // (supplier cards, header payable tile, statements). Scoped to the
+        // branch on screen; the owner's all-branches view sees the whole
+        // distributor account.
+        $ledgerReady = SupplierLedgerService::schemaReady();
+        $ledgerBranch = $branchView['activeBranchId'];
+        $supplierBalances = $ledgerReady ? SupplierLedgerService::balances($companyId, $ledgerBranch) : collect();
+        $ledgerTotals = $ledgerReady ? SupplierLedgerService::totals($companyId, $ledgerBranch) : ['payable' => 0.0, 'advance' => 0.0, 'suppliers_due' => 0];
+        // Deleting a supplier must also respect its money history.
+        $supplierLedgerCounts = $ledgerReady
+            ? SupplierPayment::where('company_id', $companyId)->selectRaw('supplier_id, COUNT(*) as c')->groupBy('supplier_id')->pluck('c', 'supplier_id')
+            : collect();
+
         // First page of purchase history (page size + 1 to detect "has more");
         // the blade renders these via Alpine and fetches older/searched pages
         // from purchases() below. items.product eager-loaded — live runs with
@@ -289,6 +306,10 @@ class FbrPosStockController extends Controller
             'recentPurchasesData' => $this->serializePurchases($recentPurchases),
             'purchasesHasMore' => $purchasesHasMore,
             'stockEnabled' => (bool) $company->inventory_enabled,
+            'ledgerReady' => $ledgerReady,
+            'supplierBalances' => $supplierBalances,
+            'supplierLedgerCounts' => $supplierLedgerCounts,
+            'ledgerTotals' => $ledgerTotals,
             // 💊 Pharmacy Mode (Task 1558): the receiving form only grows batch
             // number / expiry / retail inputs for a shop that actually tracks
             // batches. Every other FBR shop renders exactly the old form.
@@ -385,12 +406,17 @@ class FbrPosStockController extends Controller
             'po_number' => (string) $po->po_number,
             'date' => ($po->received_date ?? $po->created_at)?->format('d M Y'),
             'supplier' => $po->supplier?->name,
+            'supplier_id' => $po->supplier_id ? (int) $po->supplier_id : null,
+            'invoice_no' => $po->getAttribute('supplier_invoice_no'),
             'total' => number_format((float) $po->total_amount, 2),
+            'discount' => number_format((float) $po->getAttribute('line_discount_amount') + (float) $po->getAttribute('invoice_discount_amount'), 2),
             'voided' => $po->status === PurchaseOrder::STATUS_CANCELLED,
             'can_void' => $po->status === PurchaseOrder::STATUS_RECEIVED,
             'items' => $po->items->map(fn ($it) => [
                 'name' => $it->product?->name ?? ('#' . $it->product_id),
                 'qty' => $trimQty($it->quantity),
+                'bonus' => (float) $it->getAttribute('bonus_qty') > 0 ? $trimQty($it->getAttribute('bonus_qty')) : null,
+                'disc' => (float) $it->getAttribute('discount_pct') > 0 ? rtrim(rtrim(number_format((float) $it->getAttribute('discount_pct'), 2, '.', ''), '0'), '.') : null,
             ])->values()->all(),
         ])->values()->all();
     }
@@ -624,7 +650,12 @@ class FbrPosStockController extends Controller
         $this->assertNotCashier();
         $supplier = Supplier::forCompany($this->companyId())->findOrFail($id);
 
-        if ($supplier->purchaseOrders()->exists()) {
+        // Task 1580: money history (payments / returns / claim credits) is as
+        // much of a reason to keep the row as purchase history is.
+        $hasLedger = SupplierLedgerService::schemaReady() && (
+            $supplier->payments()->exists() || $supplier->purchaseReturns()->exists()
+        );
+        if ($supplier->purchaseOrders()->exists() || $hasLedger) {
             $supplier->update(['is_active' => false]);
             return redirect()->route('fbrpos.stock')
                 ->with('success', __('pos.stock_sup_deactivated', ['name' => $supplier->name]));
@@ -652,6 +683,14 @@ class FbrPosStockController extends Controller
      * One-shot purchase entry: stock received from a supplier.
      * Creates a RECEIVED purchase order + adds stock via InventoryService
      * (movement rows + avg/last purchase price maintained automatically).
+     *
+     * Task 1580 (distributor schemes): a line may carry BONUS units ("10+1")
+     * and a trade discount %, the bill a flat invoice discount, and the shop
+     * may hand over part of the money right away. SupplierLedgerService::
+     * computeLines spreads each line's NET cost over paid + bonus units, and
+     * THAT unit cost — not the printed rate — feeds the stock ledger and the
+     * batch, so weighted-average cost, Munafa and stock valuation stay right.
+     * Whatever is not paid now is the distributor's credit on the ledger.
      */
     public function storePurchase(Request $request)
     {
@@ -659,10 +698,13 @@ class FbrPosStockController extends Controller
         $request->validate([
             'supplier_id' => 'nullable|integer',
             'branch_id' => 'nullable|integer',
+            'supplier_invoice_no' => 'nullable|string|max:60',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|numeric|min:0.001',
             'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.bonus_qty' => 'nullable|numeric|min:0',
+            'items.*.discount_pct' => 'nullable|numeric|min:0|max:100',
             // 💊 Pharmacy Mode (Task 1558): batch identity arrives WITH the
             // goods. Always accepted (harmless for a non-pharmacy shop, which
             // simply never renders these inputs), only acted on when batch
@@ -670,6 +712,10 @@ class FbrPosStockController extends Controller
             'items.*.batch_number' => 'nullable|string|max:60',
             'items.*.expiry_date' => 'nullable|string|max:20',
             'items.*.retail_price' => 'nullable|numeric|min:0',
+            'invoice_discount' => 'nullable|numeric|min:0',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'paid_method' => 'nullable|string|in:cash,bank,online,cheque',
+            'paid_reference' => 'nullable|string|max:64',
             'notes' => 'nullable|string|max:300',
         ]);
 
@@ -702,38 +748,83 @@ class FbrPosStockController extends Controller
             return back()->with('error', 'Ghalat product select hua — dobara koshish karein.');
         }
 
-        $po = DB::transaction(function () use ($request, $companyId, $supplier, $branchId) {
-            $total = 0;
-            foreach ($request->items as $row) {
-                $total += round((float) $row['quantity'] * (float) $row['unit_price'], 2);
-            }
+        $ledgerReady = SupplierLedgerService::schemaReady();
+        $costing = SupplierLedgerService::computeLines(
+            $request->items,
+            $ledgerReady ? (float) ($request->invoice_discount ?? 0) : 0
+        );
+        $paidNow = $ledgerReady ? round((float) ($request->paid_amount ?? 0), 2) : 0.0;
+        if ($paidNow > 0 && !$supplier) {
+            return back()->withInput()->with('error', __('pos.sl_paid_needs_supplier'));
+        }
+        if ($paidNow > $costing['total'] + 0.005) {
+            return back()->withInput()->with('error', __('pos.sl_paid_exceeds_total'));
+        }
 
-            $po = PurchaseOrder::create([
+        $po = DB::transaction(function () use ($request, $companyId, $supplier, $branchId, $costing, $paidNow, $ledgerReady) {
+            $hasCol = fn (string $table, string $col) => \Illuminate\Support\Facades\Schema::hasColumn($table, $col);
+
+            $poData = [
                 'company_id' => $companyId,
                 'supplier_id' => $supplier?->id,
                 'po_number' => 'PUR-' . date('ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(4)),
                 'status' => PurchaseOrder::STATUS_RECEIVED,
                 'order_date' => now()->toDateString(),
                 'received_date' => now()->toDateString(),
-                'total_amount' => $total,
+                // NET of every discount = what the shop owes for this bill.
+                'total_amount' => $costing['total'],
                 'notes' => $request->notes,
                 'created_by' => $this->user()->id,
-            ]);
+            ];
+            // Task 1580: the ledger scopes purchases by the PO's own branch
+            // (movements still carry it too, for legacy resolution).
+            if ($hasCol('purchase_orders', 'branch_id')) {
+                $poData['branch_id'] = $branchId;
+            }
+            foreach ([
+                'supplier_invoice_no' => $request->filled('supplier_invoice_no') ? trim((string) $request->supplier_invoice_no) : null,
+                'gross_amount' => $costing['gross'],
+                'line_discount_amount' => $costing['line_discount'],
+                'invoice_discount_amount' => $costing['invoice_discount'],
+            ] as $col => $val) {
+                if ($hasCol('purchase_orders', $col)) {
+                    $poData[$col] = $val;
+                }
+            }
+            $po = PurchaseOrder::create($poData);
 
             // 💊 Pharmacy Mode (Task 1558): does this shop record batches?
             $batchTracking = \App\Services\PharmacyBatchService::trackingEnabled(Company::find($companyId));
 
-            foreach ($request->items as $row) {
-                $qty = (float) $row['quantity'];
-                $price = (float) $row['unit_price'];
+            foreach ($costing['lines'] as $line) {
+                $row = $line['raw'];
+                $qty = $line['quantity'];
+                $received = $line['received'];
+                $price = $line['unit_price'];
+                $unitCost = $line['net_unit_cost'];
                 $itemData = [
                     'purchase_order_id' => $po->id,
-                    'product_id' => (int) $row['product_id'],
+                    'product_id' => $line['product_id'],
                     'quantity' => $qty,
                     'unit_price' => $price,
-                    'total_price' => round($qty * $price, 2),
-                    'received_quantity' => $qty,
+                    // Printed line value (before discounts) — the shop reads
+                    // this against the distributor's paper invoice.
+                    'total_price' => $line['gross'],
+                    // Paid + bonus units: exactly what went onto the shelf and
+                    // exactly what a void takes back.
+                    'received_quantity' => $received,
                 ];
+                foreach ([
+                    'bonus_qty' => $line['bonus_qty'],
+                    'discount_pct' => $line['discount_pct'],
+                    'discount_amount' => round($line['discount_amount'] + $line['invoice_share'], 2),
+                    'net_total' => $line['net_total'],
+                    'net_unit_cost' => $unitCost,
+                ] as $col => $val) {
+                    if ($hasCol('purchase_order_items', $col)) {
+                        $itemData[$col] = $val;
+                    }
+                }
 
                 $batch = null;
                 if ($batchTracking) {
@@ -743,19 +834,19 @@ class FbrPosStockController extends Controller
                     foreach (['batch_number' => \App\Services\PharmacyBatchService::cleanBatchNumber($row['batch_number'] ?? null),
                               'expiry_date' => \App\Services\PharmacyBatchService::normalizeExpiry($row['expiry_date'] ?? null),
                               'retail_price' => isset($row['retail_price']) && $row['retail_price'] !== '' ? (float) $row['retail_price'] : null] as $col => $val) {
-                        if (\Illuminate\Support\Facades\Schema::hasColumn('purchase_order_items', $col)) {
+                        if ($hasCol('purchase_order_items', $col)) {
                             $itemData[$col] = $val;
                         }
                     }
 
                     $batch = \App\Services\PharmacyBatchService::receive(
                         $companyId,
-                        (int) $row['product_id'],
+                        $line['product_id'],
                         $branchId,
-                        $qty,
+                        $received,
                         $row['batch_number'] ?? null,
                         $row['expiry_date'] ?? null,
-                        $price,
+                        $unitCost,
                         [
                             'retail_price' => $row['retail_price'] ?? null,
                             'supplier_id' => $supplier?->id,
@@ -769,9 +860,9 @@ class FbrPosStockController extends Controller
 
                 InventoryService::addStock(
                     $companyId,
-                    (int) $row['product_id'],
-                    $qty,
-                    $price,
+                    $line['product_id'],
+                    $received,
+                    $unitCost,
                     InventoryMovement::TYPE_PURCHASE,
                     $branchId,
                     ['type' => 'purchase_order', 'id' => $po->id, 'number' => $po->po_number],
@@ -785,11 +876,33 @@ class FbrPosStockController extends Controller
                 );
             }
 
+            // Money handed over at the counter — a normal ledger payment tied
+            // to this bill. The remainder is the distributor's credit.
+            if ($paidNow > 0 && $supplier && $ledgerReady) {
+                SupplierLedgerService::recordPayment([
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
+                    'supplier_id' => $supplier->id,
+                    'purchase_order_id' => $po->id,
+                    'amount' => $paidNow,
+                    'method' => $request->paid_method ?: 'cash',
+                    'paid_on' => now()->toDateString(),
+                    'reference' => $request->filled('paid_reference') ? trim((string) $request->paid_reference) : null,
+                ], $this->user()->id);
+            }
+
             return $po;
         });
 
-        return redirect()->route('fbrpos.stock')
-            ->with('success', "Stock receive ho gaya — {$po->po_number} (Rs " . number_format($po->total_amount, 2) . ")");
+        $msg = "Stock receive ho gaya — {$po->po_number} (Rs " . number_format($po->total_amount, 2) . ")";
+        if ($paidNow > 0) {
+            $msg .= ' · ' . __('pos.sl_paid_now_flash', [
+                'paid' => number_format($paidNow, 2),
+                'due' => number_format(max(0, $po->total_amount - $paidNow), 2),
+            ]);
+        }
+
+        return redirect()->route('fbrpos.stock')->with('success', $msg);
     }
 
     /**
@@ -818,6 +931,14 @@ class FbrPosStockController extends Controller
         // stock that was never added.
         if ($po->status !== PurchaseOrder::STATUS_RECEIVED) {
             return redirect()->route('fbrpos.stock')->with('error', __('pos.stock_pur_void_not_received'));
+        }
+        // Task 1580: a purchase return is a FINAL document (goods physically
+        // went back, a credit note was issued). Reversing the whole bill on
+        // top of it would deduct units that already left and double-credit
+        // the distributor — so such a bill can no longer be voided.
+        if (SupplierLedgerService::schemaReady()
+            && \App\Models\PurchaseReturn::where('company_id', $companyId)->where('purchase_order_id', $po->id)->exists()) {
+            return redirect()->route('fbrpos.stock')->with('error', __('pos.sl_void_has_returns'));
         }
 
         // Task 1365: resolve — and AUTHORIZE — the branch this purchase's goods
@@ -880,11 +1001,14 @@ class FbrPosStockController extends Controller
                     ->orderByDesc('id')
                     ->value('unit_price');
 
+                // Task 1580: the stock went IN at the net (discount-spread,
+                // bonus-diluted) cost, so it comes OUT at the same figure.
+                // Legacy lines (NULL net cost) still reverse at unit_price.
                 InventoryService::reversePurchase(
                     $companyId,
                     (int) $item->product_id,
                     $qty,
-                    (float) $item->unit_price,
+                    $item->effectiveUnitCost(),
                     $branchId,
                     ['type' => 'purchase_void', 'id' => $po->id, 'number' => $po->po_number],
                     'Purchase void — ' . $po->po_number,
@@ -915,6 +1039,14 @@ class FbrPosStockController extends Controller
             }
 
             $locked->update(['status' => PurchaseOrder::STATUS_CANCELLED]);
+
+            // Task 1580: the bill leaves the ledger; any payment made against
+            // it deliberately STAYS as an unallocated credit with the supplier
+            // (the money really did change hands). Audit the reversal.
+            SupplierLedgerService::audit('purchase_voided', 'purchase_order', $po->id,
+                ['status' => PurchaseOrder::STATUS_RECEIVED, 'total_amount' => (float) $po->total_amount],
+                ['status' => PurchaseOrder::STATUS_CANCELLED, 'supplier_id' => $po->supplier_id],
+                $companyId, (int) $this->user()->id);
         });
 
         return redirect()->route('fbrpos.stock')

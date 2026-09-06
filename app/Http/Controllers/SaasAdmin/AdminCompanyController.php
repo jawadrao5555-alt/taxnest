@@ -1175,6 +1175,11 @@ class AdminCompanyController extends Controller
             'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',
             'fbr_pos_promotions', 'fbr_pos_shifts', 'fbr_pos_terminals',
             'fbr_pos_deals', 'fbr_pos_deal_usages',
+            // FBR Pharmacy Mode: batch ledger, distributor claims (items carry
+            // their own company_id), stock actions and the missed-sale log —
+            // all created without an FK cascade. Children before parents.
+            'pharmacy_claim_items', 'pharmacy_claims', 'pharmacy_stock_actions',
+            'product_batches', 'pharmacy_missed_sales',
             'push_subscriptions', 'payment_proofs', 'feature_suggestions',
             'madadgar_messages', 'invoice_import_batches', 'invoice_import_mappings', 'invoice_deliveries', 'audit_packs',
             // Consultant console: operational rows die with the company (FK

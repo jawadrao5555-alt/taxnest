@@ -24,15 +24,38 @@ class PasswordResetLinkController extends Controller
         return \App\Support\IdentityScope::normalize($request->input('panel'));
     }
 
-    /** PROD schema-drift guard for the new password_reset_otps column. */
+    private static ?bool $otpScoped = null;
+
+    private static float $otpScopedAt = 0.0;
+
+    /**
+     * PROD schema-drift guard for the password_reset_otps product column.
+     * YES is permanent, NO is re-checked — see IdentityScope::usersScoped().
+     */
     private function otpScoped(): bool
     {
-        static $has = null;
-        if ($has === null) {
-            $has = \Illuminate\Support\Facades\Schema::hasColumn('password_reset_otps', 'product_type');
+        if (self::$otpScoped === true) {
+            return true;
+        }
+        if (self::$otpScoped === false && (microtime(true) - self::$otpScopedAt) < 30.0) {
+            return false;
         }
 
-        return $has;
+        try {
+            self::$otpScoped = \Illuminate\Support\Facades\Schema::hasColumn('password_reset_otps', 'product_type');
+        } catch (\Throwable $e) {
+            self::$otpScoped = false;
+        }
+        self::$otpScopedAt = microtime(true);
+
+        return self::$otpScoped;
+    }
+
+    /** Tests rebuild the schema between cases; the memo must not outlive it. */
+    public static function flushSchemaCache(): void
+    {
+        self::$otpScoped = null;
+        self::$otpScopedAt = 0.0;
     }
 
     public function create(Request $request): View
@@ -52,6 +75,10 @@ class PasswordResetLinkController extends Controller
         $neutralStatus = __('pos.auth_fp_status_sent');
 
         $panel = $this->panel($request);
+        // What the VISITOR asked for. The redirect may only ever echo this
+        // back: adding a panel we resolved ourselves would tell an outsider
+        // that the address is registered, and on which product.
+        $requestedPanel = $panel;
         $accounts = User::where('email', $request->email)->orderBy('id')->get()
             ->groupBy(fn ($candidate) => \App\Support\IdentityScope::ofCompanyId($candidate->company_id));
 
@@ -75,7 +102,7 @@ class PasswordResetLinkController extends Controller
             // the panel-less one it is supposed to be indistinguishable from.
             return redirect()->route('password.verify.otp', array_filter([
                 'email' => $request->email,
-                'panel' => $panel,
+                'panel' => $requestedPanel,
             ], fn ($v) => $v !== '' && $v !== null))->with('status', $neutralStatus);
         }
 
@@ -136,8 +163,10 @@ class PasswordResetLinkController extends Controller
             return back()->withErrors(['email' => __('pos.auth_fp_send_failed')]);
         }
 
-        return redirect()->route('password.verify.otp', ['email' => $request->email])
-            ->with('status', $neutralStatus);
+        return redirect()->route('password.verify.otp', array_filter([
+            'email' => $request->email,
+            'panel' => $requestedPanel,
+        ], fn ($v) => $v !== '' && $v !== null))->with('status', $neutralStatus);
     }
 
     public function showOtpForm(Request $request): View
@@ -162,10 +191,14 @@ class PasswordResetLinkController extends Controller
 
         $panel = $this->panel($request);
 
+        // With no panel in hand, the OTP row itself decides the product — it
+        // was issued for exactly one account and the reset follows it. Filtering
+        // on an empty panel here would reject every product-scoped code, i.e.
+        // every reset started from the panel-less page.
         $record = DB::table('password_reset_otps')
             ->where('email', $request->email)
             ->where('otp', $request->otp)
-            ->when($this->otpScoped(), fn ($q) => $q->where(function ($inner) use ($panel) {
+            ->when($this->otpScoped() && $panel !== '', fn ($q) => $q->where(function ($inner) use ($panel) {
                 $inner->where('product_type', $panel)->orWhereNull('product_type');
             }))
             ->where('used', false)

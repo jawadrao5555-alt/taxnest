@@ -48,34 +48,56 @@ class CompanyGroupService
      */
     private const WEAK_SHARE_CAP = 3;
 
+    private const RECHECK_SECONDS = 30.0;
+
     /** Re-entrancy guard: model events call sync, sync writes models. */
     private static bool $syncing = false;
+
+    private static ?bool $enabled = null;
+
+    private static float $enabledAt = 0.0;
+
+    private static ?bool $pairExclusions = null;
+
+    private static float $pairExclusionsAt = 0.0;
 
     /** Per-request memo for the shared-value count (one query per value). */
     private static array $shareCounts = [];
 
     /**
-     * Only the YES is remembered. A "no" is a statement about the schema at one
-     * moment — before a migration finished, on a connection that was still
-     * being built — and memoising it would switch grouping off for the rest of
-     * the process even after the tables appeared.
+     * A YES is permanent; a NO is re-checked shortly after, so a process that
+     * started before the migration does not stay blind to the tables. See
+     * IdentityScope::usersScoped() for the reasoning.
      */
     public static function enabled(): bool
     {
-        static $ok = false;
-        if ($ok) {
+        if (self::$enabled === true) {
             return true;
+        }
+        if (self::$enabled === false && (microtime(true) - self::$enabledAt) < self::RECHECK_SECONDS) {
+            return false;
         }
 
         try {
-            $ok = Schema::hasTable('company_groups')
+            self::$enabled = Schema::hasTable('company_groups')
                 && Schema::hasTable('company_group_members')
                 && Schema::hasTable('company_identity_keys');
         } catch (\Throwable $e) {
-            $ok = false;
+            self::$enabled = false;
         }
+        self::$enabledAt = microtime(true);
 
-        return $ok;
+        return self::$enabled;
+    }
+
+    /** Tests rebuild the schema between cases; the memo must not outlive it. */
+    public static function flushSchemaCache(): void
+    {
+        self::$enabled = null;
+        self::$enabledAt = 0.0;
+        self::$pairExclusions = null;
+        self::$pairExclusionsAt = 0.0;
+        self::$shareCounts = [];
     }
 
     public static function strengthOf(string $matchType): string
@@ -283,10 +305,13 @@ class CompanyGroupService
                 return $current?->group;
             }
 
+            // Live PDO hands back ints as strings; a strict in_array would
+            // then silently ignore every exclusion on the server that matters.
             $excluded = DB::table('company_group_exclusions')
                 ->where('company_id', $company->id)
                 ->whereNotNull('company_group_id')
                 ->pluck('company_group_id')
+                ->map(fn ($id) => (int) $id)
                 ->all();
 
             // "Not the same customer" is a statement about two BUSINESSES, so
@@ -331,14 +356,14 @@ class CompanyGroupService
                     continue;
                 }
 
-                if (in_array((int) $other->id, $excludedCompanies, true)) {
+                if (in_array((int) $other->id, $excludedCompanies, true)) {   // @phpstan-ignore-line
                     continue;   // admin has already split these two apart
                 }
 
                 $otherMember = CompanyGroupMember::where('company_id', $other->id)->first();
                 $group = $otherMember?->group;
 
-                if ($group && in_array($group->id, $excluded, true)) {
+                if ($group && in_array((int) $group->id, $excluded, true)) {
                     continue;   // admin said these two are not the same customer
                 }
 
@@ -464,25 +489,36 @@ class CompanyGroupService
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        $member->delete();
+        // The removal and the record of WHY belong together: a detach that
+        // half-applied would be re-formed by the next automatic pass.
+        DB::transaction(function () use ($member, $company, $groupId) {
+            $member->delete();
 
-        DB::table('company_group_exclusions')->updateOrInsert(
-            ['company_group_id' => $groupId, 'company_id' => $company->id, 'excluded_company_id' => null],
-            ['updated_at' => now(), 'created_at' => now()]
-        );
+            DB::table('company_group_exclusions')->updateOrInsert(
+                ['company_group_id' => $groupId, 'company_id' => $company->id, 'excluded_company_id' => null],
+                ['updated_at' => now(), 'created_at' => now()]
+            );
+        });
 
-        if (self::pairExclusionsEnabled()) {
-            foreach ($siblings as $siblingId) {
-                foreach ([[$company->id, $siblingId], [$siblingId, $company->id]] as [$left, $right]) {
-                    // No group id on a pair row: the decision outlives the
-                    // group, and the (group, company) unique index would
-                    // otherwise allow only one pair per company.
-                    DB::table('company_group_exclusions')->updateOrInsert(
-                        ['company_id' => $left, 'excluded_company_id' => $right],
-                        ['company_group_id' => null, 'updated_at' => now(), 'created_at' => now()]
-                    );
+        // Pair rows are the durable form of the decision, but a deployment
+        // whose column could not be made nullable must not lose the detach
+        // itself — it already holds above.
+        try {
+            if (self::pairExclusionsEnabled()) {
+                foreach ($siblings as $siblingId) {
+                    foreach ([[$company->id, $siblingId], [$siblingId, $company->id]] as [$left, $right]) {
+                        // No group id on a pair row: the decision outlives the
+                        // group, and the (group, company) unique index would
+                        // otherwise allow only one pair per company.
+                        DB::table('company_group_exclusions')->updateOrInsert(
+                            ['company_id' => $left, 'excluded_company_id' => $right],
+                            ['company_group_id' => null, 'updated_at' => now(), 'created_at' => now()]
+                        );
+                    }
                 }
             }
+        } catch (\Throwable $e) {
+            Log::warning('Pair exclusion could not be recorded', ['company_id' => $company->id, 'error' => $e->getMessage()]);
         }
 
         self::dissolveIfAlone($groupId);
@@ -504,19 +540,22 @@ class CompanyGroupService
     /** Older deployments may not have the pair column yet. */
     public static function pairExclusionsEnabled(): bool
     {
-        static $ok = false;
-        if ($ok) {
+        if (self::$pairExclusions === true) {
             return true;
+        }
+        if (self::$pairExclusions === false && (microtime(true) - self::$pairExclusionsAt) < self::RECHECK_SECONDS) {
+            return false;
         }
 
         try {
-            $ok = Schema::hasTable('company_group_exclusions')
+            self::$pairExclusions = Schema::hasTable('company_group_exclusions')
                 && Schema::hasColumn('company_group_exclusions', 'excluded_company_id');
         } catch (\Throwable $e) {
-            $ok = false;
+            self::$pairExclusions = false;
         }
+        self::$pairExclusionsAt = microtime(true);
 
-        return $ok;
+        return self::$pairExclusions;
     }
 
     /** Forget everything about a company that no longer exists. */

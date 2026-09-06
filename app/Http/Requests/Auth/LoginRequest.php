@@ -68,8 +68,12 @@ class LoginRequest extends FormRequest
 
             // STRICT isolation: only DI users (or orphan users with no company) may login here.
             // POS / FBR-POS users → fall through to generic failure (no info leak).
+            // Pin the attempt to the RESOLVED row, not the email. Since 5 Sep
+            // 2026 an email is unique per product only, so a plain email lookup
+            // returns whichever account was created first — a POS owner's
+            // password could then open a DI session on the same address.
             if (($productType === null || $productType === 'di')
-                && Auth::attempt(['email' => $user->email, 'password' => $password], $remember)
+                && Auth::attempt(['id' => $user->id, 'password' => $password], $remember)
             ) {
                 RateLimiter::clear($this->throttleKey());
                 return;

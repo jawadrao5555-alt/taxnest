@@ -24,6 +24,15 @@ abstract class TestCase extends BaseTestCase
         // mark. Disarm it per test — the runner, not the app, owns time here.
         @set_time_limit(0);
 
+        // Schema-capability memos ("does users.product_type exist?") are static
+        // and would otherwise survive into the next test class — and some
+        // classes here drop every table and hand-build a minimal schema. One
+        // stale answer then either skips per-product scoping everywhere or
+        // writes a column that class never created.
+        \App\Support\IdentityScope::flushSchemaCache();
+        \App\Services\CompanyGroupService::flushSchemaCache();
+        \App\Http\Controllers\Auth\PasswordResetLinkController::flushSchemaCache();
+
         $this->assertTestEnvironmentIsIsolated();
     }
 

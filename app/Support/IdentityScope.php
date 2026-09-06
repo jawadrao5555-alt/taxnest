@@ -39,26 +39,51 @@ final class IdentityScope
     /** Product bucket for an account that belongs to no product line. */
     public const NONE = '';
 
+    private const RECHECK_SECONDS = 30.0;
+
     private static ?bool $usersScoped = null;
+
+    private static float $usersScopedAt = 0.0;
 
     /** company_id => product bucket, for the life of one request. */
     private static array $productCache = [];
 
-    /** PROD schema drift guard — the mirror column may not exist yet. */
+    /**
+     * PROD schema drift guard — the mirror column may not exist yet.
+     *
+     * A YES is permanent: columns do not disappear in production. A NO is only
+     * true of the schema at that instant — mid-deploy, before the migration
+     * lands — so it is re-checked shortly afterwards. Caching a NO for the life
+     * of the process would silently turn per-product identity back into a
+     * global one, which is exactly what the composite unique keys prevent.
+     */
     public static function usersScoped(): bool
     {
-        if (self::$usersScoped === null) {
-            try {
-                self::$usersScoped = Schema::hasColumn('users', 'product_type');
-            } catch (\Throwable $e) {
-                self::$usersScoped = false;
-            }
+        if (self::$usersScoped === true) {
+            return true;
         }
+        if (self::$usersScoped === false && (microtime(true) - self::$usersScopedAt) < self::RECHECK_SECONDS) {
+            return false;
+        }
+
+        try {
+            self::$usersScoped = Schema::hasColumn('users', 'product_type');
+        } catch (\Throwable $e) {
+            self::$usersScoped = false;
+        }
+        self::$usersScopedAt = microtime(true);
 
         return self::$usersScoped;
     }
 
-    /** Canonical product bucket ('' when the value belongs to no product). */
+    /** Tests rebuild the schema between cases; the memo must not outlive it. */
+    public static function flushSchemaCache(): void
+    {
+        self::$usersScoped = null;
+        self::$usersScopedAt = 0.0;
+        self::$productCache = [];
+    }
+
     public static function normalize(?string $productType): string
     {
         return ProductCatalog::normalize($productType) ?? self::NONE;

@@ -1517,6 +1517,16 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/hs-master/seed', [GlobalHsMasterController::class, 'seed'])->name('admin.hs-master.seed');
     Route::post('/hs-master/map-unmapped', [GlobalHsMasterController::class, 'mapUnmapped'])->name('admin.hs-master.map-unmapped');
 
+    // Medicine Catalogue (Task 1579) — global DRAP-seeded list for pharmacy-mode FBR shops
+    Route::get('/medicine-catalogue', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'index'])->name('admin.medicine-catalogue');
+    Route::get('/medicine-catalogue/sync-status', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'syncStatus'])->name('admin.medicine-catalogue.sync-status');
+    Route::get('/medicine-catalogue/export', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'export'])->name('admin.medicine-catalogue.export');
+    Route::post('/medicine-catalogue/sync', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'startSync'])->name('admin.medicine-catalogue.sync');
+    Route::post('/medicine-catalogue/sync-cancel', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'cancelSync'])->name('admin.medicine-catalogue.sync-cancel');
+    Route::post('/medicine-catalogue/import', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'import'])->name('admin.medicine-catalogue.import');
+    Route::post('/medicine-catalogue', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'store'])->name('admin.medicine-catalogue.store');
+    Route::put('/medicine-catalogue/{id}', [\App\Http\Controllers\Admin\MedicineCatalogueController::class, 'update'])->name('admin.medicine-catalogue.update');
+
     Route::get('/hs-master-global', [HsMasterController::class, 'index'])->name('admin.hs-master-global.index');
     Route::get('/hs-master-global/{id}/edit', [HsMasterController::class, 'edit'])->name('admin.hs-master-global.edit');
     Route::post('/hs-master-global/{id}', [HsMasterController::class, 'update'])->name('admin.hs-master-global.update');
@@ -2638,6 +2648,14 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // 💊 Pharmacy Mode (Task 1558) — batch/expiry stock, distributor expiry
     // claims and pharmacy reports. Every action re-checks pharmacyLive() in
     // the controller, so a bookmarked URL cannot walk around the nav hiding.
+    // 💊 Medicine Catalogue + MRP update notices (Task 1579) — pharmacyLive()
+    // re-checked in-controller; writes are company_admin only.
+    Route::get('/pharmacy/catalogue/search', [\App\Http\Controllers\FbrPosCatalogueController::class, 'search'])->name('fbrpos.pharmacy.catalogue.search');
+    Route::post('/pharmacy/catalogue/add', [\App\Http\Controllers\FbrPosCatalogueController::class, 'add'])->name('fbrpos.pharmacy.catalogue.add')->middleware('plan.limit:products');
+    Route::get('/pharmacy/price-updates', [\App\Http\Controllers\FbrPosCatalogueController::class, 'priceUpdates'])->name('fbrpos.pharmacy.price-updates');
+    Route::post('/pharmacy/price-updates/apply-all', [\App\Http\Controllers\FbrPosCatalogueController::class, 'applyAll'])->name('fbrpos.pharmacy.price-updates.apply-all');
+    Route::post('/pharmacy/price-updates/{id}/apply', [\App\Http\Controllers\FbrPosCatalogueController::class, 'apply'])->name('fbrpos.pharmacy.price-updates.apply');
+    Route::post('/pharmacy/price-updates/{id}/dismiss', [\App\Http\Controllers\FbrPosCatalogueController::class, 'dismiss'])->name('fbrpos.pharmacy.price-updates.dismiss');
     Route::get('/pharmacy/batches', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batches'])->name('fbrpos.pharmacy.batches');
     Route::post('/pharmacy/batches', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeBatch'])->name('fbrpos.pharmacy.batch.store')->middleware('plan.limit:inventory');
     Route::post('/pharmacy/batches/{id}/action', [\App\Http\Controllers\FbrPosPharmacyController::class, 'batchAction'])->name('fbrpos.pharmacy.batch.action')->middleware('plan.limit:inventory');
@@ -2648,6 +2666,13 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/pharmacy/claims/{id}/print', [\App\Http\Controllers\FbrPosPharmacyController::class, 'printClaim'])->name('fbrpos.pharmacy.claim.print');
     Route::post('/pharmacy/claims/{id}/status', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateClaimStatus'])->name('fbrpos.pharmacy.claim.status')->middleware('plan.limit:inventory');
     Route::get('/pharmacy/reports', [\App\Http\Controllers\FbrPosPharmacyController::class, 'reports'])->name('fbrpos.pharmacy.reports');
+    // Counter-side pharmacy (Sep 2026): near-expiry window, salt-alternative
+    // stock check, and the "customer asked, shop lacked" missed-sale log.
+    Route::post('/pharmacy/near-days', [\App\Http\Controllers\FbrPosPharmacyController::class, 'updateNearDays'])->name('fbrpos.pharmacy.near-days');
+    Route::get('/pharmacy/stock-check', [\App\Http\Controllers\FbrPosPharmacyController::class, 'stockCheck'])->name('fbrpos.pharmacy.stock-check');
+    Route::post('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'storeMissedSale'])->name('fbrpos.pharmacy.missed-sales.store');
+    Route::get('/pharmacy/missed-sales', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSales'])->name('fbrpos.pharmacy.missed-sales');
+    Route::post('/pharmacy/missed-sales/handled', [\App\Http\Controllers\FbrPosPharmacyController::class, 'missedSaleHandled'])->name('fbrpos.pharmacy.missed-sales.handled');
 
     // 🚚 Delivery Riders (Aug 2026 — FBR port of PRA PosRiderController)
     // Board + mutations: admin + cashier. Rider CRUD: admin-only (checked in controller).

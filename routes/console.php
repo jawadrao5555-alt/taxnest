@@ -136,6 +136,11 @@ Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::job(new SyncFbrPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::command('pos:clean-zombie-tables')->everyFifteenMinutes();
+// DRAP medicine catalogue (Task 1579): weekly re-sync keeps notified MRPs and
+// effective dates current. The command only QUEUES the crawl (bulk queue, chunked
+// self-requeue, cursor in medicine_catalogue_syncs) — live needs both the
+// schedule:run cron and the taxnest-queue worker; idempotent to re-run.
+Schedule::command('catalogue:sync-drap')->weeklyOn(0, '01:30');
 Schedule::job(new CheckTrialExpiryJob)->dailyAt('03:00');
 Schedule::command('trial:reminders')->dailyAt('08:00');
 // Admin nudge: pending payment proofs whose auto-granted 10-day access ends

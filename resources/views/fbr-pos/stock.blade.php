@@ -18,6 +18,11 @@
                     {{ $stockEnabled ? __('pos.stock_tracking_on') : __('pos.stock_tracking_off') }}
                 </button>
             </form>
+            @if($ledgerReady ?? false)
+            <a href="{{ route('fbrpos.stock.returns') }}" class="flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 border-gray-200 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                ↩ {{ __('pos.sl_returns_link') }} <x-new-badge feature="fbr_purchase_returns" />
+            </a>
+            @endif
             <a href="{{ route('fbrpos.create') }}" class="text-sm text-blue-600 hover:underline">← {{ __('pos.stock_back_sale_screen') }}</a>
         </div>
     </div>
@@ -41,7 +46,7 @@
     </section>
 
     {{-- Stat tiles --}}
-    <div class="grid grid-cols-3 gap-3 mb-6">
+    <div class="grid grid-cols-3 {{ ($ledgerReady ?? false) ? 'lg:grid-cols-4' : '' }} gap-3 mb-6">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ __('pos.stock_tile_products') }}</p>
             <p class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">{{ $rows->count() }}</p>
@@ -54,6 +59,18 @@
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ __('pos.stock_tile_minus') }}</p>
             <p class="text-2xl font-extrabold {{ $negative->count() > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' }} mt-1">{{ $negative->count() }}</p>
         </div>
+        @if($ledgerReady ?? false)
+        {{-- Distributor payable (Task 1580) — the ONE number the owner asks for:
+             sum of every supplier's positive balance (advances shown apart). --}}
+        <a href="#suppliers" class="col-span-3 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow p-4 border-l-4 {{ $ledgerTotals['payable'] > 0 ? 'border-purple-500' : 'border-gray-200 dark:border-gray-700' }} block">
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">{{ __('pos.sl_tile_payable') }} <x-new-badge feature="fbr_supplier_ledger" /></p>
+            <p class="text-2xl font-extrabold {{ $ledgerTotals['payable'] > 0 ? 'text-purple-700 dark:text-purple-300' : 'text-gray-900 dark:text-white' }} mt-1">Rs {{ number_format($ledgerTotals['payable'], 0) }}</p>
+            <p class="text-[11px] text-gray-400 mt-0.5">
+                {{ __('pos.sl_tile_suppliers_due', ['n' => $ledgerTotals['suppliers_due']]) }}
+                @if($ledgerTotals['advance'] > 0) · {{ __('pos.sl_tile_advance', ['amount' => number_format($ledgerTotals['advance'], 0)]) }} @endif
+            </p>
+        </a>
+        @endif
     </div>
 
     {{-- Low stock alert list --}}
@@ -79,10 +96,11 @@
         {{-- Purchase entry --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-5">
             <h3 class="font-bold text-gray-900 dark:text-white mb-3">{{ __('pos.stock_purchase_heading') }}</h3>
-            <form method="POST" action="{{ route('fbrpos.stock.purchase') }}" @submit="return purchaseRows.length > 0">
+            <form method="POST" action="{{ route('fbrpos.stock.purchase') }}" @submit="if (!purchaseRows.length) $event.preventDefault()">
                 @csrf
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_supplier_optional_lbl') }}</label>
-                <select name="supplier_id" class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mb-3">
+                <div class="grid grid-cols-5 gap-2 mb-3">
+                <select name="supplier_id" x-model="purSupplier" class="col-span-3 w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
                     <option value="">{{ __('pos.stock_no_supplier_option') }}</option>
                     @foreach($suppliers as $s)
                     @if($s->is_active)
@@ -90,6 +108,13 @@
                     @endif
                     @endforeach
                 </select>
+                @if($ledgerReady ?? false)
+                {{-- Distributor's own bill number (Task 1580) — the reference the
+                     rep quotes when reconciling; free text, printed on the statement. --}}
+                <input type="text" name="supplier_invoice_no" maxlength="60" placeholder="{{ __('pos.sl_invoice_no_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="col-span-2 w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                @endif
+                </div>
 
                 @if($multiBranch ?? false)
                 {{-- Per-branch stock (Task 1365): received maal has to land in ONE
@@ -132,6 +157,28 @@
                                placeholder="{{ __('pos.stock_kharid_rate_ph') }}" class="w-28 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
                         <button type="button" @click="purchaseRows.splice(i, 1)" class="text-red-500 hover:text-red-700 font-bold px-1">&times;</button>
                     </div>
+                    @if($ledgerReady ?? false)
+                    {{-- Scheme / bonus + trade discount (Task 1580). "10+1" = qty 10,
+                         bonus 1: the free strip enters stock at zero cost and the
+                         line's net cost is spread across all 11 units. --}}
+                    <div class="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 text-xs">
+                        <label class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                            <span class="font-bold uppercase tracking-wider text-[10px]">{{ __('pos.sl_bonus_lbl') }}</span>
+                            <input type="number" :name="`items[${i}][bonus_qty]`" x-model="row.bonus_qty" step="0.001" min="0" placeholder="0"
+                                   class="w-16 border rounded px-2 py-1 text-xs dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        </label>
+                        <label class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                            <span class="font-bold uppercase tracking-wider text-[10px]">{{ __('pos.sl_disc_pct_lbl') }}</span>
+                            <input type="number" :name="`items[${i}][discount_pct]`" x-model="row.discount_pct" step="0.01" min="0" max="100" placeholder="0"
+                                   class="w-16 border rounded px-2 py-1 text-xs dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        </label>
+                        <span class="ml-auto text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                            <span x-show="rowUnits(row) > 0 && rowNet(row) > 0" x-cloak>
+                                {{ __('pos.sl_row_net_cost') }} <strong class="text-gray-800 dark:text-gray-100" x-text="'Rs ' + fmt2(rowUnitCost(row))"></strong> /<span x-text="row.uom"></span>
+                            </span>
+                        </span>
+                    </div>
+                    @endif
                     @if($batchTracking ?? false)
                     {{-- 💊 Pharmacy Mode (Task 1558): batch identity rides along
                          with the goods. Leaving all three blank still receives
@@ -154,6 +201,49 @@
                 <p class="text-[11px] text-gray-400 mb-2">{{ __('pos.ph_expiry_hint') }}</p>
                 @endif
 
+                @if($ledgerReady ?? false)
+                <div x-show="purchaseRows.length > 0" x-cloak class="mt-3 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/60 dark:bg-purple-900/10 p-3 text-sm space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-gray-600 dark:text-gray-300">{{ __('pos.sl_gross_total') }}</span>
+                        <span class="font-semibold text-gray-900 dark:text-white" x-text="'Rs ' + fmt2(purchaseGross())"></span>
+                    </div>
+                    <div class="flex items-center justify-between gap-2" x-show="purchaseLineDisc() > 0">
+                        <span class="text-gray-600 dark:text-gray-300">{{ __('pos.sl_line_discounts') }}</span>
+                        <span class="font-semibold text-red-600" x-text="'- Rs ' + fmt2(purchaseLineDisc())"></span>
+                    </div>
+                    <label class="flex items-center justify-between gap-2">
+                        <span class="text-gray-600 dark:text-gray-300">{{ __('pos.sl_invoice_discount_lbl') }}</span>
+                        <input type="number" name="invoice_discount" x-model="invDiscount" step="0.01" min="0" placeholder="0"
+                               class="w-28 border rounded px-2 py-1 text-sm text-right dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                    </label>
+                    <div class="flex items-center justify-between gap-2 border-t border-purple-200 dark:border-purple-800 pt-2">
+                        <span class="font-bold text-gray-800 dark:text-gray-100">{{ __('pos.sl_net_payable') }}</span>
+                        <span class="font-extrabold text-lg text-purple-700 dark:text-purple-300" x-text="'Rs ' + fmt2(purchaseNet())"></span>
+                    </div>
+                    {{-- Paid now: only meaningful against a named distributor; the
+                         remainder is booked to that supplier's khata. --}}
+                    <div x-show="purSupplier !== ''" x-cloak class="border-t border-purple-200 dark:border-purple-800 pt-2 space-y-2">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">{{ __('pos.sl_paid_now_lbl') }} <x-new-badge feature="fbr_supplier_ledger" /></p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <input type="number" name="paid_amount" x-model="paidAmount" step="0.01" min="0" :max="purchaseNet()" placeholder="{{ __('pos.sl_paid_amount_ph') }}"
+                                   class="border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                            <select name="paid_method" class="border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                                <option value="cash">{{ __('pos.sl_method_cash') }}</option>
+                                <option value="bank">{{ __('pos.sl_method_bank') }}</option>
+                                <option value="online">{{ __('pos.sl_method_online') }}</option>
+                                <option value="cheque">{{ __('pos.sl_method_cheque') }}</option>
+                            </select>
+                            <input type="text" name="paid_reference" maxlength="64" placeholder="{{ __('pos.sl_paid_ref_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                   class="border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        </div>
+                        <div class="flex items-center justify-between gap-2 text-xs">
+                            <button type="button" @click="paidAmount = fmt2(purchaseNet())" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">{{ __('pos.sl_pay_full') }}</button>
+                            <span class="text-gray-600 dark:text-gray-300">{{ __('pos.sl_udhaar_remaining') }} <strong :class="purchaseDue() > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400'" x-text="'Rs ' + fmt2(purchaseDue())"></strong></span>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 <input type="text" name="notes" maxlength="300" placeholder="{{ __('pos.stock_note_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mt-2 mb-3">
 
@@ -165,8 +255,10 @@
         </div>
 
         {{-- Suppliers --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-5">
-            <h3 class="font-bold text-gray-900 dark:text-white mb-3">{{ __('pos.stock_suppliers_heading') }}</h3>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-5" id="suppliers">
+            <h3 class="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">{{ __('pos.stock_suppliers_heading') }}
+                @if($ledgerReady ?? false)<span class="text-xs font-normal text-gray-400">· {{ __('pos.sl_balances_hint') }}</span>@endif
+            </h3>
             <form method="POST" action="{{ route('fbrpos.stock.supplier') }}" class="grid grid-cols-2 gap-2 mb-4">
                 @csrf
                 <input type="text" name="name" required maxlength="150" placeholder="{{ __('pos.stock_sup_name_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
@@ -192,12 +284,35 @@
                                 @endunless
                             </p>
                             <p class="text-xs text-gray-400">{{ $s->phone ?: '' }}{{ $s->city ? ($s->phone ? ' · ' : '') . $s->city : '' }}</p>
+                            @if($ledgerReady ?? false)
+                            @php $sb = $supplierBalances->get($s->id); $sbal = $sb ? (float) $sb->balance : 0.0; @endphp
+                            <p class="text-xs mt-0.5">
+                                @if($sbal > 0.004)
+                                <span class="font-bold text-amber-700 dark:text-amber-400">{{ __('pos.sl_baqaya') }} Rs {{ number_format($sbal, 2) }}</span>
+                                @elseif($sbal < -0.004)
+                                <span class="font-bold text-green-700 dark:text-green-400">{{ __('pos.sl_advance') }} Rs {{ number_format(abs($sbal), 2) }}</span>
+                                @else
+                                <span class="text-gray-400">{{ __('pos.sl_settled') }}</span>
+                                @endif
+                                @if($sb && $sb->billed > 0)
+                                <span class="text-gray-400"> · {{ __('pos.sl_billed_short') }} {{ number_format($sb->billed, 0) }} · {{ __('pos.sl_paid_short') }} {{ number_format($sb->paid, 0) }}@if($sb->returned + $sb->credited > 0) · {{ __('pos.sl_credit_short') }} {{ number_format($sb->returned + $sb->credited, 0) }}@endif</span>
+                                @endif
+                            </p>
+                            @endif
                         </div>
                         <div class="flex items-center gap-1 shrink-0">
+                            @if($ledgerReady ?? false)
+                            <a href="{{ route('fbrpos.stock.supplier.statement', $s->id) }}"
+                               class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-700">{{ __('pos.sl_statement_btn') }}</a>
+                            @if($s->is_active)
+                            <button type="button" @click="openPay({{ (int) $s->id }}, @js($s->name), {{ json_encode(round($sbal, 2)) }})"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-700">{{ __('pos.sl_pay_btn') }}</button>
+                            @endif
+                            @endif
                             @if($s->is_active)
                             <button type="button" @click="editSup = true"
                                     class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700">{{ __('pos.stock_sup_edit') }}</button>
-                            @if($s->purchase_orders_count > 0)
+                            @if($s->purchase_orders_count > 0 || ($supplierLedgerCounts[$s->id] ?? 0) > 0)
                             <form method="POST" action="{{ route('fbrpos.stock.supplier.delete', $s->id) }}"
                                   onsubmit="return confirm(@js(__('pos.stock_sup_deact_confirm')))">
                                 @csrf
@@ -312,7 +427,7 @@
          @keydown.escape.window="editOpen = false">
         <div class="absolute inset-0 bg-black/50" @click="editOpen = false"></div>
         <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <form method="POST" action="{{ route('fbrpos.stock.item') }}" @submit="return confirmEditSubmit()">
+            <form method="POST" action="{{ route('fbrpos.stock.item') }}" @submit="if (!confirmEditSubmit()) $event.preventDefault()">
                 @csrf
                 <input type="hidden" name="product_id" :value="edit.id">
                 <input type="hidden" name="kharid_rate_orig" :value="edit.kharid_orig">
@@ -568,13 +683,16 @@
             <tbody>
                 <template x-for="po in purchases" :key="po.id">
                     <tr class="border-t dark:border-gray-700 align-top">
-                        <td data-label="{{ __('pos.stock_purch_col_number') }}" class="px-4 py-2 font-semibold text-gray-900 dark:text-white" x-text="po.po_number"></td>
+                        <td data-label="{{ __('pos.stock_purch_col_number') }}" class="px-4 py-2 font-semibold text-gray-900 dark:text-white">
+                            <span x-text="po.po_number"></span>
+                            <span x-show="po.invoice_no" x-cloak class="block text-[11px] font-normal text-gray-400" x-text="'#' + po.invoice_no"></span>
+                        </td>
                         <td data-label="{{ __('pos.stock_purch_col_date') }}" class="px-4 py-2 text-gray-500" x-text="po.date"></td>
                         <td data-label="{{ __('pos.stock_purch_col_supplier') }}" class="px-4 py-2 text-gray-500" x-text="po.supplier || '—'"></td>
                         <td data-label="{{ __('pos.stock_purch_items_col') }}" class="px-4 py-2 text-gray-600 dark:text-gray-300">
                             <span class="inline-flex flex-wrap gap-x-1 gap-y-0.5 justify-end sm:justify-start">
                                 <template x-for="(it, ix) in visiblePurchItems(po)" :key="po.id + '-' + ix">
-                                    <span class="whitespace-nowrap"><span x-text="it.name"></span><span class="text-gray-400 font-semibold" x-text="'\u00d7' + it.qty"></span><span x-show="ix < visiblePurchItems(po).length - 1">,</span></span>
+                                    <span class="whitespace-nowrap"><span x-text="it.name"></span><span class="text-gray-400 font-semibold" x-text="'\u00d7' + it.qty + (it.bonus ? '+' + it.bonus : '')"></span><span x-show="it.disc" class="text-[10px] text-green-600 dark:text-green-400 font-bold" x-text="' -' + it.disc + '%'"></span><span x-show="ix < visiblePurchItems(po).length - 1">,</span></span>
                                 </template>
                                 <button type="button" x-show="po.items.length > 3 && !purchExpanded.includes(po.id)"
                                         @click="purchExpanded.push(po.id)"
@@ -586,7 +704,10 @@
                             </span>
                         </td>
                         <td data-label="{{ __('pos.stock_purch_col_total') }}" class="px-4 py-2 text-right font-bold text-gray-900 dark:text-white"
-                            :class="po.voided ? 'line-through opacity-60' : ''" x-text="'Rs ' + po.total"></td>
+                            :class="po.voided ? 'line-through opacity-60' : ''">
+                            <span x-text="'Rs ' + po.total"></span>
+                            <span x-show="po.discount && po.discount !== '0.00'" x-cloak class="block text-[11px] font-normal text-green-600 dark:text-green-400" x-text="'{{ __('pos.sl_disc_short') }} ' + po.discount"></span>
+                        </td>
                         <td class="px-4 py-2 text-right whitespace-nowrap">
                             <span x-show="po.voided" x-cloak
                                   class="inline-block px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">{{ __('pos.stock_pur_voided') }}</span>
@@ -605,6 +726,73 @@
             </button>
         </div>
     </div>
+
+    @if($ledgerReady ?? false)
+    {{-- Payment darj karein (Task 1580) — money handed to a distributor at any
+         time. Plain form POST; the ledger recomputes server-side on redirect.
+         A payment is never edited: void + re-enter from the statement page. --}}
+    <div x-show="payOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @keydown.escape.window="payOpen = false">
+        <div class="absolute inset-0 bg-black/50" @click="payOpen = false"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <form method="POST" action="{{ route('fbrpos.stock.payment.store') }}">
+                @csrf
+                <input type="hidden" name="supplier_id" :value="pay.supplier_id">
+                <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <h3 class="font-bold text-gray-900 dark:text-white truncate">{{ __('pos.sl_pay_modal_title') }}</h3>
+                        <p class="text-xs text-gray-500 truncate" x-text="pay.name"></p>
+                    </div>
+                    <button type="button" @click="payOpen = false" class="text-gray-400 hover:text-gray-600 text-2xl leading-none px-1">&times;</button>
+                </div>
+                <div class="px-5 py-4 space-y-3 text-sm">
+                    <div class="rounded-lg px-3 py-2 text-xs" :class="pay.balance > 0 ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300'">
+                        <span x-text="pay.balance < 0 ? @js(__('pos.sl_advance')) : @js(__('pos.sl_baqaya'))"></span> <strong x-text="'Rs ' + fmt2(Math.abs(pay.balance))"></strong>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.sl_pay_amount_lbl') }}</label>
+                        <input type="number" name="amount" x-model="pay.amount" step="0.01" min="0.01" required
+                               class="w-full border rounded-lg px-3 py-2 text-lg font-bold dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.sl_pay_method_lbl') }}</label>
+                            <select name="method" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                                <option value="cash">{{ __('pos.sl_method_cash') }}</option>
+                                <option value="bank">{{ __('pos.sl_method_bank') }}</option>
+                                <option value="online">{{ __('pos.sl_method_online') }}</option>
+                                <option value="cheque">{{ __('pos.sl_method_cheque') }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.sl_pay_date_lbl') }}</label>
+                            <input type="date" name="paid_on" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}"
+                                   class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        </div>
+                    </div>
+                    <input type="text" name="reference" maxlength="64" placeholder="{{ __('pos.sl_paid_ref_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                    <input type="text" name="notes" maxlength="500" placeholder="{{ __('pos.stock_note_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                    @if($multiBranch ?? false)
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.sl_branch_lbl') }}</label>
+                        <select name="branch_id" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                            @foreach($branches as $b)
+                            <option value="{{ $b->id }}" {{ (int) ($activeBranchId ?? 0) === (int) $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+                </div>
+                <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-700 flex gap-2">
+                    <button type="submit" class="flex-1 py-2.5 rounded-lg bg-purple-600 text-white font-bold hover:bg-purple-700">{{ __('pos.sl_pay_save_btn') }}</button>
+                    <button type="button" @click="payOpen = false" class="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">{{ __('pos.stock_sup_cancel') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endif
 </div>
 
 <script>
@@ -614,6 +802,34 @@ function stockPage() {
         prodSearch: '',
         prodResults: [],
         purchaseRows: [],
+        // ── Distributor ledger (Task 1580): purchase form money state ──
+        purSupplier: '',
+        invDiscount: '',
+        paidAmount: '',
+        num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; },
+        fmt2(v) { return (Math.round((this.num(v) + Number.EPSILON) * 100) / 100).toFixed(2); },
+        rowUnits(row) { return this.num(row.quantity) + this.num(row.bonus_qty); },
+        rowGross(row) { return this.num(row.quantity) * this.num(row.unit_price); },
+        rowNet(row) { const g = this.rowGross(row); return Math.max(0, g - g * Math.min(100, this.num(row.discount_pct)) / 100); },
+        purchaseGross() { return this.purchaseRows.reduce((s, r) => s + this.rowGross(r), 0); },
+        purchaseLineDisc() { return this.purchaseRows.reduce((s, r) => s + (this.rowGross(r) - this.rowNet(r)), 0); },
+        purchaseNet() { return Math.max(0, this.purchaseRows.reduce((s, r) => s + this.rowNet(r), 0) - this.num(this.invDiscount)); },
+        // Same spread the server books: the invoice discount is shared across
+        // lines pro-rata to their net, then divided over paid + bonus units.
+        rowUnitCost(row) {
+            const units = this.rowUnits(row); if (units <= 0) return 0;
+            const netSum = this.purchaseRows.reduce((s, r) => s + this.rowNet(r), 0);
+            const share = netSum > 0 ? Math.min(this.num(this.invDiscount), netSum) * (this.rowNet(row) / netSum) : 0;
+            return Math.max(0, this.rowNet(row) - share) / units;
+        },
+        purchaseDue() { return Math.max(0, this.purchaseNet() - this.num(this.paidAmount)); },
+        // Payment modal (supplier cards)
+        payOpen: false,
+        pay: { supplier_id: 0, name: '', balance: 0, amount: '' },
+        openPay(id, name, balance) {
+            this.pay = { supplier_id: id, name: name, balance: balance, amount: balance > 0 ? this.fmt2(balance) : '' };
+            this.payOpen = true;
+        },
         editOpen: false,
         edit: { id: 0, name: '', sku: '', uom: 'U', price: '', kharid: '', kharid_orig: '', qty: '', qty_orig: '' },
         // Baked product list for instant client-side search (name/sku/barcode)
@@ -819,7 +1035,7 @@ function stockPage() {
         pickFirst() { if (this.prodResults.length > 0) this.addRow(this.prodResults[0]); },
         addRow(p) {
             if (!this.purchaseRows.find(r => r.product_id === p.id)) {
-                this.purchaseRows.push({ product_id: p.id, name: p.name, uom: p.uom || 'U', quantity: '', unit_price: '', batch_number: '', expiry_date: '', retail_price: '' });
+                this.purchaseRows.push({ product_id: p.id, name: p.name, uom: p.uom || 'U', quantity: '', unit_price: '', bonus_qty: '', discount_pct: '', batch_number: '', expiry_date: '', retail_price: '' });
             }
             this.prodSearch = '';
             this.prodResults = [];

@@ -180,7 +180,7 @@
                         <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Walk-in customer</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">W</kbd></div>
                         <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Focus search</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F2</kbd></div>
                         <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Focus cart</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">F6</kbd></div>
-                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Quantity prefix</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">5 burger ⏎</kbd></div>
+                        <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Quantity prefix</span><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono">5 {{ \App\Support\PosVocabulary::for()['example'] }} ⏎</kbd></div>
                     </div>
                     <div class="space-y-2">
                         <p class="text-[11px] font-bold uppercase tracking-wide text-purple-600 mb-1">Actions</p>

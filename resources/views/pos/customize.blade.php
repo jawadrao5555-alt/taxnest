@@ -5,6 +5,11 @@
         $praOn   = (bool) (auth('pos')->user()?->praReportingEnabled($company) ?? false);
         $agentOn = $company->agentHandlesPra(); // submission mode badge (Agent ON vs Direct)
         $invOn   = (bool) ($company->inventory_enabled ?? false);
+        $customVocab = \App\Support\PosVocabulary::for($company);
+        $inventoryRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'inventory');
+        $kitchenRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'kitchen');
+        $callerRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'caller_id_enabled');
+        $whatsappRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'whatsapp_enabled');
         // Tax-Inclusive Pricing (Menu-Rate-Final) — effective rates via PosTaxRule
         // helpers ONLY (global defaults + per-company overrides), never raw table reads.
         $taxIncOn  = (bool) ($company->pos_tax_inclusive ?? false);
@@ -23,14 +28,14 @@
                 'title' => __('pos.sec_setup_features'),
                 'desc'  => __('pos.sec_setup_features_desc'),
                 'items' => [
-                    ['label' => __('pos.card_modules_features'), 'desc' => __('pos.card_modules_features_desc'), 'url' => route('pos.features'), 'tone' => 'purple', 'badge' => $density, 'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4'],
+                    ['label' => __('pos.card_modules_features'), 'desc' => __('pos.pra_modules_for_category', ['category' => $customVocab['category_label']]), 'url' => route('pos.features'), 'tone' => 'purple', 'badge' => $density, 'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4'],
                     ['label' => __('pos.business_profile'), 'desc' => __('pos.card_business_profile_desc'), 'url' => route('pos.business-profile'), 'tone' => 'purple', 'badge' => __('pos.badge_identity'), 'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
                     ['label' => __('pos.card_receipt_display'), 'desc' => __('pos.card_receipt_display_desc'), 'url' => route('pos.receipt-settings'), 'tone' => 'purple', 'badge' => __('pos.badge_receipt'), 'icon' => 'M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 4h6a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v12a2 2 0 002 2z'],
                     ['label' => __('pos.printer_settings'), 'desc' => __('pos.card_printer_settings_desc'), 'url' => route('pos.printer-settings'), 'tone' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? 'emerald' : 'purple', 'badge' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? __('pos.badge_silent_on') : __('pos.badge_popup'), 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
                     ['label' => __('pos.card_pra_compliance'), 'desc' => __('pos.card_pra_compliance_desc'), 'url' => route('pos.pra-settings'), 'tone' => $praOn ? 'emerald' : 'amber', 'badge' => $praOn ? __('pos.badge_pra_on') : __('pos.badge_pra_off'), 'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
                     // ZFC request (1 Aug 2026): Kitchen/KOT settings were buried under
                     // Restaurant — surface a direct card here for restaurant-mode shops.
-                    ...(((bool) ($company->restaurant_mode ?? false)) ? [
+                    ...($kitchenRelevant ? [
                         ['label' => __('pos.card_kitchen_kot'), 'desc' => __('pos.card_kitchen_kot_desc'), 'url' => route('pos.restaurant.kitchen-settings'), 'tone' => 'purple', 'badge' => __('pos.badge_kot'), 'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
                     ] : []),
                 ],
@@ -106,7 +111,7 @@
                     </span>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold mb-1.5">{{ __('pos.customize_pos') }}</h1>
-                <p class="text-sm sm:text-base text-white/85 max-w-2xl">{{ __('pos.customize_hero_sub') }}</p>
+                <p class="text-sm sm:text-base text-white/85 max-w-2xl">{{ __('pos.vocab_for_your_business', ['category' => $customVocab['category_label']]) }}</p>
             </div>
         </div>
 
@@ -266,7 +271,7 @@
                      appears only once caller_app_latest_version is set — the
                      public release gate flips AFTER the owner phone-test. --}}
                 @php
-                    $tnCallerReady = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'caller_id_enabled');
+                    $tnCallerReady = $callerRelevant && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'caller_id_enabled');
                     $tnCallerOn = $tnCallerReady && ($company->caller_id_enabled ?? false);
                     $tnCallerUser = ($tnCallerReady && ($company->caller_app_user_id ?? null)) ? \App\Models\User::find($company->caller_app_user_id) : null;
                     $tnCallerSeen = ($tnCallerReady && ($company->caller_app_last_seen_at ?? null)) ? \Carbon\Carbon::parse($company->caller_app_last_seen_at) : null;
@@ -471,7 +476,7 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.quick_type_mode') }}</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.quick_type_mode_sub') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ \App\Support\PosVocabulary::t('quick_type_mode_sub') }}</p>
                     </div>
                     <button type="button"
                         @click="quickOn=!quickOn; savingQuick=true; fetch('/pos/settings/quick-type', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:quickOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingQuick=false; })"
@@ -499,6 +504,7 @@
                 {{-- WhatsApp Bill (Task 1036, owner voice note 17 Aug 2026): receipt popup ka
                      WhatsApp button (default ON) + optional auto-open mode (default OFF).
                      Pro+ plan gate (owner, 17 Aug 2026): locked below Pro. --}}
+                @if($whatsappRelevant)
                 @php $tnWaPlanAllowed = \App\Services\PosFeatureService::planAllows($company, 'whatsapp_enabled'); @endphp
                 <div x-data="{ waOn: {{ ($tnWaPlanAllowed && ($company->pos_whatsapp_bill_enabled ?? true)) ? 'true' : 'false' }}, waAutoOn: {{ ($company->pos_whatsapp_bill_auto_open ?? false) ? 'true' : 'false' }}, savingWa: false,
                         saveWa(payload, revert) { this.savingWa = true; fetch('{{ route('pos.settings.whatsapp-bill-toggle') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify(payload)}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { revert(); alert((d && d.message) || {{ Js::from(__('pos.setting_save_failed')) }}); } }).catch(()=>{ revert(); alert({{ Js::from(__('pos.setting_save_failed')) }}); }).finally(()=>{ this.savingWa = false; }); } }"
@@ -543,8 +549,10 @@
                         </button>
                     </div>
                 </div>
+                @endif
 
                 {{-- Inventory tracking (moved here from Business Profile) --}}
+                @if($inventoryRelevant)
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -575,8 +583,9 @@
                         <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="restockOn && 'translate-x-6'"></span>
                     </button>
                 </div>
+                @endif
 
-                @if($company->restaurant_mode ?? false)
+                @if($kitchenRelevant)
                 {{-- KDS auto-print KOT (P6, F5) — kitchen display device prints new orders itself --}}
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">

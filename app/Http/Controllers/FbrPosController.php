@@ -9137,14 +9137,21 @@ class FbrPosController extends Controller
     // third-schedule-implies-0-tax rule.
     // ═══════════════════════════════════════════════════════════════════
 
-    // Sample rows shown in the blank template. importFbrProducts() silently skips a
-    // row that still matches one of these EXACTLY (name+price+sku) so an untouched
-    // sample never becomes a real product in the shop's list.
-    private const FBR_IMPORT_SAMPLE_ROWS = [
-        ['Lux Soap 100g', 120.0, 'LUX-100'],
-        ['Pepsi 500ml', 120.0, 'PEP-500'],
-        ['Sugar 1kg', 180.0, 'SUG-001'],
-    ];
+    /** Category-aware blank-template samples and their import skip signatures. */
+    private function fbrImportSampleRows(?Company $company): array
+    {
+        return collect(\App\Support\PosVocabulary::for($company)['import_rows'])
+            ->values()
+            ->map(function (array $row, int $index) {
+                [$name, , $price, $unit] = $row;
+                $sku = 'SAMPLE-' . ($index + 1);
+                return [
+                    'signature' => [$name, (float) $price, $sku],
+                    'row' => [$name, (float) $price, '', $sku, '', 0, $unit, 'No', 'No', '', ''],
+                ];
+            })
+            ->all();
+    }
 
     public function downloadProductTemplate()
     {
@@ -9155,6 +9162,7 @@ class FbrPosController extends Controller
         if ($resp = $this->fbrPlanGate('excel_enabled')) return $resp;
 
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
         $existingProducts = Product::where('company_id', $companyId)->orderBy('name')->get();
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -9171,7 +9179,7 @@ class FbrPosController extends Controller
         // bulk round trip is complete — a pharmacy that exports, edits salt
         // names in Excel and re-imports must not silently lose them. Columns
         // appear ONLY for a pharmacy; every other shop's file is unchanged.
-        $pharmacyExcel = \App\Services\PosFeatureService::pharmacyLive(Company::find($companyId));
+        $pharmacyExcel = \App\Services\PosFeatureService::pharmacyLive($company);
         if ($pharmacyExcel) {
             $headers = array_merge($headers, [
                 'Generic / Salt', 'Strength', 'Dosage Form', 'Manufacturer', 'Drug Schedule',
@@ -9198,13 +9206,8 @@ class FbrPosController extends Controller
 
         $rowNum = 2;
         if ($existingProducts->isEmpty()) {
-            $samples = [
-                ['Lux Soap 100g', 120, '3401.1100', 'LUX-100', '8964000112345', 18, 'U', 'No', 'Yes', 130, 48],
-                ['Pepsi 500ml', 120, '2202.1010', 'PEP-500', '8964000154321', 18, 'U', 'No', 'No', '', 24],
-                ['Sugar 1kg', 180, '1701.9910', 'SUG-001', '', 0, 'KG', 'Yes', 'No', '', ''],
-            ];
-            foreach ($samples as $s) {
-                $this->writeFbrProductRow($sheet, $rowNum++, $s);
+            foreach ($this->fbrImportSampleRows($company) as $sample) {
+                $this->writeFbrProductRow($sheet, $rowNum++, $sample['row']);
             }
         } else {
             foreach ($existingProducts as $p) {
@@ -9282,6 +9285,7 @@ class FbrPosController extends Controller
         if ($resp = $this->fbrPlanGate('excel_enabled')) return $resp;
 
         $companyId = app('currentCompanyId');
+        $templateSamples = $this->fbrImportSampleRows(Company::find($companyId));
 
         // Subscription access gate (Task 361): the route deliberately has no
         // plan.limit middleware (an at-cap shop must still be able to run an
@@ -9516,7 +9520,8 @@ class FbrPosController extends Controller
             }
 
             // Untouched template sample rows never become real products.
-            foreach (self::FBR_IMPORT_SAMPLE_ROWS as $s) {
+            foreach ($templateSamples as $sample) {
+                $s = $sample['signature'];
                 if (strcasecmp($name, $s[0]) === 0 && abs($price - $s[1]) < 0.001 && strcasecmp((string) $sku, $s[2]) === 0) {
                     $samplesSkipped++;
                     continue 2;

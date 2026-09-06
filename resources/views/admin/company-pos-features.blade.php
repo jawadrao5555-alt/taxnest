@@ -12,7 +12,6 @@
     </x-slot>
 
     @php
-        $flagsByCat = \App\Services\PosFeatureService::flagsByCategory();
         $deps = \App\Services\PosFeatureService::dependencies();
         // Panel-aware: a PRA company is offered the Punjab SERVICE categories, an
         // FBR company the federal GOODS ones (plus restaurant/salon, which are a
@@ -31,6 +30,14 @@
         // category is genuinely the OTHER regulator's; a catch-all like
         // 'general' belongs to nobody and must not raise it.
         $onLegacyCategory = \App\Services\PosFeatureService::belongsToOtherPanel($company);
+        $profile = \App\Services\PosFeatureService::profile($company);
+        $categorySet = array_flip($categoryModules);
+        $extraSet = array_flip(array_keys($extraModules));
+        $flagGroups = [
+            'Category modules' => array_values(array_filter(\App\Services\PosFeatureService::ALL_FLAGS, fn ($flag) => isset($categorySet[$flag]))),
+            'Granted extras' => array_values(array_filter(\App\Services\PosFeatureService::ALL_FLAGS, fn ($flag) => isset($extraSet[$flag]))),
+            'Outside category' => array_values(array_filter(\App\Services\PosFeatureService::ALL_FLAGS, fn ($flag) => !isset($categorySet[$flag]) && !isset($extraSet[$flag]))),
+        ];
     @endphp
 
     <div class="py-6">
@@ -55,6 +62,73 @@
                     {{ session('success') }}
                 </div>
             @endif
+            @if(session('error'))
+                <div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-800 font-semibold">{{ session('error') }}</div>
+            @endif
+
+            <div class="mb-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                    <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Category profile</h3>
+                    <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 text-xs font-bold">{{ \App\Support\PosVocabulary::categoryLabel(\App\Services\PosFeatureService::profileCategory($company)) }}</span>
+                    <span class="px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 text-xs font-bold">{{ \App\Support\PosVocabulary::audienceOptions()[$profile['family']] ?? ucfirst(str_replace('_', ' ', $profile['family'])) }}</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($categoryModules as $module)
+                        @php $moduleMeta = \App\Services\PosFeatureService::moduleMeta($module); @endphp
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-200">
+                            {{ $moduleMeta['icon'] }} {{ $moduleMeta['label'] }}
+                            <span class="text-[9px] font-bold uppercase text-gray-400">{{ $moduleMeta['kind'] === 'flag' ? 'Flag' : 'Plan gate' }}</span>
+                        </span>
+                    @endforeach
+                </div>
+            </div>
+
+            <div class="mb-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
+                <h3 class="text-base font-extrabold text-gray-900 dark:text-white mb-1">Category extras</h3>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-3">Explicit exceptions that make modules outside this category visible to the shop.</p>
+                <div class="overflow-x-auto mb-4">
+                    <table class="w-full text-sm">
+                        <thead><tr class="text-left text-xs text-gray-500 border-b border-gray-200 dark:border-gray-700"><th class="py-2">Module</th><th>Source</th><th>Reason</th><th>By</th><th>At</th><th></th></tr></thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @forelse($extraModules as $module => $extra)
+                            @php $moduleMeta = \App\Services\PosFeatureService::moduleMeta($module); @endphp
+                            <tr>
+                                <td class="py-2 font-semibold text-gray-900 dark:text-white">{{ $moduleMeta['icon'] }} {{ $moduleMeta['label'] }}</td>
+                                <td class="text-gray-600 dark:text-gray-300">{{ ucfirst($extra['source'] ?? 'admin') }}</td>
+                                <td class="text-gray-600 dark:text-gray-300">{{ $extra['reason'] ?? '—' }}</td>
+                                <td class="text-gray-600 dark:text-gray-300">{{ $extra['by'] ?? '—' }}</td>
+                                <td class="text-gray-600 dark:text-gray-300 whitespace-nowrap">{{ $extra['at'] ?? '—' }}</td>
+                                <td class="text-right">
+                                    <form method="POST" action="/admin/company/{{ $company->id }}/pos-features/extras/{{ $module }}/revoke" onsubmit="return confirm('Revoke this category extra?')">
+                                        @csrf
+                                        <button class="px-2.5 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-semibold">Revoke</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="py-4 text-center text-gray-500">No category extras.</td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if($grantableModules)
+                    <form method="POST" action="/admin/company/{{ $company->id }}/pos-features/extras" class="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] gap-2 items-end">
+                        @csrf
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">Module
+                            <select name="module" required class="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 text-sm">
+                                @foreach($grantableModules as $module)
+                                    @php $moduleMeta = \App\Services\PosFeatureService::moduleMeta($module); @endphp
+                                    <option value="{{ $module }}">{{ $moduleMeta['label'] }} ({{ $moduleMeta['kind'] === 'flag' ? 'flag' : 'plan gate' }})</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">Reason
+                            <input name="reason" required maxlength="500" value="{{ old('reason') }}" class="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 text-sm" placeholder="Why this shop needs the module">
+                        </label>
+                        <button class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-bold">Grant extra</button>
+                    </form>
+                @endif
+            </div>
 
             <form method="POST" action="/admin/company/{{ $company->id }}/pos-features" class="space-y-5">
                 @csrf
@@ -131,12 +205,11 @@
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
                     <h3 class="text-base font-extrabold text-gray-900 dark:text-white mb-4">Modules</h3>
                     <div class="space-y-5">
-                        @foreach($flagsByCat as $cat => $flags)
-                            @php $catMeta = \App\Services\PosFeatureService::categoryMeta($cat); @endphp
+                        @foreach($flagGroups as $group => $flags)
+                            @continue(!$flags)
                             <div>
                                 <div class="flex items-center gap-2 mb-2 pb-1.5 border-b border-gray-200 dark:border-gray-700">
-                                    <span class="text-base">{{ $catMeta['icon'] }}</span>
-                                    <h4 class="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ $catMeta['label'] }}</h4>
+                                    <h4 class="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ $group }}</h4>
                                 </div>
                                 <div class="grid sm:grid-cols-2 gap-2">
                                     @foreach($flags as $flag)
@@ -146,6 +219,9 @@
                                             <div class="flex-1 min-w-0">
                                                 <div class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">{{ $meta['icon'] }} {{ $meta['label'] }}</div>
                                                 <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">{{ $meta['description'] }}</p>
+                                                @if(!isset($categorySet[$flag]))
+                                                    <p class="mt-1 text-[9px] font-semibold text-amber-700 dark:text-amber-400">Outside category — needs a grant to be visible to the shop.</p>
+                                                @endif
                                                 @if(isset($deps[$flag]))
                                                     <div class="mt-1 inline-flex items-center gap-1 text-[8px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
                                                         REQ: {{ implode(', ', $deps[$flag]) }}

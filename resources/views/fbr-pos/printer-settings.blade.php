@@ -131,6 +131,7 @@
                         <div class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-300">{{ __('pos.printer_text_only_warn') }}</div>
                         @endif
                     </div>
+                    @if(\App\Services\PosFeatureService::moduleRelevant($company, 'kot_enabled'))
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ __('pos.fbr_store_printer') }}</label>
                         <select name="kot_printer" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
@@ -175,6 +176,7 @@
                         </select>
                         <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.fbr_counter_store_copy_hint') }}</p>
                     </div>
+                    @endif
                     <div class="flex items-end">
                         <button type="submit" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-sm">{{ __('pos.save_printer_settings') }}</button>
                     </div>

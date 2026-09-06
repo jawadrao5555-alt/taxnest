@@ -1,12 +1,20 @@
 <x-pos-layout>
+@php
+    $posVocab = \App\Support\PosVocabulary::for($company);
+    $productsDealsAvailable = \App\Services\PosFeatureService::moduleAvailable($company, 'deals_enabled');
+    $productsBarcodeRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'barcode');
+    $productsInventoryRelevant = \App\Services\PosFeatureService::moduleRelevant($company, 'inventory');
+@endphp
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     @include('pos.partials.back-link')
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('pos.pos_products') }}</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ $posVocab['items'] }}</h1>
         <div class="flex items-center gap-2">
+            @if($productsDealsAvailable)
             <a href="{{ route('pos.deals') }}" class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 shadow-sm transition hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/35">
                 {{ __('pos.deals_title') }}
             </a>
+            @endif
             <button onclick="document.getElementById('importSection').classList.toggle('hidden')" class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                     {{ __('pos.import_excel') }}
@@ -36,7 +44,7 @@
     {{-- Per-branch stock (Task 1354): products are shared company-wide, but the
          stock column belongs to ONE shop — say which one so nobody reads
          Gulberg's numbers as Main Shop's. --}}
-    @if($stockBranchName ?? null)
+    @if($productsInventoryRelevant && ($stockBranchName ?? null))
     <div class="mb-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/60 dark:bg-purple-900/10 px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2">
         <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
         <span>
@@ -73,11 +81,11 @@
                 @csrf
                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="radio" name="mode" value="prefix" onchange="this.form.submit()" {{ $searchMode !== 'any_word' ? 'checked' : '' }} class="text-purple-600 focus:ring-purple-500">
-                    <span>{{ __('pos.search_mode_prefix') }}</span>
+                    <span>{{ \App\Support\PosVocabulary::t('search_mode_prefix') }}</span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="radio" name="mode" value="any_word" onchange="this.form.submit()" {{ $searchMode === 'any_word' ? 'checked' : '' }} class="text-purple-600 focus:ring-purple-500">
-                    <span>{{ __('pos.search_mode_any_word') }}</span>
+                    <span>{{ \App\Support\PosVocabulary::t('search_mode_any_word') }}</span>
                 </label>
             </form>
         </div>
@@ -160,12 +168,12 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div class="sm:col-span-2">
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.product_name_label') }} *</label>
-                        <input type="text" name="name" required placeholder="{{ __('pos.ph_enter_product_name') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ $posVocab['item'] }} *</label>
+                        <input type="text" name="name" required placeholder="{{ \App\Support\PosVocabulary::t('ph_chicken_burger', [], $company) }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.category_label') }}</label>
-                        <input type="text" name="category" placeholder="{{ __('pos.ph_category_eg') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                        <input type="text" name="category" placeholder="{{ $posVocab['sample_category'] }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.sku_label') }}</label>
@@ -175,10 +183,12 @@
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.description_label') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
                         <input type="text" name="description" placeholder="{{ __('pos.ph_short_description') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                     </div>
+                    @if($productsBarcodeRelevant)
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.barcode_label') }}</label>
                         <input type="text" name="barcode" placeholder="{{ __('pos.ph_barcode_number') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                     </div>
+                    @endif
                 </div>
             </div>
 
@@ -250,21 +260,19 @@
             <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/20 p-4">
                 <div class="flex items-center gap-2 mb-3">
                     <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('pos.inventory_and_unit') }}</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ $productsInventoryRelevant ? __('pos.inventory_and_unit') : __('pos.unit_uom') }}</span>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.unit_uom') }}</label>
                         <select name="uom" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-                            <option value="NOS">{{ __('pos.uom_nos') }}</option>
-                            <option value="KGS">{{ __('pos.uom_kgs') }}</option>
-                            <option value="LTR">{{ __('pos.uom_ltr') }}</option>
-                            <option value="MTR">{{ __('pos.uom_mtr') }}</option>
-                            <option value="PCS">{{ __('pos.uom_pcs') }}</option>
-                            <option value="PKT">{{ __('pos.uom_pkt') }}</option>
-                            <option value="BOX">{{ __('pos.uom_box') }}</option>
+                            @foreach($posVocab['units'] as $u)
+                            @php $uomKey = 'pos.uom_' . strtolower($u); @endphp
+                            <option value="{{ $u }}" @selected($u === $posVocab['unit'])>{{ \Illuminate\Support\Facades\Lang::has($uomKey) ? __($uomKey) : $u }}</option>
+                            @endforeach
                         </select>
                     </div>
+                    @if($productsInventoryRelevant)
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.opening_stock') }} <span class="text-gray-400">{{ __('pos.paren_blank_not_tracked') }}</span></label>
                         <input type="number" name="stock_quantity" step="1" min="0" placeholder="{{ __('pos.ph_eg_50') }}" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-emerald-500">
@@ -276,6 +284,7 @@
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.low_stock_alert_at') }}</label>
                         <input type="number" name="low_stock_threshold" step="1" min="0" value="10" placeholder="10" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-amber-500">
                     </div>
+                    @endif
                 </div>
             </div>
 
@@ -332,6 +341,7 @@
             </div>
             @endif
 
+            @if(\App\Services\PosFeatureService::moduleRelevant($company, 'recipes'))
             {{-- ═══════════════════════════════════════════════════════════════════
                  Unified Recipe / Ingredients (Single-Box) — optional, collapsible.
                  Vendor request: "product add karte waqt sath hi uski recipe add ho".
@@ -482,9 +492,10 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <div class="flex items-end col-span-full">
-                <button type="submit" class="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition">{{ __('pos.save_product_with_recipe') }}</button>
+                <button type="submit" class="w-full bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition">{{ __(\App\Services\PosFeatureService::moduleRelevant($company, 'recipes') ? 'pos.save_product_with_recipe' : 'pos.save_product') }}</button>
             </div>
         </form>
     </div>
@@ -536,6 +547,7 @@
                 <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{{ __('pos.active_word') }}</div>
                 <div class="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-0.5" x-text="stats.active"></div>
             </div>
+            @if($productsInventoryRelevant)
             <div class="rounded-xl border p-3.5 shadow-sm transition-colors"
                  :class="stats.lowStock > 0 ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'">
                 <div class="text-[10px] font-bold uppercase tracking-wider" :class="stats.lowStock > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400'">{{ __('pos.low_stock') }}</div>
@@ -545,6 +557,7 @@
                 <div class="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">{{ __('pos.stock_value') }}</div>
                 <div class="text-lg font-extrabold text-purple-700 dark:text-purple-300 mt-1.5" x-text="'Rs ' + fmt(stats.stockValue)"></div>
             </div>
+            @endif
             <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-3.5 shadow-sm col-span-2 sm:col-span-1">
                 <div class="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{{ __('pos.avg_margin') }}</div>
                 <div class="text-2xl font-extrabold text-blue-700 dark:text-blue-300 mt-0.5" x-text="stats.avgMargin !== null ? stats.avgMargin + '%' : '—'"></div>
@@ -555,7 +568,7 @@
         <div class="flex flex-col lg:flex-row lg:items-center gap-2 mb-3">
             <div class="relative flex-1">
                 <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <input type="text" x-model="search" placeholder="{{ __('pos.ph_search_name_sku_barcode') }}"
+                <input type="text" x-model="search" placeholder="{{ __($productsBarcodeRelevant ? 'pos.ph_search_name_sku_barcode' : 'pos.pra_search_name_sku_category') }}"
                        class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-9 pr-3 py-2 focus:ring-2 focus:ring-purple-500">
             </div>
             <select x-model="catFilter" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
@@ -566,13 +579,13 @@
                 <option value="">{{ __('pos.all_status') }}</option>
                 <option value="active">{{ __('pos.active_only') }}</option>
                 <option value="inactive">{{ __('pos.inactive_only') }}</option>
-                <option value="low">{{ __('pos.low_stock') }}</option>
+                @if($productsInventoryRelevant)<option value="low">{{ __('pos.low_stock') }}</option>@endif
                 <option value="third">{{ __('pos.third_schedule_only') }}</option>
             </select>
             <select x-model="sortKey" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                 <option value="name">{{ __('pos.name_label') }}</option>
                 <option value="price">{{ __('pos.receipt_price') }}</option>
-                <option value="stock_quantity">{{ __('pos.stock_word') }}</option>
+                @if($productsInventoryRelevant)<option value="stock_quantity">{{ __('pos.stock_word') }}</option>@endif
                 <option value="margin">{{ __('pos.margin_word') }}</option>
                 <option value="category">{{ __('pos.category_label') }}</option>
             </select>
@@ -637,7 +650,7 @@
                             <th class="px-4 py-3">{{ __('pos.product_col') }}</th>
                             <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.category_label') }}</th>
                             <th class="px-4 py-3 hidden lg:table-cell">{{ __('pos.sku_label') }}</th>
-                            <th class="px-4 py-3 text-center">{{ __('pos.stock_word') }}</th>
+                            @if($productsInventoryRelevant)<th class="px-4 py-3 text-center">{{ __('pos.stock_word') }}</th>@endif
                             <th class="px-4 py-3 text-right">{{ __('pos.receipt_price') }}</th>
                             <th class="px-4 py-3 text-right hidden sm:table-cell">{{ __('pos.margin_word') }}</th>
                             <th class="px-4 py-3 text-right hidden sm:table-cell">{{ __('pos.tax_pct_col') }}</th>
@@ -668,6 +681,7 @@
                                 </td>
                                 <td class="px-4 py-3 text-gray-500 hidden md:table-cell" x-text="p.category || '—'"></td>
                                 <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell" x-text="p.sku || '—'"></td>
+                                @if($productsInventoryRelevant)
                                 <td class="px-4 py-3 text-center">
                                     <template x-if="p.stock_quantity === null">
                                         <span class="text-gray-300 dark:text-gray-600">—</span>
@@ -680,6 +694,7 @@
                                         </span>
                                     </template>
                                 </td>
+                                @endif
                                 <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-white" x-text="'PKR ' + fmt(p.price)"></td>
                                 <td class="px-4 py-3 text-right hidden sm:table-cell">
                                     <template x-if="marginPct(p) !== null">
@@ -718,7 +733,7 @@
                     <div class="absolute top-2 left-2 z-10">
                         <input type="checkbox" :value="p.id" x-model.number="selected" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 bg-white/90 shadow">
                     </div>
-                    <span x-show="isLow(p)" class="absolute top-2 right-2 z-10 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white shadow">{{ __('pos.low_badge') }}</span>
+                    @if($productsInventoryRelevant)<span x-show="isLow(p)" class="absolute top-2 right-2 z-10 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white shadow">{{ __('pos.low_badge') }}</span>@endif
                     <div class="aspect-square bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
                         <template x-if="p.image_url"><img :src="p.image_url" :alt="p.name" class="w-full h-full object-cover" onerror="this.style.display='none'"></template>
                         <template x-if="!p.image_url"><div class="w-16 h-16 rounded-xl flex items-center justify-center text-xl font-extrabold border" :style="chipStyle(p.name)" x-text="initials(p.name)"></div></template>
@@ -728,9 +743,11 @@
                         <div class="text-[11px] text-gray-400 truncate" x-text="p.category || '—'"></div>
                         <div class="flex items-center justify-between mt-1.5">
                             <span class="font-extrabold text-gray-900 dark:text-white" x-text="'Rs ' + fmt(p.price)"></span>
+                            @if($productsInventoryRelevant)
                             <template x-if="p.stock_quantity !== null">
                                 <span class="text-xs font-bold" :class="isLow(p) ? 'text-red-600' : 'text-gray-500'" x-text="@js(__('pos.stk_abbrev')) + ' ' + p.stock_quantity"></span>
                             </template>
+                            @endif
                         </div>
                         <div class="flex items-center gap-1 mt-2">
                             <button @click="openEdit(p)" class="flex-1 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 rounded-md py-1">{{ __('pos.edit') }}</button>
@@ -783,6 +800,7 @@
                                 <input type="checkbox" name="show_on_sale" value="1" x-model="editing.show_on_sale" class="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
                                 <span class="text-[11px] font-bold uppercase tracking-wider" :class="editing.show_on_sale ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500'" x-text="editing.show_on_sale ? @js(__('pos.on_sale_screen')) : @js(__('pos.hidden_from_sale'))"></span>
                             </label>
+                            @if($productsInventoryRelevant)
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                     {{ __('pos.stock_word') }}
@@ -803,6 +821,7 @@
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.low_stock_alert_at') }}</label>
                                 <input type="number" name="low_stock_threshold" x-model="editing.low_stock_threshold" step="1" min="0" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-amber-500">
                             </div>
+                            @endif
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.category_label') }}</label>
                                 <input type="text" name="category" x-model="editing.category" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
@@ -811,15 +830,18 @@
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.sku_label') }}</label>
                                 <input type="text" name="sku" x-model="editing.sku" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                             </div>
+                            @if($productsBarcodeRelevant)
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.barcode_label') }}</label>
                                 <input type="text" name="barcode" x-model="editing.barcode" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                             </div>
+                            @endif
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.unit_uom') }}</label>
                                 <select name="uom" x-model="editing.uom" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
-                                    @foreach(['NOS','KGS','LTR','MTR','PCS','PKT','BOX'] as $u)
-                                    <option value="{{ $u }}">{{ $u }}</option>
+                                    @foreach($posVocab['units'] as $u)
+                                    @php $uomKey = 'pos.uom_' . strtolower($u); @endphp
+                                    <option value="{{ $u }}">{{ \Illuminate\Support\Facades\Lang::has($uomKey) ? __($uomKey) : $u }}</option>
                                     @endforeach
                                 </select>
                             </div>

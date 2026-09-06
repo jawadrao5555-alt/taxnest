@@ -53,6 +53,11 @@
                                     <option value="{{ $key }}" {{ $v->required_feature === $key ? 'selected' : '' }}>{{ $label }}</option>
                                     @endforeach
                                 </select>
+                                <select name="audience_family" aria-label="Audience family" class="text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 py-1.5 pr-7">
+                                    @foreach($audienceOptions as $key => $label)
+                                    <option value="{{ $key }}" {{ $v->audience_family === $key ? 'selected' : '' }}>{{ $label }}</option>
+                                    @endforeach
+                                </select>
                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Set</button>
                             </form>
                         </td>
@@ -64,6 +69,11 @@
                                 <select name="min_role" class="text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 py-1.5 pr-7">
                                     @foreach($roleOptions as $key => $label)
                                     <option value="{{ $key }}" {{ ($v->min_role ?? 'any') === $key ? 'selected' : '' }}>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <select name="audience_family" aria-label="Audience family" class="text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 py-1.5 pr-7">
+                                    @foreach($audienceOptions as $key => $label)
+                                    <option value="{{ $key }}" {{ $v->audience_family === $key ? 'selected' : '' }}>{{ $label }}</option>
                                     @endforeach
                                 </select>
                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Set</button>
@@ -87,7 +97,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="5" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No tutorial videos yet — they arrive via deploys from the recording pipeline.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No tutorial videos yet — they arrive via deploys from the recording pipeline.</td></tr>
                     @endforelse
                 </tbody>
             </table>

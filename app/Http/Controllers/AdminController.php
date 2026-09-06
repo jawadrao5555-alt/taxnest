@@ -972,7 +972,80 @@ class AdminController extends Controller
     public function posFeatures(Company $company)
     {
         $features = \App\Services\PosFeatureService::forCompany($company);
-        return view('admin.company-pos-features', compact('company', 'features'));
+        $categoryModules = \App\Services\PosFeatureService::categoryModules($company);
+        $extraModules = \App\Services\PosFeatureService::extraModules($company);
+        $grantableModules = array_values(array_diff(
+            \App\Services\PosCategoryProfiles::knownModules(),
+            $categoryModules,
+            array_keys($extraModules)
+        ));
+
+        return view('admin.company-pos-features', compact(
+            'company',
+            'features',
+            'categoryModules',
+            'extraModules',
+            'grantableModules'
+        ));
+    }
+
+    /** Grant a module that sits outside the company's category profile. */
+    public function grantPosFeatureExtra(Request $request, Company $company)
+    {
+        $known = \App\Services\PosCategoryProfiles::knownModules();
+        $data = $request->validate([
+            'module' => 'required|string|in:' . implode(',', $known),
+            'reason' => 'required|string|max:500',
+        ]);
+
+        if (in_array($data['module'], \App\Services\PosFeatureService::categoryModules($company), true)) {
+            return back()->with('error', 'That module is already included in the company category.');
+        }
+
+        $admin = auth('admin')->user();
+        $actor = $admin?->email ?? $admin?->name;
+        \App\Services\PosFeatureService::grantExtra(
+            $company,
+            $data['module'],
+            'admin',
+            $data['reason'],
+            $actor
+        );
+
+        AuditLogService::log(
+            'admin_pos_extra_granted',
+            'Company',
+            $company->id,
+            null,
+            ['module' => $data['module'], 'reason' => $data['reason'], 'by' => $actor],
+            $company->id,
+            auth('admin')->id()
+        );
+
+        return back()->with('success', 'Extra module granted.');
+    }
+
+    /** Revoke one explicit category-profile exception. */
+    public function revokePosFeatureExtra(Company $company, string $module)
+    {
+        if (!in_array($module, \App\Services\PosCategoryProfiles::knownModules(), true)) {
+            abort(404);
+        }
+
+        $old = \App\Services\PosFeatureService::extraModules($company)[$module] ?? null;
+        \App\Services\PosFeatureService::revokeExtra($company, $module);
+
+        AuditLogService::log(
+            'admin_pos_extra_revoked',
+            'Company',
+            $company->id,
+            ['module' => $module, 'extra' => $old],
+            ['module' => $module],
+            $company->id,
+            auth('admin')->id()
+        );
+
+        return back()->with('success', 'Extra module revoked.');
     }
 
     /**
@@ -1055,6 +1128,9 @@ class AdminController extends Controller
         }
 
         $company->update($update);
+        if ($company->business_category !== $oldCategory) {
+            \App\Services\PosFeatureService::reevaluateExtras($company);
+        }
 
         $adminId = auth('admin')->id();
         AuditLogService::log(

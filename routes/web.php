@@ -1452,6 +1452,8 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/company/{company}/toggle-fbr-pos', [AdminController::class, 'toggleFbrPos']);
     Route::get('/company/{company}/pos-features', [AdminController::class, 'posFeatures'])->name('admin.company.pos-features');
     Route::put('/company/{company}/pos-features', [AdminController::class, 'updatePosFeatures'])->name('admin.company.pos-features.update');
+    Route::post('/company/{company}/pos-features/extras', [AdminController::class, 'grantPosFeatureExtra'])->name('admin.company.pos-features.extras.grant');
+    Route::post('/company/{company}/pos-features/extras/{module}/revoke', [AdminController::class, 'revokePosFeatureExtra'])->name('admin.company.pos-features.extras.revoke');
     Route::post('/company/{company}/update-limits', [AdminController::class, 'updateCompanyLimits']);
     Route::post('/company/{company}/reset-limits', [AdminController::class, 'resetCompanyLimits']);
 

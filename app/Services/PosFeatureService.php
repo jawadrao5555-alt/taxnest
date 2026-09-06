@@ -839,7 +839,266 @@ class PosFeatureService
             }
         }
 
+        // Category profile (Task 1582): a flag that does not BELONG to this kind
+        // of shop — and was neither admin-granted nor grandfathered — is masked
+        // OFF exactly like a plan-locked module, so every existing caller
+        // (nav, gates, sale screens, middleware) inherits "hidden = unreachable"
+        // without a second check. Stored configuration survives untouched.
+        foreach (self::ALL_FLAGS as $flag) {
+            if (!empty($flags[$flag]) && !self::moduleRelevant($company, $flag)) {
+                $flags[$flag] = false;
+            }
+        }
+
         return self::flagsToObject(self::resolve($flags));
+    }
+
+    /* ------------------------------------------------------------------
+     |  Category profiles — ONE availability predicate (Task 1582)
+     | ------------------------------------------------------------------ */
+
+    /** Per-request cache: company_id => [module => bool] relevance. */
+    protected static array $relevanceCache = [];
+
+    /** Plan-gate labels for admin/wizard surfaces (flags use FLAG_META). */
+    public const GATE_META = [
+        'deals_enabled' => ['label' => 'Deals & Combos', 'icon' => '🎁'],
+        'riders_enabled' => ['label' => 'Delivery Riders', 'icon' => '🛵'],
+        'rider_tracking_enabled' => ['label' => 'Rider LIVE Tracking', 'icon' => '📍'],
+        'hazri_enabled' => ['label' => 'Staff Hazri (Attendance)', 'icon' => '🕒'],
+        'analytics_enabled' => ['label' => 'Business Analytics', 'icon' => '📈'],
+        'reports_enabled' => ['label' => 'Reports & Exports', 'icon' => '📊'],
+        'custom_access_enabled' => ['label' => 'Team Custom Access', 'icon' => '🔐'],
+        'qr_menu_enabled' => ['label' => 'Public QR Menu', 'icon' => '📱'],
+        'offline_enabled' => ['label' => 'Offline Mode', 'icon' => '📴'],
+        'excel_enabled' => ['label' => 'Excel Import / Export', 'icon' => '📗'],
+        'khata_enabled' => ['label' => 'Khata (Customer Credit)', 'icon' => '📒'],
+        'loyalty_enabled' => ['label' => 'Loyalty Points', 'icon' => '⭐'],
+        'kot_enabled' => ['label' => 'Kitchen / Store Slip Printing', 'icon' => '🖨️'],
+        'caller_id_enabled' => ['label' => 'Caller ID Popup', 'icon' => '📞'],
+        'whatsapp_enabled' => ['label' => 'WhatsApp Bill', 'icon' => '💬'],
+        'pharmacy_enabled' => ['label' => 'Pharmacy Module', 'icon' => '💊'],
+    ];
+
+    /** Human label + icon for ANY module key (flag or plan gate). */
+    public static function moduleMeta(string $key): array
+    {
+        if (in_array($key, self::ALL_FLAGS, true)) {
+            $m = self::flagMeta($key);
+            return ['label' => $m['label'], 'icon' => $m['icon'] ?? '⚙️', 'kind' => 'flag'];
+        }
+        $m = self::GATE_META[$key] ?? ['label' => str_replace('_', ' ', ucwords($key, '_')), 'icon' => '⚙️'];
+        return $m + ['kind' => 'gate'];
+    }
+
+    /**
+     * The category whose PROFILE this shop lives under.
+     *
+     * Same lookup as resolveCategory() (business_category, then pos_type) but
+     * a shop nobody classified lands on 'general' — the "hide nothing" profile
+     * — rather than on the restaurant preset. Hiding is a stronger act than
+     * labelling: a pre-category FBR grocery must never lose its barcode screen
+     * because a display fallback called it a restaurant.
+     */
+    public static function profileCategory(?Company $company): string
+    {
+        if (!$company) {
+            return 'general';
+        }
+        $known = self::allCategoryDefaults();
+        $stored = $company->business_category;
+        if (is_string($stored) && isset($known[$stored]) && PosCategoryProfiles::has($stored)) {
+            return $stored;
+        }
+        $posType = $company->pos_type ?? null;
+        if (is_string($posType) && isset($known[$posType]) && PosCategoryProfiles::has($posType)) {
+            return $posType;
+        }
+        return 'general';
+    }
+
+    /** The resolved profile record (modules, family, examples, defaults) for a shop. */
+    public static function profile(?Company $company): array
+    {
+        return PosCategoryProfiles::profile(self::profileCategory($company), self::panelFor($company));
+    }
+
+    /** Vocabulary family: food_service / goods_retail / pharmacy / services / general. */
+    public static function familyFor(?Company $company): string
+    {
+        return PosCategoryProfiles::family(self::profileCategory($company));
+    }
+
+    /** Audience families (What's New / tutorials) that reach this shop. */
+    public static function audiencesFor(?Company $company): array
+    {
+        return PosCategoryProfiles::audiences(self::profileCategory($company));
+    }
+
+    /** Does an audience-family value ('all' or a family) reach this shop? */
+    public static function audienceMatches(?Company $company, ?string $audienceFamily): bool
+    {
+        $a = $audienceFamily ?: 'all';
+        return $a === 'all' || in_array($a, self::audiencesFor($company), true);
+    }
+
+    /** Modules that BELONG to the shop's own category (no extras). */
+    public static function categoryModules(?Company $company): array
+    {
+        return PosCategoryProfiles::modules(self::profileCategory($company), self::panelFor($company));
+    }
+
+    /** Whether the extras column has landed — before that the predicate stays dormant. */
+    protected static ?bool $extrasColumn = null;
+
+    /** Tests only: sticky override — pretend the extras column does / does not exist (null = ask the schema). */
+    protected static ?bool $extrasColumnAssumed = null;
+
+    public static function assumeExtrasColumn(?bool $exists): void
+    {
+        self::$extrasColumnAssumed = $exists;
+        self::$extrasColumn = null;
+        self::$relevanceCache = [];
+        self::$planGateCache = [];
+    }
+
+    public static function extrasColumnExists(): bool
+    {
+        if (self::$extrasColumnAssumed !== null) {
+            return self::$extrasColumnAssumed;
+        }
+        if (self::$extrasColumn === null) {
+            try {
+                self::$extrasColumn = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_module_extras');
+            } catch (\Throwable $e) {
+                self::$extrasColumn = false;
+            }
+        }
+        return self::$extrasColumn;
+    }
+
+    /**
+     * Modules this shop carries OUTSIDE its category, keyed by module:
+     *   ['riders_enabled' => ['source' => 'admin'|'grandfathered', 'reason' => ?, 'by' => ?, 'at' => ?]]
+     */
+    public static function extraModules(?Company $company): array
+    {
+        if (!$company || !self::extrasColumnExists()) {
+            return [];
+        }
+        $raw = $company->getAttribute('pos_module_extras');
+        if (is_string($raw)) {
+            $raw = json_decode($raw, true);
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+        $known = PosCategoryProfiles::knownModules();
+        $out = [];
+        foreach ($raw as $key => $meta) {
+            if (!in_array($key, $known, true)) {
+                continue;
+            }
+            $out[$key] = is_array($meta) ? $meta : ['source' => 'admin'];
+        }
+        return $out;
+    }
+
+    /**
+     * THE relevance half of the availability predicate: does module $key
+     * belong to company $company — by its category, by an admin grant, or by
+     * grandfathering? Unknown keys and a missing company are always relevant
+     * (there is nothing to hide). Plan/add-on gates are NOT consulted here.
+     */
+    public static function moduleRelevant(?Company $company, string $key): bool
+    {
+        // A view that forgot to pass $company must not silently un-hide a
+        // module: fall back to the request's own company before giving up.
+        $company = $company ?? \App\Support\PosVocabulary::currentCompany();
+        if (!$company || !in_array($key, PosCategoryProfiles::knownModules(), true)) {
+            return true;
+        }
+        // Rollout safety: until the extras column exists, nothing can have been
+        // grandfathered, so hiding would strip live shops. Stay dormant.
+        if (!self::extrasColumnExists()) {
+            return true;
+        }
+        $cid = (int) $company->id;
+        if (isset(self::$relevanceCache[$cid][$key])) {
+            return self::$relevanceCache[$cid][$key];
+        }
+        $relevant = in_array($key, self::categoryModules($company), true)
+            || array_key_exists($key, self::extraModules($company));
+        return self::$relevanceCache[$cid][$key] = $relevant;
+    }
+
+    /**
+     * THE availability predicate (Task 1582): relevant for the category (or
+     * granted / grandfathered) AND switched on / covered by the plan.
+     *   - module flag  → the resolved feature map (already relevance-masked)
+     *   - plan gate    → planAllows() (already relevance-aware)
+     */
+    public static function moduleAvailable(?Company $company, string $key): bool
+    {
+        $company = $company ?? \App\Support\PosVocabulary::currentCompany();
+        if (in_array($key, self::ALL_FLAGS, true)) {
+            return !empty(self::forCompany($company)->{$key});
+        }
+        if (in_array($key, self::PLAN_GATES, true)) {
+            return self::planAllows($company, $key);
+        }
+        return true;
+    }
+
+    /** Persist one admin grant (or grandfather record) and flush caches. */
+    public static function grantExtra(Company $company, string $key, string $source, ?string $reason = null, ?string $by = null): void
+    {
+        if (!self::extrasColumnExists() || !in_array($key, PosCategoryProfiles::knownModules(), true)) {
+            return;
+        }
+        $extras = self::extraModules($company);
+        $extras[$key] = array_filter([
+            'source' => $source,
+            'reason' => $reason,
+            'by' => $by,
+            'at' => now()->toDateTimeString(),
+        ], fn ($v) => $v !== null && $v !== '');
+        $company->forceFill(['pos_module_extras' => $extras])->save();
+        self::flushGateCaches();
+    }
+
+    public static function revokeExtra(Company $company, string $key): void
+    {
+        if (!self::extrasColumnExists()) {
+            return;
+        }
+        $extras = self::extraModules($company);
+        unset($extras[$key]);
+        $company->forceFill(['pos_module_extras' => $extras ?: null])->save();
+        self::flushGateCaches();
+    }
+
+    /**
+     * Admin changed the category: extras survive, but any that the NEW
+     * category already covers are redundant and dropped so the admin page
+     * shows only true outsiders.
+     */
+    public static function reevaluateExtras(Company $company): void
+    {
+        if (!self::extrasColumnExists()) {
+            return;
+        }
+        self::flushGateCaches();
+        $extras = self::extraModules($company);
+        if (!$extras) {
+            return;
+        }
+        $own = self::categoryModules($company);
+        $kept = array_diff_key($extras, array_flip($own));
+        if (count($kept) !== count($extras)) {
+            $company->forceFill(['pos_module_extras' => $kept ?: null])->save();
+            self::flushGateCaches();
+        }
     }
 
     /**
@@ -1089,6 +1348,8 @@ class PosFeatureService
         self::$planGateCache = [];
         self::$restaurantAllowedCache = [];
         self::$pharmacyAllowedCache = [];
+        self::$relevanceCache = [];
+        self::$extrasColumn = null;
         \App\Services\PosAddonService::flushCache();
     }
 
@@ -1112,6 +1373,14 @@ class PosFeatureService
         }
         if (isset(self::$planGateCache[$company->id][$planColumn])) {
             return self::$planGateCache[$company->id][$planColumn];
+        }
+
+        // Category profile (Task 1582): a plan-gated module that does not
+        // BELONG to this kind of shop (and was neither granted nor
+        // grandfathered) is unavailable whatever the package says — the same
+        // single answer nav, controllers, tutorials and add-on sales all read.
+        if (!self::moduleRelevant($company, $planColumn)) {
+            return self::$planGateCache[$company->id][$planColumn] = false;
         }
 
         $allowed = false;

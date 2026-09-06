@@ -136,8 +136,14 @@ foreach (\$cats as \$c) {
         exit(1);
     }
 }
-\$extra = (\$cats && Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories'))
-    ? ['target_categories' => \$cats] : [];
+// A requested category list must never degrade into a broadcast: if the
+// target_categories column is not on this DB yet (deploy carrying the
+// migration not run), refuse — create the elaan AFTER the deploy instead.
+if (\$cats && ! Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'target_categories')) {
+    fwrite(STDERR, "ERROR: app_updates.target_categories column missing on this DB — a --category elaan would silently reach EVERY shop. Deploy first (migration adds the column), then create the elaan.\n");
+    exit(1);
+}
+\$extra = \$cats ? ['target_categories' => \$cats] : [];
 
 \$row = App\Models\AppUpdate::create([
     'title'        => '$TITLE_ESCAPED',
